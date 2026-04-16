@@ -25,9 +25,13 @@ import com.wip.cmp_desktop_test.ui.screens.MainScreen
 import com.wip.cmp_desktop_test.ui.screens.Screen
 import com.wip.cmp_desktop_test.ui.screens.SettingsScreen
 
+import com.wip.cmp_desktop_test.settings.SettingsViewModel
+import com.wip.cmp_desktop_test.ui.theme.AppTheme
+import androidx.lifecycle.viewmodel.compose.viewModel
+
 @Composable
-fun App() {
-    MaterialTheme {
+fun App(viewModel: SettingsViewModel = viewModel { SettingsViewModel() }) {
+    AppTheme(theme = viewModel.settings.appearance.theme) {
         var isNavbarCollapsed by remember { mutableStateOf(false) }
 
         // Nav3: library-managed backstack with SavedStateConfiguration for JVM polymorphic serialization
@@ -36,7 +40,7 @@ fun App() {
 
         val sections = listOf(
             SidebarSectionData(
-                title = Res.string.section_interface,
+                title = Res.string.section_application,
                 elements = listOf(
                     SidebarElement(
                         id = Screen.Main,
@@ -73,7 +77,7 @@ fun App() {
                         when (key) {
                             is Screen.Main     -> NavEntry(key) { MainScreen() }
                             is Screen.Board    -> NavEntry(key) { BoardScreen() }
-                            is Screen.Settings -> NavEntry(key) { SettingsScreen() }
+                            is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
                             else               -> NavEntry(key) { }
                         }
                     }

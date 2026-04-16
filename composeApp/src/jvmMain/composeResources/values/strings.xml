@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">WOToolkit</string>
-    <string name="section_interface">Interface</string>
+    <string name="section_application">Application</string>
     <string name="nav_main">Main</string>
     <string name="nav_board">Board</string>
     <string name="section_privacy">Privacy e Sicurezza</string>
@@ -18,4 +18,11 @@
     <string name="setting_appearance">Appearance</string>
     <string name="section_module_repo">Module Repository</string>
     <string name="section_about">About</string>
+    <string name="section_general">General</string>
+    <string name="section_localization">Localization</string>
+    <string name="setting_adaptive_color">Adaptive Color</string>
+    <string name="setting_timezone">Timezone</string>
+    <string name="setting_animations">Animations</string>
+    <string name="setting_animation_speed">Animation Speed</string>
+    <string name="setting_disable_animations">Disable Animations</string>
 </resources>

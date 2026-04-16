@@ -9,53 +9,71 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
 import cmp_desktop_test.composeapp.generated.resources.*
+import com.wip.cmp_desktop_test.settings.SettingsViewModel
 import com.wip.cmp_desktop_test.ui.components.SidebarElement
 import com.wip.cmp_desktop_test.ui.components.SidebarSection
 import com.wip.cmp_desktop_test.ui.components.SidebarSectionData
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
+
+import androidx.navigation3.runtime.NavKey
+import androidx.savedstate.serialization.SavedStateConfiguration
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
 
 /**
  * Internal route keys for the Settings master-detail navigation.
- * These are separate from [Screen] which drives the top-level app navigation.
  */
-sealed interface SettingRoute {
-    data object Appearance  : SettingRoute
-    data object ModuleRepo  : SettingRoute
-    data object About       : SettingRoute
+@Serializable
+sealed interface SettingNavKey : NavKey {
+    @Serializable data object Appearance  : SettingNavKey
+    @Serializable data object ModuleRepo   : SettingNavKey
+    @Serializable data object About        : SettingNavKey
+}
+
+/** Nav3 configuration for Settings internal navigation. */
+val SettingNavConfig = SavedStateConfiguration {
+    serializersModule = SerializersModule {
+        polymorphic(NavKey::class) {
+            subclass(SettingNavKey.Appearance::class, SettingNavKey.Appearance.serializer())
+            subclass(SettingNavKey.ModuleRepo::class, SettingNavKey.ModuleRepo.serializer())
+            subclass(SettingNavKey.About::class, SettingNavKey.About.serializer())
+        }
+    }
 }
 
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
-    var activeRoute: Any by remember { mutableStateOf(SettingRoute.Appearance) }
+fun SettingsScreen(
+    modifier: Modifier = Modifier,
+    viewModel: SettingsViewModel = viewModel { SettingsViewModel() }
+) {
+    // Nested Nav3 backstack for settings sub-pages with proper SavedState configuration
+    val backStack = rememberNavBackStack(SettingNavConfig, SettingNavKey.Appearance as SettingNavKey)
+    val currentKey = backStack.lastOrNull() ?: SettingNavKey.Appearance
 
     val interfaceSection = SidebarSectionData(
-        title = Res.string.section_interface,
+        title = Res.string.section_application,
         elements = listOf(
-            SidebarElement(SettingRoute.Appearance, Icons.Default.Palette,    Res.string.setting_appearance),
+            SidebarElement(SettingNavKey.Appearance, Icons.Default.Palette, Res.string.setting_appearance),
         )
     )
-//    Should contain
-//    > Theme
-//    - Accent Color (the base for teh adaptive color)
-//    - Theme (System/Light/Dark/Amoled)
-//    > Localization
-//    - Language (Ita/Eng)
-//    - Timezone (GMT+1,+2...)
-//    > General
-//    - Scaling (100%)
 
     val moduleSection = SidebarSectionData(
         title = Res.string.section_module_repo,
         elements = listOf(
-            SidebarElement(SettingRoute.ModuleRepo, Icons.Default.Inventory, Res.string.section_module_repo)
+            SidebarElement(SettingNavKey.ModuleRepo, Icons.Default.Inventory, Res.string.section_module_repo)
         )
     )
 
     val aboutSection = SidebarSectionData(
         title = Res.string.section_about,
         elements = listOf(
-            SidebarElement(SettingRoute.About, Icons.Default.Info, Res.string.section_about)
+            SidebarElement(SettingNavKey.About, Icons.Default.Info, Res.string.section_about)
         )
     )
 
@@ -63,7 +81,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         // ── Left: internal settings sidebar ─────────────────────────────────
         Surface(
             modifier = Modifier.width(250.dp).fillMaxHeight(),
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(0.dp)
+            color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
                 Text(
@@ -75,65 +93,94 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
 
                 SidebarSection(
                     section = interfaceSection,
-                    currentSelection = activeRoute,
-                    onItemSelected = { activeRoute = it }
+                    currentSelection = currentKey,
+                    onItemSelected = { key ->
+                        val route = key as SettingNavKey
+                        if (backStack.lastOrNull() != route) {
+                            backStack.removeAll { it == route }
+                            backStack.add(route)
+                        }
+                    }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
                 SidebarSection(
                     section = moduleSection,
-                    currentSelection = activeRoute,
-                    onItemSelected = { activeRoute = it }
+                    currentSelection = currentKey,
+                    onItemSelected = { key ->
+                        val route = key as SettingNavKey
+                        if (backStack.lastOrNull() != route) {
+                            backStack.removeAll { it == route }
+                            backStack.add(route)
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
 
                 SidebarSection(
                     section = aboutSection,
-                    currentSelection = activeRoute,
-                    onItemSelected = { activeRoute = it }
+                    currentSelection = currentKey,
+                    onItemSelected = { key ->
+                        val route = key as SettingNavKey
+                        if (backStack.lastOrNull() != route) {
+                            backStack.removeAll { it == route }
+                            backStack.add(route)
+                        }
+                    }
                 )
             }
         }
 
         // ── Right: detail panel ──────────────────────────────────────────────
-        Box(
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .padding(24.dp)
         ) {
-            val titleText = when (activeRoute) {
-//                SettingRoute.AccentColor -> stringResource(Res.string.setting_accent_color)
-//                SettingRoute.Theme       -> stringResource(Res.string.setting_theme)
-//                SettingRoute.Language    -> stringResource(Res.string.setting_language)
-//                SettingRoute.Scaling     -> stringResource(Res.string.setting_scaling)
-                SettingRoute.ModuleRepo  -> stringResource(Res.string.section_module_repo)
-                SettingRoute.About       -> stringResource(Res.string.section_about)
-                else                     -> "Settings"
+            val titleText = when (currentKey) {
+                SettingNavKey.Appearance   -> stringResource(Res.string.setting_appearance)
+                SettingNavKey.ModuleRepo   -> stringResource(Res.string.section_module_repo)
+                SettingNavKey.About        -> stringResource(Res.string.section_about)
+                else                       -> "Error"
             }
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                Text(
-                    text = titleText,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+            Text(
+                text = titleText,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            shape = MaterialTheme.shapes.medium
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Controls for $titleText will appear here.")
+            // NavDisplay for nested settings content
+            NavDisplay(
+                backStack = backStack,
+                modifier = Modifier.fillMaxSize(),
+                onBack = { if (backStack.size > 1) backStack.removeLast() }
+            ) { key ->
+                when (key) {
+                    SettingNavKey.Appearance   -> NavEntry(key) { AppearanceSettingsView(viewModel) }
+                    SettingNavKey.ModuleRepo   -> NavEntry(key) { PlaceholderView("Module Repository") }
+                    SettingNavKey.About        -> NavEntry(key) { PlaceholderView("About This App") }
+                    else                       -> NavEntry(key) { PlaceholderView("Error") }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun PlaceholderView(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                shape = MaterialTheme.shapes.medium
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Content for $text will appear here.", style = MaterialTheme.typography.bodyLarge)
     }
 }
