@@ -11,6 +11,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
+import com.wip.cmp_desktop_test.ui.screens.ScreenNavConfig
 import cmp_desktop_test.composeapp.generated.resources.*
 import cmp_desktop_test.composeapp.generated.resources.Res
 import com.wip.cmp_desktop_test.ui.components.NavigationSidebar
@@ -26,13 +30,13 @@ fun App() {
     MaterialTheme {
         var isNavbarCollapsed by remember { mutableStateOf(false) }
 
-        // Nav3-style developer-owned backstack — no external library needed
-        val backStack = remember { mutableStateListOf<Screen>(Screen.Main) }
-        val currentScreen: Screen = backStack.lastOrNull() ?: Screen.Main
+        // Nav3: library-managed backstack with SavedStateConfiguration for JVM polymorphic serialization
+        val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
+        val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
 
         val sections = listOf(
             SidebarSectionData(
-                title = Res.string.section_application,
+                title = Res.string.section_interface,
                 elements = listOf(
                     SidebarElement(
                         id = Screen.Main,
@@ -60,14 +64,17 @@ fun App() {
                     // Reserve physical space for the sidebar
                     Spacer(modifier = Modifier.width(layoutSidebarWidth))
 
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        // Render the current top of the backstack
-                        key(currentScreen) {
-                            when (currentScreen) {
-                                Screen.Main -> MainScreen()
-                                Screen.Board -> BoardScreen()
-                                Screen.Settings -> SettingsScreen()
-                            }
+                    // Nav3 NavDisplay: observes the backstack and renders the top entry
+                    NavDisplay(
+                        backStack = backStack,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        onBack = { if (backStack.size > 1) backStack.removeLast() }
+                    ) { key ->
+                        when (key) {
+                            is Screen.Main     -> NavEntry(key) { MainScreen() }
+                            is Screen.Board    -> NavEntry(key) { BoardScreen() }
+                            is Screen.Settings -> NavEntry(key) { SettingsScreen() }
+                            else               -> NavEntry(key) { }
                         }
                     }
                 }
@@ -77,10 +84,10 @@ fun App() {
                     sections = sections,
                     currentScreen = currentScreen,
                     onScreenSelected = { route ->
-                        if (currentScreen != route) {
-                            // singleTop: remove existing occurrence then push
-                            backStack.remove(route)
-                            backStack.add(route as Screen)
+                        val screen = route as Screen
+                        if (backStack.lastOrNull() != screen) {
+                            backStack.removeAll { it == screen }
+                            backStack.add(screen)
                         }
                     },
                     isNavbarCollapsed = isNavbarCollapsed,

@@ -20,27 +20,30 @@ import org.jetbrains.compose.resources.stringResource
  * These are separate from [Screen] which drives the top-level app navigation.
  */
 sealed interface SettingRoute {
-    data object AccentColor : SettingRoute
-    data object Theme       : SettingRoute
-    data object Language    : SettingRoute
-    data object Scaling     : SettingRoute
+    data object Appearance  : SettingRoute
     data object ModuleRepo  : SettingRoute
     data object About       : SettingRoute
 }
 
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
-    var activeRoute: Any by remember { mutableStateOf(SettingRoute.AccentColor) }
+    var activeRoute: Any by remember { mutableStateOf(SettingRoute.Appearance) }
 
-    val applicationSection = SidebarSectionData(
-        title = Res.string.section_application,
+    val interfaceSection = SidebarSectionData(
+        title = Res.string.section_interface,
         elements = listOf(
-            SidebarElement(SettingRoute.AccentColor, Icons.Default.Palette,    Res.string.setting_accent_color),
-            SidebarElement(SettingRoute.Theme,       Icons.Default.DarkMode,   Res.string.setting_theme),
-            SidebarElement(SettingRoute.Language,    Icons.Default.Language,   Res.string.setting_language),
-            SidebarElement(SettingRoute.Scaling,     Icons.Default.FormatSize, Res.string.setting_scaling)
+            SidebarElement(SettingRoute.Appearance, Icons.Default.Palette,    Res.string.setting_appearance),
         )
     )
+//    Should contain
+//    > Theme
+//    - Accent Color (the base for teh adaptive color)
+//    - Theme (System/Light/Dark/Amoled)
+//    > Localization
+//    - Language (Ita/Eng)
+//    - Timezone (GMT+1,+2...)
+//    > General
+//    - Scaling (100%)
 
     val moduleSection = SidebarSectionData(
         title = Res.string.section_module_repo,
@@ -71,7 +74,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 )
 
                 SidebarSection(
-                    section = applicationSection,
+                    section = interfaceSection,
                     currentSelection = activeRoute,
                     onItemSelected = { activeRoute = it }
                 )
@@ -101,10 +104,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 .padding(24.dp)
         ) {
             val titleText = when (activeRoute) {
-                SettingRoute.AccentColor -> stringResource(Res.string.setting_accent_color)
-                SettingRoute.Theme       -> stringResource(Res.string.setting_theme)
-                SettingRoute.Language    -> stringResource(Res.string.setting_language)
-                SettingRoute.Scaling     -> stringResource(Res.string.setting_scaling)
+//                SettingRoute.AccentColor -> stringResource(Res.string.setting_accent_color)
+//                SettingRoute.Theme       -> stringResource(Res.string.setting_theme)
+//                SettingRoute.Language    -> stringResource(Res.string.setting_language)
+//                SettingRoute.Scaling     -> stringResource(Res.string.setting_scaling)
                 SettingRoute.ModuleRepo  -> stringResource(Res.string.section_module_repo)
                 SettingRoute.About       -> stringResource(Res.string.section_about)
                 else                     -> "Settings"
