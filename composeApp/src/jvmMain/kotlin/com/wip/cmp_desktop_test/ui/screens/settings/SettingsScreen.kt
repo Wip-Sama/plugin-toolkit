@@ -1,4 +1,4 @@
-package com.wip.cmp_desktop_test.ui.screens
+package com.wip.cmp_desktop_test.ui.screens.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -33,6 +33,7 @@ import kotlinx.serialization.modules.polymorphic
 sealed interface SettingNavKey : NavKey {
     @Serializable data object Appearance  : SettingNavKey
     @Serializable data object ModuleRepo   : SettingNavKey
+    @Serializable data object ModuleManager   : SettingNavKey
     @Serializable data object About        : SettingNavKey
 }
 
@@ -64,9 +65,10 @@ fun SettingsScreen(
     )
 
     val moduleSection = SidebarSectionData(
-        title = Res.string.section_module_repo,
+        title = Res.string.section_modules,
         elements = listOf(
-            SidebarElement(SettingNavKey.ModuleRepo, Icons.Default.Inventory, Res.string.section_module_repo)
+            SidebarElement(SettingNavKey.ModuleManager, Icons.Default.Inventory, Res.string.section_modules),
+            SidebarElement(SettingNavKey.ModuleRepo, Icons.Default.Inventory, Res.string.section_modules_repositories)
         )
     )
 
@@ -141,7 +143,7 @@ fun SettingsScreen(
         ) {
             val titleText = when (currentKey) {
                 SettingNavKey.Appearance   -> stringResource(Res.string.setting_appearance)
-                SettingNavKey.ModuleRepo   -> stringResource(Res.string.section_module_repo)
+                SettingNavKey.ModuleRepo   -> stringResource(Res.string.section_modules)
                 SettingNavKey.About        -> stringResource(Res.string.section_about)
                 else                       -> "Error"
             }

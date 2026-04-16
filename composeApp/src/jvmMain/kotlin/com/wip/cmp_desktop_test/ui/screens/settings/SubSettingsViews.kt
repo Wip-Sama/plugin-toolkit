@@ -1,4 +1,4 @@
-package com.wip.cmp_desktop_test.ui.screens
+package com.wip.cmp_desktop_test.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

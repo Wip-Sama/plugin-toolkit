@@ -23,7 +23,7 @@ import com.wip.cmp_desktop_test.ui.components.SidebarSectionData
 import com.wip.cmp_desktop_test.ui.screens.BoardScreen
 import com.wip.cmp_desktop_test.ui.screens.MainScreen
 import com.wip.cmp_desktop_test.ui.screens.Screen
-import com.wip.cmp_desktop_test.ui.screens.SettingsScreen
+import com.wip.cmp_desktop_test.ui.screens.settings.SettingsScreen
 
 import com.wip.cmp_desktop_test.settings.SettingsViewModel
 import com.wip.cmp_desktop_test.ui.theme.AppTheme

@@ -16,7 +16,8 @@
     <string name="setting_language">Language</string>
     <string name="setting_scaling">Scaling</string>
     <string name="setting_appearance">Appearance</string>
-    <string name="section_module_repo">Module Repository</string>
+    <string name="section_modules">Modules</string>
+    <string name="section_modules_repositories">Repositories</string>
     <string name="section_about">About</string>
     <string name="section_general">General</string>
     <string name="section_localization">Localization</string>
