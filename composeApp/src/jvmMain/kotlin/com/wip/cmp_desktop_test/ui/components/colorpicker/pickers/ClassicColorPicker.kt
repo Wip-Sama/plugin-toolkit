@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,8 +25,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.singleWindowApplication
 import com.wip.cmp_desktop_test.data.colorpicker.Colors.gradientColors
 import com.wip.cmp_desktop_test.extensions.colorpicker.blue
 import com.wip.cmp_desktop_test.extensions.colorpicker.darken
@@ -34,6 +39,7 @@ import com.wip.cmp_desktop_test.extensions.colorpicker.green
 import com.wip.cmp_desktop_test.extensions.colorpicker.lighten
 import com.wip.cmp_desktop_test.extensions.colorpicker.red
 import com.wip.cmp_desktop_test.extensions.colorpicker.toHueProgress
+import com.wip.cmp_desktop_test.ui.components.colorpicker.ColorPickerPreview
 import com.wip.cmp_desktop_test.ui.components.colorpicker.ColorSlideBar
 import kotlin.math.roundToInt
 
@@ -118,9 +124,10 @@ internal fun ClassicColorPicker(
 
         Spacer(modifier = Modifier.height(16.dp))
         ColorSlideBar(
-            value = rangeColor.toHueProgress(),
+            value = hueSlider,
             onValueChange = {
                 rangeColor = Color.fromHueProgress(it)
+                hueSlider = it
             },
             colors = gradientColors
         )
@@ -132,6 +139,23 @@ internal fun ClassicColorPicker(
                 onValueChange = { alpha = it },
                 colors = listOf(Color.Transparent, rangeColor)
             )
+        }
+    }
+}
+
+
+@Composable
+@Preview
+fun ClassicColorPickerPreview() {
+    MaterialTheme {
+        ClassicColorPicker(showAlphaBar = true, onPickedColor = {})
+    }
+}
+
+fun main() {
+    singleWindowApplication {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            ColorPickerPreview()
         }
     }
 }

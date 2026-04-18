@@ -17,7 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,8 +39,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.singleWindowApplication
+import com.wip.cmp_desktop_test.extensions.colorpicker.toCMYK
+import com.wip.cmp_desktop_test.extensions.colorpicker.toHSL
 import com.wip.cmp_desktop_test.extensions.colorpicker.toHex
+import com.wip.cmp_desktop_test.extensions.colorpicker.toRGB
 import com.wip.cmp_desktop_test.extensions.colorpicker.transparentBackground
+import com.wip.cmp_desktop_test.ui.components.SelectedButtonGroup
 import com.wip.cmp_desktop_test.ui.components.colorpicker.pickers.CircleColorPicker
 import com.wip.cmp_desktop_test.ui.components.colorpicker.pickers.ClassicColorPicker
 import com.wip.cmp_desktop_test.ui.components.colorpicker.pickers.RingColorPicker
@@ -57,7 +65,6 @@ import com.wip.cmp_desktop_test.ui.components.colorpicker.pickers.SimpleRingColo
  * ```
  */
 sealed class ColorPickerType {
-
     /**
      * Classic square picker (gradient box + hue slider).
      * @param showAlphaBar Sets the visibility of the alpha bar.
@@ -181,16 +188,54 @@ fun ColorPickerDialog(
             onDismissRequest()
             showDialog = false
         }) {
-            androidx.compose.material3.Surface(
+            var selectedFormat by remember { mutableStateOf("HEX") }
+            val includeAlpha = when (type) {
+                is ColorPickerType.Circle -> type.showAlphaBar
+                is ColorPickerType.Classic -> type.showAlphaBar
+                is ColorPickerType.Ring -> type.showAlphaBar
+                else -> false
+            }
+
+            val colorCode = remember(color, selectedFormat) {
+                when (selectedFormat) {
+                    "HEX" -> color.toHex(
+                        hexPrefix = true,
+                        includeAlpha = includeAlpha
+                    )
+                    "RGB" -> color.toRGB(
+                        rgbPrefix = true,
+                        includeAlpha = includeAlpha
+                    )
+                    "HSL" -> color.toHSL(
+                        hslPrefix = true,
+                        includeAlpha = includeAlpha
+                    )
+                    "CMYK" -> color.toCMYK(
+                        cmykPrefix = true,
+                        includeAlpha = includeAlpha
+                    )
+                    else -> color.toHex(hexPrefix = true, includeAlpha = includeAlpha)
+                }
+            }
+
+            Surface(
                 modifier = Modifier.width(IntrinsicSize.Max),
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 6.dp
             ) {
-                Box(modifier = Modifier.padding(32.dp)) {
-                    Column {
+                Box(
+                    modifier = Modifier.padding(32.dp),
+                ) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        SelectedButtonGroup(
+                            buttons = listOf("HEX", "RGB", "HSL", "CMYK"),
+                            startingIndex = 0,
+                            onButtonSelected = { selectedFormat = it }
+                        )
                         ColorPicker(type = type, onPickedColor = { color = it })
-                        Spacer(modifier = Modifier.height(16.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -199,29 +244,16 @@ fun ColorPickerDialog(
                                 modifier = Modifier
                                     .size(50.dp, 30.dp)
                                     .clip(RoundedCornerShape(50))
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.outlineVariant,
-                                        shape = RoundedCornerShape(50)
-                                    )
                                     .transparentBackground(verticalBoxesAmount = 4)
                                     .background(color)
                             )
                             Text(
-                                text = buildAnnotatedString {
-                                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                        append("#")
-                                    }
-                                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                        append(color.toHex())
-                                    }
-                                },
+                                text = colorCode,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 14.sp,
                                 fontFamily = FontFamily.Monospace,
                             )
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
@@ -253,5 +285,13 @@ fun ColorPickerPreview() {
             onDismissRequest = {  },
             onPickedColor = {  },
         )
+    }
+}
+
+fun main() = singleWindowApplication(
+    state = WindowState(width = 500.dp, height = 400.dp)
+) {
+    Surface(color = MaterialTheme.colorScheme.background) {
+        ColorPickerPreview()
     }
 }

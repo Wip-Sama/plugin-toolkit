@@ -69,6 +69,70 @@ fun Color.toHex(hexPrefix: Boolean = false, includeAlpha: Boolean = true): Strin
     }
 }
 
+fun Color.toRGB(rgbPrefix: Boolean = false, includeAlpha: Boolean = true): String {
+    val (alpha, red, green, blue) = argb()
+    return if (includeAlpha) {
+        (if (rgbPrefix) "rgba" else "") + "($red, $green, $blue, ${alpha / 255f})"
+    } else {
+        (if (rgbPrefix) "rgb" else "")+"($red, $green, $blue)"
+    }
+}
+
+fun Color.toHSL(hslPrefix: Boolean = false, includeAlpha: Boolean = true): String {
+    val (alpha, redInt, greenInt, blueInt) = argb()
+    val r = redInt / 255f
+    val g = greenInt / 255f
+    val b = blueInt / 255f
+
+    val max = max(r, max(g, b))
+    val min = min(r, min(g, b))
+    val delta = max - min
+
+    var h = 0f
+    var s = 0f
+    val l = (max + min) / 2f
+
+    if (delta != 0f) {
+        s = if (l < 0.5f) delta / (max + min) else delta / (2f - max - min)
+        h = when (max) {
+            r -> (g - b) / delta + (if (g < b) 6 else 0)
+            g -> (b - r) / delta + 2
+            else -> (r - g) / delta + 4
+        }
+        h *= 60f
+    }
+
+    val hue = h.roundToInt()
+    val sat = (s * 100).roundToInt()
+    val light = (l * 100).roundToInt()
+
+    return if (includeAlpha) {
+        (if (hslPrefix) "hsla" else "") + "($hue, $sat%, $light%, ${alpha / 255f})"
+    } else {
+        (if (hslPrefix) "hsl" else "") + "($hue, $sat%, $light%)"
+    }
+}
+
+fun Color.toCMYK(cmykPrefix: Boolean = false, includeAlpha: Boolean = true): String {
+    val (alpha, redInt, greenInt, blueInt) = argb()
+    val r = redInt / 255f
+    val g = greenInt / 255f
+    val b = blueInt / 255f
+
+    val k = 1f - max(r, max(g, b))
+    val c = if (k == 1f) 0f else (1f - r - k) / (1f - k)
+    val m = if (k == 1f) 0f else (1f - g - k) / (1f - k)
+    val y = if (k == 1f) 0f else (1f - b - k) / (1f - k)
+
+    val cp = (c * 100).roundToInt()
+    val mp = (m * 100).roundToInt()
+    val yp = (y * 100).roundToInt()
+    val kp = (k * 100).roundToInt()
+
+    val alphaString = if (includeAlpha) ", ${(alpha / 255f)}" else ""
+    return (if (cmykPrefix) "cmyk" else "") + "($cp%, $mp%, $yp%, $kp%$alphaString)"
+}
+
 private fun Int.toHex(): String {
     return Integer.toHexString(this).let {
         if (it.length == 1) {
@@ -138,7 +202,7 @@ internal fun Color.Companion.fromHueProgress(progress: Float): Color {
     return Color(red, green, blue)
 }
 
-internal fun Color.toHueProgress(): Float {
+internal fun Color.toHueProgress(): Float { // May be broken, need checking, also should return int probably
     val red = this.red() / 255f
     val green = this.green() / 255f
     val blue = this.blue() / 255f
@@ -161,6 +225,7 @@ internal fun Color.toHueProgress(): Float {
 
     hue *= 60
     if (hue < 0) hue += 360
+
 
     return hue
 }
