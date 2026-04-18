@@ -25,9 +25,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.wip.cmp_desktop_test.data.colorpicker.ColorRange
+import com.wip.cmp_desktop_test.extensions.colorpicker.blue
 import com.wip.cmp_desktop_test.extensions.colorpicker.darken
-import com.wip.cmp_desktop_test.helper.colorpicker.ColorPickerHelper
+import com.wip.cmp_desktop_test.extensions.colorpicker.fromHueProgress
+import com.wip.cmp_desktop_test.extensions.colorpicker.green
+import com.wip.cmp_desktop_test.extensions.colorpicker.red
 import com.wip.cmp_desktop_test.helper.colorpicker.MathHelper
 import kotlin.math.atan2
 import kotlin.math.roundToInt
@@ -162,30 +164,11 @@ private fun calculateSimpleRingLocation(
 }
 
 private fun getColorAt(progress: Float, deepProgress: Float): Color {
-    val (rangeProgress, range) = ColorPickerHelper.calculateRangeProgress(progress.toDouble())
+    val pureColor = Color.fromHueProgress(progress)
     val dark: Float = 0.5f * deepProgress
-    val red: Int
-    val green: Int
-    val blue: Int
-    when (range) {
-        ColorRange.RedToYellow -> {
-            red = 255; green = (255f * rangeProgress).roundToInt(); blue = 0
-        }
-        ColorRange.YellowToGreen -> {
-            red = (255 * (1 - rangeProgress)).roundToInt(); green = 255; blue = 0
-        }
-        ColorRange.GreenToCyan -> {
-            red = 0; green = 255; blue = (255 * rangeProgress).roundToInt()
-        }
-        ColorRange.CyanToBlue -> {
-            red = 0; green = (255 * (1 - rangeProgress)).roundToInt(); blue = 255
-        }
-        ColorRange.BlueToPurple -> {
-            red = (255 * rangeProgress).roundToInt(); green = 0; blue = 255
-        }
-        ColorRange.PurpleToRed -> {
-            red = 255; green = 0; blue = (255 * (1 - rangeProgress)).roundToInt()
-        }
-    }
-    return Color(red.darken(dark), green.darken(dark), blue.darken(dark))
+    return Color(
+        pureColor.red().darken(dark),
+        pureColor.green().darken(dark),
+        pureColor.blue().darken(dark)
+    )
 }

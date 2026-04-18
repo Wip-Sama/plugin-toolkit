@@ -23,18 +23,18 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
-import com.wip.cmp_desktop_test.data.colorpicker.ColorRange
 import com.wip.cmp_desktop_test.data.colorpicker.Colors.gradientColors
 import com.wip.cmp_desktop_test.extensions.colorpicker.blue
 import com.wip.cmp_desktop_test.extensions.colorpicker.darken
 import com.wip.cmp_desktop_test.extensions.colorpicker.drawColorSelector
+import com.wip.cmp_desktop_test.extensions.colorpicker.fromHueProgress
 import com.wip.cmp_desktop_test.extensions.colorpicker.green
 import com.wip.cmp_desktop_test.extensions.colorpicker.lighten
 import com.wip.cmp_desktop_test.extensions.colorpicker.red
 import com.wip.cmp_desktop_test.helper.colorpicker.BoundedPointStrategy
-import com.wip.cmp_desktop_test.helper.colorpicker.ColorPickerHelper
 import com.wip.cmp_desktop_test.helper.colorpicker.MathHelper.getBoundedPointWithInRadius
 import com.wip.cmp_desktop_test.helper.colorpicker.MathHelper.getLength
+import com.wip.cmp_desktop_test.ui.components.colorpicker.ColorSlideBar
 import kotlin.math.atan2
 import kotlin.math.roundToInt
 
@@ -121,16 +121,22 @@ internal fun CircleColorPicker(
         if (showBrightnessBar) {
             Spacer(modifier = Modifier.height(16.dp))
             ColorSlideBar(
+                value = brightness,
+                onValueChange = { brightness = it },
                 colors = listOf(
                     if (lightCenter) Color.Black else Color.White,
                     pickerColor
-                )
-            ) { brightness = 1 - it }
+                ),
+            )
         }
 
         if (showAlphaBar) {
             Spacer(modifier = Modifier.height(16.dp))
-            ColorSlideBar(colors = listOf(Color.Transparent, pickerColor)) { alpha = it }
+            ColorSlideBar(
+                value = alpha,
+                onValueChange = { alpha = it },
+                colors = listOf(Color.Transparent, pickerColor)
+            )
         }
     }
 }
@@ -147,40 +153,12 @@ private fun handleCirclePickerInput(
     val length = getLength(x, y, radius)
     val radiusProgress = (1 - (length / radius)).coerceIn(0f, 1f)
     val angleProgress = angle / 360f
-    val (rangeProgress, range) = ColorPickerHelper.calculateRangeProgress(angleProgress.toDouble())
-
-    val newColor = when (range) {
-        ColorRange.RedToYellow -> Color(
-            red = 255.moveColorTo(lightCenter, radiusProgress.toFloat()),
-            green = (255f * rangeProgress).toFloat().moveColorTo(lightCenter, radiusProgress.toFloat()).roundToInt(),
-            blue = 0.moveColorTo(lightCenter, radiusProgress.toFloat()),
-        )
-        ColorRange.YellowToGreen -> Color(
-            red = (255 * (1 - rangeProgress)).toFloat().moveColorTo(lightCenter, radiusProgress.toFloat()).roundToInt(),
-            green = 255.moveColorTo(lightCenter, radiusProgress.toFloat()),
-            blue = 0.moveColorTo(lightCenter, radiusProgress.toFloat()),
-        )
-        ColorRange.GreenToCyan -> Color(
-            red = 0.moveColorTo(lightCenter, radiusProgress.toFloat()),
-            green = 255.moveColorTo(lightCenter, radiusProgress.toFloat()),
-            blue = (255 * rangeProgress).toFloat().moveColorTo(lightCenter, radiusProgress.toFloat()).roundToInt(),
-        )
-        ColorRange.CyanToBlue -> Color(
-            red = 0.moveColorTo(lightCenter, radiusProgress.toFloat()),
-            green = (255 * (1 - rangeProgress)).toFloat().moveColorTo(lightCenter, radiusProgress.toFloat()).roundToInt(),
-            blue = 255.moveColorTo(lightCenter, radiusProgress.toFloat()),
-        )
-        ColorRange.BlueToPurple -> Color(
-            red = (255 * rangeProgress).toFloat().moveColorTo(lightCenter, radiusProgress.toFloat()).roundToInt(),
-            green = 0.moveColorTo(lightCenter, radiusProgress.toFloat()),
-            blue = 255.moveColorTo(lightCenter, radiusProgress.toFloat()),
-        )
-        ColorRange.PurpleToRed -> Color(
-            red = 255.moveColorTo(lightCenter, radiusProgress.toFloat()),
-            green = 0.moveColorTo(lightCenter, radiusProgress.toFloat()),
-            blue = (255 * (1 - rangeProgress)).toFloat().moveColorTo(lightCenter, radiusProgress.toFloat()).roundToInt(),
-        )
-    }
+    val pureColor = Color.fromHueProgress(angleProgress.toFloat())
+    val newColor = Color(
+        red = pureColor.red().moveColorTo(lightCenter, radiusProgress.toFloat()),
+        green = pureColor.green().moveColorTo(lightCenter, radiusProgress.toFloat()),
+        blue = pureColor.blue().moveColorTo(lightCenter, radiusProgress.toFloat()),
+    )
     onColorChange(newColor)
     onLocationChange(
         getBoundedPointWithInRadius(x, y, length, radius, BoundedPointStrategy.Inside)

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -180,11 +181,11 @@ fun ColorPickerDialog(
             onDismissRequest()
             showDialog = false
         }) {
-            Box(
-                modifier = Modifier
-                    .width(IntrinsicSize.Max)
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(Color.White)
+            androidx.compose.material3.Surface(
+                modifier = Modifier.width(IntrinsicSize.Max),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 6.dp
             ) {
                 Box(modifier = Modifier.padding(32.dp)) {
                     Column {
@@ -198,17 +199,24 @@ fun ColorPickerDialog(
                                 modifier = Modifier
                                     .size(50.dp, 30.dp)
                                     .clip(RoundedCornerShape(50))
-                                    .border(0.3.dp, Color.LightGray, RoundedCornerShape(50))
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                        shape = RoundedCornerShape(50)
+                                    )
                                     .transparentBackground(verticalBoxesAmount = 4)
                                     .background(color)
                             )
                             Text(
                                 text = buildAnnotatedString {
-                                    withStyle(SpanStyle(color = Color.Gray)) { append("#") }
+                                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                        append("#")
+                                    }
                                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                                         append(color.toHex())
                                     }
                                 },
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 14.sp,
                                 fontFamily = FontFamily.Monospace,
                             )
@@ -220,7 +228,7 @@ fun ColorPickerDialog(
                                 onPickedColor(color)
                                 showDialog = false
                             },
-                            shape = RoundedCornerShape(50)
+                            shape = CircleShape
                         ) {
                             Text(text = "Select")
                         }

@@ -24,18 +24,18 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.wip.cmp_desktop_test.data.colorpicker.ColorRange
 import com.wip.cmp_desktop_test.data.colorpicker.Colors.gradientColors
 import com.wip.cmp_desktop_test.extensions.colorpicker.blue
 import com.wip.cmp_desktop_test.extensions.colorpicker.darken
 import com.wip.cmp_desktop_test.extensions.colorpicker.drawColorSelector
+import com.wip.cmp_desktop_test.extensions.colorpicker.fromHueProgress
 import com.wip.cmp_desktop_test.extensions.colorpicker.green
 import com.wip.cmp_desktop_test.extensions.colorpicker.lighten
 import com.wip.cmp_desktop_test.extensions.colorpicker.red
 import com.wip.cmp_desktop_test.helper.colorpicker.BoundedPointStrategy
-import com.wip.cmp_desktop_test.helper.colorpicker.ColorPickerHelper
 import com.wip.cmp_desktop_test.helper.colorpicker.MathHelper
 import com.wip.cmp_desktop_test.helper.colorpicker.MathHelper.getBoundedPointWithInRadius
+import com.wip.cmp_desktop_test.ui.components.colorpicker.ColorSlideBar
 import kotlin.math.atan2
 import kotlin.math.roundToInt
 
@@ -141,15 +141,27 @@ internal fun RingColorPicker(
 
         if (showLightColorBar) {
             Spacer(modifier = Modifier.height(16.dp))
-            ColorSlideBar(colors = listOf(Color.White, selectedColor)) { lightness = 1 - it }
+            ColorSlideBar(
+                value = lightness,
+                onValueChange = { lightness = it },
+                colors = listOf(Color.Transparent, selectedColor)
+            )
         }
         if (showDarkColorBar) {
             Spacer(modifier = Modifier.height(16.dp))
-            ColorSlideBar(colors = listOf(Color.Black, lightColor)) { darkness = 1 - it }
+            ColorSlideBar(
+                value = darkness,
+                onValueChange = { darkness = it },
+                colors = listOf(Color.Transparent, lightColor)
+            )
         }
         if (showAlphaBar) {
             Spacer(modifier = Modifier.height(16.dp))
-            ColorSlideBar(colors = listOf(Color.Transparent, darkColor)) { alpha = it }
+            ColorSlideBar(
+                value = alpha,
+                onValueChange = { alpha = it },
+                colors = listOf(Color.Transparent, darkColor)
+            )
         }
     }
 }
@@ -165,33 +177,8 @@ private fun handleRingPickerInput(
     val angle = (Math.toDegrees(atan2(y - radius, x - radius).toDouble()) + 360) % 360
     val length = MathHelper.getLength(x, y, radius)
     val progress = angle / 360f
-    val (rangeProgress, range) = ColorPickerHelper.calculateRangeProgress(progress)
-
-    val red: Int
-    val green: Int
-    val blue: Int
-    when (range) {
-        ColorRange.RedToYellow -> {
-            red = 255; green = (255f * rangeProgress).toFloat().roundToInt(); blue = 0
-        }
-        ColorRange.YellowToGreen -> {
-            red = (255 * (1 - rangeProgress)).toFloat().roundToInt(); green = 255; blue = 0
-        }
-        ColorRange.GreenToCyan -> {
-            red = 0; green = 255; blue = (255 * rangeProgress).toFloat().roundToInt()
-        }
-        ColorRange.CyanToBlue -> {
-            red = 0; green = (255 * (1 - rangeProgress)).toFloat().roundToInt(); blue = 255
-        }
-        ColorRange.BlueToPurple -> {
-            red = (255 * rangeProgress).toFloat().roundToInt(); green = 0; blue = 255
-        }
-        ColorRange.PurpleToRed -> {
-            red = 255; green = 0; blue = (255 * (1 - rangeProgress)).toFloat().roundToInt()
-        }
-    }
     onLocationChange(
         getBoundedPointWithInRadius(x, y, length, radius - ringWidthPx / 2, BoundedPointStrategy.Edge)
     )
-    onColorChange(Color(red, green, blue))
+    onColorChange(Color.fromHueProgress(progress.toFloat()))
 }
