@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">WOToolkit</string>
+    <string name="section_application">Applicazione</string>
+    <string name="nav_main">Home</string>
+    <string name="nav_board">Lavagna</string>
+    <string name="section_privacy">Privacy e Sicurezza</string>
+    <string name="nav_privacy">Privacy</string>
+    <string name="section_archive">Archiviazione e dati</string>
+    <string name="nav_archive">Archiviazione</string>
+    <string name="nav_backup">Backup e ripristino</string>
+    <string name="settings">Impostazioni</string>
+    <string name="board_controls">Controlli Lavagna</string>
+    <string name="board_reset">Ripristina Lavagna</string>
+    <string name="setting_accent_color">Colore accento</string>
+    <string name="setting_theme">Tema</string>
+    <string name="setting_language">Lingua</string>
+    <string name="setting_use_system_language">Usa lingua di sistema</string>
+    <string name="setting_use_system_language_subtitle">Segui automaticamente la lingua del dispositivo</string>
+    <string name="setting_scaling">Ridimensionamento</string>
+    <string name="setting_appearance">Aspetto</string>
+    <string name="section_modules">Moduli</string>
+    <string name="section_modules_repositories">Repository</string>
+    <string name="section_about">Informazioni</string>
+    <string name="section_general">Generale</string>
+    <string name="section_localization">Localizzazione</string>
+    <string name="setting_adaptive_color">Colore adattivo</string>
+    <string name="setting_timezone">Fuso orario</string>
+</resources>

@@ -57,6 +57,7 @@ fun SettingsItem(
     subtitle: String? = null,
     icon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
     control: @Composable (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -73,40 +74,44 @@ fun SettingsItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
-            .hoverable(interactionSource)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .hoverable(interactionSource, enabled = enabled)
+            .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp).padding(end = 16.dp)
-            )
-        } else {
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium
-            )
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        val alpha = if (enabled) 1f else 0.5f
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+                    modifier = Modifier.size(24.dp).padding(end = 16.dp)
                 )
+            } else {
+                Spacer(modifier = Modifier.width(8.dp))
             }
-        }
 
-        if (control != null) {
-            Box(modifier = Modifier.padding(start = 16.dp)) {
-                control()
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                    )
+                }
+            }
+
+            if (control != null) {
+                Box(modifier = Modifier.padding(start = 16.dp)) {
+                    control()
+                }
             }
         }
     }
@@ -132,15 +137,18 @@ fun <T> SettingsDropdown(
     options: List<T>,
     selectedOption: T,
     onOptionSelected: (T) -> Unit,
-    labelProvider: (T) -> String
+    labelProvider: (T) -> String,
+    enabled: Boolean = true
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Box {
         Surface(
-            onClick = { expanded = true },
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-            shape = RoundedCornerShape(8.dp)
+            onClick = { if (enabled) expanded = true },
+            color = if (enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) 
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            shape = RoundedCornerShape(8.dp),
+            enabled = enabled
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -148,9 +156,16 @@ fun <T> SettingsDropdown(
             ) {
                 Text(
                     text = labelProvider(selectedOption),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface 
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                 )
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                Icon(
+                    Icons.Default.ArrowDropDown, 
+                    contentDescription = null,
+                    tint = if (enabled) MaterialTheme.colorScheme.onSurface 
+                           else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                )
             }
         }
 

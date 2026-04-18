@@ -9,7 +9,11 @@ plugins {
 }
 
 kotlin {
-    jvm()
+    jvm {
+//        compilerOptions {
+//            freeCompilerArgs.add("-opt-in=io.github.mohammedalaamorsi.colorpicker.ExperimentalColorPickerApi")
+//        }
+    }
     
     sourceSets {
         commonMain.dependencies {
@@ -26,6 +30,7 @@ kotlin {
             implementation(libs.kotlinxSerializationJson)
             implementation(libs.navigation3.ui)
             implementation(libs.lifecycle.nav3)
+            implementation(libs.colorpicker)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -33,6 +38,9 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            implementation(libs.jna)
+            implementation(libs.jna.platform)
+            implementation(libs.dbus.java.core)
         }
     }
 }

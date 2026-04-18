@@ -3,17 +3,19 @@
     <string name="section_application">Application</string>
     <string name="nav_main">Main</string>
     <string name="nav_board">Board</string>
-    <string name="section_privacy">Privacy e Sicurezza</string>
+    <string name="section_privacy">Privacy and Security</string>
     <string name="nav_privacy">Privacy</string>
-    <string name="section_archive">Archiviazione e dati</string>
-    <string name="nav_archive">Archiviazione</string>
-    <string name="nav_backup">Backup e ripristino</string>
+    <string name="section_archive">Storage and Data</string>
+    <string name="nav_archive">Storage</string>
+    <string name="nav_backup">Backup and Restore</string>
     <string name="settings">Settings</string>
     <string name="board_controls">Board Controls</string>
     <string name="board_reset">Reset Board</string>
-    <string name="setting_accent_color">Accent color</string>
+    <string name="setting_accent_color">Accent Color</string>
     <string name="setting_theme">Theme</string>
     <string name="setting_language">Language</string>
+    <string name="setting_use_system_language">Use System Language</string>
+    <string name="setting_use_system_language_subtitle">Automatically follow your device language</string>
     <string name="setting_scaling">Scaling</string>
     <string name="setting_appearance">Appearance</string>
     <string name="section_modules">Modules</string>
@@ -23,7 +25,4 @@
     <string name="section_localization">Localization</string>
     <string name="setting_adaptive_color">Adaptive Color</string>
     <string name="setting_timezone">Timezone</string>
-    <string name="setting_animations">Animations</string>
-    <string name="setting_animation_speed">Animation Speed</string>
-    <string name="setting_disable_animations">Disable Animations</string>
 </resources>
