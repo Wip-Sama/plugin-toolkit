@@ -15,7 +15,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Brightness6
@@ -25,7 +24,6 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,7 +69,7 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
     if (showColorPicker) {
         ColorPickerDialog(
             show = showColorPicker,
-            type = ColorPickerType.Classic(),
+            initialType = ColorPickerType.Classic(),
             onDismissRequest = { showColorPicker = false },
             onPickedColor = { color ->
                 viewModel.updateSettings {

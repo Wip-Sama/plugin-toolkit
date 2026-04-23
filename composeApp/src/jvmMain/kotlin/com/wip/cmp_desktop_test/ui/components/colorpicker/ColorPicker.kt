@@ -1,26 +1,22 @@
 package com.wip.cmp_desktop_test.ui.components.colorpicker
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,11 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -78,9 +70,7 @@ sealed class ColorPickerType {
      * @param lightCenter       When true the center fades to white, when false to black.
      */
     class Circle(
-        val showBrightnessBar: Boolean = true,
-        val showAlphaBar: Boolean = true,
-        val lightCenter: Boolean = true
+        val showBrightnessBar: Boolean = true, val showAlphaBar: Boolean = true, val lightCenter: Boolean = true
     ) : ColorPickerType()
 
     /**
@@ -126,9 +116,7 @@ sealed class ColorPickerType {
  */
 @Composable
 fun ColorPicker(
-    modifier: Modifier = Modifier,
-    type: ColorPickerType = ColorPickerType.Classic(),
-    onPickedColor: (Color) -> Unit
+    modifier: Modifier = Modifier, type: ColorPickerType = ColorPickerType.Classic(), onPickedColor: (Color) -> Unit
 ) {
     Box(modifier = modifier) {
         when (type) {
@@ -136,12 +124,14 @@ fun ColorPicker(
                 showAlphaBar = type.showAlphaBar,
                 onPickedColor = onPickedColor,
             )
+
             is ColorPickerType.Circle -> CircleColorPicker(
                 showAlphaBar = type.showAlphaBar,
                 showBrightnessBar = type.showBrightnessBar,
                 lightCenter = type.lightCenter,
                 onPickedColor = onPickedColor
             )
+
             is ColorPickerType.Ring -> RingColorPicker(
                 ringWidth = type.ringWidth,
                 previewRadius = type.previewRadius,
@@ -151,6 +141,7 @@ fun ColorPicker(
                 showColorPreview = type.showColorPreview,
                 onPickedColor = onPickedColor
             )
+
             is ColorPickerType.SimpleRing -> SimpleRingColorPicker(
                 colorWidth = type.colorWidth,
                 tracksCount = type.tracksCount,
@@ -170,56 +161,60 @@ fun ColorPicker(
  *
  * @param show            Whether the dialog is visible.
  * @param onDismissRequest Called when the user tries to dismiss the dialog.
- * @param type            The picker style — defaults to [ColorPickerType.Classic].
+ * @param initialType            The picker style — defaults to [ColorPickerType.Classic].
  * @param onPickedColor   Callback invoked when the user confirms a color selection.
  */
 @Composable
 fun ColorPickerDialog(
     show: Boolean,
     onDismissRequest: () -> Unit,
-    type: ColorPickerType = ColorPickerType.Classic(),
+    initialType: ColorPickerType = ColorPickerType.Classic(),
     onPickedColor: (Color) -> Unit
 ) {
     var showDialog by remember(show) { mutableStateOf(show) }
     var color by remember { mutableStateOf(Color.White) }
+    var selectedFormat by remember { mutableStateOf("HEX") }
+    var type by remember<MutableState<ColorPickerType>> { mutableStateOf(initialType) }
 
     if (showDialog) {
-        Dialog(onDismissRequest = {
-            onDismissRequest()
-            showDialog = false
-        }) {
-            var selectedFormat by remember { mutableStateOf("HEX") }
+        Dialog(
+            onDismissRequest = {
+                onDismissRequest()
+                showDialog = false
+            }) {
             val includeAlpha = when (type) {
-                is ColorPickerType.Circle -> type.showAlphaBar
-                is ColorPickerType.Classic -> type.showAlphaBar
-                is ColorPickerType.Ring -> type.showAlphaBar
+                is ColorPickerType.Circle -> (type as ColorPickerType.Circle).showAlphaBar
+                is ColorPickerType.Classic -> (type as ColorPickerType.Classic).showAlphaBar
+                is ColorPickerType.Ring -> (type as ColorPickerType.Ring).showAlphaBar
                 else -> false
             }
 
             val colorCode = remember(color, selectedFormat) {
                 when (selectedFormat) {
                     "HEX" -> color.toHex(
-                        hexPrefix = true,
-                        includeAlpha = includeAlpha
+                        hexPrefix = true, includeAlpha = includeAlpha
                     )
+
                     "RGB" -> color.toRGB(
-                        rgbPrefix = true,
-                        includeAlpha = includeAlpha
+                        rgbPrefix = true, includeAlpha = includeAlpha
                     )
+
                     "HSL" -> color.toHSL(
-                        hslPrefix = true,
-                        includeAlpha = includeAlpha
+                        hslPrefix = true, includeAlpha = includeAlpha
                     )
+
                     "CMYK" -> color.toCMYK(
-                        cmykPrefix = true,
-                        includeAlpha = includeAlpha
+                        cmykPrefix = true, includeAlpha = includeAlpha
                     )
+
                     else -> color.toHex(hexPrefix = true, includeAlpha = includeAlpha)
                 }
             }
 
             Surface(
-                modifier = Modifier.width(IntrinsicSize.Max),
+                modifier = Modifier
+//                    .width(IntrinsicSize.Max)
+                    .widthIn(max = 300.dp),
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 6.dp
@@ -228,24 +223,33 @@ fun ColorPickerDialog(
                     modifier = Modifier.padding(32.dp),
                 ) {
                     Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         SelectedButtonGroup(
                             buttons = listOf("HEX", "RGB", "HSL", "CMYK"),
                             startingIndex = 0,
-                            onButtonSelected = { selectedFormat = it }
-                        )
+                            onButtonSelected = { selectedFormat = it })
+                        SelectedButtonGroup(
+                            buttons = listOf("Classic", "Circle", "Ring", "Simple"),
+                            startingIndex = 0,
+                            onButtonSelected = {
+                                type = when (it) {
+                                    "Classic" -> ColorPickerType.Classic()
+                                    "Circle" -> ColorPickerType.Circle()
+                                    "Ring" -> ColorPickerType.Ring()
+                                    "Simple" -> ColorPickerType.SimpleRing()
+                                    else -> ColorPickerType.Classic()
+                                }
+                            })
                         ColorPicker(type = type, onPickedColor = { color = it })
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Box(
-                                modifier = Modifier
-                                    .size(50.dp, 30.dp)
-                                    .clip(RoundedCornerShape(50))
-                                    .transparentBackground(verticalBoxesAmount = 4)
-                                    .background(color)
+                                modifier = Modifier.size(50.dp, 30.dp).clip(RoundedCornerShape(50))
+                                    .transparentBackground(verticalBoxesAmount = 4).background(color)
                             )
                             Text(
                                 text = colorCode,
@@ -255,12 +259,10 @@ fun ColorPickerDialog(
                             )
                         }
                         Button(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = {
+                            modifier = Modifier.fillMaxWidth(), onClick = {
                                 onPickedColor(color)
                                 showDialog = false
-                            },
-                            shape = CircleShape
+                            }, shape = CircleShape
                         ) {
                             Text(text = "Select")
                         }
@@ -280,10 +282,10 @@ fun ColorPickerPreview() {
 //            onPickedColor = {  },
 //        )
         ColorPickerDialog(
-            type = ColorPickerType.Classic(),
+            initialType = ColorPickerType.Classic(),
             show = true,
-            onDismissRequest = {  },
-            onPickedColor = {  },
+            onDismissRequest = { },
+            onPickedColor = { },
         )
     }
 }

@@ -32,7 +32,6 @@ fun SelectedButtonGroup(
     val scrollState = rememberScrollState()
     Row(
         modifier = modifier
-            .fillMaxWidth()
             .horizontalScroll(scrollState),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         verticalAlignment = Alignment.CenterVertically,
