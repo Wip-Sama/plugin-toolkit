@@ -1,10 +1,6 @@
 plugins {
-    id("java-library")
     alias(libs.plugins.jetbrainsKotlinJvm)
-    alias(libs.plugins.kotlinSerialization)
-    alias(libs.plugins.ksp)
 }
-
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -18,9 +14,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(platform(libs.koin.bom))
-    implementation(libs.koin.core)
-    implementation(libs.kotlinxSerializationJson)
     implementation(project(":plugin-api"))
-    ksp(project(":plugin-processor"))
+    implementation(libs.ksp.api)
+    implementation(libs.kotlinpoet)
+    implementation(libs.kotlinpoet.ksp)
 }
