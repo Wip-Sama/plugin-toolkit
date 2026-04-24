@@ -9,12 +9,8 @@ plugins {
 }
 
 kotlin {
-    jvm {
-//        compilerOptions {
-//            freeCompilerArgs.add("-opt-in=io.github.mohammedalaamorsi.colorpicker.ExperimentalColorPickerApi")
-//        }
-    }
-    
+    jvm()
+
     sourceSets {
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -30,7 +26,10 @@ kotlin {
             implementation(libs.kotlinxSerializationJson)
             implementation(libs.navigation3.ui)
             implementation(libs.lifecycle.nav3)
-            implementation(libs.colorpicker)
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -48,11 +47,11 @@ kotlin {
 
 compose.desktop {
     application {
-        mainClass = "com.wip.cmp_desktop_test.MainKt"
+        mainClass = "com.wip.kpm_cpm_wotoolkit.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.wip.cmp_desktop_test"
+            packageName = "com.wip.kpm_cpm_wotoolkit"
             packageVersion = "1.0.0"
         }
     }

@@ -1,4 +1,4 @@
-rootProject.name = "CMP_desktop_test"
+rootProject.name = "kpm_cpm_wotoolkit"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
@@ -33,3 +33,5 @@ plugins {
 }
 
 include(":composeApp")
+include(":additions")
+include(":operations")
