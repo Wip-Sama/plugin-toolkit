@@ -146,7 +146,7 @@ fun <T> SettingsDropdown(
             onClick = { if (enabled) expanded = true },
             color = if (enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.medium,
             enabled = enabled
         ) {
             Row(
@@ -226,7 +226,7 @@ fun SettingsNumericInput(
         modifier = modifier.width(100.dp).height(48.dp),
         textStyle = MaterialTheme.typography.bodyMedium,
         singleLine = true,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -256,7 +256,7 @@ fun SettingsTextInput(
         modifier = modifier.width(100.dp).height(48.dp),
         textStyle = MaterialTheme.typography.bodyMedium,
         singleLine = true,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)

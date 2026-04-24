@@ -110,7 +110,7 @@ internal fun ClassicColorPicker(
             Canvas(
                 modifier = Modifier
                     .matchParentSize()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(MaterialTheme.shapes.medium)
             ) {
                 drawRect(Brush.horizontalGradient(listOf(Color.White, rangeColor)))
                 drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))

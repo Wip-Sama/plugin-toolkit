@@ -22,9 +22,11 @@ class MathProcessor {
 
     @Capability(name = "subtract", description = "Subtracts numbers sequentially")
     fun subtractCapability(
-        @PluginParam(description = "List of numbers to subtract"
-    ) values: List<Double>): Double =
-        if (values.isEmpty()) 0.0 else values.reduce { acc, d -> acc - d }
+        @PluginParam(description = "Numerator") a: Double,
+        @PluginParam(description = "Denominator") b: Double
+    ): Double {
+        return a - b
+    }
 
     @Capability(name = "divide", description = "Divides two numbers")
     fun divideCapability(

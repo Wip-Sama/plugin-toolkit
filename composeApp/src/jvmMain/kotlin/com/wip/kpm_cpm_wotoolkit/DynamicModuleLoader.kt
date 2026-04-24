@@ -1,40 +1,51 @@
 package com.wip.kpm_cpm_wotoolkit
 
 import com.wip.plugin.api.PluginEntry
-import org.koin.core.context.loadKoinModules
-import org.koin.core.context.unloadKoinModules
+import org.koin.core.Koin
+import org.koin.dsl.koinApplication
 import org.koin.core.module.Module
-import org.koin.mp.KoinPlatformTools
 import java.io.File
 import java.net.URLClassLoader
 
-object DynamicModuleLoader {
-    private var classLoader: URLClassLoader? = null
-    private var currentModule: Module? = null
-    private var currentPlugin: PluginEntry? = null
+data class LoadedPlugin(
+    val jarPath: String,
+    val entry: PluginEntry,
+    val classLoader: URLClassLoader,
+    val koin: Koin
+)
 
-    fun loadPlugin(jarPath: String, moduleClassName: String, modulePropertyName: String): Result<PluginEntry> {
+object DynamicModuleLoader {
+    private val loadedPlugins = mutableMapOf<String, LoadedPlugin>()
+
+    fun loadPlugin(
+        jarPath: String, 
+        moduleClassName: String, 
+        modulePropertyName: String
+    ): Result<PluginEntry> {
         return try {
             val file = File(jarPath)
             if (!file.exists()) return Result.failure(Exception("File not found: $jarPath"))
 
-            unloadPlugin()
+            // If already loaded, return it
+            loadedPlugins[jarPath]?.let { return Result.success(it.entry) }
 
             val url = file.toURI().toURL()
             val newClassLoader = URLClassLoader(arrayOf(url), this.javaClass.classLoader)
-            classLoader = newClassLoader
 
             val clazz = newClassLoader.loadClass(moduleClassName)
             val field = clazz.getDeclaredField(modulePropertyName)
             field.isAccessible = true
             val module = field.get(null) as Module
 
-            loadKoinModules(module)
-            currentModule = module
-            
-            val koin = KoinPlatformTools.defaultContext().get()
+            // Create an isolated Koin application for this plugin
+            val koinApp = koinApplication {
+                modules(module)
+            }
+            val koin = koinApp.koin
             val pluginEntry = koin.get<PluginEntry>()
-            currentPlugin = pluginEntry
+            
+            val loadedPlugin = LoadedPlugin(jarPath, pluginEntry, newClassLoader, koin)
+            loadedPlugins[jarPath] = loadedPlugin
             
             Result.success(pluginEntry)
         } catch (e: Exception) {
@@ -43,16 +54,18 @@ object DynamicModuleLoader {
         }
     }
 
-    fun unloadPlugin() {
-        currentPlugin?.shutdown()
-        currentPlugin = null
-        currentModule?.let {
-            unloadKoinModules(it)
-            currentModule = null
+    fun unloadPlugin(jarPath: String) {
+        loadedPlugins.remove(jarPath)?.let { 
+            it.entry.shutdown()
+            it.classLoader.close()
         }
-        classLoader?.close()
-        classLoader = null
     }
+
+    fun unloadAll() {
+        loadedPlugins.keys.toList().forEach { unloadPlugin(it) }
+    }
+
+    fun getPlugins(): List<PluginEntry> = loadedPlugins.values.map { it.entry }
     
-    fun getPlugin(): PluginEntry? = currentPlugin
+    fun getPlugin(jarPath: String): PluginEntry? = loadedPlugins[jarPath]?.entry
 }
