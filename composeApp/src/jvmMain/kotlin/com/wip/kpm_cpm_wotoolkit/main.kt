@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.onEach
 import java.io.File
 import org.koin.dsl.module
 import com.wip.kpm_cpm_wotoolkit.core.notification.*
+import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
 import androidx.compose.ui.Modifier
 import org.koin.mp.KoinPlatform.getKoin
 
@@ -41,6 +42,7 @@ fun main(args: Array<String>) {
     startKoin {
         modules(module {
             single<NotificationService> { JvmNotificationService { viewModelProvider()!!.settings } }
+            single { SettingsRegistry() }
         })
     }
 

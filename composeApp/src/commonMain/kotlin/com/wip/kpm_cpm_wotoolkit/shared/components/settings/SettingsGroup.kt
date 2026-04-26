@@ -1,5 +1,6 @@
 package com.wip.kpm_cpm_wotoolkit.shared.components.settings
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -29,7 +30,7 @@ fun SettingsGroup(
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
             shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().animateContentSize()
         ) {
             Column(modifier = Modifier.padding(4.dp)) {
                 content()

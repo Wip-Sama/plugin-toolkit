@@ -39,6 +39,7 @@ fun NavigationSidebar(
     isNavbarCollapsed: Boolean,
     onToggleNavbar: () -> Unit,
     canCollapse: Boolean = true,
+    headerContent: @Composable () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isHovered by remember { mutableStateOf(false) }
@@ -94,6 +95,10 @@ fun NavigationSidebar(
                         overflow = TextOverflow.Clip
                     )
                 }
+            }
+
+            if (isActuallyExpanded) {
+                headerContent()
             }
 
             // Nav sections (BODY SECTION - Scrollable)
