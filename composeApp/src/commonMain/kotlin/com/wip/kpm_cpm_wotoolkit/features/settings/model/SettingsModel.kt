@@ -6,7 +6,9 @@ import kotlinx.serialization.Serializable
 data class AppSettings(
         val appearance: AppearanceSettings = AppearanceSettings(),
         val localization: LocalizationSettings = LocalizationSettings(),
-        val general: GeneralSettings = GeneralSettings()
+        val general: GeneralSettings = GeneralSettings(),
+        val logging: LoggingSettings = LoggingSettings(),
+        val notifications: NotificationSettings = NotificationSettings()
 )
 
 @Serializable
@@ -41,5 +43,44 @@ enum class AppLanguage(val label: String) {
 @Serializable
 data class GeneralSettings(
         val scaling: Float = 1.0f,
-        val animationsEnabled: Boolean = true
+        val animationsEnabled: Boolean = true,
+        val launchAtStartup: Boolean = false,
+        val launchMinimizedAtStartup: Boolean = true,
+        val startMinimized: Boolean = false,
+        val closeToTray: Boolean = false
+)
+
+@Serializable
+data class LoggingSettings(
+    val level: LogLevel = LogLevel.Info,
+    val logsToKeep: Int = 7,
+    val compressOldLogs: Boolean = true,
+    val compressedLogsToKeep: Int = 14
+)
+
+@Serializable
+enum class LogLevel {
+    Verbose,
+    Debug,
+    Info,
+    Warn,
+    Error,
+    Assert
+}
+
+@Serializable
+data class NotificationSettings(
+    val enableToasts: Boolean = true,
+    val toastAutoDismiss: Boolean = true,
+    val toastDismissTime: Int = 5, // seconds
+    val enableSystemNotifications: Boolean = true,
+    val showInfo: Boolean = true,
+    val showWarning: Boolean = true,
+    val showError: Boolean = true,
+    val history: NotificationHistorySettings = NotificationHistorySettings()
+)
+
+@Serializable
+data class NotificationHistorySettings(
+    val retentionDays: Int = 7 // Default 7 days, up to 30 (1 month)
 )

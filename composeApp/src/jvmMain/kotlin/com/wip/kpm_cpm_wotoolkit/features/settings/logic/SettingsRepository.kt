@@ -1,8 +1,10 @@
 package com.wip.kpm_cpm_wotoolkit.features.settings.logic
 
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
+import com.wip.kpm_cpm_wotoolkit.core.KeepTrack
 import kotlinx.serialization.json.Json
 import java.io.File
+import co.touchlab.kermit.Logger
 
 actual class SettingsRepository actual constructor() {
     private val json = Json {
@@ -11,8 +13,8 @@ actual class SettingsRepository actual constructor() {
         encodeDefaults = true
     }
 
-    private val settingsDir = File(System.getProperty("user.home"), ".kpm_cpm_wotoolkit")
-    private val settingsFile = File(settingsDir, "settings.json")
+    private val settingsDir = File(System.getProperty("user.home"), KeepTrack.SETTINGS_DIR_NAME)
+    private val settingsFile = File(settingsDir, KeepTrack.SETTINGS_FILE_NAME)
 
     actual fun loadSettings(): AppSettings {
         return try {
@@ -23,7 +25,7 @@ actual class SettingsRepository actual constructor() {
                 AppSettings()
             }
         } catch (e: Exception) {
-            println("Error loading settings: ${e.message}")
+            Logger.e(e) { "Error loading settings" }
             AppSettings()
         }
     }
@@ -36,7 +38,21 @@ actual class SettingsRepository actual constructor() {
             val content = json.encodeToString(AppSettings.serializer(), settings)
             settingsFile.writeText(content)
         } catch (e: Exception) {
-            println("Error saving settings: ${e.message}")
+            Logger.e(e) { "Error saving settings" }
+        }
+    }
+
+    actual fun openLogFolder() {
+        try {
+            val logDir = File(settingsDir, KeepTrack.LOGS_DIR_NAME)
+            if (!logDir.exists()) {
+                logDir.mkdirs()
+            }
+            if (java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().open(logDir)
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Error opening log folder" }
         }
     }
 }

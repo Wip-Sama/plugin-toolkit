@@ -14,6 +14,6 @@ enum class SidebarItemPosition {
 }
 
 data class SidebarSectionData(
-    val title: StringResource,
+    val title: StringResource?,
     val elements: List<SidebarElement>
 )

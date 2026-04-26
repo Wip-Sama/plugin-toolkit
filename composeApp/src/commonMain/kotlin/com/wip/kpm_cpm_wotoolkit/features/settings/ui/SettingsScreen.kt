@@ -30,8 +30,10 @@ import androidx.compose.ui.tooling.preview.Preview
 @Serializable
 sealed interface SettingNavKey : NavKey {
     @Serializable data object Appearance  : SettingNavKey
+    @Serializable data object SystemSettings : SettingNavKey
     @Serializable data object ModuleRepo   : SettingNavKey
     @Serializable data object ModuleManager   : SettingNavKey
+    @Serializable data object NotificationHistory : SettingNavKey
     @Serializable data object About        : SettingNavKey
 }
 
@@ -40,7 +42,9 @@ val SettingNavConfig = SavedStateConfiguration {
     serializersModule = SerializersModule {
         polymorphic(NavKey::class) {
             subclass(SettingNavKey.Appearance::class, SettingNavKey.Appearance.serializer())
+            subclass(SettingNavKey.SystemSettings::class, SettingNavKey.SystemSettings.serializer())
             subclass(SettingNavKey.ModuleRepo::class, SettingNavKey.ModuleRepo.serializer())
+            subclass(SettingNavKey.NotificationHistory::class, SettingNavKey.NotificationHistory.serializer())
             subclass(SettingNavKey.About::class, SettingNavKey.About.serializer())
         }
     }
@@ -58,6 +62,8 @@ fun SettingsScreen(
         title = Res.string.section_application,
         elements = listOf(
             SidebarElement(SettingNavKey.Appearance, Icons.Default.Palette, Res.string.setting_appearance),
+            SidebarElement(SettingNavKey.SystemSettings, Icons.Default.Settings, Res.string.section_system),
+            SidebarElement(SettingNavKey.NotificationHistory, Icons.Default.History, Res.string.nav_notification_history),
         )
     )
 
@@ -78,58 +84,22 @@ fun SettingsScreen(
 
     Row(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // ── Left: internal settings sidebar ─────────────────────────────────
-        Surface(
-            modifier = Modifier.width(250.dp).fillMaxHeight(),
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
-        ) {
-            Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
-                Text(
-                    text = stringResource(Res.string.settings),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
-                )
-
-                SidebarSection(
-                    section = interfaceSection,
-                    currentSelection = currentKey,
-                    onItemSelected = { key ->
-                        val route = key as SettingNavKey
-                        if (backStack.lastOrNull() != route) {
-                            backStack.removeAll { it == route }
-                            backStack.add(route)
-                        }
-                    }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                SidebarSection(
-                    section = moduleSection,
-                    currentSelection = currentKey,
-                    onItemSelected = { key ->
-                        val route = key as SettingNavKey
-                        if (backStack.lastOrNull() != route) {
-                            backStack.removeAll { it == route }
-                            backStack.add(route)
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                SidebarSection(
-                    section = aboutSection,
-                    currentSelection = currentKey,
-                    onItemSelected = { key ->
-                        val route = key as SettingNavKey
-                        if (backStack.lastOrNull() != route) {
-                            backStack.removeAll { it == route }
-                            backStack.add(route)
-                        }
-                    }
-                )
-            }
-        }
+        NavigationSidebar(
+            title = Res.string.settings,
+            bodySections = listOf(interfaceSection, moduleSection),
+            bottomSections = listOf(aboutSection),
+            currentScreen = currentKey,
+            onScreenSelected = { key ->
+                val route = key as SettingNavKey
+                if (backStack.lastOrNull() != route) {
+                    backStack.removeAll { it == route }
+                    backStack.add(route)
+                }
+            },
+            isNavbarCollapsed = false,
+            onToggleNavbar = {},
+            canCollapse = false
+        )
 
         // ── Right: detail panel ──────────────────────────────────────────────
         Column(
@@ -140,6 +110,8 @@ fun SettingsScreen(
         ) {
             val titleText = when (currentKey) {
                 SettingNavKey.Appearance   -> stringResource(Res.string.setting_appearance)
+                SettingNavKey.SystemSettings -> stringResource(Res.string.section_system)
+                SettingNavKey.NotificationHistory -> stringResource(Res.string.nav_notification_history)
                 SettingNavKey.ModuleRepo   -> stringResource(Res.string.section_modules)
                 SettingNavKey.About        -> stringResource(Res.string.section_about)
                 else                       -> "Error"
@@ -159,6 +131,8 @@ fun SettingsScreen(
             ) { key ->
                 when (key) {
                     SettingNavKey.Appearance   -> NavEntry(key) { AppearanceSettingsView(viewModel) }
+                    SettingNavKey.SystemSettings -> NavEntry(key) { SystemSettingsView(viewModel) }
+                    SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView(viewModel) }
                     SettingNavKey.ModuleRepo   -> NavEntry(key) { PlaceholderView("Module Repository") }
                     SettingNavKey.About        -> NavEntry(key) { PlaceholderView("About This App") }
                     else                       -> NavEntry(key) { PlaceholderView("Error") }

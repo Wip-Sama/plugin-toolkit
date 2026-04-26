@@ -14,6 +14,7 @@ dbus-java = "5.1.0"
 jetbrainsKotlinJvm = "2.3.20"
 koin-bom = "4.2.1"
 ksp = "2.3.7"
+kermit = "2.1.0"
 kotlinpoet = "2.3.0"
 
 [libraries]
@@ -48,6 +49,7 @@ koin-test = { module = "io.insert-koin:koin-test" }
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 
 [plugins]
 composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "composeHotReload" }

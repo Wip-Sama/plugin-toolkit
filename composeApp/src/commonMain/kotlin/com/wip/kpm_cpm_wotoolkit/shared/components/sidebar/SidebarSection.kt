@@ -43,7 +43,7 @@ fun SidebarSection(
     var isSectionCollapsed by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        if (isExpanded) {
+        if (isExpanded && section.title != null) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

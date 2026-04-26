@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
@@ -30,7 +31,10 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.core.theme.AppTheme
 import com.wip.kpm_cpm_wotoolkit.core.utils.PlatformLocalization
+import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService
+import com.wip.kpm_cpm_wotoolkit.shared.components.ToastHost
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.mp.KoinPlatform.getKoin
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
 
@@ -91,6 +95,19 @@ private fun AppContent(viewModel: SettingsViewModel) {
                 )
             )
 
+            val bottomSections = listOf(
+                SidebarSectionData(
+                    title = null,
+                    elements = listOf(
+                        SidebarElement(
+                            id = Screen.Settings,
+                            icon = Icons.Default.Settings,
+                            title = Res.string.settings
+                        )
+                    )
+                )
+            )
+
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     val layoutSidebarWidth by animateDpAsState(
@@ -116,7 +133,9 @@ private fun AppContent(viewModel: SettingsViewModel) {
                     }
 
                     NavigationSidebar(
-                        sections = sections,
+                        title = Res.string.app_name,
+                        bodySections = sections,
+                        bottomSections = bottomSections,
                         currentScreen = currentScreen,
                         onScreenSelected = { route ->
                             val screen = route as Screen
@@ -128,6 +147,12 @@ private fun AppContent(viewModel: SettingsViewModel) {
                         isNavbarCollapsed = isNavbarCollapsed,
                         onToggleNavbar = { isNavbarCollapsed = !isNavbarCollapsed },
                         modifier = Modifier.fillMaxHeight()
+                    )
+
+                    val notificationService = remember { getKoin().get<NotificationService>() }
+                    ToastHost(
+                        notificationService = notificationService,
+                        settings = viewModel.settings.notifications
                     )
                 }
             }

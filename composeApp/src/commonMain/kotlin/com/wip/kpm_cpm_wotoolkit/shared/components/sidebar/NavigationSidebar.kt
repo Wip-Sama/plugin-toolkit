@@ -5,7 +5,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -24,36 +26,25 @@ import kpm_cpm_wotoolkit.composeapp.generated.resources.*
 import com.wip.kpm_cpm_wotoolkit.features.navigation.model.Screen
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-
-@Preview
-@Composable
-private fun NavigationSidebarPreview() {
-    MaterialTheme {
-        NavigationSidebar(
-            sections = listOf(),
-            currentScreen = Screen.Main,
-            onScreenSelected = {},
-            isNavbarCollapsed = false,
-            onToggleNavbar = {}
-        )
-    }
-}
-
+import org.jetbrains.compose.resources.StringResource
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun NavigationSidebar(
-    sections: List<SidebarSectionData>,
+    title: StringResource,
+    bodySections: List<SidebarSectionData>,
+    bottomSections: List<SidebarSectionData> = emptyList(),
     currentScreen: Any,
     onScreenSelected: (Any) -> Unit,
     isNavbarCollapsed: Boolean,
     onToggleNavbar: () -> Unit,
+    canCollapse: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var isHovered by remember { mutableStateOf(false) }
 
     // If navbar is collapsed, it can temporarily expand on hover
-    val isActuallyExpanded = !isNavbarCollapsed || isHovered
+    val isActuallyExpanded = !canCollapse || !isNavbarCollapsed || isHovered
 
     val sidebarWidth by animateDpAsState(
         targetValue = if (isActuallyExpanded) 250.dp else 80.dp,
@@ -67,12 +58,12 @@ fun NavigationSidebar(
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false },
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
-        shadowElevation = if (isHovered && isNavbarCollapsed) 8.dp else 0.dp
+        shadowElevation = if (isHovered && isNavbarCollapsed && canCollapse) 8.dp else 0.dp
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(12.dp)
         ) {
-            // Header / toggle
+            // Header / toggle (TOP SECTION)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -80,17 +71,21 @@ fun NavigationSidebar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (isActuallyExpanded) Arrangement.Start else Arrangement.Center
             ) {
-                IconButton(onClick = onToggleNavbar) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Toggle Sidebar"
-                    )
+                if (canCollapse) {
+                    IconButton(onClick = onToggleNavbar) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Toggle Sidebar"
+                        )
+                    }
+                    if (isActuallyExpanded) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
                 }
 
                 if (isActuallyExpanded) {
-                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = stringResource(Res.string.app_name),
+                        text = stringResource(title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -101,78 +96,53 @@ fun NavigationSidebar(
                 }
             }
 
-            // Nav sections
-            sections.forEach { section ->
-                SidebarSection(
-                    section = section,
-                    currentSelection = currentScreen,
-                    onItemSelected = onScreenSelected,
-                    isExpanded = isActuallyExpanded
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+            // Nav sections (BODY SECTION - Scrollable)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                bodySections.forEach { section ->
+                    SidebarSection(
+                        section = section,
+                        currentSelection = currentScreen,
+                        onItemSelected = onScreenSelected,
+                        isExpanded = isActuallyExpanded
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Settings button at the bottom
-            val isSettingsSelected = currentScreen == Screen.Settings
-            val settingsBg = if (isSettingsSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
-            val settingsColor = if (isSettingsSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-            val settingsIconColor = if (isSettingsSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            val settingsIconBg = if (isSettingsSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-
-            if (isActuallyExpanded) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(settingsBg)
-                        .clickable { onScreenSelected(Screen.Settings) }
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(settingsIconBg),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = settingsIconColor, modifier = Modifier.size(22.dp))
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        text = stringResource(Res.string.settings),
-                        color = settingsColor,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip
+            // Bottom sections (BOTTOM SECTION)
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                bottomSections.forEach { section ->
+                    SidebarSection(
+                        section = section,
+                        currentSelection = currentScreen,
+                        onItemSelected = onScreenSelected,
+                        isExpanded = isActuallyExpanded
                     )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(settingsBg)
-                        .clickable { onScreenSelected(Screen.Settings) }
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(settingsIconBg),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = settingsIconColor, modifier = Modifier.size(22.dp))
-                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
     }
 }
 
+@Preview
+@Composable
+private fun NavigationSidebarPreview() {
+    MaterialTheme {
+        NavigationSidebar(
+            title = Res.string.app_name,
+            bodySections = listOf(),
+            currentScreen = Screen.Main,
+            onScreenSelected = {},
+            isNavbarCollapsed = false,
+            onToggleNavbar = {}
+        )
+    }
+}
