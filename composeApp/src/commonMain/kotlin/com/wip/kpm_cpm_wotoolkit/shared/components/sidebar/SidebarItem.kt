@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-fun SidebarItem(
-    element: SidebarElement,
+fun <T> SidebarItem(
+    element: SidebarElement<out T>,
     isSelected: Boolean,
     onClick: () -> Unit,
     isExpanded: Boolean = true,

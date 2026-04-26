@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -35,22 +36,13 @@ import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService
 import com.wip.kpm_cpm_wotoolkit.shared.components.ToastHost
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.koin.mp.KoinPlatform.getKoin
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
+import org.koin.compose.koinInject
 
 @Composable
-fun App(viewModel: SettingsViewModel = viewModel { SettingsViewModel() }) {
-    val localization = viewModel.settings.localization
+fun App(viewModel: SettingsViewModel = koinInject()) {
+    val languageCode by viewModel.currentLanguageCode.collectAsState()
     
-    val languageCode = if (localization.useSystemLanguage) {
-        val systemLang = PlatformLocalization.getSystemLanguage()
-        if (systemLang == "it") "it" else "en"
-    } else {
-        when (localization.language) {
-            AppLanguage.Italian -> "it"
-            AppLanguage.English -> "en"
-        }
-    }
 
     LaunchedEffect(languageCode) {
         PlatformLocalization.setApplicationLanguage(languageCode)
@@ -137,10 +129,8 @@ private fun AppContent(viewModel: SettingsViewModel) {
                         bodySections = sections,
                         bottomSections = bottomSections,
                         currentScreen = currentScreen,
-                        onScreenSelected = { route ->
-                            val screen = route as Screen
+                        onScreenSelected = { screen ->
                             if (backStack.lastOrNull() != screen) {
-                                backStack.removeAll { it == screen }
                                 backStack.add(screen)
                             }
                         },
@@ -149,7 +139,7 @@ private fun AppContent(viewModel: SettingsViewModel) {
                         modifier = Modifier.fillMaxHeight()
                     )
 
-                    val notificationService = remember { getKoin().get<NotificationService>() }
+                    val notificationService = koinInject<NotificationService>()
                     ToastHost(
                         notificationService = notificationService,
                         settings = viewModel.settings.notifications

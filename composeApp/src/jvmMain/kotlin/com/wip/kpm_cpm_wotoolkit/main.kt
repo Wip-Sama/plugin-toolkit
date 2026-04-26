@@ -7,6 +7,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.window.*
 import com.wip.kpm_cpm_wotoolkit.features.settings.logic.SettingsRepository
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import com.wip.kpm_cpm_wotoolkit.core.KeepTrack
 import org.jetbrains.compose.resources.painterResource
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
@@ -41,12 +43,16 @@ fun main(args: Array<String>) {
 
     startKoin {
         modules(module {
+            single { repository }
             single<NotificationService> { JvmNotificationService { viewModelProvider()!!.settings } }
             single { SettingsRegistry() }
+            factory { SettingsViewModel(get()) }
+            factory { NotificationViewModel(get()) }
+            factory { SettingsSearchViewModel(get()) }
         })
     }
 
-    val viewModel = SettingsViewModel(repository)
+    val viewModel = org.koin.mp.KoinPlatform.getKoin().get<SettingsViewModel>()
     viewModelProvider = { viewModel }
 
     // Initialize Logging with Kermit
@@ -99,7 +105,7 @@ fun main(args: Array<String>) {
                 },
                 title = "WOToolkit",
             ) {
-                val notificationService = remember { getKoin().get<NotificationService>() }
+                val notificationService = org.koin.mp.KoinPlatform.getKoin().get<NotificationService>()
 
                 LaunchedEffect(Unit) {
                     val trayState = trayState // from application scope

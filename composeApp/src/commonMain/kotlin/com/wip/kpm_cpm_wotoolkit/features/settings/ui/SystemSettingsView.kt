@@ -12,13 +12,19 @@ import androidx.compose.ui.unit.dp
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import kpm_cpm_wotoolkit.composeapp.generated.resources.*
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
+import org.koin.compose.koinInject
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.*
 import org.jetbrains.compose.resources.stringResource
 import com.wip.kpm_cpm_wotoolkit.core.utils.StartupManager
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.LogLevel
+import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType
 
 @Composable
-fun SystemSettingsView(viewModel: SettingsViewModel) {
+fun SystemSettingsView(
+    viewModel: SettingsViewModel,
+    notificationViewModel: NotificationViewModel = koinInject()
+) {
     val general = viewModel.settings.general
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -320,16 +326,16 @@ fun SystemSettingsView(viewModel: SettingsViewModel) {
                 icon = Icons.Default.BugReport,
                 control = {
                     Row {
-                        IconButton(onClick = { viewModel.testSystemNotification(com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType.Info) }) {
+                        IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Info) }) {
                             Icon(Icons.Default.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary)
                         }
-                        IconButton(onClick = { viewModel.testSystemNotification(com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType.Warning) }) {
+                        IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Warning) }) {
                             Icon(Icons.Default.Warning, contentDescription = "Warning", tint = androidx.compose.ui.graphics.Color(0xFFFFA500))
                         }
-                        IconButton(onClick = { viewModel.testSystemNotification(com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType.Error) }) {
+                        IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Error) }) {
                             Icon(Icons.Default.Error, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
                         }
-                        IconButton(onClick = { viewModel.testToastNotification() }) {
+                        IconButton(onClick = { notificationViewModel.testToastNotification() }) {
                             Icon(Icons.Default.ChatBubble, contentDescription = "Toast")
                         }
                     }

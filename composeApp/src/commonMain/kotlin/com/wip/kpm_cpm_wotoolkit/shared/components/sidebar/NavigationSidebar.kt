@@ -30,12 +30,12 @@ import org.jetbrains.compose.resources.StringResource
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-fun NavigationSidebar(
+fun <T> NavigationSidebar(
     title: StringResource,
-    bodySections: List<SidebarSectionData>,
-    bottomSections: List<SidebarSectionData> = emptyList(),
-    currentScreen: Any,
-    onScreenSelected: (Any) -> Unit,
+    bodySections: List<SidebarSectionData<out T>>,
+    bottomSections: List<SidebarSectionData<out T>> = emptyList(),
+    currentScreen: T,
+    onScreenSelected: (T) -> Unit,
     isNavbarCollapsed: Boolean,
     onToggleNavbar: () -> Unit,
     canCollapse: Boolean = true,
@@ -143,7 +143,7 @@ private fun NavigationSidebarPreview() {
     MaterialTheme {
         NavigationSidebar(
             title = Res.string.app_name,
-            bodySections = listOf(),
+            bodySections = listOf<SidebarSectionData<Screen>>(),
             currentScreen = Screen.Main,
             onScreenSelected = {},
             isNavbarCollapsed = false,

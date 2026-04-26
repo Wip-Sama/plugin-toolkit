@@ -17,7 +17,9 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import kpm_cpm_wotoolkit.composeapp.generated.resources.*
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.*
+import org.koin.compose.koinInject
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.*
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.*
 import kotlinx.serialization.Serializable
@@ -59,12 +61,18 @@ val SettingNavConfig = SavedStateConfiguration {
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
-    viewModel: SettingsViewModel = viewModel { SettingsViewModel() }
+    viewModel: SettingsViewModel = koinInject(),
+    searchViewModel: SettingsSearchViewModel = koinInject()
 ) {
     val backStack = rememberNavBackStack(SettingNavConfig, SettingNavKey.BroadSearch as SettingNavKey)
     val currentKey = backStack.lastOrNull() ?: SettingNavKey.BroadSearch
-    val searchQuery = viewModel.searchQuery
-    val allSettings by viewModel.settingsRegistry.settings.collectAsState()
+    val searchQuery = searchViewModel.searchQuery
+    val allSettings by searchViewModel.allSettings.collectAsState()
+
+    // Resolve all settings strings to avoid @Composable issues in ViewModel logic
+    val resolvedStrings = allSettings.flatMap { 
+        listOfNotNull(it.title, it.subtitle, it.sectionTitle) 
+    }.distinct().associateWith { it.resolve() }
 
     val interfaceSection = SidebarSectionData(
         title = Res.string.section_application,
@@ -97,10 +105,8 @@ fun SettingsScreen(
             bodySections = listOf(interfaceSection, moduleSection),
             bottomSections = listOf(aboutSection),
             currentScreen = currentKey,
-            onScreenSelected = { key ->
-                val route = key as SettingNavKey
+            onScreenSelected = { route ->
                 if (backStack.lastOrNull() != route) {
-                    backStack.removeAll { it == route }
                     backStack.add(route)
                 }
             },
@@ -110,7 +116,7 @@ fun SettingsScreen(
             headerContent = {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { viewModel.searchQuery = it },
+                    onValueChange = { searchViewModel.searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     placeholder = { Text("Search settings...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
@@ -144,20 +150,12 @@ fun SettingsScreen(
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-            CompositionLocalProvider(LocalSettingsSearchQuery provides searchQuery) {
-                // Determine if we should show the "search globally" button
-                var hasLocalMatches by remember { mutableStateOf(true) }
-                
-                if (searchQuery.isNotBlank() && currentKey != SettingNavKey.BroadSearch && currentKey != SettingNavKey.NotificationHistory) {
-                    val currentMatches = allSettings.filter { 
-                        it.navKey == currentKey && 
-                        (it.title.resolve().contains(searchQuery, ignoreCase = true) || 
-                         it.subtitle?.resolve()?.contains(searchQuery, ignoreCase = true) == true) 
-                    }
-                    hasLocalMatches = currentMatches.isNotEmpty()
-                } else {
-                    hasLocalMatches = true
-                }
+            CompositionLocalProvider(
+                LocalSettingsSearchQuery provides searchQuery,
+                LocalSettingsRegistry provides allSettings
+            ) {
+                val currentSettingKey = currentKey as? SettingNavKey ?: SettingNavKey.BroadSearch
+                val hasLocalMatches = searchViewModel.hasLocalMatches(currentSettingKey, allSettings, resolvedStrings)
 
                 if (!hasLocalMatches && currentKey != SettingNavKey.BroadSearch) {
                     Column(
@@ -169,7 +167,6 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(onClick = { 
                             if (backStack.lastOrNull() != SettingNavKey.BroadSearch) {
-                                backStack.removeAll { it == SettingNavKey.BroadSearch }
                                 backStack.add(SettingNavKey.BroadSearch)
                             }
                         }) {
@@ -187,22 +184,23 @@ fun SettingsScreen(
                         when (key) {
                             SettingNavKey.Appearance   -> NavEntry(key) { AppearanceSettingsView(viewModel) }
                             SettingNavKey.SystemSettings -> NavEntry(key) { SystemSettingsView(viewModel) }
-                            SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView(viewModel) }
+                            SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
                             SettingNavKey.ModuleRepo   -> NavEntry(key) { PlaceholderView("Module Repository") }
                             SettingNavKey.About        -> NavEntry(key) { PlaceholderView("About This App") }
                             SettingNavKey.BroadSearch  -> NavEntry(key) { 
                                 BroadSearchResultsView(
                                     searchQuery = searchQuery, 
                                     allSettings = allSettings, 
+                                    searchViewModel = searchViewModel,
+                                    resolvedStrings = resolvedStrings,
                                     onNavigate = { targetKey ->
                                         if (backStack.lastOrNull() != targetKey) {
-                                            backStack.removeAll { it == targetKey }
                                             backStack.add(targetKey)
                                         }
                                     }
                                 ) 
                             }
-                            else                       -> NavEntry(key) { PlaceholderView("Error") }
+                            else -> NavEntry(key) { PlaceholderView("Error") }
                         }
                     }
                 }
@@ -215,6 +213,8 @@ fun SettingsScreen(
 fun BroadSearchResultsView(
     searchQuery: String, 
     allSettings: List<SearchableSetting>,
+    searchViewModel: SettingsSearchViewModel,
+    resolvedStrings: Map<SettingText, String>,
     onNavigate: (SettingNavKey) -> Unit
 ) {
     if (searchQuery.isBlank()) {
@@ -222,29 +222,20 @@ fun BroadSearchResultsView(
         return
     }
 
-    // Filter out Notification History
-    val searchPool = allSettings.filter { it.navKey != SettingNavKey.NotificationHistory }
-    
-    val matches = searchPool.filter {
-        it.title.resolve().contains(searchQuery, ignoreCase = true) ||
-        it.subtitle?.resolve()?.contains(searchQuery, ignoreCase = true) == true
-    }
+    val grouped = searchViewModel.getBroadSearchResults(allSettings, resolvedStrings)
 
-    if (matches.isEmpty()) {
+    if (grouped.isEmpty()) {
         PlaceholderView("No results found for \"$searchQuery\"")
         return
     }
-
-    // Group by section
-    val grouped = matches.groupBy { it.sectionTitle.resolve() }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         grouped.forEach { (sectionName, items) ->
             SettingsGroup(title = sectionName) {
                 items.forEach { setting ->
                     SettingsItem(
-                        title = setting.title.resolve(),
-                        subtitle = setting.subtitle?.resolve(),
+                        title = resolvedStrings[setting.title] ?: "",
+                        subtitle = setting.subtitle?.let { resolvedStrings[it] },
                         icon = Icons.Default.Search,
                         onClick = {
                             onNavigate(setting.navKey)

@@ -205,11 +205,3 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
     }
 }
 
-@Preview
-@Composable
-private fun AppearanceSettingsViewPreview() {
-    MaterialTheme {
-        AppearanceSettingsView(SettingsViewModel())
-    }
-}
-

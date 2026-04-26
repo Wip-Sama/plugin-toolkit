@@ -23,7 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 private fun SidebarSectionPreview() {
     MaterialTheme {
         SidebarSection(
-            section = SidebarSectionData(
+            section = SidebarSectionData<String>(
                 title = Res.string.section_application,
                 elements = listOf()
             ),
@@ -34,10 +34,10 @@ private fun SidebarSectionPreview() {
 }
 
 @Composable
-fun SidebarSection(
-    section: SidebarSectionData,
-    currentSelection: Any,
-    onItemSelected: (Any) -> Unit,
+fun <T> SidebarSection(
+    section: SidebarSectionData<out T>,
+    currentSelection: T,
+    onItemSelected: (T) -> Unit,
     isExpanded: Boolean = true
 ) {
     var isSectionCollapsed by remember { mutableStateOf(false) }

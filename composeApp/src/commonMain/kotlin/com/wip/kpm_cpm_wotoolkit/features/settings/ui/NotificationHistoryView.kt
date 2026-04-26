@@ -15,7 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationRecord
 import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType
-import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
+import org.koin.compose.koinInject
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import kpm_cpm_wotoolkit.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -24,8 +25,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun NotificationHistoryView(viewModel: SettingsViewModel) {
-    val history by viewModel.notificationHistory.collectAsState()
+fun NotificationHistoryView(viewModel: NotificationViewModel = koinInject()) {
+    val history by viewModel.history.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -33,7 +34,7 @@ fun NotificationHistoryView(viewModel: SettingsViewModel) {
             horizontalArrangement = Arrangement.End
         ) {
             Button(
-                onClick = { viewModel.clearNotificationHistory() },
+                onClick = { viewModel.clearHistory() },
                 enabled = history.isNotEmpty(),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)
             ) {
@@ -55,7 +56,7 @@ fun NotificationHistoryView(viewModel: SettingsViewModel) {
                 items(history, key = { it.id }) { record ->
                     NotificationItem(
                         record = record,
-                        onDelete = { viewModel.removeNotificationItem(record.id) }
+                        onDelete = { viewModel.removeHistoryItem(record.id) }
                     )
                 }
             }
