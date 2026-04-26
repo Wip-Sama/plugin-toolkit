@@ -1,0 +1,63 @@
+package com.wip.kpm_cpm_wotoolkit.shared.components
+
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.Preview
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun SelectedButtonGroup(
+    buttons: List<String>,
+    modifier: Modifier = Modifier,
+    startingIndex: Int = 0,
+    onButtonSelected: (button: String) -> Unit = {},
+) {
+    var selectedIndex by remember { mutableIntStateOf(startingIndex) }
+    val scrollState = rememberScrollState()
+    Row(
+        modifier = modifier
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        buttons.forEachIndexed { index, buttonText ->
+            ToggleButton(
+                checked = selectedIndex == index,
+                onCheckedChange = {
+                    selectedIndex = index
+                    onButtonSelected(buttonText)
+                },
+                shapes =
+                    when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        buttons.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    },
+                modifier = Modifier.semantics { role = Role.RadioButton },
+            ) {
+                Text(buttonText)
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun SelectedButtonGroupPreview() {
+    MaterialTheme {
+        SelectedButtonGroup(
+            buttons = listOf("Option A", "Option B", "Option C"),
+            startingIndex = 1
+        )
+    }
+}
+
