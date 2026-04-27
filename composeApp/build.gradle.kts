@@ -31,6 +31,9 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.kermit)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -42,6 +45,7 @@ kotlin {
             implementation(libs.jna.platform)
             implementation(libs.dbus.java.core)
             implementation(project(":plugin-api"))
+            implementation(libs.ktor.client.cio)
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.wip.kpm_cpm_wotoolkit.features.settings.model
 
+import com.wip.kpm_cpm_wotoolkit.features.repository.model.ExtensionRepo
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -8,7 +9,8 @@ data class AppSettings(
         val localization: LocalizationSettings = LocalizationSettings(),
         val general: GeneralSettings = GeneralSettings(),
         val logging: LoggingSettings = LoggingSettings(),
-        val notifications: NotificationSettings = NotificationSettings()
+        val notifications: NotificationSettings = NotificationSettings(),
+        val extensions: ExtensionSettings = ExtensionSettings()
 )
 
 @Serializable
@@ -83,4 +85,10 @@ data class NotificationSettings(
 @Serializable
 data class NotificationHistorySettings(
     val retentionDays: Int = 7 // Default 7 days, up to 30 (1 month)
+)
+
+@Serializable
+data class ExtensionSettings(
+    val repositories: List<ExtensionRepo> = emptyList(),
+    val packageSourceOverrides: Map<String, String> = emptyMap() // pkg to repo url
 )

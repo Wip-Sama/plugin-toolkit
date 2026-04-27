@@ -28,6 +28,8 @@ import java.io.File
 import org.koin.dsl.module
 import com.wip.kpm_cpm_wotoolkit.core.notification.*
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
+import com.wip.kpm_cpm_wotoolkit.features.repository.logic.RepoManager
+import com.wip.kpm_cpm_wotoolkit.features.repository.viewmodel.ModuleRepoViewModel
 import androidx.compose.ui.Modifier
 import org.koin.mp.KoinPlatform.getKoin
 
@@ -46,13 +48,17 @@ fun main(args: Array<String>) {
             single { repository }
             single<NotificationService> { JvmNotificationService { viewModelProvider()!!.settings } }
             single { SettingsRegistry() }
+            single { RepoManager(get()) }
             factory { SettingsViewModel(get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
+            factory { ModuleRepoViewModel(get(), get()) }
         })
     }
 
-    val viewModel = org.koin.mp.KoinPlatform.getKoin().get<SettingsViewModel>()
+    val koin = org.koin.mp.KoinPlatform.getKoin()
+    val viewModel = koin.get<SettingsViewModel>()
+    koin.get<RepoManager>() // Trigger initialization and background refresh
     viewModelProvider = { viewModel }
 
     // Initialize Logging with Kermit

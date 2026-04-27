@@ -59,4 +59,12 @@
     <string name="nav_notification_history">Notification History</string>
     <string name="history_clear_all">Clear All</string>
     <string name="history_empty">No notifications recorded yet.</string>
+    <string name="repo_add_title">Add Repository</string>
+    <string name="repo_url_label">Repository URL</string>
+    <string name="repo_add_button">Add</string>
+    <string name="repo_conflicts_title">Conflicts</string>
+    <string name="repo_conflicts_subtitle">Select source repository for this package</string>
+    <string name="repo_managed_title">Managed Repositories</string>
+    <string name="repo_refresh_all">Refresh All</string>
+    <string name="repo_empty_list">No repositories added yet.</string>
 </resources>

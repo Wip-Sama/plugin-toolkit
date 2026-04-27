@@ -60,6 +60,7 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
+import com.wip.kpm_cpm_wotoolkit.features.repository.ui.ModuleRepoView
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -309,7 +310,7 @@ fun SettingsScreen(
 
                             // ── Custom pages (parallel system) ────────────
                             SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
-                            SettingNavKey.ModuleRepo -> NavEntry(key) { PlaceholderView("Module Repository") }
+                            SettingNavKey.ModuleRepo -> NavEntry(key) { ModuleRepoView() }
                             SettingNavKey.About -> NavEntry(key) { PlaceholderView("About This App") }
 
                             // ── Broad search (initial entry state) ────────
