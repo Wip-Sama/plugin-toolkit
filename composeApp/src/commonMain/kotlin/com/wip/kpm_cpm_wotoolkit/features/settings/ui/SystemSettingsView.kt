@@ -1,52 +1,100 @@
 package com.wip.kpm_cpm_wotoolkit.features.settings.ui
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AvTimer
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Input
+import androidx.compose.material.icons.filled.Minimize
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.SettingsInputComponent
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
-import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
-import kpm_cpm_wotoolkit.composeapp.generated.resources.*
-import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
-import org.koin.compose.koinInject
-import com.wip.kpm_cpm_wotoolkit.shared.components.settings.*
-import org.jetbrains.compose.resources.stringResource
+import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType
 import com.wip.kpm_cpm_wotoolkit.core.utils.StartupManager
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.LogLevel
-import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsDropdown
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsGroup
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsNumericInput
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsSwitch
+import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_logging
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_notifications
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_system
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_toasts
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_close_to_tray
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_close_to_tray_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_compress_old_logs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_compress_old_logs_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_compressed_logs_to_keep
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_compressed_logs_to_keep_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_enable_system_notifications
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_enable_toasts
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_history_retention
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_launch_at_startup
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_launch_at_startup_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_launch_minimized_at_startup
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_launch_minimized_at_startup_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_log_level
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_log_level_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_logs_to_keep
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_logs_to_keep_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_open_log_folder
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_open_log_folder_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_error
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_info
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_warning
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_start_minimized
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_start_minimized_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_toast_auto_dismiss
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_toast_dismiss_time
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 
 @Composable
 fun SystemSettingsView(
-    viewModel: SettingsViewModel,
-    notificationViewModel: NotificationViewModel = koinInject()
+    viewModel: SettingsViewModel, notificationViewModel: NotificationViewModel = koinInject()
 ) {
     val general = viewModel.settings.general
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SettingsGroup(title = stringResource(Res.string.section_system)) {
-            
+
             SettingsItem(
                 title = stringResource(Res.string.setting_launch_at_startup),
                 subtitle = stringResource(Res.string.setting_launch_at_startup_subtitle),
                 icon = Icons.Default.RocketLaunch,
                 control = {
                     SettingsSwitch(
-                        checked = general.launchAtStartup,
-                        onCheckedChange = { checked ->
+                        checked = general.launchAtStartup, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(general = it.general.copy(launchAtStartup = checked))
                             }
                             // Apply the change immediately to the OS
                             StartupManager.setLaunchAtStartup(checked, general.launchMinimizedAtStartup)
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_launch_minimized_at_startup),
@@ -66,8 +114,7 @@ fun SystemSettingsView(
                             }
                         },
                     )
-                }
-            )
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_start_minimized),
@@ -75,15 +122,12 @@ fun SystemSettingsView(
                 icon = Icons.Default.Minimize,
                 control = {
                     SettingsSwitch(
-                        checked = general.startMinimized,
-                        onCheckedChange = { checked ->
+                        checked = general.startMinimized, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(general = it.general.copy(startMinimized = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_close_to_tray),
@@ -91,17 +135,14 @@ fun SystemSettingsView(
                 icon = Icons.Default.SettingsInputComponent, // Or any relevant icon
                 control = {
                     SettingsSwitch(
-                        checked = general.closeToTray,
-                        onCheckedChange = { checked ->
+                        checked = general.closeToTray, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(general = it.general.copy(closeToTray = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
         }
-        
+
         SettingsGroup(title = stringResource(Res.string.section_logging)) {
             val logging = viewModel.settings.logging
 
@@ -118,10 +159,8 @@ fun SystemSettingsView(
                             viewModel.updateSettings {
                                 it.copy(logging = it.logging.copy(level = LogLevel.valueOf(name)))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_logs_to_keep),
@@ -129,16 +168,13 @@ fun SystemSettingsView(
                 icon = Icons.Default.CalendarToday,
                 control = {
                     SettingsNumericInput(
-                        value = logging.logsToKeep,
-                        onValueChange = { value ->
+                        value = logging.logsToKeep, onValueChange = { value ->
                             viewModel.updateSettings {
                                 it.copy(logging = it.logging.copy(logsToKeep = value))
                             }
-                        },
-                        valueRange = 1..30
+                        }, valueRange = 1..30
                     )
-                }
-            )
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_compress_old_logs),
@@ -146,15 +182,12 @@ fun SystemSettingsView(
                 icon = Icons.Default.Compress,
                 control = {
                     SettingsSwitch(
-                        checked = logging.compressOldLogs,
-                        onCheckedChange = { checked ->
+                        checked = logging.compressOldLogs, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(logging = it.logging.copy(compressOldLogs = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_compressed_logs_to_keep),
@@ -163,16 +196,13 @@ fun SystemSettingsView(
                 enabled = logging.compressOldLogs,
                 control = {
                     SettingsNumericInput(
-                        value = logging.compressedLogsToKeep,
-                        onValueChange = { value ->
+                        value = logging.compressedLogsToKeep, onValueChange = { value ->
                             viewModel.updateSettings {
                                 it.copy(logging = it.logging.copy(compressedLogsToKeep = value))
                             }
-                        },
-                        valueRange = 1..100
+                        }, valueRange = 1..100
                     )
-                }
-            )
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_open_log_folder),
@@ -180,27 +210,21 @@ fun SystemSettingsView(
                 icon = Icons.Default.FolderOpen,
                 onClick = {
                     viewModel.openLogFolder()
-                }
-            )
+                })
         }
 
         SettingsGroup(title = stringResource(Res.string.section_toasts)) {
             val notifications = viewModel.settings.notifications
 
             SettingsItem(
-                title = stringResource(Res.string.setting_enable_toasts),
-                icon = Icons.Default.ChatBubble,
-                control = {
+                title = stringResource(Res.string.setting_enable_toasts), icon = Icons.Default.ChatBubble, control = {
                     SettingsSwitch(
-                        checked = notifications.enableToasts,
-                        onCheckedChange = { checked ->
+                        checked = notifications.enableToasts, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(notifications = it.notifications.copy(enableToasts = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_toast_auto_dismiss),
@@ -208,15 +232,12 @@ fun SystemSettingsView(
                 enabled = notifications.enableToasts,
                 control = {
                     SettingsSwitch(
-                        checked = notifications.toastAutoDismiss,
-                        onCheckedChange = { checked ->
+                        checked = notifications.toastAutoDismiss, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(notifications = it.notifications.copy(toastAutoDismiss = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_toast_dismiss_time),
@@ -224,16 +245,13 @@ fun SystemSettingsView(
                 enabled = notifications.enableToasts && notifications.toastAutoDismiss,
                 control = {
                     SettingsNumericInput(
-                        value = notifications.toastDismissTime,
-                        onValueChange = { value ->
+                        value = notifications.toastDismissTime, onValueChange = { value ->
                             viewModel.updateSettings {
                                 it.copy(notifications = it.notifications.copy(toastDismissTime = value))
                             }
-                        },
-                        valueRange = 1..10
+                        }, valueRange = 1..10
                     )
-                }
-            )
+                })
         }
 
         SettingsGroup(title = stringResource(Res.string.section_notifications)) {
@@ -244,15 +262,12 @@ fun SystemSettingsView(
                 icon = Icons.Default.Notifications,
                 control = {
                     SettingsSwitch(
-                        checked = notifications.enableSystemNotifications,
-                        onCheckedChange = { checked ->
+                        checked = notifications.enableSystemNotifications, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(notifications = it.notifications.copy(enableSystemNotifications = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_show_info),
@@ -260,15 +275,12 @@ fun SystemSettingsView(
                 enabled = notifications.enableSystemNotifications,
                 control = {
                     SettingsSwitch(
-                        checked = notifications.showInfo,
-                        onCheckedChange = { checked ->
+                        checked = notifications.showInfo, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(notifications = it.notifications.copy(showInfo = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_show_warning),
@@ -276,15 +288,12 @@ fun SystemSettingsView(
                 enabled = notifications.enableSystemNotifications,
                 control = {
                     SettingsSwitch(
-                        checked = notifications.showWarning,
-                        onCheckedChange = { checked ->
+                        checked = notifications.showWarning, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(notifications = it.notifications.copy(showWarning = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
                 title = stringResource(Res.string.setting_show_error),
@@ -292,34 +301,28 @@ fun SystemSettingsView(
                 enabled = notifications.enableSystemNotifications,
                 control = {
                     SettingsSwitch(
-                        checked = notifications.showError,
-                        onCheckedChange = { checked ->
+                        checked = notifications.showError, onCheckedChange = { checked ->
                             viewModel.updateSettings {
                                 it.copy(notifications = it.notifications.copy(showError = checked))
                             }
-                        }
-                    )
-                }
-            )
+                        })
+                })
 
             SettingsItem(
-                title = stringResource(Res.string.setting_history_retention),
-                icon = Icons.Default.History,
-                control = {
+                title = stringResource(Res.string.setting_history_retention), icon = Icons.Default.History, control = {
                     SettingsNumericInput(
-                        value = notifications.history.retentionDays,
-                        onValueChange = { value ->
+                        value = notifications.history.retentionDays, onValueChange = { value ->
                             viewModel.updateSettings {
-                                it.copy(notifications = it.notifications.copy(
-                                    history = it.notifications.history.copy(retentionDays = value)
-                                ))
+                                it.copy(
+                                    notifications = it.notifications.copy(
+                                        history = it.notifications.history.copy(retentionDays = value)
+                                    )
+                                )
                             }
-                        },
-                        valueRange = 1..30
+                        }, valueRange = 1..30
                     )
-                }
-            )
-            
+                })
+
             SettingsItem(
                 title = "Test Notifications",
                 subtitle = "Trigger test notifications to verify behavior",
@@ -327,20 +330,31 @@ fun SystemSettingsView(
                 control = {
                     Row {
                         IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Info) }) {
-                            Icon(Icons.Default.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Info",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
                         IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Warning) }) {
-                            Icon(Icons.Default.Warning, contentDescription = "Warning", tint = androidx.compose.ui.graphics.Color(0xFFFFA500))
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = "Warning",
+                                tint = androidx.compose.ui.graphics.Color(0xFFFFA500)
+                            )
                         }
                         IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Error) }) {
-                            Icon(Icons.Default.Error, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
+                            Icon(
+                                Icons.Default.Error,
+                                contentDescription = "Error",
+                                tint = MaterialTheme.colorScheme.error
+                            )
                         }
                         IconButton(onClick = { notificationViewModel.testToastNotification() }) {
                             Icon(Icons.Default.ChatBubble, contentDescription = "Toast")
                         }
                     }
-                }
-            )
+                })
         }
     }
 }

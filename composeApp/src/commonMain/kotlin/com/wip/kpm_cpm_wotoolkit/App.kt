@@ -130,6 +130,7 @@ private fun AppContent(viewModel: SettingsViewModel) {
                         bottomSections = bottomSections,
                         currentScreen = currentScreen,
                         onScreenSelected = { screen ->
+                            backStack.clear()
                             if (backStack.lastOrNull() != screen) {
                                 backStack.add(screen)
                             }

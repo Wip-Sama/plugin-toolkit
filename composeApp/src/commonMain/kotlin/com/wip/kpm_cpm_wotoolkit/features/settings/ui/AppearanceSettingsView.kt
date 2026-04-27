@@ -5,30 +5,55 @@ package com.wip.kpm_cpm_wotoolkit.features.settings.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
-import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
-import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
-import kpm_cpm_wotoolkit.composeapp.generated.resources.*
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.ColorPickerType
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.ColorPickerDialog
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppTheme
-import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.ColorPickerDialog
-import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.ColorPickerType
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.TimezoneUtils
-import com.wip.kpm_cpm_wotoolkit.shared.components.settings.*
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsDropdown
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsGroup
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsSlider
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsSwitch
+import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_localization
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_accent_color
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_appearance
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_language
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_scaling
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_theme
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_timezone
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_use_system_language
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_use_system_language_subtitle
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun AppearanceSettingsView(viewModel: SettingsViewModel) {
@@ -68,8 +93,10 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                                 it.copy(appearance = it.appearance.copy(theme = theme))
                             }
                         },
-                        labelProvider = { it.name })
-                })
+                        labelProvider = { it.name }
+                    )
+                }
+            )
 
             SettingsItem(
                 title = "Follow System Accent",
@@ -85,8 +112,10 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                                     )
                                 )
                             }
-                        })
-                })
+                        }
+                    )
+                }
+            )
 
             SettingsItem(
                 title = stringResource(Res.string.setting_accent_color),
@@ -96,12 +125,16 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                 onClick = { if (!appearance.followSystemAccent) showColorPicker = true },
                 control = {
                     Box(
-                        modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(appearance.accentColor))
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(appearance.accentColor))
                             .border(
                                 1.dp, MaterialTheme.colorScheme.outline, CircleShape
                             ).clickable(
                                 enabled = !appearance.followSystemAccent
-                            ) { showColorPicker = true })
+                            ) { showColorPicker = true }
+                    )
                 }
             )
 
@@ -111,14 +144,11 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                 icon = Icons.Default.AspectRatio,
                 control = {
                     SettingsSlider(
-                        value = general.scaling,
-                        onValueChange = { valScale ->
+                        value = general.scaling, onValueChange = { valScale ->
                             viewModel.updateSettings {
                                 it.copy(general = it.general.copy(scaling = valScale))
                             }
-                        },
-                        valueRange = 0.5f..2.0f,
-                        steps = 5
+                        }, valueRange = 0.5f..2.0f, steps = 5
                     )
                 }
             )
@@ -140,8 +170,10 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                                     )
                                 )
                             }
-                        })
-                })
+                        }
+                    )
+                }
+            )
 
             SettingsItem(
                 title = stringResource(Res.string.setting_language),
@@ -162,7 +194,8 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                         labelProvider = { it.label },
                         enabled = !localization.useSystemLanguage
                     )
-                })
+                }
+            )
 
             SettingsItem(
                 title = "Use System Timezone",
@@ -178,8 +211,10 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                                     )
                                 )
                             }
-                        })
-                })
+                        }
+                    )
+                }
+            )
 
             val availableTimezones = remember { TimezoneUtils.getAvailableZoneIds() }
             SettingsItem(
@@ -200,7 +235,8 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                         labelProvider = { it },
                         enabled = !localization.useSystemTimezone
                     )
-                })
+                }
+            )
         }
     }
 }
