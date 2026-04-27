@@ -277,40 +277,16 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxSize(),
                         onBack = { if (backStack.size > 1) backStack.removeLast() }) { key ->
                         when (key) {
-                            // ── Auto-generated pages ──────────────────────
-                            SettingNavKey.Appearance -> NavEntry(key) {
-                                AutoSettingsView(
-                                    navKey = SettingNavKey.Appearance,
-                                    viewModel = viewModel,
-                                    registry = registry,
-                                    controlOverrides = controlOverrides,
-                                    actionOverrides = actionOverrides
-                                )
-                            }
-
-                            SettingNavKey.SystemSettings -> NavEntry(key) {
-                                AutoSettingsView(
-                                    navKey = SettingNavKey.SystemSettings,
-                                    viewModel = viewModel,
-                                    registry = registry,
-                                    controlOverrides = controlOverrides,
-                                    actionOverrides = actionOverrides
-                                )
-                            }
-
-                            SettingNavKey.ModuleManager -> NavEntry(key) {
-                                AutoSettingsView(
-                                    navKey = SettingNavKey.ModuleManager,
-                                    viewModel = viewModel,
-                                    registry = registry,
-                                    controlOverrides = controlOverrides,
-                                    actionOverrides = actionOverrides
-                                )
-                            }
-
-                            // ── Custom pages (parallel system) ────────────
+                            // Application
+                            SettingNavKey.Appearance -> NavEntry(key) { AppearanceSettingsView(viewModel) }
+                            SettingNavKey.SystemSettings -> NavEntry(key) { SystemSettingsView(viewModel) }
                             SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
+
+                            // Modules
+                            SettingNavKey.ModuleManager -> NavEntry(key) { PlaceholderView("Module manager Placeholder") }
                             SettingNavKey.ModuleRepo -> NavEntry(key) { ModuleRepoView() }
+
+                            // About
                             SettingNavKey.About -> NavEntry(key) { PlaceholderView("About This App") }
 
                             // ── Broad search (initial entry state) ────────
