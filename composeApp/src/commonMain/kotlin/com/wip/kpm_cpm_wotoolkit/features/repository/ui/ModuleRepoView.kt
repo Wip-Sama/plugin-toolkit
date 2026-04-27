@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.wip.kpm_cpm_wotoolkit.features.repository.viewmodel.ModuleRepoViewModel
-import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsDropdown
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.ExpressiveMenu
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsGroup
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
 import kpm_cpm_wotoolkit.composeapp.generated.resources.*
@@ -66,7 +66,7 @@ fun ModuleRepoView(
                         subtitle = stringResource(Res.string.repo_conflicts_subtitle),
                         icon = Icons.Default.Warning,
                         control = {
-                            SettingsDropdown(
+                            ExpressiveMenu(
                                 options = repos,
                                 selectedOption = viewModel.getSelectedRepoForPackage(pkg, repos),
                                 onOptionSelected = { viewModel.setPackageSource(pkg, it.url) },
@@ -160,9 +160,16 @@ fun ModuleRepoView(
 
                     val repoModules = modulesMap[repo.url] ?: emptyList()
                     items(repoModules) { module ->
+                        val installedVersion = viewModel.getInstalledVersion(module.pkg)
+                        val subtitle = if (installedVersion != null) {
+                            "v${module.version} • Installed: v$installedVersion • ${module.pkg}"
+                        } else {
+                            "v${module.version} • ${module.pkg}"
+                        }
+                        
                         SettingsItem(
                             title = module.name,
-                            subtitle = "v${module.version} • ${module.pkg}",
+                            subtitle = subtitle,
                             icon = Icons.Default.Extension,
                             control = {
                                 val isInstalled = viewModel.isInstalled(module.pkg)

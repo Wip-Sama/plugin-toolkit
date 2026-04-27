@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
+import co.touchlab.kermit.Logger
+import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationEvent
 
 class RepoManager(
     private val settingsRepository: SettingsRepository
@@ -42,6 +44,7 @@ class RepoManager(
         
         // Initial load from memory (if we had a cache, we'd load it here)
         // For now, we refresh on launch
+        Logger.i { "Initializing RepoManager with ${settings.extensions.repositories.size} repositories" }
         scope.launch {
             refreshAll()
         }
@@ -49,9 +52,11 @@ class RepoManager(
 
     suspend fun addRepository(url: String): AddRepoResult {
         if (_repositories.value.any { it.url == url }) {
+            Logger.w { "Repository already added: $url" }
             return AddRepoResult.AlreadyAdded
         }
 
+        Logger.i { "Adding repository: $url" }
         return try {
             val response = client.get(url)
             val index: RepoIndex = response.body()
@@ -71,13 +76,16 @@ class RepoManager(
 
             _modules.value = _modules.value + (url to index.modules.map { it.copy(repoUrl = url) })
             
+            Logger.i { "Successfully added repository: ${newRepo.name} ($url)" }
             AddRepoResult.Success
         } catch (e: Exception) {
+            Logger.e(e) { "Failed to add repository: $url" }
             AddRepoResult.Error(e.message ?: "Unknown error")
         }
     }
 
     fun removeRepository(url: String) {
+        Logger.i { "Removing repository: $url" }
         val updatedRepos = _repositories.value.filter { it.url != url }
         _repositories.value = updatedRepos
         
@@ -87,6 +95,7 @@ class RepoManager(
     }
 
     suspend fun refreshRepository(url: String) {
+        Logger.d { "Refreshing repository: $url" }
         try {
             val index: RepoIndex = client.get(url).body()
             _modules.value = _modules.value + (url to index.modules.map { it.copy(repoUrl = url) })
@@ -106,20 +115,25 @@ class RepoManager(
                 _repositories.value = updatedRepos
                 saveReposToSettings(updatedRepos)
             }
+            Logger.d { "Successfully refreshed repository: $url" }
+            NotificationEvent.Toast("Repository refreshed: ${index.name ?: url.substringAfterLast("/").substringBeforeLast(".")}")
         } catch (e: Exception) {
-            // Log error or notify
+            Logger.e(e) { "Failed to refresh repository: $url" }
+            NotificationEvent.Toast("Failed to refresh repository: $url")
         }
     }
 
     suspend fun refreshAll() {
         if (_isRefreshing.value) return
         _isRefreshing.value = true
+        Logger.i { "Refreshing all repositories..." }
         try {
             _repositories.value.forEach { 
                 refreshRepository(it.url)
             }
         } finally {
             _isRefreshing.value = false
+            Logger.i { "All repositories refreshed" }
         }
     }
 

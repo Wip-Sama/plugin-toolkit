@@ -10,8 +10,8 @@ data class InstalledModule(
     val installPath: String, // Absolute path to the module folder
     val isEnabled: Boolean = true,
     val repoUrl: String? = null, // Source repository URL if remote
-    val entryClass: String? = null,
-    val entryProperty: String? = null
+    val jarFileName: String? = null,
+    val description: String? = null
 )
 
 sealed class InstallationSource {

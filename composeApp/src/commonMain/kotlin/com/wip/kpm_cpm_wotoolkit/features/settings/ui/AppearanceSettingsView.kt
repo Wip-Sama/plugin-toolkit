@@ -38,7 +38,7 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppTheme
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.TimezoneUtils
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
-import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsDropdown
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.ExpressiveMenu
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsGroup
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsSlider
@@ -85,7 +85,7 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                 subtitle = "Choose between System, Light, Dark or Amoled",
                 icon = Icons.Default.Brightness6,
                 control = {
-                    SettingsDropdown(
+                    ExpressiveMenu(
                         options = AppTheme.entries,
                         selectedOption = appearance.theme,
                         onOptionSelected = { theme ->
@@ -181,7 +181,7 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                 icon = Icons.Default.Language,
                 enabled = !localization.useSystemLanguage,
                 control = {
-                    SettingsDropdown(
+                    ExpressiveMenu(
                         options = AppLanguage.entries,
                         selectedOption = localization.language,
                         onOptionSelected = { lang ->
@@ -223,7 +223,7 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                 icon = Icons.Default.Schedule,
                 enabled = !localization.useSystemTimezone,
                 control = {
-                    SettingsDropdown(
+                    ExpressiveMenu(
                         options = availableTimezones,
                         selectedOption = if (localization.useSystemTimezone) TimezoneUtils.getSystemDefaultId()
                         else localization.timezone,

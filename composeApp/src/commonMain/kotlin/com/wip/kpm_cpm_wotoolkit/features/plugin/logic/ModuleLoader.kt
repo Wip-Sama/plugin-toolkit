@@ -4,9 +4,7 @@ import com.wip.plugin.api.PluginEntry
 
 expect object ModuleLoader {
     fun loadPlugin(
-        jarPath: String, 
-        moduleClassName: String, 
-        modulePropertyName: String
+        jarPath: String
     ): Result<PluginEntry>
 
     fun unloadPlugin(jarPath: String)

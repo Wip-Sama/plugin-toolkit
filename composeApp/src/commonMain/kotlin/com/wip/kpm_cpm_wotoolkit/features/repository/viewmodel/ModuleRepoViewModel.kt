@@ -123,4 +123,8 @@ class ModuleRepoViewModel(
     fun isInstalled(pkg: String): Boolean {
         return moduleManager.installedModules.value.any { it.pkg == pkg }
     }
+
+    fun getInstalledVersion(pkg: String): String? {
+        return moduleManager.installedModules.value.find { it.pkg == pkg }?.version
+    }
 }

@@ -17,4 +17,5 @@ expect object PlatformUtils {
     fun mkdirs(path: String): Boolean
     fun listDirectories(path: String): List<String>
     fun readFile(path: String): String?
+    fun readFileFromZip(zipPath: String, fileName: String): String?
 }

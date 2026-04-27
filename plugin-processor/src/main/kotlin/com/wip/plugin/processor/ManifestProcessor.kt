@@ -6,8 +6,11 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.wip.plugin.api.annotations.PluginModule
-import com.wip.plugin.api.annotations.Capability
-import com.wip.plugin.api.annotations.PluginParam
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import com.wip.plugin.api.PluginManifest
+import com.wip.plugin.api.ModuleInfo
+import com.wip.plugin.api.Requirements
 
 class ManifestProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
@@ -297,6 +300,37 @@ class ManifestProcessor(
         )
         file.writer().use { 
             fileSpec.build().writeTo(it) 
+        }
+
+        // 4. Generate SPI Service File
+        val serviceFile = codeGenerator.createNewFile(
+            Dependencies(true, classDeclaration.containingFile!!),
+            "",
+            "META-INF/services/com.wip.plugin.api.PluginEntry",
+            ""
+        )
+        serviceFile.writer().use { 
+            it.write("$packageName.$entryName") 
+        }
+
+        // 5. Generate manifest.json Resource File
+        val manifestJsonFile = codeGenerator.createNewFile(
+            Dependencies(true, classDeclaration.containingFile!!),
+            "META-INF",
+            "manifest",
+            "json"
+        )
+        
+        val manifestObj = PluginManifest(
+            manifestVersion = "1.0",
+            module = ModuleInfo(id = id, name = name, version = version, description = description),
+            requirements = Requirements(minMemoryMb = minMemoryMb, minExecutionTimeMs = minExecutionTimeMs),
+            capabilities = emptyList() // TODO: Map capabilities here if needed for static analysis
+        )
+        
+        val json = Json { prettyPrint = true }
+        manifestJsonFile.writer().use { 
+            it.write(json.encodeToString(manifestObj)) 
         }
     }
 }

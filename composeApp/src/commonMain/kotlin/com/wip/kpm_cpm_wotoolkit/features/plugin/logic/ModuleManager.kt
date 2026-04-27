@@ -9,6 +9,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import co.touchlab.kermit.Logger
 
 class ModuleManager(
     private val settingsRepository: SettingsRepository,
@@ -23,38 +26,70 @@ class ModuleManager(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
-        _installedModules.value = settingsRepository.loadSettings().extensions.installedModules
+        val settings = settingsRepository.loadSettings()
+        _installedModules.value = settings.extensions.installedModules
+        Logger.i { "Initializing ModuleManager with ${_installedModules.value.size} installed modules" }
         // Load modules will happen in main.kt
     }
 
     suspend fun installLocal(filePath: String, targetFolderPath: String): Result<Unit> {
+        Logger.i { "Installing local module from: $filePath" }
         return try {
             // Ensure target folder exists
             PlatformUtils.mkdirs(targetFolderPath)
 
             // For local, we expect a .jar. We should ideally parse it for pkg.
-            // For now, use filename as pkg if we can't parse it.
-            val pkg = filePath.substringAfterLast("/").substringBeforeLast(".")
+            // Try to read manifest.json from the JAR (check root and META-INF)
+            val manifest = (PlatformUtils.readFileFromZip(filePath, "manifest.json") 
+                ?: PlatformUtils.readFileFromZip(filePath, "META-INF/manifest.json"))?.let { content ->
+                try {
+                    Logger.d { "Found manifest content: $content" }
+                    val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                    json.decodeFromString<com.wip.plugin.api.PluginManifest>(content)
+                } catch (e: Exception) {
+                    Logger.w { "Failed to parse manifest from $filePath: ${e.message}" }
+                    null
+                }
+            }
+            
+            if (manifest == null) {
+                Logger.w { "No manifest.json found in $filePath (checked root and META-INF/)" }
+            }
+            
+            val pkg = manifest?.module?.id ?: filePath.replace('\\', '/').substringAfterLast("/").substringBeforeLast(".")
+            val name = manifest?.module?.name ?: pkg
+            val version = manifest?.module?.version ?: "1.0.0"
+            val description = manifest?.module?.description
+
+            Logger.i { "Determined module ID: $pkg, Name: $name, Version: $version" }
             val moduleDir = "$targetFolderPath/$pkg"
             PlatformUtils.mkdirs(moduleDir)
 
-            val dest = "$moduleDir/$pkg.jar"
+            val jarFileName = filePath.replace('\\', '/').substringAfterLast("/")
+            val dest = "$moduleDir/$jarFileName"
             PlatformUtils.copyFile(filePath, dest)
-
+            
+            Logger.d { "Copied local JAR to: $dest" }
             val newModule = InstalledModule(
                 pkg = pkg,
-                name = pkg,
-                version = "1.0.0",
-                installPath = moduleDir
+                name = name,
+                version = version,
+                installPath = moduleDir,
+                jarFileName = jarFileName,
+                description = description
             )
+
             addInstalledModule(newModule)
+            Logger.i { "Successfully installed local module: ${newModule.pkg} with JAR: $jarFileName" }
             Result.success(Unit)
         } catch (e: Exception) {
+            Logger.e(e) { "Failed to install local module: $filePath" }
             Result.failure(e)
         }
     }
 
     suspend fun installRemote(module: ExtensionModule, targetFolderPath: String): Result<Unit> {
+        Logger.i { "Installing remote module: ${module.pkg} from ${module.repoUrl}" }
         return try {
             PlatformUtils.mkdirs(targetFolderPath)
             val moduleDir = "$targetFolderPath/${module.pkg}"
@@ -93,22 +128,31 @@ class ModuleManager(
                 name = module.name,
                 version = module.version,
                 installPath = moduleDir,
-                repoUrl = repoUrl
+                repoUrl = repoUrl,
+                jarFileName = module.fileName,
+                description = module.description
             )
             addInstalledModule(newModule)
+            Logger.i { "Successfully installed remote module: ${newModule.pkg} with JAR: ${module.fileName}" }
             Result.success(Unit)
         } catch (e: Exception) {
+            Logger.e(e) { "Failed to install remote module: ${module.pkg}" }
             Result.failure(e)
         }
     }
 
     fun uninstall(pkg: String) {
-        val module = _installedModules.value.find { it.pkg == pkg } ?: return
+        Logger.i { "Uninstalling module: $pkg" }
+        val module = _installedModules.value.find { it.pkg == pkg } ?: run {
+            Logger.w { "Module $pkg not found for uninstallation" }
+            return
+        }
         unloadModule(pkg)
         PlatformUtils.deleteDirectory(module.installPath)
         val updated = _installedModules.value.filter { it.pkg != pkg }
         _installedModules.value = updated
         saveToSettings(updated)
+        Logger.i { "Successfully uninstalled module: $pkg" }
     }
 
     fun loadModule(pkg: String): Result<Unit> {
@@ -116,21 +160,24 @@ class ModuleManager(
         if (!module.isEnabled) return Result.success(Unit)
 
         // Find the JAR in the folder
-        // For simplicity, assume there's only one .jar or it's named like the pkg
-        val jarFile = module.installPath + "/" + (module.pkg.substringAfterLast(".") + ".jar")
+        val jarFileName = module.jarFileName ?: (module.pkg.substringAfterLast(".") + ".jar")
+        val jarFile = module.installPath + "/" + jarFileName
         
-        // Actually we need the entry point. For now, use hardcoded or search manifest.
-        // I'll assume a convention: pkg.Entry, property: module
-        val result = ModuleLoader.loadPlugin(jarFile, "${module.pkg}.Entry", "module")
+        Logger.d { "Loading module JAR: $jarFile" }
+        val result = ModuleLoader.loadPlugin(jarFile)
         return if (result.isSuccess) {
             _loadedModules.value = _loadedModules.value + pkg
+            Logger.i { "Successfully loaded module: $pkg" }
             Result.success(Unit)
         } else {
-            Result.failure(result.exceptionOrNull() ?: Exception("Unknown error"))
+            val error = result.exceptionOrNull() ?: Exception("Unknown error")
+            Logger.e(error) { "Failed to load module: $pkg" }
+            Result.failure(error)
         }
     }
 
     fun unloadModule(pkg: String) {
+        Logger.d { "Unloading module: $pkg" }
         val module = _installedModules.value.find { it.pkg == pkg } ?: return
         val jarFile = module.installPath + "/" + (module.pkg.substringAfterLast(".") + ".jar")
         ModuleLoader.unloadPlugin(jarFile)
@@ -174,6 +221,7 @@ class ModuleManager(
                                 changed = true
                             }
                         } catch (e: Exception) {
+                            Logger.e(e) { "Failed to parse manifest at: $manifestPath" }
                             // Skip invalid manifest
                         }
                     }
@@ -189,6 +237,7 @@ class ModuleManager(
     }
 
     fun setEnabled(pkg: String, enabled: Boolean) {
+        Logger.i { "Setting module $pkg enabled: $enabled" }
         val updated = _installedModules.value.map {
             if (it.pkg == pkg) it.copy(isEnabled = enabled) else it
         }

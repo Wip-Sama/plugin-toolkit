@@ -11,8 +11,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun <T> SettingsDropdown(
+fun <T> ExpressiveMenu(
     options: List<T>,
     selectedOption: T,
     onOptionSelected: (T) -> Unit,
@@ -21,37 +22,31 @@ fun <T> SettingsDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Box {
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = !expanded }
+    ) {
         Surface(
-            onClick = { if (enabled) expanded = true },
-            color = if (enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-            shape = MaterialTheme.shapes.medium,
-            enabled = enabled
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.medium
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = labelProvider(selectedOption),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Icon(
-                    Icons.Default.ArrowDropDown,
-                    contentDescription = null,
-                    tint = if (enabled) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                )
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
             }
         }
 
-        DropdownMenu(
+        ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            onDismissRequest = { expanded = false }
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
@@ -59,7 +54,8 @@ fun <T> SettingsDropdown(
                     onClick = {
                         onOptionSelected(option)
                         expanded = false
-                    }
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
             }
         }
@@ -68,10 +64,10 @@ fun <T> SettingsDropdown(
 
 @Preview
 @Composable
-private fun SettingsDropdownPreview() {
+private fun ExpressiveMenuPreview() {
     MaterialTheme {
         Box(modifier = Modifier.padding(16.dp)) {
-            SettingsDropdown(
+            ExpressiveMenu(
                 options = listOf("Option 1", "Option 2", "Option 3"),
                 selectedOption = "Option 1",
                 onOptionSelected = {},

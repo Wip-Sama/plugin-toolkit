@@ -6,6 +6,7 @@ import com.sun.jna.platform.win32.Advapi32Util.registryValueExists
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forSessionBus
 import org.freedesktop.dbus.interfaces.DBusInterface
 import org.freedesktop.dbus.types.Variant
+import co.touchlab.kermit.Logger
 
 actual object PlatformUtils {
     actual val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
@@ -35,6 +36,7 @@ actual object PlatformUtils {
                 Color(red = r, green = g, blue = b, alpha = 1f)
             } else null
         } catch (e: Exception) {
+            Logger.e(e) { "Error getting Windows accent color" }
             null
         }
     }
@@ -65,6 +67,7 @@ actual object PlatformUtils {
                 } else null
             }
         } catch (e: Exception) {
+            Logger.e(e) { "Error getting Linux accent color" }
             null
         }
     }
@@ -92,6 +95,7 @@ actual object PlatformUtils {
     }
 
     actual fun copyFile(source: String, destination: String) {
+        Logger.d { "Copying file from $source to $destination" }
         java.io.File(source).copyTo(java.io.File(destination), overwrite = true)
     }
 
@@ -104,6 +108,7 @@ actual object PlatformUtils {
             }
             Result.success(Unit)
         } catch (e: Exception) {
+            Logger.e(e) { "Failed to download file from $url to $destination" }
             Result.failure(e)
         }
     }
@@ -112,9 +117,11 @@ actual object PlatformUtils {
         return try {
             val totalSize = getUnzippedSize(source)
             if (totalSize > maxDecompressedSize) {
+                Logger.e { "ZIP content too large: $totalSize bytes (max $maxDecompressedSize) for $source" }
                 return Result.failure(Exception("ZIP content too large: $totalSize bytes (max $maxDecompressedSize)"))
             }
 
+            Logger.d { "Unzipping $source to $destination" }
             java.util.zip.ZipFile(source).use { zip ->
                 zip.entries().asSequence().forEach { entry ->
                     val file = java.io.File(destination, entry.name)
@@ -132,6 +139,7 @@ actual object PlatformUtils {
             }
             Result.success(Unit)
         } catch (e: Exception) {
+            Logger.e(e) { "Failed to unzip $source to $destination" }
             Result.failure(e)
         }
     }
@@ -142,11 +150,13 @@ actual object PlatformUtils {
                 zip.entries().asSequence().sumOf { it.size }
             }
         } catch (e: Exception) {
+            Logger.e(e) { "Error calculating unzipped size for $zipPath" }
             0L
         }
     }
 
     actual fun deleteDirectory(path: String): Boolean {
+        Logger.d { "Deleting directory: $path" }
         return java.io.File(path).deleteRecursively()
     }
 
@@ -165,6 +175,18 @@ actual object PlatformUtils {
     actual fun readFile(path: String): String? {
         val file = java.io.File(path)
         return if (file.exists()) file.readText() else null
+    }
+    
+    actual fun readFileFromZip(zipPath: String, fileName: String): String? {
+        return try {
+            java.util.zip.ZipFile(zipPath).use { zip ->
+                val entry = zip.getEntry(fileName) ?: return null
+                zip.getInputStream(entry).use { it.bufferedReader().readText() }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Error reading $fileName from $zipPath" }
+            null
+        }
     }
 }
 

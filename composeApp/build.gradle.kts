@@ -18,8 +18,8 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(compose.materialIconsExtended)
             implementation(libs.compose.ui)
-            implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
+            implementation(libs.compose.components.resources)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.kotlinxSerializationCore)
@@ -46,6 +46,7 @@ kotlin {
             implementation(libs.dbus.java.core)
             implementation(project(":plugin-api"))
             implementation(libs.ktor.client.cio)
+            implementation(libs.slf4j.simple)
         }
     }
 }

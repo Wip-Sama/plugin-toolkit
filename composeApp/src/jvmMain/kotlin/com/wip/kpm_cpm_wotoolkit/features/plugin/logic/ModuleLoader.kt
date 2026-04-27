@@ -6,6 +6,7 @@ import org.koin.dsl.koinApplication
 import org.koin.core.module.Module
 import java.io.File
 import java.net.URLClassLoader
+import co.touchlab.kermit.Logger
 
 private data class LoadedPlugin(
     val jarPath: String,
@@ -18,24 +19,31 @@ actual object ModuleLoader {
     private val loadedPlugins = mutableMapOf<String, LoadedPlugin>()
 
     actual fun loadPlugin(
-        jarPath: String, 
-        moduleClassName: String, 
-        modulePropertyName: String
+        jarPath: String
     ): Result<PluginEntry> {
         return try {
             val file = File(jarPath)
-            if (!file.exists()) return Result.failure(Exception("File not found: $jarPath"))
+            if (!file.exists()) {
+                Logger.e { "Plugin JAR file not found: $jarPath" }
+                return Result.failure(Exception("File not found: $jarPath"))
+            }
 
             // If already loaded, return it
-            loadedPlugins[jarPath]?.let { return Result.success(it.entry) }
+            loadedPlugins[jarPath]?.let { 
+                Logger.d { "Plugin already loaded: $jarPath" }
+                return Result.success(it.entry) 
+            }
 
+            Logger.i { "Loading plugin from $jarPath" }
             val url = file.toURI().toURL()
             val newClassLoader = URLClassLoader(arrayOf(url), this.javaClass.classLoader)
 
-            val clazz = newClassLoader.loadClass(moduleClassName)
-            val field = clazz.getDeclaredField(modulePropertyName)
-            field.isAccessible = true
-            val module = field.get(null) as Module
+            // Use ServiceLoader to find the PluginEntry implementation
+            val loader = java.util.ServiceLoader.load(PluginEntry::class.java, newClassLoader)
+            val pluginEntryImpl = loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $jarPath")
+
+            // Get the Koin module from the entry point
+            val module = pluginEntryImpl.getKoinModule()
 
             // Create an isolated Koin application for this plugin
             val koinApp = koinApplication {
@@ -47,15 +55,17 @@ actual object ModuleLoader {
             val loadedPlugin = LoadedPlugin(jarPath, pluginEntry, newClassLoader, koin)
             loadedPlugins[jarPath] = loadedPlugin
             
+            Logger.i { "Successfully loaded plugin from $jarPath" }
             Result.success(pluginEntry)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Logger.e(e) { "Failed to load plugin from $jarPath" }
             Result.failure(e)
         }
     }
 
     actual fun unloadPlugin(jarPath: String) {
         loadedPlugins.remove(jarPath)?.let { 
+            Logger.i { "Unloading plugin: $jarPath" }
             it.entry.shutdown()
             it.classLoader.close()
         }

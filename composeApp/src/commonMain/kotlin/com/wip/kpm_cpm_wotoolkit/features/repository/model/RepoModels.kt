@@ -25,6 +25,7 @@ data class RepoIndex(
 data class ExtensionModule(
     val name: String,
     val fileName: String,
+    val description: String? = null,
     val pkg: String,
     val version: String,
     val minAppVersion: String? = null,

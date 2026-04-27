@@ -15,7 +15,7 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.utils.resolve
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsResolvedStrings
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsSearchQuery
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
-import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsDropdown
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.ExpressiveMenu
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsGroup
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsNumericInput
@@ -190,7 +190,7 @@ private fun <T> RenderDropdownSetting(
         icon = definition.icon,
         enabled = isEnabled,
         control = {
-            SettingsDropdown(
+            ExpressiveMenu(
                 options = definition.options,
                 selectedOption = definition.getValue(settings),
                 onOptionSelected = { value ->

@@ -44,8 +44,6 @@ class PluginViewModel : ViewModel() {
             // Hardcoded for demo, in real app we'd scan or ask user
             val result = ModuleLoader.loadPlugin(
                 jarPath, 
-                "com.wip.operations.MathOperationsKt", 
-                "mathPluginModule"
             )
             if (result.isSuccess) {
                 val plugin = result.getOrThrow()

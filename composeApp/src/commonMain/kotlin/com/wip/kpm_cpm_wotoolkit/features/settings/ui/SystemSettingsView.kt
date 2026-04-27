@@ -33,7 +33,7 @@ import com.wip.kpm_cpm_wotoolkit.core.utils.StartupManager
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.LogLevel
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
-import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsDropdown
+import com.wip.kpm_cpm_wotoolkit.shared.components.settings.ExpressiveMenu
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsGroup
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsNumericInput
@@ -151,7 +151,7 @@ fun SystemSettingsView(
                 subtitle = stringResource(Res.string.setting_log_level_subtitle),
                 icon = Icons.Default.BugReport,
                 control = {
-                    SettingsDropdown(
+                    ExpressiveMenu(
                         options = LogLevel.entries.map { it.name },
                         selectedOption = logging.level.name,
                         labelProvider = { it },
