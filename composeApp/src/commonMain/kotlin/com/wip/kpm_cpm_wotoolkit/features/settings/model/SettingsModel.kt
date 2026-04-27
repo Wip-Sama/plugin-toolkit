@@ -11,7 +11,8 @@ data class AppSettings(
         val general: GeneralSettings = GeneralSettings(),
         val logging: LoggingSettings = LoggingSettings(),
         val notifications: NotificationSettings = NotificationSettings(),
-        val extensions: ExtensionSettings = ExtensionSettings()
+        val extensions: ExtensionSettings = ExtensionSettings(),
+        val jobs: JobSettings = JobSettings()
 )
 
 @Serializable
@@ -94,4 +95,11 @@ data class ExtensionSettings(
     val packageSourceOverrides: Map<String, String> = emptyMap(), // pkg to repo url
     val moduleFolders: List<String> = emptyList(), // managed install locations
     val installedModules: List<InstalledModule> = emptyList()
+)
+
+@Serializable
+data class JobSettings(
+    val maxConcurrentJobs: Int = 2,
+    val saveHistory: Boolean = true,
+    val historyRetentionDays: Int = 30
 )

@@ -40,6 +40,7 @@ fun <T> NavigationSidebar(
     onToggleNavbar: () -> Unit,
     canCollapse: Boolean = true,
     headerContent: @Composable () -> Unit = {},
+    bottomExtraContent: @Composable ColumnScope.() -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isHovered by remember { mutableStateOf(false) }
@@ -123,6 +124,7 @@ fun <T> NavigationSidebar(
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
+                bottomExtraContent()
                 bottomSections.forEach { section ->
                     SidebarSection(
                         section = section,

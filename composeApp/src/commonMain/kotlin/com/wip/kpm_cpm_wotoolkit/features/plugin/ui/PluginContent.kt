@@ -229,12 +229,3 @@ fun ErrorView(message: String) {
         }
     }
 }
-
-@Preview
-@Composable
-private fun PluginContentPreview() {
-    MaterialTheme {
-        PluginContent(PluginViewModel())
-    }
-}
-

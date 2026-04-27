@@ -27,7 +27,10 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
 import com.wip.kpm_cpm_wotoolkit.features.board.ui.BoardScreen
 import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.MainScreen
+import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobDashboard
+import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobBadge
 import com.wip.kpm_cpm_wotoolkit.features.settings.ui.SettingsScreen
+import androidx.compose.material.icons.filled.PendingActions
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.core.theme.AppTheme
@@ -92,6 +95,12 @@ private fun AppContent(viewModel: SettingsViewModel) {
                     title = null,
                     elements = listOf(
                         SidebarElement(
+                            id = Screen.JobDashboard,
+                            icon = Icons.Default.PendingActions,
+                            title = Res.string.nav_jobs,
+                            trailingContent = { JobBadge(it) }
+                        ),
+                        SidebarElement(
                             id = Screen.Settings,
                             icon = Icons.Default.Settings,
                             title = Res.string.settings
@@ -119,6 +128,7 @@ private fun AppContent(viewModel: SettingsViewModel) {
                                 is Screen.Main     -> NavEntry(key) { MainScreen() }
                                 is Screen.Board    -> NavEntry(key) { BoardScreen() }
                                 is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
+                                is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
                                 else               -> NavEntry(key) { }
                             }
                         }

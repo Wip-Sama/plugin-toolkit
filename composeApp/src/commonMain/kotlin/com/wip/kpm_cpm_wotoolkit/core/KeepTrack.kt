@@ -17,6 +17,9 @@ object KeepTrack {
 
     /** The directory for modules. */
     const val MODULES_DIR_NAME = "modules"
+
+    /** The directory for background job states. */
+    const val JOBS_DIR_NAME = "jobs"
     
     // --- Startup Parameters ---
     /** The name used for system startup entries (Registry/Desktop file). */

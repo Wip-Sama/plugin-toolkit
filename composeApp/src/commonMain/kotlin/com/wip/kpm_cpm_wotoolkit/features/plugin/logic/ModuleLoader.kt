@@ -11,4 +11,5 @@ expect object ModuleLoader {
     fun unloadAll()
     fun getPlugins(): List<PluginEntry>
     fun getPlugin(jarPath: String): PluginEntry?
+    fun getPluginById(pluginId: String): PluginEntry?
 }

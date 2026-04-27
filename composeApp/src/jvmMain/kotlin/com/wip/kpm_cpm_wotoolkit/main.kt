@@ -31,6 +31,7 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
 import com.wip.kpm_cpm_wotoolkit.features.repository.logic.RepoManager
 import com.wip.kpm_cpm_wotoolkit.features.repository.viewmodel.ModuleRepoViewModel
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.SupervisorJob
 import org.koin.mp.KoinPlatform.getKoin
 
 fun main(args: Array<String>) {
@@ -51,11 +52,14 @@ fun main(args: Array<String>) {
             single { RepoManager(get()) }
             single { com.wip.kpm_cpm_wotoolkit.core.ui.DialogService() }
             single { com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager(get(), get()) }
+            single { com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager(CoroutineScope(SupervisorJob() + Dispatchers.Default), repository.loadSettings().jobs.maxConcurrentJobs) }
             factory { SettingsViewModel(get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { ModuleRepoViewModel(get(), get(), get(), get(), get()) }
             factory { com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.ModuleManagerViewModel(get(), get(), get()) }
+            factory { com.wip.kpm_cpm_wotoolkit.features.job.viewmodel.JobViewModel(get()) }
+            factory { com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel(get()) }
         })
     }
 

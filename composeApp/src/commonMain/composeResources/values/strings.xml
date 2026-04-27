@@ -81,4 +81,9 @@
     <string name="module_validate">Validate</string>
     <string name="module_enabled">Enabled</string>
     <string name="module_loaded">Loaded</string>
+    <string name="nav_jobs">Jobs</string>
+    <string name="nav_job_general">General</string>
+    <string name="nav_job_archive">Archive</string>
+    <string name="nav_job_scheduler">Scheduler</string>
+    <string name="nav_job_history">History</string>
 </resources>

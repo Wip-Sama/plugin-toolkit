@@ -6,14 +6,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager
+import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobType
 import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleLoader
 import com.wip.plugin.api.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
+import kotlin.random.Random
 
-class PluginViewModel : ViewModel() {
+class PluginViewModel(
+    private val jobManager: JobManager
+) : ViewModel() {
     var jarPath by mutableStateOf("C:\\Users\\sgroo\\AndroidStudioProjects\\CMP_desktop_test\\operations\\build\\libs\\operations.jar")
     var selectedPlugin by mutableStateOf<PluginEntry?>(null)
     var selectedCapability by mutableStateOf<Capability?>(null)
@@ -67,19 +73,24 @@ class PluginViewModel : ViewModel() {
         val plugin = selectedPlugin ?: return
         
         viewModelScope.launch {
-            isExecuting = true
-            try {
-                val request = buildRequest(capability, parameterValues)
-                val processor = plugin.getProcessor()
-                val result = withContext(Dispatchers.Default) {
-                    processor.process(request)
+            val params = selectedCapability?.let { capability ->
+                parameterValues.toMap().mapValues { (name, value) ->
+                    val meta = capability.parameters?.get(name)
+                    if (meta != null) parseValue(value, meta.type) else JsonPrimitive(value)
                 }
-                executionResult = result
-            } catch (e: Exception) {
-                executionResult = Result.failure(e)
-            } finally {
-                isExecuting = false
-            }
+            } ?: emptyMap()
+
+            val job = BackgroundJob(
+                id = Random.nextInt(1000, 9999).toString(),
+                name = "${plugin.getManifest().module.name}: ${capability.name}",
+                type = JobType.Capability,
+                pluginId = plugin.getManifest().module.id,
+                capabilityName = capability.name,
+                parameters = params
+            )
+            jobManager.enqueueJob(job)
+            
+            // Optionally, we could show a toast or navigate to the dashboard
         }
     }
 

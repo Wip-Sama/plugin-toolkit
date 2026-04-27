@@ -78,4 +78,8 @@ actual object ModuleLoader {
     actual fun getPlugins(): List<PluginEntry> = loadedPlugins.values.map { it.entry }
     
     actual fun getPlugin(jarPath: String): PluginEntry? = loadedPlugins[jarPath]?.entry
+
+    actual fun getPluginById(pluginId: String): PluginEntry? {
+        return loadedPlugins.values.find { it.entry.getManifest().module.id == pluginId }?.entry
+    }
 }

@@ -7,4 +7,5 @@ expect class SettingsRepository() {
     fun saveSettings(settings: AppSettings)
     fun openLogFolder()
     fun getSettingsDir(): String
+    fun getJobsDir(): String
 }

@@ -97,6 +97,12 @@ fun <T> SidebarItem(
                 softWrap = false,
                 overflow = TextOverflow.Clip
             )
+            Spacer(modifier = Modifier.weight(1f))
+            element.trailingContent(true)
+        } else {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                element.trailingContent(false)
+            }
         }
     }
 }

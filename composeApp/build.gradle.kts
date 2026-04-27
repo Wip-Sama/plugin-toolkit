@@ -34,6 +34,7 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.kotlinx.datetime)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -47,6 +48,7 @@ kotlin {
             implementation(project(":plugin-api"))
             implementation(libs.ktor.client.cio)
             implementation(libs.slf4j.simple)
+            implementation(libs.kotlinx.datetime)
         }
     }
 }

@@ -107,12 +107,3 @@ fun PluginSidebar(
         }
     }
 }
-
-@Preview
-@Composable
-private fun PluginSidebarPreview() {
-    MaterialTheme {
-        PluginSidebar(PluginViewModel())
-    }
-}
-

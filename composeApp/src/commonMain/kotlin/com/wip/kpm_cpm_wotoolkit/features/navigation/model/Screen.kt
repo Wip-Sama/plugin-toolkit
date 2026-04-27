@@ -16,6 +16,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object Settings : Screen
+
+    @Serializable
+    data object JobDashboard : Screen
 }
 
 /** Polymorphic serialization config required by rememberNavBackStack. */
@@ -25,6 +28,7 @@ val ScreenNavConfig = SavedStateConfiguration {
             subclass(Screen.Main::class, Screen.Main.serializer())
             subclass(Screen.Board::class, Screen.Board.serializer())
             subclass(Screen.Settings::class, Screen.Settings.serializer())
+            subclass(Screen.JobDashboard::class, Screen.JobDashboard.serializer())
         }
     }
 }

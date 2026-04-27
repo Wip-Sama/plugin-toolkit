@@ -18,6 +18,14 @@ actual class SettingsRepository actual constructor() {
 
     actual fun getSettingsDir(): String = settingsDir.absolutePath
 
+    actual fun getJobsDir(): String {
+        val jobsDir = File(settingsDir, KeepTrack.JOBS_DIR_NAME)
+        if (!jobsDir.exists()) {
+            jobsDir.mkdirs()
+        }
+        return jobsDir.absolutePath
+    }
+
     actual fun loadSettings(): AppSettings {
         return try {
             if (settingsFile.exists()) {

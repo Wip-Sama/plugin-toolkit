@@ -106,6 +106,7 @@ class SettingsRegistry {
         val loggingSection = SettingText.Resource(Res.string.section_logging)
         val toastsSection = SettingText.Resource(Res.string.section_toasts)
         val notificationsSection = SettingText.Resource(Res.string.section_notifications)
+        val jobsSection = SettingText.Raw("Jobs")
 
         val definitions = listOf(
             // ── Appearance ───────────────────────────────────────────────
@@ -434,6 +435,40 @@ class SettingsRegistry {
                     // with the actual NotificationViewModel-dependent buttons.
                     // See AutoSettingsView for the injection point.
                 }
+            ),
+
+            // ── Jobs ────────────────────────────────────────────────────
+            SettingDefinition.NumericSetting(
+                title = SettingText.Raw("Max Concurrent Jobs"),
+                subtitle = SettingText.Raw("Number of workers available to run background tasks"),
+                icon = Icons.Default.Engineering,
+                sectionTitle = jobsSection,
+                navKey = SettingNavKey.SystemSettings,
+                getValue = { it.jobs.maxConcurrentJobs },
+                setValue = { s, v -> s.copy(jobs = s.jobs.copy(maxConcurrentJobs = v)) },
+                valueRange = 1..16
+            ),
+
+            SettingDefinition.SwitchSetting(
+                title = SettingText.Raw("Save Job History"),
+                subtitle = SettingText.Raw("Keep a log of all executed jobs and their results"),
+                icon = Icons.Default.History,
+                sectionTitle = jobsSection,
+                navKey = SettingNavKey.SystemSettings,
+                getValue = { it.jobs.saveHistory },
+                setValue = { s, v -> s.copy(jobs = s.jobs.copy(saveHistory = v)) }
+            ),
+
+            SettingDefinition.NumericSetting(
+                title = SettingText.Raw("History Retention Days"),
+                subtitle = SettingText.Raw("Number of days to keep job history before automatic deletion"),
+                icon = Icons.Default.EventRepeat,
+                sectionTitle = jobsSection,
+                navKey = SettingNavKey.SystemSettings,
+                enabled = { it.jobs.saveHistory },
+                getValue = { it.jobs.historyRetentionDays },
+                setValue = { s, v -> s.copy(jobs = s.jobs.copy(historyRetentionDays = v)) },
+                valueRange = 1..365
             )
         )
 
