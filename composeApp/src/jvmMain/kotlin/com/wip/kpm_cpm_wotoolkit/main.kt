@@ -49,16 +49,31 @@ fun main(args: Array<String>) {
             single<NotificationService> { JvmNotificationService { viewModelProvider()!!.settings } }
             single { SettingsRegistry() }
             single { RepoManager(get()) }
+            single { com.wip.kpm_cpm_wotoolkit.core.ui.DialogService() }
+            single { com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager(get(), get()) }
             factory { SettingsViewModel(get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
-            factory { ModuleRepoViewModel(get(), get()) }
+            factory { ModuleRepoViewModel(get(), get(), get(), get(), get()) }
+            factory { com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.ModuleManagerViewModel(get(), get(), get()) }
         })
     }
 
     val koin = org.koin.mp.KoinPlatform.getKoin()
     val viewModel = koin.get<SettingsViewModel>()
     koin.get<RepoManager>() // Trigger initialization and background refresh
+    val moduleManager = koin.get<com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager>()
+    
+    // Load enabled modules at startup
+    moduleManager.installedModules.value.forEach { module ->
+        if (module.isEnabled) {
+            val result = moduleManager.loadModule(module.pkg)
+            if (result.isFailure) {
+                Logger.e { "Failed to load module ${module.pkg}: ${result.exceptionOrNull()?.message}" }
+            }
+        }
+    }
+    
     viewModelProvider = { viewModel }
 
     // Initialize Logging with Kermit

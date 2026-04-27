@@ -16,6 +16,8 @@ actual class SettingsRepository actual constructor() {
     private val settingsDir = File(System.getProperty("user.home"), KeepTrack.SETTINGS_DIR_NAME)
     private val settingsFile = File(settingsDir, KeepTrack.SETTINGS_FILE_NAME)
 
+    actual fun getSettingsDir(): String = settingsDir.absolutePath
+
     actual fun loadSettings(): AppSettings {
         return try {
             if (settingsFile.exists()) {

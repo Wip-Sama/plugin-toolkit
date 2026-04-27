@@ -61,6 +61,7 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
 import com.wip.kpm_cpm_wotoolkit.features.repository.ui.ModuleRepoView
+import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.ModuleManagerView
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -283,7 +284,7 @@ fun SettingsScreen(
                             SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
 
                             // Modules
-                            SettingNavKey.ModuleManager -> NavEntry(key) { PlaceholderView("Module manager Placeholder") }
+                            SettingNavKey.ModuleManager -> NavEntry(key) { ModuleManagerView() }
                             SettingNavKey.ModuleRepo -> NavEntry(key) { ModuleRepoView() }
 
                             // About

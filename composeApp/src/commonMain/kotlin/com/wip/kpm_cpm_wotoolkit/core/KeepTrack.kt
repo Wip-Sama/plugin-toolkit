@@ -14,6 +14,9 @@ object KeepTrack {
 
     /** The directory for application logs. */
     const val LOGS_DIR_NAME = "logs"
+
+    /** The directory for modules. */
+    const val MODULES_DIR_NAME = "modules"
     
     // --- Startup Parameters ---
     /** The name used for system startup entries (Registry/Desktop file). */

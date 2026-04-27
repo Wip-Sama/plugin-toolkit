@@ -1,7 +1,8 @@
 package com.wip.kpm_cpm_wotoolkit.features.settings.model
 
-import com.wip.kpm_cpm_wotoolkit.features.repository.model.ExtensionRepo
 import kotlinx.serialization.Serializable
+import com.wip.kpm_cpm_wotoolkit.features.repository.model.ExtensionRepo
+import com.wip.kpm_cpm_wotoolkit.features.plugin.model.InstalledModule
 
 @Serializable
 data class AppSettings(
@@ -90,5 +91,7 @@ data class NotificationHistorySettings(
 @Serializable
 data class ExtensionSettings(
     val repositories: List<ExtensionRepo> = emptyList(),
-    val packageSourceOverrides: Map<String, String> = emptyMap() // pkg to repo url
+    val packageSourceOverrides: Map<String, String> = emptyMap(), // pkg to repo url
+    val moduleFolders: List<String> = emptyList(), // managed install locations
+    val installedModules: List<InstalledModule> = emptyList()
 )

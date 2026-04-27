@@ -126,16 +126,23 @@ fun ModuleRepoView(
                 }
             }
         } else {
+            val modulesMap by viewModel.modules.collectAsState()
+            
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                items(repositories) { repo ->
-                    SettingsItem(
-                        title = repo.name,
-                        subtitle = repo.url,
-                        icon = Icons.Default.Folder,
-                        control = {
+                repositories.forEach { repo ->
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(repo.name, style = MaterialTheme.typography.titleMedium)
+                                Text(repo.url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                            }
                             Row {
                                 IconButton(onClick = { viewModel.refreshRepository(repo.url) }) {
                                     Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -149,7 +156,38 @@ fun ModuleRepoView(
                                 }
                             }
                         }
-                    )
+                    }
+
+                    val repoModules = modulesMap[repo.url] ?: emptyList()
+                    items(repoModules) { module ->
+                        SettingsItem(
+                            title = module.name,
+                            subtitle = "v${module.version} • ${module.pkg}",
+                            icon = Icons.Default.Extension,
+                            control = {
+                                val isInstalled = viewModel.isInstalled(module.pkg)
+                                if (isInstalled) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shape = MaterialTheme.shapes.extraSmall
+                                    ) {
+                                        Text(
+                                            "Installed", 
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                } else {
+                                    Button(onClick = { viewModel.installModule(module) }) {
+                                        Text("Install")
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
             }
         }

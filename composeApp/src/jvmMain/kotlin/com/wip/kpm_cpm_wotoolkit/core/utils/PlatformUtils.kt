@@ -68,6 +68,104 @@ actual object PlatformUtils {
             null
         }
     }
+
+    actual fun pickFolder(): String? {
+        val chooser = javax.swing.JFileChooser().apply {
+            fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
+            dialogTitle = "Select Folder"
+        }
+        val result = chooser.showOpenDialog(null)
+        return if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
+            chooser.selectedFile.absolutePath
+        } else null
+    }
+
+    actual fun pickFile(): String? {
+        val chooser = javax.swing.JFileChooser().apply {
+            fileSelectionMode = javax.swing.JFileChooser.FILES_ONLY
+            dialogTitle = "Select Module File"
+        }
+        val result = chooser.showOpenDialog(null)
+        return if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
+            chooser.selectedFile.absolutePath
+        } else null
+    }
+
+    actual fun copyFile(source: String, destination: String) {
+        java.io.File(source).copyTo(java.io.File(destination), overwrite = true)
+    }
+
+    actual fun downloadFile(url: String, destination: String): Result<Unit> {
+        return try {
+            java.net.URL(url).openStream().use { input ->
+                java.io.File(destination).outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    actual fun unzip(source: String, destination: String, maxDecompressedSize: Long): Result<Unit> {
+        return try {
+            val totalSize = getUnzippedSize(source)
+            if (totalSize > maxDecompressedSize) {
+                return Result.failure(Exception("ZIP content too large: $totalSize bytes (max $maxDecompressedSize)"))
+            }
+
+            java.util.zip.ZipFile(source).use { zip ->
+                zip.entries().asSequence().forEach { entry ->
+                    val file = java.io.File(destination, entry.name)
+                    if (entry.isDirectory) {
+                        file.mkdirs()
+                    } else {
+                        file.parentFile.mkdirs()
+                        zip.getInputStream(entry).use { input ->
+                            file.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    actual fun getUnzippedSize(zipPath: String): Long {
+        return try {
+            java.util.zip.ZipFile(zipPath).use { zip ->
+                zip.entries().asSequence().sumOf { it.size }
+            }
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    actual fun deleteDirectory(path: String): Boolean {
+        return java.io.File(path).deleteRecursively()
+    }
+
+    actual fun exists(path: String): Boolean {
+        return java.io.File(path).exists()
+    }
+
+    actual fun mkdirs(path: String): Boolean {
+        return java.io.File(path).mkdirs()
+    }
+
+    actual fun listDirectories(path: String): List<String> {
+        return java.io.File(path).listFiles()?.filter { it.isDirectory }?.map { it.absolutePath } ?: emptyList()
+    }
+
+    actual fun readFile(path: String): String? {
+        val file = java.io.File(path)
+        return if (file.exists()) file.readText() else null
+    }
 }
 
 interface PortalSettings : DBusInterface {

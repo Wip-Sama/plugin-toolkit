@@ -6,4 +6,5 @@ expect class SettingsRepository() {
     fun loadSettings(): AppSettings
     fun saveSettings(settings: AppSettings)
     fun openLogFolder()
+    fun getSettingsDir(): String
 }

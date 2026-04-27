@@ -141,10 +141,13 @@ private fun AppContent(viewModel: SettingsViewModel) {
                     )
 
                     val notificationService = koinInject<NotificationService>()
+                    val dialogService = koinInject<com.wip.kpm_cpm_wotoolkit.core.ui.DialogService>()
+                    
                     ToastHost(
                         notificationService = notificationService,
                         settings = viewModel.settings.notifications
                     )
+                    com.wip.kpm_cpm_wotoolkit.core.ui.DialogHost(dialogService)
                 }
             }
         }

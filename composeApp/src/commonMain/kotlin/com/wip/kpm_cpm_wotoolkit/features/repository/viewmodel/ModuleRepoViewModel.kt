@@ -18,8 +18,13 @@ import kotlinx.coroutines.launch
 
 class ModuleRepoViewModel(
     private val repoManager: RepoManager,
-    private val notificationService: NotificationService
+    private val moduleManager: com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager,
+    private val notificationService: NotificationService,
+    private val dialogService: com.wip.kpm_cpm_wotoolkit.core.ui.DialogService,
+    private val settingsRepository: com.wip.kpm_cpm_wotoolkit.features.settings.logic.SettingsRepository
 ) : ViewModel() {
+    
+    val modules = repoManager.modules
     
     var repoUrlInput by mutableStateOf("")
 
@@ -90,5 +95,32 @@ class ModuleRepoViewModel(
     fun getSelectedRepoForPackage(pkg: String, repos: List<ExtensionRepo>): ExtensionRepo {
         val override = repoManager.repositories.value.find { it.url == repoManager.getPackageSourceOverride(pkg) }
         return override ?: repos.first()
+    }
+
+    fun installModule(module: ExtensionModule) {
+        pickInstallLocation { target ->
+            viewModelScope.launch {
+                val result = moduleManager.installRemote(module, target)
+                if (result.isSuccess) {
+                    notificationService.toast("Module ${module.name} installed")
+                } else {
+                    notificationService.toast("Failed to install ${module.name}: ${result.exceptionOrNull()?.message}")
+                }
+            }
+        }
+    }
+
+    private fun pickInstallLocation(onSelected: (String) -> Unit) {
+        val folders = settingsRepository.loadSettings().extensions.moduleFolders
+        if (folders.isEmpty()) {
+            val defaultPath = settingsRepository.getSettingsDir() + "/" + com.wip.kpm_cpm_wotoolkit.core.KeepTrack.MODULES_DIR_NAME
+            onSelected(defaultPath)
+            return
+        }
+        dialogService.showLocationPicker("Choose Install Location", folders, onSelected)
+    }
+
+    fun isInstalled(pkg: String): Boolean {
+        return moduleManager.installedModules.value.any { it.pkg == pkg }
     }
 }
