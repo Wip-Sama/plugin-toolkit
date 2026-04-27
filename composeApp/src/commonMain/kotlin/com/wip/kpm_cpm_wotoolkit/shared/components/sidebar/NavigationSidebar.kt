@@ -24,14 +24,15 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import kpm_cpm_wotoolkit.composeapp.generated.resources.*
 import com.wip.kpm_cpm_wotoolkit.features.navigation.model.Screen
-import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.resources.StringResource
+import com.wip.kpm_cpm_wotoolkit.core.model.LocalizedString
+import com.wip.kpm_cpm_wotoolkit.core.model.localized
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun <T> NavigationSidebar(
-    title: StringResource,
+    title: LocalizedString,
     bodySections: List<SidebarSectionData<out T>>,
     bottomSections: List<SidebarSectionData<out T>> = emptyList(),
     currentScreen: T,
@@ -87,7 +88,7 @@ fun <T> NavigationSidebar(
 
                 if (isActuallyExpanded) {
                     Text(
-                        text = stringResource(title),
+                        text = title.resolve(),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -144,7 +145,7 @@ fun <T> NavigationSidebar(
 private fun NavigationSidebarPreview() {
     MaterialTheme {
         NavigationSidebar(
-            title = Res.string.app_name,
+            title = Res.string.app_name.localized,
             bodySections = listOf<SidebarSectionData<Screen>>(),
             currentScreen = Screen.Main,
             onScreenSelected = {},

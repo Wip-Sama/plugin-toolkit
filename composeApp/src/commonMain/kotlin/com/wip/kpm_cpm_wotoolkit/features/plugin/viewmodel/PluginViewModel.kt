@@ -17,13 +17,61 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import kotlin.random.Random
 
+import androidx.lifecycle.viewModelScope
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import com.wip.plugin.api.PluginResponse
+
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager
+
 class PluginViewModel(
-    private val jobManager: JobManager
+    private val jobManager: JobManager,
+    private val notificationService: com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService,
+    private val moduleManager: ModuleManager
 ) : ViewModel() {
+    init {
+        jobManager.jobs
+            .onEach { jobs ->
+                val myJob = jobs.find { it.id == lastEnqueuedJobId }
+                if (myJob != null) {
+                    when (myJob.status) {
+                        JobStatus.Completed -> {
+                            val jsonResult = myJob.result?.let { 
+                                try { Json.parseToJsonElement(it) } catch (e: Exception) { JsonNull }
+                            } ?: JsonNull
+                            executionResult = Result.success(PluginResponse(result = jsonResult))
+                        }
+                        JobStatus.Failed -> {
+                            executionResult = Result.failure(Exception(myJob.errorMessage ?: "Job failed"))
+                        }
+                        else -> { /* Still running or queued */ }
+                    }
+                }
+            }
+            .launchIn(viewModelScope)
+
+        // Sync with ModuleManager
+        moduleManager.loadedModules
+            .onEach { 
+                loadedPlugins = ModuleLoader.getPlugins()
+                // If the selected plugin was unloaded, clear it
+                if (selectedPlugin != null && !it.contains(selectedPlugin?.getManifest()?.module?.id)) {
+                    selectPlugin(null)
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
     var jarPath by mutableStateOf("C:\\Users\\sgroo\\AndroidStudioProjects\\CMP_desktop_test\\operations\\build\\libs\\operations.jar")
     var selectedPlugin by mutableStateOf<PluginEntry?>(null)
     var selectedCapability by mutableStateOf<Capability?>(null)
     var loadedPlugins by mutableStateOf(ModuleLoader.getPlugins())
+    
+    var lastEnqueuedJobId by mutableStateOf<String?>(null)
+    val activeJobs = jobManager.jobs // Flow<List<BackgroundJob>>
     
     var executionResult by mutableStateOf<Result<PluginResponse>?>(null)
     var isExecuting by mutableStateOf(false)
@@ -72,6 +120,8 @@ class PluginViewModel(
         val capability = selectedCapability ?: return
         val plugin = selectedPlugin ?: return
         
+        executionResult = null
+        
         viewModelScope.launch {
             val params = selectedCapability?.let { capability ->
                 parameterValues.toMap().mapValues { (name, value) ->
@@ -80,8 +130,9 @@ class PluginViewModel(
                 }
             } ?: emptyMap()
 
+            val jobId = Random.nextInt(1000, 9999).toString()
             val job = BackgroundJob(
-                id = Random.nextInt(1000, 9999).toString(),
+                id = jobId,
                 name = "${plugin.getManifest().module.name}: ${capability.name}",
                 type = JobType.Capability,
                 pluginId = plugin.getManifest().module.id,
@@ -89,8 +140,12 @@ class PluginViewModel(
                 parameters = params
             )
             jobManager.enqueueJob(job)
+            lastEnqueuedJobId = jobId
             
-            // Optionally, we could show a toast or navigate to the dashboard
+            notificationService.notify(
+                title = "Job Enqueued",
+                message = "Executing ${capability.name} in background"
+            )
         }
     }
 

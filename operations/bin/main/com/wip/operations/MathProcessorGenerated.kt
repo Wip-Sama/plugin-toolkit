@@ -12,6 +12,7 @@ import com.wip.plugin.api.Requirements
 import com.wip.plugin.api.getDataType
 import kotlin.Boolean
 import kotlin.Double
+import kotlin.Long
 import kotlin.Result
 import kotlin.String
 import kotlin.Unit
@@ -61,6 +62,15 @@ public object MathProcessorManifest {
               "b" to ParameterMetadata(null, "Denominator", getDataType<Double>())
             ),
             returnType = getDataType<Double>()
+          ),
+          Capability(
+            name = "slow_sum",
+            description = "Calculates the sum of a list of numbers with a delay",
+            parameters = mapOf(
+              "values" to ParameterMetadata(null, "List of numbers to add", getDataType<List<Double>>()),
+              "delay" to ParameterMetadata(null, "Delay in milliseconds", getDataType<Long>())
+            ),
+            returnType = getDataType<Double>()
           )
         )
       )
@@ -95,6 +105,13 @@ public class MathProcessorDispatcher(
           val result = processor.divideCapability(
             Json.decodeFromJsonElement<Double>(request.parameters["a"] ?: throw IllegalArgumentException("Missing mandatory parameter: a")),
             Json.decodeFromJsonElement<Double>(request.parameters["b"] ?: throw IllegalArgumentException("Missing mandatory parameter: b"))
+          )
+          PluginResponse(result = Json.encodeToJsonElement(result), metadata = mapOf("status" to "success"))
+        },
+        "slow_sum" to { request ->
+          val result = processor.slowSumCapability(
+            Json.decodeFromJsonElement<List<Double>>(request.parameters["values"] ?: throw IllegalArgumentException("Missing mandatory parameter: values")),
+            Json.decodeFromJsonElement<Long>(request.parameters["delay"] ?: throw IllegalArgumentException("Missing mandatory parameter: delay"))
           )
           PluginResponse(result = Json.encodeToJsonElement(result), metadata = mapOf("status" to "success"))
         }

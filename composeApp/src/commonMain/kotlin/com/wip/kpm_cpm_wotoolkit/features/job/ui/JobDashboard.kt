@@ -28,6 +28,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigation3.runtime.NavEntry
 import androidx.savedstate.serialization.SavedStateConfiguration
+import com.wip.kpm_cpm_wotoolkit.core.model.localized
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import org.jetbrains.compose.resources.stringResource
@@ -69,12 +70,12 @@ fun JobDashboard(
 
     val sections = listOf(
         SidebarSectionData(
-            title = Res.string.nav_jobs,
+            title = Res.string.nav_jobs.localized,
             elements = listOf(
-                SidebarElement(JobNavKey.General, Icons.Default.Dashboard, Res.string.nav_job_general),
-                SidebarElement(JobNavKey.Archive, Icons.Default.Archive, Res.string.nav_job_archive),
-                SidebarElement(JobNavKey.Scheduler, Icons.Default.Schedule, Res.string.nav_job_scheduler),
-                SidebarElement(JobNavKey.History, Icons.Default.History, Res.string.nav_job_history),
+                SidebarElement(JobNavKey.General, Icons.Default.Dashboard, Res.string.nav_job_general.localized),
+                SidebarElement(JobNavKey.Archive, Icons.Default.Archive, Res.string.nav_job_archive.localized),
+                SidebarElement(JobNavKey.Scheduler, Icons.Default.Schedule, Res.string.nav_job_scheduler.localized),
+                SidebarElement(JobNavKey.History, Icons.Default.History, Res.string.nav_job_history.localized),
             )
         )
     )
@@ -82,7 +83,7 @@ fun JobDashboard(
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Internal Sidebar
         NavigationSidebar(
-            title = Res.string.nav_jobs,
+            title = Res.string.nav_jobs.localized,
             bodySections = sections,
             currentScreen = currentKey,
             onScreenSelected = { key ->

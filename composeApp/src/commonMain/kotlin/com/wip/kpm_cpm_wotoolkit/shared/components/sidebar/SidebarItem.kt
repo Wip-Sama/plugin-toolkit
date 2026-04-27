@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun <T> SidebarItem(
@@ -80,7 +79,7 @@ fun <T> SidebarItem(
         ) {
             Icon(
                 imageVector = element.icon,
-                contentDescription = stringResource(element.title),
+                contentDescription = element.title.resolve(),
                 tint = iconTintColor,
                 modifier = Modifier.size(22.dp)
             )
@@ -89,7 +88,7 @@ fun <T> SidebarItem(
         if (isExpanded) {
             Spacer(modifier = Modifier.width(16.dp))
             Text(
-                text = stringResource(element.title),
+                text = element.title.resolve(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = contentColor,

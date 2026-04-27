@@ -13,10 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.stringResource
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import kpm_cpm_wotoolkit.composeapp.generated.resources.*
 import androidx.compose.ui.tooling.preview.Preview
+import com.wip.kpm_cpm_wotoolkit.core.model.localized
 
 @Composable
 @Preview
@@ -24,7 +24,7 @@ private fun SidebarSectionPreview() {
     MaterialTheme {
         SidebarSection(
             section = SidebarSectionData<String>(
-                title = Res.string.section_application,
+                title = Res.string.section_application.localized,
                 elements = listOf()
             ),
             currentSelection = "main",
@@ -54,7 +54,7 @@ fun <T> SidebarSection(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = stringResource(section.title),
+                    text = section.title.resolve(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

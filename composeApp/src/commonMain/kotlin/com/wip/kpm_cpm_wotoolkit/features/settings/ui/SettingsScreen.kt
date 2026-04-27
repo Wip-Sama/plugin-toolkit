@@ -44,6 +44,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
+import com.wip.kpm_cpm_wotoolkit.core.model.localized
 import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.SettingDefinition
@@ -68,7 +69,7 @@ import kotlinx.serialization.modules.polymorphic
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import kpm_cpm_wotoolkit.composeapp.generated.resources.nav_notification_history
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_about
-import kpm_cpm_wotoolkit.composeapp.generated.resources.section_application
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_general
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules_manager
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules_repositories
@@ -173,34 +174,34 @@ fun SettingsScreen(
     }
 
     val applicationSection = SidebarSectionData(
-        title = Res.string.section_application, elements = listOf(
-            SidebarElement(SettingNavKey.Appearance, Icons.Default.Palette, Res.string.setting_appearance),
-            SidebarElement(SettingNavKey.SystemSettings, Icons.Default.Settings, Res.string.section_system),
+        title = Res.string.section_general.localized, elements = listOf(
+            SidebarElement(SettingNavKey.Appearance, Icons.Default.Palette, Res.string.setting_appearance.localized),
+            SidebarElement(SettingNavKey.SystemSettings, Icons.Default.Settings, Res.string.section_system.localized),
             SidebarElement(
                 SettingNavKey.NotificationHistory,
                 Icons.Default.History,
-                Res.string.nav_notification_history
+                Res.string.nav_notification_history.localized
             ),
         )
     )
 
     val moduleSection = SidebarSectionData(
-        title = Res.string.section_modules, elements = listOf(
-            SidebarElement(SettingNavKey.ModuleManager, Icons.Default.Inventory, Res.string.section_modules),
-            SidebarElement(SettingNavKey.ModuleRepo, Icons.Default.Inventory, Res.string.section_modules_repositories)
+        title = Res.string.section_modules.localized, elements = listOf(
+            SidebarElement(SettingNavKey.ModuleManager, Icons.Default.Inventory, Res.string.section_modules.localized),
+            SidebarElement(SettingNavKey.ModuleRepo, Icons.Default.Inventory, Res.string.section_modules_repositories.localized)
         )
     )
 
     val aboutSection = SidebarSectionData(
-        title = Res.string.section_about, elements = listOf(
-            SidebarElement(SettingNavKey.About, Icons.Default.Info, Res.string.section_about)
+        title = Res.string.section_about.localized, elements = listOf(
+            SidebarElement(SettingNavKey.About, Icons.Default.Info, Res.string.section_about.localized)
         )
     )
 
     Row(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // ── Left: internal settings sidebar ─────────────────────────────────
         NavigationSidebar(
-            title = Res.string.settings,
+            title = Res.string.settings.localized,
             bodySections = listOf(applicationSection, moduleSection),
             bottomSections = listOf(aboutSection),
             currentScreen = currentKey,

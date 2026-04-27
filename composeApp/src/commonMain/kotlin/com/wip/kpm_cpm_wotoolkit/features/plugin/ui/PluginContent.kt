@@ -7,11 +7,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
+import com.wip.kpm_cpm_wotoolkit.features.job.ui.StatusBadge
 import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
 import com.wip.kpm_cpm_wotoolkit.shared.components.SectionHeader
 import com.wip.kpm_cpm_wotoolkit.shared.components.GlassCard
@@ -21,83 +28,50 @@ import com.wip.plugin.api.Capability
 import com.wip.plugin.api.PluginManifest
 import androidx.compose.ui.tooling.preview.Preview
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun PluginContent(
     viewModel: PluginViewModel,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxHeight()) {
-        val selectedPlugin = viewModel.selectedPlugin
-        if (selectedPlugin == null) {
-            EmptyState("Select a module to begin testing")
+        val selectedCapability = viewModel.selectedCapability
+        val activeJobs by viewModel.activeJobs.collectAsState(initial = emptyList<BackgroundJob>())
+        val currentJob = activeJobs.find { it.id == viewModel.lastEnqueuedJobId }
+
+        if (selectedCapability == null) {
+            EmptyState("Select a capability to begin testing")
         } else {
-            val manifest = selectedPlugin.getManifest()
-            
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(32.dp)
             ) {
-                // Module Header
-                ModuleHeader(manifest)
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    // Capabilities List
-                    Column(modifier = Modifier.weight(0.4f)) {
-                        SectionHeader(title = "CAPABILITIES", icon = Icons.Default.Bolt)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        for (capability in manifest.capabilities) {
-                            CapabilityItem(
-                                capability = capability,
-                                isSelected = viewModel.selectedCapability == capability,
-                                onClick = { viewModel.selectCapability(capability) }
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
+                // Tester Area
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    val isJobActive = currentJob?.status == JobStatus.Running || currentJob?.status == JobStatus.Queued
                     
-                    Spacer(modifier = Modifier.width(32.dp))
-                    
-                    // Tester Area
-                    Column(modifier = Modifier.weight(0.6f)) {
-                        AnimatedContent(
-                            targetState = viewModel.selectedCapability,
-                            transitionSpec = {
-                                fadeIn() + slideInHorizontally { it / 2 } togetherWith fadeOut() + slideOutHorizontally { -it / 2 }
-                            }
-                        ) { capability ->
-                            if (capability != null) {
-                                Column {
-                                    CapabilityTester(
-                                        capability = capability,
-                                        parameterValues = viewModel.parameterValues,
-                                        isExecuting = viewModel.isExecuting,
-                                        onExecute = { viewModel.executeCapability() }
-                                    )
+                    CapabilityTester(
+                        capability = selectedCapability,
+                        parameterValues = viewModel.parameterValues,
+                        isExecuting = isJobActive,
+                        currentJob = currentJob,
+                        onExecute = { viewModel.executeCapability() }
+                    )
 
-                                    AnimatedVisibility(
-                                        visible = viewModel.executionResult != null,
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        viewModel.executionResult?.let { result ->
-                                            Column {
-                                                Spacer(modifier = Modifier.height(24.dp))
-                                                if (result.isSuccess) {
-                                                    ResponseView(result.getOrThrow())
-                                                } else {
-                                                    ErrorView(result.exceptionOrNull()?.message ?: "Unknown error")
-                                                }
-                                            }
-                                        }
-                                    }
+                    AnimatedVisibility(
+                        visible = viewModel.executionResult != null && !isJobActive,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        viewModel.executionResult?.let { result ->
+                            Column {
+                                Spacer(modifier = Modifier.height(24.dp))
+                                if (result.isSuccess) {
+                                    ResponseView(result.getOrThrow())
+                                } else {
+                                    ErrorView(result.exceptionOrNull()?.message ?: "Unknown error")
                                 }
-                            } else {
-                                EmptyState("Select a capability to test")
                             }
                         }
                     }
@@ -158,10 +132,21 @@ fun CapabilityTester(
     capability: Capability,
     parameterValues: Map<String, String>,
     isExecuting: Boolean,
+    currentJob: BackgroundJob?,
     onExecute: () -> Unit
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(title = "Capability Tester: ${capability.name}", icon = Icons.Default.PlayArrow)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SectionHeader(title = "Capability Tester: ${capability.name}", icon = Icons.Default.PlayArrow)
+            if (currentJob != null) {
+                StatusBadge(currentJob.status)
+            }
+        }
+        
         Spacer(modifier = Modifier.height(16.dp))
         
         if (capability.parameters != null) {
@@ -181,6 +166,24 @@ fun CapabilityTester(
         
         Spacer(modifier = Modifier.height(24.dp))
         
+        if (currentJob != null && currentJob.status == JobStatus.Running) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                LinearProgressIndicator(
+                    progress = { currentJob.progress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    color = ProgressIndicatorDefaults.linearColor,
+                    trackColor = ProgressIndicatorDefaults.linearTrackColor,
+                    strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Executing... ${(currentJob.progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
         Button(
             onClick = onExecute,
             modifier = Modifier.fillMaxWidth(),

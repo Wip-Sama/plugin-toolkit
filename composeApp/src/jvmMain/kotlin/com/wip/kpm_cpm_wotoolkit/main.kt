@@ -31,6 +31,9 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
 import com.wip.kpm_cpm_wotoolkit.features.repository.logic.RepoManager
 import com.wip.kpm_cpm_wotoolkit.features.repository.viewmodel.ModuleRepoViewModel
 import androidx.compose.ui.Modifier
+import com.wip.kpm_cpm_wotoolkit.features.job.viewmodel.JobViewModel
+import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.ModuleManagerViewModel
+import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
 import kotlinx.coroutines.SupervisorJob
 import org.koin.mp.KoinPlatform.getKoin
 
@@ -57,13 +60,13 @@ fun main(args: Array<String>) {
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { ModuleRepoViewModel(get(), get(), get(), get(), get()) }
-            factory { com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.ModuleManagerViewModel(get(), get(), get()) }
-            factory { com.wip.kpm_cpm_wotoolkit.features.job.viewmodel.JobViewModel(get()) }
-            factory { com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel(get()) }
+            factory { ModuleManagerViewModel(get(), get(), get()) }
+            factory { JobViewModel(get()) }
+            factory { PluginViewModel(get(), get(), get()) }
         })
     }
 
-    val koin = org.koin.mp.KoinPlatform.getKoin()
+    val koin = getKoin()
     val viewModel = koin.get<SettingsViewModel>()
     koin.get<RepoManager>() // Trigger initialization and background refresh
     val moduleManager = koin.get<com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager>()
@@ -130,7 +133,7 @@ fun main(args: Array<String>) {
                 },
                 title = "WOToolkit",
             ) {
-                val notificationService = org.koin.mp.KoinPlatform.getKoin().get<NotificationService>()
+                val notificationService = getKoin().get<NotificationService>()
 
                 LaunchedEffect(Unit) {
                     val trayState = trayState // from application scope

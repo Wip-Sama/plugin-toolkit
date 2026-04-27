@@ -36,6 +36,15 @@ class MathProcessor {
         if (b == 0.0) throw ArithmeticException("Division by zero")
         return a / b
     }
+
+    @Capability(name = "slow_sum", description = "Calculates the sum of a list of numbers with a delay")
+    fun slowSumCapability(
+        @PluginParam(description = "List of numbers to add") values: List<Double>,
+        @PluginParam(description = "Delay in milliseconds") delay: Long
+    ): Double {
+        Thread.sleep(delay)
+        return values.sum()
+    }
 }
 
 val mathPluginModule = org.koin.dsl.module {
