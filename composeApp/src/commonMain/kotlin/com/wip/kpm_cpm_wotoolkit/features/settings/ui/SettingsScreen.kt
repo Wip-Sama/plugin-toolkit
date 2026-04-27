@@ -48,6 +48,7 @@ import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.SettingDefinition
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsRegistry
+import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsResolvedStrings
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsSearchQuery
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingText
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.resolve
@@ -67,6 +68,7 @@ import kpm_cpm_wotoolkit.composeapp.generated.resources.nav_notification_history
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_about
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_application
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules_manager
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules_repositories
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_system
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_appearance
@@ -103,6 +105,7 @@ val SettingNavConfig = SavedStateConfiguration {
             subclass(SettingNavKey.Appearance::class, SettingNavKey.Appearance.serializer())
             subclass(SettingNavKey.SystemSettings::class, SettingNavKey.SystemSettings.serializer())
             subclass(SettingNavKey.ModuleRepo::class, SettingNavKey.ModuleRepo.serializer())
+            subclass(SettingNavKey.ModuleManager::class, SettingNavKey.ModuleManager.serializer())
             subclass(SettingNavKey.NotificationHistory::class, SettingNavKey.NotificationHistory.serializer())
             subclass(SettingNavKey.About::class, SettingNavKey.About.serializer())
             subclass(SettingNavKey.BroadSearch::class, SettingNavKey.BroadSearch.serializer())
@@ -117,8 +120,8 @@ fun SettingsScreen(
     searchViewModel: SettingsSearchViewModel = koinInject(),
     notificationViewModel: NotificationViewModel = koinInject()
 ) {
-    // Start with BroadSearch — no page pre-selected
-    val backStack = rememberNavBackStack(SettingNavConfig, SettingNavKey.BroadSearch as SettingNavKey)
+    // Start with Appearance — showing settings immediately
+    val backStack = rememberNavBackStack(SettingNavConfig, SettingNavKey.Appearance as SettingNavKey)
     val currentKey = backStack.lastOrNull() ?: SettingNavKey.BroadSearch
     val searchQuery = searchViewModel.searchQuery
     val allDefinitions by searchViewModel.allDefinitions.collectAsState()
@@ -227,7 +230,8 @@ fun SettingsScreen(
                 SettingNavKey.Appearance -> stringResource(Res.string.setting_appearance)
                 SettingNavKey.SystemSettings -> stringResource(Res.string.section_system)
                 SettingNavKey.NotificationHistory -> stringResource(Res.string.nav_notification_history)
-                SettingNavKey.ModuleRepo -> stringResource(Res.string.section_modules)
+                SettingNavKey.ModuleRepo -> stringResource(Res.string.section_modules_repositories)
+                SettingNavKey.ModuleManager -> stringResource(Res.string.section_modules_manager)
                 SettingNavKey.About -> stringResource(Res.string.section_about)
                 SettingNavKey.BroadSearch -> stringResource(Res.string.settings)
                 else -> "Error"
@@ -241,7 +245,9 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
             CompositionLocalProvider(
-                LocalSettingsSearchQuery provides searchQuery, LocalSettingsRegistry provides allDefinitions
+                LocalSettingsSearchQuery provides searchQuery,
+                LocalSettingsRegistry provides allDefinitions,
+                LocalSettingsResolvedStrings provides resolvedStrings
             ) {
                 val currentSettingKey = currentKey as? SettingNavKey ?: SettingNavKey.BroadSearch
                 val hasLocalMatches = searchViewModel.hasLocalMatches(currentSettingKey, allDefinitions, resolvedStrings)
@@ -291,6 +297,16 @@ fun SettingsScreen(
                                 )
                             }
 
+                            SettingNavKey.ModuleManager -> NavEntry(key) {
+                                AutoSettingsView(
+                                    navKey = SettingNavKey.ModuleManager,
+                                    viewModel = viewModel,
+                                    registry = registry,
+                                    controlOverrides = controlOverrides,
+                                    actionOverrides = actionOverrides
+                                )
+                            }
+
                             // ── Custom pages (parallel system) ────────────
                             SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
                             SettingNavKey.ModuleRepo -> NavEntry(key) { PlaceholderView("Module Repository") }
@@ -327,10 +343,7 @@ fun BroadSearchResultsView(
     resolvedStrings: Map<SettingText, String>,
     onNavigate: (SettingNavKey) -> Unit
 ) {
-    if (searchQuery.isBlank()) {
-        PlaceholderView("Type to search across all settings")
-        return
-    }
+    // We now show all settings when blank, handled by the ViewModel
 
     val grouped = searchViewModel.getBroadSearchResults(allDefinitions, resolvedStrings)
 

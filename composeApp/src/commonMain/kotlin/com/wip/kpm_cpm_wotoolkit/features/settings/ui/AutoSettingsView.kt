@@ -12,6 +12,8 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.SettingDefinition
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.resolve
+import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsResolvedStrings
+import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsSearchQuery
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsDropdown
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsGroup
@@ -37,8 +39,20 @@ fun AutoSettingsView(
     actionOverrides: Map<Int, () -> Unit> = emptyMap()
 ) {
     val allDefinitions by registry.definitions.collectAsState()
+    val searchQuery = LocalSettingsSearchQuery.current
+    val resolvedStrings = LocalSettingsResolvedStrings.current
+
     val pageDefinitions = allDefinitions.filter { it.navKey == navKey }
-    val grouped = pageDefinitions.groupBy { it.sectionTitle }
+    val filteredDefinitions = if (searchQuery.isBlank()) {
+        pageDefinitions
+    } else {
+        pageDefinitions.filter { definition ->
+            (resolvedStrings[definition.title] ?: "").contains(searchQuery, ignoreCase = true) ||
+            (definition.subtitle != null && (resolvedStrings[definition.subtitle] ?: "").contains(searchQuery, ignoreCase = true))
+        }
+    }
+    
+    val grouped = filteredDefinitions.groupBy { it.sectionTitle }
 
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         grouped.forEach { (sectionTitle, definitions) ->
@@ -92,8 +106,8 @@ private fun RenderSettingDefinition(
         }
 
         is SettingDefinition.DropdownSetting<*> -> {
-            @Suppress("UNCHECKED_CAST") RenderDropdownSetting(
-                definition = definition as SettingDefinition.DropdownSetting<Any?>,
+            RenderDropdownSetting(
+                definition = definition,
                 settings = settings,
                 onUpdate = onUpdate,
                 isEnabled = isEnabled
@@ -114,7 +128,8 @@ private fun RenderSettingDefinition(
                             onUpdate(definition.setValue(settings, value))
                         }, valueRange = definition.valueRange, steps = definition.steps, enabled = isEnabled
                     )
-                })
+                }
+            )
         }
 
         is SettingDefinition.NumericSetting -> {
@@ -129,7 +144,8 @@ private fun RenderSettingDefinition(
                             onUpdate(definition.setValue(settings, value))
                         }, valueRange = definition.valueRange, enabled = isEnabled
                     )
-                })
+                }
+            )
         }
 
         is SettingDefinition.ActionSetting -> {
@@ -152,7 +168,8 @@ private fun RenderSettingDefinition(
                 onClick = definition.onClick,
                 control = {
                     control(settings, onUpdate)
-                })
+                }
+            )
         }
     }
 }
@@ -182,5 +199,6 @@ private fun <T> RenderDropdownSetting(
                 labelProvider = definition.labelProvider,
                 enabled = isEnabled
             )
-        })
+        }
+    )
 }

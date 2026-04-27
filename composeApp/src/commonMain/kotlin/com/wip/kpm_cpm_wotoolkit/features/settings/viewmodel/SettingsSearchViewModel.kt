@@ -37,12 +37,15 @@ class SettingsSearchViewModel(
         definitions: List<SettingDefinition>,
         resolvedStrings: Map<SettingText, String>
     ): Map<String, List<SettingDefinition>> {
-        if (searchQuery.isBlank()) return emptyMap()
-
         val searchPool = definitions.filter { it.navKey != SettingNavKey.NotificationHistory }
-        val matches = searchPool.filter {
-            (resolvedStrings[it.title] ?: "").contains(searchQuery, ignoreCase = true) ||
-            (it.subtitle != null && (resolvedStrings[it.subtitle] ?: "").contains(searchQuery, ignoreCase = true))
+        
+        val matches = if (searchQuery.isBlank()) {
+            searchPool
+        } else {
+            searchPool.filter {
+                (resolvedStrings[it.title] ?: "").contains(searchQuery, ignoreCase = true) ||
+                (it.subtitle != null && (resolvedStrings[it.subtitle] ?: "").contains(searchQuery, ignoreCase = true))
+            }
         }
 
         return matches.groupBy { resolvedStrings[it.sectionTitle] ?: "" }

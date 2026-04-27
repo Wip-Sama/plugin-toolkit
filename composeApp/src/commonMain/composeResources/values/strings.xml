@@ -20,6 +20,7 @@
     <string name="setting_appearance">Appearance</string>
     <string name="section_modules">Modules</string>
     <string name="section_modules_repositories">Repositories</string>
+    <string name="section_modules_manager">Manager</string>
     <string name="section_about">About</string>
     <string name="section_general">General</string>
     <string name="section_localization">Localization</string>

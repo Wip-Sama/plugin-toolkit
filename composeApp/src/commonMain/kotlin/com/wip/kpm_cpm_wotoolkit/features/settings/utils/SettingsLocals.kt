@@ -5,3 +5,4 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.model.SettingDefinition
 
 val LocalSettingsSearchQuery = compositionLocalOf { "" }
 val LocalSettingsRegistry = compositionLocalOf<List<SettingDefinition>> { emptyList() }
+val LocalSettingsResolvedStrings = compositionLocalOf<Map<com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingText, String>> { emptyMap() }
