@@ -58,13 +58,13 @@ fun main(args: Array<String>) {
             single { DialogService() }
             single { ModuleManager(get(), get()) }
             single { JobManager(CoroutineScope(SupervisorJob() + Dispatchers.Default), repository.loadSettings().jobs.maxConcurrentJobs) }
+            single { PluginViewModel(get(), get(), get()) }
             factory { SettingsViewModel(get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { ModuleRepoViewModel(get(), get(), get(), get(), get()) }
             factory { ModuleManagerViewModel(get(), get(), get()) }
             factory { JobViewModel(get()) }
-            factory { PluginViewModel(get(), get(), get()) }
         })
     }
 

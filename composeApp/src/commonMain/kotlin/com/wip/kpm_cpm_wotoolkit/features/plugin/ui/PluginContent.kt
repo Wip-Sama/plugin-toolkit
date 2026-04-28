@@ -8,12 +8,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
@@ -35,8 +34,15 @@ fun PluginContent(
 ) {
     Box(modifier = modifier.fillMaxHeight()) {
         val selectedCapability = viewModel.selectedCapability
-        val activeJobs by viewModel.activeJobs.collectAsState(initial = emptyList<BackgroundJob>())
-        val currentJob = activeJobs.find { it.id == viewModel.lastEnqueuedJobId }
+        val allJobs by viewModel.activeJobs.collectAsState(initial = emptyList<BackgroundJob>())
+        
+        val capabilityJobs = remember(allJobs, viewModel.selectedPlugin, selectedCapability) {
+            val pluginId = viewModel.selectedPlugin?.getManifest()?.module?.id
+            val capName = selectedCapability?.name
+            if (pluginId == null || capName == null) emptyList<BackgroundJob>()
+            else allJobs.filter { it.pluginId == pluginId && it.capabilityName == capName }
+                .sortedByDescending { it.enqueuedAt }
+        }
 
         if (selectedCapability == null) {
             EmptyState("Select a capability to begin testing")
@@ -48,31 +54,48 @@ fun PluginContent(
                     .padding(32.dp)
             ) {
                 // Tester Area
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    val isJobActive = currentJob?.status == JobStatus.Running || currentJob?.status == JobStatus.Queued
-                    
-                    CapabilityTester(
-                        capability = selectedCapability,
-                        parameterValues = viewModel.parameterValues,
-                        isExecuting = isJobActive,
-                        currentJob = currentJob,
-                        onExecute = { viewModel.executeCapability() }
-                    )
+                CapabilityTester(
+                    capability = selectedCapability,
+                    parameterValues = viewModel.parameterValues,
+                    saveResults = viewModel.saveResults,
+                    onSaveResultsChange = { viewModel.saveResults = it },
+                    activeJobs = capabilityJobs.filter { it.status == JobStatus.Running || it.status == JobStatus.Queued },
+                    onExecute = { viewModel.executeCapability() }
+                )
 
-                    AnimatedVisibility(
-                        visible = viewModel.executionResult != null && !isJobActive,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // History / Results Area
+                val visibleJobs = if (viewModel.saveResults) {
+                    capabilityJobs
+                } else {
+                    capabilityJobs.take(1) // Only show latest if not saving
+                }
+
+                if (visibleJobs.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        viewModel.executionResult?.let { result ->
-                            Column {
-                                Spacer(modifier = Modifier.height(24.dp))
-                                if (result.isSuccess) {
-                                    ResponseView(result.getOrThrow())
-                                } else {
-                                    ErrorView(result.exceptionOrNull()?.message ?: "Unknown error")
-                                }
+                        Text(
+                            if (viewModel.saveResults) "Execution History" else "Latest Result",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        if (viewModel.saveResults) {
+                            TextButton(onClick = { viewModel.clearCapabilityHistory() }) {
+                                Icon(Icons.Default.ClearAll, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Clear")
                             }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        visibleJobs.forEach { job ->
+                            JobResultItem(job)
                         }
                     }
                 }
@@ -131,8 +154,9 @@ fun CapabilityItem(
 fun CapabilityTester(
     capability: Capability,
     parameterValues: Map<String, String>,
-    isExecuting: Boolean,
-    currentJob: BackgroundJob?,
+    saveResults: Boolean,
+    onSaveResultsChange: (Boolean) -> Unit,
+    activeJobs: List<BackgroundJob>,
     onExecute: () -> Unit
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -141,9 +165,20 @@ fun CapabilityTester(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SectionHeader(title = "Capability Tester: ${capability.name}", icon = Icons.Default.PlayArrow)
-            if (currentJob != null) {
-                StatusBadge(currentJob.status)
+            SectionHeader(
+                title = "Capability Tester: ${capability.name}", 
+                icon = Icons.Default.PlayArrow,
+                modifier = Modifier.weight(1f)
+            )
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Save Results", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                Spacer(modifier = Modifier.width(8.dp))
+                Switch(
+                    checked = saveResults,
+                    onCheckedChange = onSaveResultsChange,
+                    modifier = Modifier.scale(0.8f)
+                )
             }
         }
         
@@ -166,35 +201,76 @@ fun CapabilityTester(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        if (currentJob != null && currentJob.status == JobStatus.Running) {
-            val currentProgress by currentJob.progress.collectAsState()
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                LinearProgressIndicator(
-                    progress = { currentProgress },
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
-                    color = ProgressIndicatorDefaults.linearColor,
-                    trackColor = ProgressIndicatorDefaults.linearTrackColor,
-                    strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Executing... ${(currentProgress * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
         Button(
             onClick = onExecute,
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isExecuting,
             shape = MaterialTheme.shapes.medium
         ) {
-            if (isExecuting) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            if (activeJobs.isNotEmpty()) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Execute Capability (${activeJobs.size} running)")
             } else {
                 Text("Execute Capability")
+            }
+        }
+    }
+}
+
+@Composable
+fun JobResultItem(job: BackgroundJob) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Execution ${job.id}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                StatusBadge(job.status)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
+                val currentProgress by job.progress.collectAsState()
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    LinearProgressIndicator(
+                        progress = { currentProgress },
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
+                        color = ProgressIndicatorDefaults.linearColor,
+                        trackColor = ProgressIndicatorDefaults.linearTrackColor,
+                        strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Executing... ${(currentProgress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            } else if (job.status == JobStatus.Completed) {
+                val jsonResult = remember(job.result) {
+                    job.result?.let { 
+                        try { kotlinx.serialization.json.Json.parseToJsonElement(it) } catch (e: Exception) { kotlinx.serialization.json.JsonNull }
+                    } ?: kotlinx.serialization.json.JsonNull
+                }
+                ResponseView(com.wip.plugin.api.PluginResponse(result = jsonResult))
+            } else if (job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
+                ErrorView(job.errorMessage ?: "Execution ${job.status.name}")
             }
         }
     }

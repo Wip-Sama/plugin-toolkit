@@ -272,6 +272,10 @@ class JobManager(
         }
     }
 
+    fun removeJobs(predicate: (BackgroundJob) -> Boolean) {
+        _jobs.update { it.filterNot(predicate) }
+    }
+
     suspend fun stopAll() {
         workers.forEach { it.stop() }
         coroutinesMutex.withLock {

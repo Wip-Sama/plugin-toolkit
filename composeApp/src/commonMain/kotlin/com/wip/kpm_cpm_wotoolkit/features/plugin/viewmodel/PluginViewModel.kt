@@ -37,35 +37,12 @@ class PluginViewModel(
     var selectedCapability by mutableStateOf<Capability?>(null)
     var loadedPlugins by mutableStateOf(ModuleLoader.getPlugins())
     
-    var lastEnqueuedJobId by mutableStateOf<String?>(null)
+    var saveResults by mutableStateOf(true) // Default to true as requested "ability to save"
     val activeJobs = jobManager.jobs // Flow<List<BackgroundJob>>
     
-    var executionResult by mutableStateOf<Result<PluginResponse>?>(null)
-    var isExecuting by mutableStateOf(false)
-
     val parameterValues = mutableStateMapOf<String, String>()
 
     init {
-        jobManager.jobs
-            .onEach { jobs ->
-                val myJob = jobs.find { it.id == lastEnqueuedJobId }
-                if (myJob != null) {
-                    when (myJob.status) {
-                        JobStatus.Completed -> {
-                            val jsonResult = myJob.result?.let { 
-                                try { Json.parseToJsonElement(it) } catch (e: Exception) { JsonNull }
-                            } ?: JsonNull
-                            executionResult = Result.success(PluginResponse(result = jsonResult))
-                        }
-                        JobStatus.Failed -> {
-                            executionResult = Result.failure(Exception(myJob.errorMessage ?: "Job failed"))
-                        }
-                        else -> { /* Still running or queued */ }
-                    }
-                }
-            }
-            .launchIn(viewModelScope)
-
         // Sync with ModuleManager
         moduleManager.loadedModules
             .onEach { 
@@ -82,7 +59,6 @@ class PluginViewModel(
     fun selectPlugin(plugin: PluginEntry?) {
         selectedPlugin = plugin
         selectedCapability = null
-        executionResult = null
     }
 
     fun selectCapability(capability: Capability?) {
@@ -91,7 +67,6 @@ class PluginViewModel(
         capability?.parameters?.forEach { (name, _) ->
             parameterValues[name] = ""
         }
-        executionResult = null
     }
 
     fun loadPlugin() {
@@ -121,8 +96,6 @@ class PluginViewModel(
         val capability = selectedCapability ?: return
         val plugin = selectedPlugin ?: return
         
-        executionResult = null
-        
         viewModelScope.launch {
             val params = selectedCapability?.let { capability ->
                 parameterValues.toMap().mapValues { (name, value) ->
@@ -141,12 +114,23 @@ class PluginViewModel(
                 parameters = params
             )
             jobManager.enqueueJob(job)
-            lastEnqueuedJobId = jobId
             
             notificationService.notify(
                 title = "Job Enqueued",
                 message = "Executing ${capability.name} in background"
             )
+        }
+    }
+
+    fun clearCapabilityHistory() {
+        val pluginId = selectedPlugin?.getManifest()?.module?.id
+        val capName = selectedCapability?.name
+        if (pluginId != null && capName != null) {
+            jobManager.removeJobs { 
+                it.pluginId == pluginId && 
+                it.capabilityName == capName && 
+                (it.status == JobStatus.Completed || it.status == JobStatus.Failed || it.status == JobStatus.Cancelled)
+            }
         }
     }
 
