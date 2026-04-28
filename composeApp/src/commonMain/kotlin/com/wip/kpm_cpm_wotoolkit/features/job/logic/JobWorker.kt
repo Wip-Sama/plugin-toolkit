@@ -82,8 +82,7 @@ class JobWorker(
                         // Extra safety check in loop
                         val current = manager.jobs.value.find { it.id == job.id }
                         if (current?.status == JobStatus.Running) {
-                            // Update progress lock-free directly on the state flow!
-                            current.progress.value = p
+                            manager.updateJobProgress(job.id, p)
                         } else {
                             // If it's no longer running, stop collecting progress
                             cancel()

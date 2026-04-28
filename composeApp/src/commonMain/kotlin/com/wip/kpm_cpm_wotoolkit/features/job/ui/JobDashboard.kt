@@ -43,6 +43,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 import kotlinx.coroutines.delay
+import kotlin.time.Clock
 
 @Serializable
 sealed interface JobNavKey : NavKey {
@@ -141,6 +142,7 @@ fun JobDashboard(
 fun GeneralTab(viewModel: JobViewModel) {
     val runningJobs by viewModel.runningJobs.collectAsState()
     val queuedJobs by viewModel.queuedJobs.collectAsState()
+    val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -151,7 +153,12 @@ fun GeneralTab(viewModel: JobViewModel) {
                 SectionHeader(title = "Running Jobs", icon = Icons.Default.PlayArrow)
             }
             items(runningJobs) { job ->
-                JobCard(job, onCancel = { viewModel.cancelJob(job.id) }, onPause = { viewModel.pauseJob(job.id) })
+                JobCard(
+                    job = job, 
+                    progress = progressMap[job.id] ?: 0f,
+                    onCancel = { viewModel.cancelJob(job.id) }, 
+                    onPause = { viewModel.pauseJob(job.id) }
+                )
             }
         }
 
@@ -162,6 +169,7 @@ fun GeneralTab(viewModel: JobViewModel) {
             items(queuedJobs) { job ->
                 JobCard(
                     job = job, 
+                    progress = progressMap[job.id] ?: 0f,
                     onCancel = { viewModel.cancelJob(job.id) },
                     onPause = { viewModel.pauseJob(job.id) }
                 )
@@ -179,6 +187,7 @@ fun GeneralTab(viewModel: JobViewModel) {
 @Composable
 fun ArchiveTab(viewModel: JobViewModel) {
     val pausedJobs by viewModel.pausedJobs.collectAsState()
+    val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -189,7 +198,12 @@ fun ArchiveTab(viewModel: JobViewModel) {
                 SectionHeader(title = "Paused Jobs", icon = Icons.Default.Pause)
             }
             items(pausedJobs) { job ->
-                JobCard(job, onCancel = { viewModel.cancelJob(job.id) }, onResume = { viewModel.resumeJob(job.id) })
+                JobCard(
+                    job = job, 
+                    progress = progressMap[job.id] ?: 0f,
+                    onCancel = { viewModel.cancelJob(job.id) }, 
+                    onResume = { viewModel.resumeJob(job.id) }
+                )
             }
         } else {
             item {
@@ -277,6 +291,7 @@ fun HistoryTab(viewModel: JobViewModel) {
 @Composable
 fun JobCard(
     job: BackgroundJob,
+    progress: Float = 0f,
     onCancel: () -> Unit = {},
     onPause: () -> Unit = {},
     onResume: () -> Unit = {}
@@ -310,9 +325,8 @@ fun JobCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             if (job.status == JobStatus.Running) {
-                val currentProgress by job.progress.collectAsState()
                 LinearProgressIndicator(
-                    progress = { currentProgress },
+                    progress = { progress },
                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
                     color = ProgressIndicatorDefaults.linearColor,
                     trackColor = ProgressIndicatorDefaults.linearTrackColor,
@@ -320,9 +334,13 @@ fun JobCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "${(currentProgress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
+                    Text(text = "${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
                     // Use ticker to force update
-                    val displayTime = if (ticker >= 0) job.elapsedTime else 0L
+                    val displayTime = if (ticker >= 0) {
+                        val end = job.completedAt ?: Clock.System.now()
+                        val start = job.startedAt
+                        if (start != null) (end - start).inWholeMilliseconds else 0L
+                    } else 0L
                     Text(text = formatDuration(displayTime), style = MaterialTheme.typography.labelSmall)
                 }
             }

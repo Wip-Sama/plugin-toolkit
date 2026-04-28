@@ -21,6 +21,9 @@ class JobManager(
     private val _jobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
     val jobs: StateFlow<List<BackgroundJob>> = _jobs.asStateFlow()
 
+    private val _jobProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val jobProgress: StateFlow<Map<String, Float>> = _jobProgress.asStateFlow()
+
     private val _history = MutableStateFlow<List<JobHistoryEntry>>(emptyList())
     val history: StateFlow<List<JobHistoryEntry>> = _history.asStateFlow()
 
@@ -49,7 +52,19 @@ class JobManager(
     }
 
     fun enqueueJob(job: BackgroundJob) {
-        _jobs.update { it + job }
+        _jobs.update { currentList ->
+            val filtered = if (!job.keepResult) {
+                currentList.filterNot { 
+                    it.pluginId == job.pluginId && 
+                    it.capabilityName == job.capabilityName && 
+                    !it.keepResult &&
+                    (it.status == JobStatus.Completed || it.status == JobStatus.Failed || it.status == JobStatus.Cancelled)
+                }
+            } else {
+                currentList
+            }
+            filtered + job
+        }
         addHistoryEntryInternal(job.id, job.name, "Enqueued")
         Logger.i { "Job ${job.id} (${job.name}) enqueued" }
         jobSignal.trySend(Unit)
@@ -147,14 +162,11 @@ class JobManager(
             var claimedJob: BackgroundJob? = null
             
             _jobs.update { currentList ->
-                // PriorityQueue behavior: FIFO based on enqueuedAt
-                val candidate = currentList.filter { it.status == JobStatus.Queued }
-                    .minByOrNull { it.enqueuedAt }
+                // PriorityQueue behavior: FIFO based on list order
+                val candidate = currentList.firstOrNull { it.status == JobStatus.Queued }
                     
                 if (candidate != null) {
                     claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
-                    // IMPORTANT: copy() correctly maintains the reference to the Transient MutableStateFlow 
-                    // from candidate to claimedJob, avoiding progress reset issues.
                     currentList.map { if (it.id == candidate.id) claimedJob!! else it }
                 } else {
                     currentList
@@ -175,6 +187,10 @@ class JobManager(
         }
     }
 
+    fun updateJobProgress(jobId: String, progress: Float) {
+        _jobProgress.update { it + (jobId to progress) }
+    }
+
     fun tryCompleteJob(jobId: String, result: String?): Boolean {
         var completed = false
         var jobName = ""
@@ -183,8 +199,7 @@ class JobManager(
             jobName = job.name
             if (job.status == JobStatus.Running) {
                 completed = true
-                // We set the flow to 1.0f directly to ensure it updates even without copying the list
-                job.progress.value = 1.0f
+                updateJobProgress(jobId, 1.0f)
                 currentList.map { 
                     if (it.id == jobId) it.copy(
                         status = JobStatus.Completed,

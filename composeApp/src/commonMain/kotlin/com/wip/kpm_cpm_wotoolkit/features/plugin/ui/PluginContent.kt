@@ -34,6 +34,7 @@ fun PluginContent(
         val selectedCapability = viewModel.selectedCapability
         val allJobs by viewModel.activeJobs.collectAsState(initial = emptyList<BackgroundJob>())
         
+        val jobProgressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
         val capabilityJobs = remember(allJobs, viewModel.selectedPlugin, selectedCapability) {
             val pluginId = viewModel.selectedPlugin?.getManifest()?.module?.id
             val capName = selectedCapability?.name
@@ -55,6 +56,7 @@ fun PluginContent(
                 CapabilityTester(
                     capability = selectedCapability,
                     parameterValues = viewModel.parameterValues,
+                    onParameterChange = { name, value -> viewModel.updateParameter(name, value) },
                     saveResults = viewModel.saveResults,
                     onSaveResultsChange = { viewModel.saveResults = it },
                     activeJobs = capabilityJobs.filter { it.status == JobStatus.Running || it.status == JobStatus.Queued },
@@ -64,11 +66,7 @@ fun PluginContent(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // History / Results Area
-                val visibleJobs = if (viewModel.saveResults) {
-                    capabilityJobs
-                } else {
-                    capabilityJobs.take(1) // Only show latest if not saving
-                }
+                val visibleJobs = capabilityJobs
 
                 if (visibleJobs.isNotEmpty()) {
                     Row(
@@ -77,23 +75,25 @@ fun PluginContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            if (viewModel.saveResults) "Execution History" else "Latest Result",
+                            "Execution Results",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         
-                        if (viewModel.saveResults) {
-                            TextButton(onClick = { viewModel.clearCapabilityHistory() }) {
-                                Icon(Icons.Default.ClearAll, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Clear")
-                            }
+                        TextButton(onClick = { viewModel.clearCapabilityHistory() }) {
+                            Icon(Icons.Default.ClearAll, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Clear")
                         }
                     }
 
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         visibleJobs.forEach { job ->
-                            JobResultItem(job)
+                            JobResultItem(
+                                job = job, 
+                                progress = jobProgressMap[job.id] ?: 0f,
+                                onDelete = { viewModel.removeJob(job.id) }
+                            )
                         }
                     }
                 }
@@ -152,6 +152,7 @@ fun CapabilityItem(
 fun CapabilityTester(
     capability: Capability,
     parameterValues: Map<String, String>,
+    onParameterChange: (String, String) -> Unit,
     saveResults: Boolean,
     onSaveResultsChange: (Boolean) -> Unit,
     activeJobs: List<BackgroundJob>,
@@ -188,7 +189,7 @@ fun CapabilityTester(
                     name = name,
                     metadata = meta,
                     value = parameterValues[name] ?: "",
-                    onValueChange = { (parameterValues as MutableMap)[name] = it }
+                    onValueChange = { onParameterChange(name, it) }
                 )
             }
         }
@@ -216,7 +217,11 @@ fun CapabilityTester(
 }
 
 @Composable
-fun JobResultItem(job: BackgroundJob) {
+fun JobResultItem(
+    job: BackgroundJob, 
+    progress: Float = 0f,
+    onDelete: () -> Unit
+) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -224,7 +229,7 @@ fun JobResultItem(job: BackgroundJob) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Icon(
                         imageVector = Icons.Default.History,
                         contentDescription = null,
@@ -238,16 +243,30 @@ fun JobResultItem(job: BackgroundJob) {
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
-                StatusBadge(job.status)
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusBadge(job.status)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Delete",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
-                val currentProgress by job.progress.collectAsState()
                 Column(modifier = Modifier.fillMaxWidth()) {
                     LinearProgressIndicator(
-                        progress = { currentProgress },
+                        progress = { progress },
                         modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
                         color = ProgressIndicatorDefaults.linearColor,
                         trackColor = ProgressIndicatorDefaults.linearTrackColor,
@@ -255,7 +274,7 @@ fun JobResultItem(job: BackgroundJob) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Executing... ${(currentProgress * 100).toInt()}%",
+                        text = "Executing... ${(progress * 100).toInt()}%",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )

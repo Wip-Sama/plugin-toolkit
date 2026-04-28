@@ -15,7 +15,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import kotlin.random.Random
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 import androidx.lifecycle.viewModelScope
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
@@ -32,15 +33,22 @@ class PluginViewModel(
     private val notificationService: com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService,
     private val moduleManager: ModuleManager
 ) : ViewModel() {
-    var jarPath by mutableStateOf("C:\\Users\\sgroo\\AndroidStudioProjects\\CMP_desktop_test\\operations\\build\\libs\\operations.jar")
+    var jarPath by mutableStateOf("")
     var selectedPlugin by mutableStateOf<PluginEntry?>(null)
     var selectedCapability by mutableStateOf<Capability?>(null)
     var loadedPlugins by mutableStateOf(ModuleLoader.getPlugins())
     
     var saveResults by mutableStateOf(true) // Default to true as requested "ability to save"
     val activeJobs = jobManager.jobs // Flow<List<BackgroundJob>>
+    val jobProgress = jobManager.jobProgress // Flow<Map<String, Float>>
     
     val parameterValues = mutableStateMapOf<String, String>()
+    private val jobCounterMutex = Mutex()
+    private var jobCounter = 0
+
+    fun updateParameter(name: String, value: String) {
+        parameterValues[name] = value
+    }
 
     init {
         // Sync with ModuleManager
@@ -70,16 +78,20 @@ class PluginViewModel(
     }
 
     fun loadPlugin() {
+        if (jarPath.isBlank()) {
+            notificationService.notify(title = "Error", message = "Plugin path is empty")
+            return
+        }
         viewModelScope.launch {
-            // Hardcoded for demo, in real app we'd scan or ask user
-            val result = ModuleLoader.loadPlugin(
-                jarPath, 
-            )
+            val result = ModuleLoader.loadPlugin(jarPath)
             if (result.isSuccess) {
                 val plugin = result.getOrThrow()
                 plugin.initialize()
                 loadedPlugins = ModuleLoader.getPlugins()
                 selectPlugin(plugin)
+                notificationService.notify(title = "Success", message = "Plugin loaded successfully")
+            } else {
+                notificationService.notify(title = "Error", message = "Failed to load plugin: ${result.exceptionOrNull()?.message}")
             }
         }
     }
@@ -104,22 +116,26 @@ class PluginViewModel(
                 }
             } ?: emptyMap()
 
-            val jobId = Random.nextInt(1000, 9999).toString()
+            val jobId = jobCounterMutex.withLock { ++jobCounter }.toString()
             val job = BackgroundJob(
                 id = jobId,
                 name = "${plugin.getManifest().module.name}: ${capability.name}",
                 type = JobType.Capability,
                 pluginId = plugin.getManifest().module.id,
                 capabilityName = capability.name,
-                parameters = params
+                parameters = params,
+                keepResult = saveResults
             )
             jobManager.enqueueJob(job)
             
-            notificationService.notify(
-                title = "Job Enqueued",
+            notificationService.toast(
                 message = "Executing ${capability.name} in background"
             )
         }
+    }
+
+    fun removeJob(jobId: String) {
+        jobManager.removeJobs { it.id == jobId }
     }
 
     fun clearCapabilityHistory() {

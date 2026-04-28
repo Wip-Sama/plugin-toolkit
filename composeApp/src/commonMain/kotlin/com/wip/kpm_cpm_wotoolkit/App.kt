@@ -41,9 +41,17 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.ToastHost
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
 import com.wip.kpm_cpm_wotoolkit.core.model.localized
+import com.wip.kpm_cpm_wotoolkit.core.ui.DialogHost
+import com.wip.kpm_cpm_wotoolkit.core.ui.DialogService
+import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
 
 @Composable
-fun App(viewModel: SettingsViewModel = koinInject()) {
+fun App(
+    viewModel: SettingsViewModel = koinInject(),
+    pluginViewModel: PluginViewModel = koinInject(),
+    notificationService: NotificationService = koinInject(),
+    dialogService: DialogService = koinInject()
+) {
     val languageCode by viewModel.currentLanguageCode.collectAsState()
     
 
@@ -51,11 +59,16 @@ fun App(viewModel: SettingsViewModel = koinInject()) {
         PlatformLocalization.setApplicationLanguage(languageCode)
     }
 
-    AppContent(viewModel)
+    AppContent(viewModel, pluginViewModel, notificationService, dialogService)
 }
 
 @Composable
-private fun AppContent(viewModel: SettingsViewModel) {
+private fun AppContent(
+    viewModel: SettingsViewModel,
+    pluginViewModel: PluginViewModel,
+    notificationService: NotificationService,
+    dialogService: DialogService
+) {
     val general = viewModel.settings.general
     val density = LocalDensity.current
     val customDensity = remember(density, general.scaling) {
@@ -69,7 +82,6 @@ private fun AppContent(viewModel: SettingsViewModel) {
         AppTheme(appearance = viewModel.settings.appearance) {
             var isNavbarCollapsed by remember { mutableStateOf(false) }
 
-            val pluginViewModel: com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel = koinInject()
             val loadedPlugins = pluginViewModel.loadedPlugins
 
             val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
@@ -172,14 +184,12 @@ private fun AppContent(viewModel: SettingsViewModel) {
                         modifier = Modifier.fillMaxHeight()
                     )
 
-                    val notificationService = koinInject<NotificationService>()
-                    val dialogService = koinInject<com.wip.kpm_cpm_wotoolkit.core.ui.DialogService>()
                     
                     ToastHost(
                         notificationService = notificationService,
                         settings = viewModel.settings.notifications
                     )
-                    com.wip.kpm_cpm_wotoolkit.core.ui.DialogHost(dialogService)
+                    DialogHost(dialogService)
                 }
             }
         }

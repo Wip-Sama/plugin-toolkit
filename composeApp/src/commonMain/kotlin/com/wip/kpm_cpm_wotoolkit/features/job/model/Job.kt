@@ -1,9 +1,7 @@
 package com.wip.kpm_cpm_wotoolkit.features.job.model
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -29,7 +27,6 @@ data class BackgroundJob(
     val name: String,
     val type: JobType,
     val status: JobStatus = JobStatus.Queued,
-    @Transient val progress: MutableStateFlow<Float> = MutableStateFlow(0f),
     val enqueuedAt: Instant = Clock.System.now(),
     val startedAt: Instant? = null,
     val completedAt: Instant? = null,
@@ -39,15 +36,9 @@ data class BackgroundJob(
     // Using a map of strings for parameters for now to simplify serialization
     // In a real app, we might use JsonObject
     val parameters: Map<String, JsonElement> = emptyMap<String, JsonElement>(),
-    val result: String? = null // Serialized result
-) {
-    val elapsedTime: Long
-        get() {
-            val end = completedAt ?: Clock.System.now()
-            val start = startedAt ?: return 0
-            return (end - start).inWholeMilliseconds
-        }
-}
+    val result: String? = null, // Serialized result
+    val keepResult: Boolean = true
+)
 
 @Serializable
 data class JobHistoryEntry(
