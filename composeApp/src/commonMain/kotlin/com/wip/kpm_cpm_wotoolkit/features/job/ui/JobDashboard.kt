@@ -42,6 +42,7 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.SectionHeader
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
+import kotlinx.coroutines.delay
 
 @Serializable
 sealed interface JobNavKey : NavKey {
@@ -280,6 +281,17 @@ fun JobCard(
     onPause: () -> Unit = {},
     onResume: () -> Unit = {}
 ) {
+    // Ticker to force recomposition every second for running jobs
+    var ticker by remember { mutableStateOf(0) }
+    LaunchedEffect(job.id, job.status) {
+        if (job.status == JobStatus.Running) {
+            while (true) {
+                delay(1000)
+                ticker++
+            }
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -309,7 +321,9 @@ fun JobCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "${(currentProgress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
-                    Text(text = formatDuration(job.elapsedTime), style = MaterialTheme.typography.labelSmall)
+                    // Use ticker to force update
+                    val displayTime = if (ticker >= 0) job.elapsedTime else 0L
+                    Text(text = formatDuration(displayTime), style = MaterialTheme.typography.labelSmall)
                 }
             }
 

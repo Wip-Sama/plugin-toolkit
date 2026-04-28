@@ -1,5 +1,6 @@
 package com.wip.kpm_cpm_wotoolkit.shared.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,7 +36,9 @@ fun GlassCard(
     val finalModifier = if (onClick != null) baseModifier.clickable(onClick = onClick) else baseModifier
 
     Column(
-        modifier = finalModifier.padding(16.dp),
+        modifier = finalModifier
+            .animateContentSize()
+            .padding(16.dp),
         content = content
     )
 }
