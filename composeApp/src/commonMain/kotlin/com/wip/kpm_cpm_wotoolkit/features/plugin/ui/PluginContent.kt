@@ -1,6 +1,5 @@
 package com.wip.kpm_cpm_wotoolkit.features.plugin.ui
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,7 +24,6 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.plugin.ResponseView
 import com.wip.kpm_cpm_wotoolkit.shared.components.plugin.DynamicParameterInput
 import com.wip.plugin.api.Capability
 import com.wip.plugin.api.PluginManifest
-import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun PluginContent(

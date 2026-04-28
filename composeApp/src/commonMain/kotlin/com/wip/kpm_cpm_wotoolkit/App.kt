@@ -28,20 +28,16 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
 import com.wip.kpm_cpm_wotoolkit.features.board.ui.BoardScreen
 import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.MainScreen
+import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.PluginSectionScreen
 import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobDashboard
 import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobBadge
 import com.wip.kpm_cpm_wotoolkit.features.settings.ui.SettingsScreen
 import androidx.compose.material.icons.filled.PendingActions
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.core.theme.AppTheme
 import com.wip.kpm_cpm_wotoolkit.core.utils.PlatformLocalization
 import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService
 import com.wip.kpm_cpm_wotoolkit.shared.components.ToastHost
-import androidx.lifecycle.viewmodel.compose.viewModel
-import org.koin.mp.KoinPlatform.getKoin
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
 import com.wip.kpm_cpm_wotoolkit.core.model.localized
@@ -142,27 +138,7 @@ private fun AppContent(viewModel: SettingsViewModel) {
                         // First Sidebar Spacer
                         Spacer(modifier = Modifier.width(layoutSidebarWidth))
 
-                        // Second Sidebar (if module is selected)
-                        // Second Sidebar (Direct Execution flow)
-                        if (currentScreen is Screen.Modules || currentScreen is Screen.Module) {
-                            com.wip.kpm_cpm_wotoolkit.features.plugin.ui.DirectExecutionSidebar(
-                                loadedPlugins = loadedPlugins,
-                                selectedModuleId = (currentScreen as? Screen.Module)?.id,
-                                onModuleSelected = { id -> backStack.add(Screen.Module(id)) },
-                                onBackToModules = { 
-                                    if (backStack.any { it is Screen.Modules }) {
-                                        while (backStack.lastOrNull() !is Screen.Modules) {
-                                            backStack.removeLast()
-                                        }
-                                    } else {
-                                        backStack.add(Screen.Modules)
-                                    }
-                                },
-                                selectedCapability = pluginViewModel.selectedCapability,
-                                onCapabilitySelected = { pluginViewModel.selectCapability(it) }
-                            )
-                        }
-
+                        // Content Area
                         NavDisplay(
                             backStack = backStack,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -173,24 +149,8 @@ private fun AppContent(viewModel: SettingsViewModel) {
                                 is Screen.Board    -> NavEntry(key) { BoardScreen() }
                                 is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
                                 is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
-                                is Screen.Modules -> NavEntry(key) { 
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text("Select a module from the sidebar to see its capabilities", style = MaterialTheme.typography.bodyLarge)
-                                    }
-                                }
-                                is Screen.Module   -> NavEntry(key) {
-                                    val plugin = loadedPlugins.find { it.getManifest().module.id == key.id }
-                                    if (plugin != null) {
-                                        LaunchedEffect(key.id) {
-                                            pluginViewModel.selectPlugin(plugin)
-                                        }
-                                        com.wip.kpm_cpm_wotoolkit.features.plugin.ui.PluginContent(viewModel = pluginViewModel)
-                                    } else {
-                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                                            Text("Module not found or unloaded")
-                                        }
-                                    }
-                                }
+                                is Screen.Modules -> NavEntry(key) { PluginSectionScreen() }
+                                is Screen.Module   -> NavEntry(key) { PluginSectionScreen(initialModuleId = key.id) }
                                 else               -> NavEntry(key) { }
                             }
                         }
