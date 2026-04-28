@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -158,7 +159,11 @@ fun GeneralTab(viewModel: JobViewModel) {
                 SectionHeader(title = "Queue", icon = Icons.Default.List)
             }
             items(queuedJobs) { job ->
-                JobCard(job, onCancel = { viewModel.cancelJob(job.id) })
+                JobCard(
+                    job = job, 
+                    onCancel = { viewModel.cancelJob(job.id) },
+                    onPause = { viewModel.pauseJob(job.id) }
+                )
             }
         }
 
@@ -293,13 +298,17 @@ fun JobCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             if (job.status == JobStatus.Running) {
+                val currentProgress by job.progress.collectAsState()
                 LinearProgressIndicator(
-                    progress = job.progress,
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                    progress = { currentProgress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
+                    color = ProgressIndicatorDefaults.linearColor,
+                    trackColor = ProgressIndicatorDefaults.linearTrackColor,
+                    strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "${(job.progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
+                    Text(text = "${(currentProgress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
                     Text(text = formatDuration(job.elapsedTime), style = MaterialTheme.typography.labelSmall)
                 }
             }
@@ -323,7 +332,7 @@ fun JobCard(
                         Text("Resume")
                     }
                 }
-                if (job.status == JobStatus.Running) {
+                if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
                     TextButton(onClick = onPause) {
                         Icon(Icons.Default.Pause, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))

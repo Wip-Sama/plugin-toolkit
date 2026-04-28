@@ -32,6 +32,19 @@ class PluginViewModel(
     private val notificationService: com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService,
     private val moduleManager: ModuleManager
 ) : ViewModel() {
+    var jarPath by mutableStateOf("C:\\Users\\sgroo\\AndroidStudioProjects\\CMP_desktop_test\\operations\\build\\libs\\operations.jar")
+    var selectedPlugin by mutableStateOf<PluginEntry?>(null)
+    var selectedCapability by mutableStateOf<Capability?>(null)
+    var loadedPlugins by mutableStateOf(ModuleLoader.getPlugins())
+    
+    var lastEnqueuedJobId by mutableStateOf<String?>(null)
+    val activeJobs = jobManager.jobs // Flow<List<BackgroundJob>>
+    
+    var executionResult by mutableStateOf<Result<PluginResponse>?>(null)
+    var isExecuting by mutableStateOf(false)
+
+    val parameterValues = mutableStateMapOf<String, String>()
+
     init {
         jobManager.jobs
             .onEach { jobs ->
@@ -65,18 +78,6 @@ class PluginViewModel(
             .launchIn(viewModelScope)
     }
 
-    var jarPath by mutableStateOf("C:\\Users\\sgroo\\AndroidStudioProjects\\CMP_desktop_test\\operations\\build\\libs\\operations.jar")
-    var selectedPlugin by mutableStateOf<PluginEntry?>(null)
-    var selectedCapability by mutableStateOf<Capability?>(null)
-    var loadedPlugins by mutableStateOf(ModuleLoader.getPlugins())
-    
-    var lastEnqueuedJobId by mutableStateOf<String?>(null)
-    val activeJobs = jobManager.jobs // Flow<List<BackgroundJob>>
-    
-    var executionResult by mutableStateOf<Result<PluginResponse>?>(null)
-    var isExecuting by mutableStateOf(false)
-
-    val parameterValues = mutableStateMapOf<String, String>()
 
     fun selectPlugin(plugin: PluginEntry?) {
         selectedPlugin = plugin

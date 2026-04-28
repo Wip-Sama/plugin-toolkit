@@ -2,7 +2,6 @@ package com.wip.kpm_cpm_wotoolkit
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
 import androidx.compose.ui.window.*
 import com.wip.kpm_cpm_wotoolkit.features.settings.logic.SettingsRepository
@@ -31,7 +30,10 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
 import com.wip.kpm_cpm_wotoolkit.features.repository.logic.RepoManager
 import com.wip.kpm_cpm_wotoolkit.features.repository.viewmodel.ModuleRepoViewModel
 import androidx.compose.ui.Modifier
+import com.wip.kpm_cpm_wotoolkit.core.ui.DialogService
+import com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager
 import com.wip.kpm_cpm_wotoolkit.features.job.viewmodel.JobViewModel
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager
 import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.ModuleManagerViewModel
 import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
 import kotlinx.coroutines.SupervisorJob
@@ -53,9 +55,9 @@ fun main(args: Array<String>) {
             single<NotificationService> { JvmNotificationService { viewModelProvider()!!.settings } }
             single { SettingsRegistry() }
             single { RepoManager(get()) }
-            single { com.wip.kpm_cpm_wotoolkit.core.ui.DialogService() }
-            single { com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager(get(), get()) }
-            single { com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager(CoroutineScope(SupervisorJob() + Dispatchers.Default), repository.loadSettings().jobs.maxConcurrentJobs) }
+            single { DialogService() }
+            single { ModuleManager(get(), get()) }
+            single { JobManager(CoroutineScope(SupervisorJob() + Dispatchers.Default), repository.loadSettings().jobs.maxConcurrentJobs) }
             factory { SettingsViewModel(get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
@@ -69,18 +71,8 @@ fun main(args: Array<String>) {
     val koin = getKoin()
     val viewModel = koin.get<SettingsViewModel>()
     koin.get<RepoManager>() // Trigger initialization and background refresh
-    val moduleManager = koin.get<com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager>()
-    
-    // Load enabled modules at startup
-    moduleManager.installedModules.value.forEach { module ->
-        if (module.isEnabled) {
-            val result = moduleManager.loadModule(module.pkg)
-            if (result.isFailure) {
-                Logger.e { "Failed to load module ${module.pkg}: ${result.exceptionOrNull()?.message}" }
-            }
-        }
-    }
-    
+    val moduleManager = koin.get<ModuleManager>()
+
     viewModelProvider = { viewModel }
 
     // Initialize Logging with Kermit
@@ -102,7 +94,17 @@ fun main(args: Array<String>) {
     }.launchIn(CoroutineScope(Dispatchers.Default))
     
     Logger.i { "Application started. Logging initialized at: ${logDir.absolutePath}" }
-    
+
+    // Load enabled modules at startup
+    moduleManager.installedModules.value.forEach { module ->
+        if (module.isEnabled) {
+            val result = moduleManager.loadModule(module.pkg)
+            if (result.isFailure) {
+                Logger.e { "Failed to load module ${module.pkg}: ${result.exceptionOrNull()?.message}" }
+            }
+        }
+    }
+
     // Check if we should start minimized
     val startMinimized = args.contains(KeepTrack.STARTUP_FLAG_BACKGROUND) || initialSettings.general.startMinimized
 

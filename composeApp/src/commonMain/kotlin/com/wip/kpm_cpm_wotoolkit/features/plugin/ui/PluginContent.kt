@@ -167,17 +167,18 @@ fun CapabilityTester(
         Spacer(modifier = Modifier.height(24.dp))
         
         if (currentJob != null && currentJob.status == JobStatus.Running) {
+            val currentProgress by currentJob.progress.collectAsState()
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 LinearProgressIndicator(
-                    progress = { currentJob.progress },
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    progress = { currentProgress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
                     color = ProgressIndicatorDefaults.linearColor,
                     trackColor = ProgressIndicatorDefaults.linearTrackColor,
                     strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Executing... ${(currentJob.progress * 100).toInt()}%",
+                    text = "Executing... ${(currentProgress * 100).toInt()}%",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )

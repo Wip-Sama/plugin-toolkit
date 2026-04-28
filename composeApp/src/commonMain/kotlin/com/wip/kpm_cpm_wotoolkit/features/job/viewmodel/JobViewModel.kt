@@ -16,15 +16,15 @@ class JobViewModel(
 
     val runningJobs = jobs.map { list ->
         list.filter { it.status == JobStatus.Running }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<BackgroundJob>())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList<BackgroundJob>())
 
     val queuedJobs = jobs.map { list ->
         list.filter { it.status == JobStatus.Queued }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<BackgroundJob>())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList<BackgroundJob>())
 
     val pausedJobs = jobs.map { list ->
         list.filter { it.status == JobStatus.Paused }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<BackgroundJob>())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList<BackgroundJob>())
 
     fun enqueueJob(job: BackgroundJob) {
         viewModelScope.launch {

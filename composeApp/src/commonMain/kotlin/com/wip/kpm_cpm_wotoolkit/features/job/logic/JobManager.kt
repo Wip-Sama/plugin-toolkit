@@ -1,10 +1,16 @@
 package com.wip.kpm_cpm_wotoolkit.features.job.logic
 
 import com.wip.kpm_cpm_wotoolkit.features.job.model.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import co.touchlab.kermit.Logger
 import kotlin.time.Clock
 import kotlin.collections.emptyList
 
@@ -18,8 +24,17 @@ class JobManager(
     private val _history = MutableStateFlow<List<JobHistoryEntry>>(emptyList())
     val history: StateFlow<List<JobHistoryEntry>> = _history.asStateFlow()
 
-    private val mutex = Mutex()
     private val workers = mutableListOf<JobWorker>()
+    
+    // Channel to signal workers that a new job is available.
+    // CONFLATED means if multiple jobs are added rapidly, we wake up at least one worker.
+    private val jobSignal = Channel<Unit>(Channel.CONFLATED)
+    
+    // Mutex strictly for managing the active coroutines map, avoiding global contention.
+    private val coroutinesMutex = Mutex()
+    private val activeJobCoroutines = mutableMapOf<String, Job>()
+    
+    private val MAX_HISTORY_SIZE = 100
 
     init {
         startWorkers()
@@ -33,94 +48,236 @@ class JobManager(
         }
     }
 
-    suspend fun enqueueJob(job: BackgroundJob) {
-        mutex.withLock {
-            _jobs.value = _jobs.value + job
-            addHistoryEntry(job.id, job.name, "Enqueued")
-        }
+    fun enqueueJob(job: BackgroundJob) {
+        _jobs.update { it + job }
+        addHistoryEntryInternal(job.id, job.name, "Enqueued")
+        Logger.i { "Job ${job.id} (${job.name}) enqueued" }
+        jobSignal.trySend(Unit)
     }
 
-    suspend fun updateJob(jobId: String, update: (BackgroundJob) -> BackgroundJob) {
-        mutex.withLock {
-            val currentList = _jobs.value.toMutableList()
-            val index = currentList.indexOfFirst { it.id == jobId }
-            if (index != -1) {
-                currentList[index] = update(currentList[index])
-                _jobs.value = currentList
-            }
+    fun updateJob(jobId: String, update: (BackgroundJob) -> BackgroundJob) {
+        _jobs.update { currentList ->
+            currentList.map { if (it.id == jobId) update(it) else it }
         }
     }
 
     suspend fun cancelJob(jobId: String) {
-        mutex.withLock {
-            val job = _jobs.value.find { it.id == jobId } ?: return
+        var jobName = ""
+        var cancelled = false
+        _jobs.update { currentList ->
+            val job = currentList.find { it.id == jobId } ?: return@update currentList
+            jobName = job.name
             if (job.status == JobStatus.Running || job.status == JobStatus.Queued || job.status == JobStatus.Paused) {
-                updateJob(jobId) { it.copy(status = JobStatus.Cancelled, completedAt = Clock.System.now()) }
-                addHistoryEntry(jobId, job.name, "Cancelled")
+                cancelled = true
+                currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Cancelled, completedAt = Clock.System.now()) else it }
+            } else {
+                currentList
             }
+        }
+        
+        if (cancelled) {
+            coroutinesMutex.withLock {
+                activeJobCoroutines.remove(jobId)?.cancel()
+            }
+            addHistoryEntryInternal(jobId, jobName, "Cancelled")
+            Logger.i { "Job $jobId ($jobName) cancelled" }
         }
     }
 
     suspend fun pauseJob(jobId: String) {
-        mutex.withLock {
-            val job = _jobs.value.find { it.id == jobId } ?: return
-            if (job.status == JobStatus.Running) {
-                updateJob(jobId) { it.copy(status = JobStatus.Paused) }
-                addHistoryEntry(jobId, job.name, "Paused")
+        var jobName = ""
+        var paused = false
+        _jobs.update { currentList ->
+            val job = currentList.find { it.id == jobId } ?: return@update currentList
+            jobName = job.name
+            if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
+                paused = true
+                currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Paused) else it }
+            } else {
+                currentList
             }
+        }
+        
+        if (paused) {
+            coroutinesMutex.withLock {
+                activeJobCoroutines.remove(jobId)?.cancel()
+            }
+            addHistoryEntryInternal(jobId, jobName, "Paused")
+            Logger.i { "Job $jobId ($jobName) paused" }
         }
     }
 
-    suspend fun resumeJob(jobId: String) {
-        mutex.withLock {
-            val job = _jobs.value.find { it.id == jobId } ?: return
+    fun resumeJob(jobId: String) {
+        var resumed = false
+        var jobName = ""
+        _jobs.update { currentList ->
+            val job = currentList.find { it.id == jobId } ?: return@update currentList
+            jobName = job.name
             if (job.status == JobStatus.Paused) {
-                updateJob(jobId) { it.copy(status = JobStatus.Queued) }
-                addHistoryEntry(jobId, job.name, "Resumed")
+                resumed = true
+                currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Queued) else it }
+            } else {
+                currentList
             }
         }
+        
+        if (resumed) {
+            addHistoryEntryInternal(jobId, jobName, "Resumed")
+            Logger.i { "Job $jobId ($jobName) resumed" }
+            jobSignal.trySend(Unit)
+        }
     }
 
-    suspend fun reorderQueue(fromIndex: Int, toIndex: Int) {
-        mutex.withLock {
-            val currentList = _jobs.value.toMutableList()
-            // We only reorder Queued jobs? Or the whole list?
-            // Usually dashboard shows all. Reordering affects which one is picked next.
-            if (fromIndex in currentList.indices && toIndex in currentList.indices) {
-                val item = currentList.removeAt(fromIndex)
-                currentList.add(toIndex, item)
-                _jobs.value = currentList
+    fun reorderQueue(fromIndex: Int, toIndex: Int) {
+        _jobs.update { currentList ->
+            val newList = currentList.toMutableList()
+            if (fromIndex in newList.indices && toIndex in newList.indices) {
+                val item = newList.removeAt(fromIndex)
+                newList.add(toIndex, item)
+            }
+            newList
+        }
+    }
+
+    /**
+     * Workers call this to wait for a job.
+     */
+    suspend fun waitForNextJob(): BackgroundJob {
+        while (true) {
+            var claimedJob: BackgroundJob? = null
+            
+            _jobs.update { currentList ->
+                // PriorityQueue behavior: FIFO based on enqueuedAt
+                val candidate = currentList.filter { it.status == JobStatus.Queued }
+                    .minByOrNull { it.enqueuedAt }
+                    
+                if (candidate != null) {
+                    claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
+                    // IMPORTANT: copy() correctly maintains the reference to the Transient MutableStateFlow 
+                    // from candidate to claimedJob, avoiding progress reset issues.
+                    currentList.map { if (it.id == candidate.id) claimedJob!! else it }
+                } else {
+                    currentList
+                }
+            }
+            
+            if (claimedJob != null) {
+                // If there are more jobs, signal again to wake up other idle workers
+                if (_jobs.value.any { it.status == JobStatus.Queued }) {
+                    jobSignal.trySend(Unit)
+                }
+                return claimedJob!!
+            }
+            
+            // Wait for signal if no jobs are queued
+            Logger.v { "No queued jobs, worker waiting for signal..." }
+            jobSignal.receive()
+        }
+    }
+
+    fun tryCompleteJob(jobId: String, result: String?): Boolean {
+        var completed = false
+        var jobName = ""
+        _jobs.update { currentList ->
+            val job = currentList.find { it.id == jobId } ?: return@update currentList
+            jobName = job.name
+            if (job.status == JobStatus.Running) {
+                completed = true
+                // We set the flow to 1.0f directly to ensure it updates even without copying the list
+                job.progress.value = 1.0f
+                currentList.map { 
+                    if (it.id == jobId) it.copy(
+                        status = JobStatus.Completed,
+                        completedAt = Clock.System.now(),
+                        result = result
+                    ) else it 
+                }
+            } else {
+                currentList
             }
         }
+        
+        if (completed) {
+            addHistoryEntryInternal(jobId, jobName, "Completed")
+            Logger.i { "Job $jobId ($jobName) completed successfully" }
+        } else {
+            val job = _jobs.value.find { it.id == jobId }
+            Logger.w { "Attempted to complete job $jobId, but it was not in Running state (current: ${job?.status})" }
+        }
+        return completed
     }
 
-    suspend fun pickNextJob(): BackgroundJob? {
-        mutex.withLock {
-            val job = _jobs.value.firstOrNull { it.status == JobStatus.Queued }
-            if (job != null) {
-                val updatedJob = job.copy(status = JobStatus.Running, startedAt = Clock.System.now())
-                updateJobInternal(job.id) { updatedJob }
-                return updatedJob
+    fun tryFailJob(jobId: String, errorMessage: String?): Boolean {
+        var failed = false
+        var jobName = ""
+        _jobs.update { currentList ->
+            val job = currentList.find { it.id == jobId } ?: return@update currentList
+            jobName = job.name
+            if (job.status == JobStatus.Running) {
+                failed = true
+                currentList.map { 
+                    if (it.id == jobId) it.copy(
+                        status = JobStatus.Failed,
+                        errorMessage = errorMessage,
+                        completedAt = Clock.System.now()
+                    ) else it 
+                }
+            } else {
+                currentList
             }
-            return null
+        }
+        
+        if (failed) {
+            addHistoryEntryInternal(jobId, jobName, "Failed", errorMessage)
+            Logger.e { "Job $jobId ($jobName) failed: $errorMessage" }
+        } else {
+            val job = _jobs.value.find { it.id == jobId }
+            Logger.w { "Attempted to fail job $jobId, but it was not in Running state (current: ${job?.status})" }
+        }
+        return failed
+    }
+
+    suspend fun registerJobCoroutine(jobId: String, coroutineJob: Job) {
+        val job = _jobs.value.find { it.id == jobId }
+        // Critical check: if the job is no longer supposed to be running (e.g. paused or cancelled
+        // while the worker was starting up), we cancel the coroutine immediately and don't register it.
+        if (job == null || job.status != JobStatus.Running) {
+            coroutineJob.cancel()
+            return
+        }
+        coroutinesMutex.withLock {
+            activeJobCoroutines[jobId] = coroutineJob
         }
     }
 
-    private fun updateJobInternal(jobId: String, update: (BackgroundJob) -> BackgroundJob) {
-        val currentList = _jobs.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == jobId }
-        if (index != -1) {
-            currentList[index] = update(currentList[index])
-            _jobs.value = currentList
+    suspend fun unregisterJobCoroutine(jobId: String) {
+        coroutinesMutex.withLock {
+            activeJobCoroutines.remove(jobId)
         }
     }
 
-    private fun addHistoryEntry(jobId: String, jobName: String, event: String, details: String? = null) {
+    fun addHistoryEntry(jobId: String, jobName: String, event: String, details: String? = null) {
+        addHistoryEntryInternal(jobId, jobName, event, details)
+    }
+
+    private fun addHistoryEntryInternal(jobId: String, jobName: String, event: String, details: String? = null) {
         val entry = JobHistoryEntry(jobId, jobName, event = event, details = details)
-        _history.value = listOf(entry) + _history.value
+        _history.update { currentList ->
+            val newList = listOf(entry) + currentList
+            if (newList.size > MAX_HISTORY_SIZE) {
+                newList.take(MAX_HISTORY_SIZE)
+            } else {
+                newList
+            }
+        }
     }
 
-    fun stopAll() {
+    suspend fun stopAll() {
         workers.forEach { it.stop() }
+        coroutinesMutex.withLock {
+            activeJobCoroutines.values.forEach { it.cancel() }
+            activeJobCoroutines.clear()
+        }
     }
 }
+

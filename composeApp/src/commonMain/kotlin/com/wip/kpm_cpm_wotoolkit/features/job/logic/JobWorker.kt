@@ -14,25 +14,55 @@ class JobWorker(
     private val scope: CoroutineScope
 ) {
     private var isActive = true
-    private var currentJob: BackgroundJob? = null
+    private val workerJob = SupervisorJob()
+    private val workerScope = scope + workerJob + Dispatchers.Default
 
     fun start() {
-        scope.launch(Dispatchers.Default) {
+        workerScope.launch {
             while (isActive) {
-                val next = manager.pickNextJob()
-                if (next != null) {
-                    currentJob = next
-                    executeJob(next)
-                    currentJob = null
-                } else {
-                    delay(1000) // Poll for new jobs
+                try {
+                    val next = manager.waitForNextJob()
+                    
+                    // Link this execution to the manager for cancellation support
+                    val jobExecution = launch {
+                        try {
+                            executeJob(next)
+                        } finally {
+                            manager.unregisterJobCoroutine(next.id)
+                        }
+                    }
+                    
+                    try {
+                        manager.registerJobCoroutine(next.id, jobExecution)
+                        
+                        // Just wait for the job to complete or be cancelled.
+                        // Cancellation is cooperatively handled by jobExecution.cancel() from JobManager.
+                        jobExecution.join()
+                    } catch (e: Exception) {
+                        Logger.e(e) { "Worker $workerId: Error during job coordination" }
+                        jobExecution.cancelAndJoin()
+                    }
+                    
+                } catch (e: CancellationException) {
+                    // Normal cancellation, just continue or exit if worker is stopping
+                    if (!isActive) break
+                } catch (e: Exception) {
+                    Logger.e(e) { "Worker $workerId encountered error in loop" }
+                    delay(2000) // Cooling off period on error
                 }
             }
         }
     }
 
     private suspend fun executeJob(job: BackgroundJob) {
-        Logger.i { "Worker $workerId starting job ${job.name}" }
+        // Double check status - it might have been cancelled or paused while we were starting up
+        val latestJob = manager.jobs.value.find { it.id == job.id }
+        if (latestJob == null || latestJob.status != JobStatus.Running) {
+            Logger.w { "Worker $workerId: Job ${job.name} (${job.id}) is not in Running state (status: ${latestJob?.status}), aborting execution" }
+            return
+        }
+
+        Logger.i { "Worker $workerId starting job ${job.name} (${job.id})" }
         
         try {
             val plugin = ModuleLoader.getPluginById(job.pluginId) 
@@ -44,56 +74,49 @@ class JobWorker(
                 parameters = job.parameters
             )
 
-            // Progress tracking
-            val progressJob = processor.observeProgress()?.let { progressFlow ->
-                scope.launch {
-                    progressFlow.collect { p ->
-                        manager.updateJob(job.id) { it.copy(progress = p) }
+            // Progress tracking - tied to this job's lifecycle
+            val progressFlow = processor.observeProgress()
+            val progressJob = progressFlow?.let { flow ->
+                workerScope.launch {
+                    flow.collect { p ->
+                        // Extra safety check in loop
+                        val current = manager.jobs.value.find { it.id == job.id }
+                        if (current?.status == JobStatus.Running) {
+                            // Update progress lock-free directly on the state flow!
+                            current.progress.value = p
+                        } else {
+                            // If it's no longer running, stop collecting progress
+                            cancel()
+                        }
                     }
                 }
             }
 
-            // Run on Default dispatcher to ensure non-blocking
-            val result = withContext(Dispatchers.Default) {
+            // Execute the plugin task
+            val result = try {
                 processor.process(request)
+            } finally {
+                progressJob?.cancel()
             }
             
-            progressJob?.cancel()
-
             if (result.isSuccess) {
-                manager.updateJob(job.id) { 
-                    it.copy(
-                        status = JobStatus.Completed, 
-                        progress = 1.0f,
-                        completedAt = Clock.System.now(),
-                        result = result.getOrNull()?.result?.toString()
-                    ) 
-                }
-                Logger.i { "Worker $workerId completed job ${job.name}" }
+                manager.tryCompleteJob(job.id, result.getOrNull()?.result?.toString())
             } else {
                 val error = result.exceptionOrNull()?.message ?: "Unknown error"
-                manager.updateJob(job.id) { 
-                    it.copy(
-                        status = JobStatus.Failed, 
-                        errorMessage = error,
-                        completedAt = Clock.System.now()
-                    ) 
-                }
-                Logger.e { "Worker $workerId failed job ${job.name}: $error" }
+                manager.tryFailJob(job.id, error)
             }
+        } catch (e: CancellationException) {
+            Logger.w { "Worker $workerId: Job ${job.name} was cancelled" }
+            throw e // Re-throw to allow join() to finish
         } catch (e: Exception) {
-            manager.updateJob(job.id) { 
-                it.copy(
-                    status = JobStatus.Failed, 
-                    errorMessage = e.message,
-                    completedAt = Clock.System.now()
-                ) 
-            }
-            Logger.e(e) { "Worker $workerId encountered exception during job ${job.name}" }
+            manager.tryFailJob(job.id, e.message)
+            Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
         }
     }
 
     fun stop() {
         isActive = false
+        workerJob.cancel()
     }
 }
+

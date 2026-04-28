@@ -1,9 +1,10 @@
 package com.wip.kpm_cpm_wotoolkit.features.job.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.time.Clock
-import kotlin.time.Clock.System
 import kotlin.time.Instant
 
 @Serializable
@@ -28,7 +29,7 @@ data class BackgroundJob(
     val name: String,
     val type: JobType,
     val status: JobStatus = JobStatus.Queued,
-    val progress: Float = 0f,
+    @Transient val progress: MutableStateFlow<Float> = MutableStateFlow(0f),
     val enqueuedAt: Instant = Clock.System.now(),
     val startedAt: Instant? = null,
     val completedAt: Instant? = null,
