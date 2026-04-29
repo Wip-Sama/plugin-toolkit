@@ -28,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.resources.StringResource
 import com.wip.kpm_cpm_wotoolkit.core.model.LocalizedString
 import com.wip.kpm_cpm_wotoolkit.core.model.localized
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -50,7 +51,7 @@ fun <T> NavigationSidebar(
     val isActuallyExpanded = !canCollapse || !isNavbarCollapsed || isHovered
 
     val sidebarWidth by animateDpAsState(
-        targetValue = if (isActuallyExpanded) 250.dp else 80.dp,
+        targetValue = if (isActuallyExpanded) WOTheme.dimensions.sidebarExpandedWidth else WOTheme.dimensions.sidebarCollapsedWidth,
         animationSpec = tween(durationMillis = 200)
     )
 
@@ -61,16 +62,16 @@ fun <T> NavigationSidebar(
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false },
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
-        shadowElevation = if (isHovered && isNavbarCollapsed && canCollapse) 8.dp else 0.dp
+        shadowElevation = if (isHovered && isNavbarCollapsed && canCollapse) WOTheme.spacing.small else WOTheme.spacing.none
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp)
+            modifier = Modifier.fillMaxSize().padding(WOTheme.spacing.mediumSmall)
         ) {
             // Header / toggle (TOP SECTION)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = WOTheme.spacing.medium),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (isActuallyExpanded) Arrangement.Start else Arrangement.Center
             ) {
@@ -82,7 +83,7 @@ fun <T> NavigationSidebar(
                         )
                     }
                     if (isActuallyExpanded) {
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(WOTheme.spacing.mediumSmall))
                     }
                 }
 
@@ -117,7 +118,7 @@ fun <T> NavigationSidebar(
                         onItemSelected = onScreenSelected,
                         isExpanded = isActuallyExpanded
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(WOTheme.spacing.medium))
                 }
             }
 
@@ -133,7 +134,7 @@ fun <T> NavigationSidebar(
                         onItemSelected = onScreenSelected,
                         isExpanded = isActuallyExpanded
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(WOTheme.spacing.small))
                 }
             }
         }

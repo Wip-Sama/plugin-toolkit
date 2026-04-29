@@ -22,6 +22,7 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
 import kpm_cpm_wotoolkit.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 
 @Composable
 fun ModuleManagerView(
@@ -33,34 +34,34 @@ fun ModuleManagerView(
     Column(modifier = Modifier.fillMaxSize()) {
         // Toolbar
         Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth().padding(WOTheme.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(WOTheme.spacing.small)
         ) {
             Button(onClick = { viewModel.refreshList() }) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(WOTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.module_refresh_list))
             }
             OutlinedButton(onClick = { viewModel.reloadAll() }) {
                 Icon(Icons.Default.Replay, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(WOTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.module_reload_all))
             }
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = { viewModel.installLocal() }) {
                 Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(WOTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.module_install_local))
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(WOTheme.spacing.medium))
 
         // Module List
         LazyColumn(
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = WOTheme.spacing.medium, vertical = WOTheme.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(WOTheme.spacing.mediumSmall)
         ) {
             items(modules) { module ->
                 ModuleCard(
@@ -117,39 +118,39 @@ fun ModuleCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .then(if (isLoaded) Modifier.border(2.dp, statusColor, MaterialTheme.shapes.medium) else Modifier),
+            .then(if (isLoaded) Modifier.border(WOTheme.dimensions.cardElevation, statusColor, MaterialTheme.shapes.medium) else Modifier),
         colors = CardDefaults.cardColors(
             containerColor = if (isLoaded) statusColor.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(WOTheme.spacing.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon Placeholder
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(WOTheme.dimensions.moduleIcon)
                     .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Extension, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(WOTheme.spacing.medium))
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(module.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if (isLoaded) {
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(WOTheme.spacing.small))
                         Surface(
                             color = statusColor.copy(alpha = 0.2f),
                             shape = MaterialTheme.shapes.extraSmall
                         ) {
                             Text(
                                 stringResource(Res.string.module_loaded),
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = WOTheme.spacing.extraSmall, vertical = WOTheme.spacing.extraSmall / 2),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = statusColor
                             )
@@ -165,7 +166,7 @@ fun ModuleCard(
                     Button(
                         onClick = { onAction(ModuleAction.Update) },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = WOTheme.spacing.small)
                     ) {
                         Text(stringResource(Res.string.module_update))
                     }

@@ -22,6 +22,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.ui.tooling.preview.Preview
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 
 @Composable
 fun Dashboard(
@@ -39,24 +40,24 @@ fun Dashboard(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(32.dp)
+            .padding(WOTheme.spacing.extraLarge)
     ) {
         // Hero Section
         DashboardHero()
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(WOTheme.spacing.huge))
 
         // Stats Grid
         Text(
             "System Overview",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = WOTheme.spacing.medium)
         )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+            horizontalArrangement = Arrangement.spacedBy(WOTheme.spacing.large)
         ) {
             StatCard(
                 title = "Loaded Modules",
@@ -81,21 +82,21 @@ fun Dashboard(
             )
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(WOTheme.spacing.huge))
 
         // Quick Actions or Recent Activity
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(WOTheme.spacing.large)) {
             GlassCard(modifier = Modifier.weight(1.5f).height(300.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(WOTheme.spacing.medium)) {
                     Text("Recent Activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(WOTheme.spacing.medium))
                     
                     if (jobs.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("No recent activity", color = MaterialTheme.colorScheme.outline)
                         }
                     } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(WOTheme.spacing.mediumSmall)) {
                             jobs.take(5).forEach { job ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -104,10 +105,10 @@ fun Dashboard(
                                     Icon(
                                         imageVector = Icons.Default.History,
                                         contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(WOTheme.dimensions.iconSmall),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Spacer(modifier = Modifier.width(WOTheme.spacing.mediumSmall))
                                     Text(job.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                                     Spacer(modifier = Modifier.weight(1f))
                                     Text(
@@ -123,9 +124,9 @@ fun Dashboard(
             }
 
             GlassCard(modifier = Modifier.weight(1f).height(300.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(WOTheme.spacing.medium)) {
                     Text("Quick Links", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(WOTheme.spacing.medium))
                     
                     QuickLinkItem("Open Job Dashboard", Icons.Default.Dashboard)
                     QuickLinkItem("View All Modules", Icons.Default.SettingsInputComponent)
@@ -150,9 +151,9 @@ fun DashboardHero() {
         modifier = Modifier
             .fillMaxWidth()
             .height(160.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(MaterialTheme.shapes.extraLarge)
             .background(brush)
-            .padding(32.dp),
+            .padding(WOTheme.spacing.extraLarge),
         contentAlignment = Alignment.CenterStart
     ) {
         Column {
@@ -187,13 +188,13 @@ fun StatCard(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(MaterialTheme.shapes.medium)
                     .background(color.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(imageVector = icon, contentDescription = null, tint = color)
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(WOTheme.spacing.medium))
             Column {
                 Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
                 Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -208,7 +209,7 @@ fun QuickLinkItem(title: String, icon: ImageVector) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { /* Navigate */ }
-            .padding(vertical = 8.dp),
+            .padding(vertical = WOTheme.spacing.small),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -217,13 +218,13 @@ fun QuickLinkItem(title: String, icon: ImageVector) {
             modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.primary
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(WOTheme.spacing.mediumSmall))
         Text(title, style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.weight(1f))
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(WOTheme.dimensions.iconSmall),
             tint = MaterialTheme.colorScheme.outline
         )
     }

@@ -7,11 +7,49 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wip.kpm_cpm_wotoolkit.core.utils.PlatformUtils
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppTheme
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppearanceSettings
-import androidx.compose.ui.tooling.preview.Preview
+
+data class Spacing(
+    val none: Dp = 0.dp,
+    val extraSmall: Dp = 4.dp,
+    val small: Dp = 8.dp,
+    val mediumSmall: Dp = 12.dp,
+    val medium: Dp = 16.dp,
+    val large: Dp = 24.dp,
+    val extraLarge: Dp = 32.dp,
+    val huge: Dp = 40.dp,
+    val massive: Dp = 64.dp
+)
+
+data class Dimensions(
+    val sidebarCollapsedWidth: Dp = 80.dp,
+    val sidebarExpandedWidth: Dp = 250.dp,
+    val iconSmall: Dp = 16.dp,
+    val iconMedium: Dp = 24.dp,
+    val iconLarge: Dp = 32.dp,
+    val moduleIcon: Dp = 48.dp,
+    val cardElevation: Dp = 2.dp
+)
+
+val LocalSpacing = staticCompositionLocalOf { Spacing() }
+val LocalDimensions = staticCompositionLocalOf { Dimensions() }
+
+object WOTheme {
+    val spacing: Spacing
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalSpacing.current
+
+    val dimensions: Dimensions
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalDimensions.current
+}
 
 private val DarkColorScheme =
         darkColorScheme(
@@ -73,10 +111,21 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
             baseScheme.copy(
                     primary = seedColor,
                     primaryContainer = seedColor.copy(alpha = 0.2f),
-                    onPrimaryContainer = seedColor
+                    onPrimaryContainer = seedColor,
+                    error = Color(0xFFB00020),
+                    onError = Color.White
             )
 
-    MaterialTheme(colorScheme = colorScheme, content = content)
+    CompositionLocalProvider(
+        LocalSpacing provides Spacing(),
+        LocalDimensions provides Dimensions()
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            shapes = Shapes,
+            content = content
+        )
+    }
 }
 
 @Preview

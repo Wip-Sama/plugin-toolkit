@@ -54,6 +54,7 @@ import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_timezone
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_use_system_language
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_use_system_language_subtitle
 import org.jetbrains.compose.resources.stringResource
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 
 @Composable
 fun AppearanceSettingsView(viewModel: SettingsViewModel) {
@@ -126,7 +127,7 @@ fun AppearanceSettingsView(viewModel: SettingsViewModel) {
                 control = {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(WOTheme.dimensions.iconLarge)
                             .clip(CircleShape)
                             .background(Color(appearance.accentColor))
                             .border(

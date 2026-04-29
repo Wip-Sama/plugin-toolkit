@@ -25,7 +25,7 @@ import org.koin.core.module.Module
 public object SlicerManifest {
   public val manifest: PluginManifest = PluginManifest(
         manifestVersion = "1.0",
-        module = ModuleInfo(id = "com.wip.operations.slicer", name = "Slicer", version = "0.4.1", description = "A module that provides vertical images sliding capabilities for manhwa."),
+        module = ModuleInfo(id = "com.wip.operations.slicer", name = "Slicer", version = "0.4.2", description = "A module that provides vertical images sliding capabilities for manhwa."),
         requirements = Requirements(minMemoryMb = 128, minExecutionTimeMs = 10),
         capabilities = listOf(
           Capability(

@@ -62,13 +62,13 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
 import kotlinx.serialization.Serializable
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import kpm_cpm_wotoolkit.composeapp.generated.resources.nav_notification_history
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_about
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_general
-import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules_manager
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_modules_repositories
 import kpm_cpm_wotoolkit.composeapp.generated.resources.section_system
@@ -209,7 +209,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchViewModel.searchQuery = it },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = WOTheme.spacing.medium),
                     placeholder = { Text("Search settings...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                     singleLine = true,
@@ -219,7 +219,7 @@ fun SettingsScreen(
 
         // ── Right: detail panel ──────────────────────────────────────────────
         Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().padding(24.dp)
+            modifier = Modifier.weight(1f).fillMaxHeight().padding(WOTheme.spacing.large)
         ) {
             val titleText = when (currentKey) {
                 SettingNavKey.Appearance -> stringResource(Res.string.setting_appearance)
@@ -237,7 +237,7 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = WOTheme.spacing.medium))
 
             CompositionLocalProvider(
                 LocalSettingsSearchQuery provides searchQuery,
@@ -254,14 +254,14 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text("No results found in ${titleText}", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(WOTheme.spacing.medium))
                         Button(onClick = {
                             if (backStack.lastOrNull() != SettingNavKey.BroadSearch) {
                                 backStack.add(SettingNavKey.BroadSearch)
                             }
                         }) {
                             Icon(Icons.Default.Search, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(WOTheme.spacing.small))
                             Text("Search in whole settings")
                         }
                     }

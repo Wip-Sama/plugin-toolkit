@@ -12,6 +12,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 
 @Composable
 fun GlassCard(
@@ -38,7 +39,7 @@ fun GlassCard(
     Column(
         modifier = finalModifier
             .animateContentSize()
-            .padding(16.dp),
+            .padding(WOTheme.spacing.medium),
         content = content
     )
 }

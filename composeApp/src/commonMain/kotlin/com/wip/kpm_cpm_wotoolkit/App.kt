@@ -38,6 +38,7 @@ import com.wip.kpm_cpm_wotoolkit.features.repository.ui.ModuleRepoView
 import androidx.compose.material.icons.filled.PendingActions
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.core.theme.AppTheme
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 import com.wip.kpm_cpm_wotoolkit.core.utils.PlatformLocalization
 import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService
 import com.wip.kpm_cpm_wotoolkit.shared.components.ToastHost
@@ -158,7 +159,7 @@ private fun AppContent(
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     val layoutSidebarWidth by animateDpAsState(
-                        targetValue = if (isNavbarCollapsed) 80.dp else 250.dp,
+                        targetValue = if (isNavbarCollapsed) WOTheme.dimensions.sidebarCollapsedWidth else WOTheme.dimensions.sidebarExpandedWidth,
                         animationSpec = tween(durationMillis = 200)
                     )
 

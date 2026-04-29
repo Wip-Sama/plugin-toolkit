@@ -5,9 +5,10 @@ import com.wip.plugin.api.annotations.PluginModule
 import com.wip.plugin.api.annotations.CapabilityParam
 import com.wip.plugin.api.PluginLogger
 import com.wip.plugin.api.ProgressReporter
-import kotlinx.io.files.FileSystem
-import kotlinx.io.files.Path
 import kotlinx.io.asInputStream
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.Path
+import kotlinx.io.buffered
 import javax.imageio.ImageIO
 import kotlin.math.abs
 import java.awt.image.BufferedImage
@@ -15,7 +16,7 @@ import java.awt.image.BufferedImage
 @PluginModule(
     id = "com.wip.operations.slicer",
     name = "Slicer",
-    version = "0.4.1",
+    version = "0.4.2",
     description = "A module that provides vertical images sliding capabilities for manhwa."
 )
 class Slicer {
@@ -37,11 +38,11 @@ class Slicer {
         progressReporter.report(0.1f)
         
         val folder = Path(folderPath)
-        val files = FileSystem.System.list(folder).toList()
+        val files = SystemFileSystem.list(folder).toList()
         
         if (files.isEmpty()) return "No files found"
         val images = files.filter { path ->
-            val metadata = FileSystem.System.metadataOrNull(path)
+            val metadata = SystemFileSystem.metadataOrNull(path)
             metadata?.isRegularFile == true && path.name.lowercase().let { name ->
                 name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")
             }
@@ -50,7 +51,7 @@ class Slicer {
         if (sortedImages.isEmpty()) return "No valid images found"
 
         // Combine images into one large buffer conceptually to handle merging small ones
-        val firstImage = FileSystem.System.source(sortedImages[0]).asInputStream().use { ImageIO.read(it) }
+        val firstImage = SystemFileSystem.source(sortedImages[0]).buffered().asInputStream().use { ImageIO.read(it) }
         val width = firstImage.width
         val fullBitmap = mutableListOf<BufferedImage>()
 
@@ -80,7 +81,7 @@ class Slicer {
     ): List<Boolean> {
         val rowVarianceList = mutableListOf<Int>()
         sortedImages.forEach { imagePath ->
-            val bufferedImage = FileSystem.System.source(imagePath).asInputStream().use { ImageIO.read(it) }
+            val bufferedImage = SystemFileSystem.source(imagePath).buffered().asInputStream().use { ImageIO.read(it) }
             fullBitmap.add(bufferedImage)
             for (y in 0 until bufferedImage.height) {
                 var maxDiff = 0
@@ -184,7 +185,7 @@ class Slicer {
         finalCuts: List<Int>,
         outputDir: Path
     ) {
-        if (!FileSystem.System.exists(outputDir)) FileSystem.System.createDirectories(outputDir)
+        if (!SystemFileSystem.exists(outputDir)) SystemFileSystem.createDirectories(outputDir)
 
         val combinedImage = BufferedImage(width, totalHeight, BufferedImage.TYPE_INT_RGB)
         val g = combinedImage.createGraphics()
