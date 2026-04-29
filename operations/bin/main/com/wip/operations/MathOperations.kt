@@ -2,7 +2,7 @@ package com.wip.operations
 
 import com.wip.plugin.api.annotations.Capability
 import com.wip.plugin.api.annotations.PluginModule
-import com.wip.plugin.api.annotations.PluginParam
+import com.wip.plugin.api.annotations.CapabilityParam
 
 @PluginModule(
     id = "com.wip.operations.math",
@@ -13,25 +13,25 @@ import com.wip.plugin.api.annotations.PluginParam
 class MathProcessor {
     @Capability(name = "sum", description = "Calculates the sum of a list of numbers")
     fun sumCapability(
-        @PluginParam(description = "List of numbers to add") values: List<Double>
+        @CapabilityParam(description = "List of numbers to add") values: List<Double>
     ): Double = values.sum()
 
     @Capability(name = "multiply", description = "Calculates the product of a list of numbers")
-    fun multiplyCapability(@PluginParam(description = "List of numbers to multiply") values: List<Double>): Double =
+    fun multiplyCapability(@CapabilityParam(description = "List of numbers to multiply") values: List<Double>): Double =
         if (values.isEmpty()) 0.0 else values.reduce { acc, d -> acc * d }
 
     @Capability(name = "subtract", description = "Subtracts numbers sequentially")
     fun subtractCapability(
-        @PluginParam(description = "Numerator") a: Double,
-        @PluginParam(description = "Denominator") b: Double
+        @CapabilityParam(description = "Numerator", defaultValue = "0.0") a: Double,
+        @CapabilityParam(description = "Denominator", defaultValue = "0.0") b: Double
     ): Double {
         return a - b
     }
 
     @Capability(name = "divide", description = "Divides two numbers")
     fun divideCapability(
-        @PluginParam(description = "Numerator") a: Double,
-        @PluginParam(description = "Denominator") b: Double
+        @CapabilityParam(description = "Numerator", defaultValue = "1.0") a: Double,
+        @CapabilityParam(description = "Denominator", defaultValue = "1.0") b: Double
     ): Double {
         if (b == 0.0) throw ArithmeticException("Division by zero")
         return a / b
@@ -39,8 +39,8 @@ class MathProcessor {
 
     @Capability(name = "slow_sum", description = "Calculates the sum of a list of numbers with a delay")
     fun slowSumCapability(
-        @PluginParam(description = "List of numbers to add") values: List<Double>,
-        @PluginParam(description = "Delay in milliseconds") delay: Long
+        @CapabilityParam(description = "List of numbers to add") values: List<Double>,
+        @CapabilityParam(description = "Delay in milliseconds", defaultValue = "1000") delay: Long
     ): Double {
         Thread.sleep(delay)
         return values.sum()

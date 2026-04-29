@@ -40,6 +40,35 @@ interface PluginEntry {
 }
 
 /**
+ * Logger interface for plugins to send logs to the host application.
+ */
+interface PluginLogger {
+    fun verbose(message: String)
+    fun debug(message: String)
+    fun info(message: String)
+    fun warn(message: String)
+    fun error(message: String, throwable: Throwable? = null)
+    
+    // Compatibility/helper method
+    fun log(message: String) = info(message)
+}
+
+/**
+ * Progress reporter for plugins to push progress updates.
+ */
+interface ProgressReporter {
+    fun report(progress: Float)
+}
+
+/**
+ * Context provided to a plugin during execution.
+ */
+data class ExecutionContext(
+    val logger: PluginLogger,
+    val progress: ProgressReporter
+)
+
+/**
  * The actual processor performing the business logic.
  */
 interface DataProcessor {
@@ -54,6 +83,11 @@ interface DataProcessor {
      * Set the debug mode for the processor.
      */
     fun setDebug(isDebug: Boolean) {}
+
+    /**
+     * Set the execution context for the processor.
+     */
+    fun setExecutionContext(context: ExecutionContext) {}
 
     /**
      * Observe processing progress (0.0 to 1.0).

@@ -20,6 +20,7 @@ annotation class Capability(
 
 @Target(AnnotationTarget.VALUE_PARAMETER)
 @Retention(AnnotationRetention.SOURCE)
-annotation class PluginParam(
-    val description: String
+annotation class CapabilityParam(
+    val description: String,
+    val defaultValue: String = ""
 )

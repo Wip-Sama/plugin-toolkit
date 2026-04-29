@@ -61,8 +61,6 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsItem
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
-import com.wip.kpm_cpm_wotoolkit.features.repository.ui.ModuleRepoView
-import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.ModuleManagerView
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -185,12 +183,6 @@ fun SettingsScreen(
         )
     )
 
-    val moduleSection = SidebarSectionData(
-        title = Res.string.section_modules.localized, elements = listOf(
-            SidebarElement(SettingNavKey.ModuleManager, Icons.Default.Inventory, Res.string.section_modules.localized),
-            SidebarElement(SettingNavKey.ModuleRepo, Icons.Default.Inventory, Res.string.section_modules_repositories.localized)
-        )
-    )
 
     val aboutSection = SidebarSectionData(
         title = Res.string.section_about.localized, elements = listOf(
@@ -202,7 +194,7 @@ fun SettingsScreen(
         // ── Left: internal settings sidebar ─────────────────────────────────
         NavigationSidebar(
             title = Res.string.settings.localized,
-            bodySections = listOf(applicationSection, moduleSection),
+            bodySections = listOf(applicationSection),
             bottomSections = listOf(aboutSection),
             currentScreen = currentKey,
             onScreenSelected = { route ->
@@ -283,10 +275,6 @@ fun SettingsScreen(
                             SettingNavKey.Appearance -> NavEntry(key) { AppearanceSettingsView(viewModel) }
                             SettingNavKey.SystemSettings -> NavEntry(key) { SystemSettingsView(viewModel) }
                             SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
-
-                            // Modules
-                            SettingNavKey.ModuleManager -> NavEntry(key) { ModuleManagerView() }
-                            SettingNavKey.ModuleRepo -> NavEntry(key) { ModuleRepoView() }
 
                             // About
                             SettingNavKey.About -> NavEntry(key) { PlaceholderView("About This App") }

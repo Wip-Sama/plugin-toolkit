@@ -11,20 +11,16 @@ import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobType
 import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleLoader
 import com.wip.plugin.api.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-import androidx.lifecycle.viewModelScope
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
-import com.wip.plugin.api.PluginResponse
 
 import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager
 
@@ -72,8 +68,10 @@ class PluginViewModel(
     fun selectCapability(capability: Capability?) {
         selectedCapability = capability
         parameterValues.clear()
-        capability?.parameters?.forEach { (name, _) ->
-            parameterValues[name] = ""
+        capability?.parameters?.forEach { (name, meta) ->
+            parameterValues[name] = meta.defaultValue?.let { 
+                if (it is JsonPrimitive && it.isString) it.content else it.toString() 
+            } ?: ""
         }
     }
 

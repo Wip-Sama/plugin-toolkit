@@ -2,6 +2,7 @@ package com.wip.operations
 
 import com.wip.plugin.api.Capability
 import com.wip.plugin.api.DataProcessor
+import com.wip.plugin.api.ExecutionContext
 import com.wip.plugin.api.ModuleInfo
 import com.wip.plugin.api.ParameterMetadata
 import com.wip.plugin.api.PluginEntry
@@ -49,8 +50,8 @@ public object MathProcessorManifest {
             name = "subtract",
             description = "Subtracts numbers sequentially",
             parameters = mapOf(
-              "a" to ParameterMetadata(null, "Numerator", getDataType<Double>()),
-              "b" to ParameterMetadata(null, "Denominator", getDataType<Double>())
+              "a" to ParameterMetadata(Json.parseToJsonElement("0.0"), "Numerator", getDataType<Double>()),
+              "b" to ParameterMetadata(Json.parseToJsonElement("0.0"), "Denominator", getDataType<Double>())
             ),
             returnType = getDataType<Double>()
           ),
@@ -58,8 +59,8 @@ public object MathProcessorManifest {
             name = "divide",
             description = "Divides two numbers",
             parameters = mapOf(
-              "a" to ParameterMetadata(null, "Numerator", getDataType<Double>()),
-              "b" to ParameterMetadata(null, "Denominator", getDataType<Double>())
+              "a" to ParameterMetadata(Json.parseToJsonElement("1.0"), "Numerator", getDataType<Double>()),
+              "b" to ParameterMetadata(Json.parseToJsonElement("1.0"), "Denominator", getDataType<Double>())
             ),
             returnType = getDataType<Double>()
           ),
@@ -68,7 +69,7 @@ public object MathProcessorManifest {
             description = "Calculates the sum of a list of numbers with a delay",
             parameters = mapOf(
               "values" to ParameterMetadata(null, "List of numbers to add", getDataType<List<Double>>()),
-              "delay" to ParameterMetadata(null, "Delay in milliseconds", getDataType<Long>())
+              "delay" to ParameterMetadata(Json.parseToJsonElement("1000"), "Delay in milliseconds", getDataType<Long>())
             ),
             returnType = getDataType<Double>()
           )
@@ -79,6 +80,8 @@ public object MathProcessorManifest {
 public class MathProcessorDispatcher(
   private val processor: MathProcessor,
 ) : DataProcessor {
+  private var context: ExecutionContext? = null
+
   private var isDebug: Boolean = false
 
   private val handlers: Map<String, suspend (PluginRequest) -> PluginResponse> = mapOf(
@@ -119,6 +122,10 @@ public class MathProcessorDispatcher(
 
   override fun setDebug(isDebug: Boolean) {
     this.isDebug = isDebug
+  }
+
+  override fun setExecutionContext(context: ExecutionContext) {
+    this.context = context
   }
 
   override suspend fun process(request: PluginRequest): Result<PluginResponse> = try {

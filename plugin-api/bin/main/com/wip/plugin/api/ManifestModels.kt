@@ -49,7 +49,7 @@ data class Requirements(
 
 @Serializable
 data class ParameterMetadata(
-    val value: JsonElement? = null,
+    val defaultValue: JsonElement? = null,
     val description: String,
     val type: DataType
 )

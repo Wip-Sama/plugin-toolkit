@@ -2,7 +2,7 @@ package com.wip.kpm_cpm_wotoolkit.features.job.logic
 
 import com.wip.kpm_cpm_wotoolkit.features.job.model.*
 import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleLoader
-import com.wip.plugin.api.PluginRequest
+import com.wip.plugin.api.*
 import kotlinx.coroutines.*
 import co.touchlab.kermit.Logger
 import kotlinx.serialization.json.JsonPrimitive
@@ -69,6 +69,34 @@ class JobWorker(
                 ?: throw Exception("Plugin ${job.pluginId} not found")
             
             val processor = plugin.getProcessor()
+            
+            // Provide execution context with Logger and ProgressReporter
+            val context = ExecutionContext(
+                logger = object : PluginLogger {
+                    override fun verbose(message: String) {
+                        Logger.v { "Plugin[${job.pluginId}]: $message" }
+                    }
+                    override fun debug(message: String) {
+                        Logger.d { "Plugin[${job.pluginId}]: $message" }
+                    }
+                    override fun info(message: String) {
+                        Logger.i { "Plugin[${job.pluginId}]: $message" }
+                    }
+                    override fun warn(message: String) {
+                        Logger.w { "Plugin[${job.pluginId}]: $message" }
+                    }
+                    override fun error(message: String, throwable: Throwable?) {
+                        Logger.e(throwable) { "Plugin[${job.pluginId}]: $message" }
+                    }
+                },
+                progress = object : ProgressReporter {
+                    override fun report(progress: Float) {
+                        manager.updateJobProgress(job.id, progress)
+                    }
+                }
+            )
+            processor.setExecutionContext(context)
+
             val request = PluginRequest(
                 method = job.capabilityName,
                 parameters = job.parameters

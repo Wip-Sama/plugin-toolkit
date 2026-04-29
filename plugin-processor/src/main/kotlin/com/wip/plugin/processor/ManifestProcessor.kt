@@ -80,13 +80,21 @@ class ManifestProcessor(
             capabilitiesCode.indent()
             val paramsList = func.parameters.toList()
             paramsList.forEachIndexed { pIndex, param ->
-                val paramAnn = param.annotations.find { it.shortName.asString() == "PluginParam" }
+                val paramAnn = param.annotations.find { it.shortName.asString() == "CapabilityParam" }
                 val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
+                val defaultValue = paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
                 val paramNameStr = param.name?.asString() ?: ""
                 val paramType = param.type.resolve().toTypeName()
                 
-                capabilitiesCode.add("%S to ParameterMetadata(null, %S, getDataType<%T>())", paramNameStr, paramDesc, paramType)
-                if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
+                // Only include in manifest if it's not a system-injected dependency
+                val typeStr = paramType.toString()
+                if (typeStr != "com.wip.plugin.api.PluginLogger" && typeStr != "com.wip.plugin.api.ProgressReporter") {
+                    val defaultValueCode = if (defaultValue.isNotEmpty()) "Json.parseToJsonElement(%S)" else "%L"
+                    val defaultValueVal = if (defaultValue.isNotEmpty()) defaultValue else "null"
+                    
+                    capabilitiesCode.add("%S to ParameterMetadata($defaultValueCode, %S, getDataType<%T>())", paramNameStr, defaultValueVal, paramDesc, paramType)
+                    if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
+                }
             }
             capabilitiesCode.unindent()
             capabilitiesCode.add("),\n")
@@ -132,6 +140,13 @@ class ManifestProcessor(
                     .build()
             )
             .addProperty(
+                PropertySpec.builder("context", ClassName("com.wip.plugin.api", "ExecutionContext").copy(nullable = true))
+                    .mutable(true)
+                    .initializer("null")
+                    .addModifiers(KModifier.PRIVATE)
+                    .build()
+            )
+            .addProperty(
                 PropertySpec.builder("isDebug", Boolean::class)
                     .mutable(true)
                     .initializer("false")
@@ -143,6 +158,13 @@ class ManifestProcessor(
                     .addModifiers(KModifier.OVERRIDE)
                     .addParameter("isDebug", Boolean::class)
                     .addStatement("this.isDebug = isDebug")
+                    .build()
+            )
+            .addFunction(
+                FunSpec.builder("setExecutionContext")
+                    .addModifiers(KModifier.OVERRIDE)
+                    .addParameter("context", ClassName("com.wip.plugin.api", "ExecutionContext"))
+                    .addStatement("this.context = context")
                     .build()
             )
 
@@ -173,10 +195,15 @@ class ManifestProcessor(
             paramsList.forEachIndexed { pIndex, param ->
                 val paramName = param.name?.asString() ?: ""
                 val paramType = param.type.resolve().toTypeName()
+                val typeStr = paramType.toString()
                 val isNullable = param.type.resolve().isMarkedNullable
                 val hasDefault = param.hasDefault
                 
-                if (hasDefault) {
+                if (typeStr == "com.wip.plugin.api.PluginLogger") {
+                    mapCode.add("context?.logger ?: throw IllegalStateException(%S)", "Logger not available")
+                } else if (typeStr == "com.wip.plugin.api.ProgressReporter") {
+                    mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
+                } else if (hasDefault) {
                     mapCode.add("if (request.parameters.containsKey(%S)) Json.decodeFromJsonElement<%T>(request.parameters[%S]!!) else null", paramName, paramType.copy(nullable = false), paramName)
                 } else if (isNullable) {
                     mapCode.add("request.parameters[%S]?.let { Json.decodeFromJsonElement<%T>(it) }", paramName, paramType)

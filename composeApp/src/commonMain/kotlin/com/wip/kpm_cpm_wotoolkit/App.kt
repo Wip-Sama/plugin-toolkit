@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,11 +28,13 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
 import com.wip.kpm_cpm_wotoolkit.features.board.ui.BoardScreen
-import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.MainScreen
+import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.Dashboard
 import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.PluginSectionScreen
 import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobDashboard
 import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobBadge
 import com.wip.kpm_cpm_wotoolkit.features.settings.ui.SettingsScreen
+import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.ModuleManagerView
+import com.wip.kpm_cpm_wotoolkit.features.repository.ui.ModuleRepoView
 import androidx.compose.material.icons.filled.PendingActions
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.core.theme.AppTheme
@@ -82,8 +85,6 @@ private fun AppContent(
         AppTheme(appearance = viewModel.settings.appearance) {
             var isNavbarCollapsed by remember { mutableStateOf(false) }
 
-            val loadedPlugins = pluginViewModel.loadedPlugins
-
             val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
             val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
 
@@ -105,6 +106,21 @@ private fun AppContent(
                             id = Screen.Modules,
                             icon = Icons.Default.Extension,
                             title = Res.string.nav_modules.localized
+                        )
+                    )
+                ),
+                SidebarSectionData(
+                    title = Res.string.section_modules.localized,
+                    elements = listOf(
+                        SidebarElement(
+                            id = Screen.ModuleManager,
+                            icon = Icons.Default.Inventory,
+                            title = Res.string.section_modules.localized
+                        ),
+                        SidebarElement(
+                            id = Screen.ModuleRepo,
+                            icon = Icons.Default.Inventory,
+                            title = Res.string.section_modules_repositories.localized
                         )
                     )
                 ),
@@ -157,12 +173,14 @@ private fun AppContent(
                             onBack = { if (backStack.size > 1) backStack.removeLast() }
                         ) { key ->
                             when (key) {
-                                is Screen.Main     -> NavEntry(key) { MainScreen() }
+                                is Screen.Main     -> NavEntry(key) { Dashboard() }
                                 is Screen.Board    -> NavEntry(key) { BoardScreen() }
                                 is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
                                 is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
                                 is Screen.Modules -> NavEntry(key) { PluginSectionScreen() }
                                 is Screen.Module   -> NavEntry(key) { PluginSectionScreen(initialModuleId = key.id) }
+                                is Screen.ModuleManager -> NavEntry(key) { ModuleManagerView() }
+                                is Screen.ModuleRepo -> NavEntry(key) { ModuleRepoView() }
                                 else               -> NavEntry(key) { }
                             }
                         }
