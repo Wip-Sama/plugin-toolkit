@@ -3,7 +3,12 @@ package com.wip.kpm_cpm_wotoolkit.features.settings.logic
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
 import com.wip.kpm_cpm_wotoolkit.core.KeepTrack
 import kotlinx.serialization.json.Json
-import java.io.File
+import kotlinx.io.files.FileSystem
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.Path
+import kotlinx.io.buffered
+import kotlinx.io.readString
+import kotlinx.io.writeString
 import co.touchlab.kermit.Logger
 
 actual class SettingsRepository actual constructor() {
@@ -13,23 +18,25 @@ actual class SettingsRepository actual constructor() {
         encodeDefaults = true
     }
 
-    private val settingsDir = File(System.getProperty("user.home"), KeepTrack.SETTINGS_DIR_NAME)
-    private val settingsFile = File(settingsDir, KeepTrack.SETTINGS_FILE_NAME)
+    private val settingsDirPath = "${System.getProperty("user.home")}/${KeepTrack.SETTINGS_DIR_NAME}"
+    private val settingsDir = Path(settingsDirPath)
+    private val settingsFile = Path("$settingsDirPath/${KeepTrack.SETTINGS_FILE_NAME}")
 
-    actual fun getSettingsDir(): String = settingsDir.absolutePath
+    actual fun getSettingsDir(): String = settingsDirPath
 
     actual fun getJobsDir(): String {
-        val jobsDir = File(settingsDir, KeepTrack.JOBS_DIR_NAME)
-        if (!jobsDir.exists()) {
-            jobsDir.mkdirs()
+        val jobsDirPath = "$settingsDirPath/${KeepTrack.JOBS_DIR_NAME}"
+        val jobsDir = Path(jobsDirPath)
+        if (!SystemFileSystem.exists(jobsDir)) {
+            SystemFileSystem.createDirectories(jobsDir)
         }
-        return jobsDir.absolutePath
+        return jobsDirPath
     }
 
     actual fun loadSettings(): AppSettings {
         return try {
-            if (settingsFile.exists()) {
-                val content = settingsFile.readText()
+            if (SystemFileSystem.exists(settingsFile)) {
+                val content = SystemFileSystem.source(settingsFile).use { it.buffered().readString() }
                 json.decodeFromString<AppSettings>(content)
             } else {
                 AppSettings()
@@ -42,11 +49,11 @@ actual class SettingsRepository actual constructor() {
 
     actual fun saveSettings(settings: AppSettings) {
         try {
-            if (!settingsDir.exists()) {
-                settingsDir.mkdirs()
+            if (!SystemFileSystem.exists(settingsDir)) {
+                SystemFileSystem.createDirectories(settingsDir)
             }
             val content = json.encodeToString(AppSettings.serializer(), settings)
-            settingsFile.writeText(content)
+            SystemFileSystem.sink(settingsFile).use { it.buffered().writeString(content) }
         } catch (e: Exception) {
             Logger.e(e) { "Error saving settings" }
         }
@@ -54,12 +61,13 @@ actual class SettingsRepository actual constructor() {
 
     actual fun openLogFolder() {
         try {
-            val logDir = File(settingsDir, KeepTrack.LOGS_DIR_NAME)
-            if (!logDir.exists()) {
-                logDir.mkdirs()
+            val logDirPath = "$settingsDirPath/${KeepTrack.LOGS_DIR_NAME}"
+            val logDir = Path(logDirPath)
+            if (!SystemFileSystem.exists(logDir)) {
+                SystemFileSystem.createDirectories(logDir)
             }
             if (java.awt.Desktop.isDesktopSupported()) {
-                java.awt.Desktop.getDesktop().open(logDir)
+                java.awt.Desktop.getDesktop().open(java.io.File(logDirPath))
             }
         } catch (e: Exception) {
             Logger.e(e) { "Error opening log folder" }

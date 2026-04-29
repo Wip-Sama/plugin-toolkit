@@ -7,8 +7,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.FileOutputStream
+import kotlinx.io.files.FileSystem
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.Path
+import kotlinx.io.asOutputStream
+import kotlinx.io.asInputStream
+import kotlinx.io.buffered
+import kotlinx.io.writeString
 import java.io.PrintWriter
 import java.text.SimpleDateFormat
 import java.util.*
@@ -16,7 +21,7 @@ import java.util.concurrent.Executors
 import java.util.zip.GZIPOutputStream
 
 class FileLogWriter(
-    private val logsDir: File,
+    private val logsDir: Path,
     private val settingsProvider: () -> LoggingSettings
 ) : LogWriter() {
 
@@ -30,8 +35,8 @@ class FileLogWriter(
     private val dateFormatter = SimpleDateFormat("yyyy_MM_dd", Locale.getDefault())
 
     init {
-        if (!logsDir.exists()) {
-            logsDir.mkdirs()
+        if (!SystemFileSystem.exists(logsDir)) {
+            SystemFileSystem.createDirectories(logsDir)
         }
         cleanupOldLogs()
     }
@@ -40,7 +45,7 @@ class FileLogWriter(
         val now = Date()
         val timestamp = timeFormatter.format(now)
         val dateString = dateFormatter.format(now)
-        val logFile = File(logsDir, "$dateString.log")
+        val logFile = Path("${logsDir}/$dateString.log")
 
         val severityChar = when (severity) {
             Severity.Verbose -> "V"
@@ -55,7 +60,7 @@ class FileLogWriter(
 
         scope.launch {
             try {
-                FileOutputStream(logFile, true).use { fos ->
+                SystemFileSystem.sink(logFile, append = true).buffered().asOutputStream().use { fos ->
                     PrintWriter(fos).use { pw ->
                         pw.println(formattedLine)
                         throwable?.let {
@@ -72,18 +77,17 @@ class FileLogWriter(
     private fun cleanupOldLogs() {
         scope.launch {
             try {
-                val files = logsDir.listFiles() ?: return@launch
-                val now = Calendar.getInstance()
+                val files = SystemFileSystem.list(logsDir).toList()
                 
                 // Group files by type
-                val logFiles = files.filter { it.extension == "log" }.sortedByDescending { it.name }
-                val gzFiles = files.filter { it.extension == "gz" }.sortedByDescending { it.name }
+                val logFiles = files.filter { it.name.endsWith(".log") }.sortedByDescending { it.name }
+                val gzFiles = files.filter { it.name.endsWith(".gz") }.sortedByDescending { it.name }
 
                 val todayStr = dateFormatter.format(Date())
 
                 // 1. Handle compression and deletion of .log files
                 logFiles.forEach { file ->
-                    val fileName = file.nameWithoutExtension
+                    val fileName = file.name.substringBeforeLast(".")
                     if (fileName == todayStr) return@forEach // Don't touch today's log
 
                     val fileDate = try { dateFormatter.parse(fileName) } catch (e: Exception) { null } ?: return@forEach
@@ -92,17 +96,17 @@ class FileLogWriter(
                     if (daysOld >= settings.logsToKeep) {
                         if (settings.compressOldLogs) {
                             compressFile(file)
-                            file.delete()
+                            SystemFileSystem.delete(file)
                         } else {
-                            file.delete()
+                            SystemFileSystem.delete(file)
                         }
                     }
                 }
 
                 // 2. Handle cleanup of .gz files
-                val updatedGzFiles = logsDir.listFiles { _, name -> name.endsWith(".gz") }?.sortedByDescending { it.name } ?: emptyList()
+                val updatedGzFiles = SystemFileSystem.list(logsDir).filter { it.name.endsWith(".gz") }.sortedByDescending { it.name }.toList()
                 if (updatedGzFiles.size > settings.compressedLogsToKeep) {
-                    updatedGzFiles.drop(settings.compressedLogsToKeep).forEach { it.delete() }
+                    updatedGzFiles.drop(settings.compressedLogsToKeep).forEach { SystemFileSystem.delete(it) }
                 }
 
             } catch (e: Exception) {
@@ -111,11 +115,11 @@ class FileLogWriter(
         }
     }
 
-    private fun compressFile(file: File) {
-        val gzFile = File(file.parent, "${file.name}.gz")
+    private fun compressFile(file: Path) {
+        val gzFile = Path("${file}.gz")
         try {
-            file.inputStream().use { input ->
-                GZIPOutputStream(gzFile.outputStream()).use { output ->
+            SystemFileSystem.source(file).buffered().asInputStream().use { input ->
+                GZIPOutputStream(SystemFileSystem.sink(gzFile).buffered().asOutputStream()).use { output ->
                     input.copyTo(output)
                 }
             }

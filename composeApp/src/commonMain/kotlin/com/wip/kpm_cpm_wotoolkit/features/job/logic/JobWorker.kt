@@ -5,8 +5,6 @@ import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleLoader
 import com.wip.plugin.api.*
 import kotlinx.coroutines.*
 import co.touchlab.kermit.Logger
-import kotlinx.serialization.json.JsonPrimitive
-import kotlin.time.Clock
 
 class JobWorker(
     val workerId: Int,
@@ -74,19 +72,29 @@ class JobWorker(
             val context = ExecutionContext(
                 logger = object : PluginLogger {
                     override fun verbose(message: String) {
-                        Logger.v { "Plugin[${job.pluginId}]: $message" }
+                        val fullMessage = "[${job.pluginId}] $message"
+                        Logger.v { fullMessage }
+                        manager.addJobLog(job.id, fullMessage, "VERBOSE")
                     }
                     override fun debug(message: String) {
-                        Logger.d { "Plugin[${job.pluginId}]: $message" }
+                        val fullMessage = "[${job.pluginId}] $message"
+                        Logger.d { fullMessage }
+                        manager.addJobLog(job.id, fullMessage, "DEBUG")
                     }
                     override fun info(message: String) {
-                        Logger.i { "Plugin[${job.pluginId}]: $message" }
+                        val fullMessage = "[${job.pluginId}] $message"
+                        Logger.i { fullMessage }
+                        manager.addJobLog(job.id, fullMessage, "INFO")
                     }
                     override fun warn(message: String) {
-                        Logger.w { "Plugin[${job.pluginId}]: $message" }
+                        val fullMessage = "[${job.pluginId}] $message"
+                        Logger.w { fullMessage }
+                        manager.addJobLog(job.id, fullMessage, "WARN")
                     }
                     override fun error(message: String, throwable: Throwable?) {
-                        Logger.e(throwable) { "Plugin[${job.pluginId}]: $message" }
+                        val fullMessage = "[${job.pluginId}] $message"
+                        Logger.e(throwable) { fullMessage }
+                        manager.addJobLog(job.id, fullMessage + (throwable?.let { ": ${it.message}" } ?: ""), "ERROR")
                     }
                 },
                 progress = object : ProgressReporter {

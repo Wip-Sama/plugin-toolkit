@@ -6,8 +6,8 @@ expect object PlatformUtils {
     val isWindows: Boolean
     val isLinux: Boolean
     fun getSystemAccentColor(): Color?
-    fun pickFolder(): String?
-    fun pickFile(): String?
+    suspend fun pickFolder(): String?
+    suspend fun pickFile(): String?
     fun copyFile(source: String, destination: String)
     fun downloadFile(url: String, destination: String): Result<Unit>
     fun unzip(source: String, destination: String, maxDecompressedSize: Long): Result<Unit>

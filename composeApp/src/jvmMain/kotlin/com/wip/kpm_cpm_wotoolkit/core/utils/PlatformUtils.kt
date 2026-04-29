@@ -7,6 +7,21 @@ import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forSessionBus
 import org.freedesktop.dbus.interfaces.DBusInterface
 import org.freedesktop.dbus.types.Variant
 import co.touchlab.kermit.Logger
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.*
+
+
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.toKotlinxIoPath
+
+import kotlinx.io.asSource
+import kotlinx.io.buffered
+import kotlinx.io.files.FileSystem
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.Path
+import kotlinx.io.readByteArray
+import kotlinx.io.readString
+import java.io.File
 
 actual object PlatformUtils {
     actual val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
@@ -72,38 +87,54 @@ actual object PlatformUtils {
         }
     }
 
-    actual fun pickFolder(): String? {
-        val chooser = javax.swing.JFileChooser().apply {
-            fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
-            dialogTitle = "Select Folder"
-        }
-        val result = chooser.showOpenDialog(null)
-        return if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
-            chooser.selectedFile.absolutePath
-        } else null
+    actual suspend fun pickFolder(): String? {
+        return FileKit.openDirectoryPicker(
+            dialogSettings = FileKitDialogSettings(title = "Select Folder")
+        )?.toKotlinxIoPath()?.toString()
     }
 
-    actual fun pickFile(): String? {
-        val chooser = javax.swing.JFileChooser().apply {
-            fileSelectionMode = javax.swing.JFileChooser.FILES_ONLY
-            dialogTitle = "Select Module File"
-        }
-        val result = chooser.showOpenDialog(null)
-        return if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
-            chooser.selectedFile.absolutePath
-        } else null
+    actual suspend fun pickFile(): String? {
+        return FileKit.openFilePicker(
+            dialogSettings = FileKitDialogSettings(title = "Select Module File")
+        )?.toKotlinxIoPath()?.toString()
     }
+
+
+
+
 
     actual fun copyFile(source: String, destination: String) {
         Logger.d { "Copying file from $source to $destination" }
-        java.io.File(source).copyTo(java.io.File(destination), overwrite = true)
+        val src = Path(source)
+        val dst = Path(destination)
+        SystemFileSystem.source(src).use { sourceStream ->
+            SystemFileSystem.sink(dst).use { sinkStream ->
+                val buffer = ByteArray(8192)
+                val bufferedSource = sourceStream.buffered()
+                val bufferedSink = sinkStream.buffered()
+                while (true) {
+                    val read = bufferedSource.readAtMostTo(buffer)
+                    if (read == -1) break
+                    bufferedSink.write(buffer, 0, read)
+                }
+                bufferedSink.flush()
+            }
+        }
     }
 
     actual fun downloadFile(url: String, destination: String): Result<Unit> {
         return try {
             java.net.URL(url).openStream().use { input ->
-                java.io.File(destination).outputStream().use { output ->
-                    input.copyTo(output)
+                val dst = Path(destination)
+                SystemFileSystem.sink(dst).use { sink ->
+                    val bufferedSink = sink.buffered()
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        bufferedSink.write(buffer, 0, read)
+                    }
+                    bufferedSink.flush()
                 }
             }
             Result.success(Unit)
@@ -157,24 +188,47 @@ actual object PlatformUtils {
 
     actual fun deleteDirectory(path: String): Boolean {
         Logger.d { "Deleting directory: $path" }
-        return java.io.File(path).deleteRecursively()
+        return try {
+            deleteRecursively(Path(path))
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting directory $path: ${e.message}" }
+            false
+        }
+    }
+
+    private fun deleteRecursively(path: Path) {
+        if (SystemFileSystem.exists(path)) {
+            val metadata = SystemFileSystem.metadataOrNull(path)
+            if (metadata?.isDirectory == true) {
+                SystemFileSystem.list(path).forEach { child ->
+                    deleteRecursively(child)
+                }
+            }
+            SystemFileSystem.delete(path)
+        }
     }
 
     actual fun exists(path: String): Boolean {
-        return java.io.File(path).exists()
+        return SystemFileSystem.exists(Path(path))
     }
 
     actual fun mkdirs(path: String): Boolean {
-        return java.io.File(path).mkdirs()
+        SystemFileSystem.createDirectories(Path(path))
+        return true
     }
 
     actual fun listDirectories(path: String): List<String> {
-        return java.io.File(path).listFiles()?.filter { it.isDirectory }?.map { it.absolutePath } ?: emptyList()
+        return SystemFileSystem.list(Path(path))
+            .filter { SystemFileSystem.metadataOrNull(it)?.isDirectory == true }
+            .map { it.toString() }
     }
 
     actual fun readFile(path: String): String? {
-        val file = java.io.File(path)
-        return if (file.exists()) file.readText() else null
+        val p = Path(path)
+        return if (SystemFileSystem.exists(p)) {
+            SystemFileSystem.source(p).use { it.buffered().readString() }
+        } else null
     }
     
     actual fun readFileFromZip(zipPath: String, fileName: String): String? {

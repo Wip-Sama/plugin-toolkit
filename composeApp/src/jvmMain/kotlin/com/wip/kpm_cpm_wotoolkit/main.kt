@@ -38,8 +38,14 @@ import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.ModuleManagerViewMode
 import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
 import kotlinx.coroutines.SupervisorJob
 import org.koin.mp.KoinPlatform.getKoin
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.*
+
+
 
 fun main(args: Array<String>) {
+    FileKit.init(appId = "com.wip.kpm_cpm_wotoolkit")
+
     // Check if we should start minimized
     val repository = SettingsRepository()
     val initialSettings = repository.loadSettings()
@@ -76,7 +82,8 @@ fun main(args: Array<String>) {
     viewModelProvider = { viewModel }
 
     // Initialize Logging with Kermit
-    val logDir = File(System.getProperty("user.home"), KeepTrack.SETTINGS_DIR_NAME + File.separator + KeepTrack.LOGS_DIR_NAME)
+    val logDirPath = "${System.getProperty("user.home")}/${KeepTrack.SETTINGS_DIR_NAME}/${KeepTrack.LOGS_DIR_NAME}"
+    val logDir = kotlinx.io.files.Path(logDirPath)
     
     Logger.setLogWriters(platformLogWriter(), FileLogWriter(logDir) { viewModel.settings.logging })
     
@@ -93,7 +100,8 @@ fun main(args: Array<String>) {
         Logger.setMinSeverity(severity)
     }.launchIn(CoroutineScope(Dispatchers.Default))
     
-    Logger.i { "Application started. Logging initialized at: ${logDir.absolutePath}" }
+    Logger.i { "Application started. Logging initialized at: $logDir" }
+
 
     // Load enabled modules at startup
     moduleManager.installedModules.value.forEach { module ->

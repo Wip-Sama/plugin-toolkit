@@ -143,6 +143,8 @@ fun GeneralTab(viewModel: JobViewModel) {
     val runningJobs by viewModel.runningJobs.collectAsState()
     val queuedJobs by viewModel.queuedJobs.collectAsState()
     val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
+    val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
+    val expandedJobs = remember { mutableStateMapOf<String, Boolean>() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -156,6 +158,9 @@ fun GeneralTab(viewModel: JobViewModel) {
                 JobCard(
                     job = job, 
                     progress = progressMap[job.id] ?: 0f,
+                    logs = logsMap[job.id] ?: emptyList(),
+                    isExpanded = expandedJobs[job.id] ?: false,
+                    onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
                     onCancel = { viewModel.cancelJob(job.id) }, 
                     onPause = { viewModel.pauseJob(job.id) }
                 )
@@ -170,6 +175,9 @@ fun GeneralTab(viewModel: JobViewModel) {
                 JobCard(
                     job = job, 
                     progress = progressMap[job.id] ?: 0f,
+                    logs = logsMap[job.id] ?: emptyList(),
+                    isExpanded = expandedJobs[job.id] ?: false,
+                    onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
                     onCancel = { viewModel.cancelJob(job.id) },
                     onPause = { viewModel.pauseJob(job.id) }
                 )
@@ -188,6 +196,8 @@ fun GeneralTab(viewModel: JobViewModel) {
 fun ArchiveTab(viewModel: JobViewModel) {
     val pausedJobs by viewModel.pausedJobs.collectAsState()
     val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
+    val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
+    val expandedJobs = remember { mutableStateMapOf<String, Boolean>() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -201,6 +211,9 @@ fun ArchiveTab(viewModel: JobViewModel) {
                 JobCard(
                     job = job, 
                     progress = progressMap[job.id] ?: 0f,
+                    logs = logsMap[job.id] ?: emptyList(),
+                    isExpanded = expandedJobs[job.id] ?: false,
+                    onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
                     onCancel = { viewModel.cancelJob(job.id) }, 
                     onResume = { viewModel.resumeJob(job.id) }
                 )
@@ -292,6 +305,9 @@ fun HistoryTab(viewModel: JobViewModel) {
 fun JobCard(
     job: BackgroundJob,
     progress: Float = 0f,
+    logs: List<String> = emptyList(),
+    isExpanded: Boolean = false,
+    onToggleExpand: () -> Unit = {},
     onCancel: () -> Unit = {},
     onPause: () -> Unit = {},
     onResume: () -> Unit = {}
@@ -314,6 +330,13 @@ fun JobCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onToggleExpand) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand"
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(text = "ID: ${job.id}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -354,6 +377,11 @@ fun JobCard(
                 )
             }
 
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+                TerminalLogView(logs)
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
@@ -378,6 +406,48 @@ fun JobCard(
                         Text("Cancel")
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun TerminalLogView(logs: List<String>) {
+    val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
+    
+    // Auto-scroll to bottom when new logs arrive
+    LaunchedEffect(logs.size) {
+        if (logs.isNotEmpty()) {
+            scrollState.animateScrollToItem(logs.size - 1)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 200.dp) // Approx 10 rows
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF1E1E1E))
+            .padding(8.dp)
+    ) {
+        LazyColumn(
+            state = scrollState,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(logs) { log ->
+                Text(
+                    text = log,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    ),
+                    color = when {
+                        log.contains("[ERROR]") -> Color(0xFFF44336)
+                        log.contains("[WARN]") -> Color(0xFFFFEB3B)
+                        log.contains("[VERBOSE]") -> Color(0xFF9E9E9E)
+                        log.contains("[DEBUG]") -> Color(0xFF2196F3)
+                        else -> Color(0xFFE0E0E0)
+                    }
+                )
             }
         }
     }

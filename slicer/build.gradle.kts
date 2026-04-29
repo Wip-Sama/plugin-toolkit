@@ -20,6 +20,7 @@ dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.kotlinxSerializationJson)
+    implementation(libs.kotlinx.io.core)
     implementation(project(":plugin-api"))
     implementation(project(":plugin-api"))
     ksp(project(":plugin-processor"))

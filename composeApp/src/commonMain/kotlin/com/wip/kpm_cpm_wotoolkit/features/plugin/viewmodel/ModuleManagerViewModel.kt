@@ -46,11 +46,13 @@ class ModuleManagerViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun installLocal() {
-        val filePath = PlatformUtils.pickFile()
-        if (filePath != null) {
-            pickInstallLocation { target ->
-                viewModelScope.launch {
-                    moduleManager.installLocal(filePath, target)
+        viewModelScope.launch {
+            val filePath = PlatformUtils.pickFile()
+            if (filePath != null) {
+                pickInstallLocation { target ->
+                    viewModelScope.launch {
+                        moduleManager.installLocal(filePath, target)
+                    }
                 }
             }
         }
@@ -67,14 +69,16 @@ class ModuleManagerViewModel(
     }
 
     fun addManagedFolder() {
-        val folder = PlatformUtils.pickFolder()
-        if (folder != null) {
-            val settings = settingsRepository.loadSettings()
-            val updated = settings.extensions.moduleFolders + folder
-            settingsRepository.saveSettings(settings.copy(
-                extensions = settings.extensions.copy(moduleFolders = updated)
-            ))
-            _managedFolders.value = updated
+        viewModelScope.launch {
+            val folder = PlatformUtils.pickFolder()
+            if (folder != null) {
+                val settings = settingsRepository.loadSettings()
+                val updated = settings.extensions.moduleFolders + folder
+                settingsRepository.saveSettings(settings.copy(
+                    extensions = settings.extensions.copy(moduleFolders = updated)
+                ))
+                _managedFolders.value = updated
+            }
         }
     }
 

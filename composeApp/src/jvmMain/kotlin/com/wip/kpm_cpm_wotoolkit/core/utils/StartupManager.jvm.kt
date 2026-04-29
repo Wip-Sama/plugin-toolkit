@@ -1,7 +1,11 @@
 package com.wip.kpm_cpm_wotoolkit.core.utils
 
 import com.wip.kpm_cpm_wotoolkit.core.KeepTrack
-import java.io.File
+import kotlinx.io.files.FileSystem
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.Path
+import kotlinx.io.buffered
+import kotlinx.io.writeString
 import java.util.Locale
 
 actual object StartupManager {
@@ -33,7 +37,7 @@ actual object StartupManager {
     private fun getExecutablePath(): String? {
         // Try to get the current running command
         val command = ProcessHandle.current().info().command().orElse(null)
-        if (command != null && File(command).exists()) {
+        if (command != null && SystemFileSystem.exists(Path(command))) {
             return command
         }
         return null
@@ -66,11 +70,12 @@ actual object StartupManager {
 
     private fun setLinuxStartup(enabled: Boolean, minimized: Boolean) {
         val exePath = getExecutablePath() ?: return
-        val autostartDir = File(System.getProperty("user.home"), KeepTrack.LINUX_AUTOSTART_DIR)
-        if (!autostartDir.exists()) {
-            autostartDir.mkdirs()
+        val autostartDirPath = "${System.getProperty("user.home")}/${KeepTrack.LINUX_AUTOSTART_DIR}"
+        val autostartDir = Path(autostartDirPath)
+        if (!SystemFileSystem.exists(autostartDir)) {
+            SystemFileSystem.createDirectories(autostartDir)
         }
-        val desktopFile = File(autostartDir, KeepTrack.LINUX_DESKTOP_FILENAME)
+        val desktopFile = Path("$autostartDirPath/${KeepTrack.LINUX_DESKTOP_FILENAME}")
 
         if (enabled) {
             val execCommand = if (minimized) "$exePath $backgroundFlag" else exePath
@@ -84,17 +89,17 @@ actual object StartupManager {
                 Name=$appName
                 Comment=Start $appName at login
             """.trimIndent()
-            desktopFile.writeText(content)
+            SystemFileSystem.sink(desktopFile).use { it.buffered().writeString(content) }
         } else {
-            if (desktopFile.exists()) {
-                desktopFile.delete()
+            if (SystemFileSystem.exists(desktopFile)) {
+                SystemFileSystem.delete(desktopFile)
             }
         }
     }
 
     private fun isLinuxStartupEnabled(): Boolean {
-        val autostartDir = File(System.getProperty("user.home"), KeepTrack.LINUX_AUTOSTART_DIR)
-        val desktopFile = File(autostartDir, KeepTrack.LINUX_DESKTOP_FILENAME)
-        return desktopFile.exists()
+        val autostartDirPath = "${System.getProperty("user.home")}/${KeepTrack.LINUX_AUTOSTART_DIR}"
+        val desktopFile = Path("$autostartDirPath/${KeepTrack.LINUX_DESKTOP_FILENAME}")
+        return SystemFileSystem.exists(desktopFile)
     }
 }

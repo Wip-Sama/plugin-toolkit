@@ -13,6 +13,7 @@ class JobViewModel(
 ) : ViewModel() {
     val jobs = jobManager.jobs
     val jobProgress = jobManager.jobProgress
+    val jobLogs = jobManager.jobLogs
     val history = jobManager.history
 
     val runningJobs = jobs.map { list ->

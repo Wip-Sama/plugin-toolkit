@@ -6,7 +6,12 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
-import java.io.File
+import kotlinx.io.files.FileSystem
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.Path
+import kotlinx.io.buffered
+import kotlinx.io.readString
+import kotlinx.io.writeString
 import java.util.UUID
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -24,7 +29,8 @@ class JvmNotificationService(
     override val history: StateFlow<List<NotificationRecord>> = _history.asStateFlow()
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
-    private val historyFile = File(System.getProperty("user.home"), "${KeepTrack.SETTINGS_DIR_NAME}/notification_history.json")
+    private val historyFilePath = "${System.getProperty("user.home")}/${KeepTrack.SETTINGS_DIR_NAME}/notification_history.json"
+    private val historyFile = Path(historyFilePath)
 
     init {
         loadHistory()
@@ -90,8 +96,8 @@ class JvmNotificationService(
 
     private fun loadHistory() {
         try {
-            if (historyFile.exists()) {
-                val content = historyFile.readText()
+            if (SystemFileSystem.exists(historyFile)) {
+                val content = SystemFileSystem.source(historyFile).use { it.buffered().readString() }
                 _history.value = json.decodeFromString<List<NotificationRecord>>(content)
                 cleanupOldNotifications() // Cleanup on load
             }
@@ -103,8 +109,11 @@ class JvmNotificationService(
     private fun saveHistory() {
         scope.launch {
             try {
-                if (!historyFile.parentFile.exists()) historyFile.parentFile.mkdirs()
-                historyFile.writeText(json.encodeToString(_history.value))
+                val parent = historyFile.parent
+                if (parent != null && !SystemFileSystem.exists(parent)) {
+                    SystemFileSystem.createDirectories(parent)
+                }
+                SystemFileSystem.sink(historyFile).use { it.buffered().writeString(json.encodeToString(_history.value)) }
             } catch (e: Exception) {
                 Logger.e(e) { "Error saving notification history" }
             }

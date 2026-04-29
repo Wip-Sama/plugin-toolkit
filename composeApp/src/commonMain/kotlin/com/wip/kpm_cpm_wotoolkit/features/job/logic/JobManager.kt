@@ -11,8 +11,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import co.touchlab.kermit.Logger
-import kotlin.time.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.collections.emptyList
+import kotlin.time.Clock
 
 class JobManager(
     private val scope: CoroutineScope,
@@ -26,6 +28,9 @@ class JobManager(
 
     private val _history = MutableStateFlow<List<JobHistoryEntry>>(emptyList())
     val history: StateFlow<List<JobHistoryEntry>> = _history.asStateFlow()
+
+    private val _jobLogs = MutableStateFlow<Map<String, List<String>>>(emptyMap())
+    val jobLogs: StateFlow<Map<String, List<String>>> = _jobLogs.asStateFlow()
 
     private val workers = mutableListOf<JobWorker>()
     
@@ -189,6 +194,22 @@ class JobManager(
 
     fun updateJobProgress(jobId: String, progress: Float) {
         _jobProgress.update { it + (jobId to progress) }
+        val progressPercent = (progress * 100).toInt()
+        addJobLog(jobId, "Progress: $progressPercent%", "VERBOSE")
+    }
+
+    fun addJobLog(jobId: String, message: String, level: String = "INFO") {
+        val now = Clock.System.now()
+        val local = now.toLocalDateTime(TimeZone.currentSystemDefault())
+        val timestamp = "${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}:${local.second.toString().padStart(2, '0')}"
+        
+        val prefix = if (level == "VERBOSE") "[$jobId] " else ""
+        val formattedLog = "[$timestamp] [$level] $prefix$message"
+        
+        _jobLogs.update { currentLogs ->
+            val logs = currentLogs[jobId] ?: emptyList()
+            currentLogs + (jobId to (logs + formattedLog).takeLast(100))
+        }
     }
 
     fun tryCompleteJob(jobId: String, result: String?): Boolean {
