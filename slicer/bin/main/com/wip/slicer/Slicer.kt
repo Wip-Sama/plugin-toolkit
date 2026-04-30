@@ -17,7 +17,7 @@ import java.awt.image.BufferedImage
 @PluginModule(
     id = "com.wip.operations.slicer",
     name = "Slicer",
-    version = "0.4.2",
+    version = "0.4.3",
     description = "A module that provides vertical images sliding capabilities for manhwa."
 )
 class Slicer {
@@ -202,7 +202,7 @@ class Slicer {
             val sliceHeight = cut - prevCut
             val slice = combinedImage.getSubimage(0, prevCut, width, sliceHeight)
             val outputFilePath = Path("${outputDir}/${index + 1}.png")
-            SystemFileSystem.sink(outputFilePath).use { sink ->
+            SystemFileSystem.sink(outputFilePath).buffered().use { sink ->
                 ImageIO.write(slice, "png", sink.asOutputStream())
             }
             prevCut = cut

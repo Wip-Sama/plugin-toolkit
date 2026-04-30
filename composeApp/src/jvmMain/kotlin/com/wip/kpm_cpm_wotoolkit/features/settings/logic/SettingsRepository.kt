@@ -36,8 +36,12 @@ actual class SettingsRepository actual constructor() {
     actual fun loadSettings(): AppSettings {
         return try {
             if (SystemFileSystem.exists(settingsFile)) {
-                val content = SystemFileSystem.source(settingsFile).use { it.buffered().readString() }
-                json.decodeFromString<AppSettings>(content)
+                val content = SystemFileSystem.source(settingsFile).buffered().use { it.readString() }
+                if (content.isBlank()) {
+                    AppSettings()
+                } else {
+                    json.decodeFromString<AppSettings>(content)
+                }
             } else {
                 AppSettings()
             }
@@ -53,7 +57,7 @@ actual class SettingsRepository actual constructor() {
                 SystemFileSystem.createDirectories(settingsDir)
             }
             val content = json.encodeToString(AppSettings.serializer(), settings)
-            SystemFileSystem.sink(settingsFile).use { it.buffered().writeString(content) }
+            SystemFileSystem.sink(settingsFile).buffered().use { it.writeString(content) }
         } catch (e: Exception) {
             Logger.e(e) { "Error saving settings" }
         }

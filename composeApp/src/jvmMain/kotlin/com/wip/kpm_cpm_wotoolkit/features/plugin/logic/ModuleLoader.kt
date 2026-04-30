@@ -81,4 +81,13 @@ actual object ModuleLoader {
     actual fun getPluginById(pluginId: String): PluginEntry? {
         return loadedPlugins.values.find { it.entry.getManifest().module.id == pluginId }?.entry
     }
+
+    actual fun getPluginInstallPath(pluginId: String): String? {
+        val plugin = loadedPlugins.values.find { it.entry.getManifest().module.id == pluginId }
+        if (plugin != null) {
+            val file = File(plugin.jarPath)
+            return file.parent
+        }
+        return null
+    }
 }

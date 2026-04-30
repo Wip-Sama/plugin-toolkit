@@ -5,6 +5,7 @@ import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleLoader
 import com.wip.plugin.api.*
 import kotlinx.coroutines.*
 import co.touchlab.kermit.Logger
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.DefaultPluginFileSystem
 
 class JobWorker(
     val workerId: Int,
@@ -101,7 +102,10 @@ class JobWorker(
                     override fun report(progress: Float) {
                         manager.updateJobProgress(job.id, progress)
                     }
-                }
+                },
+                fileSystem = DefaultPluginFileSystem(
+                    ModuleLoader.getPluginInstallPath(job.pluginId) ?: ""
+                )
             )
             processor.setExecutionContext(context)
 

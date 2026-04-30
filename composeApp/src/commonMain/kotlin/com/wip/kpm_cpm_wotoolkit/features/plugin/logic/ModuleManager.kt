@@ -233,6 +233,9 @@ class ModuleManager(
             val newList = currentModules.values.toList()
             _installedModules.value = newList
             saveToSettings(newList)
+            newList.filter { it.isEnabled && !_loadedModules.value.contains(it.pkg) }.forEach {
+                loadModule(it.pkg)
+            }
         }
     }
 
@@ -285,5 +288,29 @@ class ModuleManager(
             if (s1[i] < s2[i]) return false
         }
         return s1.size > s2.size
+    }
+
+    suspend fun updateLocal(pkg: String, newJarPath: String): Result<Unit> {
+        val module = _installedModules.value.find { it.pkg == pkg } ?: return Result.failure(Exception("Module not found"))
+        unloadModule(pkg)
+        // Install over existing path
+        return installLocal(newJarPath, module.installPath.substringBeforeLast("/"))
+    }
+
+    suspend fun updateRemote(pkg: String): Result<Unit> {
+        val update = getUpdate(pkg) ?: return Result.failure(Exception("No update available"))
+        val module = _installedModules.value.find { it.pkg == pkg } ?: return Result.failure(Exception("Module not found"))
+        unloadModule(pkg)
+        return installRemote(update, module.installPath.substringBeforeLast("/"))
+    }
+
+    suspend fun validateModule(pkg: String): Result<Unit> {
+        val plugin = ModuleLoader.getPluginById(pkg) ?: return Result.failure(Exception("Module not loaded"))
+        return plugin.validate()
+    }
+
+    suspend fun performSetup(pkg: String): Result<Unit> {
+        val plugin = ModuleLoader.getPluginById(pkg) ?: return Result.failure(Exception("Module not loaded"))
+        return plugin.performSetup()
     }
 }

@@ -107,17 +107,14 @@ actual object PlatformUtils {
         Logger.d { "Copying file from $source to $destination" }
         val src = Path(source)
         val dst = Path(destination)
-        SystemFileSystem.source(src).use { sourceStream ->
-            SystemFileSystem.sink(dst).use { sinkStream ->
+        SystemFileSystem.source(src).buffered().use { bufferedSource ->
+            SystemFileSystem.sink(dst).buffered().use { bufferedSink ->
                 val buffer = ByteArray(8192)
-                val bufferedSource = sourceStream.buffered()
-                val bufferedSink = sinkStream.buffered()
                 while (true) {
                     val read = bufferedSource.readAtMostTo(buffer)
                     if (read == -1) break
                     bufferedSink.write(buffer, 0, read)
                 }
-                bufferedSink.flush()
             }
         }
     }
@@ -126,15 +123,13 @@ actual object PlatformUtils {
         return try {
             java.net.URL(url).openStream().use { input ->
                 val dst = Path(destination)
-                SystemFileSystem.sink(dst).use { sink ->
-                    val bufferedSink = sink.buffered()
+                SystemFileSystem.sink(dst).buffered().use { bufferedSink ->
                     val buffer = ByteArray(8192)
                     while (true) {
                         val read = input.read(buffer)
                         if (read == -1) break
                         bufferedSink.write(buffer, 0, read)
                     }
-                    bufferedSink.flush()
                 }
             }
             Result.success(Unit)
@@ -161,15 +156,13 @@ actual object PlatformUtils {
                     } else {
                         path.parent?.let { SystemFileSystem.createDirectories(it) }
                         zip.getInputStream(entry).use { input ->
-                            SystemFileSystem.sink(path).use { sink ->
-                                val bufferedSink = sink.buffered()
+                            SystemFileSystem.sink(path).buffered().use { bufferedSink ->
                                 val buffer = ByteArray(8192)
                                 while (true) {
                                     val read = input.read(buffer)
                                     if (read == -1) break
                                     bufferedSink.write(buffer, 0, read)
                                 }
-                                bufferedSink.flush()
                             }
                         }
                     }
@@ -234,7 +227,7 @@ actual object PlatformUtils {
     actual fun readFile(path: String): String? {
         val p = Path(path)
         return if (SystemFileSystem.exists(p)) {
-            SystemFileSystem.source(p).use { it.buffered().readString() }
+            SystemFileSystem.source(p).buffered().use { it.readString() }
         } else null
     }
     

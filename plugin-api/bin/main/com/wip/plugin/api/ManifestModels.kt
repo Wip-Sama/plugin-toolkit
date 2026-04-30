@@ -25,12 +25,39 @@ enum class PrimitiveType {
 }
 
 @Serializable
+enum class UpdateType {
+    REPLACE_ALL, SCRIPT, PATCH
+}
+
+@Serializable
+data class SettingMetadata(
+    val defaultValue: JsonElement? = null,
+    val description: String,
+    val type: DataType
+)
+
+@Serializable
 data class PluginManifest(
     val manifestVersion: String,
     val module: ModuleInfo,
     val requirements: Requirements,
     val defaultParameters: Map<String, ParameterMetadata>? = null,
-    val capabilities: List<Capability> = emptyList()
+    val capabilities: List<Capability> = emptyList(),
+    val settings: Map<String, SettingMetadata>? = null,
+    val changelog: Changelog? = null,
+    val updateType: UpdateType = UpdateType.REPLACE_ALL
+)
+
+@Serializable
+data class Changelog(
+    val releases: List<Release>
+)
+
+@Serializable
+data class Release(
+    val version: String,
+    val date: String,
+    val categories: Map<String, List<String>>
 )
 
 @Serializable

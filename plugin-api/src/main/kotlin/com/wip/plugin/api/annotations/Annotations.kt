@@ -24,3 +24,18 @@ annotation class CapabilityParam(
     val description: String,
     val defaultValue: String = ""
 )
+
+@Target(AnnotationTarget.PROPERTY)
+@Retention(AnnotationRetention.SOURCE)
+annotation class ModuleSetting(
+    val description: String,
+    val defaultValue: String = ""
+)
+
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class ModuleSetup
+
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class ModuleValidate

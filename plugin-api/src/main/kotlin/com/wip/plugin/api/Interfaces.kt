@@ -34,9 +34,32 @@ interface PluginEntry {
     fun setDebug(isDebug: Boolean)
 
     /**
+     * Optional setup step called by the host application.
+     */
+    suspend fun performSetup(): Result<Unit> = Result.success(Unit)
+
+    /**
+     * Validate the plugin installation and status.
+     */
+    suspend fun validate(): Result<Unit> = Result.success(Unit)
+
+    /**
      * Clean up resources.
      */
     fun shutdown()
+}
+
+/**
+ * File system interface for plugins, restricting operations to the plugin's managed folder.
+ */
+interface PluginFileSystem {
+    suspend fun readFile(relativePath: String): ByteArray?
+    suspend fun readTextFile(relativePath: String): String?
+    suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit>
+    suspend fun writeTextFile(relativePath: String, text: String): Result<Unit>
+    suspend fun exists(relativePath: String): Boolean
+    suspend fun listFiles(relativePath: String = ""): List<String>
+    suspend fun deleteFile(relativePath: String): Result<Unit>
 }
 
 /**
@@ -65,7 +88,8 @@ interface ProgressReporter {
  */
 data class ExecutionContext(
     val logger: PluginLogger,
-    val progress: ProgressReporter
+    val progress: ProgressReporter,
+    val fileSystem: PluginFileSystem
 )
 
 /**

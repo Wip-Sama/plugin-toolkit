@@ -74,7 +74,9 @@ fun ModuleManagerView(
                             ModuleAction.Uninstall -> viewModel.uninstall(module.pkg)
                             ModuleAction.Reload -> viewModel.reload(module.pkg)
                             ModuleAction.Update -> viewModel.updateModule(module.pkg)
-                            else -> {} // Stubs for Changelog, Settings, Validate
+                            ModuleAction.Validate -> viewModel.validateModule(module.pkg)
+                            ModuleAction.Changelog -> viewModel.showChangelog(module.pkg)
+                            ModuleAction.Settings -> viewModel.openSettings(module.pkg)
                         }
                     }
                 )
@@ -169,6 +171,13 @@ fun ModuleCard(
                         modifier = Modifier.padding(end = WOTheme.spacing.small)
                     ) {
                         Text(stringResource(Res.string.module_update))
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { onAction(ModuleAction.Update) },
+                        modifier = Modifier.padding(end = WOTheme.spacing.small)
+                    ) {
+                        Text(stringResource(Res.string.module_update) + " (Local)")
                     }
                 }
 

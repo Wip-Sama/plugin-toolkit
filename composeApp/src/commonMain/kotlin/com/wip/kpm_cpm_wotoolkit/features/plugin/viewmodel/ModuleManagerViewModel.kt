@@ -116,12 +116,41 @@ class ModuleManagerViewModel(
     }
 
     fun updateModule(pkg: String) {
-        val update = moduleManager.getUpdate(pkg) ?: return
-        pickInstallLocation { target ->
-            viewModelScope.launch {
-                moduleManager.installRemote(update, target)
+        viewModelScope.launch {
+            if (moduleManager.getUpdate(pkg) != null) {
+                moduleManager.updateRemote(pkg)
+            } else {
+                val newPath = PlatformUtils.pickFile()
+                if (newPath != null) {
+                    moduleManager.updateLocal(pkg, newPath)
+                }
             }
         }
+    }
+
+    fun validateModule(pkg: String) {
+        viewModelScope.launch {
+            val result = moduleManager.validateModule(pkg)
+            val msg = if (result.isSuccess) "Module validated successfully." else "Validation failed: ${result.exceptionOrNull()?.message}"
+            dialogService.showConfirmation("Validation Result", msg, {})
+        }
+    }
+
+    fun showChangelog(pkg: String) {
+        viewModelScope.launch {
+            val module = moduleManager.installedModules.value.find { it.pkg == pkg } ?: return@launch
+            val chlogPath = module.installPath + "/changelog.chlog"
+            val content = PlatformUtils.readFile(chlogPath)
+            if (content != null) {
+                dialogService.showConfirmation("Changelog", content, {})
+            } else {
+                dialogService.showConfirmation("Changelog", "No changelog found.", {})
+            }
+        }
+    }
+
+    fun openSettings(pkg: String) {
+        dialogService.showConfirmation("Settings", "Settings editing to be implemented in a dedicated UI.", {})
     }
     
     fun getUpdate(pkg: String) = moduleManager.getUpdate(pkg)

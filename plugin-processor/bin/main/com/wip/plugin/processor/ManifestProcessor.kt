@@ -11,6 +11,15 @@ import kotlinx.serialization.encodeToString
 import com.wip.plugin.api.PluginManifest
 import com.wip.plugin.api.ModuleInfo
 import com.wip.plugin.api.Requirements
+import com.wip.plugin.api.DataType
+import com.wip.plugin.api.PrimitiveType
+import com.wip.plugin.api.Capability
+import com.wip.plugin.api.ParameterMetadata
+import com.wip.plugin.api.SettingMetadata
+import com.wip.plugin.api.Changelog
+import com.wip.plugin.api.Release
+import java.io.File
+import kotlinx.serialization.json.JsonElement
 
 class ManifestProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
@@ -57,7 +66,7 @@ class ManifestProcessor(
         val entryName = baseClassName + "PluginEntry"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
-            .addImport("com.wip.plugin.api", "PluginManifest", "ModuleInfo", "Requirements", "Capability", "ParameterMetadata", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType")
+            .addImport("com.wip.plugin.api", "PluginManifest", "ModuleInfo", "Requirements", "Capability", "ParameterMetadata", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType")
             .addImport("kotlinx.serialization.json", "Json", "decodeFromJsonElement", "encodeToJsonElement")
 
         // 1. Generate Manifest Object
@@ -107,6 +116,32 @@ class ManifestProcessor(
         capabilitiesCode.unindent()
         capabilitiesCode.add(")\n")
 
+        val settingsProperties = classDeclaration.getAllProperties().filter { 
+            it.annotations.any { ann -> ann.shortName.asString() == "ModuleSetting" }
+        }
+
+        val settingsCode = CodeBlock.builder()
+        settingsCode.add("mapOf(\n")
+        settingsCode.indent()
+        val propsList = settingsProperties.toList()
+        propsList.forEachIndexed { index, prop ->
+            val ann = prop.annotations.first { it.shortName.asString() == "ModuleSetting" }
+            val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
+            val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
+            val propName = prop.simpleName.asString()
+            val propType = prop.type.resolve().toTypeName()
+            val defaultValueCode = if (defaultVal.isNotEmpty()) "Json.parseToJsonElement(%S)" else "null"
+            
+            if (defaultVal.isNotEmpty()) {
+               settingsCode.add("%S to SettingMetadata($defaultValueCode, %S, getDataType<%T>())", propName, defaultVal, desc, propType)
+            } else {
+               settingsCode.add("%S to SettingMetadata(null, %S, getDataType<%T>())", propName, desc, propType)
+            }
+            if (index < propsList.size - 1) settingsCode.add(",\n") else settingsCode.add("\n")
+        }
+        settingsCode.unindent()
+        settingsCode.add(")\n")
+
         manifestType.addProperty(
             PropertySpec.builder("manifest", ClassName("com.wip.plugin.api", "PluginManifest"))
                 .initializer(
@@ -118,6 +153,8 @@ class ManifestProcessor(
                         .add("requirements = Requirements(minMemoryMb = %L, minExecutionTimeMs = %L),\n", minMemoryMb, minExecutionTimeMs)
                         .add("capabilities = ")
                         .add(capabilitiesCode.build())
+                        .add(",\nsettings = ")
+                        .add(settingsCode.build())
                         .unindent()
                         .add(")")
                         .build()
@@ -316,6 +353,25 @@ class ManifestProcessor(
                     .build()
             )
 
+        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "ModuleSetup" } }
+        val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "ModuleValidate" } }
+
+        if (setupFunction != null) {
+            entryType.addFunction(FunSpec.builder("performSetup")
+                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+                .addStatement("return processor.${setupFunction.simpleName.asString()}()")
+                .build())
+        }
+
+        if (validateFunction != null) {
+            entryType.addFunction(FunSpec.builder("validate")
+                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+                .addStatement("return processor.${validateFunction.simpleName.asString()}()")
+                .build())
+        }
+
         fileSpec.addType(manifestType.build())
         fileSpec.addType(dispatcherType.build())
         fileSpec.addType(entryType.build())
@@ -340,7 +396,26 @@ class ManifestProcessor(
             it.write("$packageName.$entryName") 
         }
 
-        // 5. Generate manifest.json Resource File
+        // 5. Look for changelog.txt
+        var changelogObj: com.wip.plugin.api.Changelog? = null
+        val sourceFile = classDeclaration.containingFile
+        val changelogFile = sourceFile?.let { findChangelogFile(it) }
+        
+        if (changelogFile != null) {
+            val content = changelogFile.readText()
+            changelogObj = parseChangelog(content)
+            
+            // Bundle changelog.txt into resources
+            val bundledChangelog = codeGenerator.createNewFile(
+                Dependencies(true, sourceFile),
+                "META-INF",
+                "changelog",
+                "txt"
+            )
+            bundledChangelog.writer().use { it.write(content) }
+        }
+
+        // 6. Generate manifest.json Resource File
         val manifestJsonFile = codeGenerator.createNewFile(
             Dependencies(true, classDeclaration.containingFile!!),
             "META-INF",
@@ -348,16 +423,151 @@ class ManifestProcessor(
             "json"
         )
         
+        val manifestCapabilities = functions.map { func ->
+            val capAnn = func.annotations.first { it.shortName.asString() == "Capability" }
+            val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
+            val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
+            
+            val params = func.parameters.filter { param ->
+                val paramType = param.type.resolve().toTypeName().toString()
+                paramType != "com.wip.plugin.api.PluginLogger" && paramType != "com.wip.plugin.api.ProgressReporter"
+            }.associate { param ->
+                val paramAnn = param.annotations.find { it.shortName.asString() == "CapabilityParam" }
+                val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
+                val defaultValue = paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
+                val paramName = param.name?.asString() ?: ""
+                val ksType = param.type.resolve()
+                
+                val defaultJson = if (defaultValue.isNotEmpty()) {
+                    try { Json.parseToJsonElement(defaultValue) } catch(e: Exception) { null }
+                } else null
+                
+                paramName to ParameterMetadata(
+                    defaultValue = defaultJson,
+                    description = paramDesc,
+                    type = mapKSTypeToDataType(ksType)
+                )
+            }
+            
+            Capability(
+                name = capName,
+                description = capDesc,
+                parameters = if (params.isEmpty()) null else params,
+                returnType = mapKSTypeToDataType(func.returnType!!.resolve())
+            )
+        }.toList()
+
+        val manifestSettings = settingsProperties.associate { prop ->
+            val ann = prop.annotations.first { it.shortName.asString() == "ModuleSetting" }
+            val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
+            val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
+            val propName = prop.simpleName.asString()
+            val ksType = prop.type.resolve()
+            
+            val defaultJson = if (defaultVal.isNotEmpty()) {
+                try { Json.parseToJsonElement(defaultVal) } catch(e: Exception) { null }
+            } else null
+            
+            propName to SettingMetadata(
+                defaultValue = defaultJson,
+                description = desc,
+                type = mapKSTypeToDataType(ksType)
+            )
+        }
+
         val manifestObj = PluginManifest(
             manifestVersion = "1.0",
             module = ModuleInfo(id = id, name = name, version = version, description = description),
             requirements = Requirements(minMemoryMb = minMemoryMb, minExecutionTimeMs = minExecutionTimeMs),
-            capabilities = emptyList() // TODO: Map capabilities here if needed for static analysis
+            capabilities = manifestCapabilities,
+            settings = if (manifestSettings.isEmpty()) null else manifestSettings,
+            changelog = changelogObj
         )
         
         val json = Json { prettyPrint = true }
         manifestJsonFile.writer().use { 
             it.write(json.encodeToString(manifestObj)) 
+        }
+    }
+
+    private fun findChangelogFile(sourceFile: KSFile): File? {
+        var currentDir = File(sourceFile.filePath).parentFile
+        while (currentDir != null) {
+            val changelog = File(currentDir, "changelog.txt")
+            if (changelog.exists()) return changelog
+            // Stop at module root
+            if (File(currentDir, "build.gradle.kts").exists() || File(currentDir, "build.gradle").exists()) {
+                // Check if it's in the module root itself
+                return if (changelog.exists()) changelog else null
+            }
+            currentDir = currentDir.parentFile
+        }
+        return null
+    }
+
+    private fun parseChangelog(content: String): com.wip.plugin.api.Changelog {
+        val releases = mutableListOf<com.wip.plugin.api.Release>()
+        var currentVersion: String? = null
+        var currentDate: String? = null
+        var currentCategories = mutableMapOf<String, MutableList<String>>()
+        var currentCategoryName: String? = null
+
+        content.lines().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.isEmpty() || trimmed.all { it == '-' }) return@forEach
+
+            when {
+                trimmed.startsWith("Version:", ignoreCase = true) -> {
+                    if (currentVersion != null) {
+                        releases.add(com.wip.plugin.api.Release(currentVersion!!, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
+                        currentCategories = mutableMapOf()
+                        currentCategoryName = null
+                    }
+                    currentVersion = trimmed.substringAfter(":").trim()
+                }
+                trimmed.startsWith("Date:", ignoreCase = true) -> {
+                    currentDate = trimmed.substringAfter(":").trim()
+                }
+                !line.startsWith(" ") && trimmed.endsWith(":") -> {
+                    val catName = trimmed.removeSuffix(":")
+                    if (catName.equals("Version", ignoreCase = true) || catName.equals("Date", ignoreCase = true)) return@forEach
+                    currentCategoryName = catName
+                    currentCategories[currentCategoryName!!] = mutableListOf()
+                }
+                line.startsWith(" ") && trimmed.startsWith("-") -> {
+                    val item = trimmed.removePrefix("-").trim()
+                    currentCategoryName?.let { currentCategories[it]?.add(item) }
+                }
+            }
+        }
+
+        if (currentVersion != null) {
+            releases.add(com.wip.plugin.api.Release(currentVersion!!, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
+        }
+
+        return com.wip.plugin.api.Changelog(releases)
+    }
+
+    private fun mapKSTypeToDataType(ksType: KSType): DataType {
+        val declaration = ksType.declaration
+        val qualifiedName = declaration.qualifiedName?.asString() ?: ""
+        
+        return when (qualifiedName) {
+            "kotlin.Double", "kotlin.Float" -> DataType.Primitive(PrimitiveType.DOUBLE)
+            "kotlin.Int", "kotlin.Short", "kotlin.Byte", "kotlin.Long" -> DataType.Primitive(PrimitiveType.INT)
+            "kotlin.String", "kotlin.Char" -> DataType.Primitive(PrimitiveType.STRING)
+            "kotlin.Boolean" -> DataType.Primitive(PrimitiveType.BOOLEAN)
+            "kotlin.Unit" -> DataType.Primitive(PrimitiveType.UNIT)
+            "kotlinx.serialization.json.JsonElement", "kotlin.Any" -> DataType.Primitive(PrimitiveType.ANY)
+            "kotlin.collections.List", "kotlin.collections.MutableList" -> {
+                val elementType = ksType.arguments.firstOrNull()?.type?.resolve()
+                if (elementType != null) {
+                    DataType.Array(mapKSTypeToDataType(elementType))
+                } else {
+                    DataType.Primitive(PrimitiveType.ANY)
+                }
+            }
+            else -> DataType.Object(qualifiedName)
         }
     }
 }

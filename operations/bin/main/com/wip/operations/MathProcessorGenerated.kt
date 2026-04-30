@@ -10,6 +10,8 @@ import com.wip.plugin.api.PluginManifest
 import com.wip.plugin.api.PluginRequest
 import com.wip.plugin.api.PluginResponse
 import com.wip.plugin.api.Requirements
+import com.wip.plugin.api.SettingMetadata
+import com.wip.plugin.api.UpdateType
 import com.wip.plugin.api.getDataType
 import kotlin.Boolean
 import kotlin.Double
@@ -73,6 +75,9 @@ public object MathProcessorManifest {
             ),
             returnType = getDataType<Double>()
           )
+        )
+        ,
+        settings = mapOf(
         )
       )
 }
