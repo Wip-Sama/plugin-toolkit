@@ -35,5 +35,4 @@ plugins {
 include(":composeApp")
 include(":plugin-api")
 include(":operations")
-include(":plugin-processor")
 include(":slicer")

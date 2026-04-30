@@ -80,18 +80,22 @@ fun DialogHost(dialogService: DialogService) {
                 }
             }
             is DialogData.Changelog -> {
-                AlertDialog(
-                    onDismissRequest = { dialogService.dismiss() },
-                    title = { Text("Changelog: ${data.moduleName}") },
-                    text = { 
-                        Box(modifier = Modifier.heightIn(max = 400.dp)) {
-                            Text(data.content) 
-                        }
-                    },
-                    confirmButton = {
-                        Button(onClick = { dialogService.dismiss() }) { Text("Close") }
+                Dialog(onDismissRequest = { dialogService.dismiss() }) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .fillMaxHeight(0.85f)
+                            .padding(vertical = 16.dp),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    ) {
+                        com.wip.kpm_cpm_wotoolkit.features.plugin.ui.ChangelogView(
+                            moduleName = data.moduleName,
+                            versions = data.versions,
+                            onClose = { dialogService.dismiss() }
+                        )
                     }
-                )
+                }
             }
         }
     }

@@ -121,7 +121,7 @@ class ModuleManager(
             }
 
             // 3. Download Changelog (optional)
-            PlatformUtils.downloadFile("$baseUrl/changelog.chlog", "$moduleDir/changelog.chlog")
+            PlatformUtils.downloadFile("$baseUrl/changelog.txt", "$moduleDir/changelog.txt")
 
             val newModule = InstalledModule(
                 pkg = module.pkg,
@@ -277,6 +277,14 @@ class ModuleManager(
                     remote
                 } else null
             }
+    }
+
+    suspend fun fetchRemoteChangelog(pkg: String): String? {
+        val remote = repoManager.modules.value.values.flatten().find { it.pkg == pkg } ?: return null
+        val repoUrl = remote.repoUrl ?: return null
+        val modulesFolder = repoUrl.substringBeforeLast("/") + "/modules"
+        val baseUrl = "$modulesFolder/${remote.pkg}"
+        return repoManager.fetchText("$baseUrl/changelog.txt") ?: repoManager.fetchText("$baseUrl/changelog.txt")
     }
 
     private fun isNewer(v1: String, v2: String): Boolean {

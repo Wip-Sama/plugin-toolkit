@@ -144,6 +144,15 @@ class RepoManager(
         ))
     }
 
+    suspend fun fetchText(url: String): String? {
+        return try {
+            client.get(url).body<String>()
+        } catch (e: Exception) {
+            co.touchlab.kermit.Logger.e(e) { "Failed to fetch text from: $url" }
+            null
+        }
+    }
+
     fun setPackageSourceOverride(pkg: String, repoUrl: String) {
         val settings = settingsRepository.loadSettings()
         settingsRepository.saveSettings(settings.copy(

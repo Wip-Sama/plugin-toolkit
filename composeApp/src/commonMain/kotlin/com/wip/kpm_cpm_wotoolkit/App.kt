@@ -3,12 +3,6 @@ package com.wip.kpm_cpm_wotoolkit
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Inventory
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
@@ -16,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -25,17 +18,14 @@ import com.wip.kpm_cpm_wotoolkit.features.navigation.model.ScreenNavConfig
 import kpm_cpm_wotoolkit.composeapp.generated.resources.*
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
-import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
-import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
 import com.wip.kpm_cpm_wotoolkit.features.board.ui.BoardScreen
-import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.Dashboard
+import com.wip.kpm_cpm_wotoolkit.features.landingPage.ui.LandingPage
 import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.PluginSectionScreen
 import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobDashboard
 import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobBadge
 import com.wip.kpm_cpm_wotoolkit.features.settings.ui.SettingsScreen
 import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.ModuleManagerView
 import com.wip.kpm_cpm_wotoolkit.features.repository.ui.ModuleRepoView
-import androidx.compose.material.icons.filled.PendingActions
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.core.theme.AppTheme
 import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
@@ -121,7 +111,7 @@ private fun AppContent(
                             onBack = { if (backStack.size > 1) backStack.removeLast() }
                         ) { key ->
                             when (key) {
-                                is Screen.Main     -> NavEntry(key) { Dashboard() }
+                                is Screen.Main     -> NavEntry(key) { LandingPage() }
                                 is Screen.Board    -> NavEntry(key) { BoardScreen() }
                                 is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
                                 is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }

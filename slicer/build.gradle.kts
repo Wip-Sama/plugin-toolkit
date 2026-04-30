@@ -22,5 +22,4 @@ dependencies {
     implementation(libs.kotlinxSerializationJson)
     implementation(libs.kotlinx.io.core)
     implementation(project(":plugin-api"))
-    ksp(project(":plugin-processor"))
 }

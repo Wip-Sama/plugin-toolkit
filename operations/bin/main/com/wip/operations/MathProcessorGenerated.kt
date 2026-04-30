@@ -29,7 +29,7 @@ import org.koin.core.module.Module
 public object MathProcessorManifest {
   public val manifest: PluginManifest = PluginManifest(
         manifestVersion = "1.0",
-        module = ModuleInfo(id = "com.wip.operations.math", name = "Math Operations", version = "1.2.0", description = "A module that provides mathematical operations on lists of numbers."),
+        module = ModuleInfo(id = "com.wip.operations.math", name = "Math Operations", version = "1.3.1", description = "A module that provides mathematical operations on lists of numbers."),
         requirements = Requirements(minMemoryMb = 128, minExecutionTimeMs = 10),
         capabilities = listOf(
           Capability(

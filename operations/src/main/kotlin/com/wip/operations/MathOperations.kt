@@ -7,7 +7,7 @@ import com.wip.plugin.api.annotations.CapabilityParam
 @PluginModule(
     id = "com.wip.operations.math",
     name = "Math Operations",
-    version = "1.2.0",
+    version = "1.3.1",
     description = "A module that provides mathematical operations on lists of numbers."
 )
 class MathProcessor {
@@ -46,8 +46,3 @@ class MathProcessor {
         return values.sum()
     }
 }
-
-val mathPluginModule = org.koin.dsl.module {
-    single<com.wip.plugin.api.PluginEntry> { MathProcessorPluginEntry() }
-}
-

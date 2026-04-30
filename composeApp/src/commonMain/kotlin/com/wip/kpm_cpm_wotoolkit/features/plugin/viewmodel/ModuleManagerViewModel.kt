@@ -138,13 +138,31 @@ class ModuleManagerViewModel(
 
     fun showChangelog(pkg: String) {
         viewModelScope.launch {
-            val module = moduleManager.installedModules.value.find { it.pkg == pkg } ?: return@launch
-            val chlogPath = module.installPath + "/changelog.chlog"
-            val content = PlatformUtils.readFile(chlogPath)
-            if (content != null) {
-                dialogService.showConfirmation("Changelog", content, {})
+            val module = moduleManager.installedModules.value.find { it.pkg == pkg }
+            
+            var content: String? = null
+            
+            if (module != null) {
+                // Fetch from JAR resources
+                val jarFileName = module.jarFileName ?: (module.pkg.substringAfterLast(".") + ".jar")
+                val jarPath = module.installPath + "/" + jarFileName
+                content = PlatformUtils.readFileFromZip(jarPath, "resources/changelog.txt")
+                if (content == null) {
+                    content = PlatformUtils.readFileFromZip(jarPath, "resources/changelog.txt")
+                }
             } else {
-                dialogService.showConfirmation("Changelog", "No changelog found.", {})
+                // Fetch from remote repository
+                content = moduleManager.fetchRemoteChangelog(pkg)
+            }
+            
+            val name = module?.name ?: pkg
+            
+            if (content != null) {
+                val versions = com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ChangelogParser.parse(content)
+                dialogService.showChangelog(name, versions)
+            } else {
+                val errorMsg = if (module != null) "No changelog found in JAR resources for $name" else "No remote changelog found for $name"
+                dialogService.showConfirmation("Changelog", errorMsg, {})
             }
         }
     }

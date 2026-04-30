@@ -397,7 +397,7 @@ class ManifestProcessor(
         }
 
         // 5. Look for changelog.txt
-        var changelogObj: com.wip.plugin.api.Changelog? = null
+        var changelogObj: Changelog? = null
         val sourceFile = classDeclaration.containingFile
         val changelogFile = sourceFile?.let { findChangelogFile(it) }
         
@@ -408,7 +408,7 @@ class ManifestProcessor(
             // Bundle changelog.txt into resources
             val bundledChangelog = codeGenerator.createNewFile(
                 Dependencies(true, sourceFile),
-                "META-INF",
+                "resources",
                 "changelog",
                 "txt"
             )
@@ -493,11 +493,18 @@ class ManifestProcessor(
     private fun findChangelogFile(sourceFile: KSFile): File? {
         var currentDir = File(sourceFile.filePath).parentFile
         while (currentDir != null) {
+            // Check direct parents
             val changelog = File(currentDir, "changelog.txt")
             if (changelog.exists()) return changelog
+            
+            // Check src/main/resources
+            val resourcesChangelog = File(currentDir, "src/main/resources/changelog.txt")
+            if (resourcesChangelog.exists()) return resourcesChangelog
+
             // Stop at module root
             if (File(currentDir, "build.gradle.kts").exists() || File(currentDir, "build.gradle").exists()) {
-                // Check if it's in the module root itself
+                val modResources = File(currentDir, "src/main/resources/changelog.txt")
+                if (modResources.exists()) return modResources
                 return if (changelog.exists()) changelog else null
             }
             currentDir = currentDir.parentFile
@@ -505,8 +512,8 @@ class ManifestProcessor(
         return null
     }
 
-    private fun parseChangelog(content: String): com.wip.plugin.api.Changelog {
-        val releases = mutableListOf<com.wip.plugin.api.Release>()
+    private fun parseChangelog(content: String): Changelog {
+        val releases = mutableListOf<Release>()
         var currentVersion: String? = null
         var currentDate: String? = null
         var currentCategories = mutableMapOf<String, MutableList<String>>()
@@ -519,7 +526,7 @@ class ManifestProcessor(
             when {
                 trimmed.startsWith("Version:", ignoreCase = true) -> {
                     if (currentVersion != null) {
-                        releases.add(com.wip.plugin.api.Release(currentVersion!!, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
+                        releases.add(Release(currentVersion, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
                         currentCategories = mutableMapOf()
                         currentCategoryName = null
                     }
@@ -542,10 +549,10 @@ class ManifestProcessor(
         }
 
         if (currentVersion != null) {
-            releases.add(com.wip.plugin.api.Release(currentVersion!!, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
+            releases.add(Release(currentVersion, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
         }
 
-        return com.wip.plugin.api.Changelog(releases)
+        return Changelog(releases)
     }
 
     private fun mapKSTypeToDataType(ksType: KSType): DataType {

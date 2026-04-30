@@ -20,4 +20,9 @@ dependencies {
     implementation(libs.koin.core)
     implementation(libs.kotlinx.coroutinesSwing)
     implementation(libs.kotlinxSerializationJson)
+
+    // Processor dependencies
+    implementation(libs.ksp.api)
+    implementation(libs.kotlinpoet)
+    implementation(libs.kotlinpoet.ksp)
 }
