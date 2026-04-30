@@ -40,6 +40,7 @@ import kotlinx.coroutines.SupervisorJob
 import org.koin.mp.KoinPlatform.getKoin
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.*
+import com.wip.kpm_cpm_wotoolkit.features.navigation.viewmodel.AppViewModel
 
 
 
@@ -71,6 +72,7 @@ fun main(args: Array<String>) {
             factory { ModuleRepoViewModel(get(), get(), get(), get(), get()) }
             factory { ModuleManagerViewModel(get(), get(), get()) }
             factory { JobViewModel(get()) }
+            factory { AppViewModel() }
         })
     }
 

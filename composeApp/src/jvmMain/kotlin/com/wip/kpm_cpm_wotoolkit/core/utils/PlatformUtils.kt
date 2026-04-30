@@ -155,14 +155,21 @@ actual object PlatformUtils {
             Logger.d { "Unzipping $source to $destination" }
             java.util.zip.ZipFile(source).use { zip ->
                 zip.entries().asSequence().forEach { entry ->
-                    val file = java.io.File(destination, entry.name)
+                    val path = Path(destination, entry.name)
                     if (entry.isDirectory) {
-                        file.mkdirs()
+                        SystemFileSystem.createDirectories(path)
                     } else {
-                        file.parentFile.mkdirs()
+                        path.parent?.let { SystemFileSystem.createDirectories(it) }
                         zip.getInputStream(entry).use { input ->
-                            file.outputStream().use { output ->
-                                input.copyTo(output)
+                            SystemFileSystem.sink(path).use { sink ->
+                                val bufferedSink = sink.buffered()
+                                val buffer = ByteArray(8192)
+                                while (true) {
+                                    val read = input.read(buffer)
+                                    if (read == -1) break
+                                    bufferedSink.write(buffer, 0, read)
+                                }
+                                bufferedSink.flush()
                             }
                         }
                     }

@@ -48,11 +48,13 @@ import com.wip.kpm_cpm_wotoolkit.core.model.localized
 import com.wip.kpm_cpm_wotoolkit.core.ui.DialogHost
 import com.wip.kpm_cpm_wotoolkit.core.ui.DialogService
 import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
+import com.wip.kpm_cpm_wotoolkit.features.navigation.viewmodel.AppViewModel
 
 @Composable
 fun App(
     viewModel: SettingsViewModel = koinInject(),
     pluginViewModel: PluginViewModel = koinInject(),
+    appViewModel: AppViewModel = koinInject(),
     notificationService: NotificationService = koinInject(),
     dialogService: DialogService = koinInject()
 ) {
@@ -63,13 +65,14 @@ fun App(
         PlatformLocalization.setApplicationLanguage(languageCode)
     }
 
-    AppContent(viewModel, pluginViewModel, notificationService, dialogService)
+    AppContent(viewModel, pluginViewModel, appViewModel, notificationService, dialogService)
 }
 
 @Composable
 private fun AppContent(
     viewModel: SettingsViewModel,
     pluginViewModel: PluginViewModel,
+    appViewModel: AppViewModel,
     notificationService: NotificationService,
     dialogService: DialogService
 ) {
@@ -89,72 +92,16 @@ private fun AppContent(
             val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
             val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
 
-            val sections = listOf(
-                SidebarSectionData(
-                    title = null,
-                    elements = listOf(
-                        SidebarElement(
-                            id = Screen.Main,
-                            icon = Icons.Default.Home,
-                            title = Res.string.nav_main.localized
-                        )
-                    )
-                ),
-                SidebarSectionData(
-                    title = Res.string.section_direct_execution.localized,
-                    elements = listOf(
-                        SidebarElement(
-                            id = Screen.Modules,
-                            icon = Icons.Default.Extension,
-                            title = Res.string.nav_modules.localized
-                        )
-                    )
-                ),
-                SidebarSectionData(
-                    title = Res.string.section_modules.localized,
-                    elements = listOf(
-                        SidebarElement(
-                            id = Screen.ModuleManager,
-                            icon = Icons.Default.Inventory,
-                            title = Res.string.section_modules.localized
-                        ),
-                        SidebarElement(
-                            id = Screen.ModuleRepo,
-                            icon = Icons.Default.Inventory,
-                            title = Res.string.section_modules_repositories.localized
-                        )
-                    )
-                ),
-                SidebarSectionData(
-                    title = Res.string.section_flows.localized,
-                    elements = listOf(
-                        SidebarElement(
-                            id = Screen.Board,
-                            icon = Icons.Default.Edit,
-                            title = Res.string.nav_board.localized
-                        )
-                    )
-                )
-            )
-
-            val bottomSections = listOf(
-                SidebarSectionData(
-                    title = null,
-                    elements = listOf(
-                        SidebarElement(
-                            id = Screen.JobDashboard,
-                            icon = Icons.Default.PendingActions,
-                            title = Res.string.nav_jobs.localized,
-                            trailingContent = { JobBadge(it) }
-                        ),
-                        SidebarElement(
-                            id = Screen.Settings,
-                            icon = Icons.Default.Settings,
-                            title = Res.string.settings.localized
-                        )
-                    )
-                )
-            )
+            val sections = appViewModel.sections
+            val bottomSections = remember(appViewModel.bottomSections) {
+                appViewModel.bottomSections.map { section ->
+                    section.copy(elements = section.elements.map { element ->
+                        if (element.id == Screen.JobDashboard) {
+                            element.copy(trailingContent = { JobBadge(it) })
+                        } else element
+                    })
+                }
+            }
 
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(modifier = Modifier.fillMaxSize()) {

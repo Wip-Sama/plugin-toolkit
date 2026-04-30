@@ -3,7 +3,6 @@ package com.wip.kpm_cpm_wotoolkit.features.plugin.logic
 import com.wip.plugin.api.PluginEntry
 import org.koin.core.Koin
 import org.koin.dsl.koinApplication
-import org.koin.core.module.Module
 import java.io.File
 import java.net.URLClassLoader
 import co.touchlab.kermit.Logger
@@ -22,8 +21,8 @@ actual object ModuleLoader {
         jarPath: String
     ): Result<PluginEntry> {
         return try {
-            val file = File(jarPath)
-            if (!file.exists()) {
+            val path = kotlinx.io.files.Path(jarPath)
+            if (!kotlinx.io.files.SystemFileSystem.exists(path)) {
                 Logger.e { "Plugin JAR file not found: $jarPath" }
                 return Result.failure(Exception("File not found: $jarPath"))
             }
@@ -35,7 +34,7 @@ actual object ModuleLoader {
             }
 
             Logger.i { "Loading plugin from $jarPath" }
-            val url = file.toURI().toURL()
+            val url = File(jarPath).toURI().toURL()
             val newClassLoader = URLClassLoader(arrayOf(url), this.javaClass.classLoader)
 
             // Use ServiceLoader to find the PluginEntry implementation

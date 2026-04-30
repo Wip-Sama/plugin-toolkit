@@ -6,6 +6,7 @@ import com.wip.plugin.api.annotations.CapabilityParam
 import com.wip.plugin.api.PluginLogger
 import com.wip.plugin.api.ProgressReporter
 import kotlinx.io.asInputStream
+import kotlinx.io.asOutputStream
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.Path
 import kotlinx.io.buffered
@@ -201,9 +202,9 @@ class Slicer {
             val sliceHeight = cut - prevCut
             val slice = combinedImage.getSubimage(0, prevCut, width, sliceHeight)
             val outputFilePath = Path("${outputDir}/${index + 1}.png")
-            // ImageIO.write doesn't take Sink, but we can use File if needed or OutputStream
-            // Since it's JVM only, we can use File(outputFilePath.toString())
-            ImageIO.write(slice, "png", java.io.File(outputFilePath.toString()))
+            SystemFileSystem.sink(outputFilePath).use { sink ->
+                ImageIO.write(slice, "png", sink.asOutputStream())
+            }
             prevCut = cut
         }
     }
