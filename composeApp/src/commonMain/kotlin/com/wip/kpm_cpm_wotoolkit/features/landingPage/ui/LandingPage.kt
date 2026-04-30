@@ -1,8 +1,7 @@
-package com.wip.kpm_cpm_wotoolkit.features.plugin.ui
+package com.wip.kpm_cpm_wotoolkit.features.landingPage.ui
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -25,7 +24,7 @@ import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
 import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 
 @Composable
-fun Dashboard(
+fun LandingPage(
     modifier: Modifier = Modifier,
     viewModel: PluginViewModel = koinViewModel(),
     jobManager: JobManager = koinInject()
@@ -232,9 +231,9 @@ fun QuickLinkItem(title: String, icon: ImageVector) {
 
 @Preview
 @Composable
-private fun DashboardPreview() {
+private fun LandingPagePreview() {
     MaterialTheme {
-        Dashboard()
+        LandingPage()
     }
 }
 
