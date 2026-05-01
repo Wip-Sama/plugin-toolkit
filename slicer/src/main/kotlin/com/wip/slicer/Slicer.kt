@@ -45,7 +45,7 @@ class Slicer {
         val images = files.filter { path ->
             val metadata = SystemFileSystem.metadataOrNull(path)
             metadata?.isRegularFile == true && path.name.lowercase().let { name ->
-                name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")
+                name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp")
             }
         }
         val sortedImages = images.sortedWith(natsortComparator)
@@ -64,8 +64,7 @@ class Slicer {
 
         if (finalCuts.isEmpty()) return "Could not find a valid slicing path"
 
-        val parentFolder = folder.parent ?: folder
-        val outputDir = Path("${parentFolder}/output")
+        val outputDir = Path("${folder}/output")
         saveSlices(fullBitmap, width, totalHeight, finalCuts, outputDir)
 
         val displayError = totalError.toDouble() / 1000.0

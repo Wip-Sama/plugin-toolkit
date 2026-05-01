@@ -8,6 +8,8 @@ import com.wip.plugin.api.annotations.PluginValidate
 import com.wip.plugin.api.PluginFileSystem
 import com.wip.plugin.api.PluginLogger
 import com.wip.plugin.api.ProgressReporter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 enum class OutputFormat {
@@ -29,7 +31,7 @@ class BetterManhwa {
         @CapabilityParam(description = "Folder to process") folder: String,
         @CapabilityParam(description = "Output width in pixels", defaultValue = "720", minValue = 100.0, maxValue = 4096.0) width: Int,
         @CapabilityParam(description = "Grain level for processing", defaultValue = "4", minValue = 1.0, maxValue = 20.0) grain: Int,
-        @CapabilityParam(description = "Output image format") outputFormat: OutputFormat,
+        @CapabilityParam(description = "Output image format", defaultValue = "PNG") outputFormat: OutputFormat,
         @CapabilityParam(description = "Output folder (leave empty to auto-create)", defaultValue = "null") outFolder: String,
         logger: PluginLogger,
         fileSystem: PluginFileSystem,
@@ -79,7 +81,6 @@ class BetterManhwa {
         val command = mutableListOf(
             pythonExe.absolutePath,
             coreScript.absolutePath,
-//            "--input",
             inputDir.absolutePath,
 //            "--output", outputDir.absolutePath,
             "--width", width.toString(),
@@ -149,10 +150,12 @@ class BetterManhwa {
 
             if (installScript.exists()) {
                 logger.info("Running install script: ${installScript.absolutePath}")
-                val process = ProcessBuilder("cmd", "/c", installScript.absolutePath)
-                    .directory(File(basePath))
-                    .redirectErrorStream(true)
-                    .start()
+                val process = withContext(Dispatchers.IO) {
+                    ProcessBuilder("cmd", "/c", installScript.absolutePath)
+                        .directory(File(basePath))
+                        .redirectErrorStream(true)
+                        .start()
+                }
 
                 process.inputStream.bufferedReader().use { reader ->
                     reader.lines().forEach { line ->
@@ -160,7 +163,9 @@ class BetterManhwa {
                     }
                 }
 
-                val exitCode = process.waitFor()
+                val exitCode = withContext(Dispatchers.IO) {
+                    process.waitFor()
+                }
                 if (exitCode != 0) {
                     logger.error("Install script exited with code $exitCode")
                     return Result.failure(RuntimeException("Install script failed with exit code $exitCode"))
