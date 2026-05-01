@@ -11,7 +11,7 @@ import kotlinx.io.writeString
 class DefaultPluginFileSystem(
     private val basePath: String
 ) : PluginFileSystem {
-
+    //TODO: need to check better if this should be implemented in platform specific FileSystem like it is for PlatformUtils
     private fun resolvePath(relativePath: String): Path {
         // Prevent path traversal
         val sanitized = relativePath.replace("..", "").replace("\\", "/")

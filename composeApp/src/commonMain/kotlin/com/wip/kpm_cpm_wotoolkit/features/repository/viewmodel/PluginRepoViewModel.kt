@@ -138,14 +138,17 @@ class PluginRepoViewModel(
     }
 
     private fun pickInstallLocation(onSelected: (String) -> Unit) {
-        val folders = settingsRepository.loadSettings().extensions.pluginFolders
-        if (folders.isEmpty()) {
-            val defaultPath = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
-            onSelected(defaultPath)
+        val defaultPath = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
+        val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
+        val allFolders = (listOf(defaultPath) + savedFolders).distinct()
+        
+        if (allFolders.size == 1) {
+            onSelected(allFolders.first())
             return
         }
+        
         viewModelScope.launch {
-            dialogService.showLocationPicker(getString(ResStrings.plugin_choose_install_location), folders, onSelected)
+            dialogService.showLocationPicker(getString(ResStrings.plugin_choose_install_location), allFolders, onSelected)
         }
     }
 

@@ -32,7 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -75,6 +75,7 @@ import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_reload_all
 import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_settings
 import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_uninstall
 import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_update
+import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_update_local
 import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_validate
 import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_version_pkg_format
 import org.jetbrains.compose.resources.stringResource
@@ -278,7 +279,7 @@ fun PluginCard(
                         onClick = { onAction(PluginAction.Update) },
                         modifier = Modifier.padding(end = WOTheme.spacing.small)
                     ) {
-                        Text(stringResource(Res.string.plugin_update) + " (Local)")
+                        Text(stringResource(Res.string.plugin_update_local))
                     }
                 }
 
@@ -313,7 +314,7 @@ fun PluginCard(
                             onClick = { onAction(PluginAction.Settings); expanded = false },
                             leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
                         )
-                        Divider()
+                        HorizontalDivider()
                         DropdownMenuItem(
                             text = {
                                 Text(

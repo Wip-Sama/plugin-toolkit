@@ -102,6 +102,7 @@ fun ChangelogView(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(WOTheme.spacing.medium)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)

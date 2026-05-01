@@ -130,25 +130,26 @@
     <string name="job_no_active">No active or queued jobs</string>
     <string name="job_no_archived">No archived jobs</string>
     <string name="job_scheduler_soon">Scheduler coming soon</string>
-    <string name="job_error_format">Error: %s</string>
+    <string name="job_error_format">Error: %1$s</string>
 
     <!-- Plugin Manager -->
     <string name="plugin_choose_install_location">Choose Install Location</string>
     <string name="plugin_action_blocked">Action Blocked</string>
     <string name="plugin_state_change_error">Could not change plugin state</string>
     <string name="plugin_uninstall_title">Uninstall Plugin</string>
-    <string name="plugin_uninstall_confirmation">Are you sure you want to uninstall %s?</string>
+    <string name="plugin_uninstall_confirmation">Are you sure you want to uninstall %1$s?</string>
     <string name="plugin_uninstall_blocked">Uninstall Blocked</string>
     <string name="plugin_uninstall_error">Could not uninstall plugin</string>
+    <string name="plugin_update_local">Update (Local)</string>
     <string name="plugin_validation_result">Validation Result</string>
     <string name="plugin_validated_success">Plugin validated successfully.</string>
-    <string name="plugin_validation_failed">Validation failed: %s</string>
-    <string name="plugin_changelog_not_found_jar">No changelog found in JAR resources for %s</string>
-    <string name="plugin_changelog_not_found_remote">No remote changelog found for %s</string>
+    <string name="plugin_validation_failed">Validation failed: %1$s</string>
+    <string name="plugin_changelog_not_found_jar">No changelog found in JAR resources for %1$s</string>
+    <string name="plugin_changelog_not_found_remote">No remote changelog found for %1$s</string>
     <string name="plugin_default_folder_label">Default Managed Folder (Permanent)</string>
     <string name="plugin_default_tag">DEFAULT</string>
-    <string name="plugin_version_pkg_format">v%s • %s</string>
-    <string name="plugin_version_pkg_installed_format">v%s • Installed: v%s • %s</string>
+    <string name="plugin_version_pkg_format">v%1$s • %2$s</string>
+    <string name="plugin_version_pkg_installed_format">v%1$s • Installed: v%2$s • %3$s</string>
     <string name="plugin_installed_label">Installed</string>
     <string name="plugin_not_found_unloaded">Plugin not found or unloaded</string>
     <string name="plugin_selection_hint">Select a plugin from the sidebar to see its capabilities</string>
@@ -156,15 +157,15 @@
     <!-- Plugin Content / Tester -->
     <string name="plugin_select_capability_hint">Select a capability to begin testing</string>
     <string name="plugin_execution_results">Execution Results</string>
-    <string name="plugin_id_format">ID: %s</string>
-    <string name="plugin_mem_format">Mem: %dMB</string>
-    <string name="plugin_tester_title">Capability Tester: %s</string>
+    <string name="plugin_id_format">ID: %1$s</string>
+    <string name="plugin_mem_format">Mem: %1$dMB</string>
+    <string name="plugin_tester_title">Capability Tester: %1$s</string>
     <string name="plugin_save_results">Save Results</string>
     <string name="plugin_no_parameters">No parameters required for this capability.</string>
     <string name="plugin_execute_capability">Execute Capability</string>
     <string name="plugin_execute_capability_running">Execute Capability (%d running)</string>
-    <string name="plugin_execution_id_format">Execution %s</string>
-    <string name="plugin_executing_progress">Executing... %d%%</string>
+    <string name="plugin_execution_id_format">Execution %1$s</string>
+    <string name="plugin_executing_progress">Executing... %1$d%%</string>
 
     <!-- Repositories -->
     <string name="repo_add_success">Repository added successfully</string>
@@ -173,9 +174,9 @@
     <string name="repo_removed">Repository removed</string>
     <string name="repo_refreshed">Repository refreshed</string>
     <string name="repo_all_refreshed">All repositories refreshed</string>
-    <string name="repo_source_updated">Source for %s updated</string>
-    <string name="repo_plugin_installed">Plugin %s installed</string>
-    <string name="repo_install_failed">Failed to install %s: %s</string>
+    <string name="repo_source_updated">Source for %1$s updated</string>
+    <string name="repo_plugin_installed">Plugin %1$s installed</string>
+    <string name="repo_install_failed">Failed to install %1$s: %2$s</string>
     <string name="repo_url_placeholder">https://.../index.json</string>
 
     <!-- Landing Page -->

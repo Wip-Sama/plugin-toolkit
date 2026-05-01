@@ -47,6 +47,7 @@ class PluginManagerViewModel(
     val managedFolders: StateFlow<List<String>> = _managedFolders.asStateFlow()
 
     init {
+        PlatformUtils.mkdirs(defaultPluginFolder)
         refreshManagedFolders()
     }
 
@@ -80,13 +81,15 @@ class PluginManagerViewModel(
 
     fun pickInstallLocation(onSelected: (String) -> Unit) {
         viewModelScope.launch {
-            val folders = settingsRepository.loadSettings().extensions.pluginFolders
-            if (folders.isEmpty()) {
-                val defaultPath = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
-                onSelected(defaultPath)
+            val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
+            val allFolders = (listOf(defaultPluginFolder) + savedFolders).distinct()
+            
+            if (allFolders.size == 1) {
+                onSelected(allFolders.first())
                 return@launch
             }
-            dialogService.showLocationPicker(getString(Res.string.plugin_choose_install_location), folders, onSelected)
+            
+            dialogService.showLocationPicker(getString(Res.string.plugin_choose_install_location), allFolders, onSelected)
         }
     }
 

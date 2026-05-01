@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.ChangelogView
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import kpm_cpm_wotoolkit.composeapp.generated.resources.dialog_cancel
 import kpm_cpm_wotoolkit.composeapp.generated.resources.dialog_confirm
@@ -112,7 +113,7 @@ fun DialogHost(dialogService: DialogService) {
                         shape = MaterialTheme.shapes.extraLarge,
                         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
-                        com.wip.kpm_cpm_wotoolkit.features.plugin.ui.ChangelogView(
+                        ChangelogView(
                             pluginName = data.pluginName,
                             versions = data.versions,
                             onClose = { dialogService.dismiss() }

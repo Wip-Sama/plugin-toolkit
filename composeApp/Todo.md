@@ -1,18 +1,13 @@
 Plugin:
-- If a plugin is installed in an "invalid location" (non managed folder) it should show it as unmanaged, and should not be possible to update it, only to remove it
-- Bool should be a switch
-- String should stay textfield
-- Int should be textfield that only allows number
-- Float/Double should be textfield that only allows number and .
-- List should be ay of teh previous textfield + , for splitting
+- If a plugin is installed in an "invalid location" (non managed folder) it should show it as unmanaged, and should not be possible to update it, only to remove ità
 
 Plugin Api:
-- Plan to switch of plugins access files in a way that allow the main app to preload/prepare the needed resources to have more control on how the modules operate
+- (?) Plan to switch of plugins access files in a way that allow the main app to preload/prepare the needed resources to have more control on how the modules operate
 
 Gradle:
-- Change the naming output of the plugin file to include the version
+- (?) Change the naming output of the plugin file to include the version
 - Change the main app versioning to follow what gradle saves to avoid hardcoded strings
-- Support for sighing the modules with a key
+- Support for signing the modules with a key
 
 Documentation:
 - The api interface should have documentation for the various annotations and what / how to use it, probably with Dokka
