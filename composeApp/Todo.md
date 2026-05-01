@@ -1,5 +1,7 @@
 Plugin:
 - If a plugin is installed in an "invalid location" (non managed folder) it should show it as unmanaged, and should not be possible to update it, only to remove ità
+- Add pause/cancel call to be able to properly pause teh program
+- add non pausable flag
 
 Plugin Api:
 - (?) Plan to switch of plugins access files in a way that allow the main app to preload/prepare the needed resources to have more control on how the modules operate

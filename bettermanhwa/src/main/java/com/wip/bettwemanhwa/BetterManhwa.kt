@@ -1,13 +1,13 @@
 package com.wip.bettwemanhwa
 
+import com.wip.plugin.api.PluginFileSystem
+import com.wip.plugin.api.PluginLogger
+import com.wip.plugin.api.ProgressReporter
 import com.wip.plugin.api.annotations.Capability
 import com.wip.plugin.api.annotations.CapabilityParam
 import com.wip.plugin.api.annotations.PluginInfo
 import com.wip.plugin.api.annotations.PluginSetup
 import com.wip.plugin.api.annotations.PluginValidate
-import com.wip.plugin.api.PluginFileSystem
-import com.wip.plugin.api.PluginLogger
-import com.wip.plugin.api.ProgressReporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -16,23 +16,26 @@ enum class OutputFormat {
     PNG, WEBP
 }
 
+enum class Widths {
+    x1, x2, x4, x8
+}
+
 @PluginInfo(
     id = "com.wip.bettwemanhwa",
     name = "BetterManhwa",
-    version = "0.1.0",
+    version = "1.0.0",
     description = "A plugin that processes manhwa images using the BetterManhwa CLI tool."
 )
 class BetterManhwa {
     @Capability(
-        name = "Manhwa Processor",
-        description = "Process a folder of manhwa images using BetterManhwa CLI"
+        name = "Manhwa Processor", description = "Process a folder of manhwa images using BetterManhwa CLI"
     )
     fun manhwaProcessor(
         @CapabilityParam(description = "Folder to process") folder: String,
-        @CapabilityParam(description = "Output width in pixels", defaultValue = "720", minValue = 100.0, maxValue = 4096.0) width: Int,
-        @CapabilityParam(description = "Grain level for processing", defaultValue = "4", minValue = 1.0, maxValue = 20.0) grain: Int,
-        @CapabilityParam(description = "Output image format", defaultValue = "PNG") outputFormat: OutputFormat,
-        @CapabilityParam(description = "Output folder (leave empty to auto-create)", defaultValue = "null") outFolder: String,
+        @CapabilityParam(description = "Output width in pixels", defaultValue = "940") width: Int,
+        @CapabilityParam(description = "Grain level for processing", defaultValue = "5") grain: Int,
+        @CapabilityParam(description = "Output image format", defaultValue = "WEBP") outputFormat: OutputFormat,
+        @CapabilityParam(description = "Output folder (leave null to auto-create)", defaultValue = "null") outFolder: String,
         logger: PluginLogger,
         fileSystem: PluginFileSystem,
         progressReporter: ProgressReporter
@@ -65,15 +68,13 @@ class BetterManhwa {
 
         if (!pythonExe.exists()) {
             throw IllegalStateException(
-                "Python environment not found at ${pythonExe.absolutePath}. " +
-                "Please run plugin setup first."
+                "Python environment not found at ${pythonExe.absolutePath}. " + "Please run plugin setup first."
             )
         }
 
         if (!coreScript.exists()) {
             throw IllegalStateException(
-                "upscaler_core.py not found at ${coreScript.absolutePath}. " +
-                "Please run plugin setup first."
+                "upscaler_core.py not found at ${coreScript.absolutePath}. " + "Please run plugin setup first."
             )
         }
 
@@ -82,7 +83,7 @@ class BetterManhwa {
             pythonExe.absolutePath,
             coreScript.absolutePath,
             inputDir.absolutePath,
-//            "--output", outputDir.absolutePath,
+            "--output", outputDir.absolutePath,
             "--width", width.toString(),
             "--grain", grain.toString(),
             "--format", outputFormat.name.lowercase()
@@ -95,11 +96,20 @@ class BetterManhwa {
             .redirectErrorStream(true)
             .start()
 
-        // Stream output to logger
         val output = StringBuilder()
         process.inputStream.bufferedReader().use { reader ->
             reader.lines().forEach { line ->
-                logger.debug(line)
+                if (line.toFloatOrNull() != null) {
+                    progressReporter.report(line.toFloat().coerceIn(0f, 1f))
+                } else {
+                    logger.debug(line)
+                    output.appendLine(line)
+                }
+            }
+        }
+        process.errorStream.bufferedReader().use { reader ->
+            reader.lines().forEach { line ->
+                logger.error(line)
                 output.appendLine(line)
             }
         }
@@ -113,7 +123,7 @@ class BetterManhwa {
         }
 
         logger.info("Processing completed successfully")
-        return outputDir.absolutePath
+        return outputDir.absolutePath.replace("\\\\", "\\")
     }
 
     @PluginSetup
@@ -151,10 +161,8 @@ class BetterManhwa {
             if (installScript.exists()) {
                 logger.info("Running install script: ${installScript.absolutePath}")
                 val process = withContext(Dispatchers.IO) {
-                    ProcessBuilder("cmd", "/c", installScript.absolutePath)
-                        .directory(File(basePath))
-                        .redirectErrorStream(true)
-                        .start()
+                    ProcessBuilder("cmd", "/c", installScript.absolutePath).directory(File(basePath))
+                        .redirectErrorStream(true).start()
                 }
 
                 process.inputStream.bufferedReader().use { reader ->
