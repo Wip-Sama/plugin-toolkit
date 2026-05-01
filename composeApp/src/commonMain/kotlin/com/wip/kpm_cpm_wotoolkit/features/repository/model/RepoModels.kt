@@ -8,7 +8,7 @@ data class ExtensionRepo(
     val url: String, // index.json url
     val signPublicKey: String? = null,
     val signAlgorithm: String = "SHA256",
-    val modulesFolder: String? = null
+    val pluginsFolder: String? = null
 )
 
 @Serializable
@@ -17,12 +17,12 @@ data class RepoIndex(
     val url: String? = null,
     val signPublicKey: String? = null,
     val signAlgorithm: String? = null,
-    val modulesFolder: String? = null,
-    val modules: List<ExtensionModule> = emptyList()
+    val pluginsFolder: String? = null,
+    val plugins: List<ExtensionPlugin> = emptyList()
 )
 
 @Serializable
-data class ExtensionModule(
+data class ExtensionPlugin(
     val name: String,
     val fileName: String,
     val description: String? = null,
@@ -32,7 +32,7 @@ data class ExtensionModule(
     val repoUrl: String? = null // Filled during parsing to track source
 )
 
-data class ModuleChangelog(
+data class PluginChangelog(
     val date: String,
     val version: String,
     val categories: Map<String, List<String>>

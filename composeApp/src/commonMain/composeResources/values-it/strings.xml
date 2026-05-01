@@ -18,11 +18,16 @@
     <string name="setting_use_system_language_subtitle">Segui automaticamente la lingua del dispositivo</string>
     <string name="setting_scaling">Ridimensionamento</string>
     <string name="setting_appearance">Aspetto</string>
-    <string name="section_modules">Moduli</string>
-    <string name="section_modules_repositories">Repository</string>
+    <string name="section_plugins">Plugin</string>
+    <string name="section_plugins_repositories">Repository</string>
     <string name="section_about">Informazioni</string>
     <string name="section_general">Generale</string>
     <string name="section_localization">Localizzazione</string>
     <string name="setting_adaptive_color">Colore adattivo</string>
     <string name="setting_timezone">Fuso orario</string>
+    <string name="section_jobs">Lavori</string>
+    <string name="setting_plugin_unplug_behavior">Comportamento Rimozione Plugin</string>
+    <string name="setting_plugin_unplug_behavior_subtitle">Cosa fare quando si disabilita o disinstalla un plugin con lavori attivi</string>
+    <string name="setting_plugin_unplug_behavior_block">Impedisci la rimozione durante il lavoro</string>
+    <string name="setting_plugin_unplug_behavior_stop">Ferma tutto e rimuovi</string>
 </resources>

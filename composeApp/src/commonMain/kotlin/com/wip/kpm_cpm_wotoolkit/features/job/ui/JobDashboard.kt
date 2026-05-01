@@ -1,16 +1,58 @@
 package com.wip.kpm_cpm_wotoolkit.features.job.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.runtime.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProgressIndicatorDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,38 +61,59 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
-import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
-import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
-import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
-import kotlinx.serialization.Serializable
+import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import androidx.navigation3.runtime.NavEntry
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.wip.kpm_cpm_wotoolkit.core.model.localized
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import org.jetbrains.compose.resources.stringResource
-import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
-import kpm_cpm_wotoolkit.composeapp.generated.resources.*
+import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
 import com.wip.kpm_cpm_wotoolkit.features.job.viewmodel.JobViewModel
-import org.koin.compose.viewmodel.koinViewModel
 import com.wip.kpm_cpm_wotoolkit.shared.components.SectionHeader
+import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
+import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarElement
+import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.SidebarSectionData
+import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Instant
-import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
+import kpm_cpm_wotoolkit.composeapp.generated.resources.action_collapse
+import kpm_cpm_wotoolkit.composeapp.generated.resources.action_expand
+import kpm_cpm_wotoolkit.composeapp.generated.resources.action_pause
+import kpm_cpm_wotoolkit.composeapp.generated.resources.action_resume
+import kpm_cpm_wotoolkit.composeapp.generated.resources.dialog_cancel
+import kpm_cpm_wotoolkit.composeapp.generated.resources.job_error_format
+import kpm_cpm_wotoolkit.composeapp.generated.resources.job_no_active
+import kpm_cpm_wotoolkit.composeapp.generated.resources.job_no_archived
+import kpm_cpm_wotoolkit.composeapp.generated.resources.job_paused_jobs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.job_queue
+import kpm_cpm_wotoolkit.composeapp.generated.resources.job_running_jobs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.job_scheduler_soon
+import kpm_cpm_wotoolkit.composeapp.generated.resources.nav_job_archive
+import kpm_cpm_wotoolkit.composeapp.generated.resources.nav_job_general
+import kpm_cpm_wotoolkit.composeapp.generated.resources.nav_job_history
+import kpm_cpm_wotoolkit.composeapp.generated.resources.nav_job_scheduler
+import kpm_cpm_wotoolkit.composeapp.generated.resources.nav_jobs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_id_format
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 @Serializable
 sealed interface JobNavKey : NavKey {
-    @Serializable data object General : JobNavKey
-    @Serializable data object Archive : JobNavKey
-    @Serializable data object Scheduler : JobNavKey
-    @Serializable data object History : JobNavKey
+    @Serializable
+    data object General : JobNavKey
+    @Serializable
+    data object Archive : JobNavKey
+    @Serializable
+    data object Scheduler : JobNavKey
+    @Serializable
+    data object History : JobNavKey
 }
 
 val JobNavConfig = SavedStateConfiguration {
@@ -116,7 +179,7 @@ fun JobDashboard(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
             Box(modifier = Modifier.weight(1f)) {
@@ -152,16 +215,16 @@ fun GeneralTab(viewModel: JobViewModel) {
     ) {
         if (runningJobs.isNotEmpty()) {
             item {
-                SectionHeader(title = "Running Jobs", icon = Icons.Default.PlayArrow)
+                SectionHeader(title = stringResource(Res.string.job_running_jobs), icon = Icons.Default.PlayArrow)
             }
             items(runningJobs) { job ->
                 JobCard(
-                    job = job, 
+                    job = job,
                     progress = progressMap[job.id] ?: 0f,
                     logs = logsMap[job.id] ?: emptyList(),
                     isExpanded = expandedJobs[job.id] ?: false,
                     onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
-                    onCancel = { viewModel.cancelJob(job.id) }, 
+                    onCancel = { viewModel.cancelJob(job.id) },
                     onPause = { viewModel.pauseJob(job.id) }
                 )
             }
@@ -169,11 +232,11 @@ fun GeneralTab(viewModel: JobViewModel) {
 
         if (queuedJobs.isNotEmpty()) {
             item {
-                SectionHeader(title = "Queue", icon = Icons.Default.List)
+                SectionHeader(title = stringResource(Res.string.job_queue), icon = Icons.Default.List)
             }
             items(queuedJobs) { job ->
                 JobCard(
-                    job = job, 
+                    job = job,
                     progress = progressMap[job.id] ?: 0f,
                     logs = logsMap[job.id] ?: emptyList(),
                     isExpanded = expandedJobs[job.id] ?: false,
@@ -186,7 +249,7 @@ fun GeneralTab(viewModel: JobViewModel) {
 
         if (runningJobs.isEmpty() && queuedJobs.isEmpty()) {
             item {
-                EmptyState("No active or queued jobs", Icons.Default.Inbox)
+                EmptyState(stringResource(Res.string.job_no_active), Icons.Default.Inbox)
             }
         }
     }
@@ -205,22 +268,22 @@ fun ArchiveTab(viewModel: JobViewModel) {
     ) {
         if (pausedJobs.isNotEmpty()) {
             item {
-                SectionHeader(title = "Paused Jobs", icon = Icons.Default.Pause)
+                SectionHeader(title = stringResource(Res.string.job_paused_jobs), icon = Icons.Default.Pause)
             }
             items(pausedJobs) { job ->
                 JobCard(
-                    job = job, 
+                    job = job,
                     progress = progressMap[job.id] ?: 0f,
                     logs = logsMap[job.id] ?: emptyList(),
                     isExpanded = expandedJobs[job.id] ?: false,
                     onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
-                    onCancel = { viewModel.cancelJob(job.id) }, 
+                    onCancel = { viewModel.cancelJob(job.id) },
                     onResume = { viewModel.resumeJob(job.id) }
                 )
             }
         } else {
             item {
-                EmptyState("No archived jobs", Icons.Default.Archive)
+                EmptyState(stringResource(Res.string.job_no_archived), Icons.Default.Archive)
             }
         }
     }
@@ -241,7 +304,7 @@ fun SchedulerTab() {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Scheduler coming soon",
+            text = stringResource(Res.string.job_scheduler_soon),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -285,7 +348,11 @@ fun HistoryTab(viewModel: JobViewModel) {
                     Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "${entry.jobName}: ${entry.event}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = "${entry.jobName}: ${entry.event}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
                         if (entry.details != null) {
                             Text(text = entry.details, style = MaterialTheme.typography.labelSmall)
                         }
@@ -333,15 +400,21 @@ fun JobCard(
                 IconButton(onClick = onToggleExpand) {
                     Icon(
                         imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand"
+                        contentDescription = if (isExpanded) stringResource(Res.string.action_collapse) else stringResource(
+                            Res.string.action_expand
+                        )
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(text = "ID: ${job.id}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = stringResource(Res.string.plugin_id_format, job.id),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                
+
                 StatusBadge(job.status)
             }
 
@@ -370,7 +443,7 @@ fun JobCard(
 
             if (job.errorMessage != null) {
                 Text(
-                    text = "Error: ${job.errorMessage}",
+                    text = stringResource(Res.string.job_error_format, job.errorMessage!!),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp)
@@ -389,21 +462,24 @@ fun JobCard(
                     TextButton(onClick = onResume) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Resume")
+                        Text(stringResource(Res.string.action_resume))
                     }
                 }
                 if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
                     TextButton(onClick = onPause) {
                         Icon(Icons.Default.Pause, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Pause")
+                        Text(stringResource(Res.string.action_pause))
                     }
                 }
                 if (job.status != JobStatus.Completed && job.status != JobStatus.Cancelled && job.status != JobStatus.Failed) {
-                    TextButton(onClick = onCancel, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    TextButton(
+                        onClick = onCancel,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
                         Icon(Icons.Default.Cancel, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Cancel")
+                        Text(stringResource(Res.string.dialog_cancel))
                     }
                 }
             }
@@ -414,7 +490,7 @@ fun JobCard(
 @Composable
 fun TerminalLogView(logs: List<String>) {
     val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
-    
+
     // Auto-scroll to bottom when new logs arrive
     LaunchedEffect(logs.size) {
         if (logs.isNotEmpty()) {
@@ -492,13 +568,19 @@ fun EmptyState(text: String, icon: ImageVector) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Text(text = text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 private fun formatTime(instant: Instant): String {
     val localDateTime = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-    return "${localDateTime.hour.toString().padStart(2, '0')}:${localDateTime.minute.toString().padStart(2, '0')}:${localDateTime.second.toString().padStart(2, '0')}"
+    return "${localDateTime.hour.toString().padStart(2, '0')}:${
+        localDateTime.minute.toString().padStart(2, '0')
+    }:${localDateTime.second.toString().padStart(2, '0')}"
 }
 
 private fun formatDuration(ms: Long): String {

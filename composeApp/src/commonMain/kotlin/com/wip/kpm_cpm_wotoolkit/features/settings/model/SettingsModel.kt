@@ -1,25 +1,25 @@
 package com.wip.kpm_cpm_wotoolkit.features.settings.model
 
-import kotlinx.serialization.Serializable
+import com.wip.kpm_cpm_wotoolkit.features.plugin.model.InstalledPlugin
 import com.wip.kpm_cpm_wotoolkit.features.repository.model.ExtensionRepo
-import com.wip.kpm_cpm_wotoolkit.features.plugin.model.InstalledModule
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class AppSettings(
-        val appearance: AppearanceSettings = AppearanceSettings(),
-        val localization: LocalizationSettings = LocalizationSettings(),
-        val general: GeneralSettings = GeneralSettings(),
-        val logging: LoggingSettings = LoggingSettings(),
-        val notifications: NotificationSettings = NotificationSettings(),
-        val extensions: ExtensionSettings = ExtensionSettings(),
-        val jobs: JobSettings = JobSettings()
+    val appearance: AppearanceSettings = AppearanceSettings(),
+    val localization: LocalizationSettings = LocalizationSettings(),
+    val general: GeneralSettings = GeneralSettings(),
+    val logging: LoggingSettings = LoggingSettings(),
+    val notifications: NotificationSettings = NotificationSettings(),
+    val extensions: ExtensionSettings = ExtensionSettings(),
+    val jobs: JobSettings = JobSettings()
 )
 
 @Serializable
 data class AppearanceSettings(
-        val theme: AppTheme = AppTheme.System,
-        val accentColor: Long = 0xFF6200EE, // Default purple
-        val followSystemAccent: Boolean = true
+    val theme: AppTheme = AppTheme.System,
+    val accentColor: Long = 0xFF6200EE, // Default purple
+    val followSystemAccent: Boolean = true
 )
 
 @Serializable
@@ -31,11 +31,19 @@ enum class AppTheme {
 }
 
 @Serializable
+enum class WindowStartMode {
+    Normal,
+    Minimized,
+    Maximized,
+    Fullscreen
+}
+
+@Serializable
 data class LocalizationSettings(
-        val language: AppLanguage = AppLanguage.English,
-        val timezone: String = "UTC",
-        val useSystemTimezone: Boolean = true,
-        val useSystemLanguage: Boolean = true
+    val language: AppLanguage = AppLanguage.English,
+    val timezone: String = "UTC",
+    val useSystemTimezone: Boolean = true,
+    val useSystemLanguage: Boolean = true
 )
 
 @Serializable
@@ -46,12 +54,12 @@ enum class AppLanguage(val label: String) {
 
 @Serializable
 data class GeneralSettings(
-        val scaling: Float = 1.0f,
-        val animationsEnabled: Boolean = true,
-        val launchAtStartup: Boolean = false,
-        val launchMinimizedAtStartup: Boolean = true,
-        val startMinimized: Boolean = false,
-        val closeToTray: Boolean = false
+    val scaling: Float = 1.0f,
+    val animationsEnabled: Boolean = true,
+    val launchAtStartup: Boolean = false,
+    val launchMinimizedAtStartup: Boolean = true,
+    val windowStartMode: WindowStartMode = WindowStartMode.Normal,
+    val closeToTray: Boolean = false
 )
 
 @Serializable
@@ -90,11 +98,18 @@ data class NotificationHistorySettings(
 )
 
 @Serializable
+enum class PluginUnplugBehavior {
+    Block,
+    StopJobs
+}
+
+@Serializable
 data class ExtensionSettings(
     val repositories: List<ExtensionRepo> = emptyList(),
     val packageSourceOverrides: Map<String, String> = emptyMap(), // pkg to repo url
-    val moduleFolders: List<String> = emptyList(), // managed install locations
-    val installedModules: List<InstalledModule> = emptyList()
+    val pluginFolders: List<String> = emptyList(), // managed install locations
+    val installedPlugins: List<InstalledPlugin> = emptyList(),
+    val pluginUnplugBehavior: PluginUnplugBehavior = PluginUnplugBehavior.Block
 )
 
 @Serializable

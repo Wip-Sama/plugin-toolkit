@@ -1,10 +1,14 @@
 package com.wip.kpm_cpm_wotoolkit.features.plugin.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
@@ -16,57 +20,62 @@ import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
+import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
+import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_not_found_unloaded
+import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_selection_hint
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
 @Serializable
 sealed interface PluginNavKey : NavKey {
     @Serializable
-    data object ModuleList : PluginNavKey
+    data object PluginList : PluginNavKey
+
     @Serializable
-    data class ModuleDetail(val id: String) : PluginNavKey
+    data class PluginDetail(val id: String) : PluginNavKey
 }
 
 val PluginNavConfig = SavedStateConfiguration {
     serializersModule = SerializersModule {
         polymorphic(NavKey::class) {
-            subclass(PluginNavKey.ModuleList::class, PluginNavKey.ModuleList.serializer())
-            subclass(PluginNavKey.ModuleDetail::class, PluginNavKey.ModuleDetail.serializer())
+            subclass(PluginNavKey.PluginList::class, PluginNavKey.PluginList.serializer())
+            subclass(PluginNavKey.PluginDetail::class, PluginNavKey.PluginDetail.serializer())
         }
     }
 }
 
 @Composable
 fun PluginSectionScreen(
-    initialModuleId: String? = null,
+    initialPluginId: String? = null,
     viewModel: PluginViewModel = koinInject()
 ) {
-    val startDestination = if (initialModuleId != null) {
-        PluginNavKey.ModuleDetail(initialModuleId)
+    val startDestination = if (initialPluginId != null) {
+        PluginNavKey.PluginDetail(initialPluginId)
     } else {
-        PluginNavKey.ModuleList
+        PluginNavKey.PluginList
     }
 
     val backStack = rememberNavBackStack(PluginNavConfig, startDestination)
-    val currentKey = backStack.lastOrNull() ?: PluginNavKey.ModuleList
+    val currentKey = backStack.lastOrNull() ?: PluginNavKey.PluginList
     val loadedPlugins = viewModel.loadedPlugins
 
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Nested Navigation Sidebar for Modules
+        // Nested Navigation Sidebar for Plugins
         DirectExecutionSidebar(
             loadedPlugins = loadedPlugins,
-            selectedModuleId = (currentKey as? PluginNavKey.ModuleDetail)?.id,
-            onModuleSelected = { id -> 
-                if ((currentKey as? PluginNavKey.ModuleDetail)?.id != id) {
-                    backStack.add(PluginNavKey.ModuleDetail(id))
+            selectedPluginId = (currentKey as? PluginNavKey.PluginDetail)?.id,
+            onPluginSelected = { id ->
+                if ((currentKey as? PluginNavKey.PluginDetail)?.id != id) {
+                    backStack.add(PluginNavKey.PluginDetail(id))
                 }
             },
-            onBackToModules = {
-                if (backStack.any { it is PluginNavKey.ModuleList }) {
-                    while (backStack.lastOrNull() !is PluginNavKey.ModuleList) {
+            onBackToPlugins = {
+                if (backStack.any { it is PluginNavKey.PluginList }) {
+                    while (backStack.lastOrNull() !is PluginNavKey.PluginList) {
                         backStack.removeLast()
                     }
                 } else {
-                    backStack.add(PluginNavKey.ModuleList)
+                    backStack.add(PluginNavKey.PluginList)
                 }
             },
             selectedCapability = viewModel.selectedCapability,
@@ -81,17 +90,18 @@ fun PluginSectionScreen(
                 onBack = { if (backStack.size > 1) backStack.removeLast() }
             ) { key ->
                 when (key) {
-                    is PluginNavKey.ModuleList -> NavEntry(key) {
+                    is PluginNavKey.PluginList -> NavEntry(key) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
-                                "Select a module from the sidebar to see its capabilities",
+                                stringResource(Res.string.plugin_selection_hint),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    is PluginNavKey.ModuleDetail -> NavEntry(key) {
-                        val plugin = loadedPlugins.find { it.getManifest().module.id == key.id }
+
+                    is PluginNavKey.PluginDetail -> NavEntry(key) {
+                        val plugin = loadedPlugins.find { it.getManifest().plugin.id == key.id }
                         if (plugin != null) {
                             LaunchedEffect(key.id) {
                                 viewModel.selectPlugin(plugin)
@@ -99,10 +109,14 @@ fun PluginSectionScreen(
                             PluginContent(viewModel = viewModel)
                         } else {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("Module not found or unloaded", color = MaterialTheme.colorScheme.error)
+                                Text(
+                                    stringResource(Res.string.plugin_not_found_unloaded),
+                                    color = MaterialTheme.colorScheme.error
+                                )
                             }
                         }
                     }
+
                     else -> NavEntry(key) { }
                 }
             }

@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType
 import com.wip.kpm_cpm_wotoolkit.core.utils.StartupManager
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.LogLevel
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.WindowStartMode
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.ExpressiveMenu
@@ -65,10 +66,10 @@ import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_open_log_folder_
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_error
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_info
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_warning
-import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_start_minimized
-import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_start_minimized_subtitle
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_toast_auto_dismiss
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_toast_dismiss_time
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_window_start_mode
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_window_start_mode_subtitle
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -117,14 +118,17 @@ fun SystemSettingsView(
                 })
 
             SettingsItem(
-                title = stringResource(Res.string.setting_start_minimized),
-                subtitle = stringResource(Res.string.setting_start_minimized_subtitle),
+                title = stringResource(Res.string.setting_window_start_mode),
+                subtitle = stringResource(Res.string.setting_window_start_mode_subtitle),
                 icon = Icons.Default.Minimize,
                 control = {
-                    SettingsSwitch(
-                        checked = general.startMinimized, onCheckedChange = { checked ->
+                    ExpressiveMenu(
+                        options = WindowStartMode.entries,
+                        selectedOption = general.windowStartMode,
+                        labelProvider = { it.name },
+                        onOptionSelected = { mode ->
                             viewModel.updateSettings {
-                                it.copy(general = it.general.copy(startMinimized = checked))
+                                it.copy(general = it.general.copy(windowStartMode = mode))
                             }
                         })
                 })

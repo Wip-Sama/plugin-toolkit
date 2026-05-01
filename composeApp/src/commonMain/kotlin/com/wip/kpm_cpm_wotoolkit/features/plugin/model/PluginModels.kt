@@ -3,11 +3,11 @@ package com.wip.kpm_cpm_wotoolkit.features.plugin.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class InstalledModule(
+data class InstalledPlugin(
     val pkg: String,
     val name: String,
     val version: String,
-    val installPath: String, // Absolute path to the module folder
+    val installPath: String, // Absolute path to the plugin folder
     val isEnabled: Boolean = true,
     val repoUrl: String? = null, // Source repository URL if remote
     val jarFileName: String? = null,
@@ -16,5 +16,5 @@ data class InstalledModule(
 
 sealed class InstallationSource {
     data class Local(val filePath: String) : InstallationSource()
-    data class Remote(val moduleUrl: String, val fileName: String, val pkg: String) : InstallationSource()
+    data class Remote(val pluginUrl: String, val fileName: String, val pkg: String) : InstallationSource()
 }

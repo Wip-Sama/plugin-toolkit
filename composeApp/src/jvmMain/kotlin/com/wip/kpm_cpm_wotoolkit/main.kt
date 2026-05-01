@@ -2,46 +2,62 @@ package com.wip.kpm_cpm_wotoolkit
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
-import androidx.compose.ui.window.*
-import com.wip.kpm_cpm_wotoolkit.features.settings.logic.SettingsRepository
-import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
-import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
-import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsSearchViewModel
-import com.wip.kpm_cpm_wotoolkit.core.KeepTrack
-import org.jetbrains.compose.resources.painterResource
-import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
-import kpm_cpm_wotoolkit.composeapp.generated.resources.compose_multiplatform
-import org.koin.core.context.startKoin
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Notification
+import androidx.compose.ui.window.Tray
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberTrayState
+import androidx.compose.ui.window.rememberWindowState
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.platformLogWriter
+import com.wip.kpm_cpm_wotoolkit.core.KeepTrack
 import com.wip.kpm_cpm_wotoolkit.core.logging.FileLogWriter
-import com.wip.kpm_cpm_wotoolkit.features.settings.model.LogLevel
-import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import java.io.File
-import org.koin.dsl.module
-import com.wip.kpm_cpm_wotoolkit.core.notification.*
-import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
-import com.wip.kpm_cpm_wotoolkit.features.repository.logic.RepoManager
-import com.wip.kpm_cpm_wotoolkit.features.repository.viewmodel.ModuleRepoViewModel
-import androidx.compose.ui.Modifier
+import com.wip.kpm_cpm_wotoolkit.core.notification.JvmNotificationService
+import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationEvent
+import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService
+import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationType
 import com.wip.kpm_cpm_wotoolkit.core.ui.DialogService
 import com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager
 import com.wip.kpm_cpm_wotoolkit.features.job.viewmodel.JobViewModel
-import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleManager
-import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.ModuleManagerViewModel
-import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
-import kotlinx.coroutines.SupervisorJob
-import org.koin.mp.KoinPlatform.getKoin
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.*
 import com.wip.kpm_cpm_wotoolkit.features.navigation.viewmodel.AppViewModel
-
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.PluginManager
+import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginManagerViewModel
+import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
+import com.wip.kpm_cpm_wotoolkit.features.repository.logic.RepoManager
+import com.wip.kpm_cpm_wotoolkit.features.repository.viewmodel.PluginRepoViewModel
+import com.wip.kpm_cpm_wotoolkit.features.settings.logic.SettingsRepository
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.LogLevel
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.WindowStartMode
+import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.NotificationViewModel
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsSearchViewModel
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
+import io.github.vinceglb.filekit.FileKit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
+import kpm_cpm_wotoolkit.composeapp.generated.resources.compose_multiplatform
+import org.jetbrains.compose.resources.painterResource
+import org.koin.core.context.startKoin
+import org.koin.dsl.module
+import org.koin.mp.KoinPlatform.getKoin
+import java.awt.Dimension
 
 
 fun main(args: Array<String>) {
@@ -50,7 +66,7 @@ fun main(args: Array<String>) {
     // Check if we should start minimized
     val repository = SettingsRepository()
     val initialSettings = repository.loadSettings()
-    
+
     // We need a late-init provider for settings because viewModel is created after startKoin
     // but viewModel needs NotificationService which needs settings.
     // However, since viewModel is created manually, we can just use a lambda that captures it later.
@@ -63,14 +79,19 @@ fun main(args: Array<String>) {
             single { SettingsRegistry() }
             single { RepoManager(get()) }
             single { DialogService() }
-            single { ModuleManager(get(), get()) }
-            single { JobManager(CoroutineScope(SupervisorJob() + Dispatchers.Default), repository.loadSettings().jobs.maxConcurrentJobs) }
+            single { PluginManager(get(), get(), get()) }
+            single {
+                JobManager(
+                    CoroutineScope(SupervisorJob() + Dispatchers.Default),
+                    repository.loadSettings().jobs.maxConcurrentJobs
+                )
+            }
             single { PluginViewModel(get(), get(), get()) }
             factory { SettingsViewModel(get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
-            factory { ModuleRepoViewModel(get(), get(), get(), get(), get()) }
-            factory { ModuleManagerViewModel(get(), get(), get()) }
+            factory { PluginRepoViewModel(get(), get(), get(), get(), get()) }
+            factory { PluginManagerViewModel(get(), get(), get()) }
             factory { JobViewModel(get()) }
             factory { AppViewModel() }
         })
@@ -79,16 +100,16 @@ fun main(args: Array<String>) {
     val koin = getKoin()
     val viewModel = koin.get<SettingsViewModel>()
     koin.get<RepoManager>() // Trigger initialization and background refresh
-    val moduleManager = koin.get<ModuleManager>()
+    val pluginManager = koin.get<PluginManager>()
 
     viewModelProvider = { viewModel }
 
     // Initialize Logging with Kermit
     val logDirPath = "${System.getProperty("user.home")}/${KeepTrack.SETTINGS_DIR_NAME}/${KeepTrack.LOGS_DIR_NAME}"
     val logDir = kotlinx.io.files.Path(logDirPath)
-    
+
     Logger.setLogWriters(platformLogWriter(), FileLogWriter(logDir) { viewModel.settings.logging })
-    
+
     // Sync logger severity with settings
     snapshotFlow { viewModel.settings.logging.level }.onEach { level ->
         val severity = when (level) {
@@ -101,26 +122,37 @@ fun main(args: Array<String>) {
         }
         Logger.setMinSeverity(severity)
     }.launchIn(CoroutineScope(Dispatchers.Default))
-    
+
     Logger.i { "Application started. Logging initialized at: $logDir" }
 
 
-    // Load enabled modules at startup
-    moduleManager.installedModules.value.forEach { module ->
-        if (module.isEnabled) {
-            val result = moduleManager.loadModule(module.pkg)
+    // Load enabled plugins at startup
+    pluginManager.installedPlugins.value.forEach { plugin ->
+        if (plugin.isEnabled) {
+            val result = pluginManager.loadPlugin(plugin.pkg)
             if (result.isFailure) {
-                Logger.e { "Failed to load module ${module.pkg}: ${result.exceptionOrNull()?.message}" }
+                Logger.e { "Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
             }
         }
     }
 
-    // Check if we should start minimized
-    val startMinimized = args.contains(KeepTrack.STARTUP_FLAG_BACKGROUND) || initialSettings.general.startMinimized
+    // Determine initial window state based on settings and flags
+    val startMinimizedOverride = args.contains(KeepTrack.STARTUP_FLAG_BACKGROUND)
+    val startMode = if (startMinimizedOverride) WindowStartMode.Minimized else initialSettings.general.windowStartMode
 
     application {
         val trayState = rememberTrayState()
-        var isVisible by remember { mutableStateOf(!startMinimized) }
+        var isVisible by remember { mutableStateOf(startMode != WindowStartMode.Minimized) }
+
+        val windowState = rememberWindowState(
+            placement = when (startMode) {
+                WindowStartMode.Maximized -> WindowPlacement.Maximized
+                WindowStartMode.Fullscreen -> WindowPlacement.Fullscreen
+                else -> WindowPlacement.Floating
+            },
+            position = WindowPosition(Alignment.Center),
+            size = DpSize(1280.dp, 800.dp)
+        )
 
         Tray(
             state = trayState,
@@ -144,7 +176,10 @@ fun main(args: Array<String>) {
                     }
                 },
                 title = "WOToolkit",
+                state = windowState
             ) {
+                // Set minimum window size
+                window.minimumSize = Dimension(1000, 600)
                 val notificationService = getKoin().get<NotificationService>()
 
                 LaunchedEffect(Unit) {

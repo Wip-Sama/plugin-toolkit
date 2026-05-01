@@ -1,11 +1,24 @@
 package com.wip.kpm_cpm_wotoolkit.features.job.logic
 
-import com.wip.kpm_cpm_wotoolkit.features.job.model.*
-import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ModuleLoader
-import com.wip.plugin.api.*
-import kotlinx.coroutines.*
 import co.touchlab.kermit.Logger
+import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
 import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.DefaultPluginFileSystem
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.PluginLoader
+import com.wip.plugin.api.ExecutionContext
+import com.wip.plugin.api.PluginLogger
+import com.wip.plugin.api.PluginRequest
+import com.wip.plugin.api.ProgressReporter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 
 class JobWorker(
     val workerId: Int,
@@ -21,7 +34,7 @@ class JobWorker(
             while (isActive) {
                 try {
                     val next = manager.waitForNextJob()
-                    
+
                     // Link this execution to the manager for cancellation support
                     val jobExecution = launch {
                         try {
@@ -30,10 +43,10 @@ class JobWorker(
                             manager.unregisterJobCoroutine(next.id)
                         }
                     }
-                    
+
                     try {
                         manager.registerJobCoroutine(next.id, jobExecution)
-                        
+
                         // Just wait for the job to complete or be cancelled.
                         // Cancellation is cooperatively handled by jobExecution.cancel() from JobManager.
                         jobExecution.join()
@@ -41,7 +54,7 @@ class JobWorker(
                         Logger.e(e) { "Worker $workerId: Error during job coordination" }
                         jobExecution.cancelAndJoin()
                     }
-                    
+
                 } catch (e: CancellationException) {
                     // Normal cancellation, just continue or exit if worker is stopping
                     if (!isActive) break
@@ -62,13 +75,13 @@ class JobWorker(
         }
 
         Logger.i { "Worker $workerId starting job ${job.name} (${job.id})" }
-        
+
         try {
-            val plugin = ModuleLoader.getPluginById(job.pluginId) 
+            val plugin = PluginLoader.getPluginById(job.pluginId)
                 ?: throw Exception("Plugin ${job.pluginId} not found")
-            
+
             val processor = plugin.getProcessor()
-            
+
             // Provide execution context with Logger and ProgressReporter
             val context = ExecutionContext(
                 logger = object : PluginLogger {
@@ -77,21 +90,25 @@ class JobWorker(
                         Logger.v { fullMessage }
                         manager.addJobLog(job.id, fullMessage, "VERBOSE")
                     }
+
                     override fun debug(message: String) {
                         val fullMessage = "[${job.pluginId}] $message"
                         Logger.d { fullMessage }
                         manager.addJobLog(job.id, fullMessage, "DEBUG")
                     }
+
                     override fun info(message: String) {
                         val fullMessage = "[${job.pluginId}] $message"
                         Logger.i { fullMessage }
                         manager.addJobLog(job.id, fullMessage, "INFO")
                     }
+
                     override fun warn(message: String) {
                         val fullMessage = "[${job.pluginId}] $message"
                         Logger.w { fullMessage }
                         manager.addJobLog(job.id, fullMessage, "WARN")
                     }
+
                     override fun error(message: String, throwable: Throwable?) {
                         val fullMessage = "[${job.pluginId}] $message"
                         Logger.e(throwable) { fullMessage }
@@ -104,7 +121,7 @@ class JobWorker(
                     }
                 },
                 fileSystem = DefaultPluginFileSystem(
-                    ModuleLoader.getPluginInstallPath(job.pluginId) ?: ""
+                    PluginLoader.getPluginInstallPath(job.pluginId) ?: ""
                 )
             )
             processor.setExecutionContext(context)
@@ -137,7 +154,7 @@ class JobWorker(
             } finally {
                 progressJob?.cancel()
             }
-            
+
             if (result.isSuccess) {
                 manager.tryCompleteJob(job.id, result.getOrNull()?.result?.toString())
             } else {

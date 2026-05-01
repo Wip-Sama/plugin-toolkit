@@ -5,11 +5,10 @@ import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toTypeName
-import com.wip.plugin.api.annotations.PluginModule
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
 import com.wip.plugin.api.PluginManifest
-import com.wip.plugin.api.ModuleInfo
+import com.wip.plugin.api.PluginInfo
+import com.wip.plugin.api.annotations.PluginInfo as PluginInfoAnnotation
 import com.wip.plugin.api.Requirements
 import com.wip.plugin.api.DataType
 import com.wip.plugin.api.PrimitiveType
@@ -19,7 +18,6 @@ import com.wip.plugin.api.SettingMetadata
 import com.wip.plugin.api.Changelog
 import com.wip.plugin.api.Release
 import java.io.File
-import kotlinx.serialization.json.JsonElement
 
 class ManifestProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
@@ -33,7 +31,7 @@ class ManifestProcessor(
 ) : SymbolProcessor {
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val symbols = resolver.getSymbolsWithAnnotation(PluginModule::class.qualifiedName!!)
+        val symbols = resolver.getSymbolsWithAnnotation(PluginInfoAnnotation::class.qualifiedName!!)
         
         symbols.filterIsInstance<KSClassDeclaration>().forEach { classDeclaration ->
             generateManifest(classDeclaration, resolver)
@@ -43,16 +41,16 @@ class ManifestProcessor(
     }
 
     private fun generateManifest(classDeclaration: KSClassDeclaration, resolver: Resolver) {
-        val pluginModuleAnnotation = classDeclaration.annotations.find { 
-            it.shortName.asString() == "PluginModule" 
+        val pluginInfoAnnotation = classDeclaration.annotations.find {
+            it.shortName.asString() == "PluginInfo"
         } ?: return
 
-        val id = pluginModuleAnnotation.arguments.find { it.name?.asString() == "id" }?.value as String
-        val name = pluginModuleAnnotation.arguments.find { it.name?.asString() == "name" }?.value as String
-        val version = pluginModuleAnnotation.arguments.find { it.name?.asString() == "version" }?.value as String
-        val description = pluginModuleAnnotation.arguments.find { it.name?.asString() == "description" }?.value as String
-        val minMemoryMb = pluginModuleAnnotation.arguments.find { it.name?.asString() == "minMemoryMb" }?.value as Int
-        val minExecutionTimeMs = pluginModuleAnnotation.arguments.find { it.name?.asString() == "minExecutionTimeMs" }?.value as Int
+        val id = pluginInfoAnnotation.arguments.find { it.name?.asString() == "id" }?.value as String
+        val name = pluginInfoAnnotation.arguments.find { it.name?.asString() == "name" }?.value as String
+        val version = pluginInfoAnnotation.arguments.find { it.name?.asString() == "version" }?.value as String
+        val description = pluginInfoAnnotation.arguments.find { it.name?.asString() == "description" }?.value as String
+        val minMemoryMb = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minMemoryMb" }?.value as Int
+        val minExecutionTimeMs = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minExecutionTimeMs" }?.value as Int
 
         val functions = classDeclaration.getAllFunctions().filter { 
             it.annotations.any { ann -> ann.shortName.asString() == "Capability" }
@@ -66,7 +64,7 @@ class ManifestProcessor(
         val entryName = baseClassName + "PluginEntry"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
-            .addImport("com.wip.plugin.api", "PluginManifest", "ModuleInfo", "Requirements", "Capability", "ParameterMetadata", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType")
+            .addImport("com.wip.plugin.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "ParameterMetadata", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType")
             .addImport("kotlinx.serialization.json", "Json", "decodeFromJsonElement", "encodeToJsonElement")
 
         // 1. Generate Manifest Object
@@ -117,7 +115,7 @@ class ManifestProcessor(
         capabilitiesCode.add(")\n")
 
         val settingsProperties = classDeclaration.getAllProperties().filter { 
-            it.annotations.any { ann -> ann.shortName.asString() == "ModuleSetting" }
+            it.annotations.any { ann -> ann.shortName.asString() == "PluginSetting" }
         }
 
         val settingsCode = CodeBlock.builder()
@@ -125,7 +123,7 @@ class ManifestProcessor(
         settingsCode.indent()
         val propsList = settingsProperties.toList()
         propsList.forEachIndexed { index, prop ->
-            val ann = prop.annotations.first { it.shortName.asString() == "ModuleSetting" }
+            val ann = prop.annotations.first { it.shortName.asString() == "PluginSetting" }
             val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
             val propName = prop.simpleName.asString()
@@ -149,7 +147,7 @@ class ManifestProcessor(
                         .add("PluginManifest(\n")
                         .indent()
                         .add("manifestVersion = %S,\n", "1.0")
-                        .add("module = ModuleInfo(id = %S, name = %S, version = %S, description = %S),\n", id, name, version, description)
+                        .add("plugin = PluginInfo(id = %S, name = %S, version = %S, description = %S),\n", id, name, version, description)
                         .add("requirements = Requirements(minMemoryMb = %L, minExecutionTimeMs = %L),\n", minMemoryMb, minExecutionTimeMs)
                         .add("capabilities = ")
                         .add(capabilitiesCode.build())
@@ -353,8 +351,8 @@ class ManifestProcessor(
                     .build()
             )
 
-        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "ModuleSetup" } }
-        val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "ModuleValidate" } }
+        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "PluginSetup" } }
+        val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "PluginValidate" } }
 
         if (setupFunction != null) {
             entryType.addFunction(FunSpec.builder("performSetup")
@@ -408,8 +406,8 @@ class ManifestProcessor(
             // Bundle changelog.txt into resources
             val bundledChangelog = codeGenerator.createNewFile(
                 Dependencies(true, sourceFile),
-                "resources",
-                "changelog",
+                "",
+                "resources/changelog",
                 "txt"
             )
             bundledChangelog.writer().use { it.write(content) }
@@ -418,8 +416,8 @@ class ManifestProcessor(
         // 6. Generate manifest.json Resource File
         val manifestJsonFile = codeGenerator.createNewFile(
             Dependencies(true, classDeclaration.containingFile!!),
-            "META-INF",
-            "manifest",
+            "",
+            "META-INF/manifest",
             "json"
         )
         
@@ -458,7 +456,7 @@ class ManifestProcessor(
         }.toList()
 
         val manifestSettings = settingsProperties.associate { prop ->
-            val ann = prop.annotations.first { it.shortName.asString() == "ModuleSetting" }
+            val ann = prop.annotations.first { it.shortName.asString() == "PluginSetting" }
             val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
             val propName = prop.simpleName.asString()
@@ -477,7 +475,7 @@ class ManifestProcessor(
 
         val manifestObj = PluginManifest(
             manifestVersion = "1.0",
-            module = ModuleInfo(id = id, name = name, version = version, description = description),
+            plugin = PluginInfo(id = id, name = name, version = version, description = description),
             requirements = Requirements(minMemoryMb = minMemoryMb, minExecutionTimeMs = minExecutionTimeMs),
             capabilities = manifestCapabilities,
             settings = if (manifestSettings.isEmpty()) null else manifestSettings,
@@ -501,7 +499,7 @@ class ManifestProcessor(
             val resourcesChangelog = File(currentDir, "src/main/resources/changelog.txt")
             if (resourcesChangelog.exists()) return resourcesChangelog
 
-            // Stop at module root
+            // Stop at plugin root
             if (File(currentDir, "build.gradle.kts").exists() || File(currentDir, "build.gradle").exists()) {
                 val modResources = File(currentDir, "src/main/resources/changelog.txt")
                 if (modResources.exists()) return modResources

@@ -2,7 +2,7 @@ package com.wip.kpm_cpm_wotoolkit.features.plugin.logic
 
 import com.wip.plugin.api.PluginEntry
 
-expect object ModuleLoader {
+expect object PluginLoader {
     fun loadPlugin(
         jarPath: String
     ): Result<PluginEntry>

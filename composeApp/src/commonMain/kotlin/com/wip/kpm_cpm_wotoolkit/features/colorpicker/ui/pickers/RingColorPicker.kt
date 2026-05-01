@@ -2,8 +2,18 @@ package com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.pickers
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -14,10 +24,17 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.logic.BoundedPointStrategy
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.logic.MathHelper
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.Colors.gradientColors
-import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.*
-import com.wip.kpm_cpm_wotoolkit.features.colorpicker.logic.*
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.ColorSlideBar
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.blue
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.darken
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.drawColorSelector
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.fromHueProgress
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.green
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.lighten
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.red
 import kotlin.math.atan2
 import kotlin.math.roundToInt
 
@@ -74,7 +91,8 @@ internal fun RingColorPicker(
     }
 
     Column(modifier = Modifier.width(IntrinsicSize.Max)) {
-        Canvas(modifier = modifier
+        Canvas(
+            modifier = modifier
             .size(200.dp)
             .onSizeChanged { radius = it.width.toFloat() / 2 }
             .pointerInput(Unit) {
@@ -150,7 +168,7 @@ private fun handleRingPickerInput(
 ) {
     val angleRad = atan2(y - radius, x - radius)
     var angleDeg = (angleRad * 180.0 / kotlin.math.PI + 360) % 360
-    
+
     val length = MathHelper.getLength(x, y, radius)
     val progress = angleDeg / 360f
     onLocationChange(

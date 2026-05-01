@@ -3,10 +3,12 @@ package com.wip.kpm_cpm_wotoolkit.features.job.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager
-import com.wip.kpm_cpm_wotoolkit.features.job.model.*
-import kotlinx.coroutines.flow.*
+import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlin.collections.emptyList
 
 class JobViewModel(
     private val jobManager: JobManager

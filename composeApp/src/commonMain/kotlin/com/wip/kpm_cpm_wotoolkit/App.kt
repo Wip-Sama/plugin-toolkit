@@ -2,43 +2,54 @@ package com.wip.kpm_cpm_wotoolkit
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import com.wip.kpm_cpm_wotoolkit.features.navigation.model.Screen
-import com.wip.kpm_cpm_wotoolkit.features.navigation.model.ScreenNavConfig
-import kpm_cpm_wotoolkit.composeapp.generated.resources.*
-import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
-import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
-import com.wip.kpm_cpm_wotoolkit.features.board.ui.BoardScreen
-import com.wip.kpm_cpm_wotoolkit.features.landingPage.ui.LandingPage
-import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.PluginSectionScreen
-import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobDashboard
-import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobBadge
-import com.wip.kpm_cpm_wotoolkit.features.settings.ui.SettingsScreen
-import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.ModuleManagerView
-import com.wip.kpm_cpm_wotoolkit.features.repository.ui.ModuleRepoView
-import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
+import com.wip.kpm_cpm_wotoolkit.core.model.localized
+import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService
 import com.wip.kpm_cpm_wotoolkit.core.theme.AppTheme
 import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
-import com.wip.kpm_cpm_wotoolkit.core.utils.PlatformLocalization
-import com.wip.kpm_cpm_wotoolkit.core.notification.NotificationService
-import com.wip.kpm_cpm_wotoolkit.shared.components.ToastHost
-import androidx.compose.ui.tooling.preview.Preview
-import org.koin.compose.koinInject
-import com.wip.kpm_cpm_wotoolkit.core.model.localized
 import com.wip.kpm_cpm_wotoolkit.core.ui.DialogHost
 import com.wip.kpm_cpm_wotoolkit.core.ui.DialogService
-import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
+import com.wip.kpm_cpm_wotoolkit.core.utils.PlatformLocalization
+import com.wip.kpm_cpm_wotoolkit.features.board.ui.BoardScreen
+import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobBadge
+import com.wip.kpm_cpm_wotoolkit.features.job.ui.JobDashboard
+import com.wip.kpm_cpm_wotoolkit.features.landingPage.ui.LandingPage
+import com.wip.kpm_cpm_wotoolkit.features.navigation.model.Screen
+import com.wip.kpm_cpm_wotoolkit.features.navigation.model.ScreenNavConfig
 import com.wip.kpm_cpm_wotoolkit.features.navigation.viewmodel.AppViewModel
+import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.PluginManagerView
+import com.wip.kpm_cpm_wotoolkit.features.plugin.ui.PluginSectionScreen
+import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
+import com.wip.kpm_cpm_wotoolkit.features.repository.ui.PluginRepoView
+import com.wip.kpm_cpm_wotoolkit.features.settings.ui.SettingsScreen
+import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
+import com.wip.kpm_cpm_wotoolkit.shared.components.ToastHost
+import com.wip.kpm_cpm_wotoolkit.shared.components.sidebar.NavigationSidebar
+import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
+import kpm_cpm_wotoolkit.composeapp.generated.resources.app_name
+import org.koin.compose.koinInject
 
 @Composable
 fun App(
@@ -49,7 +60,7 @@ fun App(
     dialogService: DialogService = koinInject()
 ) {
     val languageCode by viewModel.currentLanguageCode.collectAsState()
-    
+
 
     LaunchedEffect(languageCode) {
         PlatformLocalization.setApplicationLanguage(languageCode)
@@ -111,15 +122,15 @@ private fun AppContent(
                             onBack = { if (backStack.size > 1) backStack.removeLast() }
                         ) { key ->
                             when (key) {
-                                is Screen.Main     -> NavEntry(key) { LandingPage() }
-                                is Screen.Board    -> NavEntry(key) { BoardScreen() }
+                                is Screen.Main -> NavEntry(key) { LandingPage() }
+                                is Screen.Board -> NavEntry(key) { BoardScreen() }
                                 is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
                                 is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
-                                is Screen.Modules -> NavEntry(key) { PluginSectionScreen() }
-                                is Screen.Module   -> NavEntry(key) { PluginSectionScreen(initialModuleId = key.id) }
-                                is Screen.ModuleManager -> NavEntry(key) { ModuleManagerView() }
-                                is Screen.ModuleRepo -> NavEntry(key) { ModuleRepoView() }
-                                else               -> NavEntry(key) { }
+                                is Screen.Plugins -> NavEntry(key) { PluginSectionScreen() }
+                                is Screen.Plugin -> NavEntry(key) { PluginSectionScreen(initialPluginId = key.id) }
+                                is Screen.PluginManager -> NavEntry(key) { PluginManagerView() }
+                                is Screen.PluginRepo -> NavEntry(key) { PluginRepoView() }
+                                else -> NavEntry(key) { }
                             }
                         }
                     }
@@ -140,7 +151,7 @@ private fun AppContent(
                         modifier = Modifier.fillMaxHeight()
                     )
 
-                    
+
                     ToastHost(
                         notificationService = notificationService,
                         settings = viewModel.settings.notifications

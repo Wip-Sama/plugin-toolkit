@@ -21,7 +21,7 @@ data class NotificationRecord(
 sealed class NotificationEvent {
     data class System(val record: NotificationRecord) : NotificationEvent()
     data class Toast(
-        val message: String, 
+        val message: String,
         val isNotification: Boolean = true
     ) : NotificationEvent()
 }

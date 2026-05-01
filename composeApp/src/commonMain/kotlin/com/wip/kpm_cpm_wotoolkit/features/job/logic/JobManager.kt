@@ -1,6 +1,9 @@
 package com.wip.kpm_cpm_wotoolkit.features.job.logic
 
-import com.wip.kpm_cpm_wotoolkit.features.job.model.*
+import co.touchlab.kermit.Logger
+import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobHistoryEntry
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -10,10 +13,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import co.touchlab.kermit.Logger
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.collections.emptyList
 import kotlin.time.Clock
 
 class JobManager(
@@ -33,15 +34,15 @@ class JobManager(
     val jobLogs: StateFlow<Map<String, List<String>>> = _jobLogs.asStateFlow()
 
     private val workers = mutableListOf<JobWorker>()
-    
+
     // Channel to signal workers that a new job is available.
     // CONFLATED means if multiple jobs are added rapidly, we wake up at least one worker.
     private val jobSignal = Channel<Unit>(Channel.CONFLATED)
-    
+
     // Mutex strictly for managing the active coroutines map, avoiding global contention.
     private val coroutinesMutex = Mutex()
     private val activeJobCoroutines = mutableMapOf<String, Job>()
-    
+
     private val MAX_HISTORY_SIZE = 100
 
     init {
@@ -59,11 +60,11 @@ class JobManager(
     fun enqueueJob(job: BackgroundJob) {
         _jobs.update { currentList ->
             val filtered = if (!job.keepResult) {
-                currentList.filterNot { 
-                    it.pluginId == job.pluginId && 
-                    it.capabilityName == job.capabilityName && 
-                    !it.keepResult &&
-                    (it.status == JobStatus.Completed || it.status == JobStatus.Failed || it.status == JobStatus.Cancelled)
+                currentList.filterNot {
+                    it.pluginId == job.pluginId &&
+                            it.capabilityName == job.capabilityName &&
+                            !it.keepResult &&
+                            (it.status == JobStatus.Completed || it.status == JobStatus.Failed || it.status == JobStatus.Cancelled)
                 }
             } else {
                 currentList
@@ -89,12 +90,17 @@ class JobManager(
             jobName = job.name
             if (job.status == JobStatus.Running || job.status == JobStatus.Queued || job.status == JobStatus.Paused) {
                 cancelled = true
-                currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Cancelled, completedAt = Clock.System.now()) else it }
+                currentList.map {
+                    if (it.id == jobId) it.copy(
+                        status = JobStatus.Cancelled,
+                        completedAt = Clock.System.now()
+                    ) else it
+                }
             } else {
                 currentList
             }
         }
-        
+
         if (cancelled) {
             coroutinesMutex.withLock {
                 activeJobCoroutines.remove(jobId)?.cancel()
@@ -117,7 +123,7 @@ class JobManager(
                 currentList
             }
         }
-        
+
         if (paused) {
             coroutinesMutex.withLock {
                 activeJobCoroutines.remove(jobId)?.cancel()
@@ -140,7 +146,7 @@ class JobManager(
                 currentList
             }
         }
-        
+
         if (resumed) {
             addHistoryEntryInternal(jobId, jobName, "Resumed")
             Logger.i { "Job $jobId ($jobName) resumed" }
@@ -165,11 +171,11 @@ class JobManager(
     suspend fun waitForNextJob(): BackgroundJob {
         while (true) {
             var claimedJob: BackgroundJob? = null
-            
+
             _jobs.update { currentList ->
                 // PriorityQueue behavior: FIFO based on list order
                 val candidate = currentList.firstOrNull { it.status == JobStatus.Queued }
-                    
+
                 if (candidate != null) {
                     claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
                     currentList.map { if (it.id == candidate.id) claimedJob!! else it }
@@ -177,7 +183,7 @@ class JobManager(
                     currentList
                 }
             }
-            
+
             if (claimedJob != null) {
                 // If there are more jobs, signal again to wake up other idle workers
                 if (_jobs.value.any { it.status == JobStatus.Queued }) {
@@ -185,7 +191,7 @@ class JobManager(
                 }
                 return claimedJob!!
             }
-            
+
             // Wait for signal if no jobs are queued
             Logger.v { "No queued jobs, worker waiting for signal..." }
             jobSignal.receive()
@@ -201,11 +207,13 @@ class JobManager(
     fun addJobLog(jobId: String, message: String, level: String = "INFO") {
         val now = Clock.System.now()
         val local = now.toLocalDateTime(TimeZone.currentSystemDefault())
-        val timestamp = "${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}:${local.second.toString().padStart(2, '0')}"
-        
+        val timestamp = "${local.hour.toString().padStart(2, '0')}:${
+            local.minute.toString().padStart(2, '0')
+        }:${local.second.toString().padStart(2, '0')}"
+
         val prefix = if (level == "VERBOSE") "[$jobId] " else ""
         val formattedLog = "[$timestamp] [$level] $prefix$message"
-        
+
         _jobLogs.update { currentLogs ->
             val logs = currentLogs[jobId] ?: emptyList()
             currentLogs + (jobId to (logs + formattedLog).takeLast(100))
@@ -221,18 +229,18 @@ class JobManager(
             if (job.status == JobStatus.Running) {
                 completed = true
                 updateJobProgress(jobId, 1.0f)
-                currentList.map { 
+                currentList.map {
                     if (it.id == jobId) it.copy(
                         status = JobStatus.Completed,
                         completedAt = Clock.System.now(),
                         result = result
-                    ) else it 
+                    ) else it
                 }
             } else {
                 currentList
             }
         }
-        
+
         if (completed) {
             addHistoryEntryInternal(jobId, jobName, "Completed")
             Logger.i { "Job $jobId ($jobName) completed successfully" }
@@ -251,18 +259,18 @@ class JobManager(
             jobName = job.name
             if (job.status == JobStatus.Running) {
                 failed = true
-                currentList.map { 
+                currentList.map {
                     if (it.id == jobId) it.copy(
                         status = JobStatus.Failed,
                         errorMessage = errorMessage,
                         completedAt = Clock.System.now()
-                    ) else it 
+                    ) else it
                 }
             } else {
                 currentList
             }
         }
-        
+
         if (failed) {
             addHistoryEntryInternal(jobId, jobName, "Failed", errorMessage)
             Logger.e { "Job $jobId ($jobName) failed: $errorMessage" }

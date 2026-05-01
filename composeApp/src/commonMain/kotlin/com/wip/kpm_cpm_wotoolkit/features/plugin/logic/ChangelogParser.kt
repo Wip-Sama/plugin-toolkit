@@ -10,26 +10,26 @@ object ChangelogParser {
     fun parse(content: String): List<ChangelogVersion> {
         val versions = mutableListOf<ChangelogVersion>()
         val lines = content.lines()
-        
+
         var currentDate = ""
         var currentVersion = ""
         var currentTags = mutableMapOf<String, MutableList<String>>()
         var currentTag = ""
-        
+
         val versionHeaderRegex = Regex("""\[(.*?)\]\s*(?:-|\[)?\s*(.*?)(?:\])?$""")
-        
+
         for (line in lines) {
             val trimmed = line.trimEnd()
             if (trimmed.isEmpty()) continue
             if (trimmed.all { it == '-' || it == '=' || it == '*' }) continue
-            
+
             val headerMatch = versionHeaderRegex.find(trimmed)
             if (headerMatch != null) {
                 // Save previous version
                 if (currentVersion.isNotEmpty()) {
                     versions.add(ChangelogVersion(currentDate, currentVersion, currentTags))
                 }
-                
+
                 // Start new version
                 currentDate = headerMatch.groupValues[1].trim()
                 currentVersion = headerMatch.groupValues[2].removePrefix("Version:").trim()
@@ -66,12 +66,12 @@ object ChangelogParser {
                 }
             }
         }
-        
+
         // Add the last one
         if (currentVersion.isNotEmpty()) {
             versions.add(ChangelogVersion(currentDate, currentVersion, currentTags))
         }
-        
+
         return versions
     }
 }

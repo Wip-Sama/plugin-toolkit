@@ -6,10 +6,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.wip.kpm_cpm_wotoolkit.features.settings.logic.SettingsRepository
-import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
-import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
 import com.wip.kpm_cpm_wotoolkit.core.utils.PlatformLocalization
+import com.wip.kpm_cpm_wotoolkit.features.settings.logic.SettingsRepository
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val repository: SettingsRepository
 ) : ViewModel() {
-    
+
     var settings by mutableStateOf(repository.loadSettings())
         private set
 

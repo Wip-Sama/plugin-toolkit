@@ -24,3 +24,7 @@ dependencies {
     implementation(project(":plugin-api"))
     ksp(project(":plugin-api"))
 }
+
+tasks.withType<ProcessResources> {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}

@@ -39,7 +39,7 @@ data class SettingMetadata(
 @Serializable
 data class PluginManifest(
     val manifestVersion: String,
-    val module: ModuleInfo,
+    val plugin: PluginInfo,
     val requirements: Requirements,
     val defaultParameters: Map<String, ParameterMetadata>? = null,
     val capabilities: List<Capability> = emptyList(),
@@ -61,7 +61,7 @@ data class Release(
 )
 
 @Serializable
-data class ModuleInfo(
+data class PluginInfo(
     val id: String,
     val name: String,
     val version: String,

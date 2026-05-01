@@ -2,8 +2,8 @@ package com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.ColorRange
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.logic.ColorPickerHelper
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.ColorRange
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -73,7 +73,7 @@ fun Color.toRGB(rgbPrefix: Boolean = false, includeAlpha: Boolean = true): Strin
     return if (includeAlpha) {
         (if (rgbPrefix) "rgba" else "") + "($red, $green, $blue, ${alpha / 255f})"
     } else {
-        (if (rgbPrefix) "rgb" else "")+"($red, $green, $blue)"
+        (if (rgbPrefix) "rgb" else "") + "($red, $green, $blue)"
     }
 }
 
@@ -183,18 +183,23 @@ internal fun Color.Companion.fromHueProgress(progress: Float): Color {
         ColorRange.RedToYellow -> {
             red = 255; green = (255f * rangeProgress).roundToInt(); blue = 0
         }
+
         ColorRange.YellowToGreen -> {
             red = (255 * (1 - rangeProgress)).roundToInt(); green = 255; blue = 0
         }
+
         ColorRange.GreenToCyan -> {
             red = 0; green = 255; blue = (255 * rangeProgress).roundToInt()
         }
+
         ColorRange.CyanToBlue -> {
             red = 0; green = (255 * (1 - rangeProgress)).roundToInt(); blue = 255
         }
+
         ColorRange.BlueToPurple -> {
             red = (255 * rangeProgress).roundToInt(); green = 0; blue = 255
         }
+
         ColorRange.PurpleToRed -> {
             red = 255; green = 0; blue = (255 * (1 - rangeProgress)).roundToInt()
         }

@@ -1,10 +1,9 @@
 package com.wip.kpm_cpm_wotoolkit.core.utils
 
 import com.wip.kpm_cpm_wotoolkit.core.KeepTrack
-import kotlinx.io.files.FileSystem
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.files.Path
 import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
 import java.util.Locale
 
@@ -47,7 +46,18 @@ actual object StartupManager {
         val exePath = getExecutablePath() ?: return
         val commandLine = if (minimized) "\"$exePath\" $backgroundFlag" else "\"$exePath\""
         val command = if (enabled) {
-            arrayOf("reg", "add", KeepTrack.WINDOWS_STARTUP_REGISTRY_PATH, "/v", appName, "/t", "REG_SZ", "/d", commandLine, "/f")
+            arrayOf(
+                "reg",
+                "add",
+                KeepTrack.WINDOWS_STARTUP_REGISTRY_PATH,
+                "/v",
+                appName,
+                "/t",
+                "REG_SZ",
+                "/d",
+                commandLine,
+                "/f"
+            )
         } else {
             arrayOf("reg", "delete", KeepTrack.WINDOWS_STARTUP_REGISTRY_PATH, "/v", appName, "/f")
         }

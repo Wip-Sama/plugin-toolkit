@@ -83,22 +83,23 @@ class BoardViewModel : ViewModel() {
         _state.update { currentState ->
             val currentZoom = currentState.scale
             val currentIndex = zoomLevels.indexOfFirst { it >= currentZoom }
-            
+
             val newScale = if (delta > 0) {
                 // Zoom out
                 val newIndex = (currentIndex - 1).coerceAtLeast(0)
                 zoomLevels[newIndex]
             } else {
                 // Zoom in
-                val newIndex = (if (currentIndex == -1) zoomLevels.size - 1 else currentIndex + 1).coerceAtMost(zoomLevels.size - 1)
+                val newIndex =
+                    (if (currentIndex == -1) zoomLevels.size - 1 else currentIndex + 1).coerceAtMost(zoomLevels.size - 1)
                 zoomLevels[newIndex]
             }
-            
+
             if (newScale == currentZoom) return@update currentState
 
             val boardFocus = (focusPosition - currentState.offset) / currentZoom
             val newOffset = focusPosition - boardFocus * newScale
-            
+
             currentState.copy(scale = newScale, offset = newOffset)
         }
     }

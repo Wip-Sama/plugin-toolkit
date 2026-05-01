@@ -5,8 +5,8 @@
     <string name="nav_board">Board</string>
     <string name="section_flows">Flows</string>
     <string name="section_direct_execution">Direct Execution</string>
-    <string name="nav_modules">Modules</string>
-    <string name="section_loaded_modules">Loaded Modules</string>
+    <string name="nav_plugins">Plugins</string>
+    <string name="section_loaded_plugins">Loaded Plugins</string>
     <string name="section_privacy">Privacy and Security</string>
     <string name="nav_privacy">Privacy</string>
     <string name="section_archive">Storage and Data</string>
@@ -22,9 +22,9 @@
     <string name="setting_use_system_language_subtitle">Automatically follow your device language</string>
     <string name="setting_scaling">Scaling</string>
     <string name="setting_appearance">Appearance</string>
-    <string name="section_modules">Modules</string>
-    <string name="section_modules_repositories">Repositories</string>
-    <string name="section_modules_manager">Manager</string>
+    <string name="section_plugins">Plugins</string>
+    <string name="section_plugins_repositories">Repositories</string>
+    <string name="section_plugins_manager">Manager</string>
     <string name="section_about">About</string>
     <string name="section_general">General</string>
     <string name="section_localization">Localization</string>
@@ -35,8 +35,8 @@
     <string name="setting_launch_at_startup_subtitle">Automatically start the application when you log in</string>
     <string name="setting_launch_minimized_at_startup">Minimized at Startup</string>
     <string name="setting_launch_minimized_at_startup_subtitle">Hide the window when the app is launched by the system</string>
-    <string name="setting_start_minimized">Start Minimized</string>
-    <string name="setting_start_minimized_subtitle">Start the application in the system tray</string>
+    <string name="setting_window_start_mode">Window Start Mode</string>
+    <string name="setting_window_start_mode_subtitle">Select how the application window should appear at startup</string>
     <string name="setting_close_to_tray">Close to Tray</string>
     <string name="setting_close_to_tray_subtitle">Close the application to the system tray</string>
     <string name="section_logging">Logging</string>
@@ -71,23 +71,125 @@
     <string name="repo_managed_title">Managed Repositories</string>
     <string name="repo_refresh_all">Refresh All</string>
     <string name="repo_empty_list">No repositories added yet.</string>
-    <string name="module_manager_title">Module Manager</string>
-    <string name="module_refresh_list">Refresh List</string>
-    <string name="module_reload_all">Reload All</string>
-    <string name="module_install_local">Install Local</string>
-    <string name="module_managed_folders">Managed Folders</string>
-    <string name="module_add_folder">Add Folder</string>
-    <string name="module_uninstall">Remove</string>
-    <string name="module_reload">Reload</string>
-    <string name="module_changelog">Changelog</string>
-    <string name="module_settings">Settings</string>
-    <string name="module_update">Update</string>
-    <string name="module_validate">Validate</string>
-    <string name="module_enabled">Enabled</string>
-    <string name="module_loaded">Loaded</string>
+    <string name="plugin_manager_title">Plugin Manager</string>
+    <string name="plugin_refresh_list">Refresh List</string>
+    <string name="plugin_reload_all">Reload All</string>
+    <string name="plugin_install_local">Install Local</string>
+    <string name="plugin_managed_folders">Managed Folders</string>
+    <string name="plugin_add_folder">Add Folder</string>
+    <string name="plugin_uninstall">Remove</string>
+    <string name="plugin_reload">Reload</string>
+    <string name="plugin_changelog">Changelog</string>
+    <string name="plugin_settings">Settings</string>
+    <string name="plugin_update">Update</string>
+    <string name="plugin_validate">Validate</string>
+    <string name="plugin_enabled">Enabled</string>
+    <string name="plugin_loaded">Loaded</string>
     <string name="nav_jobs">Jobs</string>
     <string name="nav_job_general">General</string>
     <string name="nav_job_archive">Archive</string>
     <string name="nav_job_scheduler">Scheduler</string>
     <string name="nav_job_history">History</string>
+    <string name="section_jobs">Jobs</string>
+    <string name="setting_plugin_unplug_behavior">Plugin Unplug Behavior</string>
+    <string name="setting_plugin_unplug_behavior_subtitle">What to do when disabling or uninstalling a plugin with active jobs</string>
+    <string name="setting_plugin_unplug_behavior_block">Prevent unplugging while working</string>
+    <string name="setting_plugin_unplug_behavior_stop">Stop everything and unplug</string>
+    <string name="setting_max_concurrent_jobs">Max Concurrent Jobs</string>
+    <string name="setting_max_concurrent_jobs_subtitle">Number of workers available to run background tasks</string>
+    <string name="setting_save_job_history">Save Job History</string>
+    <string name="setting_save_job_history_subtitle">Keep a log of all executed jobs and their results</string>
+    <string name="setting_history_retention_days">History Retention Days</string>
+    <string name="setting_history_retention_days_subtitle">Number of days to keep job history before automatic deletion</string>
+
+    <!-- General / Common -->
+    <string name="dialog_confirm">Confirm</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_proceed_anyway">Proceed Anyway</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_more_actions">More actions</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_install">Install</string>
+    <string name="action_resume">Resume</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+
+    <!-- Settings -->
+    <string name="settings_search_placeholder">Search settings...</string>
+    <string name="settings_no_results">No results found in %s</string>
+    <string name="settings_search_whole">Search in whole settings</string>
+    <string name="settings_feature_placeholder">Content for %s will appear here.</string>
+
+    <!-- Jobs -->
+    <string name="job_running_jobs">Running Jobs</string>
+    <string name="job_queue">Queue</string>
+    <string name="job_paused_jobs">Paused Jobs</string>
+    <string name="job_no_active">No active or queued jobs</string>
+    <string name="job_no_archived">No archived jobs</string>
+    <string name="job_scheduler_soon">Scheduler coming soon</string>
+    <string name="job_error_format">Error: %s</string>
+
+    <!-- Plugin Manager -->
+    <string name="plugin_choose_install_location">Choose Install Location</string>
+    <string name="plugin_action_blocked">Action Blocked</string>
+    <string name="plugin_state_change_error">Could not change plugin state</string>
+    <string name="plugin_uninstall_title">Uninstall Plugin</string>
+    <string name="plugin_uninstall_confirmation">Are you sure you want to uninstall %s?</string>
+    <string name="plugin_uninstall_blocked">Uninstall Blocked</string>
+    <string name="plugin_uninstall_error">Could not uninstall plugin</string>
+    <string name="plugin_validation_result">Validation Result</string>
+    <string name="plugin_validated_success">Plugin validated successfully.</string>
+    <string name="plugin_validation_failed">Validation failed: %s</string>
+    <string name="plugin_changelog_not_found_jar">No changelog found in JAR resources for %s</string>
+    <string name="plugin_changelog_not_found_remote">No remote changelog found for %s</string>
+    <string name="plugin_default_folder_label">Default Managed Folder (Permanent)</string>
+    <string name="plugin_default_tag">DEFAULT</string>
+    <string name="plugin_version_pkg_format">v%s • %s</string>
+    <string name="plugin_version_pkg_installed_format">v%s • Installed: v%s • %s</string>
+    <string name="plugin_installed_label">Installed</string>
+    <string name="plugin_not_found_unloaded">Plugin not found or unloaded</string>
+    <string name="plugin_selection_hint">Select a plugin from the sidebar to see its capabilities</string>
+
+    <!-- Plugin Content / Tester -->
+    <string name="plugin_select_capability_hint">Select a capability to begin testing</string>
+    <string name="plugin_execution_results">Execution Results</string>
+    <string name="plugin_id_format">ID: %s</string>
+    <string name="plugin_mem_format">Mem: %dMB</string>
+    <string name="plugin_tester_title">Capability Tester: %s</string>
+    <string name="plugin_save_results">Save Results</string>
+    <string name="plugin_no_parameters">No parameters required for this capability.</string>
+    <string name="plugin_execute_capability">Execute Capability</string>
+    <string name="plugin_execute_capability_running">Execute Capability (%d running)</string>
+    <string name="plugin_execution_id_format">Execution %s</string>
+    <string name="plugin_executing_progress">Executing... %d%%</string>
+
+    <!-- Repositories -->
+    <string name="repo_add_success">Repository added successfully</string>
+    <string name="repo_already_added">Repository already added</string>
+    <string name="repo_add_error">Error adding repository: %s</string>
+    <string name="repo_removed">Repository removed</string>
+    <string name="repo_refreshed">Repository refreshed</string>
+    <string name="repo_all_refreshed">All repositories refreshed</string>
+    <string name="repo_source_updated">Source for %s updated</string>
+    <string name="repo_plugin_installed">Plugin %s installed</string>
+    <string name="repo_install_failed">Failed to install %s: %s</string>
+    <string name="repo_url_placeholder">https://.../index.json</string>
+
+    <!-- Landing Page -->
+    <string name="landing_system_overview">System Overview</string>
+    <string name="landing_loaded_plugins">Loaded Plugins</string>
+    <string name="landing_active_jobs">Active Jobs</string>
+    <string name="landing_queued_jobs">Queued Jobs</string>
+    <string name="landing_recent_activity">Recent Activity</string>
+    <string name="landing_no_activity">No recent activity</string>
+    <string name="landing_quick_links">Quick Links</string>
+    <string name="landing_link_jobs">Open Job Dashboard</string>
+    <string name="landing_link_plugins">View All Plugins</string>
+    <string name="landing_link_settings">System Settings</string>
+    <string name="landing_link_docs">Documentation</string>
+    <string name="landing_welcome_title">Welcome to WOToolkit</string>
+    <string name="landing_welcome_subtitle">Your central hub for plugin orchestration and automation.</string>
 </resources>

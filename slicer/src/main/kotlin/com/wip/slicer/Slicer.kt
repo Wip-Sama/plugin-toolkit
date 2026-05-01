@@ -1,7 +1,7 @@
 package com.wip.slicer
 
 import com.wip.plugin.api.annotations.Capability
-import com.wip.plugin.api.annotations.PluginModule
+import com.wip.plugin.api.annotations.PluginInfo
 import com.wip.plugin.api.annotations.CapabilityParam
 import com.wip.plugin.api.PluginLogger
 import com.wip.plugin.api.ProgressReporter
@@ -14,11 +14,11 @@ import javax.imageio.ImageIO
 import kotlin.math.abs
 import java.awt.image.BufferedImage
 
-@PluginModule(
+@PluginInfo(
     id = "com.wip.operations.slicer",
     name = "Slicer",
     version = "0.4.3",
-    description = "A module that provides vertical images sliding capabilities for manhwa."
+    description = "A plugin that provides vertical images sliding capabilities for manhwa."
 )
 class Slicer {
     @Capability(

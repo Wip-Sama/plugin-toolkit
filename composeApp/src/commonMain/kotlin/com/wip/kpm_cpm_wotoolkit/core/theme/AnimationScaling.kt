@@ -1,6 +1,6 @@
 package com.wip.kpm_cpm_wotoolkit.core.theme
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.MonotonicFrameClock
 
 /**
  * A [MonotonicFrameClock] that scales the time passed to its frames.
@@ -22,7 +22,7 @@ class ScaledFrameClock(
             } else {
                 val delta = actualTimeNanos - lastActualTimeNanos
                 // Use a very high scale if disabled to make it effectively instant (1,000,000x)
-                val effectiveScale = if (enabledProvider()) 1f else 1_000_000f 
+                val effectiveScale = if (enabledProvider()) 1f else 1_000_000f
                 scaledTimeNanos += (delta * effectiveScale).toLong()
                 lastActualTimeNanos = actualTimeNanos
             }

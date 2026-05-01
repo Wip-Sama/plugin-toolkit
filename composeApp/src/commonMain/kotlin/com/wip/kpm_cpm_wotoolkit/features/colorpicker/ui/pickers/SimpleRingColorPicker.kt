@@ -6,7 +6,12 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -22,8 +27,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.*
-import com.wip.kpm_cpm_wotoolkit.features.colorpicker.logic.*
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.logic.MathHelper
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.blue
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.darken
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.fromHueProgress
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.green
+import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.red
 import kotlin.math.atan2
 
 /**
@@ -53,7 +62,8 @@ internal fun SimpleRingColorPicker(
         )
     }
 
-    Canvas(modifier = modifier
+    Canvas(
+        modifier = modifier
         .size(280.dp)
         .aspectRatio(1f)
         .onSizeChanged { radius = it.width / 2f }
@@ -115,7 +125,7 @@ internal fun SimpleRingColorPicker(
                     (pickerLocation.y / tracksCount.toFloat()).coerceIn(0f, 1f)
                 )
             }
-            
+
             canvas.drawArc(
                 pickerLocation.y * colorWidthPx + colorWidthPx / 2 + selectColorWidth / 2,
                 pickerLocation.y * colorWidthPx + colorWidthPx / 2 + selectColorWidth / 2,
@@ -143,11 +153,11 @@ private fun calculateSimpleRingLocation(
     val length = MathHelper.getLength(x, y, radius)
     val outerEdge = radius - selectColorWidth / 2
     val trackIndex = ((outerEdge - length) / colorWidthPx).toInt().coerceIn(0, tracksCount - 1)
-    
+
     val angleRad = atan2(y - radius, x - radius)
     val angleDeg = (angleRad * 180.0 / kotlin.math.PI + 360) % 360
     val angleProgress = angleDeg / 360f
-    
+
     return IntOffset(
         (sectorsCount * angleProgress).toInt().coerceIn(0, sectorsCount - 1),
         trackIndex

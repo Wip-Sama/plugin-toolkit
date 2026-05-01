@@ -21,16 +21,16 @@ sealed interface Screen : NavKey {
     data object JobDashboard : Screen
 
     @Serializable
-    data object Modules : Screen
+    data object Plugins : Screen
 
     @Serializable
-    data class Module(val id: String) : Screen
+    data class Plugin(val id: String) : Screen
 
     @Serializable
-    data object ModuleManager : Screen
+    data object PluginManager : Screen
 
     @Serializable
-    data object ModuleRepo : Screen
+    data object PluginRepo : Screen
 }
 
 /** Polymorphic serialization config required by rememberNavBackStack. */
@@ -41,10 +41,10 @@ val ScreenNavConfig = SavedStateConfiguration {
             subclass(Screen.Board::class, Screen.Board.serializer())
             subclass(Screen.Settings::class, Screen.Settings.serializer())
             subclass(Screen.JobDashboard::class, Screen.JobDashboard.serializer())
-            subclass(Screen.Modules::class, Screen.Modules.serializer())
-            subclass(Screen.Module::class, Screen.Module.serializer())
-            subclass(Screen.ModuleManager::class, Screen.ModuleManager.serializer())
-            subclass(Screen.ModuleRepo::class, Screen.ModuleRepo.serializer())
+            subclass(Screen.Plugins::class, Screen.Plugins.serializer())
+            subclass(Screen.Plugin::class, Screen.Plugin.serializer())
+            subclass(Screen.PluginManager::class, Screen.PluginManager.serializer())
+            subclass(Screen.PluginRepo::class, Screen.PluginRepo.serializer())
         }
     }
 }

@@ -1,11 +1,11 @@
 package com.wip.kpm_cpm_wotoolkit.features.plugin.logic
 
 import com.wip.plugin.api.PluginFileSystem
+import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readByteArray
 import kotlinx.io.readString
-import kotlinx.io.buffered
 import kotlinx.io.writeString
 
 class DefaultPluginFileSystem(
@@ -61,7 +61,7 @@ class DefaultPluginFileSystem(
         if (!SystemFileSystem.exists(path)) return emptyList()
         val metadata = SystemFileSystem.metadataOrNull(path)
         if (metadata?.isDirectory != true) return emptyList()
-        
+
         return SystemFileSystem.list(path).map { it.name }
     }
 

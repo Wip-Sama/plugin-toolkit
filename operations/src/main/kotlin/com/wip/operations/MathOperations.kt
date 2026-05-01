@@ -1,10 +1,10 @@
 package com.wip.operations
 
 import com.wip.plugin.api.annotations.Capability
-import com.wip.plugin.api.annotations.PluginModule
+import com.wip.plugin.api.annotations.PluginInfo
 import com.wip.plugin.api.annotations.CapabilityParam
 
-@PluginModule(
+@PluginInfo(
     id = "com.wip.operations.math",
     name = "Math Operations",
     version = "1.3.1",

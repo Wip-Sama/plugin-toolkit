@@ -7,7 +7,33 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.AvTimer
+import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.Engineering
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Input
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Minimize
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PowerOff
+import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.SettingsInputComponent
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,22 +45,78 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
-import com.wip.kpm_cpm_wotoolkit.features.settings.model.*
-import com.wip.kpm_cpm_wotoolkit.features.settings.ui.SettingNavKey
 import com.wip.kpm_cpm_wotoolkit.core.utils.StartupManager
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.ColorPickerType
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.ColorPickerDialog
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppTheme
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.LogLevel
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.PluginUnplugBehavior
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.SettingDefinition
+import com.wip.kpm_cpm_wotoolkit.features.settings.model.WindowStartMode
+import com.wip.kpm_cpm_wotoolkit.features.settings.ui.SettingNavKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_jobs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_localization
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_logging
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_notifications
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_plugins
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_system
+import kpm_cpm_wotoolkit.composeapp.generated.resources.section_toasts
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_accent_color
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_appearance
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_close_to_tray
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_close_to_tray_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_compress_old_logs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_compress_old_logs_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_compressed_logs_to_keep
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_compressed_logs_to_keep_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_enable_system_notifications
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_enable_toasts
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_history_retention
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_history_retention_days
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_history_retention_days_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_language
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_launch_at_startup
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_launch_at_startup_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_launch_minimized_at_startup
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_launch_minimized_at_startup_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_log_level
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_log_level_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_logs_to_keep
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_logs_to_keep_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_max_concurrent_jobs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_max_concurrent_jobs_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_open_log_folder
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_open_log_folder_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_plugin_unplug_behavior
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_plugin_unplug_behavior_block
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_plugin_unplug_behavior_stop
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_plugin_unplug_behavior_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_save_job_history
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_save_job_history_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_scaling
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_error
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_info
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_show_warning
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_theme
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_timezone
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_toast_auto_dismiss
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_toast_dismiss_time
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_use_system_language
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_use_system_language_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_window_start_mode
+import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_window_start_mode_subtitle
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
-import kpm_cpm_wotoolkit.composeapp.generated.resources.*
 
 /**
  * An abstraction to handle both Compose StringResources (for static UI)
- * and plain Strings (for dynamic module settings).
+ * and plain Strings (for dynamic plugin settings).
  */
 sealed interface SettingText {
     data class Resource(val res: StringResource) : SettingText
@@ -48,7 +130,6 @@ fun SettingText.resolve(): String {
         is SettingText.Raw -> text
     }
 }
-
 
 
 class SettingsRegistry {
@@ -106,7 +187,8 @@ class SettingsRegistry {
         val loggingSection = SettingText.Resource(Res.string.section_logging)
         val toastsSection = SettingText.Resource(Res.string.section_toasts)
         val notificationsSection = SettingText.Resource(Res.string.section_notifications)
-        val jobsSection = SettingText.Raw("Jobs")
+        val jobsSection = SettingText.Resource(Res.string.section_jobs)
+        val pluginsSection = SettingText.Resource(Res.string.section_plugins)
 
         val definitions = listOf(
             // ── Appearance ───────────────────────────────────────────────
@@ -256,14 +338,16 @@ class SettingsRegistry {
                 setValue = { s, v -> s.copy(general = s.general.copy(launchMinimizedAtStartup = v)) }
             ),
 
-            SettingDefinition.SwitchSetting(
-                title = SettingText.Resource(Res.string.setting_start_minimized),
-                subtitle = SettingText.Resource(Res.string.setting_start_minimized_subtitle),
+            SettingDefinition.DropdownSetting(
+                title = SettingText.Resource(Res.string.setting_window_start_mode),
+                subtitle = SettingText.Resource(Res.string.setting_window_start_mode_subtitle),
                 icon = Icons.Default.Minimize,
                 sectionTitle = systemSection,
                 navKey = SettingNavKey.SystemSettings,
-                getValue = { it.general.startMinimized },
-                setValue = { s, v -> s.copy(general = s.general.copy(startMinimized = v)) }
+                options = WindowStartMode.entries,
+                getValue = { it.general.windowStartMode },
+                setValue = { s, v -> s.copy(general = s.general.copy(windowStartMode = v)) },
+                labelProvider = { it.name }
             ),
 
             SettingDefinition.SwitchSetting(
@@ -417,9 +501,11 @@ class SettingsRegistry {
                 navKey = SettingNavKey.SystemSettings,
                 getValue = { it.notifications.history.retentionDays },
                 setValue = { s, v ->
-                    s.copy(notifications = s.notifications.copy(
-                        history = s.notifications.history.copy(retentionDays = v)
-                    ))
+                    s.copy(
+                        notifications = s.notifications.copy(
+                            history = s.notifications.history.copy(retentionDays = v)
+                        )
+                    )
                 },
                 valueRange = 1..30
             ),
@@ -439,8 +525,8 @@ class SettingsRegistry {
 
             // ── Jobs ────────────────────────────────────────────────────
             SettingDefinition.NumericSetting(
-                title = SettingText.Raw("Max Concurrent Jobs"),
-                subtitle = SettingText.Raw("Number of workers available to run background tasks"),
+                title = SettingText.Resource(Res.string.setting_max_concurrent_jobs),
+                subtitle = SettingText.Resource(Res.string.setting_max_concurrent_jobs_subtitle),
                 icon = Icons.Default.Engineering,
                 sectionTitle = jobsSection,
                 navKey = SettingNavKey.SystemSettings,
@@ -450,8 +536,8 @@ class SettingsRegistry {
             ),
 
             SettingDefinition.SwitchSetting(
-                title = SettingText.Raw("Save Job History"),
-                subtitle = SettingText.Raw("Keep a log of all executed jobs and their results"),
+                title = SettingText.Resource(Res.string.setting_save_job_history),
+                subtitle = SettingText.Resource(Res.string.setting_save_job_history_subtitle),
                 icon = Icons.Default.History,
                 sectionTitle = jobsSection,
                 navKey = SettingNavKey.SystemSettings,
@@ -460,8 +546,8 @@ class SettingsRegistry {
             ),
 
             SettingDefinition.NumericSetting(
-                title = SettingText.Raw("History Retention Days"),
-                subtitle = SettingText.Raw("Number of days to keep job history before automatic deletion"),
+                title = SettingText.Resource(Res.string.setting_history_retention_days),
+                subtitle = SettingText.Resource(Res.string.setting_history_retention_days_subtitle),
                 icon = Icons.Default.EventRepeat,
                 sectionTitle = jobsSection,
                 navKey = SettingNavKey.SystemSettings,
@@ -469,6 +555,24 @@ class SettingsRegistry {
                 getValue = { it.jobs.historyRetentionDays },
                 setValue = { s, v -> s.copy(jobs = s.jobs.copy(historyRetentionDays = v)) },
                 valueRange = 1..365
+            ),
+
+            // ── Plugins ─────────────────────────────────────────────────
+            SettingDefinition.DropdownSetting(
+                title = SettingText.Resource(Res.string.setting_plugin_unplug_behavior),
+                subtitle = SettingText.Resource(Res.string.setting_plugin_unplug_behavior_subtitle),
+                icon = Icons.Default.PowerOff,
+                sectionTitle = pluginsSection,
+                navKey = SettingNavKey.SystemSettings,
+                options = PluginUnplugBehavior.entries,
+                getValue = { it.extensions.pluginUnplugBehavior },
+                setValue = { s, v -> s.copy(extensions = s.extensions.copy(pluginUnplugBehavior = v)) },
+                labelProvider = {
+                    when (it) {
+                        PluginUnplugBehavior.Block -> stringResource(Res.string.setting_plugin_unplug_behavior_block)
+                        PluginUnplugBehavior.StopJobs -> stringResource(Res.string.setting_plugin_unplug_behavior_stop)
+                    }
+                }
             )
         )
 

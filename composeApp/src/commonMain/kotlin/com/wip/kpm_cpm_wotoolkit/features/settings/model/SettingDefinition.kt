@@ -16,14 +16,19 @@ import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingText
 sealed class SettingDefinition {
     /** Display title for the setting */
     abstract val title: SettingText
+
     /** Optional subtitle / description */
     abstract val subtitle: SettingText?
+
     /** Icon shown next to the setting */
     abstract val icon: ImageVector
+
     /** Section header this setting belongs to (for grouping) */
     abstract val sectionTitle: SettingText
+
     /** Which settings page this definition belongs to */
     abstract val navKey: SettingNavKey
+
     /** Whether this setting is currently enabled, evaluated against the current AppSettings */
     abstract val enabled: (AppSettings) -> Boolean
 

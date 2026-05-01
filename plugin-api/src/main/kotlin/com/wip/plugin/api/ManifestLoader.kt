@@ -12,7 +12,7 @@ object ManifestLoader {
      * Loads the manifest.json from the resources of the provided class.
      */
     fun loadFromResources(clazz: Class<*>): PluginManifest {
-        val resourceStream = clazz.getResourceAsStream("/manifest.json")
+        val resourceStream = clazz.getResourceAsStream("/META-INF/manifest.json")
             ?: throw IllegalStateException("manifest.json not found in resources of ${clazz.name}")
         
         val content = resourceStream.bufferedReader().use { it.readText() }

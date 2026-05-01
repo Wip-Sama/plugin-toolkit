@@ -2,7 +2,7 @@ package com.wip.plugin.api.annotations
 
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
-annotation class PluginModule(
+annotation class PluginInfo(
     val id: String,
     val name: String,
     val version: String,
@@ -27,15 +27,15 @@ annotation class CapabilityParam(
 
 @Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.SOURCE)
-annotation class ModuleSetting(
+annotation class PluginSetting(
     val description: String,
     val defaultValue: String = ""
 )
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.SOURCE)
-annotation class ModuleSetup
+annotation class PluginSetup
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.SOURCE)
-annotation class ModuleValidate
+annotation class PluginValidate

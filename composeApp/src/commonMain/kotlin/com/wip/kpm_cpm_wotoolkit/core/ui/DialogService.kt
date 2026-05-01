@@ -1,10 +1,9 @@
 package com.wip.kpm_cpm_wotoolkit.core.ui
 
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ChangelogVersion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.ChangelogVersion
 
 class DialogService {
     private val _dialogState = MutableStateFlow<DialogData?>(null)
@@ -22,8 +21,8 @@ class DialogService {
         _dialogState.value = DialogData.Warning(title, message, onConfirm)
     }
 
-    fun showChangelog(moduleName: String, versions: List<ChangelogVersion>) {
-        _dialogState.value = DialogData.Changelog(moduleName, versions)
+    fun showChangelog(pluginName: String, versions: List<ChangelogVersion>) {
+        _dialogState.value = DialogData.Changelog(pluginName, versions)
     }
 
     fun dismiss() {
@@ -34,6 +33,8 @@ class DialogService {
 sealed class DialogData {
     data class Confirmation(val title: String, val message: String, val onConfirm: () -> Unit) : DialogData()
     data class Warning(val title: String, val message: String, val onConfirm: () -> Unit) : DialogData()
-    data class LocationPicker(val title: String, val folders: List<String>, val onSelected: (String) -> Unit) : DialogData()
-    data class Changelog(val moduleName: String, val versions: List<ChangelogVersion>) : DialogData()
+    data class LocationPicker(val title: String, val folders: List<String>, val onSelected: (String) -> Unit) :
+        DialogData()
+
+    data class Changelog(val pluginName: String, val versions: List<ChangelogVersion>) : DialogData()
 }

@@ -4,11 +4,23 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -16,18 +28,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.wip.kpm_cpm_wotoolkit.features.board.viewmodel.BoardEvent
 import com.wip.kpm_cpm_wotoolkit.features.board.viewmodel.BoardViewModel
 import com.wip.kpm_cpm_wotoolkit.shared.components.ZoomControls
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
-import kpm_cpm_wotoolkit.composeapp.generated.resources.*
+import kpm_cpm_wotoolkit.composeapp.generated.resources.board_controls
+import kpm_cpm_wotoolkit.composeapp.generated.resources.board_reset
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import kotlin.math.roundToInt
 
 @Composable
@@ -77,10 +90,10 @@ fun BoardScreen(
             val scaledGridSize = gridSize * state.scale
             val startX = (state.offset.x % scaledGridSize) - scaledGridSize
             val startY = (state.offset.y % scaledGridSize) - scaledGridSize
-            
+
             val cols = (size.width / scaledGridSize).toInt() + 2
             val rows = (size.height / scaledGridSize).toInt() + 2
-            
+
             for (i in 0..cols) {
                 for (j in 0..rows) {
                     val x = startX + i * scaledGridSize
@@ -105,7 +118,7 @@ fun BoardScreen(
                         )
                     }
                     .graphicsLayer(
-                        scaleX = state.scale, 
+                        scaleX = state.scale,
                         scaleY = state.scale,
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                     )

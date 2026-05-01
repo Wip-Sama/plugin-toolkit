@@ -1,27 +1,22 @@
 package com.wip.kpm_cpm_wotoolkit.core.utils
 
+
 import androidx.compose.ui.graphics.Color
+import co.touchlab.kermit.Logger
 import com.sun.jna.platform.win32.Advapi32Util.registryGetIntValue
 import com.sun.jna.platform.win32.Advapi32Util.registryValueExists
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
+import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.toKotlinxIoPath
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readString
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forSessionBus
 import org.freedesktop.dbus.interfaces.DBusInterface
 import org.freedesktop.dbus.types.Variant
-import co.touchlab.kermit.Logger
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.*
-
-
-import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.toKotlinxIoPath
-
-import kotlinx.io.asSource
-import kotlinx.io.buffered
-import kotlinx.io.files.FileSystem
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.files.Path
-import kotlinx.io.readByteArray
-import kotlinx.io.readString
-import java.io.File
 
 actual object PlatformUtils {
     actual val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
@@ -60,11 +55,11 @@ actual object PlatformUtils {
         return try {
             forSessionBus().build().use { conn ->
                 val settings =
-                        conn.getRemoteObject(
-                                "org.freedesktop.portal.Desktop",
-                                "/org/freedesktop/portal/desktop",
-                                PortalSettings::class.java
-                        )
+                    conn.getRemoteObject(
+                        "org.freedesktop.portal.Desktop",
+                        "/org/freedesktop/portal/desktop",
+                        PortalSettings::class.java
+                    )
 
                 val result = settings.Read("org.freedesktop.appearance", "accent-color")
                 val value = result.value
@@ -95,12 +90,9 @@ actual object PlatformUtils {
 
     actual suspend fun pickFile(): String? {
         return FileKit.openFilePicker(
-            dialogSettings = FileKitDialogSettings(title = "Select Module File")
+            dialogSettings = FileKitDialogSettings(title = "Select Plugin File")
         )?.toKotlinxIoPath()?.toString()
     }
-
-
-
 
 
     actual fun copyFile(source: String, destination: String) {
@@ -230,7 +222,7 @@ actual object PlatformUtils {
             SystemFileSystem.source(p).buffered().use { it.readString() }
         } else null
     }
-    
+
     actual fun readFileFromZip(zipPath: String, fileName: String): String? {
         return try {
             java.util.zip.ZipFile(zipPath).use { zip ->

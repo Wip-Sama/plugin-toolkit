@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.ColorPickerType
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.ColorPickerDialog
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppLanguage
@@ -54,7 +55,6 @@ import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_timezone
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_use_system_language
 import kpm_cpm_wotoolkit.composeapp.generated.resources.setting_use_system_language_subtitle
 import org.jetbrains.compose.resources.stringResource
-import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 
 @Composable
 fun AppearanceSettingsView(viewModel: SettingsViewModel) {

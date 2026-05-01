@@ -1,11 +1,36 @@
 package com.wip.kpm_cpm_wotoolkit.features.landingPage.ui
 
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SettingsInputComponent
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -13,15 +38,30 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
+import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 import com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
+import com.wip.kpm_cpm_wotoolkit.features.plugin.viewmodel.PluginViewModel
 import com.wip.kpm_cpm_wotoolkit.shared.components.GlassCard
+import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_active_jobs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_link_docs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_link_jobs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_link_plugins
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_link_settings
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_loaded_plugins
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_no_activity
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_queued_jobs
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_quick_links
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_recent_activity
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_system_overview
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_welcome_subtitle
+import kpm_cpm_wotoolkit.composeapp.generated.resources.landing_welcome_title
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
-import androidx.compose.ui.tooling.preview.Preview
-import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
-import com.wip.kpm_cpm_wotoolkit.core.theme.WOTheme
 
 @Composable
 fun LandingPage(
@@ -31,7 +71,7 @@ fun LandingPage(
 ) {
     val jobs by jobManager.jobs.collectAsState()
     val loadedPlugins = viewModel.loadedPlugins
-    
+
     val activeJobsCount = jobs.count { it.status == JobStatus.Running }
     val queuedJobsCount = jobs.count { it.status == JobStatus.Queued }
 
@@ -48,7 +88,7 @@ fun LandingPage(
 
         // Stats Grid
         Text(
-            "System Overview",
+            stringResource(Res.string.landing_system_overview),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = WOTheme.spacing.medium)
@@ -59,21 +99,21 @@ fun LandingPage(
             horizontalArrangement = Arrangement.spacedBy(WOTheme.spacing.large)
         ) {
             StatCard(
-                title = "Loaded Modules",
+                title = stringResource(Res.string.landing_loaded_plugins),
                 value = loadedPlugins.size.toString(),
                 icon = Icons.Default.Extension,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                title = "Active Jobs",
+                title = stringResource(Res.string.landing_active_jobs),
                 value = activeJobsCount.toString(),
                 icon = Icons.Default.PlayArrow,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                title = "Queued Jobs",
+                title = stringResource(Res.string.landing_queued_jobs),
                 value = queuedJobsCount.toString(),
                 icon = Icons.Default.List,
                 color = MaterialTheme.colorScheme.tertiary,
@@ -87,12 +127,19 @@ fun LandingPage(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(WOTheme.spacing.large)) {
             GlassCard(modifier = Modifier.weight(1.5f).height(300.dp)) {
                 Column(modifier = Modifier.padding(WOTheme.spacing.medium)) {
-                    Text("Recent Activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(Res.string.landing_recent_activity),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(WOTheme.spacing.medium))
-                    
+
                     if (jobs.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No recent activity", color = MaterialTheme.colorScheme.outline)
+                            Text(
+                                stringResource(Res.string.landing_no_activity),
+                                color = MaterialTheme.colorScheme.outline
+                            )
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(WOTheme.spacing.mediumSmall)) {
@@ -124,13 +171,17 @@ fun LandingPage(
 
             GlassCard(modifier = Modifier.weight(1f).height(300.dp)) {
                 Column(modifier = Modifier.padding(WOTheme.spacing.medium)) {
-                    Text("Quick Links", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(Res.string.landing_quick_links),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(WOTheme.spacing.medium))
-                    
-                    QuickLinkItem("Open Job Dashboard", Icons.Default.Dashboard)
-                    QuickLinkItem("View All Modules", Icons.Default.SettingsInputComponent)
-                    QuickLinkItem("System Settings", Icons.Default.Settings)
-                    QuickLinkItem("Documentation", Icons.Default.Info)
+
+                    QuickLinkItem(stringResource(Res.string.landing_link_jobs), Icons.Default.Dashboard)
+                    QuickLinkItem(stringResource(Res.string.landing_link_plugins), Icons.Default.SettingsInputComponent)
+                    QuickLinkItem(stringResource(Res.string.landing_link_settings), Icons.Default.Settings)
+                    QuickLinkItem(stringResource(Res.string.landing_link_docs), Icons.Default.Info)
                 }
             }
         }
@@ -157,13 +208,13 @@ fun DashboardHero() {
     ) {
         Column {
             Text(
-                "Welcome to WOToolkit",
+                stringResource(Res.string.landing_welcome_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = Color.White,
                 fontWeight = FontWeight.ExtraBold
             )
             Text(
-                "Your central hub for module orchestration and automation.",
+                stringResource(Res.string.landing_welcome_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.8f)
             )

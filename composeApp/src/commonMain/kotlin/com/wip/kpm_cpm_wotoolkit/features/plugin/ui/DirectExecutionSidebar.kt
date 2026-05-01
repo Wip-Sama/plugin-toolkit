@@ -1,14 +1,35 @@
 package com.wip.kpm_cpm_wotoolkit.features.plugin.ui
 
-import androidx.compose.animation.*
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,14 +39,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wip.plugin.api.Capability
 import com.wip.plugin.api.PluginEntry
-import com.wip.kpm_cpm_wotoolkit.core.model.localized
 
 @Composable
 fun DirectExecutionSidebar(
     loadedPlugins: List<PluginEntry>,
-    selectedModuleId: String?,
-    onModuleSelected: (String) -> Unit,
-    onBackToModules: () -> Unit,
+    selectedPluginId: String?,
+    onPluginSelected: (String) -> Unit,
+    onBackToPlugins: () -> Unit,
     selectedCapability: Capability?,
     onCapabilitySelected: (Capability) -> Unit,
     modifier: Modifier = Modifier
@@ -38,7 +58,7 @@ fun DirectExecutionSidebar(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         AnimatedContent(
-            targetState = selectedModuleId,
+            targetState = selectedPluginId,
             transitionSpec = {
                 if (targetState != null) {
                     slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
@@ -46,17 +66,17 @@ fun DirectExecutionSidebar(
                     slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
                 }
             }
-        ) { moduleId ->
-            if (moduleId == null) {
-                ModuleListSidebar(loadedPlugins, onModuleSelected)
+        ) { pluginId ->
+            if (pluginId == null) {
+                PluginListSidebar(loadedPlugins, onPluginSelected)
             } else {
-                val plugin = loadedPlugins.find { it.getManifest().module.id == moduleId }
+                val plugin = loadedPlugins.find { it.getManifest().plugin.id == pluginId }
                 if (plugin != null) {
                     CapabilityListSidebar(
                         plugin = plugin,
                         selectedCapability = selectedCapability,
                         onCapabilitySelected = onCapabilitySelected,
-                        onBack = onBackToModules
+                        onBack = onBackToPlugins
                     )
                 }
             }
@@ -65,13 +85,13 @@ fun DirectExecutionSidebar(
 }
 
 @Composable
-private fun ModuleListSidebar(
+private fun PluginListSidebar(
     plugins: List<PluginEntry>,
-    onModuleSelected: (String) -> Unit
+    onPluginSelected: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         Text(
-            "LOADED MODULES",
+            "LOADED PLUGINS",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.outline,
@@ -85,7 +105,7 @@ private fun ModuleListSidebar(
             plugins.forEach { plugin ->
                 val manifest = plugin.getManifest()
                 Surface(
-                    onClick = { onModuleSelected(manifest.module.id) },
+                    onClick = { onPluginSelected(manifest.plugin.id) },
                     modifier = Modifier.fillMaxWidth(),
                     color = Color.Transparent,
                     shape = RoundedCornerShape(8.dp)
@@ -102,7 +122,7 @@ private fun ModuleListSidebar(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            manifest.module.name,
+                            manifest.plugin.name,
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -133,14 +153,14 @@ private fun CapabilityListSidebar(
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
-                    manifest.module.name,
+                    manifest.plugin.name,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    "v${manifest.module.version}",
+                    "v${manifest.plugin.version}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )

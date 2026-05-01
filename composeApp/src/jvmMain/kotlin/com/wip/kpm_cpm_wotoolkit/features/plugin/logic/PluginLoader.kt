@@ -1,11 +1,11 @@
 package com.wip.kpm_cpm_wotoolkit.features.plugin.logic
 
+import co.touchlab.kermit.Logger
 import com.wip.plugin.api.PluginEntry
 import org.koin.core.Koin
 import org.koin.dsl.koinApplication
 import java.io.File
 import java.net.URLClassLoader
-import co.touchlab.kermit.Logger
 
 private data class LoadedPlugin(
     val jarPath: String,
@@ -14,7 +14,7 @@ private data class LoadedPlugin(
     val koin: Koin
 )
 
-actual object ModuleLoader {
+actual object PluginLoader {
     private val loadedPlugins = mutableMapOf<String, LoadedPlugin>()
 
     actual fun loadPlugin(
@@ -28,9 +28,9 @@ actual object ModuleLoader {
             }
 
             // If already loaded, return it
-            loadedPlugins[jarPath]?.let { 
+            loadedPlugins[jarPath]?.let {
                 Logger.d { "Plugin already loaded: $jarPath" }
-                return Result.success(it.entry) 
+                return Result.success(it.entry)
             }
 
             Logger.i { "Loading plugin from $jarPath" }
@@ -39,7 +39,8 @@ actual object ModuleLoader {
 
             // Use ServiceLoader to find the PluginEntry implementation
             val loader = java.util.ServiceLoader.load(PluginEntry::class.java, newClassLoader)
-            val pluginEntryImpl = loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $jarPath")
+            val pluginEntryImpl =
+                loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $jarPath")
 
             // Get the Koin module from the entry point
             val module = pluginEntryImpl.getKoinModule()
@@ -50,10 +51,10 @@ actual object ModuleLoader {
             }
             val koin = koinApp.koin
             val pluginEntry = koin.get<PluginEntry>()
-            
+
             val loadedPlugin = LoadedPlugin(jarPath, pluginEntry, newClassLoader, koin)
             loadedPlugins[jarPath] = loadedPlugin
-            
+
             Logger.i { "Successfully loaded plugin from $jarPath" }
             Result.success(pluginEntry)
         } catch (e: Exception) {
@@ -63,7 +64,7 @@ actual object ModuleLoader {
     }
 
     actual fun unloadPlugin(jarPath: String) {
-        loadedPlugins.remove(jarPath)?.let { 
+        loadedPlugins.remove(jarPath)?.let {
             Logger.i { "Unloading plugin: $jarPath" }
             it.entry.shutdown()
             it.classLoader.close()
@@ -75,15 +76,15 @@ actual object ModuleLoader {
     }
 
     actual fun getPlugins(): List<PluginEntry> = loadedPlugins.values.map { it.entry }
-    
+
     actual fun getPlugin(jarPath: String): PluginEntry? = loadedPlugins[jarPath]?.entry
 
     actual fun getPluginById(pluginId: String): PluginEntry? {
-        return loadedPlugins.values.find { it.entry.getManifest().module.id == pluginId }?.entry
+        return loadedPlugins.values.find { it.entry.getManifest().plugin.id == pluginId }?.entry
     }
 
     actual fun getPluginInstallPath(pluginId: String): String? {
-        val plugin = loadedPlugins.values.find { it.entry.getManifest().module.id == pluginId }
+        val plugin = loadedPlugins.values.find { it.entry.getManifest().plugin.id == pluginId }
         if (plugin != null) {
             val file = File(plugin.jarPath)
             return file.parent

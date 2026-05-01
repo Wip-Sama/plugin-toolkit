@@ -7,16 +7,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
-import kotlinx.io.files.FileSystem
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.files.Path
-import kotlinx.io.asOutputStream
 import kotlinx.io.asInputStream
+import kotlinx.io.asOutputStream
 import kotlinx.io.buffered
-import kotlinx.io.writeString
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import java.io.PrintWriter
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.zip.GZIPOutputStream
 
@@ -78,7 +77,7 @@ class FileLogWriter(
         scope.launch {
             try {
                 val files = SystemFileSystem.list(logsDir).toList()
-                
+
                 // Group files by type
                 val logFiles = files.filter { it.name.endsWith(".log") }.sortedByDescending { it.name }
                 val gzFiles = files.filter { it.name.endsWith(".gz") }.sortedByDescending { it.name }
@@ -90,7 +89,11 @@ class FileLogWriter(
                     val fileName = file.name.substringBeforeLast(".")
                     if (fileName == todayStr) return@forEach // Don't touch today's log
 
-                    val fileDate = try { dateFormatter.parse(fileName) } catch (e: Exception) { null } ?: return@forEach
+                    val fileDate = try {
+                        dateFormatter.parse(fileName)
+                    } catch (e: Exception) {
+                        null
+                    } ?: return@forEach
                     val daysOld = getDaysDifference(fileDate, Date())
 
                     if (daysOld >= settings.logsToKeep) {
@@ -104,7 +107,9 @@ class FileLogWriter(
                 }
 
                 // 2. Handle cleanup of .gz files
-                val updatedGzFiles = SystemFileSystem.list(logsDir).filter { it.name.endsWith(".gz") }.sortedByDescending { it.name }.toList()
+                val updatedGzFiles =
+                    SystemFileSystem.list(logsDir).filter { it.name.endsWith(".gz") }.sortedByDescending { it.name }
+                        .toList()
                 if (updatedGzFiles.size > settings.compressedLogsToKeep) {
                     updatedGzFiles.drop(settings.compressedLogsToKeep).forEach { SystemFileSystem.delete(it) }
                 }

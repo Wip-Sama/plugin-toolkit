@@ -4,12 +4,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.ColorPickerType
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.pickers.CircleColorPicker
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.pickers.ClassicColorPicker
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.pickers.RingColorPicker
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui.pickers.SimpleRingColorPicker
-import androidx.compose.ui.tooling.preview.Preview
 
 /**
  * Inline color picker composable.
@@ -19,8 +19,8 @@ import androidx.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun ColorPicker(
-    modifier: Modifier = Modifier, 
-    type: ColorPickerType = ColorPickerType.Classic(), 
+    modifier: Modifier = Modifier,
+    type: ColorPickerType = ColorPickerType.Classic(),
     onPickedColor: (Color) -> Unit
 ) {
     Box(modifier = modifier) {

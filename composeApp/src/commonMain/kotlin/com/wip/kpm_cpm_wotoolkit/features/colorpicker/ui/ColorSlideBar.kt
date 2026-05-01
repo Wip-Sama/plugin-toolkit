@@ -1,15 +1,28 @@
 package com.wip.kpm_cpm_wotoolkit.features.colorpicker.ui
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -18,10 +31,10 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.model.Colors
 import com.wip.kpm_cpm_wotoolkit.features.colorpicker.utils.fromHueProgress
-import androidx.compose.ui.tooling.preview.Preview
 
 /**
  * A horizontal color slide bar that reports progress [0f..1f] via [onValueChange].
@@ -77,18 +90,18 @@ internal fun ColorSlideBar(
                     Color.White
                 }
             }
-            
+
             // Material Expressive Vertical Bar Thumb (Animated Width)
             Box(
                 modifier = Modifier
-                    .size(width = animatedThumbWidth, height = handleHeight) 
+                    .size(width = animatedThumbWidth, height = handleHeight)
                     .clip(CircleShape)
                     .background(thumbColor)
             )
         },
         track = { sliderState ->
             val brush = Brush.horizontalGradient(colors)
-            
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -100,12 +113,13 @@ internal fun ColorSlideBar(
                 ) {
                     val totalWidth = size.width
                     val thumbPos = totalWidth * value
-                    
+
                     // Use animated width for gap calculation
                     val currentThumbWidthPx = animatedThumbWidth.toPx()
                     val gapStart = (thumbPos - (currentThumbWidthPx / 2 + handleLeadingSpace.toPx())).coerceAtLeast(0f)
-                    val gapEnd = (thumbPos + (currentThumbWidthPx / 2 + handleTrailingSpace.toPx())).coerceAtMost(totalWidth)
-                    
+                    val gapEnd =
+                        (thumbPos + (currentThumbWidthPx / 2 + handleTrailingSpace.toPx())).coerceAtMost(totalWidth)
+
                     // 1. Draw Active Segment (Left) - Asymmetric Rounding
                     if (gapStart > 0) {
                         val activePath = Path().apply {
@@ -124,7 +138,7 @@ internal fun ColorSlideBar(
                         }
                         drawPath(path = activePath, brush = brush)
                     }
-                    
+
                     // 2. Draw Inactive Segment (Right) - Differentiated (Smaller) and Asymmetric
                     if (gapEnd < totalWidth) {
                         val inactiveHeightPx = inactiveTrackHeight.toPx()
@@ -174,7 +188,7 @@ private fun ColorSlideBarPreview() {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Text("Material 3 Expressive Color Slider", style = MaterialTheme.typography.titleMedium)
-            
+
             ColorSlideBar(
                 value = progress,
                 onValueChange = { progress = it },
@@ -182,7 +196,7 @@ private fun ColorSlideBarPreview() {
             )
 
             Text("Alpha / Opacity Bar", style = MaterialTheme.typography.titleMedium)
-            
+
             ColorSlideBar(
                 value = progress,
                 onValueChange = { progress = it },

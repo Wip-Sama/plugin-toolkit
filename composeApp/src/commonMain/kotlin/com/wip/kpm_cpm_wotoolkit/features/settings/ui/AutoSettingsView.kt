@@ -10,10 +10,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.AppSettings
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.SettingDefinition
-import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
-import com.wip.kpm_cpm_wotoolkit.features.settings.utils.resolve
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsResolvedStrings
 import com.wip.kpm_cpm_wotoolkit.features.settings.utils.LocalSettingsSearchQuery
+import com.wip.kpm_cpm_wotoolkit.features.settings.utils.SettingsRegistry
+import com.wip.kpm_cpm_wotoolkit.features.settings.utils.resolve
 import com.wip.kpm_cpm_wotoolkit.features.settings.viewmodel.SettingsViewModel
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.ExpressiveMenu
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsGroup
@@ -23,7 +23,7 @@ import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsSlider
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.SettingsSwitch
 
 /**
- * A fully auto-generated settings page for use in modules and dynamic settings.
+ * A fully auto-generated settings page for use in plugins and dynamic settings.
  * Reads [SettingDefinition]s from the [SettingsRegistry] for the given [navKey],
  * groups them by section, and renders the appropriate prefab component for each.
  *
@@ -48,10 +48,13 @@ fun AutoSettingsView(
     } else {
         pageDefinitions.filter { definition ->
             (resolvedStrings[definition.title] ?: "").contains(searchQuery, ignoreCase = true) ||
-            (definition.subtitle != null && (resolvedStrings[definition.subtitle] ?: "").contains(searchQuery, ignoreCase = true))
+                    (definition.subtitle != null && (resolvedStrings[definition.subtitle] ?: "").contains(
+                        searchQuery,
+                        ignoreCase = true
+                    ))
         }
     }
-    
+
     val grouped = filteredDefinitions.groupBy { it.sectionTitle }
 
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
