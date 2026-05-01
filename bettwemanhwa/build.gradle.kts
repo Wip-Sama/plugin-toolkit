@@ -21,6 +21,7 @@ dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.kotlinxSerializationJson)
+    implementation(libs.kotlinx.coroutinesSwing)
     implementation(project(":plugin-api"))
     ksp(project(":plugin-api"))
 }

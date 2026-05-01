@@ -7,9 +7,12 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readByteArray
 import kotlinx.io.readString
 import kotlinx.io.writeString
+import java.io.File
+import java.util.jar.JarFile
 
 class DefaultPluginFileSystem(
-    pluginInstallPath: String
+    pluginInstallPath: String,
+    private val jarPath: String? = null
 ) : PluginFileSystem {
     private val basePath: String = Path(pluginInstallPath, "files").toString()
 
@@ -82,4 +85,22 @@ class DefaultPluginFileSystem(
             Result.failure(e)
         }
     }
+
+    override suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit> {
+        return try {
+            val jar = jarPath ?: return Result.failure(Exception("No JAR path configured for resource extraction"))
+            val jarFile = JarFile(File(jar))
+            val entry = jarFile.getJarEntry(resourcePath)
+                ?: return Result.failure(Exception("Resource not found in JAR: $resourcePath"))
+
+            val data = jarFile.getInputStream(entry).use { it.readBytes() }
+            jarFile.close()
+
+            writeFile(targetRelativePath, data)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getBasePath(): String = basePath
 }

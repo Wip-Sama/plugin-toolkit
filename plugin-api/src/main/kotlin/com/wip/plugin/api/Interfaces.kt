@@ -35,13 +35,15 @@ interface PluginEntry {
 
     /**
      * Optional setup step called by the host application.
+     * @param context The execution context providing logger, progress, and file system access.
      */
-    suspend fun performSetup(): Result<Unit> = Result.success(Unit)
+    suspend fun performSetup(context: ExecutionContext): Result<Unit> = Result.success(Unit)
 
     /**
      * Validate the plugin installation and status.
+     * @param context The execution context providing logger, progress, and file system access.
      */
-    suspend fun validate(): Result<Unit> = Result.success(Unit)
+    suspend fun validate(context: ExecutionContext): Result<Unit> = Result.success(Unit)
 
     /**
      * Clean up resources.
@@ -60,6 +62,18 @@ interface PluginFileSystem {
     suspend fun exists(relativePath: String): Boolean
     suspend fun listFiles(relativePath: String = ""): List<String>
     suspend fun deleteFile(relativePath: String): Result<Unit>
+
+    /**
+     * Extract a resource bundled inside the plugin JAR to the plugin's managed file area.
+     * @param resourcePath Path to the resource inside the JAR (e.g. "scripts/install.bat").
+     * @param targetRelativePath Relative path within the plugin's managed folder to write to.
+     */
+    suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit>
+
+    /**
+     * Get the absolute base path of the plugin's managed file area.
+     */
+    fun getBasePath(): String
 }
 
 /**

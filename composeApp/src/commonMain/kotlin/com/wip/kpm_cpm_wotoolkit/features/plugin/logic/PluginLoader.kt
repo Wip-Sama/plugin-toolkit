@@ -13,4 +13,5 @@ expect object PluginLoader {
     fun getPlugin(jarPath: String): PluginEntry?
     fun getPluginById(pluginId: String): PluginEntry?
     fun getPluginInstallPath(pluginId: String): String?
+    fun getPluginJarPath(pluginId: String): String?
 }

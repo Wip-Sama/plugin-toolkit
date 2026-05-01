@@ -121,7 +121,8 @@ class JobWorker(
                     }
                 },
                 fileSystem = DefaultPluginFileSystem(
-                    PluginLoader.getPluginInstallPath(job.pluginId) ?: ""
+                    PluginLoader.getPluginInstallPath(job.pluginId) ?: "",
+                    PluginLoader.getPluginJarPath(job.pluginId)
                 )
             )
             processor.setExecutionContext(context)

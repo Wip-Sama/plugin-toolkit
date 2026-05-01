@@ -65,7 +65,7 @@ class ManifestProcessor(
         val entryName = baseClassName + "PluginEntry"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
-            .addImport("com.wip.plugin.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "ParameterMetadata", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType")
+            .addImport("com.wip.plugin.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType")
             .addImport("kotlinx.serialization.json", "Json", "decodeFromJsonElement", "encodeToJsonElement")
 
         // 1. Generate Manifest Object
@@ -96,7 +96,7 @@ class ManifestProcessor(
                 
                 // Only include in manifest if it's not a system-injected dependency
                 val typeStr = paramType.toString()
-                if (typeStr != "com.wip.plugin.api.PluginLogger" && typeStr != "com.wip.plugin.api.ProgressReporter") {
+                if (typeStr != "com.wip.plugin.api.PluginLogger" && typeStr != "com.wip.plugin.api.ProgressReporter" && typeStr != "com.wip.plugin.api.PluginFileSystem") {
                     val defaultValueCode = if (defaultValue.isNotEmpty()) "Json.parseToJsonElement(%S)" else "%L"
                     val defaultValueVal = if (defaultValue.isNotEmpty()) defaultValue else "null"
                     
@@ -254,6 +254,8 @@ class ManifestProcessor(
                     mapCode.add("context?.logger ?: throw IllegalStateException(%S)", "Logger not available")
                 } else if (typeStr == "com.wip.plugin.api.ProgressReporter") {
                     mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
+                } else if (typeStr == "com.wip.plugin.api.PluginFileSystem") {
+                    mapCode.add("context?.fileSystem ?: throw IllegalStateException(%S)", "FileSystem not available")
                 } else if (hasDefault) {
                     mapCode.add("if (request.parameters.containsKey(%S)) Json.decodeFromJsonElement<%T>(request.parameters[%S]!!) else null", paramName, paramType.copy(nullable = false), paramName)
                 } else if (isNullable) {
@@ -371,19 +373,62 @@ class ManifestProcessor(
         val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "PluginValidate" } }
 
         if (setupFunction != null) {
-            entryType.addFunction(FunSpec.builder("performSetup")
+            val setupParams = setupFunction.parameters.toList()
+            val setupInjectsContext = setupParams.any {
+                val t = it.type.resolve().toTypeName().toString()
+                t == "com.wip.plugin.api.PluginFileSystem" || t == "com.wip.plugin.api.PluginLogger" || t == "com.wip.plugin.api.ProgressReporter" || t == "com.wip.plugin.api.ExecutionContext"
+            }
+            val setupFunBuilder = FunSpec.builder("performSetup")
                 .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .addParameter("context", ClassName("com.wip.plugin.api", "ExecutionContext"))
                 .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
-                .addStatement("return processor.${setupFunction.simpleName.asString()}()")
-                .build())
+            
+            if (setupInjectsContext) {
+                // Build call with injected params
+                val callArgs = setupParams.joinToString(", ") { param ->
+                    val t = param.type.resolve().toTypeName().toString()
+                    when (t) {
+                        "com.wip.plugin.api.PluginFileSystem" -> "context.fileSystem"
+                        "com.wip.plugin.api.PluginLogger" -> "context.logger"
+                        "com.wip.plugin.api.ProgressReporter" -> "context.progress"
+                        "com.wip.plugin.api.ExecutionContext" -> "context"
+                        else -> param.name?.asString() ?: ""
+                    }
+                }
+                setupFunBuilder.addStatement("return processor.${setupFunction.simpleName.asString()}($callArgs)")
+            } else {
+                setupFunBuilder.addStatement("return processor.${setupFunction.simpleName.asString()}()")
+            }
+            entryType.addFunction(setupFunBuilder.build())
         }
 
         if (validateFunction != null) {
-            entryType.addFunction(FunSpec.builder("validate")
+            val validateParams = validateFunction.parameters.toList()
+            val validateInjectsContext = validateParams.any {
+                val t = it.type.resolve().toTypeName().toString()
+                t == "com.wip.plugin.api.PluginFileSystem" || t == "com.wip.plugin.api.PluginLogger" || t == "com.wip.plugin.api.ProgressReporter" || t == "com.wip.plugin.api.ExecutionContext"
+            }
+            val validateFunBuilder = FunSpec.builder("validate")
                 .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .addParameter("context", ClassName("com.wip.plugin.api", "ExecutionContext"))
                 .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
-                .addStatement("return processor.${validateFunction.simpleName.asString()}()")
-                .build())
+            
+            if (validateInjectsContext) {
+                val callArgs = validateParams.joinToString(", ") { param ->
+                    val t = param.type.resolve().toTypeName().toString()
+                    when (t) {
+                        "com.wip.plugin.api.PluginFileSystem" -> "context.fileSystem"
+                        "com.wip.plugin.api.PluginLogger" -> "context.logger"
+                        "com.wip.plugin.api.ProgressReporter" -> "context.progress"
+                        "com.wip.plugin.api.ExecutionContext" -> "context"
+                        else -> param.name?.asString() ?: ""
+                    }
+                }
+                validateFunBuilder.addStatement("return processor.${validateFunction.simpleName.asString()}($callArgs)")
+            } else {
+                validateFunBuilder.addStatement("return processor.${validateFunction.simpleName.asString()}()")
+            }
+            entryType.addFunction(validateFunBuilder.build())
         }
 
         fileSpec.addType(manifestType.build())
@@ -444,7 +489,7 @@ class ManifestProcessor(
             
             val params = func.parameters.filter { param ->
                 val paramType = param.type.resolve().toTypeName().toString()
-                paramType != "com.wip.plugin.api.PluginLogger" && paramType != "com.wip.plugin.api.ProgressReporter"
+                paramType != "com.wip.plugin.api.PluginLogger" && paramType != "com.wip.plugin.api.ProgressReporter" && paramType != "com.wip.plugin.api.PluginFileSystem"
             }.associate { param ->
                 val paramAnn = param.annotations.find { it.shortName.asString() == "CapabilityParam" }
                 val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""

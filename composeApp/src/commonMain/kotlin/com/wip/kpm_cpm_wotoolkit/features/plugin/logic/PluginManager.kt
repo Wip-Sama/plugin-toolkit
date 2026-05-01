@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class PluginManager(
     private val settingsRepository: SettingsRepository,
@@ -89,7 +90,7 @@ class PluginManager(
 
             // Auto-load if enabled
             if (newPlugin.isEnabled) {
-                loadPlugin(newPlugin.pkg)
+                setupPluginInBackground(newPlugin.pkg)
             }
 
             Result.success(Unit)
@@ -148,7 +149,7 @@ class PluginManager(
 
             // Auto-load if enabled
             if (newPlugin.isEnabled) {
-                loadPlugin(newPlugin.pkg)
+                setupPluginInBackground(newPlugin.pkg)
             }
 
             Result.success(Unit)
@@ -366,13 +367,53 @@ class PluginManager(
         return installRemote(update, plugin.installPath.substringBeforeLast("/"))
     }
 
+    private fun createExecutionContext(pkg: String): com.wip.plugin.api.ExecutionContext {
+        val installPath = PluginLoader.getPluginInstallPath(pkg) ?: ""
+        val jarFullPath = PluginLoader.getPluginJarPath(pkg)
+
+        return com.wip.plugin.api.ExecutionContext(
+            logger = object : com.wip.plugin.api.PluginLogger {
+                override fun verbose(message: String) { Logger.v { "[$pkg] $message" } }
+                override fun debug(message: String) { Logger.d { "[$pkg] $message" } }
+                override fun info(message: String) { Logger.i { "[$pkg] $message" } }
+                override fun warn(message: String) { Logger.w { "[$pkg] $message" } }
+                override fun error(message: String, throwable: Throwable?) { Logger.e(throwable) { "[$pkg] $message" } }
+            },
+            progress = object : com.wip.plugin.api.ProgressReporter {
+                override fun report(progress: Float) { /* no-op for setup/validate */ }
+            },
+            fileSystem = DefaultPluginFileSystem(installPath, jarFullPath)
+        )
+    }
+
     suspend fun validatePlugin(pkg: String): Result<Unit> {
         val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
-        return plugin.validate()
+        return plugin.validate(createExecutionContext(pkg))
     }
 
     suspend fun performSetup(pkg: String): Result<Unit> {
         val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
-        return plugin.performSetup()
+        return plugin.performSetup(createExecutionContext(pkg))
+    }
+
+    private fun setupPluginInBackground(pkg: String) {
+        scope.launch {
+            val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return@launch
+            val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
+            val jarFile = plugin.installPath + "/" + jarFileName
+
+            Logger.d { "Loading plugin JAR for background setup: $jarFile" }
+            val result = PluginLoader.loadPlugin(jarFile)
+            if (result.isSuccess) {
+                performSetup(pkg).onFailure { e ->
+                    Logger.e(e) { "Failed to perform setup for plugin: $pkg" }
+                }
+                _loadedPlugins.value = _loadedPlugins.value + pkg
+                Logger.i { "Successfully completed setup and loaded plugin: $pkg" }
+            } else {
+                val error = result.exceptionOrNull() ?: Exception("Unknown error")
+                Logger.e(error) { "Failed to load plugin for setup: $pkg" }
+            }
+        }
     }
 }

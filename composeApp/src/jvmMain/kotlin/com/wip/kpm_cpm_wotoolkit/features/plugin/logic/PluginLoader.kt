@@ -91,4 +91,8 @@ actual object PluginLoader {
         }
         return null
     }
+
+    actual fun getPluginJarPath(pluginId: String): String? {
+        return loadedPlugins.values.find { it.entry.getManifest().plugin.id == pluginId }?.jarPath
+    }
 }

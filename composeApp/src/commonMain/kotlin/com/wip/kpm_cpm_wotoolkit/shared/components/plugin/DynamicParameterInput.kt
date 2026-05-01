@@ -30,30 +30,6 @@ import com.wip.plugin.api.ParameterConstraints
 import com.wip.plugin.api.PrimitiveType
 import com.wip.kpm_cpm_wotoolkit.shared.components.settings.ExpressiveMenu
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import com.wip.plugin.api.DataType
-import com.wip.plugin.api.ParameterMetadata
-import com.wip.plugin.api.PrimitiveType
-
 @Composable
 fun DynamicParameterInput(
     name: String,
@@ -192,18 +168,20 @@ private fun NumericTextField(
     val validate: (String) -> Unit = { newValue ->
         if (newValue.isNotEmpty()) {
             val numValue = newValue.toDoubleOrNull()
-            if (numValue != null) {
-                if (constraints?.minValue != null && numValue < constraints.minValue) {
+            if (numValue != null && constraints != null) {
+                val minValue = constraints.minValue
+                val maxValue = constraints.maxValue
+                if (minValue != null && numValue < minValue) {
                     isError = true
-                    errorMessage = "Value must be >= ${constraints.minValue}"
-                } else if (constraints?.maxValue != null && numValue > constraints.maxValue) {
+                    errorMessage = "Value must be >= $minValue"
+                } else if (maxValue != null && numValue > maxValue) {
                     isError = true
-                    errorMessage = "Value must be <= ${constraints.maxValue}"
+                    errorMessage = "Value must be <= $maxValue"
                 } else {
                     isError = false
                     errorMessage = ""
                 }
-            } else {
+            } else if (numValue == null) {
                 isError = true
                 errorMessage = "Invalid number"
             }
@@ -264,14 +242,17 @@ private fun StandardTextField(
         isError = false
         errorMessage = ""
         if (constraints != null) {
-            if (constraints.minLength != null && newValue.length < constraints.minLength) {
+            val minLength = constraints.minLength
+            val maxLength = constraints.maxLength
+            val regex = constraints.regex
+            if (minLength != null && newValue.length < minLength) {
                 isError = true
-                errorMessage = "Minimum length is ${constraints.minLength}"
-            } else if (constraints.maxLength != null && newValue.length > constraints.maxLength) {
+                errorMessage = "Minimum length is $minLength"
+            } else if (maxLength != null && newValue.length > maxLength) {
                 isError = true
-                errorMessage = "Maximum length is ${constraints.maxLength}"
-            } else if (constraints.regex != null && constraints.regex.isNotEmpty()) {
-                if (!Regex(constraints.regex).matches(newValue)) {
+                errorMessage = "Maximum length is $maxLength"
+            } else if (regex != null && regex.isNotEmpty()) {
+                if (!Regex(regex).matches(newValue)) {
                     isError = true
                     errorMessage = "Does not match required format"
                 }

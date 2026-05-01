@@ -191,6 +191,10 @@ class PluginViewModel(
                     JsonPrimitive(value)
                 }
             }
+
+            is DataType.Enum -> {
+                JsonPrimitive(value)
+            }
         }
     }
 }
