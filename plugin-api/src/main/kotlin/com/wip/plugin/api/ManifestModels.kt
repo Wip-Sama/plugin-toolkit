@@ -17,6 +17,10 @@ sealed class DataType {
     @Serializable
     @SerialName("object")
     data class Object(val className: String) : DataType()
+
+    @Serializable
+    @SerialName("enum")
+    data class Enum(val className: String, val options: List<String>) : DataType()
 }
 
 @Serializable
@@ -28,6 +32,18 @@ enum class PrimitiveType {
 enum class UpdateType {
     REPLACE_ALL, SCRIPT, PATCH
 }
+
+@Serializable
+data class ParameterConstraints(
+    val minValue: Double? = null,
+    val maxValue: Double? = null,
+    val minLength: Int? = null,
+    val maxLength: Int? = null,
+    val regex: String? = null,
+    val multiSelect: Boolean? = null,
+    val minChoices: Int? = null,
+    val maxChoices: Int? = null
+)
 
 @Serializable
 data class SettingMetadata(
@@ -78,7 +94,8 @@ data class Requirements(
 data class ParameterMetadata(
     val defaultValue: JsonElement? = null,
     val description: String,
-    val type: DataType
+    val type: DataType,
+    val constraints: ParameterConstraints? = null
 )
 
 @Serializable

@@ -22,7 +22,15 @@ annotation class Capability(
 @Retention(AnnotationRetention.SOURCE)
 annotation class CapabilityParam(
     val description: String,
-    val defaultValue: String = ""
+    val defaultValue: String = "",
+    val minValue: Double = Double.NaN,
+    val maxValue: Double = Double.NaN,
+    val minLength: Int = -1,
+    val maxLength: Int = -1,
+    val regex: String = "",
+    val multiSelect: Boolean = false,
+    val minChoices: Int = -1,
+    val maxChoices: Int = -1
 )
 
 @Target(AnnotationTarget.PROPERTY)

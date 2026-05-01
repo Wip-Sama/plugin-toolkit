@@ -9,8 +9,14 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 
 class DefaultPluginFileSystem(
-    private val basePath: String
+    pluginInstallPath: String
 ) : PluginFileSystem {
+    private val basePath: String = Path(pluginInstallPath, "files").toString()
+
+    init {
+        SystemFileSystem.createDirectories(Path(basePath))
+    }
+
     //TODO: need to check better if this should be implemented in platform specific FileSystem like it is for PlatformUtils
     private fun resolvePath(relativePath: String): Path {
         // Prevent path traversal

@@ -95,14 +95,12 @@ fun ChangelogView(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.onSurface)
     ) {
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(WOTheme.spacing.medium)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -130,7 +128,7 @@ fun ChangelogView(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(WOTheme.spacing.small)
                 ) {
-                    FilterLevel.values().forEach { level ->
+                    FilterLevel.entries.forEach { level ->
                         FilterChip(
                             selected = selectedLevel == level,
                             onClick = { selectedLevel = level },
@@ -250,7 +248,10 @@ fun ChangelogView(
 }
 
 @Composable
-fun VersionCard(version: ChangelogVersion, selectedCategory: String) {
+fun VersionCard(
+    version: ChangelogVersion,
+    selectedCategory: String
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp)

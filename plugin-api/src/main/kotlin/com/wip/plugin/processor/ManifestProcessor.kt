@@ -14,6 +14,7 @@ import com.wip.plugin.api.DataType
 import com.wip.plugin.api.PrimitiveType
 import com.wip.plugin.api.Capability
 import com.wip.plugin.api.ParameterMetadata
+import com.wip.plugin.api.ParameterConstraints
 import com.wip.plugin.api.SettingMetadata
 import com.wip.plugin.api.Changelog
 import com.wip.plugin.api.Release
@@ -99,7 +100,22 @@ class ManifestProcessor(
                     val defaultValueCode = if (defaultValue.isNotEmpty()) "Json.parseToJsonElement(%S)" else "%L"
                     val defaultValueVal = if (defaultValue.isNotEmpty()) defaultValue else "null"
                     
-                    capabilitiesCode.add("%S to ParameterMetadata($defaultValueCode, %S, getDataType<%T>())", paramNameStr, defaultValueVal, paramDesc, paramType)
+                    val minValue = paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
+                    val maxValue = paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
+                    val minLength = paramAnn?.arguments?.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
+                    val maxLength = paramAnn?.arguments?.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
+                    val regex = paramAnn?.arguments?.find { it.name?.asString() == "regex" }?.value as? String ?: ""
+                    val multiSelect = paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
+                    val minChoices = paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
+                    val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
+                    
+                    val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
+                    
+                    val constraintsCode = if (hasConstraints) {
+                        "ParameterConstraints(minValue = ${if (!minValue.isNaN()) minValue else "null"}, maxValue = ${if (!maxValue.isNaN()) maxValue else "null"}, minLength = ${if (minLength != -1) minLength else "null"}, maxLength = ${if (maxLength != -1) maxLength else "null"}, regex = ${if (regex.isNotEmpty()) "\"$regex\"" else "null"}, multiSelect = ${if (multiSelect) "true" else "null"}, minChoices = ${if (minChoices != -1) minChoices else "null"}, maxChoices = ${if (maxChoices != -1) maxChoices else "null"})"
+                    } else "null"
+                    
+                    capabilitiesCode.add("%S to ParameterMetadata(defaultValue = $defaultValueCode, description = %S, type = getDataType<%T>(), constraints = $constraintsCode)", paramNameStr, defaultValueVal, paramDesc, paramType)
                     if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
                 }
             }
@@ -440,10 +456,35 @@ class ManifestProcessor(
                     try { Json.parseToJsonElement(defaultValue) } catch(e: Exception) { null }
                 } else null
                 
+                val minValue = paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
+                val maxValue = paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
+                val minLength = paramAnn?.arguments?.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
+                val maxLength = paramAnn?.arguments?.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
+                val regex = paramAnn?.arguments?.find { it.name?.asString() == "regex" }?.value as? String ?: ""
+                val multiSelect = paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
+                val minChoices = paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
+                val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
+                
+                val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
+                
+                val constraints = if (hasConstraints) {
+                    ParameterConstraints(
+                        minValue = if (!minValue.isNaN()) minValue else null,
+                        maxValue = if (!maxValue.isNaN()) maxValue else null,
+                        minLength = if (minLength != -1) minLength else null,
+                        maxLength = if (maxLength != -1) maxLength else null,
+                        regex = if (regex.isNotEmpty()) regex else null,
+                        multiSelect = if (multiSelect) true else null,
+                        minChoices = if (minChoices != -1) minChoices else null,
+                        maxChoices = if (maxChoices != -1) maxChoices else null
+                    )
+                } else null
+                
                 paramName to ParameterMetadata(
                     defaultValue = defaultJson,
                     description = paramDesc,
-                    type = mapKSTypeToDataType(ksType)
+                    type = mapKSTypeToDataType(ksType),
+                    constraints = constraints
                 )
             }
             
@@ -572,7 +613,18 @@ class ManifestProcessor(
                     DataType.Primitive(PrimitiveType.ANY)
                 }
             }
-            else -> DataType.Object(qualifiedName)
+            else -> {
+                if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
+                    val options = declaration.declarations
+                        .filterIsInstance<KSClassDeclaration>()
+                        .filter { it.classKind == ClassKind.ENUM_ENTRY }
+                        .map { it.simpleName.asString() }
+                        .toList()
+                    DataType.Enum(qualifiedName, options)
+                } else {
+                    DataType.Object(qualifiedName)
+                }
+            }
         }
     }
 }

@@ -7,6 +7,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.serializer
 
+import kotlinx.serialization.descriptors.SerialKind
+
 @OptIn(ExperimentalSerializationApi::class)
 fun SerialDescriptor.toDataType(): DataType {
     return when (this.kind) {
@@ -20,6 +22,10 @@ fun SerialDescriptor.toDataType(): DataType {
         }
         StructureKind.MAP -> DataType.Object(this.serialName)
         PolymorphicKind.SEALED, PolymorphicKind.OPEN -> DataType.Object(this.serialName)
+        SerialKind.ENUM -> {
+            val options = (0 until this.elementsCount).map { this.getElementName(it) }
+            DataType.Enum(this.serialName, options)
+        }
         else -> {
             val unitName = serializer<Unit>().descriptor.serialName
             val jsonElementName = serializer<kotlinx.serialization.json.JsonElement>().descriptor.serialName
