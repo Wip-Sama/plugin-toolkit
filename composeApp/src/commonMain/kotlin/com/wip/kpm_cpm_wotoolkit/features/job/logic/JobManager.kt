@@ -39,9 +39,9 @@ class JobManager(
     // CONFLATED means if multiple jobs are added rapidly, we wake up at least one worker.
     private val jobSignal = Channel<Unit>(Channel.CONFLATED)
 
-    // Mutex strictly for managing the active coroutines map, avoiding global contention.
-    private val coroutinesMutex = Mutex()
-    private val activeJobCoroutines = mutableMapOf<String, Job>()
+    // Mutex strictly for managing the active handles map, avoiding global contention.
+    private val handlesMutex = Mutex()
+    private val activeJobHandles = mutableMapOf<String, com.wip.plugin.api.JobHandle>()
 
     private val MAX_HISTORY_SIZE = 100
 
@@ -102,8 +102,8 @@ class JobManager(
         }
 
         if (cancelled) {
-            coroutinesMutex.withLock {
-                activeJobCoroutines.remove(jobId)?.cancel()
+            handlesMutex.withLock {
+                activeJobHandles.remove(jobId)?.cancel(force = true)
             }
             addHistoryEntryInternal(jobId, jobName, "Cancelled")
             Logger.i { "Job $jobId ($jobName) cancelled" }
@@ -125,15 +125,15 @@ class JobManager(
         }
 
         if (paused) {
-            coroutinesMutex.withLock {
-                activeJobCoroutines.remove(jobId)?.cancel()
+            handlesMutex.withLock {
+                activeJobHandles[jobId]?.pause()
             }
             addHistoryEntryInternal(jobId, jobName, "Paused")
             Logger.i { "Job $jobId ($jobName) paused" }
         }
     }
 
-    fun resumeJob(jobId: String) {
+    suspend fun resumeJob(jobId: String) {
         var resumed = false
         var jobName = ""
         _jobs.update { currentList ->
@@ -148,6 +148,9 @@ class JobManager(
         }
 
         if (resumed) {
+            handlesMutex.withLock {
+                activeJobHandles[jobId]?.resume()
+            }
             addHistoryEntryInternal(jobId, jobName, "Resumed")
             Logger.i { "Job $jobId ($jobName) resumed" }
             jobSignal.trySend(Unit)
@@ -281,22 +284,20 @@ class JobManager(
         return failed
     }
 
-    suspend fun registerJobCoroutine(jobId: String, coroutineJob: Job) {
+    suspend fun registerJobHandle(jobId: String, handle: com.wip.plugin.api.JobHandle) {
         val job = _jobs.value.find { it.id == jobId }
-        // Critical check: if the job is no longer supposed to be running (e.g. paused or cancelled
-        // while the worker was starting up), we cancel the coroutine immediately and don't register it.
-        if (job == null || job.status != JobStatus.Running) {
-            coroutineJob.cancel()
+        if (job == null || (job.status != JobStatus.Running && job.status != JobStatus.Paused)) {
+            handle.cancel(force = true)
             return
         }
-        coroutinesMutex.withLock {
-            activeJobCoroutines[jobId] = coroutineJob
+        handlesMutex.withLock {
+            activeJobHandles[jobId] = handle
         }
     }
 
-    suspend fun unregisterJobCoroutine(jobId: String) {
-        coroutinesMutex.withLock {
-            activeJobCoroutines.remove(jobId)
+    suspend fun unregisterJobHandle(jobId: String) {
+        handlesMutex.withLock {
+            activeJobHandles.remove(jobId)
         }
     }
 
@@ -322,9 +323,9 @@ class JobManager(
 
     suspend fun stopAll() {
         workers.forEach { it.stop() }
-        coroutinesMutex.withLock {
-            activeJobCoroutines.values.forEach { it.cancel() }
-            activeJobCoroutines.clear()
+        handlesMutex.withLock {
+            activeJobHandles.values.forEach { it.cancel(force = true) }
+            activeJobHandles.clear()
         }
     }
 }

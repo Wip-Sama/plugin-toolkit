@@ -40,13 +40,13 @@ class JobWorker(
                         try {
                             executeJob(next)
                         } finally {
-                            manager.unregisterJobCoroutine(next.id)
+                            manager.unregisterJobHandle(next.id)
                         }
                     }
 
                     try {
-                        manager.registerJobCoroutine(next.id, jobExecution)
-
+                        // Registration now happens inside executeJob because we need the JobHandle from the plugin
+                        
                         // Just wait for the job to complete or be cancelled.
                         // Cancellation is cooperatively handled by jobExecution.cancel() from JobManager.
                         jobExecution.join()
@@ -149,9 +149,14 @@ class JobWorker(
                 }
             }
 
-            // Execute the plugin task
+            // Execute the plugin task using processAsync
+            val handle = processor.processAsync(request)
+            
+            // Register the handle with the manager
+            manager.registerJobHandle(job.id, handle)
+            
             val result = try {
-                processor.process(request)
+                handle.result.await()
             } finally {
                 progressJob?.cancel()
             }

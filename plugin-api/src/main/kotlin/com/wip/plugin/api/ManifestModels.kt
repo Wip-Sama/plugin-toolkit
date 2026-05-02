@@ -103,5 +103,7 @@ data class Capability(
     val name: String,
     val description: String,
     val parameters: Map<String, ParameterMetadata>? = null,
-    val returnType: DataType
+    val returnType: DataType,
+    val isPausable: Boolean = false,
+    val isCancellable: Boolean = true
 )

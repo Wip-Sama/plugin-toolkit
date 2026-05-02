@@ -65,8 +65,9 @@ class ManifestProcessor(
         val entryName = baseClassName + "PluginEntry"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
-            .addImport("com.wip.plugin.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType")
+            .addImport("com.wip.plugin.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType", "JobHandle", "PluginSignal")
             .addImport("kotlinx.serialization.json", "Json", "decodeFromJsonElement", "encodeToJsonElement")
+            .addImport("kotlinx.coroutines", "CoroutineScope", "Dispatchers", "SupervisorJob", "async", "launch", "cancel")
 
         // 1. Generate Manifest Object
         val manifestType = TypeSpec.objectBuilder(manifestName)
@@ -79,11 +80,15 @@ class ManifestProcessor(
             val capAnn = func.annotations.first { it.shortName.asString() == "Capability" }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
+            val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
+            val supportsCancel = capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
 
             capabilitiesCode.add("Capability(\n")
             capabilitiesCode.indent()
             capabilitiesCode.add("name = %S,\n", capName)
             capabilitiesCode.add("description = %S,\n", capDesc)
+            capabilitiesCode.add("isPausable = %L,\n", supportsPause)
+            capabilitiesCode.add("isCancellable = %L,\n", supportsCancel)
             capabilitiesCode.add("parameters = mapOf(\n")
             capabilitiesCode.indent()
             val paramsList = func.parameters.toList()
@@ -96,7 +101,7 @@ class ManifestProcessor(
                 
                 // Only include in manifest if it's not a system-injected dependency
                 val typeStr = paramType.toString()
-                if (typeStr != "com.wip.plugin.api.PluginLogger" && typeStr != "com.wip.plugin.api.ProgressReporter" && typeStr != "com.wip.plugin.api.PluginFileSystem") {
+                if (typeStr != "com.wip.plugin.api.PluginLogger" && typeStr != "com.wip.plugin.api.ProgressReporter" && typeStr != "com.wip.plugin.api.PluginFileSystem" && typeStr != "com.wip.plugin.api.ExecutionContext") {
                     val defaultValueCode = if (defaultValue.isNotEmpty()) "Json.parseToJsonElement(%S)" else "%L"
                     val defaultValueVal = if (defaultValue.isNotEmpty()) defaultValue else "null"
                     
@@ -256,6 +261,8 @@ class ManifestProcessor(
                     mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
                 } else if (typeStr == "com.wip.plugin.api.PluginFileSystem") {
                     mapCode.add("context?.fileSystem ?: throw IllegalStateException(%S)", "FileSystem not available")
+                } else if (typeStr == "com.wip.plugin.api.ExecutionContext") {
+                    mapCode.add("context ?: throw IllegalStateException(%S)", "ExecutionContext not available")
                 } else if (hasDefault) {
                     mapCode.add("if (request.parameters.containsKey(%S)) Json.decodeFromJsonElement<%T>(request.parameters[%S]!!) else null", paramName, paramType.copy(nullable = false), paramName)
                 } else if (isNullable) {
@@ -295,6 +302,39 @@ class ManifestProcessor(
             .endControlFlow()
         
         dispatcherType.addFunction(processFunc.build())
+
+        val processAsyncFunc = FunSpec.builder("processAsync")
+            .addModifiers(KModifier.OVERRIDE)
+            .addParameter("request", ClassName("com.wip.plugin.api", "PluginRequest"))
+            .returns(ClassName("com.wip.plugin.api", "JobHandle"))
+            .addCode("""
+                val handler = handlers[request.method.lowercase()] ?: throw IllegalArgumentException("Unknown method: ${'$'}{request.method}")
+                val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+                val deferred = scope.async {
+                    runCatching {
+                        handler(request)
+                    }
+                }
+                
+                return object : JobHandle {
+                    override val result = deferred
+                    override fun pause() {
+                        scope.launch { context?.sendSignal(PluginSignal.PAUSE) }
+                    }
+                    override fun resume() {
+                        scope.launch { context?.sendSignal(PluginSignal.RESUME) }
+                    }
+                    override fun cancel(force: Boolean) {
+                        scope.launch { context?.sendSignal(PluginSignal.CANCEL) }
+                        deferred.cancel()
+                        if (force) {
+                            scope.cancel()
+                        }
+                    }
+                }
+            """.trimIndent())
+        
+        dispatcherType.addFunction(processAsyncFunc.build())
 
         // 3. Generate Entry Class
         val entryType = TypeSpec.classBuilder(entryName)
@@ -486,10 +526,12 @@ class ManifestProcessor(
             val capAnn = func.annotations.first { it.shortName.asString() == "Capability" }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
+            val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
+            val supportsCancel = capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
             
             val params = func.parameters.filter { param ->
                 val paramType = param.type.resolve().toTypeName().toString()
-                paramType != "com.wip.plugin.api.PluginLogger" && paramType != "com.wip.plugin.api.ProgressReporter" && paramType != "com.wip.plugin.api.PluginFileSystem"
+                paramType != "com.wip.plugin.api.PluginLogger" && paramType != "com.wip.plugin.api.ProgressReporter" && paramType != "com.wip.plugin.api.PluginFileSystem" && paramType != "com.wip.plugin.api.ExecutionContext"
             }.associate { param ->
                 val paramAnn = param.annotations.find { it.shortName.asString() == "CapabilityParam" }
                 val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
@@ -537,7 +579,9 @@ class ManifestProcessor(
                 name = capName,
                 description = capDesc,
                 parameters = if (params.isEmpty()) null else params,
-                returnType = mapKSTypeToDataType(func.returnType!!.resolve())
+                returnType = mapKSTypeToDataType(func.returnType!!.resolve()),
+                isPausable = supportsPause,
+                isCancellable = supportsCancel
             )
         }.toList()
 

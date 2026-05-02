@@ -2,6 +2,7 @@ package com.wip.plugin.api
 
 import org.koin.core.module.Module
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Deferred
 
 /**
  * The root interface for any plugin.
@@ -98,13 +99,46 @@ interface ProgressReporter {
 }
 
 /**
+ * Signals that can be sent to a running plugin capability.
+ */
+enum class PluginSignal {
+    PAUSE, RESUME, CANCEL
+}
+
+/**
+ * Handle to control a running plugin task.
+ */
+interface JobHandle {
+    val result: Deferred<Result<PluginResponse>>
+    fun pause()
+    fun resume()
+    fun cancel(force: Boolean = false)
+}
+
+/**
  * Context provided to a plugin during execution.
  */
-data class ExecutionContext(
+class ExecutionContext(
     val logger: PluginLogger,
     val progress: ProgressReporter,
     val fileSystem: PluginFileSystem
-)
+) {
+    private val signalHandlers = mutableListOf<suspend (PluginSignal) -> Unit>()
+
+    /**
+     * Internal method for the Host to send signals to the plugin.
+     */
+    suspend fun sendSignal(signal: PluginSignal) {
+        signalHandlers.forEach { it(signal) }
+    }
+
+    /**
+     * Register a block to handle lifecycle signals (Pause, Resume, Cancel).
+     */
+    fun onSignal(handler: suspend (PluginSignal) -> Unit) {
+        signalHandlers.add(handler)
+    }
+}
 
 /**
  * The actual processor performing the business logic.
@@ -131,4 +165,11 @@ interface DataProcessor {
      * Observe processing progress (0.0 to 1.0).
      */
     fun observeProgress(): Flow<Float>? = null
+
+    /**
+     * Process data asynchronously, returning a handle to control the task.
+     */
+    fun processAsync(request: PluginRequest): JobHandle {
+        throw NotImplementedError("processAsync not implemented")
+    }
 }

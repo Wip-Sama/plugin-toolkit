@@ -3,6 +3,7 @@ package com.wip.bettwemanhwa
 import com.wip.plugin.api.ExecutionContext
 import com.wip.plugin.api.PluginFileSystem
 import com.wip.plugin.api.PluginLogger
+import com.wip.plugin.api.PluginSignal
 import com.wip.plugin.api.ProgressReporter
 import com.wip.plugin.api.annotations.Capability
 import com.wip.plugin.api.annotations.CapabilityParam
@@ -29,7 +30,8 @@ enum class Widths {
 )
 class BetterManhwa {
     @Capability(
-        name = "Manhwa Processor", description = "Process a folder of manhwa images using BetterManhwa CLI"
+        name = "Manhwa Processor",
+        description = "Process a folder of manhwa images using BetterManhwa CLI"
     )
     fun manhwaProcessor(
         @CapabilityParam(description = "Folder to process") folder: String,
@@ -94,45 +96,69 @@ class BetterManhwa {
 
         logger.info("Executing: ${command.joinToString(" ")}")
 
-        val process = ProcessBuilder(command)
+        var process = ProcessBuilder(command)
             .directory(File(basePath))
             .redirectErrorStream(true)
             .start()
 
-        val output = StringBuilder()
-        process.inputStream.bufferedReader().use { reader ->
-            reader.lines().forEach { line ->
-                if (line.toFloatOrNull() != null) {
-                    progressReporter.report(line.toFloat().coerceIn(0f, 1f))
-                } else {
-                    logger.debug(line)
+        fun executeProcess(process: Process) {
+            val output = StringBuilder()
+            process.inputStream.bufferedReader().use { reader ->
+                reader.lines().forEach { line ->
+                    if (line.toFloatOrNull() != null) {
+                        progressReporter.report(line.toFloat().coerceIn(0f, 1f))
+                    } else {
+                        logger.debug(line)
+                        output.appendLine(line)
+                    }
+                }
+            }
+            process.errorStream.bufferedReader().use { reader ->
+                reader.lines().forEach { line ->
+                    logger.error(line)
                     output.appendLine(line)
                 }
             }
-        }
-        process.errorStream.bufferedReader().use { reader ->
-            reader.lines().forEach { line ->
-                logger.error(line)
-                output.appendLine(line)
+
+            try {
+                val exitCode = process.waitFor()
+                if (exitCode != 0) {
+                    val errorMsg = "Upscaler core exited with code $exitCode. Output:\n$output"
+                    logger.error(errorMsg)
+                    throw RuntimeException(errorMsg)
+                }
+            } catch (
+                e: Exception
+            ) {
+                val errorMsg = "Error while waiting for process to finish: ${e.message}"
+                logger.error(errorMsg, e)
+                throw RuntimeException(e)
+            } finally {
+                process.destroyForcibly()
             }
         }
 
-        try {
-            val exitCode = process.waitFor()
-            if (exitCode != 0) {
-                val errorMsg = "Upscaler core exited with code $exitCode. Output:\n$output"
-                logger.error(errorMsg)
-                throw RuntimeException(errorMsg)
+        context.onSignal { signal ->
+            when(signal) {
+                PluginSignal.PAUSE -> {
+                    logger.info("Received pause signal. Killing process...")
+                    process.destroyForcibly()
+                }
+                PluginSignal.RESUME -> {
+                    logger.info("Received resume signal. Restarting process...")
+                    process = ProcessBuilder(command)
+                        .directory(File(basePath))
+                        .redirectErrorStream(true)
+                        .start()
+                    executeProcess(process)
+                }
+                PluginSignal.CANCEL -> {
+                    logger.info("Received cancel signal. Killing process...")
+                    process.destroyForcibly()
+                }
             }
-        } catch (
-            e: Exception
-        ) {
-            val errorMsg = "Error while waiting for process to finish: ${e.message}"
-            logger.error(errorMsg, e)
-            throw RuntimeException(e)
-        } finally {
-            process.destroyForcibly()
         }
+        executeProcess(process)
 
         logger.info("Processing completed successfully")
         return outputDir.absolutePath.replace("\\\\", "\\")

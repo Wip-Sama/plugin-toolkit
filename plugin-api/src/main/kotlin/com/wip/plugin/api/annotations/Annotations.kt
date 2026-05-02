@@ -15,7 +15,9 @@ annotation class PluginInfo(
 @Retention(AnnotationRetention.SOURCE)
 annotation class Capability(
     val name: String,
-    val description: String
+    val description: String,
+    val supportsPause: Boolean = false,
+    val supportsCancel: Boolean = true
 )
 
 @Target(AnnotationTarget.VALUE_PARAMETER)
