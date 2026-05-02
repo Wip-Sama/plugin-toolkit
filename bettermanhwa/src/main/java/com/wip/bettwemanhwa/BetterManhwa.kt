@@ -1,5 +1,6 @@
 package com.wip.bettwemanhwa
 
+import com.wip.plugin.api.ExecutionContext
 import com.wip.plugin.api.PluginFileSystem
 import com.wip.plugin.api.PluginLogger
 import com.wip.plugin.api.ProgressReporter
@@ -36,15 +37,17 @@ class BetterManhwa {
         @CapabilityParam(description = "Grain level for processing", defaultValue = "5") grain: Int,
         @CapabilityParam(description = "Output image format", defaultValue = "WEBP") outputFormat: OutputFormat,
         @CapabilityParam(description = "Output folder (leave null to auto-create)", defaultValue = "null") outFolder: String,
-        logger: PluginLogger,
-        fileSystem: PluginFileSystem,
-        progressReporter: ProgressReporter
+        context: ExecutionContext
     ): String {
         // Validate input folder
         val inputDir = File(folder)
         if (!inputDir.exists() || !inputDir.isDirectory) {
             throw IllegalArgumentException("Input folder does not exist or is not a directory: $folder")
         }
+
+        val logger = context.logger
+        val fileSystem = context.fileSystem
+        val progressReporter = context.progress
 
         // Determine output folder
         val outputDir = if (outFolder.isNotBlank() && outFolder != "null") {
@@ -114,12 +117,21 @@ class BetterManhwa {
             }
         }
 
-        val exitCode = process.waitFor()
-
-        if (exitCode != 0) {
-            val errorMsg = "Upscaler core exited with code $exitCode. Output:\n$output"
-            logger.error(errorMsg)
-            throw RuntimeException(errorMsg)
+        try {
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                val errorMsg = "Upscaler core exited with code $exitCode. Output:\n$output"
+                logger.error(errorMsg)
+                throw RuntimeException(errorMsg)
+            }
+        } catch (
+            e: Exception
+        ) {
+            val errorMsg = "Error while waiting for process to finish: ${e.message}"
+            logger.error(errorMsg, e)
+            throw RuntimeException(e)
+        } finally {
+            process.destroyForcibly()
         }
 
         logger.info("Processing completed successfully")

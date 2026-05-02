@@ -2,10 +2,13 @@ package com.wip.kpm_cpm_wotoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
 import com.wip.plugin.api.PluginEntry
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import org.koin.core.Koin
 import org.koin.dsl.koinApplication
 import java.io.File
 import java.net.URLClassLoader
+import java.util.ServiceLoader
 
 private data class LoadedPlugin(
     val jarPath: String,
@@ -21,8 +24,8 @@ actual object PluginLoader {
         jarPath: String
     ): Result<PluginEntry> {
         return try {
-            val path = kotlinx.io.files.Path(jarPath)
-            if (!kotlinx.io.files.SystemFileSystem.exists(path)) {
+            val path = Path(jarPath)
+            if (!SystemFileSystem.exists(path)) {
                 Logger.e { "Plugin JAR file not found: $jarPath" }
                 return Result.failure(Exception("File not found: $jarPath"))
             }
@@ -38,7 +41,7 @@ actual object PluginLoader {
             val newClassLoader = URLClassLoader(arrayOf(url), this.javaClass.classLoader)
 
             // Use ServiceLoader to find the PluginEntry implementation
-            val loader = java.util.ServiceLoader.load(PluginEntry::class.java, newClassLoader)
+            val loader = ServiceLoader.load(PluginEntry::class.java, newClassLoader)
             val pluginEntryImpl =
                 loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $jarPath")
 

@@ -1,10 +1,15 @@
 Plugin:
 - If a plugin is installed in an "invalid location" (non managed folder) it should show it as unmanaged, and should not be possible to update it, only to remove ità
-- Add pause/cancel call to be able to properly pause teh program
-- add non pausable flag
 
 Plugin Api:
 - (?) Plan to switch of plugins access files in a way that allow the main app to preload/prepare the needed resources to have more control on how the modules operate
+- Add pause/cancel call to be able to properly pause the program
+- add non pausable flag
+- Byte cose scanning for future security settings
+- The Child-First ClassLoader
+- JobHandle
+- Signal handling
+- Documentation
 
 Gradle:
 - (?) Change the naming output of the plugin file to include the version
