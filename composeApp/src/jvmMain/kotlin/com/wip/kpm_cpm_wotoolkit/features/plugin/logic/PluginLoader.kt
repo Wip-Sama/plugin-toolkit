@@ -38,7 +38,7 @@ actual object PluginLoader {
 
             Logger.i { "Loading plugin from $jarPath" }
             val url = File(jarPath).toURI().toURL()
-            val newClassLoader = URLClassLoader(arrayOf(url), this.javaClass.classLoader)
+            val newClassLoader = ChildFirstClassLoader(arrayOf(url), this.javaClass.classLoader)
 
             // Use ServiceLoader to find the PluginEntry implementation
             val loader = ServiceLoader.load(PluginEntry::class.java, newClassLoader)
