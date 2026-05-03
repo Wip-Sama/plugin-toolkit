@@ -80,7 +80,7 @@ class RepoManager(
 
             saveReposToSettings(updatedRepos)
 
-            _plugins.value = _plugins.value + (url to index.plugins.map { it.copy(repoUrl = url) })
+            _plugins.value += (url to index.plugins.map { it.copy(repoUrl = url) })
 
             Logger.i { "Successfully added repository: ${newRepo.name} ($url)" }
             AddRepoResult.Success
@@ -97,14 +97,14 @@ class RepoManager(
 
         saveReposToSettings(updatedRepos)
 
-        _plugins.value = _plugins.value - url
+        _plugins.value -= url
     }
 
     suspend fun refreshRepository(url: String) {
         Logger.d { "Refreshing repository: $url" }
         try {
             val index: RepoIndex = client.get(url).body()
-            _plugins.value = _plugins.value + (url to index.plugins.map { it.copy(repoUrl = url) })
+            _plugins.value += (url to index.plugins.map { it.copy(repoUrl = url) })
 
             // Update repo metadata if changed
             val updatedRepos = _repositories.value.map {

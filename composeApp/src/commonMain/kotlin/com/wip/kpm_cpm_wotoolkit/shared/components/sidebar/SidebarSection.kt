@@ -40,7 +40,7 @@ import kpm_cpm_wotoolkit.composeapp.generated.resources.section_application
 private fun SidebarSectionPreview() {
     MaterialTheme {
         SidebarSection(
-            section = SidebarSectionData<String>(
+            section = SidebarSectionData(
                 title = Res.string.section_application.localized,
                 elements = listOf()
             ),

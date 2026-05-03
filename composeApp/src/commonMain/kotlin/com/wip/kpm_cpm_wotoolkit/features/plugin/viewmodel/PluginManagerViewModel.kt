@@ -195,7 +195,7 @@ class PluginManagerViewModel(
             } else {
                 getString(Res.string.plugin_validation_failed, result.exceptionOrNull()?.message ?: "Unknown error")
             }
-            dialogService.showConfirmation(getString(Res.string.plugin_validation_result), msg, {})
+            dialogService.showConfirmation(getString(Res.string.plugin_validation_result), msg) {}
         }
     }
 
@@ -229,7 +229,7 @@ class PluginManagerViewModel(
                 } else {
                     getString(Res.string.plugin_changelog_not_found_remote, name)
                 }
-                dialogService.showConfirmation(getString(Res.string.plugin_changelog), errorMsg, {})
+                dialogService.showConfirmation(getString(Res.string.plugin_changelog), errorMsg) {}
             }
         }
     }
@@ -238,9 +238,8 @@ class PluginManagerViewModel(
         viewModelScope.launch {
             dialogService.showConfirmation(
                 getString(Res.string.plugin_settings),
-                "Settings editing to be implemented in a dedicated UI.",
-                {}
-            )
+                "Settings editing to be implemented in a dedicated UI."
+            ) {}
         }
     }
 

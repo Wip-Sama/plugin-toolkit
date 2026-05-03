@@ -96,7 +96,7 @@ class BetterManhwa {
 
         logger.info("Executing: ${command.joinToString(" ")}")
 
-        var process = ProcessBuilder(command)
+        val process = ProcessBuilder(command)
             .directory(File(basePath))
             .redirectErrorStream(true)
             .start()

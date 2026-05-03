@@ -145,7 +145,7 @@ private fun handleCirclePickerInput(
     onLocationChange: (Offset) -> Unit
 ) {
     val angleRad = atan2(y - radius, x - radius)
-    var angleDeg = (angleRad * 180.0 / kotlin.math.PI + 360) % 360
+    val angleDeg = (angleRad * 180.0 / kotlin.math.PI + 360) % 360
 
     val length = MathHelper.getLength(x, y, radius)
     val radiusProgress = (1 - (length / radius)).coerceIn(0f, 1f)

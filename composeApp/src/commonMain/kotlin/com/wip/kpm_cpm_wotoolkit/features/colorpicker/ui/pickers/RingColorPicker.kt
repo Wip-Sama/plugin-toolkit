@@ -167,7 +167,7 @@ private fun handleRingPickerInput(
     onLocationChange: (Offset) -> Unit
 ) {
     val angleRad = atan2(y - radius, x - radius)
-    var angleDeg = (angleRad * 180.0 / kotlin.math.PI + 360) % 360
+    val angleDeg = (angleRad * 180.0 / kotlin.math.PI + 360) % 360
 
     val length = MathHelper.getLength(x, y, radius)
     val progress = angleDeg / 360f

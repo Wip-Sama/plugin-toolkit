@@ -128,7 +128,7 @@ class Slicer {
             val forcedJ = (i + desiredHeight).coerceIn(searchStart, searchEnd)
 
             for (j in searchStart..searchEnd) {
-                val isUseful = (j > 0 && j <= totalHeight && usefulRowVarianceList[j - 1]) || j == totalHeight
+                val isUseful = (j in 1..totalHeight && usefulRowVarianceList[j - 1]) || j == totalHeight
                 val isForced = (j == forcedJ)
 
                 if (isUseful || isForced) {

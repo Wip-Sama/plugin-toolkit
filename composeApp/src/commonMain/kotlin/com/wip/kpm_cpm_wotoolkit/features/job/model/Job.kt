@@ -37,7 +37,7 @@ data class BackgroundJob(
     val capabilityName: String,
     // Using a map of strings for parameters for now to simplify serialization
     // In a real app, we might use JsonObject
-    val parameters: Map<String, JsonElement> = emptyMap<String, JsonElement>(),
+    val parameters: Map<String, JsonElement> = emptyMap(),
     val result: String? = null, // Serialized result
     val resumeState: JsonElement? = null,
     val keepResult: Boolean = true,

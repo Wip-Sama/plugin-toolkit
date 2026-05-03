@@ -33,15 +33,15 @@ A plugin provides one or more **Capabilities**. These are functions annotated wi
 
 The following types are supported for parameters annotated with `@CapabilityParam`:
 
-| Type | Kotlin Example | Description |
-| :--- | :--- | :--- |
-| **String** | `String` | Standard text input. |
+| Type        | Kotlin Example                   | Description                                        |
+|:------------|:---------------------------------|:---------------------------------------------------|
+| **String**  | `String`                         | Standard text input.                               |
 | **Numeric** | `Int`, `Long`, `Double`, `Float` | Numeric inputs (validated by min/max if provided). |
-| **Boolean** | `Boolean` | Rendered as a toggle/switch in the UI. |
-| **Enum** | `MyEnum` | Rendered as a dropdown list of options. |
-| **List** | `List<String>` | A collection of values. |
-| **Object** | `@Serializable class MyData` | Complex objects (serialized as JSON). |
-| **Any** | `JsonElement` | Raw JSON input for maximum flexibility. |
+| **Boolean** | `Boolean`                        | Rendered as a toggle/switch in the UI.             |
+| **Enum**    | `MyEnum`                         | Rendered as a dropdown list of options.            |
+| **List**    | `List<String>`                   | A collection of values.                            |
+| **Object**  | `@Serializable class MyData`     | Complex objects (serialized as JSON).              |
+| **Any**     | `JsonElement`                    | Raw JSON input for maximum flexibility.            |
 
 ```kotlin
 @Capability(

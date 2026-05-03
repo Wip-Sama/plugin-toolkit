@@ -50,7 +50,7 @@ class JobWorker(
                     try {
                         // Registration now happens inside executeJob because we need the JobHandle from the plugin
                         
-                        // Just wait for the job to complete or be cancelled.
+                        // Just wait for the job to complete or be canceled.
                         // Cancellation is cooperatively handled by jobExecution.cancel() from JobManager.
                         jobExecution.join()
                     } catch (e: Exception) {
@@ -63,7 +63,8 @@ class JobWorker(
                     if (!isActive) break
                 } catch (e: Exception) {
                     Logger.e(e) { "Worker $workerId encountered error in loop" }
-                    delay(2000) // Cooling off period on error
+                    delay(2000) //TODO: maybe remove this
+                    // Cooling-off period on error
                 }
             }
         }

@@ -219,13 +219,16 @@ internal fun Color.toHueProgress(): Float {
         return 0f
     }
 
-    var hue = 0f
-    if (max == red) {
-        hue = (green - blue) / (max - min)
-    } else if (max == green) {
-        hue = 2f + (blue - red) / (max - min)
-    } else {
-        hue = 4f + (red - green) / (max - min)
+    var hue = when (max) {
+        red -> {
+            (green - blue) / (max - min)
+        }
+        green -> {
+            2f + (blue - red) / (max - min)
+        }
+        else -> {
+            4f + (red - green) / (max - min)
+        }
     }
 
     hue *= 60

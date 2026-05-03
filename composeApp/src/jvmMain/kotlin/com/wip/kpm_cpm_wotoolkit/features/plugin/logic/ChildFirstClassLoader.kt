@@ -40,11 +40,11 @@ class ChildFirstClassLoader(
                     } catch (e: ClassNotFoundException) {
                         // If not found locally, and not already checked parent, delegate to parent
                         if (!isSharedClass) {
-                            try {
-                                c = super.loadClass(name, resolve)
+                            c = try {
+                                super.loadClass(name, resolve)
                             } catch (e2: ClassNotFoundException) {
                                 // Last resort: system class loader
-                                c = systemClassLoader.loadClass(name)
+                                systemClassLoader.loadClass(name)
                             }
                         }
                     }

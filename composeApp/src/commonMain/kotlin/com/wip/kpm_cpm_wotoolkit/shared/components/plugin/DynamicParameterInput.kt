@@ -251,7 +251,7 @@ private fun StandardTextField(
             } else if (maxLength != null && newValue.length > maxLength) {
                 isError = true
                 errorMessage = "Maximum length is $maxLength"
-            } else if (regex != null && regex.isNotEmpty()) {
+            } else if (!regex.isNullOrEmpty()) {
                 if (!Regex(regex).matches(newValue)) {
                     isError = true
                     errorMessage = "Does not match required format"

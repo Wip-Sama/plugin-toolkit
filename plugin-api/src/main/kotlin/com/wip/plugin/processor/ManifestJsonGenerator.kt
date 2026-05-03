@@ -59,7 +59,7 @@ object ManifestJsonGenerator {
                         maxValue = if (!maxValue.isNaN()) maxValue else null,
                         minLength = if (minLength != -1) minLength else null,
                         maxLength = if (maxLength != -1) maxLength else null,
-                        regex = if (regex.isNotEmpty()) regex else null,
+                        regex = regex.ifEmpty { null },
                         multiSelect = if (multiSelect) true else null,
                         minChoices = if (minChoices != -1) minChoices else null,
                         maxChoices = if (maxChoices != -1) maxChoices else null
@@ -81,7 +81,7 @@ object ManifestJsonGenerator {
             Capability(
                 name = capName,
                 description = capDesc,
-                parameters = if (params.isEmpty()) null else params,
+                parameters = params.ifEmpty { null },
                 returnType = GeneratorUtils.mapKSTypeToDataType(func.returnType!!.resolve()),
                 isPausable = supportsPause || hasResumeState,
                 isCancellable = supportsCancel
@@ -111,7 +111,7 @@ object ManifestJsonGenerator {
             plugin = PluginInfo(id = id, name = name, version = version, description = description),
             requirements = Requirements(minMemoryMb = minMemoryMb, minExecutionTimeMs = minExecutionTimeMs),
             capabilities = manifestCapabilities,
-            settings = if (manifestSettings.isEmpty()) null else manifestSettings,
+            settings = manifestSettings.ifEmpty { null },
             changelog = changelogObj
         )
         

@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh

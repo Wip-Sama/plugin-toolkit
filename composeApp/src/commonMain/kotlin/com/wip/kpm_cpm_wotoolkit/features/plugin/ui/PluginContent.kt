@@ -78,13 +78,13 @@ fun PluginContent(
 ) {
     Box(modifier = modifier.fillMaxHeight()) {
         val selectedCapability = viewModel.selectedCapability
-        val allJobs by viewModel.activeJobs.collectAsState(initial = emptyList<BackgroundJob>())
+        val allJobs by viewModel.activeJobs.collectAsState(initial = emptyList())
 
         val jobProgressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
         val capabilityJobs = remember(allJobs, viewModel.selectedPlugin, selectedCapability) {
             val pluginId = viewModel.selectedPlugin?.getManifest()?.plugin?.id
             val capName = selectedCapability?.name
-            if (pluginId == null || capName == null) emptyList<BackgroundJob>()
+            if (pluginId == null || capName == null) emptyList()
             else allJobs.filter { it.pluginId == pluginId && it.capabilityName == capName }
                 .sortedByDescending { it.enqueuedAt }
         }
@@ -319,35 +319,40 @@ fun JobResultItem(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
-                        color = ProgressIndicatorDefaults.linearColor,
-                        trackColor = ProgressIndicatorDefaults.linearTrackColor,
-                        strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(Res.string.plugin_executing_progress, (progress * 100).toInt()),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+            when (job.status) {
+                JobStatus.Running, JobStatus.Queued -> {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
+                            color = ProgressIndicatorDefaults.linearColor,
+                            trackColor = ProgressIndicatorDefaults.linearTrackColor,
+                            strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(Res.string.plugin_executing_progress, (progress * 100).toInt()),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
-            } else if (job.status == JobStatus.Completed) {
-                val jsonResult = remember(job.result) {
-                    job.result?.let {
-                        try {
-                            kotlinx.serialization.json.Json.parseToJsonElement(it)
-                        } catch (e: Exception) {
-                            kotlinx.serialization.json.JsonNull
-                        }
-                    } ?: kotlinx.serialization.json.JsonNull
+                JobStatus.Completed -> {
+                    val jsonResult = remember(job.result) {
+                        job.result?.let {
+                            try {
+                                kotlinx.serialization.json.Json.parseToJsonElement(it)
+                            } catch (e: Exception) {
+                                kotlinx.serialization.json.JsonNull
+                            }
+                        } ?: kotlinx.serialization.json.JsonNull
+                    }
+                    ResponseView(com.wip.plugin.api.PluginResponse(result = jsonResult))
                 }
-                ResponseView(com.wip.plugin.api.PluginResponse(result = jsonResult))
-            } else if (job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
-                ErrorView(job.errorMessage ?: stringResource(Res.string.plugin_execution_id_format, job.status.name))
+                JobStatus.Failed, JobStatus.Cancelled -> {
+                    ErrorView(job.errorMessage ?: stringResource(Res.string.plugin_execution_id_format, job.status.name))
+                }
+                else -> {}
             }
         }
     }

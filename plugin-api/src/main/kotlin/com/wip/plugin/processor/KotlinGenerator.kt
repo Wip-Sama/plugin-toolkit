@@ -91,7 +91,7 @@ object KotlinGenerator {
                 val typeStr = paramType.toString()
                 if (typeStr != "com.wip.plugin.api.PluginLogger" && typeStr != "com.wip.plugin.api.ProgressReporter" && typeStr != "com.wip.plugin.api.PluginFileSystem" && typeStr != "com.wip.plugin.api.ExecutionContext") {
                     val defaultValueCode = if (defaultValue.isNotEmpty()) "Json.parseToJsonElement(%S)" else "%L"
-                    val defaultValueVal = if (defaultValue.isNotEmpty()) defaultValue else "null"
+                    val defaultValueVal = defaultValue.ifEmpty { "null" }
                     
                     val minValue = paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
                     val maxValue = paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
