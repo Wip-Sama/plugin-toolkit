@@ -2,6 +2,13 @@ plugins {
     id("java-library")
     alias(libs.plugins.jetbrainsKotlinJvm)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.dokka)
+}
+
+dokka {
+    dokkaPublications.html {
+        includes.from("docs/PluginDevelopment.md")
+    }
 }
 
 java {

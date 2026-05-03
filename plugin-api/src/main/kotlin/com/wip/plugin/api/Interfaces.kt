@@ -7,6 +7,10 @@ import kotlinx.serialization.json.JsonElement
 
 /**
  * The root interface for any plugin.
+ *
+ * Implementations of this interface are discovered by the host application via ServiceLoader.
+ * Usually, you should use the `@PluginInfo` annotation on your main class to have the
+ * boilerplate implementation generated for you.
  */
 interface PluginEntry {
     /**
@@ -56,6 +60,9 @@ interface PluginEntry {
 
 /**
  * File system interface for plugins, restricting operations to the plugin's managed folder.
+ *
+ * All paths provided to these methods are relative to the plugin's base directory.
+ * This ensures that plugins cannot interfere with each other or the host application's files.
  */
 interface PluginFileSystem {
     suspend fun readFile(relativePath: String): ByteArray?
@@ -81,6 +88,9 @@ interface PluginFileSystem {
 
 /**
  * Logger interface for plugins to send logs to the host application.
+ *
+ * Logs are routed through the host's logging system, allowing for centralized
+ * collection and display in the UI.
  */
 interface PluginLogger {
     fun verbose(message: String)
@@ -114,15 +124,38 @@ class PluginPausedException(val resumeState: JsonElement) : Exception("Plugin pa
 
 /**
  * Handle to control a running plugin task.
+ *
+ * Allows for checking the result, pausing, or cancelling the task.
  */
 interface JobHandle {
+    /**
+     * The deferred result of the task.
+     */
     val result: Deferred<Result<PluginResponse>>
+
+    /**
+     * Request the task to pause. The task must handle this by saving its state
+     * and throwing a [PluginPausedException].
+     */
     fun pause()
+
+    /**
+     * Request the task to cancel.
+     * @param force If true, the host may terminate the process/thread more aggressively.
+     */
     fun cancel(force: Boolean = false)
 }
 
 /**
  * Context provided to a plugin during execution.
+ *
+ * It provides access to infrastructure services like logging, progress reporting,
+ * and isolated file system access. It also handles lifecycle signals like PAUSE and CANCEL.
+ *
+ * @property logger The logger to use for reporting status and errors.
+ * @property progress The reporter to use for updating task progress.
+ * @property fileSystem Access to the plugin's persistent data storage.
+ * @property cacheFileSystem Access to the plugin's temporary/cache storage.
  */
 class ExecutionContext(
     val logger: PluginLogger,
@@ -157,6 +190,9 @@ class ExecutionContext(
 
 /**
  * The actual processor performing the business logic.
+ *
+ * This interface is typically implemented by the class annotated with `@PluginInfo`.
+ * It handles the execution of capabilities.
  */
 interface DataProcessor {
     /**

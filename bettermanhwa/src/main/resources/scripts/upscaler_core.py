@@ -1,10 +1,112 @@
 import argparse
+import atexit
+import ctypes
 import os
+import signal
 import sys
 import multiprocessing
 from pathlib import Path
 from time import sleep
 from tqdm import tqdm
+
+_active_pool = None
+_job_handle = None
+
+
+def _setup_windows_job_object():
+    """
+    Crea un Job Object Windows con JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE.
+    Quando il processo principale muore (anche via TerminateProcess da Kotlin),
+    l'OS chiude tutti i suoi handle → il job si chiude → tutti i processi
+    nel job vengono uccisi automaticamente.
+    """
+    if sys.platform != "win32":
+        return None
+
+    kernel32 = ctypes.windll.kernel32
+
+    job = kernel32.CreateJobObjectW(None, None)
+    if not job:
+        return None
+
+    class _BASIC(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_longlong),
+            ("PerJobUserTimeLimit", ctypes.c_longlong),
+            ("LimitFlags", ctypes.c_ulong),
+            ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t),
+            ("ActiveProcessLimit", ctypes.c_ulong),
+            ("Affinity", ctypes.c_size_t),
+            ("PriorityClass", ctypes.c_ulong),
+            ("SchedulingClass", ctypes.c_ulong),
+        ]
+
+    class _IO(ctypes.Structure):
+        _fields_ = [
+            (f, ctypes.c_ulonglong)
+            for f in (
+                "ReadOperationCount",
+                "WriteOperationCount",
+                "OtherOperationCount",
+                "ReadTransferCount",
+                "WriteTransferCount",
+                "OtherTransferCount",
+            )
+        ]
+
+    class _EXT(ctypes.Structure):
+        _fields_ = [
+            ("BasicLimitInformation", _BASIC),
+            ("IoInfo", _IO),
+            ("ProcessMemoryLimit", ctypes.c_size_t),
+            ("JobMemoryLimit", ctypes.c_size_t),
+            ("PeakProcessMemoryUsed", ctypes.c_size_t),
+            ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]
+
+    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000
+    JobObjectExtendedLimitInformation = 9
+
+    info = _EXT()
+    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    if not kernel32.SetInformationJobObject(
+        job, JobObjectExtendedLimitInformation, ctypes.byref(info), ctypes.sizeof(info)
+    ):
+        kernel32.CloseHandle(job)
+        return None
+
+    kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess())
+
+    return job
+
+
+def _assign_pid_to_job(job_handle, pid):
+    if job_handle is None or sys.platform != "win32" or pid is None:
+        return
+    kernel32 = ctypes.windll.kernel32
+    PROCESS_ALL_ACCESS = 0x1F0FFF
+    handle = kernel32.OpenProcess(PROCESS_ALL_ACCESS, False, pid)
+    if handle:
+        kernel32.AssignProcessToJobObject(job_handle, handle)
+        kernel32.CloseHandle(handle)
+
+
+def _cleanup():
+    global _active_pool
+    if _active_pool is not None:
+        try:
+            _active_pool.terminate()
+            _active_pool.join()
+        except Exception:
+            pass
+        _active_pool = None
+
+
+def _signal_handler(signum, frame):
+    _cleanup()
+    sys.exit(1)
+
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
@@ -256,9 +358,22 @@ def process_image(
         os.rename(file_creato, output_file)
 
 
-def run_processing(INPUT_PATH, target_width, grain, output_format, on_complete=None):
-    base_dir = os.path.dirname(INPUT_PATH) if os.path.isfile(INPUT_PATH) else INPUT_PATH
-    OUTPUT_FOLDER = os.path.join(base_dir, "upscaled")
+def run_processing(
+    INPUT_PATH,
+    target_width,
+    grain,
+    output_format,
+    on_complete=None,
+    output_path=None,
+    cli_mode=False,
+):
+    if output_path:
+        OUTPUT_FOLDER = output_path
+    else:
+        base_dir = (
+            os.path.dirname(INPUT_PATH) if os.path.isfile(INPUT_PATH) else INPUT_PATH
+        )
+        OUTPUT_FOLDER = os.path.join(base_dir, "upscaled")
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
     vs_max_workers = (
@@ -273,10 +388,40 @@ def run_processing(INPUT_PATH, target_width, grain, output_format, on_complete=N
         return
 
     best_backend_name = get_best_backend_name()
-    print(f"\nAvvio VapourSynth su {len(images)} immagini... ({vs_max_workers} worker)")
+    if not cli_mode:
+        print(
+            f"\nAvvio VapourSynth su {len(images)} immagini... ({vs_max_workers} worker)"
+        )
 
-    with multiprocessing.Pool(processes=vs_max_workers, maxtasksperchild=1) as pool:
-        pbar = tqdm(total=len(images), desc="VapourSynth", unit="img")
+    completed = [0]
+    total = len(images)
+
+    def _on_done(_):
+        completed[0] += 1
+        if cli_mode:
+            print(f"{completed[0] / total:.2f}", flush=True)
+        else:
+            pbar.update(1)
+
+    def _on_error(e):
+        completed[0] += 1
+        if cli_mode:
+            sys.stderr.write(f"Errore: {e}\n")
+            print(f"{completed[0] / total:.2f}", flush=True)
+        else:
+            tqdm.write(f"Errore: {e}")
+            pbar.update(1)
+
+    global _active_pool
+    pool = multiprocessing.Pool(processes=vs_max_workers, maxtasksperchild=1)
+    _active_pool = pool
+    # Assegna esplicitamente ogni worker al Job Object (fallback se l'ereditarietà non basta)
+    for worker in pool._pool:
+        _assign_pid_to_job(_job_handle, worker.pid)
+    pool_closed = False
+    try:
+        if not cli_mode:
+            pbar = tqdm(total=total, desc="VapourSynth", unit="img")
         for img_path in images:
             out_path = os.path.join(
                 OUTPUT_FOLDER, f"{Path(img_path).stem}_upscaled.{output_format.lower()}"
@@ -291,14 +436,26 @@ def run_processing(INPUT_PATH, target_width, grain, output_format, on_complete=N
                     target_width,
                     grain,
                 ),
-                callback=lambda _: pbar.update(1),
-                error_callback=lambda e: (tqdm.write(f"Errore: {e}"), pbar.update(1)),
+                callback=_on_done,
+                error_callback=_on_error,
             )
         pool.close()
         pool.join()
-        pbar.close()
+        pool_closed = True
+        if not cli_mode:
+            pbar.close()
+    except (KeyboardInterrupt, SystemExit):
+        if not pool_closed:
+            pool.terminate()
+            pool.join()
+        raise
+    finally:
+        _active_pool = None
+        if not pool_closed:
+            pool.terminate()
 
-    print(f"\nFinito! {len(images)} immagini processate.\n")
+    if not cli_mode:
+        print(f"\nFinito! {len(images)} immagini processate.\n")
     if on_complete:
         on_complete(True)
 
@@ -343,6 +500,15 @@ def run_cli():
 if __name__ == "__main__":
     multiprocessing.freeze_support()
 
+    # Job Object Windows: garantisce il kill dei worker anche con TerminateProcess() da Kotlin
+    _job_handle = _setup_windows_job_object()
+
+    # Fallback segnali per Ctrl+C / Ctrl+Break interattivi
+    atexit.register(_cleanup)
+    signal.signal(signal.SIGINT, _signal_handler)
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, _signal_handler)
+
     parser = argparse.ArgumentParser(
         prog="upscaler_core",
         description="BetterManhwa Upscaler",
@@ -377,6 +543,13 @@ if __name__ == "__main__":
         metavar="FORMATO",
         help="Formato di output: webp o png. [default: webp]",
     )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=None,
+        metavar="OUTPUT",
+        help="Cartella di destinazione per le immagini processate. [default: <input>/upscaled]",
+    )
 
     args = parser.parse_args()
 
@@ -384,12 +557,25 @@ if __name__ == "__main__":
         if not os.path.exists(args.input):
             parser.error(f"Percorso non valido: {args.input}")
 
+        if args.output and not os.path.exists(args.output):
+            try:
+                os.makedirs(args.output, exist_ok=True)
+            except Exception as e:
+                parser.error(f"Impossibile creare la cartella di output: {e}")
+
         w_in = args.width.strip().lower()
         SCALE_KEYWORDS = ["1x", "2x", "4x", "8x", "x1", "x2", "x4", "x8"]
         t_width = (
             w_in if w_in in SCALE_KEYWORDS else (int(w_in) if w_in.isdigit() else 1000)
         )
 
-        run_processing(args.input, t_width, args.grain, args.fmt)
+        run_processing(
+            args.input,
+            t_width,
+            args.grain,
+            args.fmt,
+            output_path=args.output,
+            cli_mode=True,
+        )
     else:
         run_cli()

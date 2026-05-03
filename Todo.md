@@ -4,12 +4,10 @@ Plugin:
 Plugin Api:
 - (?) Plan to switch of plugins access files in a way that allow the main app to preload/prepare the needed resources to have more control on how the modules operate
 - Add pause/cancel call to be able to properly pause the program
-- add non pausable flag
 - Byte cose scanning for future security settings
-- The Child-First ClassLoader
-- JobHandle
-- Signal handling
-- Documentation
+- Documentation for update plugin api (make it work)
+- Documentation for plugin setting page (make it work)
+- Documentation for plugin custom action page (make it work)
 
 Gradle:
 - (?) Change the naming output of the plugin file to include the version
