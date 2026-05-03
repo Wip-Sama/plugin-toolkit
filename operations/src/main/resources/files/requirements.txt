@@ -1,4 +1,0 @@
-tqdm
-vstools
-vsjetpack
-dearpygui
