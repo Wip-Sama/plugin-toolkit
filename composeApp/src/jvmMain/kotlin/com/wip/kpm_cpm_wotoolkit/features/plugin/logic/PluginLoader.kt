@@ -20,30 +20,40 @@ private data class LoadedPlugin(
 actual object PluginLoader {
     private val loadedPlugins = mutableMapOf<String, LoadedPlugin>()
 
+    private fun normalizePath(path: String): String {
+        return try {
+            File(path).canonicalPath
+        } catch (e: Exception) {
+            Logger.w { "Failed to get canonical path for $path, using absolute path instead" }
+            File(path).absolutePath
+        }
+    }
+
     actual fun loadPlugin(
         jarPath: String
     ): Result<PluginEntry> {
+        val normalizedPath = normalizePath(jarPath)
         return try {
-            val path = Path(jarPath)
+            val path = Path(normalizedPath)
             if (!SystemFileSystem.exists(path)) {
-                Logger.e { "Plugin JAR file not found: $jarPath" }
-                return Result.failure(Exception("File not found: $jarPath"))
+                Logger.e { "Plugin JAR file not found: $normalizedPath (original: $jarPath)" }
+                return Result.failure(Exception("File not found: $normalizedPath"))
             }
 
             // If already loaded, return it
-            loadedPlugins[jarPath]?.let {
-                Logger.d { "Plugin already loaded: $jarPath" }
+            loadedPlugins[normalizedPath]?.let {
+                Logger.d { "Plugin already loaded: $normalizedPath" }
                 return Result.success(it.entry)
             }
 
-            Logger.i { "Loading plugin from $jarPath" }
-            val url = File(jarPath).toURI().toURL()
+            Logger.i { "Loading plugin from $normalizedPath" }
+            val url = File(normalizedPath).toURI().toURL()
             val newClassLoader = ChildFirstClassLoader(arrayOf(url), this.javaClass.classLoader)
 
             // Use ServiceLoader to find the PluginEntry implementation
             val loader = ServiceLoader.load(PluginEntry::class.java, newClassLoader)
             val pluginEntryImpl =
-                loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $jarPath")
+                loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $normalizedPath")
 
             // Get the Koin module from the entry point
             val module = pluginEntryImpl.getKoinModule()
@@ -55,32 +65,41 @@ actual object PluginLoader {
             val koin = koinApp.koin
             val pluginEntry = koin.get<PluginEntry>()
 
-            val loadedPlugin = LoadedPlugin(jarPath, pluginEntry, newClassLoader, koin)
-            loadedPlugins[jarPath] = loadedPlugin
+            val loadedPlugin = LoadedPlugin(normalizedPath, pluginEntry, newClassLoader, koin)
+            loadedPlugins[normalizedPath] = loadedPlugin
 
-            Logger.i { "Successfully loaded plugin from $jarPath" }
+            Logger.i { "Successfully loaded plugin from $normalizedPath" }
             Result.success(pluginEntry)
         } catch (e: Exception) {
-            Logger.e(e) { "Failed to load plugin from $jarPath" }
+            Logger.e(e) { "Failed to load plugin from $normalizedPath" }
             Result.failure(e)
         }
     }
 
     actual fun unloadPlugin(jarPath: String) {
-        loadedPlugins.remove(jarPath)?.let {
-            Logger.i { "Unloading plugin: $jarPath" }
-            it.entry.shutdown()
-            it.classLoader.close()
+        val normalizedPath = normalizePath(jarPath)
+        loadedPlugins.remove(normalizedPath)?.let {
+            Logger.i { "Unloading plugin: $normalizedPath" }
+            try {
+                it.entry.shutdown()
+                it.classLoader.close()
+                Logger.i { "Successfully unloaded and closed classloader for $normalizedPath" }
+            } catch (e: Exception) {
+                Logger.e(e) { "Error during shutdown of plugin at $normalizedPath" }
+            }
+            return
         }
+        Logger.w { "Attempted to unload plugin but it was not found in cache: $normalizedPath (original: $jarPath). Current keys: ${loadedPlugins.keys}" }
     }
 
     actual fun unloadAll() {
+        Logger.i { "Unloading all plugins (${loadedPlugins.size} currently loaded)" }
         loadedPlugins.keys.toList().forEach { unloadPlugin(it) }
     }
 
     actual fun getPlugins(): List<PluginEntry> = loadedPlugins.values.map { it.entry }
 
-    actual fun getPlugin(jarPath: String): PluginEntry? = loadedPlugins[jarPath]?.entry
+    actual fun getPlugin(jarPath: String): PluginEntry? = loadedPlugins[normalizePath(jarPath)]?.entry
 
     actual fun getPluginById(pluginId: String): PluginEntry? {
         return loadedPlugins.values.find { it.entry.getManifest().plugin.id == pluginId }?.entry

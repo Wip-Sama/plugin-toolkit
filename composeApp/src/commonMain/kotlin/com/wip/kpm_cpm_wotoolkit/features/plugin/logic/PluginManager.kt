@@ -242,9 +242,13 @@ class PluginManager(
 
     fun unloadPlugin(pkg: String) {
         Logger.d { "Unloading plugin: $pkg" }
-        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return
+        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: run {
+            Logger.w { "Cannot unload plugin $pkg: not found in installed list" }
+            return
+        }
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = plugin.installPath + "/" + jarFileName
+        Logger.d { "Requesting PluginLoader to unload JAR: $jarFile" }
         PluginLoader.unloadPlugin(jarFile)
         _loadedPlugins.value -= pkg
     }
