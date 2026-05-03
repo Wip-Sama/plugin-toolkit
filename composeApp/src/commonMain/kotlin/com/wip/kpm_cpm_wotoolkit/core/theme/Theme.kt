@@ -47,8 +47,16 @@ data class Dimensions(
     val cardElevation: Dp = 2.dp
 )
 
+data class CustomColors(
+    val success: Color = Color(0xFF4CAF50),
+    val warning: Color = Color(0xFFFF9800),
+    val info: Color = Color(0xFF2196F3),
+    val validated: Color = Color(0xFFD0BCFF)
+)
+
 val LocalSpacing = staticCompositionLocalOf { Spacing() }
 val LocalDimensions = staticCompositionLocalOf { Dimensions() }
+val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
 
 object WOTheme {
     val spacing: Spacing
@@ -60,6 +68,11 @@ object WOTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalDimensions.current
+
+    val colors: CustomColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalCustomColors.current
 }
 
 private val DarkColorScheme =
@@ -129,7 +142,11 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
 
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
-        LocalDimensions provides Dimensions()
+        LocalDimensions provides Dimensions(),
+        LocalCustomColors provides CustomColors(
+            validated = seedColor,
+            success = Color(0xFF4CAF50) //TODO: Could be tuned based on theme
+        )
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

@@ -1,10 +1,7 @@
-package com.wip.bettwemanhwa
+package com.wip.bettermanhwa
 
 import com.wip.plugin.api.ExecutionContext
-import com.wip.plugin.api.PluginFileSystem
-import com.wip.plugin.api.PluginLogger
 import com.wip.plugin.api.PluginSignal
-import com.wip.plugin.api.ProgressReporter
 import com.wip.plugin.api.annotations.Capability
 import com.wip.plugin.api.annotations.CapabilityParam
 import com.wip.plugin.api.annotations.PluginInfo
@@ -13,6 +10,7 @@ import com.wip.plugin.api.annotations.PluginSetup
 import com.wip.plugin.api.annotations.PluginValidate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonElement
 import java.io.File
 
 enum class OutputFormat {
@@ -40,7 +38,7 @@ class BetterManhwa {
         @CapabilityParam(description = "Grain level for processing", defaultValue = "5") grain: Int,
         @CapabilityParam(description = "Output image format", defaultValue = "WEBP") outputFormat: OutputFormat,
         @CapabilityParam(description = "Output folder (leave null to auto-create)", defaultValue = "null") outFolder: String? = null,
-        @ResumeState resumeState: kotlinx.serialization.json.JsonElement? = null,
+        @ResumeState resumeState: JsonElement? = null,
         context: ExecutionContext
     ): String {
         // Validate input folder
@@ -159,8 +157,10 @@ class BetterManhwa {
     }
 
     @PluginSetup
-    suspend fun setup(fileSystem: PluginFileSystem, logger: PluginLogger): Result<Unit> {
+    suspend fun setup(context: ExecutionContext): Result<Unit> {
         return try {
+            val fileSystem = context.fileSystem
+            val logger = context.logger
             logger.info("Starting BetterManhwa setup...")
 
             // Extract bundled resources from the JAR to the plugin's managed file area
@@ -222,8 +222,10 @@ class BetterManhwa {
     }
 
     @PluginValidate
-    suspend fun validate(fileSystem: PluginFileSystem, logger: PluginLogger): Result<Unit> {
+    suspend fun validate(context: ExecutionContext): Result<Unit> {
         return try {
+            val fileSystem = context.fileSystem
+            val logger = context.logger
             val basePath = fileSystem.getBasePath()
             val pythonExe = File(basePath, "vapoursynth-portable/python.exe")
             val coreScript = File(basePath, "upscaler_core.py")

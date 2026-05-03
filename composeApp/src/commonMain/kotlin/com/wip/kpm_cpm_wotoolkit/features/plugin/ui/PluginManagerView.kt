@@ -78,6 +78,8 @@ import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_update
 import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_update_local
 import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_validate
 import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_version_pkg_format
+import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_validated
+import kpm_cpm_wotoolkit.composeapp.generated.resources.plugin_validation_pending
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -199,7 +201,7 @@ fun PluginCard(
     onToggle: (Boolean) -> Unit,
     onAction: (PluginAction) -> Unit
 ) {
-    val statusColor = if (isLoaded) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
+    val statusColor = if (isLoaded) WOTheme.colors.success else if (plugin.isValidated) WOTheme.colors.validated else MaterialTheme.colorScheme.outline
 
     Card(
         modifier = Modifier
@@ -241,20 +243,14 @@ fun PluginCard(
                     Text(plugin.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if (isLoaded) {
                         Spacer(modifier = Modifier.width(WOTheme.spacing.small))
-                        Surface(
-                            color = statusColor.copy(alpha = 0.2f),
-                            shape = MaterialTheme.shapes.extraSmall
-                        ) {
-                            Text(
-                                stringResource(Res.string.plugin_loaded),
-                                modifier = Modifier.padding(
-                                    horizontal = WOTheme.spacing.extraSmall,
-                                    vertical = WOTheme.spacing.extraSmall / 2
-                                ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = statusColor
-                            )
-                        }
+                        StatusBadge(stringResource(Res.string.plugin_loaded), WOTheme.colors.success)
+                    }
+                    if (plugin.isValidated) {
+                        Spacer(modifier = Modifier.width(WOTheme.spacing.small))
+                        StatusBadge(stringResource(Res.string.plugin_validated), WOTheme.colors.validated)
+                    } else {
+                        Spacer(modifier = Modifier.width(WOTheme.spacing.small))
+                        StatusBadge(stringResource(Res.string.plugin_validation_pending), MaterialTheme.colorScheme.error)
                     }
                 }
                 Text(
@@ -335,6 +331,25 @@ fun PluginCard(
                 }
             }
         }
+    }
+}
+@Composable
+private fun StatusBadge(text: String, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.1f),
+        shape = MaterialTheme.shapes.extraSmall,
+        modifier = Modifier.border(1.dp, color.copy(alpha = 0.2f), MaterialTheme.shapes.extraSmall)
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(
+                horizontal = WOTheme.spacing.extraSmall,
+                vertical = WOTheme.spacing.extraSmall / 2
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

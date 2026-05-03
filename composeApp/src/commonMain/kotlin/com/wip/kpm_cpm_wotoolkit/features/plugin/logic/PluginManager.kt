@@ -3,12 +3,15 @@ package com.wip.kpm_cpm_wotoolkit.features.plugin.logic
 import co.touchlab.kermit.Logger
 import com.wip.kpm_cpm_wotoolkit.core.utils.PlatformUtils
 import com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager
+import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobType
 import com.wip.kpm_cpm_wotoolkit.features.plugin.model.InstalledPlugin
 import com.wip.kpm_cpm_wotoolkit.features.repository.logic.RepoManager
 import com.wip.kpm_cpm_wotoolkit.features.repository.model.ExtensionPlugin
 import com.wip.kpm_cpm_wotoolkit.features.settings.logic.SettingsRepository
 import com.wip.kpm_cpm_wotoolkit.features.settings.model.PluginUnplugBehavior
+import com.wip.plugin.api.ExecutionContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,7 +37,19 @@ class PluginManager(
         val settings = settingsRepository.loadSettings()
         _installedPlugins.value = settings.extensions.installedPlugins
         Logger.i { "Initializing PluginManager with ${_installedPlugins.value.size} installed plugins" }
-        // Load plugins will happen in main.kt
+        
+        // Observe jobs to mark plugins as validated
+        scope.launch {
+            jobManager.jobs.collect { jobs ->
+                jobs.forEach { job ->
+                    if (job.status == JobStatus.Completed) {
+                        if (job.type == JobType.Validation || job.type == JobType.Setup) {
+                            markAsValidated(job.pluginId)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     suspend fun installLocal(filePath: String, targetFolderPath: String): Result<Unit> {
@@ -88,9 +103,9 @@ class PluginManager(
             addInstalledPlugin(newPlugin)
             Logger.i { "Successfully installed local plugin: ${newPlugin.pkg} with JAR: $jarFileName" }
 
-            // Auto-load if enabled
+            // Auto-setup if enabled
             if (newPlugin.isEnabled) {
-                setupPluginInBackground(newPlugin.pkg)
+                enqueueSetupJob(newPlugin.pkg)
             }
 
             Result.success(Unit)
@@ -147,9 +162,9 @@ class PluginManager(
             addInstalledPlugin(newPlugin)
             Logger.i { "Successfully installed remote plugin: ${newPlugin.pkg} with JAR: ${plugin.fileName}" }
 
-            // Auto-load if enabled
+            // Auto-setup if enabled
             if (newPlugin.isEnabled) {
-                setupPluginInBackground(newPlugin.pkg)
+                enqueueSetupJob(newPlugin.pkg)
             }
 
             Result.success(Unit)
@@ -188,7 +203,7 @@ class PluginManager(
         return Result.success(Unit)
     }
 
-    fun loadPlugin(pkg: String): Result<Unit> {
+    suspend fun loadPlugin(pkg: String): Result<Unit> {
         val plugin =
             _installedPlugins.value.find { it.pkg == pkg } ?: return Result.failure(Exception("Plugin not found"))
         if (!plugin.isEnabled) return Result.success(Unit)
@@ -200,8 +215,22 @@ class PluginManager(
         Logger.d { "Loading plugin JAR: $jarFile" }
         val result = PluginLoader.loadPlugin(jarFile)
         return if (result.isSuccess) {
-            _loadedPlugins.value = _loadedPlugins.value + pkg
-            Logger.i { "Successfully loaded plugin: $pkg" }
+            val entry = result.getOrThrow()
+            
+            // Initialize the plugin with its context
+            val initResult = entry.initialize(createExecutionContext(pkg))
+            if (initResult.isFailure) {
+                val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")
+                Logger.e(error) { "Failed to initialize plugin: $pkg" }
+                return Result.failure(error)
+            }
+
+            if (plugin.isValidated) {
+                _loadedPlugins.value += pkg
+                Logger.i { "Successfully loaded and activated plugin: $pkg" }
+            } else {
+                Logger.i { "Plugin $pkg loaded in loader but not yet validated/activated" }
+            }
             Result.success(Unit)
         } else {
             val error = result.exceptionOrNull() ?: Exception("Unknown error")
@@ -213,14 +242,17 @@ class PluginManager(
     fun unloadPlugin(pkg: String) {
         Logger.d { "Unloading plugin: $pkg" }
         val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return
-        val jarFile = plugin.installPath + "/" + (plugin.pkg.substringAfterLast(".") + ".jar")
+        val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
+        val jarFile = plugin.installPath + "/" + jarFileName
         PluginLoader.unloadPlugin(jarFile)
-        _loadedPlugins.value = _loadedPlugins.value - pkg
+        _loadedPlugins.value -= pkg
     }
 
     fun reloadPlugin(pkg: String) {
-        unloadPlugin(pkg)
-        loadPlugin(pkg)
+        scope.launch {
+            unloadPlugin(pkg)
+            loadPlugin(pkg)
+        }
     }
 
     fun reloadAll() {
@@ -267,8 +299,8 @@ class PluginManager(
             val newList = currentPlugins.values.toList()
             _installedPlugins.value = newList
             saveToSettings(newList)
-            newList.filter { it.isEnabled && !_loadedPlugins.value.contains(it.pkg) }.forEach {
-                loadPlugin(it.pkg)
+            newList.filter { it.isEnabled && it.isValidated && !_loadedPlugins.value.contains(it.pkg) }.forEach {
+                scope.launch { loadPlugin(it.pkg) }
             }
         }
     }
@@ -297,7 +329,14 @@ class PluginManager(
         _installedPlugins.value = updated
         saveToSettings(updated)
 
-        if (enabled) loadPlugin(pkg) else unloadPlugin(pkg)
+        if (enabled) {
+            val plugin = updated.find { it.pkg == pkg }
+            if (plugin != null) {
+                if (plugin.isValidated) loadPlugin(pkg) else enqueueSetupJob(pkg)
+            }
+        } else {
+            unloadPlugin(pkg)
+        }
         return Result.success(Unit)
     }
 
@@ -367,11 +406,11 @@ class PluginManager(
         return installRemote(update, plugin.installPath.substringBeforeLast("/"))
     }
 
-    private fun createExecutionContext(pkg: String): com.wip.plugin.api.ExecutionContext {
+    fun createExecutionContext(pkg: String): ExecutionContext {
         val installPath = PluginLoader.getPluginInstallPath(pkg) ?: ""
         val jarFullPath = PluginLoader.getPluginJarPath(pkg)
 
-        return com.wip.plugin.api.ExecutionContext(
+        return ExecutionContext(
             logger = object : com.wip.plugin.api.PluginLogger {
                 override fun verbose(message: String) { Logger.v { "[$pkg] $message" } }
                 override fun debug(message: String) { Logger.d { "[$pkg] $message" } }
@@ -387,34 +426,64 @@ class PluginManager(
         )
     }
 
+    suspend fun validatePluginInJob(pkg: String): Result<Unit> {
+        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return Result.failure(Exception("Plugin not found"))
+        
+        // Ensure it's loaded in PluginLoader
+        val loadResult = loadPlugin(pkg)
+        if (loadResult.isFailure) return Result.failure(loadResult.exceptionOrNull()!!)
+        
+        val job = BackgroundJob(
+            id = "val_$pkg",
+            name = "Validation: ${plugin.name}",
+            type = JobType.Validation,
+            pluginId = pkg,
+            capabilityName = "validate",
+            keepResult = false
+        )
+        jobManager.enqueueJob(job)
+        return Result.success(Unit)
+    }
+
     suspend fun validatePlugin(pkg: String): Result<Unit> {
+        // This is the direct call, but we should prefer validatePluginInJob for UI visibility
         val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
         return plugin.validate(createExecutionContext(pkg))
     }
 
-    suspend fun performSetup(pkg: String): Result<Unit> {
-        val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
-        return plugin.performSetup(createExecutionContext(pkg))
+    suspend fun enqueueSetupJob(pkg: String) {
+        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return
+        
+        // Ensure it's loaded in PluginLoader
+        val loadResult = loadPlugin(pkg)
+        if (loadResult.isFailure) {
+            Logger.e { "Failed to load plugin $pkg for setup: ${loadResult.exceptionOrNull()?.message}" }
+            return
+        }
+        
+        val job = BackgroundJob(
+            id = "setup_$pkg",
+            name = "Setup: ${plugin.name}",
+            type = JobType.Setup,
+            pluginId = pkg,
+            capabilityName = "setup",
+            keepResult = false
+        )
+        jobManager.enqueueJob(job)
     }
 
-    private fun setupPluginInBackground(pkg: String) {
-        scope.launch {
-            val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return@launch
-            val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
-            val jarFile = plugin.installPath + "/" + jarFileName
+    private fun markAsValidated(pkg: String) {
+        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return
+        if (plugin.isValidated) return
 
-            Logger.d { "Loading plugin JAR for background setup: $jarFile" }
-            val result = PluginLoader.loadPlugin(jarFile)
-            if (result.isSuccess) {
-                performSetup(pkg).onFailure { e ->
-                    Logger.e(e) { "Failed to perform setup for plugin: $pkg" }
-                }
-                _loadedPlugins.value = _loadedPlugins.value + pkg
-                Logger.i { "Successfully completed setup and loaded plugin: $pkg" }
-            } else {
-                val error = result.exceptionOrNull() ?: Exception("Unknown error")
-                Logger.e(error) { "Failed to load plugin for setup: $pkg" }
-            }
+        Logger.i { "Marking plugin $pkg as validated and activating" }
+        val updated = _installedPlugins.value.map {
+            if (it.pkg == pkg) it.copy(isValidated = true) else it
         }
+        _installedPlugins.value = updated
+        saveToSettings(updated)
+        
+        // Now that it's validated, load it (which will add it to _loadedPlugins)
+        scope.launch { loadPlugin(pkg) }
     }
 }

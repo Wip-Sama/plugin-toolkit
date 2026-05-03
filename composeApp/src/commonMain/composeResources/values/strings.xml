@@ -85,6 +85,8 @@
     <string name="plugin_validate">Validate</string>
     <string name="plugin_enabled">Enabled</string>
     <string name="plugin_loaded">Loaded</string>
+    <string name="plugin_validated">Validated</string>
+    <string name="plugin_validation_pending">Pending Setup</string>
     <string name="nav_jobs">Jobs</string>
     <string name="nav_job_general">General</string>
     <string name="nav_job_archive">Archive</string>

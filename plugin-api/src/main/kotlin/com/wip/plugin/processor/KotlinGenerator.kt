@@ -370,6 +370,7 @@ object KotlinGenerator {
             .addFunction(
                 FunSpec.builder("initialize")
                     .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                    .addParameter("context", ClassName("com.wip.plugin.api", "ExecutionContext"))
                     .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
                     .addStatement("return Result.success(Unit)")
                     .build()

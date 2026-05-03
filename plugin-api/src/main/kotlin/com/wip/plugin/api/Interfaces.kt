@@ -11,8 +11,9 @@ import kotlinx.serialization.json.JsonElement
 interface PluginEntry {
     /**
      * Initialize the plugin. Runs in a background thread.
+     * @param context The execution context providing logger and file system access.
      */
-    suspend fun initialize(): Result<Unit>
+    suspend fun initialize(context: ExecutionContext): Result<Unit> = Result.success(Unit)
 
     /**
      * Provide the plugin's Koin module.

@@ -51,6 +51,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kpm_cpm_wotoolkit.composeapp.generated.resources.Res
 import kpm_cpm_wotoolkit.composeapp.generated.resources.compose_multiplatform
 import org.jetbrains.compose.resources.painterResource
@@ -126,12 +127,22 @@ fun main(args: Array<String>) {
     Logger.i { "Application started. Logging initialized at: $logDir" }
 
 
-    // Load enabled plugins at startup
+    // Load enabled and validated plugins at startup
+    val startupScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     pluginManager.installedPlugins.value.forEach { plugin ->
         if (plugin.isEnabled) {
-            val result = pluginManager.loadPlugin(plugin.pkg)
-            if (result.isFailure) {
-                Logger.e { "Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
+            if (plugin.isValidated) {
+                startupScope.launch {
+                    val result = pluginManager.loadPlugin(plugin.pkg)
+                    if (result.isFailure) {
+                        Logger.e { "Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
+                    }
+                }
+            } else {
+                Logger.i { "Plugin ${plugin.pkg} is enabled but not validated, triggering background setup" }
+                startupScope.launch {
+                    pluginManager.enqueueSetupJob(plugin.pkg)
+                }
             }
         }
     }

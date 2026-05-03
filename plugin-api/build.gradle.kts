@@ -18,8 +18,7 @@ kotlin {
 dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
-    api(libs.kotlinx.coroutinesSwing)
-    api(libs.kotlinx.coroutinesCore) // Add core for consistency if needed, though Swing might include it
+    api(libs.kotlinx.coroutinesCore)
     implementation(libs.kotlinxSerializationJson)
 
     // Processor dependencies

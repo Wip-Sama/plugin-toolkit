@@ -18,7 +18,9 @@ enum class JobStatus {
 @Serializable
 enum class JobType {
     Capability,
-    Flow
+    Flow,
+    Setup,
+    Validation
 }
 
 @Serializable

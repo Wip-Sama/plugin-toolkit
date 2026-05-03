@@ -38,5 +38,3 @@ del "temp_dlls.zip"
 
 echo.
 echo [4/4] Setup completato con successo!
-
-pause

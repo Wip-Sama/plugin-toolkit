@@ -3,6 +3,7 @@ package com.wip.kpm_cpm_wotoolkit.features.job.logic
 import co.touchlab.kermit.Logger
 import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
+import com.wip.kpm_cpm_wotoolkit.features.job.model.JobType
 import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.DefaultPluginFileSystem
 import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.PluginLoader
 import com.wip.plugin.api.ExecutionContext
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -67,129 +69,177 @@ class JobWorker(
     }
 
     private suspend fun executeJob(job: BackgroundJob) {
-        // Double check status - it might have been cancelled or paused while we were starting up
         val latestJob = manager.jobs.value.find { it.id == job.id }
         if (latestJob == null || latestJob.status != JobStatus.Running) {
-            Logger.w { "Worker $workerId: Job ${job.name} (${job.id}) is not in Running state (status: ${latestJob?.status}), aborting execution" }
+            Logger.w { "Worker $workerId: Job ${job.name} (${job.id}) is not in Running state, aborting" }
             return
         }
 
-        Logger.i { "Worker $workerId starting job ${job.name} (${job.id})" }
+        Logger.i { "Worker $workerId starting job ${job.name} (${job.id}) of type ${job.type}" }
 
         try {
-            val plugin = PluginLoader.getPluginById(job.pluginId)
-                ?: throw Exception("Plugin ${job.pluginId} not found")
-
-            val processor = plugin.getProcessor()
-
-            // Provide execution context with Logger and ProgressReporter
-            val context = ExecutionContext(
-                logger = object : PluginLogger {
-                    override fun verbose(message: String) {
-                        val fullMessage = "[${job.pluginId}] $message"
-                        Logger.v { fullMessage }
-                        manager.addJobLog(job.id, fullMessage, "VERBOSE")
-                    }
-
-                    override fun debug(message: String) {
-                        val fullMessage = "[${job.pluginId}] $message"
-                        Logger.d { fullMessage }
-                        manager.addJobLog(job.id, fullMessage, "DEBUG")
-                    }
-
-                    override fun info(message: String) {
-                        val fullMessage = "[${job.pluginId}] $message"
-                        Logger.i { fullMessage }
-                        manager.addJobLog(job.id, fullMessage, "INFO")
-                    }
-
-                    override fun warn(message: String) {
-                        val fullMessage = "[${job.pluginId}] $message"
-                        Logger.w { fullMessage }
-                        manager.addJobLog(job.id, fullMessage, "WARN")
-                    }
-
-                    override fun error(message: String, throwable: Throwable?) {
-                        val fullMessage = "[${job.pluginId}] $message"
-                        Logger.e(throwable) { fullMessage }
-                        manager.addJobLog(job.id, fullMessage + (throwable?.let { ": ${it.message}" } ?: ""), "ERROR")
-                    }
-                },
-                progress = object : ProgressReporter {
-                    override fun report(progress: Float) {
-                        manager.updateJobProgress(job.id, progress)
-                    }
-                },
-                fileSystem = DefaultPluginFileSystem(
-                    PluginLoader.getPluginInstallPath(job.pluginId) ?: "",
-                    PluginLoader.getPluginJarPath(job.pluginId)
-                ),
-                cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(
-                    PluginLoader.getPluginInstallPath(job.pluginId) ?: ""
-                )
-            )
-            processor.setExecutionContext(context)
-
-            val request = PluginRequest(
-                method = job.capabilityName,
-                parameters = job.parameters,
-                resumeState = job.resumeState
-            )
-
-            // Progress tracking - tied to this job's lifecycle
-            val progressFlow = processor.observeProgress()
-            val progressJob = progressFlow?.let { flow ->
-                workerScope.launch {
-                    flow.collect { p ->
-                        // Extra safety check in loop
-                        val current = manager.jobs.value.find { it.id == job.id }
-                        if (current?.status == JobStatus.Running) {
-                            manager.updateJobProgress(job.id, p)
-                        } else {
-                            // If it's no longer running, stop collecting progress
-                            cancel()
-                        }
-                    }
-                }
-            }
-
-            // Execute the plugin task using processAsync
-            val handle = processor.processAsync(request)
-            
-            // Register the handle with the manager
-            manager.registerJobHandle(job.id, handle)
-            
-            val result = try {
-                handle.result.await()
-            } finally {
-                progressJob?.cancel()
-            }
-
-            if (result.isSuccess) {
-                val response = result.getOrNull()
-                val resumeState = response?.resumeState
-                if (resumeState != null) {
-                    manager.tryPauseJob(job.id, resumeState)
-                } else {
-                    manager.tryCompleteJob(job.id, response?.result?.toString())
-                }
-            } else {
-                val exception = result.exceptionOrNull()
-                if (exception is com.wip.plugin.api.PluginPausedException) {
-                    val resumeState = exception.resumeState
-                    manager.tryPauseJob(job.id, resumeState)
-                } else {
-                    val error = exception?.message ?: "Unknown error"
-                    manager.tryFailJob(job.id, error)
-                }
+            when (job.type) {
+                JobType.Capability -> executeCapabilityJob(job)
+                JobType.Setup -> executeSetupJob(job)
+                JobType.Validation -> executeValidationJob(job)
+                else -> throw Exception("Unsupported job type: ${job.type}")
             }
         } catch (e: CancellationException) {
             Logger.w { "Worker $workerId: Job ${job.name} was cancelled" }
-            throw e // Re-throw to allow join() to finish
+            throw e
         } catch (e: Exception) {
             manager.tryFailJob(job.id, e.message)
             Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
         }
+    }
+
+    private suspend fun executeCapabilityJob(job: BackgroundJob) {
+        val plugin = PluginLoader.getPluginById(job.pluginId)
+            ?: throw Exception("Plugin ${job.pluginId} not found")
+
+        val processor = plugin.getProcessor()
+        val context = createExecutionContext(job)
+        processor.setExecutionContext(context)
+
+        val request = PluginRequest(
+            method = job.capabilityName,
+            parameters = job.parameters,
+            resumeState = job.resumeState
+        )
+
+        val progressFlow = processor.observeProgress()
+        val progressJob = progressFlow?.let { flow ->
+            workerScope.launch {
+                flow.collect { p ->
+                    val current = manager.jobs.value.find { it.id == job.id }
+                    if (current?.status == JobStatus.Running) {
+                        manager.updateJobProgress(job.id, p)
+                    } else {
+                        cancel()
+                    }
+                }
+            }
+        }
+
+        val handle = processor.processAsync(request)
+        manager.registerJobHandle(job.id, handle)
+
+        val result = try {
+            handle.result.await()
+        } finally {
+            progressJob?.cancel()
+        }
+
+        if (result.isSuccess) {
+            val response = result.getOrNull()
+            val resumeState = response?.resumeState
+            if (resumeState != null) {
+                manager.tryPauseJob(job.id, resumeState)
+            } else {
+                manager.tryCompleteJob(job.id, response?.result?.toString())
+            }
+        } else {
+            val exception = result.exceptionOrNull()
+            if (exception is com.wip.plugin.api.PluginPausedException) {
+                manager.tryPauseJob(job.id, exception.resumeState)
+            } else {
+                manager.tryFailJob(job.id, exception?.message ?: "Unknown error")
+            }
+        }
+    }
+
+    private suspend fun executeSetupJob(job: BackgroundJob) {
+        val plugin = PluginLoader.getPluginById(job.pluginId)
+            ?: throw Exception("Plugin ${job.pluginId} not found")
+
+        val context = createExecutionContext(job)
+        
+        // Register a simple handle for cancellation
+        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        manager.registerJobHandle(job.id, object : com.wip.plugin.api.JobHandle {
+            override val result: kotlinx.coroutines.Deferred<Result<com.wip.plugin.api.PluginResponse>>
+                get() = throw UnsupportedOperationException("Not used for setup")
+            override fun pause() { /* Not supported */ }
+            override fun cancel(force: Boolean) { jobExecution.cancel() }
+        })
+
+        manager.updateJobProgress(job.id, 0.1f)
+        manager.addJobLog(job.id, "Starting validation for ${plugin.getManifest().plugin.name}...")
+        
+        val validationResult = plugin.validate(context)
+        if (validationResult.isFailure) {
+            val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
+            manager.tryFailJob(job.id, error)
+            return
+        }
+        
+        manager.updateJobProgress(job.id, 0.5f)
+        manager.addJobLog(job.id, "Validation successful. Performing setup...")
+        
+        val setupResult = plugin.performSetup(context)
+        if (setupResult.isFailure) {
+            val error = setupResult.exceptionOrNull()?.message ?: "Setup failed"
+            manager.tryFailJob(job.id, error)
+            return
+        }
+        
+        manager.updateJobProgress(job.id, 1.0f)
+        manager.addJobLog(job.id, "Setup completed successfully.")
+        manager.tryCompleteJob(job.id, "Success")
+    }
+
+    private suspend fun executeValidationJob(job: BackgroundJob) {
+        val plugin = PluginLoader.getPluginById(job.pluginId)
+            ?: throw Exception("Plugin ${job.pluginId} not found")
+
+        val context = createExecutionContext(job)
+        
+        // Register a simple handle for cancellation
+        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        manager.registerJobHandle(job.id, object : com.wip.plugin.api.JobHandle {
+            override val result: kotlinx.coroutines.Deferred<Result<com.wip.plugin.api.PluginResponse>>
+                get() = throw UnsupportedOperationException("Not used for validation")
+            override fun pause() { /* Not supported */ }
+            override fun cancel(force: Boolean) { jobExecution.cancel() }
+        })
+
+        manager.updateJobProgress(job.id, 0.2f)
+        manager.addJobLog(job.id, "Running validation for ${plugin.getManifest().plugin.name}...")
+        
+        val validationResult = plugin.validate(context)
+        if (validationResult.isFailure) {
+            val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
+            manager.tryFailJob(job.id, error)
+            return
+        }
+        
+        manager.updateJobProgress(job.id, 1.0f)
+        manager.addJobLog(job.id, "Validation successful.")
+        manager.tryCompleteJob(job.id, "Success")
+    }
+
+    private fun createExecutionContext(job: BackgroundJob): ExecutionContext {
+        return ExecutionContext(
+            logger = object : PluginLogger {
+                override fun verbose(message: String) { manager.addJobLog(job.id, "[${job.pluginId}] $message", "VERBOSE") }
+                override fun debug(message: String) { manager.addJobLog(job.id, "[${job.pluginId}] $message", "DEBUG") }
+                override fun info(message: String) { manager.addJobLog(job.id, "[${job.pluginId}] $message", "INFO") }
+                override fun warn(message: String) { manager.addJobLog(job.id, "[${job.pluginId}] $message", "WARN") }
+                override fun error(message: String, throwable: Throwable?) {
+                    manager.addJobLog(job.id, "[${job.pluginId}] $message" + (throwable?.let { ": ${it.message}" } ?: ""), "ERROR")
+                }
+            },
+            progress = object : ProgressReporter {
+                override fun report(progress: Float) { manager.updateJobProgress(job.id, progress) }
+            },
+            fileSystem = DefaultPluginFileSystem(
+                PluginLoader.getPluginInstallPath(job.pluginId) ?: "",
+                PluginLoader.getPluginJarPath(job.pluginId)
+            ),
+            cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(
+                PluginLoader.getPluginInstallPath(job.pluginId) ?: ""
+            )
+        )
     }
 
     fun stop() {

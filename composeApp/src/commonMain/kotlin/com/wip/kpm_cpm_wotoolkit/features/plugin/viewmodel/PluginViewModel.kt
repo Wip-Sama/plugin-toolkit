@@ -53,10 +53,10 @@ class PluginViewModel(
     init {
         // Sync with PluginManager
         pluginManager.loadedPlugins
-            .onEach {
-                loadedPlugins = PluginLoader.getPlugins()
+            .onEach { activeIds ->
+                loadedPlugins = PluginLoader.getPlugins().filter { activeIds.contains(it.getManifest().plugin.id) }
                 // If the selected plugin was unloaded, clear it
-                if (selectedPlugin != null && !it.contains(selectedPlugin?.getManifest()?.plugin?.id)) {
+                if (selectedPlugin != null && !activeIds.contains(selectedPlugin?.getManifest()?.plugin?.id)) {
                     selectPlugin(null)
                 }
             }
@@ -88,7 +88,8 @@ class PluginViewModel(
             val result = PluginLoader.loadPlugin(jarPath)
             if (result.isSuccess) {
                 val plugin = result.getOrThrow()
-                plugin.initialize()
+                val pkg = plugin.getManifest().plugin.id
+                plugin.initialize(pluginManager.createExecutionContext(pkg))
                 loadedPlugins = PluginLoader.getPlugins()
                 selectPlugin(plugin)
                 notificationService.notify(title = "Success", message = "Plugin loaded successfully")
