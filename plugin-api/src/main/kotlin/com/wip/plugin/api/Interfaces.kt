@@ -3,6 +3,7 @@ package com.wip.plugin.api
 import org.koin.core.module.Module
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Deferred
+import kotlinx.serialization.json.JsonElement
 
 /**
  * The root interface for any plugin.
@@ -102,8 +103,13 @@ interface ProgressReporter {
  * Signals that can be sent to a running plugin capability.
  */
 enum class PluginSignal {
-    PAUSE, RESUME, CANCEL
+    PAUSE, CANCEL
 }
+
+/**
+ * Exception thrown by a plugin to indicate it has paused and saved its state.
+ */
+class PluginPausedException(val resumeState: JsonElement) : Exception("Plugin paused")
 
 /**
  * Handle to control a running plugin task.
@@ -111,7 +117,6 @@ enum class PluginSignal {
 interface JobHandle {
     val result: Deferred<Result<PluginResponse>>
     fun pause()
-    fun resume()
     fun cancel(force: Boolean = false)
 }
 
@@ -121,7 +126,8 @@ interface JobHandle {
 class ExecutionContext(
     val logger: PluginLogger,
     val progress: ProgressReporter,
-    val fileSystem: PluginFileSystem
+    val fileSystem: PluginFileSystem,
+    val cacheFileSystem: PluginFileSystem
 ) {
     private val signalHandlers = mutableListOf<suspend (PluginSignal) -> Unit>()
 
@@ -137,6 +143,14 @@ class ExecutionContext(
      */
     fun onSignal(handler: suspend (PluginSignal) -> Unit) {
         signalHandlers.add(handler)
+    }
+
+    /**
+     * Terminate the current execution and report a resume state.
+     * This should be called by the plugin when it handles a PAUSE signal.
+     */
+    fun pause(resumeState: JsonElement): Nothing {
+        throw PluginPausedException(resumeState)
     }
 }
 

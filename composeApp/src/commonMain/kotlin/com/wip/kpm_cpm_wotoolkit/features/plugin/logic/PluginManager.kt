@@ -382,7 +382,8 @@ class PluginManager(
             progress = object : com.wip.plugin.api.ProgressReporter {
                 override fun report(progress: Float) { /* no-op for setup/validate */ }
             },
-            fileSystem = DefaultPluginFileSystem(installPath, jarFullPath)
+            fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
+            cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath)
         )
     }
 

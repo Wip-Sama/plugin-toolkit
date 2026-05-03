@@ -8,7 +8,8 @@ import kotlinx.serialization.json.JsonElement
  */
 data class PluginRequest(
     val method: String,
-    val parameters: Map<String, JsonElement> = emptyMap()
+    val parameters: Map<String, JsonElement> = emptyMap(),
+    val resumeState: JsonElement? = null
 )
 
 /**
@@ -16,5 +17,6 @@ data class PluginRequest(
  */
 data class PluginResponse(
     val result: JsonElement,
-    val metadata: Map<String, String>? = null
+    val metadata: Map<String, String>? = null,
+    val resumeState: JsonElement? = null
 )

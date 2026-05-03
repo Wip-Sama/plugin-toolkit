@@ -123,13 +123,17 @@ class JobWorker(
                 fileSystem = DefaultPluginFileSystem(
                     PluginLoader.getPluginInstallPath(job.pluginId) ?: "",
                     PluginLoader.getPluginJarPath(job.pluginId)
+                ),
+                cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(
+                    PluginLoader.getPluginInstallPath(job.pluginId) ?: ""
                 )
             )
             processor.setExecutionContext(context)
 
             val request = PluginRequest(
                 method = job.capabilityName,
-                parameters = job.parameters
+                parameters = job.parameters,
+                resumeState = job.resumeState
             )
 
             // Progress tracking - tied to this job's lifecycle
@@ -162,10 +166,22 @@ class JobWorker(
             }
 
             if (result.isSuccess) {
-                manager.tryCompleteJob(job.id, result.getOrNull()?.result?.toString())
+                val response = result.getOrNull()
+                val resumeState = response?.resumeState
+                if (resumeState != null) {
+                    manager.tryPauseJob(job.id, resumeState)
+                } else {
+                    manager.tryCompleteJob(job.id, response?.result?.toString())
+                }
             } else {
-                val error = result.exceptionOrNull()?.message ?: "Unknown error"
-                manager.tryFailJob(job.id, error)
+                val exception = result.exceptionOrNull()
+                if (exception is com.wip.plugin.api.PluginPausedException) {
+                    val resumeState = exception.resumeState
+                    manager.tryPauseJob(job.id, resumeState)
+                } else {
+                    val error = exception?.message ?: "Unknown error"
+                    manager.tryFailJob(job.id, error)
+                }
             }
         } catch (e: CancellationException) {
             Logger.w { "Worker $workerId: Job ${job.name} was cancelled" }

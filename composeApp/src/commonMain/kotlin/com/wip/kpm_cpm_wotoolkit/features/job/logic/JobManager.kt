@@ -4,8 +4,9 @@ import co.touchlab.kermit.Logger
 import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobHistoryEntry
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.DefaultPluginFileSystem
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.PluginLoader
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 
 class JobManager(
     private val scope: CoroutineScope,
@@ -128,8 +135,10 @@ class JobManager(
             handlesMutex.withLock {
                 activeJobHandles[jobId]?.pause()
             }
-            addHistoryEntryInternal(jobId, jobName, "Paused")
-            Logger.i { "Job $jobId ($jobName) paused" }
+            // We don't mark it as paused here yet.
+            // We wait for the job execution to finish and return a resumeState.
+            addHistoryEntryInternal(jobId, jobName, "Pause Requested")
+            Logger.i { "Job $jobId ($jobName) pause requested" }
         }
     }
 
@@ -148,9 +157,6 @@ class JobManager(
         }
 
         if (resumed) {
-            handlesMutex.withLock {
-                activeJobHandles[jobId]?.resume()
-            }
             addHistoryEntryInternal(jobId, jobName, "Resumed")
             Logger.i { "Job $jobId ($jobName) resumed" }
             jobSignal.trySend(Unit)
@@ -298,6 +304,65 @@ class JobManager(
     suspend fun unregisterJobHandle(jobId: String) {
         handlesMutex.withLock {
             activeJobHandles.remove(jobId)
+        }
+    }
+
+    fun tryPauseJob(jobId: String, resumeState: JsonElement): Boolean {
+        var paused = false
+        var jobName = ""
+        _jobs.update { currentList ->
+            val job = currentList.find { it.id == jobId } ?: return@update currentList
+            jobName = job.name
+            if (job.status == JobStatus.Running) {
+                paused = true
+                currentList.map {
+                    if (it.id == jobId) it.copy(
+                        status = JobStatus.Paused,
+                        resumeState = resumeState,
+                        completedAt = null // It's not finished
+                    ) else it
+                }
+            } else {
+                currentList
+            }
+        }
+
+        if (paused) {
+            addHistoryEntryInternal(jobId, jobName, "Paused")
+            Logger.i { "Job $jobId ($jobName) successfully paused with state" }
+            
+            // Persist the state
+            val job = _jobs.value.find { it.id == jobId }
+            if (job != null) {
+                saveResumeState(job)
+            }
+        }
+        return paused
+    }
+
+    private fun saveResumeState(job: BackgroundJob) {
+        // In a real app, this would write to a file in the plugin's cache folder.
+        // For now, we rely on the BackgroundJob list persistence if it exists.
+        // But the user requested a specific JSON file.
+        // We need PluginLoader to get the path.
+        val installPath = PluginLoader.getPluginInstallPath(job.pluginId)
+        if (installPath != null) {
+            scope.launch(Dispatchers.Default) {
+                val fs = DefaultPluginFileSystem.createCacheOnly(installPath)
+                val json = Json { prettyPrint = true }
+                val stateString = json.encodeToString(JsonElement.serializer(), job.resumeState ?: JsonNull)
+                fs.writeTextFile("resumes/${job.id}.json", stateString)
+                
+                // Update resumes.json index
+                val indexFile = "resumes.json"
+                val currentIndex = if (fs.exists(indexFile)) {
+                    val content = fs.readTextFile(indexFile) ?: "{}"
+                    try { json.decodeFromString<Map<String, String>>(content) } catch(e: Exception) { emptyMap() }
+                } else emptyMap()
+                
+                val newIndex = currentIndex + (job.id to "resumes/${job.id}.json")
+                fs.writeTextFile(indexFile, json.encodeToString(newIndex))
+            }
         }
     }
 
