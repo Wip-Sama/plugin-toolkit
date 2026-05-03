@@ -89,7 +89,7 @@ class JobManager(
         }
     }
 
-    suspend fun cancelJob(jobId: String) {
+    suspend fun cancelJob(jobId: String, force: Boolean = false) {
         var jobName = ""
         var cancelled = false
         _jobs.update { currentList ->
@@ -110,10 +110,10 @@ class JobManager(
 
         if (cancelled) {
             handlesMutex.withLock {
-                activeJobHandles.remove(jobId)?.cancel(force = true)
+                activeJobHandles.remove(jobId)?.cancel(force = force)
             }
             addHistoryEntryInternal(jobId, jobName, "Cancelled")
-            Logger.i { "Job $jobId ($jobName) cancelled" }
+            Logger.i { "Job $jobId ($jobName) cancelled (force=$force)" }
         }
     }
 
@@ -222,6 +222,15 @@ class JobManager(
 
         val prefix = if (level == "VERBOSE") "[$jobId] " else ""
         val formattedLog = "[$timestamp] [$level] $prefix$message"
+
+        // Log to global logger as well
+        when (level) {
+            "VERBOSE" -> Logger.v { "[$jobId] $message" }
+            "DEBUG" -> Logger.d { "[$jobId] $message" }
+            "INFO" -> Logger.i { "[$jobId] $message" }
+            "WARN" -> Logger.w { "[$jobId] $message" }
+            "ERROR" -> Logger.e { "[$jobId] $message" }
+        }
 
         _jobLogs.update { currentLogs ->
             val logs = currentLogs[jobId] ?: emptyList()
@@ -338,6 +347,32 @@ class JobManager(
             }
         }
         return paused
+    }
+
+    fun getPluginLogger(pkg: String, jobId: String? = null): com.wip.plugin.api.PluginLogger {
+        return object : com.wip.plugin.api.PluginLogger {
+            override fun verbose(message: String) {
+                if (jobId != null) addJobLog(jobId, message, "VERBOSE")
+                else Logger.v { "[$pkg] $message" }
+            }
+            override fun debug(message: String) {
+                if (jobId != null) addJobLog(jobId, message, "DEBUG")
+                else Logger.d { "[$pkg] $message" }
+            }
+            override fun info(message: String) {
+                if (jobId != null) addJobLog(jobId, message, "INFO")
+                else Logger.i { "[$pkg] $message" }
+            }
+            override fun warn(message: String) {
+                if (jobId != null) addJobLog(jobId, message, "WARN")
+                else Logger.w { "[$pkg] $message" }
+            }
+            override fun error(message: String, throwable: Throwable?) {
+                val msg = message + (throwable?.let { ": ${it.message}" } ?: "")
+                if (jobId != null) addJobLog(jobId, msg, "ERROR")
+                else Logger.e(throwable ?: Exception()) { "[$pkg] $message" }
+            }
+        }
     }
 
     private fun saveResumeState(job: BackgroundJob) {

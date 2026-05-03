@@ -40,7 +40,9 @@ data class BackgroundJob(
     val parameters: Map<String, JsonElement> = emptyMap<String, JsonElement>(),
     val result: String? = null, // Serialized result
     val resumeState: JsonElement? = null,
-    val keepResult: Boolean = true
+    val keepResult: Boolean = true,
+    val isPausable: Boolean = false,
+    val isCancellable: Boolean = true
 )
 
 @Serializable

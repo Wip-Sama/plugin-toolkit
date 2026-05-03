@@ -413,63 +413,53 @@ object KotlinGenerator {
         val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "PluginSetup" } }
         val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "PluginValidate" } }
 
+        // 3. performSetup
+        val setupFunBuilder = FunSpec.builder("performSetup")
+            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+            .addParameter("context", ClassName("com.wip.plugin.api", "ExecutionContext"))
+            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+
         if (setupFunction != null) {
             val setupParams = setupFunction.parameters
-            val setupInjectsContext = setupParams.any {
-                val t = it.type.resolve().toTypeName().toString()
-                t == "com.wip.plugin.api.PluginFileSystem" || t == "com.wip.plugin.api.PluginLogger" || t == "com.wip.plugin.api.ProgressReporter" || t == "com.wip.plugin.api.ExecutionContext"
-            }
-            val setupFunBuilder = FunSpec.builder("performSetup")
-                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-                .addParameter("context", ClassName("com.wip.plugin.api", "ExecutionContext"))
-                .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
-            
-            if (setupInjectsContext) {
-                val callArgs = setupParams.joinToString(", ") { param ->
-                    val t = param.type.resolve().toTypeName().toString()
-                    when (t) {
-                        "com.wip.plugin.api.PluginFileSystem" -> "context.fileSystem"
-                        "com.wip.plugin.api.PluginLogger" -> "context.logger"
-                        "com.wip.plugin.api.ProgressReporter" -> "context.progress"
-                        "com.wip.plugin.api.ExecutionContext" -> "context"
-                        else -> param.name?.asString() ?: ""
-                    }
+            val callArgs = setupParams.joinToString(", ") { param ->
+                val t = param.type.resolve().toTypeName().toString()
+                when (t) {
+                    "com.wip.plugin.api.PluginFileSystem" -> "context.fileSystem"
+                    "com.wip.plugin.api.PluginLogger" -> "context.logger"
+                    "com.wip.plugin.api.ProgressReporter" -> "context.progress"
+                    "com.wip.plugin.api.ExecutionContext" -> "context"
+                    else -> param.name?.asString() ?: ""
                 }
-                setupFunBuilder.addStatement("return processor.${setupFunction.simpleName.asString()}($callArgs)")
-            } else {
-                setupFunBuilder.addStatement("return processor.${setupFunction.simpleName.asString()}()")
             }
-            entryType.addFunction(setupFunBuilder.build())
+            setupFunBuilder.addStatement("return processor.${setupFunction.simpleName.asString()}($callArgs)")
+        } else {
+            setupFunBuilder.addStatement("return Result.success(Unit)")
         }
+        entryType.addFunction(setupFunBuilder.build())
+
+        // 4. validate
+        val validateFunBuilder = FunSpec.builder("validate")
+            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+            .addParameter("context", ClassName("com.wip.plugin.api", "ExecutionContext"))
+            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
 
         if (validateFunction != null) {
             val validateParams = validateFunction.parameters
-            val validateInjectsContext = validateParams.any {
-                val t = it.type.resolve().toTypeName().toString()
-                t == "com.wip.plugin.api.PluginFileSystem" || t == "com.wip.plugin.api.PluginLogger" || t == "com.wip.plugin.api.ProgressReporter" || t == "com.wip.plugin.api.ExecutionContext"
-            }
-            val validateFunBuilder = FunSpec.builder("validate")
-                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-                .addParameter("context", ClassName("com.wip.plugin.api", "ExecutionContext"))
-                .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
-            
-            if (validateInjectsContext) {
-                val callArgs = validateParams.joinToString(", ") { param ->
-                    val t = param.type.resolve().toTypeName().toString()
-                    when (t) {
-                        "com.wip.plugin.api.PluginFileSystem" -> "context.fileSystem"
-                        "com.wip.plugin.api.PluginLogger" -> "context.logger"
-                        "com.wip.plugin.api.ProgressReporter" -> "context.progress"
-                        "com.wip.plugin.api.ExecutionContext" -> "context"
-                        else -> param.name?.asString() ?: ""
-                    }
+            val callArgs = validateParams.joinToString(", ") { param ->
+                val t = param.type.resolve().toTypeName().toString()
+                when (t) {
+                    "com.wip.plugin.api.PluginFileSystem" -> "context.fileSystem"
+                    "com.wip.plugin.api.PluginLogger" -> "context.logger"
+                    "com.wip.plugin.api.ProgressReporter" -> "context.progress"
+                    "com.wip.plugin.api.ExecutionContext" -> "context"
+                    else -> param.name?.asString() ?: ""
                 }
-                validateFunBuilder.addStatement("return processor.${validateFunction.simpleName.asString()}($callArgs)")
-            } else {
-                validateFunBuilder.addStatement("return processor.${validateFunction.simpleName.asString()}()")
             }
-            entryType.addFunction(validateFunBuilder.build())
+            validateFunBuilder.addStatement("return processor.${validateFunction.simpleName.asString()}($callArgs)")
+        } else {
+            validateFunBuilder.addStatement("return Result.success(Unit)")
         }
+        entryType.addFunction(validateFunBuilder.build())
 
         return entryType.build()
     }

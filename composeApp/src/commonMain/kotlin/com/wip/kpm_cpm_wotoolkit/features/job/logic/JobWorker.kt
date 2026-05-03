@@ -21,12 +21,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import com.wip.kpm_cpm_wotoolkit.features.plugin.logic.PluginManager
 
 class JobWorker(
     val workerId: Int,
     private val manager: JobManager,
     private val scope: CoroutineScope
-) {
+) : KoinComponent {
+    private val pluginManager: PluginManager by inject()
     private var isActive = true
     private val workerJob = SupervisorJob()
     private val workerScope = scope + workerJob + Dispatchers.Default
@@ -115,7 +119,7 @@ class JobWorker(
                     if (current?.status == JobStatus.Running) {
                         manager.updateJobProgress(job.id, p)
                     } else {
-                        cancel()
+                        this.cancel()
                     }
                 }
             }
@@ -219,27 +223,7 @@ class JobWorker(
     }
 
     private fun createExecutionContext(job: BackgroundJob): ExecutionContext {
-        return ExecutionContext(
-            logger = object : PluginLogger {
-                override fun verbose(message: String) { manager.addJobLog(job.id, "[${job.pluginId}] $message", "VERBOSE") }
-                override fun debug(message: String) { manager.addJobLog(job.id, "[${job.pluginId}] $message", "DEBUG") }
-                override fun info(message: String) { manager.addJobLog(job.id, "[${job.pluginId}] $message", "INFO") }
-                override fun warn(message: String) { manager.addJobLog(job.id, "[${job.pluginId}] $message", "WARN") }
-                override fun error(message: String, throwable: Throwable?) {
-                    manager.addJobLog(job.id, "[${job.pluginId}] $message" + (throwable?.let { ": ${it.message}" } ?: ""), "ERROR")
-                }
-            },
-            progress = object : ProgressReporter {
-                override fun report(progress: Float) { manager.updateJobProgress(job.id, progress) }
-            },
-            fileSystem = DefaultPluginFileSystem(
-                PluginLoader.getPluginInstallPath(job.pluginId) ?: "",
-                PluginLoader.getPluginJarPath(job.pluginId)
-            ),
-            cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(
-                PluginLoader.getPluginInstallPath(job.pluginId) ?: ""
-            )
-        )
+        return pluginManager.createExecutionContext(job.pluginId, job.id)
     }
 
     fun stop() {

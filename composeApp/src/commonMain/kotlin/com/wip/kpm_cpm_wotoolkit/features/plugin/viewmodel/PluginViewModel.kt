@@ -130,7 +130,9 @@ class PluginViewModel(
                 pluginId = plugin.getManifest().plugin.id,
                 capabilityName = capability.name,
                 parameters = params,
-                keepResult = saveResults
+                keepResult = saveResults,
+                isPausable = capability.isPausable,
+                isCancellable = capability.isCancellable
             )
             jobManager.enqueueJob(job)
 

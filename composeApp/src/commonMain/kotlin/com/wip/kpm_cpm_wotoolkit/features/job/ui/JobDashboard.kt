@@ -59,6 +59,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isShiftPressed
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
@@ -224,7 +227,7 @@ fun GeneralTab(viewModel: JobViewModel) {
                     logs = logsMap[job.id] ?: emptyList(),
                     isExpanded = expandedJobs[job.id] ?: false,
                     onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
-                    onCancel = { viewModel.cancelJob(job.id) },
+                    onCancel = { force -> viewModel.cancelJob(job.id, force) },
                     onPause = { viewModel.pauseJob(job.id) }
                 )
             }
@@ -241,7 +244,7 @@ fun GeneralTab(viewModel: JobViewModel) {
                     logs = logsMap[job.id] ?: emptyList(),
                     isExpanded = expandedJobs[job.id] ?: false,
                     onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
-                    onCancel = { viewModel.cancelJob(job.id) },
+                    onCancel = { force -> viewModel.cancelJob(job.id, force) },
                     onPause = { viewModel.pauseJob(job.id) }
                 )
             }
@@ -277,7 +280,7 @@ fun ArchiveTab(viewModel: JobViewModel) {
                     logs = logsMap[job.id] ?: emptyList(),
                     isExpanded = expandedJobs[job.id] ?: false,
                     onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
-                    onCancel = { viewModel.cancelJob(job.id) },
+                    onCancel = { force -> viewModel.cancelJob(job.id, force) },
                     onResume = { viewModel.resumeJob(job.id) }
                 )
             }
@@ -368,6 +371,7 @@ fun HistoryTab(viewModel: JobViewModel) {
     }
 }
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun JobCard(
     job: BackgroundJob,
@@ -375,7 +379,7 @@ fun JobCard(
     logs: List<String> = emptyList(),
     isExpanded: Boolean = false,
     onToggleExpand: () -> Unit = {},
-    onCancel: () -> Unit = {},
+    onCancel: (Boolean) -> Unit = {},
     onPause: () -> Unit = {},
     onResume: () -> Unit = {}
 ) {
@@ -465,7 +469,7 @@ fun JobCard(
                         Text(stringResource(Res.string.action_resume))
                     }
                 }
-                if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
+                if (job.isPausable && (job.status == JobStatus.Running || job.status == JobStatus.Queued)) {
                     TextButton(onClick = onPause) {
                         Icon(Icons.Default.Pause, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
@@ -473,13 +477,17 @@ fun JobCard(
                     }
                 }
                 if (job.status != JobStatus.Completed && job.status != JobStatus.Cancelled && job.status != JobStatus.Failed) {
+                    var isShiftPressed by remember { mutableStateOf(false) }
                     TextButton(
-                        onClick = onCancel,
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        onClick = { onCancel(isShiftPressed) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.onPointerEvent(PointerEventType.Press) {
+                            isShiftPressed = it.keyboardModifiers.isShiftPressed
+                        }
                     ) {
                         Icon(Icons.Default.Cancel, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(Res.string.dialog_cancel))
+                        Text(if (isShiftPressed) "Force Cancel" else stringResource(Res.string.dialog_cancel))
                     }
                 }
             }

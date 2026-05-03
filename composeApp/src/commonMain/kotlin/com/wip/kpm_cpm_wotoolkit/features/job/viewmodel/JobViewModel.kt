@@ -36,9 +36,9 @@ class JobViewModel(
         }
     }
 
-    fun cancelJob(jobId: String) {
+    fun cancelJob(jobId: String, force: Boolean = false) {
         viewModelScope.launch {
-            jobManager.cancelJob(jobId)
+            jobManager.cancelJob(jobId, force)
         }
     }
 

@@ -97,7 +97,8 @@ class PluginManager(
                 version = version,
                 installPath = pluginDir,
                 jarFileName = jarFileName,
-                description = description
+                description = description,
+                isValidated = false
             )
 
             addInstalledPlugin(newPlugin)
@@ -406,20 +407,17 @@ class PluginManager(
         return installRemote(update, plugin.installPath.substringBeforeLast("/"))
     }
 
-    fun createExecutionContext(pkg: String): ExecutionContext {
-        val installPath = PluginLoader.getPluginInstallPath(pkg) ?: ""
-        val jarFullPath = PluginLoader.getPluginJarPath(pkg)
+    fun createExecutionContext(pkg: String, jobId: String? = null): ExecutionContext {
+        val plugin = _installedPlugins.value.find { it.pkg == pkg }
+        val installPath = plugin?.installPath ?: ""
+        val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }
 
         return ExecutionContext(
-            logger = object : com.wip.plugin.api.PluginLogger {
-                override fun verbose(message: String) { Logger.v { "[$pkg] $message" } }
-                override fun debug(message: String) { Logger.d { "[$pkg] $message" } }
-                override fun info(message: String) { Logger.i { "[$pkg] $message" } }
-                override fun warn(message: String) { Logger.w { "[$pkg] $message" } }
-                override fun error(message: String, throwable: Throwable?) { Logger.e(throwable) { "[$pkg] $message" } }
-            },
+            logger = jobManager.getPluginLogger(pkg, jobId),
             progress = object : com.wip.plugin.api.ProgressReporter {
-                override fun report(progress: Float) { /* no-op for setup/validate */ }
+                override fun report(progress: Float) {
+                    if (jobId != null) jobManager.updateJobProgress(jobId, progress)
+                }
             },
             fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
             cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath)
