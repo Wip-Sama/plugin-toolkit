@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import co.touchlab.kermit.Logger
 import com.wip.kpm_cpm_wotoolkit.features.job.logic.JobManager
 import com.wip.kpm_cpm_wotoolkit.features.job.model.BackgroundJob
 import com.wip.kpm_cpm_wotoolkit.features.job.model.JobStatus
@@ -191,6 +192,7 @@ class PluginViewModel(
                 try {
                     Json.parseToJsonElement(value)
                 } catch (e: Exception) {
+                    Logger.e("Failed to parse JSON", throwable = e)
                     JsonPrimitive(value)
                 }
             }

@@ -18,7 +18,7 @@ object ChangelogParser {
             when {
                 trimmed.startsWith("Version:", ignoreCase = true) -> {
                     if (currentVersion != null) {
-                        releases.add(Release(currentVersion!!, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
+                        releases.add(Release(currentVersion, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
                         currentCategories = mutableMapOf()
                         currentCategoryName = null
                     }
@@ -31,7 +31,7 @@ object ChangelogParser {
                     val catName = trimmed.removeSuffix(":")
                     if (catName.equals("Version", ignoreCase = true) || catName.equals("Date", ignoreCase = true)) return@forEach
                     currentCategoryName = catName
-                    currentCategories[currentCategoryName!!] = mutableListOf()
+                    currentCategories[currentCategoryName] = mutableListOf()
                 }
                 line.startsWith(" ") && trimmed.startsWith("-") -> {
                     val item = trimmed.removePrefix("-").trim()
@@ -41,7 +41,7 @@ object ChangelogParser {
         }
 
         if (currentVersion != null) {
-            releases.add(Release(currentVersion!!, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
+            releases.add(Release(currentVersion, currentDate ?: "", currentCategories.mapValues { it.value.toList() }))
         }
 
         return Changelog(releases)

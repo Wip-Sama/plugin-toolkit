@@ -59,6 +59,7 @@ suspend fun processMyData(
 ```
 Each capability can define multiple parameters using the `@CapabilityParam` annotation.
 The ParamType is inferred from the type and will use JSON to parse and transmit the object to the plugin.     
+While useing suspend function if a good practice is not obligatory
 
 ### 3. Changelog Management
 

@@ -3,7 +3,6 @@ package com.wip.plugin.processor
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.ksp.toTypeName
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
 import com.wip.plugin.api.*
 
 object ManifestJsonGenerator {

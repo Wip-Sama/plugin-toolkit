@@ -361,7 +361,7 @@ class PluginManager(
     }
 
     private fun verifySignature(path: String): Boolean {
-        // STUB: Always valid for now
+        //TODO: Always valid for now
         return true
     }
 
@@ -448,7 +448,7 @@ class PluginManager(
     }
 
     suspend fun validatePlugin(pkg: String): Result<Unit> {
-        // This is the direct call, but we should prefer validatePluginInJob for UI visibility
+        //TODO: This is the direct call, but we should prefer validatePluginInJob for UI visibility
         val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
         return plugin.validate(createExecutionContext(pkg))
     }

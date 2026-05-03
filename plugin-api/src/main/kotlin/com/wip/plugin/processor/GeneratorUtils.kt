@@ -3,7 +3,6 @@ package com.wip.plugin.processor
 import com.google.devtools.ksp.symbol.*
 import com.wip.plugin.api.DataType
 import com.wip.plugin.api.PrimitiveType
-import com.squareup.kotlinpoet.ksp.toTypeName
 
 object GeneratorUtils {
     fun mapKSTypeToDataType(ksType: KSType): DataType {

@@ -20,7 +20,6 @@ import kotlin.time.Clock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 
@@ -187,7 +186,7 @@ class JobManager(
 
                 if (candidate != null) {
                     claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
-                    currentList.map { if (it.id == candidate.id) claimedJob!! else it }
+                    currentList.map { if (it.id == candidate.id) claimedJob else it }
                 } else {
                     currentList
                 }
@@ -198,7 +197,7 @@ class JobManager(
                 if (_jobs.value.any { it.status == JobStatus.Queued }) {
                     jobSignal.trySend(Unit)
                 }
-                return claimedJob!!
+                return claimedJob
             }
 
             // Wait for signal if no jobs are queued
@@ -392,7 +391,10 @@ class JobManager(
                 val indexFile = "resumes.json"
                 val currentIndex = if (fs.exists(indexFile)) {
                     val content = fs.readTextFile(indexFile) ?: "{}"
-                    try { json.decodeFromString<Map<String, String>>(content) } catch(e: Exception) { emptyMap() }
+                    try { json.decodeFromString<Map<String, String>>(content) } catch(e: Exception) {
+                        Logger.w(e) { "Error decoding resumes.json index" }
+                        emptyMap()
+                    }
                 } else emptyMap()
                 
                 val newIndex = currentIndex + (job.id to "resumes/${job.id}.json")

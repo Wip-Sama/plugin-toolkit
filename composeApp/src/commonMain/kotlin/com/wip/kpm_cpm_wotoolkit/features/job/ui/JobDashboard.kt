@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Cancel
@@ -235,7 +236,7 @@ fun GeneralTab(viewModel: JobViewModel) {
 
         if (queuedJobs.isNotEmpty()) {
             item {
-                SectionHeader(title = stringResource(Res.string.job_queue), icon = Icons.Default.List)
+                SectionHeader(title = stringResource(Res.string.job_queue), icon = Icons.AutoMirrored.Filled.List)
             }
             items(queuedJobs) { job ->
                 JobCard(
@@ -447,7 +448,7 @@ fun JobCard(
 
             if (job.errorMessage != null) {
                 Text(
-                    text = stringResource(Res.string.job_error_format, job.errorMessage!!),
+                    text = stringResource(Res.string.job_error_format, job.errorMessage),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp)

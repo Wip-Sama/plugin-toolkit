@@ -1,6 +1,8 @@
 package com.wip.kpm_cpm_wotoolkit.features.plugin.logic
 
 import com.wip.plugin.api.PluginFileSystem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -90,15 +92,18 @@ class DefaultPluginFileSystem(
 
     override suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit> {
         return try {
-            val jar = jarPath ?: return Result.failure(Exception("No JAR path configured for resource extraction"))
-            val jarFile = JarFile(File(jar))
-            val entry = jarFile.getJarEntry(resourcePath)
-                ?: return Result.failure(Exception("Resource not found in JAR: $resourcePath"))
+            withContext(Dispatchers.IO) {
+                val jar = jarPath ?: return@withContext Result.failure(Exception("No JAR path configured for resource extraction"))
+                val jarFile = JarFile(File(jar))
 
-            val data = jarFile.getInputStream(entry).use { it.readBytes() }
-            jarFile.close()
+                val entry = jarFile.getJarEntry(resourcePath)
+                    ?: return@withContext Result.failure(Exception("Resource not found in JAR: $resourcePath"))
 
-            writeFile(targetRelativePath, data)
+                val data = jarFile.getInputStream(entry).use { it.readBytes() }
+                jarFile.close()
+
+                writeFile(targetRelativePath, data)
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
