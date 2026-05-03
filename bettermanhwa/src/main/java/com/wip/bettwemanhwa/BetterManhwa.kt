@@ -8,6 +8,7 @@ import com.wip.plugin.api.ProgressReporter
 import com.wip.plugin.api.annotations.Capability
 import com.wip.plugin.api.annotations.CapabilityParam
 import com.wip.plugin.api.annotations.PluginInfo
+import com.wip.plugin.api.annotations.ResumeState
 import com.wip.plugin.api.annotations.PluginSetup
 import com.wip.plugin.api.annotations.PluginValidate
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +39,8 @@ class BetterManhwa {
         @CapabilityParam(description = "Output width in pixels", defaultValue = "940") width: Int,
         @CapabilityParam(description = "Grain level for processing", defaultValue = "5") grain: Int,
         @CapabilityParam(description = "Output image format", defaultValue = "WEBP") outputFormat: OutputFormat,
-        @CapabilityParam(description = "Output folder (leave null to auto-create)", defaultValue = "null") outFolder: String,
+        @CapabilityParam(description = "Output folder (leave null to auto-create)", defaultValue = "null") outFolder: String? = null,
+        @ResumeState resumeState: kotlinx.serialization.json.JsonElement? = null,
         context: ExecutionContext
     ): String {
         // Validate input folder
@@ -52,7 +54,7 @@ class BetterManhwa {
         val progressReporter = context.progress
 
         // Determine output folder
-        val outputDir = if (outFolder.isNotBlank() && outFolder != "null") {
+        val outputDir = if (!outFolder.isNullOrBlank() && outFolder != "null") {
             File(outFolder)
         } else {
             File(inputDir.parent, "${inputDir.name}_output")
@@ -143,14 +145,6 @@ class BetterManhwa {
                 PluginSignal.PAUSE -> {
                     logger.info("Received pause signal. Killing process...")
                     process.destroyForcibly()
-                }
-                PluginSignal.RESUME -> {
-                    logger.info("Received resume signal. Restarting process...")
-                    process = ProcessBuilder(command)
-                        .directory(File(basePath))
-                        .redirectErrorStream(true)
-                        .start()
-                    executeProcess(process)
                 }
                 PluginSignal.CANCEL -> {
                     logger.info("Received cancel signal. Killing process...")

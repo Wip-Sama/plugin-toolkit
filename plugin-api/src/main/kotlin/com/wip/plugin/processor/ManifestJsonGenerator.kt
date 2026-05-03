@@ -75,12 +75,16 @@ object ManifestJsonGenerator {
                 )
             }
             
+            val hasResumeState = func.parameters.any { param -> 
+                param.annotations.any { it.shortName.asString() == "ResumeState" }
+            }
+            
             Capability(
                 name = capName,
                 description = capDesc,
                 parameters = if (params.isEmpty()) null else params,
                 returnType = GeneratorUtils.mapKSTypeToDataType(func.returnType!!.resolve()),
-                isPausable = supportsPause,
+                isPausable = supportsPause || hasResumeState,
                 isCancellable = supportsCancel
             )
         }

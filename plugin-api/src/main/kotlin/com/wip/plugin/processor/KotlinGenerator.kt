@@ -68,11 +68,15 @@ object KotlinGenerator {
             val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
             val supportsCancel = capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
 
+            val hasResumeState = func.parameters.any { param -> 
+                param.annotations.any { it.shortName.asString() == "ResumeState" }
+            }
+
             capabilitiesCode.add("Capability(\n")
             capabilitiesCode.indent()
             capabilitiesCode.add("name = %S,\n", capName)
             capabilitiesCode.add("description = %S,\n", capDesc)
-            capabilitiesCode.add("isPausable = %L,\n", supportsPause)
+            capabilitiesCode.add("isPausable = %L,\n", supportsPause || hasResumeState)
             capabilitiesCode.add("isCancellable = %L,\n", supportsCancel)
             capabilitiesCode.add("parameters = mapOf(\n")
             capabilitiesCode.indent()
@@ -242,15 +246,16 @@ object KotlinGenerator {
                 val isNullable = param.type.resolve().isMarkedNullable
                 val hasDefault = param.hasDefault
                 
-                if (typeStr == "com.wip.plugin.api.PluginLogger") {
-                    mapCode.add("context?.logger ?: throw IllegalStateException(%S)", "Logger not available")
-                } else if (typeStr == "com.wip.plugin.api.ProgressReporter") {
-                    mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
-                } else if (typeStr == "com.wip.plugin.api.PluginFileSystem") {
-                    mapCode.add("context?.fileSystem ?: throw IllegalStateException(%S)", "FileSystem not available")
-                } else if (typeStr == "com.wip.plugin.api.ExecutionContext") {
+                // if (typeStr == "com.wip.plugin.api.PluginLogger") {
+                //    mapCode.add("context?.logger ?: throw IllegalStateException(%S)", "Logger not available")
+                // } else if (typeStr == "com.wip.plugin.api.ProgressReporter") {
+                //    mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
+                // } else if (typeStr == "com.wip.plugin.api.PluginFileSystem") {
+                //     mapCode.add("context?.fileSystem ?: throw IllegalStateException(%S)", "FileSystem not available")
+                // } else
+                if (typeStr == "com.wip.plugin.api.ExecutionContext") {
                     mapCode.add("context ?: throw IllegalStateException(%S)", "ExecutionContext not available")
-                } else if (paramName == "resumeState") {
+                } else if (param.annotations.any { it.shortName.asString() == "ResumeState" }) {
                     mapCode.add("request.resumeState?.let { Json.decodeFromJsonElement<%T>(it) }", paramType)
                 } else if (hasDefault) {
                     mapCode.add("if (request.parameters.containsKey(%S)) Json.decodeFromJsonElement<%T>(request.parameters[%S]!!) else null", paramName, paramType.copy(nullable = false), paramName)

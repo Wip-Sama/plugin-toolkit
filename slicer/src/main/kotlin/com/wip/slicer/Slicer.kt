@@ -1,10 +1,9 @@
 package com.wip.slicer
 
+import com.wip.plugin.api.ExecutionContext
 import com.wip.plugin.api.annotations.Capability
 import com.wip.plugin.api.annotations.PluginInfo
 import com.wip.plugin.api.annotations.CapabilityParam
-import com.wip.plugin.api.PluginLogger
-import com.wip.plugin.api.ProgressReporter
 import kotlinx.io.asInputStream
 import kotlinx.io.asOutputStream
 import kotlinx.io.files.SystemFileSystem
@@ -32,9 +31,11 @@ class Slicer {
         @CapabilityParam(description = "Maximum Height", defaultValue = "10000") maxHeight: Int,
         @CapabilityParam(description = "Prioritize smaller", defaultValue = "true") prioritizeSmallerImages: Boolean,
         @CapabilityParam(description = "Cut tolerance", defaultValue = "5") cutTolerance: Int,
-        logger: PluginLogger,
-        progressReporter: ProgressReporter
+        context: ExecutionContext
     ): String {
+        val logger = context.logger
+        val progressReporter = context.progress
+
         logger.log("Starting slicer for folder: $folderPath")
         progressReporter.report(0.1f)
         
