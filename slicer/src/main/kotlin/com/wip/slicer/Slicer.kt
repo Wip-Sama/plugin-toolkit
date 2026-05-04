@@ -16,7 +16,7 @@ import java.awt.image.BufferedImage
 @PluginInfo(
     id = "com.wip.operations.slicer",
     name = "Slicer",
-    version = "0.4.3",
+    version = "1.0.0",
     description = "A plugin that provides vertical images sliding capabilities for manhwa."
 )
 class Slicer {
@@ -57,7 +57,7 @@ class Slicer {
         val width = firstImage.width
         val fullBitmap = mutableListOf<BufferedImage>()
 
-        val usefulRowVarianceList = analyzeRowVariances(sortedImages, width, cutTolerance, fullBitmap)
+        val usefulRowVarianceList = analyzeRowVariances(sortedImages, cutTolerance, fullBitmap)
         val totalHeight = usefulRowVarianceList.size
         progressReporter.report(0.5f)
 
@@ -74,9 +74,82 @@ class Slicer {
         return "Path: ${outputDir}. Slices created: ${finalCuts.size}. Total cumulative error: $displayError."
     }
 
+    @Capability(
+        name = "Max distance for cuts",
+        description = "Analyzes row variances to determine useful cut points"
+    )
+    fun maxDistanceForCuts(
+        @CapabilityParam(description = "List of items to slice") folderPath: String,
+        @CapabilityParam(description = "Cut tolerance", defaultValue = "5") cutTolerance: Int,
+        context: ExecutionContext
+    ): Int {
+        val logger = context.logger
+        val progressReporter = context.progress
+
+        logger.log("Starting slicer for folder: $folderPath")
+
+        val folder = Path(folderPath)
+        val files = SystemFileSystem.list(folder).toList()
+
+        if (files.isEmpty()) throw IllegalArgumentException("No files found in the specified folder.")
+        val images = files.filter { path ->
+            val metadata = SystemFileSystem.metadataOrNull(path)
+            metadata?.isRegularFile == true && path.name.lowercase().let { name ->
+                name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp")
+            }
+        }
+        val sortedImages = images.sortedWith(natsortComparator)
+        if (sortedImages.isEmpty()) throw IllegalArgumentException("No valid images found in the specified folder.")
+
+        val progressIncrement = 0.9f / sortedImages.size
+        val validRows = mutableListOf<Int>()
+        sortedImages.forEachIndexed { index, imagePath ->
+            val img = SystemFileSystem.source(imagePath).buffered().asInputStream().use { ImageIO.read(it) }
+            for (i in 0 until img.height) {
+                validRows.add(if (analyzeSingleRowVariance(img, i) <= cutTolerance) 1 else 0)
+            }
+            progressReporter.report(progressIncrement*(index+1))
+        }
+
+        var max_distance = 0
+        var local_distance = 0
+
+        val notifyInterval = validRows.size / 10
+        validRows.forEachIndexed { index, it ->
+            if (index % notifyInterval == 0) {
+                progressReporter.report(0.9f+(index/notifyInterval)*0.01f)
+            }
+            if (it == 0) {
+                if (local_distance > max_distance)
+                    max_distance = local_distance
+                local_distance = 0
+            } else {
+                local_distance++
+            }
+        }
+
+        return max_distance
+    }
+
+    private fun analyzeSingleRowVariance(bufferedImage: BufferedImage, y: Int): Int {
+        var maxDiff = 0
+        for (x in 0 until bufferedImage.width - 1) {
+            if (x >= bufferedImage.width - 1) break
+            val pixel1 = bufferedImage.getRGB(x, y)
+            val pixel2 = bufferedImage.getRGB(x + 1, y)
+
+            val rDiff = abs((pixel1 shr 16 and 0xFF) - (pixel2 shr 16 and 0xFF))
+            val gDiff = abs((pixel1 shr 8 and 0xFF) - (pixel2 shr 8 and 0xFF))
+            val bDiff = abs((pixel1 and 0xFF) - (pixel2 and 0xFF))
+
+            val currentMax = rDiff.coerceAtLeast(gDiff.coerceAtLeast(bDiff))
+            if (currentMax > maxDiff) maxDiff = currentMax
+        }
+        return maxDiff
+    }
+
     private fun analyzeRowVariances(
         sortedImages: List<Path>,
-        width: Int,
         cutTolerance: Int,
         fullBitmap: MutableList<BufferedImage>
     ): List<Boolean> {
@@ -85,20 +158,7 @@ class Slicer {
             val bufferedImage = SystemFileSystem.source(imagePath).buffered().asInputStream().use { ImageIO.read(it) }
             fullBitmap.add(bufferedImage)
             for (y in 0 until bufferedImage.height) {
-                var maxDiff = 0
-                for (x in 0 until width - 1) {
-                    if (x >= bufferedImage.width - 1) break
-                    val pixel1 = bufferedImage.getRGB(x, y)
-                    val pixel2 = bufferedImage.getRGB(x + 1, y)
-
-                    val rDiff = abs((pixel1 shr 16 and 0xFF) - (pixel2 shr 16 and 0xFF))
-                    val gDiff = abs((pixel1 shr 8 and 0xFF) - (pixel2 shr 8 and 0xFF))
-                    val bDiff = abs((pixel1 and 0xFF) - (pixel2 and 0xFF))
-
-                    val currentMax = rDiff.coerceAtLeast(gDiff.coerceAtLeast(bDiff))
-                    if (currentMax > maxDiff) maxDiff = currentMax
-                }
-                rowVarianceList.add(maxDiff)
+                rowVarianceList.add(analyzeSingleRowVariance(bufferedImage, y))
             }
         }
         return rowVarianceList.map { it <= cutTolerance }

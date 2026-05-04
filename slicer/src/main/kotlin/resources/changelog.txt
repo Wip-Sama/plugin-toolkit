@@ -1,0 +1,7 @@
+version: 1.0.0
+date: 2026-05-04
+Added:
+    - Slicer
+    - Valid cut distance checker
+Planned:
+    - Dynamic image loading in teh slicer to avoid loading all the images bitmap in ram
