@@ -1,7 +1,7 @@
 plugins {
     id("java-library")
-    alias(libs.plugins.jetbrainsKotlinJvm)
-    alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
 
@@ -20,8 +20,8 @@ kotlin {
 dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
-    implementation(libs.kotlinxSerializationJson)
-    implementation(libs.kotlinx.coroutinesSwing)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.swing)
     implementation(project(":plugin-api"))
     ksp(project(":plugin-api"))
 }

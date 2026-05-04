@@ -1,7 +1,7 @@
 plugins {
     id("java-library")
-    alias(libs.plugins.jetbrainsKotlinJvm)
-    alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
 }
 
@@ -25,8 +25,8 @@ kotlin {
 dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
-    api(libs.kotlinx.coroutinesCore)
-    implementation(libs.kotlinxSerializationJson)
+    api(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
 
     // Processor dependencies
     implementation(libs.ksp.api)

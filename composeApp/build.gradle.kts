@@ -1,11 +1,11 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.composeHotReload)
-    alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.compose.multiplatform)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.compose.hot.reload)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -18,12 +18,12 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(compose.materialIconsExtended)
             implementation(libs.compose.ui)
-            implementation(libs.compose.uiToolingPreview)
+            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.compose.components.resources)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.kotlinxSerializationCore)
-            implementation(libs.kotlinxSerializationJson)
+            implementation(libs.androidx.lifecycle.viewmodel.compose)
+            implementation(libs.androidx.lifecycle.runtime.compose)
+            implementation(libs.kotlinx.serialization.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.navigation3.ui)
             implementation(libs.lifecycle.nav3)
             implementation(project.dependencies.platform(libs.koin.bom))
@@ -46,7 +46,7 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
-            implementation(libs.kotlinx.coroutinesSwing)
+            implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.jna)
             implementation(libs.jna.platform)
             implementation(libs.dbus.java.core)
