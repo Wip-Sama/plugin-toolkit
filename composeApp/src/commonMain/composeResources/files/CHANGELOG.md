@@ -1,3 +1,10 @@
+Version: 1.1.0
+Date: 06-05-2026
+Added:
+  - Plugin Setting
+  - Plugin Actions
+  - Error checking while loading plugins
+----------------------------------------------------------------------------------------------------
 Version: 1.0.0
 Date: 05-05-2026
 Added:
