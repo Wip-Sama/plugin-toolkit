@@ -132,10 +132,13 @@
     <string name="action_install">Install</string>
     <string name="action_resume">Resume</string>
     <string name="action_pause">Pause</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
     <string name="action_expand">Expand</string>
     <string name="action_collapse">Collapse</string>
 
     <!-- Settings -->
+    <string name="plugin_settings_title">Settings: %1$s</string>
     <string name="settings_search_placeholder">Search settings...</string>
     <string name="settings_no_results">No results found in %s</string>
     <string name="settings_search_whole">Search in whole settings</string>

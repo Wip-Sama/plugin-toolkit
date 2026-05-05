@@ -73,8 +73,17 @@ class PluginViewModel(
     fun selectCapability(capability: Capability?) {
         selectedCapability = capability
         parameterValues.clear()
+
+        val pkg = selectedPlugin?.getManifest()?.plugin?.id ?: ""
+        val store = if (pkg.isNotEmpty()) pluginManager.loadPluginSettings(pkg) else null
+
         capability?.parameters?.forEach { (name, meta) ->
-            parameterValues[name] = meta.defaultValue?.let {
+            // Priority: User Capability Default -> User Global Default -> Manifest Default
+            val userValue = store?.capabilityParams?.get(capability.name)?.get(name)
+                ?: store?.globalParams?.get(name)
+                ?: meta.defaultValue
+
+            parameterValues[name] = userValue?.let {
                 if (it is JsonPrimitive && it.isString) it.content else it.toString()
             } ?: ""
         }

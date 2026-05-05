@@ -58,6 +58,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.plugin.ui.PluginSettingsDialog
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
@@ -90,6 +91,14 @@ fun PluginManagerView(
 ) {
     val plugins by viewModel.sortedPlugins.collectAsState()
     val loadedPlugins by viewModel.loadedPlugins.collectAsState()
+    val settingsPkg by viewModel.settingsPkg.collectAsState()
+
+    if (settingsPkg != null) {
+        PluginSettingsDialog(
+            pkg = settingsPkg!!,
+            onDismiss = { viewModel.closeSettings() }
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Toolbar

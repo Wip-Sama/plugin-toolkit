@@ -161,7 +161,8 @@ class ExecutionContext(
     val logger: PluginLogger,
     val progress: ProgressReporter,
     val fileSystem: PluginFileSystem,
-    val cacheFileSystem: PluginFileSystem
+    val cacheFileSystem: PluginFileSystem,
+    val settings: Map<String, JsonElement> = emptyMap()
 ) {
     private val signalHandlers = mutableListOf<suspend (PluginSignal) -> Unit>()
 
@@ -185,6 +186,33 @@ class ExecutionContext(
      */
     fun pause(resumeState: JsonElement): Nothing {
         throw PluginPausedException(resumeState)
+    }
+
+    /**
+     * Typed helpers for settings access.
+     */
+    fun getStringSetting(key: String, defaultValue: String = ""): String {
+        return settings[key]?.let {
+            if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString()
+        } ?: defaultValue
+    }
+
+    fun getIntSetting(key: String, defaultValue: Int = 0): Int {
+        return settings[key]?.let {
+            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toIntOrNull() else null
+        } ?: defaultValue
+    }
+
+    fun getBooleanSetting(key: String, defaultValue: Boolean = false): Boolean {
+        return settings[key]?.let {
+            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toBooleanStrictOrNull() else null
+        } ?: defaultValue
+    }
+
+    fun getDoubleSetting(key: String, defaultValue: Double = 0.0): Double {
+        return settings[key]?.let {
+            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toDoubleOrNull() else null
+        } ?: defaultValue
     }
 }
 

@@ -50,6 +50,7 @@ import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
+import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
@@ -98,6 +99,7 @@ fun main(args: Array<String>) {
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get()) }
             factory { PluginManagerViewModel(get(), get(), get()) }
+            factory { (pkg: String) -> PluginSettingsViewModel(pkg, get()) }
             factory { JobViewModel(get()) }
             factory { AppViewModel(get(), get()) }
             single { UpdateService() }

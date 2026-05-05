@@ -46,6 +46,9 @@ class PluginManagerViewModel(
     private val _managedFolders = MutableStateFlow<List<String>>(emptyList())
     val managedFolders: StateFlow<List<String>> = _managedFolders.asStateFlow()
 
+    private val _settingsPkg = MutableStateFlow<String?>(null)
+    val settingsPkg: StateFlow<String?> = _settingsPkg.asStateFlow()
+
     init {
         PlatformUtils.mkdirs(defaultPluginFolder)
         refreshManagedFolders()
@@ -247,12 +250,11 @@ class PluginManagerViewModel(
     }
 
     fun openSettings(pkg: String) {
-        viewModelScope.launch {
-            dialogService.showConfirmation(
-                getString(Res.string.plugin_settings),
-                "Settings editing to be implemented in a dedicated UI."
-            ) {}
-        }
+        _settingsPkg.value = pkg
+    }
+
+    fun closeSettings() {
+        _settingsPkg.value = null
     }
 
     fun getUpdate(pkg: String) = pluginManager.getUpdate(pkg)

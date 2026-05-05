@@ -19,6 +19,7 @@ import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -580,10 +581,54 @@ class PluginManager(
         return installRemote(update, plugin.installPath.substringBeforeLast("/"))
     }
 
+    private fun getSettingsFile(installPath: String): String {
+        return "$installPath/settings.json"
+    }
+
+    fun loadPluginSettings(pkg: String): PluginSettingsStore {
+        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return PluginSettingsStore()
+        val settingsFile = getSettingsFile(plugin.installPath)
+        val content = PlatformUtils.readFile(settingsFile)
+        return if (content != null) {
+            try {
+                json.decodeFromString<PluginSettingsStore>(content)
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to parse settings for $pkg" }
+                PluginSettingsStore()
+            }
+        } else {
+            PluginSettingsStore()
+        }
+    }
+
+    fun savePluginSettings(pkg: String, store: PluginSettingsStore) {
+        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return
+        val settingsFile = getSettingsFile(plugin.installPath)
+        try {
+            PlatformUtils.writeFile(settingsFile, json.encodeToString(store))
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to save settings for $pkg" }
+        }
+    }
+
     fun createExecutionContext(pkg: String, jobId: String? = null): ExecutionContext {
         val plugin = _installedPlugins.value.find { it.pkg == pkg }
         val installPath = plugin?.installPath ?: ""
         val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }
+
+        // Load settings and merge with manifest defaults
+        val storedSettings = loadPluginSettings(pkg)
+        val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+        
+        val mergedSettings = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+        
+        // 1. Start with manifest defaults
+        manifest?.settings?.forEach { (key, meta) ->
+            meta.defaultValue?.let { mergedSettings[key] = it }
+        }
+        
+        // 2. Override with stored user settings
+        mergedSettings.putAll(storedSettings.settings)
 
         return ExecutionContext(
             logger = jobManager.getPluginLogger(pkg, jobId),
@@ -593,7 +638,8 @@ class PluginManager(
                 }
             },
             fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
-            cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath)
+            cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath),
+            settings = mergedSettings
         )
     }
 
