@@ -1,16 +1,16 @@
 package com.wip.bettermanhwa
 
-import com.wip.plugin.api.ExecutionContext
-import com.wip.plugin.api.PluginSignal
-import com.wip.plugin.api.annotations.Capability
-import com.wip.plugin.api.annotations.CapabilityParam
-import com.wip.plugin.api.annotations.PluginInfo
-import com.wip.plugin.api.annotations.ResumeState
-import com.wip.plugin.api.annotations.PluginSetup
-import com.wip.plugin.api.annotations.PluginValidate
+import org.wip.plugintoolkit.api.annotations.Capability
+import org.wip.plugintoolkit.api.annotations.CapabilityParam
+import org.wip.plugintoolkit.api.annotations.PluginInfo
+import org.wip.plugintoolkit.api.annotations.ResumeState
+import org.wip.plugintoolkit.api.annotations.PluginSetup
+import org.wip.plugintoolkit.api.annotations.PluginValidate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
+import org.wip.plugintoolkit.api.ExecutionContext
+import org.wip.plugintoolkit.api.PluginSignal
 import java.io.File
 
 enum class OutputFormat {

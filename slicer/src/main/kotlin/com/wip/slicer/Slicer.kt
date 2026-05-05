@@ -1,9 +1,9 @@
 package com.wip.slicer
 
-import com.wip.plugin.api.ExecutionContext
-import com.wip.plugin.api.annotations.Capability
-import com.wip.plugin.api.annotations.PluginInfo
-import com.wip.plugin.api.annotations.CapabilityParam
+import org.wip.plugintoolkit.api.ExecutionContext
+import org.wip.plugintoolkit.api.annotations.Capability
+import org.wip.plugintoolkit.api.annotations.PluginInfo
+import org.wip.plugintoolkit.api.annotations.CapabilityParam
 import kotlinx.io.asInputStream
 import kotlinx.io.asOutputStream
 import kotlinx.io.files.SystemFileSystem

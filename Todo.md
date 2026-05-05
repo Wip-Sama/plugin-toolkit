@@ -46,3 +46,17 @@ Auto update:
 > Maybe when installing execute the install script, then close the main app and let the update script work
 - Auto compile update with github actions
 - Recheck if the modules are still supported in the new version of the application
+
+General:
+- Notify that to set the system startup in the registry you need to start the application as administrator
+> Possibly implement a way to start a subprocess to avoid restarting teh app and spawn that as administrator
+
+Security:
+- Sign App releases
+> Check app signature on download update, if invalid notify the user and ask if it is willing to proceed anyway
+> It may be dangerous to make github auto sign the application, search for a solution
+- Sign modules
+> Same procedure as app for modules update
+
+Bugs:
+- For some reasons when updating the app teh first start will not load all plugins

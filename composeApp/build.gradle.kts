@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.compose.hot.reload)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.buildkonfig)
 }
 
 kotlin {
@@ -58,15 +59,24 @@ kotlin {
     }
 }
 
+buildkonfig {
+    packageName = "org.wip.plugintoolkit"
+    objectName = "AppConfig"
+
+    defaultConfigs {
+        buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING, "VERSION", libs.versions.app.get())
+    }
+}
+
 
 compose.desktop {
     application {
-        mainClass = "com.wip.kpm_cpm_wotoolkit.MainKt"
+        mainClass = "org.wip.plugintoolkit.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.wip.kpm_cpm_wotoolkit"
-            packageVersion = "1.0.0"
+            packageName = "org.wip.plugintoolkit"
+            packageVersion = libs.versions.app.get()
         }
     }
 }

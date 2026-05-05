@@ -1,1 +1,1 @@
-com.wip.plugin.processor.ManifestProcessorProvider
+org.wip.plugintoolkit.api.processor.ManifestProcessorProvider

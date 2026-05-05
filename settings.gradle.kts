@@ -1,4 +1,4 @@
-rootProject.name = "kpm_cpm_wotoolkit"
+rootProject.name = "plugintoolkit"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

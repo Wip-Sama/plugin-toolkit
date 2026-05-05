@@ -26,6 +26,9 @@
     <string name="section_plugins_repositories">Repositories</string>
     <string name="section_plugins_manager">Manager</string>
     <string name="section_about">About</string>
+    <string name="about_built_by">Built with ❤️ by: Wip-Sama</string>
+    <string name="about_libraries">Libraries used</string>
+    <string name="about_libraries_placeholder">The list of libraries will be available soon.</string>
     <string name="section_general">General</string>
     <string name="section_localization">Localization</string>
     <string name="setting_adaptive_color">Adaptive Color</string>
@@ -103,6 +106,18 @@
     <string name="setting_save_job_history_subtitle">Keep a log of all executed jobs and their results</string>
     <string name="setting_history_retention_days">History Retention Days</string>
     <string name="setting_history_retention_days_subtitle">Number of days to keep job history before automatic deletion</string>
+    <string name="section_auto_update">Auto Update</string>
+    <string name="setting_enable_auto_update">Check for Updates Automatically</string>
+    <string name="setting_enable_auto_update_subtitle">The application will check for new versions on startup</string>
+    <string name="update_available_title">Update Available: %1$s</string>
+    <string name="update_now">Update Now</string>
+    <string name="update_later">Update Later</string>
+    <string name="update_downloading">Downloading Update...</string>
+    <string name="update_ready_to_install">Update downloaded. Launching installer...</string>
+    <string name="update_changelog_title">What\'s New</string>
+    <string name="update_check_failed">Failed to check for updates</string>
+    <string name="update_no_updates">You are running the latest version</string>
+    <string name="action_check_for_updates">Check for Updates</string>
 
     <!-- General / Common -->
     <string name="dialog_confirm">Confirm</string>
