@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest]
 
     steps:
       - name: Checkout Code
@@ -27,10 +27,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Run Unit Tests
-        run: ./gradlew test
+        run: .\gradlew test
 
       - name: Build Release Distribution
-        run: ./gradlew packageReleaseDistributionForCurrentOS
+        run: .\gradlew packageReleaseDistributionForCurrentOS
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
