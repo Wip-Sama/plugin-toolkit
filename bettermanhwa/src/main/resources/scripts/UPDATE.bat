@@ -96,7 +96,6 @@ tar -xf "%TEMP_UPDATE_ZIP%" -C "%APP_DIR_TAR%"
 
 if errorlevel 1 (
     echo [UPDATE] ERRORE: estrazione fallita.
-    pause
 ) else (
     echo.
     echo [UPDATE] Aggiornamento v%REMOTE_VER% installato con successo!

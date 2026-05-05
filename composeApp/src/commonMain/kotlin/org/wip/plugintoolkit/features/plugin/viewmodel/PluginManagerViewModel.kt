@@ -13,6 +13,7 @@ import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -258,4 +259,17 @@ class PluginManagerViewModel(
     }
 
     fun getUpdate(pkg: String) = pluginManager.getUpdate(pkg)
+
+    fun getActions(pkg: String) = try {
+        PluginLoader.getPluginById(pkg)?.getManifest()?.actions ?: emptyList()
+    } catch (t: Throwable) {
+        co.touchlab.kermit.Logger.e(t) { "Failed to get actions for $pkg" }
+        emptyList()
+    }
+
+    fun runAction(pkg: String, actionName: String) {
+        viewModelScope.launch {
+            pluginManager.runAction(pkg, actionName)
+        }
+    }
 }

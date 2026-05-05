@@ -12,7 +12,6 @@ if not exist %PYTHON_EXE% (
     echo [ERRORE] L'ambiente portable non e' stato trovato!
     echo Assicurati di aver eseguito prima il file di Setup.
     echo.
-    pause
     exit /b
 )
 
@@ -24,4 +23,3 @@ echo [2/2] Avvio interfaccia grafica...
 %PYTHON_EXE% app_ui.py
 
 echo.
-pause

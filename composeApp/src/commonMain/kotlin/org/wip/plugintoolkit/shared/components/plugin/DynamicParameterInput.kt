@@ -35,7 +35,8 @@ fun DynamicParameterInput(
     name: String,
     metadata: ParameterMetadata,
     value: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    enabled: Boolean = true
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         // Label and Type info
@@ -76,7 +77,8 @@ fun DynamicParameterInput(
                         Switch(
                             checked = value.lowercase().toBooleanStrictOrNull() ?: false,
                             onCheckedChange = { onValueChange(it.toString()) },
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            enabled = enabled
                         )
                     }
 
@@ -86,7 +88,8 @@ fun DynamicParameterInput(
                             onValueChange = onValueChange,
                             allowDecimal = false,
                             placeholder = "Enter integer",
-                            constraints = metadata.constraints
+                            constraints = metadata.constraints,
+                            enabled = enabled
                         )
                     }
 
@@ -96,7 +99,8 @@ fun DynamicParameterInput(
                             onValueChange = onValueChange,
                             allowDecimal = true,
                             placeholder = "Enter decimal number",
-                            constraints = metadata.constraints
+                            constraints = metadata.constraints,
+                            enabled = enabled
                         )
                     }
 
@@ -105,7 +109,8 @@ fun DynamicParameterInput(
                             value = value,
                             onValueChange = onValueChange,
                             placeholder = "Enter ${type.primitiveType.name.lowercase()}",
-                            constraints = metadata.constraints
+                            constraints = metadata.constraints,
+                            enabled = enabled
                         )
                     }
                 }
@@ -116,7 +121,8 @@ fun DynamicParameterInput(
                     value = value,
                     onValueChange = onValueChange,
                     placeholder = "Enter values separated by comma (,)",
-                    constraints = metadata.constraints
+                    constraints = metadata.constraints,
+                    enabled = enabled
                 )
             }
 
@@ -129,14 +135,16 @@ fun DynamicParameterInput(
                         value = value,
                         onValueChange = onValueChange,
                         placeholder = "Enter comma-separated options: ${options.joinToString()}",
-                        constraints = metadata.constraints
+                        constraints = metadata.constraints,
+                        enabled = enabled
                     )
                 } else {
                     ExpressiveMenu(
                         options = options,
                         selectedOption = value.ifEmpty { options.firstOrNull() ?: "" },
                         onOptionSelected = onValueChange,
-                        labelProvider = { it }
+                        labelProvider = { it },
+                        enabled = enabled
                     )
                 }
             }
@@ -146,7 +154,8 @@ fun DynamicParameterInput(
                     value = value,
                     onValueChange = onValueChange,
                     placeholder = "Enter value",
-                    constraints = metadata.constraints
+                    constraints = metadata.constraints,
+                    enabled = enabled
                 )
             }
         }
@@ -159,7 +168,8 @@ private fun NumericTextField(
     onValueChange: (String) -> Unit,
     allowDecimal: Boolean,
     placeholder: String,
-    constraints: ParameterConstraints? = null
+    constraints: ParameterConstraints? = null,
+    enabled: Boolean = true
 ) {
     var isError by remember(value) { mutableStateOf(false) }
     var errorMessage by remember(value) { mutableStateOf("") }
@@ -217,6 +227,7 @@ private fun NumericTextField(
             }
         },
         modifier = Modifier.fillMaxWidth(),
+        enabled = enabled,
         shape = MaterialTheme.shapes.medium,
         placeholder = { Text(placeholder, style = MaterialTheme.typography.bodySmall) },
         keyboardOptions = KeyboardOptions(
@@ -235,7 +246,8 @@ private fun StandardTextField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    constraints: ParameterConstraints? = null
+    constraints: ParameterConstraints? = null,
+    enabled: Boolean = true
 ) {
     var isError by remember(value) { mutableStateOf(false) }
     var errorMessage by remember(value) { mutableStateOf("") }
@@ -269,6 +281,7 @@ private fun StandardTextField(
             validate(it)
         },
         modifier = Modifier.fillMaxWidth(),
+        enabled = enabled,
         shape = MaterialTheme.shapes.medium,
         placeholder = { Text(placeholder, style = MaterialTheme.typography.bodySmall) },
         singleLine = true,

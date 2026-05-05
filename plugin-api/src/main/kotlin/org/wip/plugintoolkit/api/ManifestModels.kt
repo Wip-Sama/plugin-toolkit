@@ -79,6 +79,7 @@ data class PluginManifest(
     val requirements: Requirements,
     val defaultParameters: Map<String, ParameterMetadata>? = null,
     val capabilities: List<Capability> = emptyList(),
+    val actions: List<PluginAction> = emptyList(),
     val settings: Map<String, SettingMetadata>? = null,
     val changelog: Changelog? = null,
     val updateType: UpdateType = UpdateType.REPLACE_ALL
@@ -129,4 +130,14 @@ data class Capability(
     val returnType: DataType,
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true
+)
+
+/**
+ * Metadata for a custom action provided by the plugin.
+ */
+@Serializable
+data class PluginAction(
+    val name: String,
+    val description: String,
+    val functionName: String
 )

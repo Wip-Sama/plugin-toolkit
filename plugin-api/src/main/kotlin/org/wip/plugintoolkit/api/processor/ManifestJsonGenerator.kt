@@ -17,6 +17,7 @@ object ManifestJsonGenerator {
         minExecutionTimeMs: Int,
         functions: List<KSFunctionDeclaration>,
         settingsProperties: List<KSPropertyDeclaration>,
+        actions: List<KSFunctionDeclaration>,
         changelogObj: Changelog?
     ): String {
         val manifestCapabilities = functions.map { func ->
@@ -107,6 +108,18 @@ object ManifestJsonGenerator {
             )
         }
 
+        val manifestActions = actions.map { func ->
+            val ann = func.annotations.first { it.shortName.asString() == "PluginAction" }
+            val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
+            val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
+            
+            PluginAction(
+                name = actName,
+                description = actDesc,
+                functionName = func.simpleName.asString()
+            )
+        }
+
         val manifestObj = PluginManifest(
             manifestVersion = "1.0",
             plugin = PluginInfo(
@@ -120,6 +133,7 @@ object ManifestJsonGenerator {
                 minExecutionTimeMs = minExecutionTimeMs
             ),
             capabilities = manifestCapabilities,
+            actions = manifestActions,
             settings = manifestSettings.ifEmpty { null },
             changelog = changelogObj
         )

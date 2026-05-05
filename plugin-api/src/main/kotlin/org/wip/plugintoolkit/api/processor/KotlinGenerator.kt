@@ -17,6 +17,7 @@ object KotlinGenerator {
         minExecutionTimeMs: Int,
         functions: List<KSFunctionDeclaration>,
         settingsProperties: List<KSPropertyDeclaration>,
+        actions: List<KSFunctionDeclaration>,
         classDeclaration: KSClassDeclaration
     ): FileSpec {
         val generatedFileName = baseClassName + "Generated"
@@ -25,16 +26,16 @@ object KotlinGenerator {
         val entryName = baseClassName + "PluginEntry"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
-            .addImport("org.wip.plugintoolkit.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType", "JobHandle", "PluginSignal")
+            .addImport("org.wip.plugintoolkit.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "PluginAction", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType", "JobHandle", "PluginSignal")
             .addImport("kotlinx.serialization.json", "Json", "decodeFromJsonElement", "encodeToJsonElement")
             .addImport("kotlinx.coroutines", "CoroutineScope", "Dispatchers", "SupervisorJob", "async", "launch", "cancel")
 
         // 1. Generate Manifest Object
-        val manifestType = generateManifestObject(manifestName, id, name, version, description, minMemoryMb, minExecutionTimeMs, functions, settingsProperties)
+        val manifestType = generateManifestObject(manifestName, id, name, version, description, minMemoryMb, minExecutionTimeMs, functions, settingsProperties, actions)
         fileSpec.addType(manifestType)
 
         // 2. Generate Dispatcher Class
-        val dispatcherType = generateDispatcherClass(dispatcherName, packageName, baseClassName, functions)
+        val dispatcherType = generateDispatcherClass(dispatcherName, packageName, baseClassName, functions, actions)
         fileSpec.addType(dispatcherType)
 
         // 3. Generate Entry Class
@@ -53,7 +54,8 @@ object KotlinGenerator {
         minMemoryMb: Int,
         minExecutionTimeMs: Int,
         functions: List<KSFunctionDeclaration>,
-        settingsProperties: List<KSPropertyDeclaration>
+        settingsProperties: List<KSPropertyDeclaration>,
+        actions: List<KSFunctionDeclaration>
     ): TypeSpec {
         val manifestType = TypeSpec.objectBuilder(manifestName)
         
@@ -144,6 +146,20 @@ object KotlinGenerator {
         settingsCode.unindent()
         settingsCode.add(")\n")
 
+        val actionsCode = CodeBlock.builder()
+        actionsCode.add("listOf(\n")
+        actionsCode.indent()
+        actions.forEachIndexed { index, func ->
+            val ann = func.annotations.first { it.shortName.asString() == "PluginAction" }
+            val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
+            val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
+            
+            actionsCode.add("PluginAction(name = %S, description = %S, functionName = %S)", actName, actDesc, func.simpleName.asString())
+            if (index < actions.size - 1) actionsCode.add(",\n") else actionsCode.add("\n")
+        }
+        actionsCode.unindent()
+        actionsCode.add(")\n")
+
         manifestType.addProperty(
             PropertySpec.builder("manifest", ClassName("org.wip.plugintoolkit.api", "PluginManifest"))
                 .initializer(
@@ -155,6 +171,8 @@ object KotlinGenerator {
                         .add("requirements = Requirements(minMemoryMb = %L, minExecutionTimeMs = %L),\n", minMemoryMb, minExecutionTimeMs)
                         .add("capabilities = ")
                         .add(capabilitiesCode.build())
+                        .add(",\nactions = ")
+                        .add(actionsCode.build())
                         .add(",\nsettings = ")
                         .add(settingsCode.build())
                         .unindent()
@@ -170,7 +188,8 @@ object KotlinGenerator {
         dispatcherName: String,
         packageName: String,
         baseClassName: String,
-        functions: List<KSFunctionDeclaration>
+        functions: List<KSFunctionDeclaration>,
+        actions: List<KSFunctionDeclaration>
     ): TypeSpec {
         val dispatcherType = TypeSpec.classBuilder(dispatcherName)
             .addSuperinterface(ClassName("org.wip.plugintoolkit.api", "DataProcessor"))
@@ -325,6 +344,48 @@ object KotlinGenerator {
             """.trimIndent())
         
         dispatcherType.addFunction(processAsyncFunc.build())
+
+        // RunAction
+        val actionMapType = ClassName("kotlin.collections", "Map").parameterizedBy(
+            String::class.asClassName(),
+            LambdaTypeName.get(
+                parameters = listOf(ParameterSpec.unnamed(ClassName("org.wip.plugintoolkit.api", "ExecutionContext"))),
+                returnType = ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName())
+            ).copy(suspending = true)
+        )
+
+        val actionMapCode = CodeBlock.builder()
+        actionMapCode.add("mapOf(\n")
+        actionMapCode.indent()
+        actions.forEachIndexed { index, func ->
+            val methodName = func.simpleName.asString()
+            actionMapCode.add("%S to { context ->\n", methodName.lowercase())
+            actionMapCode.indent()
+            actionMapCode.add("runCatching { processor.%L(context) }\n", methodName)
+            actionMapCode.unindent()
+            actionMapCode.add("}")
+            if (index < actions.size - 1) actionMapCode.add(",\n") else actionMapCode.add("\n")
+        }
+        actionMapCode.unindent()
+        actionMapCode.add(")\n")
+
+        dispatcherType.addProperty(
+            PropertySpec.builder("actionHandlers", actionMapType)
+                .initializer(actionMapCode.build())
+                .addModifiers(KModifier.PRIVATE)
+                .build()
+        )
+
+        val runActionFunc = FunSpec.builder("runAction")
+            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+            .addParameter("actionName", String::class)
+            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "ExecutionContext"))
+            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+            .addStatement("val handler = actionHandlers[actionName.lowercase()] ?: return Result.failure(IllegalArgumentException(\"Unknown action: \$actionName\"))")
+            .addStatement("return handler(context)")
+        
+        dispatcherType.addFunction(runActionFunc.build())
+
         return dispatcherType.build()
     }
 

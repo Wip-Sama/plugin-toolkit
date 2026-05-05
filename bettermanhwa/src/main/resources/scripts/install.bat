@@ -15,7 +15,6 @@ if not exist %VS_DIR% (
 
 if not exist %PYTHON_EXE% (
     echo ERRORE: python.exe non trovato. L'installazione di VapourSynth ha fallito.
-    pause
     exit /b
 )
 

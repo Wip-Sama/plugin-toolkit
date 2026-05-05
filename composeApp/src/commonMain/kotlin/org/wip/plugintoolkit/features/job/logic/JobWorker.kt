@@ -87,6 +87,7 @@ class JobWorker(
                 JobType.Capability -> executeCapabilityJob(job)
                 JobType.Setup -> executeSetupJob(job)
                 JobType.Validation -> executeValidationJob(job)
+                JobType.PluginAction -> executePluginActionJob(job)
                 else -> throw Exception("Unsupported job type: ${job.type}")
             }
         } catch (e: CancellationException) {
@@ -231,6 +232,41 @@ class JobWorker(
         manager.updateJobProgress(job.id, 1.0f)
         manager.addJobLog(job.id, "Validation successful.")
         manager.tryCompleteJob(job.id, "Success")
+    }
+
+    private suspend fun executePluginActionJob(job: BackgroundJob) {
+        val plugin = PluginLoader.getPluginById(job.pluginId)
+            ?: throw Exception("Plugin ${job.pluginId} not found")
+
+        val processor = plugin.getProcessor()
+        val context = createExecutionContext(job)
+
+        // Register a simple handle for cancellation
+        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        manager.registerJobHandle(job.id, object : JobHandle {
+            override val result: kotlinx.coroutines.Deferred<Result<PluginResponse>>
+                get() = throw UnsupportedOperationException("Not used for actions")
+
+            override fun pause() { /* Not supported for actions currently */ }
+
+            override fun cancel(force: Boolean) {
+                jobExecution.cancel()
+            }
+        })
+
+        manager.updateJobProgress(job.id, 0.1f)
+        manager.addJobLog(job.id, "Executing action: ${job.capabilityName}")
+
+        val result = processor.runAction(job.capabilityName, context)
+        
+        if (result.isSuccess) {
+            manager.updateJobProgress(job.id, 1.0f)
+            manager.addJobLog(job.id, "Action completed successfully.")
+            manager.tryCompleteJob(job.id, "Success")
+        } else {
+            val error = result.exceptionOrNull()?.message ?: "Action failed"
+            manager.tryFailJob(job.id, error)
+        }
     }
 
     private fun createExecutionContext(job: BackgroundJob): ExecutionContext {

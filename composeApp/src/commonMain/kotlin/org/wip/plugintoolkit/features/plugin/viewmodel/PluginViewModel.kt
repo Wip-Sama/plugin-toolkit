@@ -55,9 +55,21 @@ class PluginViewModel(
         // Sync with PluginManager
         pluginManager.loadedPlugins
             .onEach { activeIds ->
-                loadedPlugins = PluginLoader.getPlugins().filter { activeIds.contains(it.getManifest().plugin.id) }
+                loadedPlugins = PluginLoader.getPlugins().filter {
+                    try {
+                        activeIds.contains(it.getManifest().plugin.id)
+                    } catch (t: Throwable) {
+                        Logger.e(t) { "Failed to get manifest during VM sync" }
+                        false
+                    }
+                }
                 // If the selected plugin was unloaded, clear it
-                if (selectedPlugin != null && !activeIds.contains(selectedPlugin?.getManifest()?.plugin?.id)) {
+                val selectedId = try {
+                    selectedPlugin?.getManifest()?.plugin?.id
+                } catch (t: Throwable) {
+                    null
+                }
+                if (selectedPlugin != null && (selectedId == null || !activeIds.contains(selectedId))) {
                     selectPlugin(null)
                 }
             }
@@ -74,7 +86,11 @@ class PluginViewModel(
         selectedCapability = capability
         parameterValues.clear()
 
-        val pkg = selectedPlugin?.getManifest()?.plugin?.id ?: ""
+        val pkg = try {
+            selectedPlugin?.getManifest()?.plugin?.id ?: ""
+        } catch (t: Throwable) {
+            ""
+        }
         val store = if (pkg.isNotEmpty()) pluginManager.loadPluginSettings(pkg) else null
 
         capability?.parameters?.forEach { (name, meta) ->
@@ -98,11 +114,17 @@ class PluginViewModel(
             val result = PluginLoader.loadPlugin(jarPath)
             if (result.isSuccess) {
                 val plugin = result.getOrThrow()
-                val pkg = plugin.getManifest().plugin.id
-                plugin.initialize(pluginManager.createExecutionContext(pkg))
-                loadedPlugins = PluginLoader.getPlugins()
-                selectPlugin(plugin)
-                notificationService.notify(title = "Success", message = "Plugin loaded successfully")
+                try {
+                    val pkg = plugin.getManifest().plugin.id
+                    plugin.initialize(pluginManager.createExecutionContext(pkg))
+                    loadedPlugins = PluginLoader.getPlugins()
+                    selectPlugin(plugin)
+                    notificationService.notify(title = "Success", message = "Plugin loaded successfully")
+                } catch (t: Throwable) {
+                    val errorMsg = "Fatal error after loading plugin: ${t.message}"
+                    Logger.e(t) { errorMsg }
+                    notificationService.notify(title = "Error", message = errorMsg)
+                }
             } else {
                 notificationService.notify(
                     title = "Error",
@@ -133,11 +155,19 @@ class PluginViewModel(
             } ?: emptyMap()
 
             val jobId = jobCounterMutex.withLock { ++jobCounter }.toString()
+            
+            val manifest = try {
+                plugin.getManifest()
+            } catch (t: Throwable) {
+                Logger.e(t) { "Failed to get manifest for job creation" }
+                null
+            }
+
             val job = BackgroundJob(
                 id = jobId,
-                name = "${plugin.getManifest().plugin.name}: ${capability.name}",
+                name = "${manifest?.plugin?.name ?: "Unknown"}: ${capability.name}",
                 type = JobType.Capability,
-                pluginId = plugin.getManifest().plugin.id,
+                pluginId = manifest?.plugin?.id ?: "",
                 capabilityName = capability.name,
                 parameters = params,
                 keepResult = saveResults,
@@ -157,7 +187,11 @@ class PluginViewModel(
     }
 
     fun clearCapabilityHistory() {
-        val pluginId = selectedPlugin?.getManifest()?.plugin?.id
+        val pluginId = try {
+            selectedPlugin?.getManifest()?.plugin?.id
+        } catch (t: Throwable) {
+            null
+        }
         val capName = selectedCapability?.name
         if (pluginId != null && capName != null) {
             jobManager.removeJobs {

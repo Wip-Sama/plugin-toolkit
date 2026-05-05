@@ -20,7 +20,8 @@ enum class JobType {
     Capability,
     Flow,
     Setup,
-    Validation
+    Validation,
+    PluginAction
 }
 
 @Serializable

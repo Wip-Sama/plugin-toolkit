@@ -251,4 +251,13 @@ interface DataProcessor {
     fun processAsync(request: PluginRequest): JobHandle {
         throw NotImplementedError("processAsync not implemented")
     }
+
+    /**
+     * Run a custom action.
+     * @param actionName The name of the action function to call.
+     * @param context The execution context.
+     */
+    suspend fun runAction(actionName: String, context: ExecutionContext): Result<Unit> {
+        return Result.failure(NotImplementedError("runAction not implemented"))
+    }
 }

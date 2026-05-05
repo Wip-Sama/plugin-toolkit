@@ -107,11 +107,25 @@ actual object PluginLoader {
     actual fun getPlugin(jarPath: String): PluginEntry? = loadedPlugins[normalizePath(jarPath)]?.entry
 
     actual fun getPluginById(pluginId: String): PluginEntry? {
-        return loadedPlugins.values.find { it.entry.getManifest().plugin.id == pluginId }?.entry
+        return loadedPlugins.values.find {
+            try {
+                it.entry.getManifest().plugin.id == pluginId
+            } catch (t: Throwable) {
+                Logger.e(t) { "Failed to get manifest for plugin at ${it.jarPath}" }
+                false
+            }
+        }?.entry
     }
 
     actual fun getPluginInstallPath(pluginId: String): String? {
-        val plugin = loadedPlugins.values.find { it.entry.getManifest().plugin.id == pluginId }
+        val plugin = loadedPlugins.values.find {
+            try {
+                it.entry.getManifest().plugin.id == pluginId
+            } catch (t: Throwable) {
+                Logger.e(t) { "Failed to get manifest for plugin at ${it.jarPath}" }
+                false
+            }
+        }
         if (plugin != null) {
             val file = File(plugin.jarPath)
             return file.parent
@@ -120,6 +134,13 @@ actual object PluginLoader {
     }
 
     actual fun getPluginJarPath(pluginId: String): String? {
-        return loadedPlugins.values.find { it.entry.getManifest().plugin.id == pluginId }?.jarPath
+        return loadedPlugins.values.find {
+            try {
+                it.entry.getManifest().plugin.id == pluginId
+            } catch (t: Throwable) {
+                Logger.e(t) { "Failed to get manifest for plugin at ${it.jarPath}" }
+                false
+            }
+        }?.jarPath
     }
 }

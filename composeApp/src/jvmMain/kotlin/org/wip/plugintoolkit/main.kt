@@ -99,7 +99,7 @@ fun main(args: Array<String>) {
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get()) }
             factory { PluginManagerViewModel(get(), get(), get()) }
-            factory { (pkg: String) -> PluginSettingsViewModel(pkg, get()) }
+            factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
             factory { JobViewModel(get()) }
             factory { AppViewModel(get(), get()) }
             single { UpdateService() }

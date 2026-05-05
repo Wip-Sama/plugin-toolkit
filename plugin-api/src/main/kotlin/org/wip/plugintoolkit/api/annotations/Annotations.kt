@@ -105,6 +105,22 @@ annotation class PluginSetup
 annotation class PluginValidate
 
 /**
+ * Marks a function as a custom action for the plugin.
+ *
+ * Actions are simple functions that can be triggered from the UI.
+ * The function must be a `suspend` function and accept an `ExecutionContext`.
+ *
+ * @property name The human-readable name of the action.
+ * @property description A brief description of what the action does.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class PluginAction(
+    val name: String,
+    val description: String
+)
+
+/**
  * Marks a parameter to receive the saved resume state for a pausable capability.
  *
  * The parameter must be of type `JsonElement?`. If the capability is being resumed,

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
@@ -70,6 +71,7 @@ import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.plugin_default_folder_label
 import plugintoolkit.composeapp.generated.resources.plugin_default_tag
 import plugintoolkit.composeapp.generated.resources.plugin_install_local
+import plugintoolkit.composeapp.generated.resources.plugin_broken
 import plugintoolkit.composeapp.generated.resources.plugin_loaded
 import plugintoolkit.composeapp.generated.resources.plugin_managed_folders
 import plugintoolkit.composeapp.generated.resources.plugin_refresh_list
@@ -145,6 +147,7 @@ fun PluginManagerView(
                     plugin = plugin,
                     isLoaded = loadedPlugins.contains(plugin.pkg),
                     hasUpdate = viewModel.getUpdate(plugin.pkg) != null,
+                    customActions = viewModel.getActions(plugin.pkg),
                     onToggle = { viewModel.toggleEnabled(plugin.pkg, it) },
                     onAction = { action ->
                         when (action) {
@@ -154,6 +157,7 @@ fun PluginManagerView(
                             PluginAction.Validate -> viewModel.validatePlugin(plugin.pkg)
                             PluginAction.Changelog -> viewModel.showChangelog(plugin.pkg)
                             PluginAction.Settings -> viewModel.openSettings(plugin.pkg)
+                            is PluginAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
                         }
                     }
                 )
@@ -216,11 +220,14 @@ fun PluginCard(
     plugin: InstalledPlugin,
     isLoaded: Boolean,
     hasUpdate: Boolean,
+    customActions: List<org.wip.plugintoolkit.api.PluginAction>,
     onToggle: (Boolean) -> Unit,
     onAction: (PluginAction) -> Unit
 ) {
-    val statusColor =
-        if (isLoaded) ToolkitTheme.colors.success else if (plugin.isValidated) ToolkitTheme.colors.validated else MaterialTheme.colorScheme.outline
+    val statusColor = if (plugin.loadError != null) MaterialTheme.colorScheme.error
+    else if (isLoaded) ToolkitTheme.colors.success
+    else if (plugin.isValidated) ToolkitTheme.colors.validated
+    else MaterialTheme.colorScheme.outline
 
     Card(
         modifier = Modifier
@@ -234,7 +241,9 @@ fun PluginCard(
                 ) else Modifier
             ),
         colors = CardDefaults.cardColors(
-            containerColor = if (isLoaded) statusColor.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface
+            containerColor = if (plugin.loadError != null) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
+            else if (isLoaded) statusColor.copy(alpha = 0.05f)
+            else MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
@@ -260,26 +269,40 @@ fun PluginCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(plugin.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (isLoaded) {
+                    if (plugin.loadError != null) {
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        StatusBadge(stringResource(Res.string.plugin_broken), MaterialTheme.colorScheme.error)
+                    } else if (isLoaded) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                         StatusBadge(stringResource(Res.string.plugin_loaded), ToolkitTheme.colors.success)
                     }
-                    if (plugin.isValidated) {
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        StatusBadge(stringResource(Res.string.plugin_validated), ToolkitTheme.colors.validated)
-                    } else {
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        StatusBadge(
-                            stringResource(Res.string.plugin_validation_pending),
-                            MaterialTheme.colorScheme.error
-                        )
+                    
+                    if (plugin.loadError == null) {
+                        if (plugin.isValidated) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            StatusBadge(stringResource(Res.string.plugin_validated), ToolkitTheme.colors.validated)
+                        } else {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            StatusBadge(
+                                stringResource(Res.string.plugin_validation_pending),
+                                MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
                 Text(
                     stringResource(Res.string.plugin_version_pkg_format, plugin.version, plugin.pkg),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (plugin.loadError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (plugin.loadError != null) {
+                    Text(
+                        plugin.loadError!!,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
 
             // Actions
@@ -312,6 +335,15 @@ fun PluginCard(
                         )
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        customActions.forEach { action ->
+                            DropdownMenuItem(
+                                text = { Text(action.name) },
+                                onClick = { onAction(PluginAction.Custom(action.functionName)); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
+                            )
+                        }
+                        if (customActions.isNotEmpty()) HorizontalDivider()
+
                         DropdownMenuItem(
                             text = { Text(stringResource(Res.string.plugin_reload)) },
                             onClick = { onAction(PluginAction.Reload); expanded = false },
@@ -376,6 +408,12 @@ private fun StatusBadge(text: String, color: Color) {
     }
 }
 
-enum class PluginAction {
-    Uninstall, Reload, Validate, Update, Changelog, Settings
+sealed class PluginAction {
+    object Uninstall : PluginAction()
+    object Reload : PluginAction()
+    object Validate : PluginAction()
+    object Update : PluginAction()
+    object Changelog : PluginAction()
+    object Settings : PluginAction()
+    data class Custom(val name: String) : PluginAction()
 }

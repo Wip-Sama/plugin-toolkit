@@ -24,6 +24,7 @@ import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
+import kotlin.time.Clock
 
 class PluginManager(
     private val settingsRepository: SettingsRepository,
@@ -123,9 +124,9 @@ class PluginManager(
             }
 
             Result.success(Unit)
-        } catch (e: Exception) {
-            Logger.e(e) { "Failed to install local plugin: $filePath" }
-            Result.failure(e)
+        } catch (t: Throwable) {
+            Logger.e(t) { "Failed to install local plugin: $filePath" }
+            Result.failure(Exception(t.message, t))
         }
     }
 
@@ -182,9 +183,9 @@ class PluginManager(
             }
 
             Result.success(Unit)
-        } catch (e: Exception) {
-            Logger.e(e) { "Failed to install remote plugin: ${plugin.pkg}" }
-            Result.failure(e)
+        } catch (t: Throwable) {
+            Logger.e(t) { "Failed to install remote plugin: ${plugin.pkg}" }
+            Result.failure(Exception(t.message, t))
         }
     }
 
@@ -242,8 +243,8 @@ class PluginManager(
                 try {
                     val folderPlugins = json.decodeFromString<List<InstalledPlugin>>(content)
                     allPlugins.addAll(folderPlugins)
-                } catch (e: Exception) {
-                    Logger.e(e) { "Failed to parse $file" }
+                } catch (t: Throwable) {
+                    Logger.e(t) { "Failed to parse $file" }
                 }
             }
         }
@@ -305,26 +306,55 @@ class PluginManager(
         return if (result.isSuccess) {
             val entry = result.getOrThrow()
 
-            // Initialize the plugin with its context
-            val initResult = entry.initialize(createExecutionContext(pkg))
-            if (initResult.isFailure) {
-                val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")
-                Logger.e(error) { "Failed to initialize plugin: $pkg" }
-                return Result.failure(error)
-            }
+            try {
+                // Ensure the manifest can be read before proceeding
+                entry.getManifest()
+                
+                // Initialize the plugin with its context
+                val initResult = entry.initialize(createExecutionContext(pkg))
+                if (initResult.isFailure) {
+                    val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")
+                    Logger.e(error) { "Failed to initialize plugin: $pkg" }
+                    updateLoadError(pkg, error.message ?: "Initialization failed")
+                    return Result.failure(error)
+                }
 
-            if (plugin.isValidated) {
-                _loadedPlugins.update { it + pkg }
-                Logger.i { "Successfully loaded and activated plugin: $pkg (Total loaded: ${_loadedPlugins.value.size})" }
-            } else {
-                Logger.i { "Plugin $pkg loaded in loader but not yet validated/activated" }
+                if (plugin.isValidated) {
+                    _loadedPlugins.update { it + pkg }
+                    Logger.i { "Successfully loaded and activated plugin: $pkg (Total loaded: ${_loadedPlugins.value.size})" }
+                    updateLoadError(pkg, null) // Clear error on success
+                } else {
+                    Logger.i { "Plugin $pkg loaded in loader but not yet validated/activated" }
+                }
+                Result.success(Unit)
+            } catch (t: Throwable) {
+                val errorMsg = "Fatal error during plugin initialization: ${t.message}"
+                Logger.e(t) { errorMsg }
+                updateLoadError(pkg, errorMsg)
+                Result.failure(Exception(errorMsg, t))
             }
-            Result.success(Unit)
         } else {
             val error = result.exceptionOrNull() ?: Exception("Unknown error")
-            Logger.e(error) { "Failed to load plugin: $pkg" }
+            val errorMsg = "Failed to load plugin: $pkg. ${error.message}"
+            Logger.e(error) { errorMsg }
+            updateLoadError(pkg, errorMsg)
             Result.failure(error)
         }
+    }
+
+    private fun updateLoadError(pkg: String, error: String?) {
+        _installedPlugins.update { current ->
+            current.map {
+                if (it.pkg == pkg) {
+                    it.copy(
+                        loadError = error,
+                        // If there's a fatal load error, the plugin is no longer considered validated
+                        isValidated = if (error != null) false else it.isValidated
+                    )
+                } else it
+            }
+        }
+        saveToManagedFolders(_installedPlugins.value)
     }
 
     fun unloadPlugin(pkg: String) {
@@ -450,8 +480,8 @@ class PluginManager(
                             } else {
                                 Logger.w { "Skipping JAR in $normalizedDir: Folder name '$folderName' does not match plugin ID '$pkg'" }
                             }
-                        } catch (e: Exception) {
-                            Logger.e(e) { "Failed to parse manifest from $normalizedJarPath" }
+                        } catch (t: Throwable) {
+                            Logger.e(t) { "Failed to parse manifest from $normalizedJarPath" }
                         }
                     }
                 }
@@ -606,8 +636,8 @@ class PluginManager(
         val settingsFile = getSettingsFile(plugin.installPath)
         try {
             PlatformUtils.writeFile(settingsFile, json.encodeToString(store))
-        } catch (e: Exception) {
-            Logger.e(e) { "Failed to save settings for $pkg" }
+        } catch (t: Throwable) {
+            Logger.e(t) { "Failed to save settings for $pkg" }
         }
     }
 
@@ -618,6 +648,7 @@ class PluginManager(
 
         // Load settings and merge with manifest defaults
         val storedSettings = loadPluginSettings(pkg)
+        
         val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
         
         val mergedSettings = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
@@ -685,6 +716,29 @@ class PluginManager(
             type = JobType.Setup,
             pluginId = pkg,
             capabilityName = "setup",
+            keepResult = false
+        )
+        jobManager.enqueueJob(job)
+    }
+
+    suspend fun runAction(pkg: String, actionName: String) {
+        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return
+        
+        Logger.i { "Enqueuing custom action: $actionName for plugin: $pkg" }
+
+        // Ensure it's loaded in PluginLoader
+        val loadResult = loadPlugin(pkg)
+        if (loadResult.isFailure) {
+            Logger.e { "Failed to load plugin $pkg for action $actionName: ${loadResult.exceptionOrNull()?.message}" }
+            return
+        }
+
+        val job = BackgroundJob(
+            id = "action_${pkg}_${actionName}_${Clock.System.now().toEpochMilliseconds()}",
+            name = "Action: $actionName (${plugin.name})",
+            type = JobType.PluginAction,
+            pluginId = pkg,
+            capabilityName = actionName,
             keepResult = false
         )
         jobManager.enqueueJob(job)

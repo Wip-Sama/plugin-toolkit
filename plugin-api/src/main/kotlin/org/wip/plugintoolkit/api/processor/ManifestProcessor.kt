@@ -48,6 +48,10 @@ class ManifestProcessor(
             it.annotations.any { ann -> ann.shortName.asString() == "PluginSetting" }
         }.toList()
 
+        val actions = classDeclaration.getAllFunctions().filter { 
+            it.annotations.any { ann -> ann.shortName.asString() == "PluginAction" }
+        }.toList()
+
         val packageName = classDeclaration.packageName.asString()
         val baseClassName = classDeclaration.simpleName.asString()
 
@@ -67,7 +71,7 @@ class ManifestProcessor(
         // 2. Generate Kotlin Classes
         val fileSpec = KotlinGenerator.generate(
             packageName, baseClassName, id, name, version, description,
-            minMemoryMb, minExecutionTimeMs, functions, settingsProperties, classDeclaration
+            minMemoryMb, minExecutionTimeMs, functions, settingsProperties, actions, classDeclaration
         )
         
         val generatedFileName = baseClassName + "Generated"
@@ -87,7 +91,7 @@ class ManifestProcessor(
         // 4. Generate manifest.json
         val manifestJson = ManifestJsonGenerator.generate(
             classDeclaration, id, name, version, description,
-            minMemoryMb, minExecutionTimeMs, functions, settingsProperties, changelogObj
+            minMemoryMb, minExecutionTimeMs, functions, settingsProperties, actions, changelogObj
         )
         writeFile(sourceFile, "", "META-INF/manifest", "json", manifestJson)
     }

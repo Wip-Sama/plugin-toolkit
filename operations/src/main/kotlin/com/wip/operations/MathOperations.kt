@@ -1,8 +1,8 @@
 package com.wip.operations
 
-import org.wip.plugintoolkit.api.annotations.Capability
-import org.wip.plugintoolkit.api.annotations.PluginInfo
-import org.wip.plugintoolkit.api.annotations.CapabilityParam
+import org.wip.plugintoolkit.api.annotations.*
+import org.wip.plugintoolkit.api.ExecutionContext
+import kotlinx.coroutines.delay
 
 @PluginInfo(
     id = "com.wip.operations.math",
@@ -11,6 +11,31 @@ import org.wip.plugintoolkit.api.annotations.CapabilityParam
     description = "A module that provides mathematical operations on lists of numbers."
 )
 class MathProcessor {
+
+    @PluginSetting(description = "Enable advanced math logs", defaultValue = "false")
+    var enableAdvancedLogs: Boolean = false
+
+    @PluginSetting(description = "Preferred decimal places", defaultValue = "2")
+    var decimalPlaces: Int = 2
+
+    @PluginAction(name = "Reset Statistics", description = "Resets all internal math counters and history.")
+    suspend fun resetStats(context: ExecutionContext) {
+        context.logger.info("Resetting statistics...")
+        delay(2000) // Simulate work
+        context.logger.info("Statistics reset successfully.")
+    }
+
+    @PluginAction(name = "Run Diagnostics", description = "Checks the health of the math engine.")
+    suspend fun runDiagnostics(context: ExecutionContext) {
+        context.logger.info("Starting diagnostics...")
+        for (i in 1..5) {
+            context.progress.report(i / 5f)
+            delay(500)
+            context.logger.info("Step $i complete")
+        }
+        context.logger.info("Diagnostics finished.")
+    }
+
     @Capability(name = "sum", description = "Calculates the sum of a list of numbers")
     fun sumCapability(
         @CapabilityParam(description = "List of numbers to add") values: List<Double>
