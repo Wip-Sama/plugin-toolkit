@@ -1,12 +1,6 @@
 package org.wip.plugintoolkit.features.job.logic
 
 import co.touchlab.kermit.Logger
-import org.wip.plugintoolkit.features.job.model.BackgroundJob
-import org.wip.plugintoolkit.features.job.model.JobStatus
-import org.wip.plugintoolkit.features.job.model.JobType
-import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
-import org.wip.plugintoolkit.api.ExecutionContext
-import org.wip.plugintoolkit.api.PluginRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,10 +14,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.api.ExecutionContext
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginPausedException
+import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PluginResponse
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
+import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 
 class JobWorker(
     val workerId: Int,
@@ -52,7 +52,7 @@ class JobWorker(
 
                     try {
                         // Registration now happens inside executeJob because we need the JobHandle from the plugin
-                        
+
                         // Just wait for the job to complete or be canceled.
                         // Cancellation is cooperatively handled by jobExecution.cancel() from JobManager.
                         jobExecution.join()
@@ -158,36 +158,41 @@ class JobWorker(
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
         val context = createExecutionContext(job)
-        
+
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
             override val result: kotlinx.coroutines.Deferred<Result<PluginResponse>>
                 get() = throw UnsupportedOperationException("Not used for setup")
-            override fun pause() { /* Not supported */ }
-            override fun cancel(force: Boolean) { jobExecution.cancel() }
+
+            override fun pause() { /* Not supported */
+            }
+
+            override fun cancel(force: Boolean) {
+                jobExecution.cancel()
+            }
         })
 
         manager.updateJobProgress(job.id, 0.1f)
         manager.addJobLog(job.id, "Starting validation for ${plugin.getManifest().plugin.name}...")
-        
+
         val validationResult = plugin.validate(context)
         if (validationResult.isFailure) {
             val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
             manager.tryFailJob(job.id, error)
             return
         }
-        
+
         manager.updateJobProgress(job.id, 0.5f)
         manager.addJobLog(job.id, "Validation successful. Performing setup...")
-        
+
         val setupResult = plugin.performSetup(context)
         if (setupResult.isFailure) {
             val error = setupResult.exceptionOrNull()?.message ?: "Setup failed"
             manager.tryFailJob(job.id, error)
             return
         }
-        
+
         manager.updateJobProgress(job.id, 1.0f)
         manager.addJobLog(job.id, "Setup completed successfully.")
         manager.tryCompleteJob(job.id, "Success")
@@ -198,26 +203,31 @@ class JobWorker(
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
         val context = createExecutionContext(job)
-        
+
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
             override val result: kotlinx.coroutines.Deferred<Result<PluginResponse>>
                 get() = throw UnsupportedOperationException("Not used for validation")
-            override fun pause() { /* Not supported */ }
-            override fun cancel(force: Boolean) { jobExecution.cancel() }
+
+            override fun pause() { /* Not supported */
+            }
+
+            override fun cancel(force: Boolean) {
+                jobExecution.cancel()
+            }
         })
 
         manager.updateJobProgress(job.id, 0.2f)
         manager.addJobLog(job.id, "Running validation for ${plugin.getManifest().plugin.name}...")
-        
+
         val validationResult = plugin.validate(context)
         if (validationResult.isFailure) {
             val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
             manager.tryFailJob(job.id, error)
             return
         }
-        
+
         manager.updateJobProgress(job.id, 1.0f)
         manager.addJobLog(job.id, "Validation successful.")
         manager.tryCompleteJob(job.id, "Success")

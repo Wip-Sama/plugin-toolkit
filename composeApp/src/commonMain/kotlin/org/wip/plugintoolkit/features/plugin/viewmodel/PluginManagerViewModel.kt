@@ -2,12 +2,6 @@ package org.wip.plugintoolkit.features.plugin.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import org.wip.plugintoolkit.core.KeepTrack
-import org.wip.plugintoolkit.core.ui.DialogService
-import org.wip.plugintoolkit.core.utils.PlatformUtils
-import org.wip.plugintoolkit.features.plugin.logic.PluginManager
-import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
-import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +9,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.ui.DialogService
+import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.plugin_action_blocked
 import plugintoolkit.composeapp.generated.resources.plugin_changelog
@@ -30,7 +31,6 @@ import plugintoolkit.composeapp.generated.resources.plugin_uninstall_title
 import plugintoolkit.composeapp.generated.resources.plugin_validated_success
 import plugintoolkit.composeapp.generated.resources.plugin_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_result
-import org.jetbrains.compose.resources.getString
 
 class PluginManagerViewModel(
     private val pluginManager: PluginManager,
@@ -83,13 +83,17 @@ class PluginManagerViewModel(
         viewModelScope.launch {
             val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
             val allFolders = (listOf(defaultPluginFolder) + savedFolders).distinct()
-            
+
             if (allFolders.size == 1) {
                 onSelected(allFolders.first())
                 return@launch
             }
-            
-            dialogService.showLocationPicker(getString(Res.string.plugin_choose_install_location), allFolders, onSelected)
+
+            dialogService.showLocationPicker(
+                getString(Res.string.plugin_choose_install_location),
+                allFolders,
+                onSelected
+            )
         }
     }
 
@@ -114,16 +118,18 @@ class PluginManagerViewModel(
     }
 
     fun removeManagedFolder(folder: String) {
-        if (folder == defaultPluginFolder) return
-
-        val settings = settingsRepository.loadSettings()
-        val updated = settings.extensions.pluginFolders - folder
-        settingsRepository.saveSettings(
-            settings.copy(
-                extensions = settings.extensions.copy(pluginFolders = updated)
-            )
-        )
-        refreshManagedFolders()
+        viewModelScope.launch {
+            // Already handled in PluginManager, but we can prevent the call here too
+            val result = pluginManager.removeManagedFolder(folder)
+            result.onFailure { error ->
+                dialogService.showWarning(
+                    getString(Res.string.plugin_action_blocked),
+                    error.message ?: getString(Res.string.plugin_state_change_error),
+                    onConfirm = {}
+                )
+            }
+            refreshManagedFolders()
+        }
     }
 
     fun reloadAll() {
@@ -132,6 +138,12 @@ class PluginManagerViewModel(
 
     fun refreshList() {
         pluginManager.refreshInstalledPlugins()
+    }
+
+    fun rescan() {
+        viewModelScope.launch {
+            pluginManager.rescanManagedFolders()
+        }
     }
 
     fun toggleEnabled(pkg: String, enabled: Boolean) {

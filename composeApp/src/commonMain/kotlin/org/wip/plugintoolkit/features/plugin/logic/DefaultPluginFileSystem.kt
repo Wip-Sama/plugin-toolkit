@@ -1,6 +1,5 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
-import org.wip.plugintoolkit.api.PluginFileSystem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.io.buffered
@@ -9,6 +8,7 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readByteArray
 import kotlinx.io.readString
 import kotlinx.io.writeString
+import org.wip.plugintoolkit.api.PluginFileSystem
 import java.io.File
 import java.util.jar.JarFile
 
@@ -93,7 +93,8 @@ class DefaultPluginFileSystem(
     override suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit> {
         return try {
             withContext(Dispatchers.IO) {
-                val jar = jarPath ?: return@withContext Result.failure(Exception("No JAR path configured for resource extraction"))
+                val jar = jarPath
+                    ?: return@withContext Result.failure(Exception("No JAR path configured for resource extraction"))
                 val jarFile = JarFile(File(jar))
 
                 val entry = jarFile.getJarEntry(resourcePath)
@@ -118,11 +119,20 @@ class DefaultPluginFileSystem(
                 object : PluginFileSystem by fs {
                     override fun getBasePath(): String = fs.cachePath
                     override suspend fun readFile(relativePath: String): ByteArray? = fs.readFromCache(relativePath)
-                    override suspend fun readTextFile(relativePath: String): String? = fs.readTextFromCache(relativePath)
-                    override suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit> = fs.writeToCache(relativePath, data)
-                    override suspend fun writeTextFile(relativePath: String, text: String): Result<Unit> = fs.writeTextToCache(relativePath, text)
-                    override suspend fun exists(relativePath: String): Boolean = SystemFileSystem.exists(fs.resolveCachePath(relativePath))
-                    override suspend fun deleteFile(relativePath: String): Result<Unit> = fs.deleteFromCache(relativePath)
+                    override suspend fun readTextFile(relativePath: String): String? =
+                        fs.readTextFromCache(relativePath)
+
+                    override suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit> =
+                        fs.writeToCache(relativePath, data)
+
+                    override suspend fun writeTextFile(relativePath: String, text: String): Result<Unit> =
+                        fs.writeTextToCache(relativePath, text)
+
+                    override suspend fun exists(relativePath: String): Boolean =
+                        SystemFileSystem.exists(fs.resolveCachePath(relativePath))
+
+                    override suspend fun deleteFile(relativePath: String): Result<Unit> =
+                        fs.deleteFromCache(relativePath)
                 }
             }
         }

@@ -16,15 +16,15 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
-import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.plugin_not_found_unloaded
 import plugintoolkit.composeapp.generated.resources.plugin_selection_hint
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
 
 @Serializable
 sealed interface PluginNavKey : NavKey {

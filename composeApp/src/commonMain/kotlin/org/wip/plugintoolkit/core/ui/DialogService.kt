@@ -1,9 +1,9 @@
 package org.wip.plugintoolkit.core.ui
 
-import org.wip.plugintoolkit.features.plugin.logic.ChangelogVersion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.wip.plugintoolkit.features.plugin.logic.ChangelogVersion
 
 class DialogService {
     private val _dialogState = MutableStateFlow<DialogData?>(null)

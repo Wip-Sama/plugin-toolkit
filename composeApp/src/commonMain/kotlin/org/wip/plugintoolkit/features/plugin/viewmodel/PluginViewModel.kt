@@ -7,17 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.touchlab.kermit.Logger
-import org.wip.plugintoolkit.features.job.logic.JobManager
-import org.wip.plugintoolkit.features.job.model.BackgroundJob
-import org.wip.plugintoolkit.features.job.model.JobStatus
-import org.wip.plugintoolkit.features.job.model.JobType
-import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
-import org.wip.plugintoolkit.features.plugin.logic.PluginManager
-import org.wip.plugintoolkit.api.Capability
-import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PluginEntry
-import org.wip.plugintoolkit.api.PluginRequest
-import org.wip.plugintoolkit.api.PrimitiveType
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -28,6 +17,17 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import org.wip.plugintoolkit.api.Capability
+import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PluginEntry
+import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
+import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 
 class PluginViewModel(
     private val jobManager: JobManager,

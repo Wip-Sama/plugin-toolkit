@@ -23,6 +23,19 @@ import androidx.compose.ui.window.rememberWindowState
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.platformLogWriter
+import io.github.vinceglb.filekit.FileKit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.io.files.Path
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import org.koin.core.context.startKoin
+import org.koin.dsl.module
+import org.koin.mp.KoinPlatform.getKoin
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.logging.FileLogWriter
 import org.wip.plugintoolkit.core.notification.JvmNotificationService
@@ -30,6 +43,8 @@ import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.ui.DialogService
+import org.wip.plugintoolkit.core.update.UpdateService
+import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
@@ -45,22 +60,9 @@ import org.wip.plugintoolkit.features.settings.utils.SettingsRegistry
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
-import io.github.vinceglb.filekit.FileKit
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-import kotlinx.io.files.Path
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.app_name
 import plugintoolkit.composeapp.generated.resources.compose_multiplatform
-import org.jetbrains.compose.resources.painterResource
-import org.koin.core.context.startKoin
-import org.koin.dsl.module
-import org.koin.mp.KoinPlatform.getKoin
-import org.wip.plugintoolkit.core.update.UpdateService
-import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import java.awt.Dimension
 
 
@@ -133,20 +135,22 @@ fun main(args: Array<String>) {
 
     // Load enabled and validated plugins at startup
     val startupScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    pluginManager.installedPlugins.value.forEach { plugin ->
-        if (plugin.isEnabled) {
-            if (plugin.isValidated) {
-                startupScope.launch {
-                    val result = pluginManager.loadPlugin(plugin.pkg)
-                    if (result.isFailure) {
-                        Logger.e { "Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
-                    }
+    val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
+    Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
+
+    pluginsToLoad.forEach { plugin ->
+        if (plugin.isValidated) {
+            Logger.d { "Startup: Launching load for validated plugin ${plugin.pkg}" }
+            startupScope.launch {
+                val result = pluginManager.loadPlugin(plugin.pkg)
+                if (result.isFailure) {
+                    Logger.e { "Startup: Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
                 }
-            } else {
-                Logger.i { "Plugin ${plugin.pkg} is enabled but not validated, triggering background setup" }
-                startupScope.launch {
-                    pluginManager.enqueueSetupJob(plugin.pkg)
-                }
+            }
+        } else {
+            Logger.i { "Startup: Plugin ${plugin.pkg} is enabled but not validated, triggering background setup" }
+            startupScope.launch {
+                pluginManager.enqueueSetupJob(plugin.pkg)
             }
         }
     }
@@ -172,7 +176,7 @@ fun main(args: Array<String>) {
         Tray(
             state = trayState,
             icon = painterResource(Res.drawable.compose_multiplatform),
-            tooltip = "WOToolkit",
+            tooltip = stringResource(Res.string.app_name),
             onAction = { isVisible = true },
             menu = {
                 Item("Open", onClick = { isVisible = true })
@@ -190,7 +194,7 @@ fun main(args: Array<String>) {
                         exitApplication()
                     }
                 },
-                title = "WOToolkit",
+                title = stringResource(Res.string.app_name),
                 state = windowState
             ) {
                 // Set minimum window size

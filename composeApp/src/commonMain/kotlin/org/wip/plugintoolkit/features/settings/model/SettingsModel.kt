@@ -1,8 +1,7 @@
 package org.wip.plugintoolkit.features.settings.model
 
-import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
-import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import kotlinx.serialization.Serializable
+import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 
 @Serializable
 data class AppSettings(
@@ -109,7 +108,6 @@ data class ExtensionSettings(
     val repositories: List<ExtensionRepo> = emptyList(),
     val packageSourceOverrides: Map<String, String> = emptyMap(), // pkg to repo url
     val pluginFolders: List<String> = emptyList(), // managed install locations
-    val installedPlugins: List<InstalledPlugin> = emptyList(),
     val pluginUnplugBehavior: PluginUnplugBehavior = PluginUnplugBehavior.Block
 )
 

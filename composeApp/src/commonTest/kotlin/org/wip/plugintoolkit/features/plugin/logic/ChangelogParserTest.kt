@@ -21,13 +21,13 @@ class ChangelogParserTest {
             Fixes:
               - Bug fix
         """.trimIndent()
-        
+
         val versions = ChangelogParser.parse(content)
         assertEquals(2, versions.size)
-        
+
         assertEquals("1.0.0", versions[0].version)
         assertEquals("2026-05-05", versions[0].date)
-        
+
         assertEquals("0.9.0", versions[1].version)
         assertEquals("2026-04-01", versions[1].date)
     }
@@ -42,7 +42,7 @@ class ChangelogParserTest {
             Version: 0.9.0
             Date: 2026-04-01
         """.trimIndent()
-        
+
         val versions = ChangelogParser.parse(content)
         // Only one version is produced (the last one found in the block)
         assertEquals(1, versions.size)
@@ -58,7 +58,7 @@ class ChangelogParserTest {
             General:
               - Item 1
         """.trimIndent()
-        
+
         val versions = ChangelogParser.parse(content)
         assertEquals(1, versions.size)
         assertEquals("1.0.0", versions[0].version)
@@ -82,7 +82,7 @@ class ChangelogParserTest {
             
             
         """.trimIndent()
-        
+
         val versions = ChangelogParser.parse(content)
         assertEquals(1, versions.size)
         assertEquals("1.0.0", versions[0].version)

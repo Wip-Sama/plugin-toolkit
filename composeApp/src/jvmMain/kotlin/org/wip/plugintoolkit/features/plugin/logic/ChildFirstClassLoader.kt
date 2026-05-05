@@ -15,18 +15,18 @@ class ChildFirstClassLoader(
         synchronized(getClassLoadingLock(name)) {
             // First, check if the class has already been loaded
             var c = findLoadedClass(name)
-            
+
             if (c == null) {
                 // Determine if we should delegate to parent first for this class
                 // Core java classes and plugin API classes MUST come from parent
                 val apiPackagePrefix = PluginEntry::class.java.name.substringBeforeLast(".") + "."
                 val isSharedClass = name.startsWith("java.") ||
-                                    name.startsWith("javax.") ||
-                                    name.startsWith("kotlin.") ||
-                                    name.startsWith(apiPackagePrefix) ||
-                                    name.startsWith("org.koin.") // Keep Koin shared if we want types to match, though the Koin instance is isolated
-                                    //TODO: could add kotlinx. probably
-                
+                        name.startsWith("javax.") ||
+                        name.startsWith("kotlin.") ||
+                        name.startsWith(apiPackagePrefix) ||
+                        name.startsWith("org.koin.") // Keep Koin shared if we want types to match, though the Koin instance is isolated
+                //TODO: could add kotlinx. probably
+
                 if (isSharedClass) {
                     try {
                         c = super.loadClass(name, resolve)

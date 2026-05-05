@@ -22,6 +22,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.DialogService
@@ -33,9 +36,6 @@ import plugintoolkit.composeapp.generated.resources.about_libraries
 import plugintoolkit.composeapp.generated.resources.about_libraries_placeholder
 import plugintoolkit.composeapp.generated.resources.app_name
 import plugintoolkit.composeapp.generated.resources.plugin_changelog
-import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
 
 @OptIn(ExperimentalResourceApi::class)
 @Composable
@@ -43,7 +43,7 @@ fun AboutView(
     dialogService: DialogService = koinInject()
 ) {
     var changelogVersions by remember { mutableStateOf<List<ChangelogVersion>>(emptyList()) }
-    
+
     LaunchedEffect(Unit) {
         try {
             val content = Res.readBytes("files/CHANGELOG.md").decodeToString()
@@ -84,10 +84,11 @@ fun AboutView(
             style = MaterialTheme.typography.bodyLarge
         )
 
+        val appName = stringResource(Res.string.app_name)
         // Changelog Button
         Button(
             onClick = {
-                dialogService.showChangelog("WOToolkit", changelogVersions)
+                dialogService.showChangelog(appName, changelogVersions) //TODO: need replacement with App_name
             },
             modifier = Modifier.fillMaxWidth(0.5f)
         ) {

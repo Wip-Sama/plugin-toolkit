@@ -1,10 +1,10 @@
 package org.wip.plugintoolkit.core.utils
 
-import org.wip.plugintoolkit.core.KeepTrack
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
+import org.wip.plugintoolkit.core.KeepTrack
 import java.util.Locale
 
 actual object StartupManager {

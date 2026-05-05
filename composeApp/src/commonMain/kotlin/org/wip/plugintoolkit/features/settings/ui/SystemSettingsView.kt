@@ -28,6 +28,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.utils.StartupManager
 import org.wip.plugintoolkit.features.settings.model.LogLevel
@@ -40,6 +42,8 @@ import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.SettingsNumericInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsSwitch
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_check_for_updates
+import plugintoolkit.composeapp.generated.resources.section_auto_update
 import plugintoolkit.composeapp.generated.resources.section_logging
 import plugintoolkit.composeapp.generated.resources.section_notifications
 import plugintoolkit.composeapp.generated.resources.section_system
@@ -50,6 +54,8 @@ import plugintoolkit.composeapp.generated.resources.setting_compress_old_logs
 import plugintoolkit.composeapp.generated.resources.setting_compress_old_logs_subtitle
 import plugintoolkit.composeapp.generated.resources.setting_compressed_logs_to_keep
 import plugintoolkit.composeapp.generated.resources.setting_compressed_logs_to_keep_subtitle
+import plugintoolkit.composeapp.generated.resources.setting_enable_auto_update
+import plugintoolkit.composeapp.generated.resources.setting_enable_auto_update_subtitle
 import plugintoolkit.composeapp.generated.resources.setting_enable_system_notifications
 import plugintoolkit.composeapp.generated.resources.setting_enable_toasts
 import plugintoolkit.composeapp.generated.resources.setting_history_retention
@@ -70,12 +76,6 @@ import plugintoolkit.composeapp.generated.resources.setting_toast_auto_dismiss
 import plugintoolkit.composeapp.generated.resources.setting_toast_dismiss_time
 import plugintoolkit.composeapp.generated.resources.setting_window_start_mode
 import plugintoolkit.composeapp.generated.resources.setting_window_start_mode_subtitle
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
-import plugintoolkit.composeapp.generated.resources.action_check_for_updates
-import plugintoolkit.composeapp.generated.resources.section_auto_update
-import plugintoolkit.composeapp.generated.resources.setting_enable_auto_update
-import plugintoolkit.composeapp.generated.resources.setting_enable_auto_update_subtitle
 
 @Composable
 fun SystemSettingsView(

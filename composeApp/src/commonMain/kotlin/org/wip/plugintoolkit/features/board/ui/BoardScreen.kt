@@ -34,13 +34,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.features.board.viewmodel.BoardEvent
 import org.wip.plugintoolkit.features.board.viewmodel.BoardViewModel
 import org.wip.plugintoolkit.shared.components.ZoomControls
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.board_controls
 import plugintoolkit.composeapp.generated.resources.board_reset
-import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 @Composable

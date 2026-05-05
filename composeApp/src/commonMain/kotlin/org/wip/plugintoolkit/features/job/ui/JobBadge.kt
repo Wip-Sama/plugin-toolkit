@@ -18,8 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.koin.compose.viewmodel.koinViewModel
+import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 
 @Composable
 fun JobBadge(

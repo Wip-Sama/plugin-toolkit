@@ -50,10 +50,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.settings.model.NotificationSettings
-import kotlinx.coroutines.delay
 import java.util.UUID
 
 data class ToastData(

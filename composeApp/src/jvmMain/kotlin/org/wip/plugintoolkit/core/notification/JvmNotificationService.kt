@@ -1,8 +1,6 @@
 package org.wip.plugintoolkit.core.notification
 
 import co.touchlab.kermit.Logger
-import org.wip.plugintoolkit.core.KeepTrack
-import org.wip.plugintoolkit.features.settings.model.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,10 +19,11 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
+import org.wip.plugintoolkit.core.utils.PlatformPathUtils
+import org.wip.plugintoolkit.features.settings.model.AppSettings
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
-import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 
 class JvmNotificationService(
     private val settingsProvider: () -> AppSettings

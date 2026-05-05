@@ -45,6 +45,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.api.Capability
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.ui.StatusBadge
@@ -53,9 +59,6 @@ import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.plugin.ResponseView
-import org.wip.plugintoolkit.api.Capability
-import org.wip.plugintoolkit.api.PluginManifest
-import org.wip.plugintoolkit.api.PluginResponse
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_clear
 import plugintoolkit.composeapp.generated.resources.action_delete
@@ -70,7 +73,6 @@ import plugintoolkit.composeapp.generated.resources.plugin_no_parameters
 import plugintoolkit.composeapp.generated.resources.plugin_save_results
 import plugintoolkit.composeapp.generated.resources.plugin_select_capability_hint
 import plugintoolkit.composeapp.generated.resources.plugin_tester_title
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun PluginContent(
@@ -338,21 +340,29 @@ fun JobResultItem(
                         )
                     }
                 }
+
                 JobStatus.Completed -> {
                     val jsonResult = remember(job.result) {
                         job.result?.let {
                             try {
-                                kotlinx.serialization.json.Json.parseToJsonElement(it)
+                                Json.parseToJsonElement(it)
                             } catch (e: Exception) {
-                                kotlinx.serialization.json.JsonNull
+                                JsonNull
                             }
-                        } ?: kotlinx.serialization.json.JsonNull
+                        } ?: JsonNull
                     }
                     ResponseView(PluginResponse(result = jsonResult))
                 }
+
                 JobStatus.Failed, JobStatus.Cancelled -> {
-                    ErrorView(job.errorMessage ?: stringResource(Res.string.plugin_execution_id_format, job.status.name))
+                    ErrorView(
+                        job.errorMessage ?: stringResource(
+                            Res.string.plugin_execution_id_format,
+                            job.status.name
+                        )
+                    )
                 }
+
                 else -> {}
             }
         }

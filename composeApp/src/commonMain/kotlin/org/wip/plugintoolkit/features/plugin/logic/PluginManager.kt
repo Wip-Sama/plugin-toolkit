@@ -1,6 +1,18 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import org.wip.plugintoolkit.api.ExecutionContext
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.ProgressReporter
+import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
@@ -11,16 +23,6 @@ import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
-import org.wip.plugintoolkit.api.ExecutionContext
-import org.wip.plugintoolkit.api.PluginManifest
-import org.wip.plugintoolkit.api.ProgressReporter
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 class PluginManager(
     private val settingsRepository: SettingsRepository,
@@ -30,16 +32,24 @@ class PluginManager(
     private val _installedPlugins = MutableStateFlow<List<InstalledPlugin>>(emptyList())
     val installedPlugins: StateFlow<List<InstalledPlugin>> = _installedPlugins.asStateFlow()
 
+    private val json = kotlinx.serialization.json.Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    private val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
+
     private val _loadedPlugins = MutableStateFlow<Set<String>>(emptySet()) // set of pkg
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
-        val settings = settingsRepository.loadSettings()
-        _installedPlugins.value = settings.extensions.installedPlugins
+        PlatformUtils.mkdirs(defaultPluginFolder)
+        loadFromManagedFolders()
         Logger.i { "Initializing PluginManager with ${_installedPlugins.value.size} installed plugins" }
-        
+
         // Observe jobs to mark plugins as validated
         scope.launch {
             jobManager.jobs.collect { jobs ->
@@ -185,24 +195,98 @@ class PluginManager(
         }
 
         // Safety check for running jobs
-        val runningJobs = jobManager.jobs.value.filter { it.pluginId == pkg && it.status == JobStatus.Running }
-        if (runningJobs.isNotEmpty()) {
-            val settings = settingsRepository.loadSettings()
-            if (settings.extensions.pluginUnplugBehavior == PluginUnplugBehavior.Block) {
-                Logger.w { "Cannot uninstall plugin $pkg: ${runningJobs.size} jobs are still running" }
-                return Result.failure(Exception("Cannot uninstall while ${runningJobs.size} jobs are running. Stop them first or change unplug behavior in settings."))
-            } else {
-                Logger.i { "Stopping ${runningJobs.size} jobs before uninstalling plugin $pkg" }
-                runningJobs.forEach { jobManager.cancelJob(it.id) }
-            }
-        }
+        ensureSafeToUnload(listOf(pkg)).onFailure { return Result.failure(it) }
 
         unloadPlugin(pkg)
         PlatformUtils.deleteDirectory(plugin.installPath)
         val updated = _installedPlugins.value.filter { it.pkg != pkg }
         _installedPlugins.value = updated
-        saveToSettings(updated)
+        saveToManagedFolders(updated)
         Logger.i { "Successfully uninstalled plugin: $pkg" }
+        return Result.success(Unit)
+    }
+
+    private suspend fun ensureSafeToUnload(pkgs: List<String>): Result<Unit> {
+        val runningJobs = jobManager.jobs.value.filter { it.pluginId in pkgs && it.status == JobStatus.Running }
+        if (runningJobs.isNotEmpty()) {
+            val settings = settingsRepository.loadSettings()
+            if (settings.extensions.pluginUnplugBehavior == PluginUnplugBehavior.Block) {
+                val msg =
+                    "Cannot proceed: ${runningJobs.size} jobs are still running for plugins: ${pkgs.joinToString()}"
+                Logger.w { msg }
+                return Result.failure(Exception(msg))
+            } else {
+                Logger.i { "Stopping ${runningJobs.size} jobs before unloading plugins: ${pkgs.joinToString()}" }
+                runningJobs.forEach { jobManager.cancelJob(it.id) }
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    private fun normalizePath(path: String): String {
+        return path.replace('\\', '/').removeSuffix("/")
+    }
+
+    private fun getManagedFolders(): List<String> {
+        val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
+        return (listOf(defaultPluginFolder) + savedFolders).distinct()
+    }
+
+    private fun loadFromManagedFolders() {
+        val allPlugins = mutableListOf<InstalledPlugin>()
+        getManagedFolders().forEach { folderPath ->
+            val file = "${normalizePath(folderPath)}/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
+            val content = PlatformUtils.readFile(file)
+            if (content != null) {
+                try {
+                    val folderPlugins = json.decodeFromString<List<InstalledPlugin>>(content)
+                    allPlugins.addAll(folderPlugins)
+                } catch (e: Exception) {
+                    Logger.e(e) { "Failed to parse $file" }
+                }
+            }
+        }
+        _installedPlugins.update { allPlugins }
+    }
+
+    private fun saveToManagedFolders(plugins: List<InstalledPlugin>) {
+        val folders = getManagedFolders()
+        folders.forEach { folderPath ->
+            val normalizedFolder = normalizePath(folderPath)
+            val folderPlugins = plugins.filter { normalizePath(it.installPath).startsWith(normalizedFolder) }
+            val file = "$normalizedFolder/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
+
+            PlatformUtils.writeFile(file, json.encodeToString(folderPlugins))
+        }
+    }
+
+    suspend fun removeManagedFolder(folderPath: String): Result<Unit> {
+        if (normalizePath(folderPath) == normalizePath(defaultPluginFolder))
+            return Result.failure(Exception("Cannot remove default plugins folder"))
+
+        val normalizedFolder = normalizePath(folderPath)
+        val pluginsInFolder =
+            _installedPlugins.value.filter { normalizePath(it.installPath).startsWith(normalizedFolder) }
+        val pkgs = pluginsInFolder.map { it.pkg }
+
+        ensureSafeToUnload(pkgs).onFailure { return Result.failure(it) }
+
+        // Unload all plugins in that folder
+        pkgs.forEach { unloadPlugin(it) }
+
+        // Remove folder from settings
+        val settings = settingsRepository.loadSettings()
+        val updatedFolders = settings.extensions.pluginFolders.filter { normalizePath(it) != normalizedFolder }
+        settingsRepository.saveSettings(
+            settings.copy(
+                extensions = settings.extensions.copy(pluginFolders = updatedFolders)
+            )
+        )
+
+        // Update memory state
+        _installedPlugins.update { current -> current.filter { !pkgs.contains(it.pkg) } }
+
+        Logger.i { "Removed managed folder: $folderPath. ${pkgs.size} plugins unmanaged." }
         return Result.success(Unit)
     }
 
@@ -219,7 +303,7 @@ class PluginManager(
         val result = PluginLoader.loadPlugin(jarFile)
         return if (result.isSuccess) {
             val entry = result.getOrThrow()
-            
+
             // Initialize the plugin with its context
             val initResult = entry.initialize(createExecutionContext(pkg))
             if (initResult.isFailure) {
@@ -229,8 +313,8 @@ class PluginManager(
             }
 
             if (plugin.isValidated) {
-                _loadedPlugins.value += pkg
-                Logger.i { "Successfully loaded and activated plugin: $pkg" }
+                _loadedPlugins.update { it + pkg }
+                Logger.i { "Successfully loaded and activated plugin: $pkg (Total loaded: ${_loadedPlugins.value.size})" }
             } else {
                 Logger.i { "Plugin $pkg loaded in loader but not yet validated/activated" }
             }
@@ -252,7 +336,7 @@ class PluginManager(
         val jarFile = plugin.installPath + "/" + jarFileName
         Logger.d { "Requesting PluginLoader to unload JAR: $jarFile" }
         PluginLoader.unloadPlugin(jarFile)
-        _loadedPlugins.value -= pkg
+        _loadedPlugins.update { it - pkg }
     }
 
     fun reloadPlugin(pkg: String) {
@@ -269,46 +353,129 @@ class PluginManager(
     }
 
     fun refreshInstalledPlugins() {
-        val folders = settingsRepository.loadSettings().extensions.pluginFolders
-        val currentPlugins = _installedPlugins.value.associateBy { it.pkg }.toMutableMap()
-        var changed = false
+        val folders = getManagedFolders()
+        val allUpdatedPlugins = mutableListOf<InstalledPlugin>()
+        var globalChanged = false
 
         folders.forEach { folderPath ->
-            PlatformUtils.listDirectories(folderPath).forEach { dirPath ->
-                val manifestPath = "$dirPath/manifest.json"
-                if (PlatformUtils.exists(manifestPath)) {
-                    val content = PlatformUtils.readFile(manifestPath)
-                    if (content != null) {
+            val normalizedFolder = normalizePath(folderPath)
+            val trackingFile = "$normalizedFolder/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
+            val existingContent = PlatformUtils.readFile(trackingFile)
+            val existingPlugins = try {
+                if (existingContent != null) json.decodeFromString<List<InstalledPlugin>>(existingContent) else emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+
+            allUpdatedPlugins.addAll(existingPlugins)
+        }
+
+        if (allUpdatedPlugins.size != _installedPlugins.value.size) {
+            _installedPlugins.update { allUpdatedPlugins }
+            allUpdatedPlugins.filter { it.isEnabled && it.isValidated && !_loadedPlugins.value.contains(it.pkg) }
+                .forEach {
+                    scope.launch { loadPlugin(it.pkg) }
+                }
+        }
+    }
+
+    fun rescanManagedFolders() {
+        val folders = getManagedFolders()
+        val allUpdatedPlugins = mutableListOf<InstalledPlugin>()
+        var globalChanged = false
+
+        folders.forEach { folderPath ->
+            val normalizedFolder = normalizePath(folderPath)
+            val trackingFile = "$normalizedFolder/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
+            val existingContent = PlatformUtils.readFile(trackingFile)
+            val existingPlugins = try {
+                if (existingContent != null) json.decodeFromString<List<InstalledPlugin>>(existingContent) else emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }.associateBy { it.pkg }
+
+            val folderPlugins = mutableListOf<InstalledPlugin>()
+            var folderChanged = false
+
+            Logger.i { "Rescanning managed folder: $normalizedFolder" }
+            PlatformUtils.listDirectories(normalizedFolder).forEach { dirPath ->
+                val normalizedDir = normalizePath(dirPath)
+                val folderName = normalizedDir.substringAfterLast("/")
+
+                // 1. Look for JAR files in the directory
+                val jarFiles = PlatformUtils.listFiles(normalizedDir).filter { it.endsWith(".jar") }
+
+                jarFiles.forEach { jarPath ->
+                    val normalizedJarPath = normalizePath(jarPath)
+                    val jarFileName = normalizedJarPath.substringAfterLast("/")
+
+                    // 2. Try to extract manifest from JAR
+                    var manifestContent = PlatformUtils.readFileFromZip(normalizedJarPath, "manifest.json")
+                    if (manifestContent == null) {
+                        manifestContent = PlatformUtils.readFileFromZip(normalizedJarPath, "META-INF/manifest.json")
+                    }
+
+                    if (manifestContent != null) {
                         try {
-                            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                            val manifest: PluginManifest = json.decodeFromString(content)
+                            val manifest = json.decodeFromString<PluginManifest>(manifestContent)
                             val pkg = manifest.plugin.id
-                            if (!currentPlugins.containsKey(pkg)) {
-                                val newPlugin = InstalledPlugin(
-                                    pkg = pkg,
-                                    name = manifest.plugin.name,
-                                    version = manifest.plugin.version,
-                                    installPath = dirPath
-                                )
-                                currentPlugins[pkg] = newPlugin
-                                changed = true
+
+                            // 3. Check if parent folder name corresponds to plugin id
+                            if (folderName == pkg) {
+                                Logger.i { "Found valid plugin $pkg in $normalizedDir" }
+
+                                val existing = existingPlugins[pkg]
+                                val updatedPlugin = if (existing != null) {
+                                    // Update metadata but preserve state
+                                    existing.copy(
+                                        name = manifest.plugin.name,
+                                        version = manifest.plugin.version,
+                                        installPath = normalizedDir,
+                                        jarFileName = jarFileName,
+                                        description = manifest.plugin.description
+                                    )
+                                } else {
+                                    folderChanged = true
+                                    InstalledPlugin(
+                                        pkg = pkg,
+                                        name = manifest.plugin.name,
+                                        version = manifest.plugin.version,
+                                        installPath = normalizedDir,
+                                        jarFileName = jarFileName,
+                                        description = manifest.plugin.description
+                                    )
+                                }
+                                folderPlugins.add(updatedPlugin)
+                            } else {
+                                Logger.w { "Skipping JAR in $normalizedDir: Folder name '$folderName' does not match plugin ID '$pkg'" }
                             }
                         } catch (e: Exception) {
-                            Logger.e(e) { "Failed to parse manifest at: $manifestPath" }
-                            // Skip invalid manifest
+                            Logger.e(e) { "Failed to parse manifest from $normalizedJarPath" }
                         }
                     }
                 }
             }
+
+            // Check if any plugins were removed from disk
+            if (folderPlugins.size != existingPlugins.size) {
+                folderChanged = true
+            }
+
+            // Always write if changed OR if the file is missing
+            if (folderChanged || !PlatformUtils.exists(trackingFile)) {
+                Logger.i { "Updating tracking file: $trackingFile with ${folderPlugins.size} plugins found during rescan" }
+                PlatformUtils.writeFile(trackingFile, json.encodeToString(folderPlugins))
+                globalChanged = true
+            }
+            allUpdatedPlugins.addAll(folderPlugins)
         }
 
-        if (changed) {
-            val newList = currentPlugins.values.toList()
-            _installedPlugins.value = newList
-            saveToSettings(newList)
-            newList.filter { it.isEnabled && it.isValidated && !_loadedPlugins.value.contains(it.pkg) }.forEach {
-                scope.launch { loadPlugin(it.pkg) }
-            }
+        if (globalChanged || allUpdatedPlugins.size != _installedPlugins.value.size) {
+            _installedPlugins.update { allUpdatedPlugins }
+            allUpdatedPlugins.filter { it.isEnabled && it.isValidated && !_loadedPlugins.value.contains(it.pkg) }
+                .forEach {
+                    scope.launch { loadPlugin(it.pkg) }
+                }
         }
     }
 
@@ -333,8 +500,8 @@ class PluginManager(
         val updated = _installedPlugins.value.map {
             if (it.pkg == pkg) it.copy(isEnabled = enabled) else it
         }
-        _installedPlugins.value = updated
-        saveToSettings(updated)
+        _installedPlugins.update { updated }
+        saveToManagedFolders(updated)
 
         if (enabled) {
             val plugin = updated.find { it.pkg == pkg }
@@ -348,19 +515,13 @@ class PluginManager(
     }
 
     private fun addInstalledPlugin(plugin: InstalledPlugin) {
-        val updated = _installedPlugins.value.filter { it.pkg != plugin.pkg } + plugin
-        _installedPlugins.value = updated
-        saveToSettings(updated)
+        _installedPlugins.update { current ->
+            current.filter { it.pkg != plugin.pkg } + plugin
+        }
+        saveToManagedFolders(_installedPlugins.value)
     }
 
-    private fun saveToSettings(plugins: List<InstalledPlugin>) {
-        val settings = settingsRepository.loadSettings()
-        settingsRepository.saveSettings(
-            settings.copy(
-                extensions = settings.extensions.copy(installedPlugins = plugins)
-            )
-        )
-    }
+    // Removed saveToSettings(plugins: List<InstalledPlugin>) as it is replaced by saveToManagedFolders
 
     private fun verifySignature(path: String): Boolean {
         //TODO: Always valid for now
@@ -400,6 +561,9 @@ class PluginManager(
     suspend fun updateLocal(pkg: String, newJarPath: String): Result<Unit> {
         val plugin =
             _installedPlugins.value.find { it.pkg == pkg } ?: return Result.failure(Exception("Plugin not found"))
+
+        ensureSafeToUnload(listOf(pkg)).onFailure { return Result.failure(it) }
+
         unloadPlugin(pkg)
         // Install over existing path
         return installLocal(newJarPath, plugin.installPath.substringBeforeLast("/"))
@@ -409,6 +573,9 @@ class PluginManager(
         val update = getUpdate(pkg) ?: return Result.failure(Exception("No update available"))
         val plugin =
             _installedPlugins.value.find { it.pkg == pkg } ?: return Result.failure(Exception("Plugin not found"))
+
+        ensureSafeToUnload(listOf(pkg)).onFailure { return Result.failure(it) }
+
         unloadPlugin(pkg)
         return installRemote(update, plugin.installPath.substringBeforeLast("/"))
     }
@@ -431,12 +598,13 @@ class PluginManager(
     }
 
     suspend fun validatePluginInJob(pkg: String): Result<Unit> {
-        val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return Result.failure(Exception("Plugin not found"))
-        
+        val plugin =
+            _installedPlugins.value.find { it.pkg == pkg } ?: return Result.failure(Exception("Plugin not found"))
+
         // Ensure it's loaded in PluginLoader
         val loadResult = loadPlugin(pkg)
         if (loadResult.isFailure) return Result.failure(loadResult.exceptionOrNull()!!)
-        
+
         val job = BackgroundJob(
             id = "val_$pkg",
             name = "Validation: ${plugin.name}",
@@ -457,14 +625,14 @@ class PluginManager(
 
     suspend fun enqueueSetupJob(pkg: String) {
         val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return
-        
+
         // Ensure it's loaded in PluginLoader
         val loadResult = loadPlugin(pkg)
         if (loadResult.isFailure) {
             Logger.e { "Failed to load plugin $pkg for setup: ${loadResult.exceptionOrNull()?.message}" }
             return
         }
-        
+
         val job = BackgroundJob(
             id = "setup_$pkg",
             name = "Setup: ${plugin.name}",
@@ -481,12 +649,11 @@ class PluginManager(
         if (plugin.isValidated) return
 
         Logger.i { "Marking plugin $pkg as validated and activating" }
-        val updated = _installedPlugins.value.map {
-            if (it.pkg == pkg) it.copy(isValidated = true) else it
+        _installedPlugins.update { current ->
+            current.map { if (it.pkg == pkg) it.copy(isValidated = true) else it }
         }
-        _installedPlugins.value = updated
-        saveToSettings(updated)
-        
+        saveToManagedFolders(_installedPlugins.value)
+
         // Now that it's validated, load it (which will add it to _loadedPlugins)
         scope.launch { loadPlugin(pkg) }
     }

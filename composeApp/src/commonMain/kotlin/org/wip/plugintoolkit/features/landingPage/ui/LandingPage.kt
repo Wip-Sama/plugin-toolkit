@@ -40,6 +40,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -59,9 +62,6 @@ import plugintoolkit.composeapp.generated.resources.landing_recent_activity
 import plugintoolkit.composeapp.generated.resources.landing_system_overview
 import plugintoolkit.composeapp.generated.resources.landing_welcome_subtitle
 import plugintoolkit.composeapp.generated.resources.landing_welcome_title
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
-import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun LandingPage(
@@ -124,7 +124,10 @@ fun LandingPage(
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.huge))
 
         // Quick Actions or Recent Activity
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.large)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.large)
+        ) {
             GlassCard(modifier = Modifier.weight(1.5f).height(300.dp)) {
                 Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                     Text(

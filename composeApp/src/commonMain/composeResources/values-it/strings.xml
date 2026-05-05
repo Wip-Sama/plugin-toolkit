@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">WOToolkit</string>
+    <string name="app_name">PluginToolkit</string>
     <string name="section_application">Applicazione</string>
     <string name="nav_main">Home</string>
     <string name="nav_board">Lavagna</string>

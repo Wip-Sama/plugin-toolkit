@@ -14,6 +14,7 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
+import kotlinx.io.writeString
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forSessionBus
 import org.freedesktop.dbus.interfaces.DBusInterface
 import org.freedesktop.dbus.types.Variant
@@ -216,11 +217,23 @@ actual object PlatformUtils {
             .map { it.toString() }
     }
 
+    actual fun listFiles(path: String): List<String> {
+        return SystemFileSystem.list(Path(path))
+            .filter { SystemFileSystem.metadataOrNull(it)?.isDirectory == false }
+            .map { it.toString() }
+    }
+
     actual fun readFile(path: String): String? {
         val p = Path(path)
         return if (SystemFileSystem.exists(p)) {
             SystemFileSystem.source(p).buffered().use { it.readString() }
         } else null
+    }
+
+    actual fun writeFile(path: String, content: String) {
+        val p = Path(path)
+        p.parent?.let { SystemFileSystem.createDirectories(it) }
+        SystemFileSystem.sink(p).buffered().use { it.writeString(content) }
     }
 
     actual fun readFileFromZip(zipPath: String, fileName: String): String? {

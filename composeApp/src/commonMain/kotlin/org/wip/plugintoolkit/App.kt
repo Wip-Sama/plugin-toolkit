@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Density
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.AppTheme
@@ -44,14 +45,13 @@ import org.wip.plugintoolkit.features.plugin.ui.PluginSectionScreen
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.repository.ui.PluginRepoView
 import org.wip.plugintoolkit.features.settings.ui.SettingsScreen
+import org.wip.plugintoolkit.features.settings.ui.UpdateDialog
+import org.wip.plugintoolkit.features.settings.ui.UpdateProgressOverlay
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import org.wip.plugintoolkit.shared.components.ToastHost
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_name
-import org.koin.compose.koinInject
-import org.wip.plugintoolkit.features.settings.ui.UpdateDialog
-import org.wip.plugintoolkit.features.settings.ui.UpdateProgressOverlay
 
 @Composable
 fun App(
@@ -90,8 +90,7 @@ private fun AppContent(
     val density = LocalDensity.current
     val customDensity = remember(density, general.scaling) {
         Density(
-            density = density.density * general.scaling,
-            fontScale = density.fontScale * general.scaling
+            density = density.density * general.scaling, fontScale = density.fontScale * general.scaling
         )
     }
 
@@ -128,8 +127,7 @@ private fun AppContent(
                         NavDisplay(
                             backStack = backStack,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
-                            onBack = { if (backStack.size > 1) backStack.removeLast() }
-                        ) { key ->
+                            onBack = { if (backStack.size > 1) backStack.removeLast() }) { key ->
                             when (key) {
                                 is Screen.Main -> NavEntry(key) { LandingPage() }
                                 is Screen.Board -> NavEntry(key) { BoardScreen() }
@@ -162,8 +160,7 @@ private fun AppContent(
 
 
                     ToastHost(
-                        notificationService = notificationService,
-                        settings = viewModel.settings.notifications
+                        notificationService = notificationService, settings = viewModel.settings.notifications
                     )
                     DialogHost(dialogService)
 
@@ -176,8 +173,7 @@ private fun AppContent(
                         UpdateDialog(
                             updateInfo = availableUpdate,
                             onDownload = { viewModel.downloadAndInstallUpdate() },
-                            onDismiss = { viewModel.dismissUpdate() }
-                        )
+                            onDismiss = { viewModel.dismissUpdate() })
                     }
 
                     if (isDownloading) {

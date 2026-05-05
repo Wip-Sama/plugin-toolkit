@@ -1,12 +1,12 @@
 package org.wip.plugintoolkit.core.update
 
 import co.touchlab.kermit.Logger
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.onDownload
+import io.ktor.client.request.get
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +57,7 @@ class UpdateService(
     private fun isNewer(latest: String, current: String): Boolean {
         val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
         val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
-        
+
         for (i in 0 until minOf(latestParts.size, currentParts.size)) {
             if (latestParts[i] > currentParts[i]) return true
             if (latestParts[i] < currentParts[i]) return false
@@ -87,7 +87,7 @@ class UpdateService(
                     }
                 }
             }
-            
+
             if (response.status.value in 200..299) {
                 val bytes = response.body<ByteArray>()
                 // Note: For very large files, streaming to disk is better.

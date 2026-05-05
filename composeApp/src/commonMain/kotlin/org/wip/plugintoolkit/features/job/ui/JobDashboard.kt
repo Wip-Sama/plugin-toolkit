@@ -69,6 +69,14 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
+import kotlinx.coroutines.delay
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -77,12 +85,6 @@ import org.wip.plugintoolkit.shared.components.SectionHeader
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
-import kotlinx.coroutines.delay
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_collapse
 import plugintoolkit.composeapp.generated.resources.action_expand
@@ -102,8 +104,6 @@ import plugintoolkit.composeapp.generated.resources.nav_job_history
 import plugintoolkit.composeapp.generated.resources.nav_job_scheduler
 import plugintoolkit.composeapp.generated.resources.nav_jobs
 import plugintoolkit.composeapp.generated.resources.plugin_id_format
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -111,10 +111,13 @@ import kotlin.time.Instant
 sealed interface JobNavKey : NavKey {
     @Serializable
     data object General : JobNavKey
+
     @Serializable
     data object Archive : JobNavKey
+
     @Serializable
     data object Scheduler : JobNavKey
+
     @Serializable
     data object History : JobNavKey
 }

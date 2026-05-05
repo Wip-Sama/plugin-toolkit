@@ -45,6 +45,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.utils.StartupManager
 import org.wip.plugintoolkit.features.colorpicker.model.ColorPickerType
 import org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog
@@ -56,9 +61,6 @@ import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
 import org.wip.plugintoolkit.features.settings.model.SettingDefinition
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.section_jobs
 import plugintoolkit.composeapp.generated.resources.section_localization
@@ -111,8 +113,6 @@ import plugintoolkit.composeapp.generated.resources.setting_use_system_language
 import plugintoolkit.composeapp.generated.resources.setting_use_system_language_subtitle
 import plugintoolkit.composeapp.generated.resources.setting_window_start_mode
 import plugintoolkit.composeapp.generated.resources.setting_window_start_mode_subtitle
-import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.stringResource
 
 /**
  * An abstraction to handle both Compose StringResources (for static UI)

@@ -16,10 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.serialization.json.JsonPrimitive
+import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
-import org.wip.plugintoolkit.api.PluginResponse
-import kotlinx.serialization.json.JsonPrimitive
 
 @Composable
 fun ResponseView(response: PluginResponse) {

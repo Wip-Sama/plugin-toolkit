@@ -36,6 +36,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
@@ -56,8 +58,6 @@ import plugintoolkit.composeapp.generated.resources.repo_managed_title
 import plugintoolkit.composeapp.generated.resources.repo_refresh_all
 import plugintoolkit.composeapp.generated.resources.repo_url_label
 import plugintoolkit.composeapp.generated.resources.repo_url_placeholder
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
 
 @Composable
 fun PluginRepoView(

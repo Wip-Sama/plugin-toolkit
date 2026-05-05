@@ -5,17 +5,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.repository.logic.AddRepoResult
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import plugintoolkit.composeapp.generated.resources.plugin_choose_install_location
 import plugintoolkit.composeapp.generated.resources.repo_add_error
 import plugintoolkit.composeapp.generated.resources.repo_add_success
@@ -141,14 +141,18 @@ class PluginRepoViewModel(
         val defaultPath = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
         val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
         val allFolders = (listOf(defaultPath) + savedFolders).distinct()
-        
+
         if (allFolders.size == 1) {
             onSelected(allFolders.first())
             return
         }
-        
+
         viewModelScope.launch {
-            dialogService.showLocationPicker(getString(ResStrings.plugin_choose_install_location), allFolders, onSelected)
+            dialogService.showLocationPicker(
+                getString(ResStrings.plugin_choose_install_location),
+                allFolders,
+                onSelected
+            )
         }
     }
 

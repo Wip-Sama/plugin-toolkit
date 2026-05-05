@@ -16,7 +16,9 @@ expect object PlatformUtils {
     fun exists(path: String): Boolean
     fun mkdirs(path: String): Boolean
     fun listDirectories(path: String): List<String>
+    fun listFiles(path: String): List<String>
     fun readFile(path: String): String?
+    fun writeFile(path: String, content: String)
     fun readFileFromZip(zipPath: String, fileName: String): String?
     fun installUpdate(path: String)
 }

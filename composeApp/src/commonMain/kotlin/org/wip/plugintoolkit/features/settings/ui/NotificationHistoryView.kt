@@ -36,14 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.notification.NotificationRecord
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.history_clear_all
 import plugintoolkit.composeapp.generated.resources.history_empty
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

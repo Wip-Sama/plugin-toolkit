@@ -1,12 +1,6 @@
 package org.wip.plugintoolkit.features.repository.logic
 
 import co.touchlab.kermit.Logger
-import org.wip.plugintoolkit.core.notification.NotificationEvent
-import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
-import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import org.wip.plugintoolkit.features.repository.model.PluginChangelog
-import org.wip.plugintoolkit.features.repository.model.RepoIndex
-import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -20,6 +14,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import org.wip.plugintoolkit.core.notification.NotificationEvent
+import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
+import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
+import org.wip.plugintoolkit.features.repository.model.PluginChangelog
+import org.wip.plugintoolkit.features.repository.model.RepoIndex
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 
 class RepoManager(
     private val settingsRepository: SettingsRepository

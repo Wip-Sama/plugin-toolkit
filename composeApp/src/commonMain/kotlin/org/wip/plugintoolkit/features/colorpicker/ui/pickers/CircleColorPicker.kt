@@ -70,32 +70,32 @@ internal fun CircleColorPicker(
     Column(modifier = Modifier.width(IntrinsicSize.Max)) {
         Canvas(
             modifier = modifier
-            .size(200.dp)
-            .onSizeChanged { radius = it.width / 2f }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
+                .size(200.dp)
+                .onSizeChanged { radius = it.width / 2f }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            if (radius > 0) {
+                                handleCirclePickerInput(
+                                    x = offset.x, y = offset.y, radius = radius,
+                                    lightCenter = lightCenter,
+                                    onColorChange = { pickerColor = it },
+                                    onLocationChange = { pickerLocation = it }
+                                )
+                            }
+                        }
+                    ) { change, _ ->
+                        change.consume()
                         if (radius > 0) {
                             handleCirclePickerInput(
-                                x = offset.x, y = offset.y, radius = radius,
+                                x = change.position.x, y = change.position.y, radius = radius,
                                 lightCenter = lightCenter,
                                 onColorChange = { pickerColor = it },
                                 onLocationChange = { pickerLocation = it }
                             )
                         }
                     }
-                ) { change, _ ->
-                    change.consume()
-                    if (radius > 0) {
-                        handleCirclePickerInput(
-                            x = change.position.x, y = change.position.y, radius = radius,
-                            lightCenter = lightCenter,
-                            onColorChange = { pickerColor = it },
-                            onLocationChange = { pickerLocation = it }
-                        )
-                    }
                 }
-            }
         ) {
             drawCircle(Brush.sweepGradient(gradientColors))
             drawCircle(

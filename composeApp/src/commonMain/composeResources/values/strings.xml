@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">WOToolkit</string>
+    <string name="app_name">PluginToolkit</string>
     <string name="section_runner">Runner</string>
     <string name="nav_main">Dashboard</string>
     <string name="nav_board">Board</string>
@@ -76,6 +76,7 @@
     <string name="repo_empty_list">No repositories added yet.</string>
     <string name="plugin_manager_title">Plugin Manager</string>
     <string name="plugin_refresh_list">Refresh List</string>
+    <string name="plugin_rescan">Rescan Folder</string>
     <string name="plugin_reload_all">Reload All</string>
     <string name="plugin_install_local">Install Local</string>
     <string name="plugin_managed_folders">Managed Folders</string>

@@ -64,7 +64,11 @@ buildkonfig {
     objectName = "AppConfig"
 
     defaultConfigs {
-        buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING, "VERSION", libs.versions.app.get())
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "VERSION",
+            libs.versions.app.get()
+        )
     }
 }
 

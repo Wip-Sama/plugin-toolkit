@@ -32,9 +32,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +54,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
@@ -72,16 +74,15 @@ import plugintoolkit.composeapp.generated.resources.plugin_managed_folders
 import plugintoolkit.composeapp.generated.resources.plugin_refresh_list
 import plugintoolkit.composeapp.generated.resources.plugin_reload
 import plugintoolkit.composeapp.generated.resources.plugin_reload_all
+import plugintoolkit.composeapp.generated.resources.plugin_rescan
 import plugintoolkit.composeapp.generated.resources.plugin_settings
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall
 import plugintoolkit.composeapp.generated.resources.plugin_update
 import plugintoolkit.composeapp.generated.resources.plugin_update_local
 import plugintoolkit.composeapp.generated.resources.plugin_validate
-import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_format
 import plugintoolkit.composeapp.generated.resources.plugin_validated
 import plugintoolkit.composeapp.generated.resources.plugin_validation_pending
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
+import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_format
 
 @Composable
 fun PluginManagerView(
@@ -101,6 +102,11 @@ fun PluginManagerView(
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.plugin_refresh_list))
             }
+            OutlinedButton(onClick = { viewModel.rescan() }) {
+                Icon(Icons.Default.Folder, contentDescription = null)
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                Text(stringResource(Res.string.plugin_rescan))
+            }
             OutlinedButton(onClick = { viewModel.reloadAll() }) {
                 Icon(Icons.Default.Replay, contentDescription = null)
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
@@ -119,7 +125,10 @@ fun PluginManagerView(
         // Plugin List
         LazyColumn(
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small),
+            contentPadding = PaddingValues(
+                horizontal = ToolkitTheme.spacing.medium,
+                vertical = ToolkitTheme.spacing.small
+            ),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
         ) {
             items(plugins) { plugin ->
@@ -201,7 +210,8 @@ fun PluginCard(
     onToggle: (Boolean) -> Unit,
     onAction: (PluginAction) -> Unit
 ) {
-    val statusColor = if (isLoaded) ToolkitTheme.colors.success else if (plugin.isValidated) ToolkitTheme.colors.validated else MaterialTheme.colorScheme.outline
+    val statusColor =
+        if (isLoaded) ToolkitTheme.colors.success else if (plugin.isValidated) ToolkitTheme.colors.validated else MaterialTheme.colorScheme.outline
 
     Card(
         modifier = Modifier
@@ -250,7 +260,10 @@ fun PluginCard(
                         StatusBadge(stringResource(Res.string.plugin_validated), ToolkitTheme.colors.validated)
                     } else {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        StatusBadge(stringResource(Res.string.plugin_validation_pending), MaterialTheme.colorScheme.error)
+                        StatusBadge(
+                            stringResource(Res.string.plugin_validation_pending),
+                            MaterialTheme.colorScheme.error
+                        )
                     }
                 }
                 Text(
@@ -333,6 +346,7 @@ fun PluginCard(
         }
     }
 }
+
 @Composable
 private fun StatusBadge(text: String, color: Color) {
     Surface(

@@ -1,29 +1,29 @@
 package org.wip.plugintoolkit.features.job.logic
 
 import co.touchlab.kermit.Logger
-import org.wip.plugintoolkit.features.job.model.BackgroundJob
-import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
-import org.wip.plugintoolkit.features.job.model.JobStatus
-import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
-import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
-import org.wip.plugintoolkit.api.JobHandle
-import org.wip.plugintoolkit.api.PluginLogger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import org.wip.plugintoolkit.api.JobHandle
+import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
+import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
+import kotlin.time.Clock
 
 class JobManager(
     private val scope: CoroutineScope,
@@ -340,7 +340,7 @@ class JobManager(
         if (paused) {
             addHistoryEntryInternal(jobId, jobName, "Paused")
             Logger.i { "Job $jobId ($jobName) successfully paused with state" }
-            
+
             // Persist the state
             val job = _jobs.value.find { it.id == jobId }
             if (job != null) {
@@ -356,18 +356,22 @@ class JobManager(
                 if (jobId != null) addJobLog(jobId, message, "VERBOSE")
                 else Logger.v { "[$pkg] $message" }
             }
+
             override fun debug(message: String) {
                 if (jobId != null) addJobLog(jobId, message, "DEBUG")
                 else Logger.d { "[$pkg] $message" }
             }
+
             override fun info(message: String) {
                 if (jobId != null) addJobLog(jobId, message, "INFO")
                 else Logger.i { "[$pkg] $message" }
             }
+
             override fun warn(message: String) {
                 if (jobId != null) addJobLog(jobId, message, "WARN")
                 else Logger.w { "[$pkg] $message" }
             }
+
             override fun error(message: String, throwable: Throwable?) {
                 val msg = message + (throwable?.let { ": ${it.message}" } ?: "")
                 if (jobId != null) addJobLog(jobId, msg, "ERROR")
@@ -388,17 +392,19 @@ class JobManager(
                 val json = Json { prettyPrint = true }
                 val stateString = json.encodeToString(JsonElement.serializer(), job.resumeState ?: JsonNull)
                 fs.writeTextFile("resumes/${job.id}.json", stateString)
-                
+
                 // Update resumes.json index
                 val indexFile = "resumes.json"
                 val currentIndex = if (fs.exists(indexFile)) {
                     val content = fs.readTextFile(indexFile) ?: "{}"
-                    try { json.decodeFromString<Map<String, String>>(content) } catch(e: Exception) {
+                    try {
+                        json.decodeFromString<Map<String, String>>(content)
+                    } catch (e: Exception) {
                         Logger.w(e) { "Error decoding resumes.json index" }
                         emptyMap()
                     }
                 } else emptyMap()
-                
+
                 val newIndex = currentIndex + (job.id to "resumes/${job.id}.json")
                 fs.writeTextFile(indexFile, json.encodeToString(newIndex))
             }

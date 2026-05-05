@@ -2,11 +2,11 @@ package org.wip.plugintoolkit.features.board.viewmodel
 
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
-import org.wip.plugintoolkit.features.board.model.Widget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import org.wip.plugintoolkit.features.board.model.Widget
 import kotlin.math.roundToInt
 
 data class BoardState(

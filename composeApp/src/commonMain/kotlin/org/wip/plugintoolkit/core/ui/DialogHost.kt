@@ -21,12 +21,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.features.plugin.ui.ChangelogView
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
 import plugintoolkit.composeapp.generated.resources.dialog_confirm
 import plugintoolkit.composeapp.generated.resources.dialog_proceed_anyway
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun DialogHost(dialogService: DialogService) {

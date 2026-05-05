@@ -42,6 +42,11 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -60,9 +65,6 @@ import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.nav_notification_history
 import plugintoolkit.composeapp.generated.resources.section_about
@@ -77,8 +79,6 @@ import plugintoolkit.composeapp.generated.resources.settings_feature_placeholder
 import plugintoolkit.composeapp.generated.resources.settings_no_results
 import plugintoolkit.composeapp.generated.resources.settings_search_placeholder
 import plugintoolkit.composeapp.generated.resources.settings_search_whole
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
 
 /**
  * Internal route keys for the Settings master-detail navigation.

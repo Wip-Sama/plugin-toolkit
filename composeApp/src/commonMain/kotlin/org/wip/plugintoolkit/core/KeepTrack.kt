@@ -24,9 +24,12 @@ object KeepTrack {
     /** The directory for background job states. */
     const val JOBS_DIR_NAME = "jobs"
 
+    /** The filename for tracking installed plugins within managed folders. */
+    const val INSTALLED_PLUGINS_FILE_NAME = "installed_plugins.json"
+
     // --- Startup Parameters ---
     /** The name used for system startup entries (Registry/Desktop file). */
-    const val STARTUP_APP_NAME = "WOToolkit"
+    const val STARTUP_APP_NAME = "PluginToolkit"
 
     /** The command-line flag used to launch the app in background mode. */
     const val STARTUP_FLAG_BACKGROUND = "--background"

@@ -1,15 +1,15 @@
 package org.wip.plugintoolkit.features.settings.logic
 
 import co.touchlab.kermit.Logger
-import org.wip.plugintoolkit.core.KeepTrack
-import org.wip.plugintoolkit.features.settings.model.AppSettings
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
+import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
+import org.wip.plugintoolkit.features.settings.model.AppSettings
 
 actual class SettingsRepository actual constructor() {
     private val json = Json {

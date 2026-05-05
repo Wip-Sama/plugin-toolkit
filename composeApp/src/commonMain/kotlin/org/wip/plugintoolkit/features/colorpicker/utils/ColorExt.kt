@@ -223,9 +223,11 @@ internal fun Color.toHueProgress(): Float {
         red -> {
             (green - blue) / (max - min)
         }
+
         green -> {
             2f + (blue - red) / (max - min)
         }
+
         else -> {
             4f + (red - green) / (max - min)
         }

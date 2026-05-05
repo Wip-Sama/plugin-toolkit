@@ -1,14 +1,15 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
-import org.wip.plugintoolkit.api.PluginEntry
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import org.koin.core.Koin
 import org.koin.dsl.koinApplication
+import org.wip.plugintoolkit.api.PluginEntry
 import java.io.File
 import java.net.URLClassLoader
 import java.util.ServiceLoader
+import java.util.concurrent.ConcurrentHashMap
 
 private data class LoadedPlugin(
     val jarPath: String,
@@ -18,7 +19,7 @@ private data class LoadedPlugin(
 )
 
 actual object PluginLoader {
-    private val loadedPlugins = mutableMapOf<String, LoadedPlugin>()
+    private val loadedPlugins = ConcurrentHashMap<String, LoadedPlugin>()
 
     private fun normalizePath(path: String): String {
         return try {
@@ -33,46 +34,50 @@ actual object PluginLoader {
         jarPath: String
     ): Result<PluginEntry> {
         val normalizedPath = normalizePath(jarPath)
-        return try {
-            val path = Path(normalizedPath)
-            if (!SystemFileSystem.exists(path)) {
-                Logger.e { "Plugin JAR file not found: $normalizedPath (original: $jarPath)" }
-                return Result.failure(Exception("File not found: $normalizedPath"))
+
+        // Use synchronized to prevent two threads from loading the same plugin simultaneously
+        synchronized(this) {
+            try {
+                val path = Path(normalizedPath)
+                if (!SystemFileSystem.exists(path)) {
+                    Logger.e { "Plugin JAR file not found: $normalizedPath (original: $jarPath)" }
+                    return Result.failure(Exception("File not found: $normalizedPath"))
+                }
+
+                // If already loaded, return it
+                loadedPlugins[normalizedPath]?.let {
+                    Logger.d { "Plugin already loaded: $normalizedPath" }
+                    return Result.success(it.entry)
+                }
+
+                Logger.i { "Loading plugin from $normalizedPath" }
+                val url = File(normalizedPath).toURI().toURL()
+                val newClassLoader = ChildFirstClassLoader(arrayOf(url), this.javaClass.classLoader)
+
+                // Use ServiceLoader to find the PluginEntry implementation
+                val loader = ServiceLoader.load(PluginEntry::class.java, newClassLoader)
+                val pluginEntryImpl =
+                    loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $normalizedPath")
+
+                // Get the Koin module from the entry point
+                val module = pluginEntryImpl.getKoinModule()
+
+                // Create an isolated Koin application for this plugin
+                val koinApp = koinApplication {
+                    modules(module)
+                }
+                val koin = koinApp.koin
+                val pluginEntry = koin.get<PluginEntry>()
+
+                val loadedPlugin = LoadedPlugin(normalizedPath, pluginEntry, newClassLoader, koin)
+                loadedPlugins[normalizedPath] = loadedPlugin
+
+                Logger.i { "Successfully loaded plugin from $normalizedPath (Total tracked: ${loadedPlugins.size})" }
+                return Result.success(pluginEntry)
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to load plugin from $normalizedPath" }
+                return Result.failure(e)
             }
-
-            // If already loaded, return it
-            loadedPlugins[normalizedPath]?.let {
-                Logger.d { "Plugin already loaded: $normalizedPath" }
-                return Result.success(it.entry)
-            }
-
-            Logger.i { "Loading plugin from $normalizedPath" }
-            val url = File(normalizedPath).toURI().toURL()
-            val newClassLoader = ChildFirstClassLoader(arrayOf(url), this.javaClass.classLoader)
-
-            // Use ServiceLoader to find the PluginEntry implementation
-            val loader = ServiceLoader.load(PluginEntry::class.java, newClassLoader)
-            val pluginEntryImpl =
-                loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $normalizedPath")
-
-            // Get the Koin module from the entry point
-            val module = pluginEntryImpl.getKoinModule()
-
-            // Create an isolated Koin application for this plugin
-            val koinApp = koinApplication {
-                modules(module)
-            }
-            val koin = koinApp.koin
-            val pluginEntry = koin.get<PluginEntry>()
-
-            val loadedPlugin = LoadedPlugin(normalizedPath, pluginEntry, newClassLoader, koin)
-            loadedPlugins[normalizedPath] = loadedPlugin
-
-            Logger.i { "Successfully loaded plugin from $normalizedPath" }
-            Result.success(pluginEntry)
-        } catch (e: Exception) {
-            Logger.e(e) { "Failed to load plugin from $normalizedPath" }
-            Result.failure(e)
         }
     }
 

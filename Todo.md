@@ -8,7 +8,6 @@ Plugin Api:
 - Documentation for update plugin api (make it work)
 - Documentation for plugin setting page (make it work)
 - Documentation for plugin custom action page (make it work)
-- Add a PluginApi version that's different than the app version
 
 Gradle:
 - (?) Change the naming output of the plugin file to include the version

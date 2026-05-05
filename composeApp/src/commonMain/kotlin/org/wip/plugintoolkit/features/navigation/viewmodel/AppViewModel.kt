@@ -29,7 +29,7 @@ class AppViewModel(
     private val settingsRepository: SettingsRepository,
     private val updateService: UpdateService
 ) : ViewModel() {
-    
+
     init {
         val settings = settingsRepository.loadSettings()
         if (settings.autoUpdate.enabled && settings.autoUpdate.checkOnStartup) {

@@ -25,8 +25,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.ParameterConstraints
+import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 
@@ -224,7 +224,9 @@ private fun NumericTextField(
         ),
         singleLine = true,
         isError = isError,
-        supportingText = if (isError) { { Text(errorMessage) } } else null
+        supportingText = if (isError) {
+            { Text(errorMessage) }
+        } else null
     )
 }
 
@@ -271,7 +273,9 @@ private fun StandardTextField(
         placeholder = { Text(placeholder, style = MaterialTheme.typography.bodySmall) },
         singleLine = true,
         isError = isError,
-        supportingText = if (isError) { { Text(errorMessage) } } else null
+        supportingText = if (isError) {
+            { Text(errorMessage) }
+        } else null
     )
 }
 

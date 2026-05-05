@@ -64,33 +64,33 @@ internal fun SimpleRingColorPicker(
 
     Canvas(
         modifier = modifier
-        .size(280.dp)
-        .aspectRatio(1f)
-        .onSizeChanged { radius = it.width / 2f }
-        .pointerInput(Unit) {
-            awaitEachGesture {
-                val down = awaitFirstDown()
-                pickerLocation = calculateSimpleRingLocation(
-                    x = down.position.x, y = down.position.y,
-                    radius = radius,
-                    colorWidthPx = colorWidthPx,
-                    selectColorWidth = selectColorWidth,
-                    tracksCount = tracksCount,
-                    sectorsCount = sectorsCount
-                )
-                drag(down.id) { change ->
+            .size(280.dp)
+            .aspectRatio(1f)
+            .onSizeChanged { radius = it.width / 2f }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown()
                     pickerLocation = calculateSimpleRingLocation(
-                        x = change.position.x, y = change.position.y,
+                        x = down.position.x, y = down.position.y,
                         radius = radius,
                         colorWidthPx = colorWidthPx,
                         selectColorWidth = selectColorWidth,
                         tracksCount = tracksCount,
                         sectorsCount = sectorsCount
                     )
-                    if (change.positionChange() != Offset.Zero) change.consume()
+                    drag(down.id) { change ->
+                        pickerLocation = calculateSimpleRingLocation(
+                            x = change.position.x, y = change.position.y,
+                            radius = radius,
+                            colorWidthPx = colorWidthPx,
+                            selectColorWidth = selectColorWidth,
+                            tracksCount = tracksCount,
+                            sectorsCount = sectorsCount
+                        )
+                        if (change.positionChange() != Offset.Zero) change.consume()
+                    }
                 }
             }
-        }
     ) {
         repeat(tracksCount) { track ->
             repeat(sectorsCount) { sector ->

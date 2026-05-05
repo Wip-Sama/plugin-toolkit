@@ -2,7 +2,6 @@ package org.wip.plugintoolkit.core.logging
 
 import co.touchlab.kermit.LogWriter
 import co.touchlab.kermit.Severity
-import org.wip.plugintoolkit.features.settings.model.LoggingSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -12,6 +11,7 @@ import kotlinx.io.asOutputStream
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import org.wip.plugintoolkit.features.settings.model.LoggingSettings
 import java.io.PrintWriter
 import java.text.SimpleDateFormat
 import java.util.Date
