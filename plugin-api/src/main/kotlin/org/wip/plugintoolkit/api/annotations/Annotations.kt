@@ -108,7 +108,7 @@ annotation class PluginValidate
  * Marks a function as a custom action for the plugin.
  *
  * Actions are simple functions that can be triggered from the UI.
- * The function must be a `suspend` function and accept an `ExecutionContext`.
+ * The function must be a `suspend` function and accept a `PluginContext`.
  *
  * @property name The human-readable name of the action.
  * @property description A brief description of what the action does.
@@ -124,7 +124,7 @@ annotation class PluginAction(
  * Marks a parameter to receive the saved resume state for a pausable capability.
  *
  * The parameter must be of type `JsonElement?`. If the capability is being resumed,
- * this parameter will contain the state that was passed to `ExecutionContext.pause()`.
+ * this parameter will contain the state that was passed to [org.wip.plugintoolkit.api.ExecutionResult.Paused].
  */
 @Target(AnnotationTarget.VALUE_PARAMETER)
 @Retention(AnnotationRetention.SOURCE)

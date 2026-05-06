@@ -65,7 +65,7 @@ class PluginLifecycleManager(
                 entry.getManifest()
                 
                 // Initialize with context
-                val initResult = entry.initialize(createExecutionContext(pkg))
+                val initResult = entry.initialize(createPluginContext(pkg))
                 if (initResult.isFailure) {
                     val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")
                     Logger.e(error) { "Initialization failed for $pkg" }
@@ -215,12 +215,7 @@ class PluginLifecycleManager(
         )
     }
 
-    fun createExecutionContext(pkg: String, jobId: String? = null): ExecutionContext {
-        val context = createPluginContext(pkg, jobId)
-        return object : ExecutionContext, PluginContext by context {
-            override val signals: PluginSignalManager = context.signals
-        }
-    }
+
 }
 
 /**

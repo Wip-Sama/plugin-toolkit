@@ -116,7 +116,7 @@ class PluginViewModel(
                 val plugin = result.getOrThrow()
                 try {
                     val pkg = plugin.getManifest().plugin.id
-                    plugin.initialize(pluginManager.createExecutionContext(pkg))
+                    plugin.initialize(pluginManager.createPluginContext(pkg))
                     loadedPlugins = PluginLoader.getPlugins()
                     selectPlugin(plugin)
                     notificationService.notify(title = "Success", message = "Plugin loaded successfully")

@@ -2,13 +2,14 @@ package org.wip.plugintoolkit.features.plugin.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.ui.DialogService
@@ -44,20 +45,17 @@ class PluginManagerViewModel(
 
     val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
 
-    private val _managedFolders = MutableStateFlow<List<String>>(emptyList())
-    val managedFolders: StateFlow<List<String>> = _managedFolders.asStateFlow()
+    val managedFolders: StateFlow<List<String>> = settingsRepository.settings
+        .map { settings ->
+            (listOf(defaultPluginFolder) + settings.extensions.pluginFolders).distinct()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf(defaultPluginFolder))
 
     private val _settingsPkg = MutableStateFlow<String?>(null)
     val settingsPkg: StateFlow<String?> = _settingsPkg.asStateFlow()
 
     init {
         PlatformUtils.mkdirs(defaultPluginFolder)
-        refreshManagedFolders()
-    }
-
-    private fun refreshManagedFolders() {
-        val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
-        _managedFolders.value = (listOf(defaultPluginFolder) + savedFolders).distinct()
     }
 
     val sortedPlugins: StateFlow<List<InstalledPlugin>> = combine(
@@ -107,16 +105,15 @@ class PluginManagerViewModel(
             if (folder != null) {
                 if (folder == defaultPluginFolder) return@launch
 
-                val settings = settingsRepository.loadSettings()
-                if (settings.extensions.pluginFolders.contains(folder)) return@launch
-
-                val updated = settings.extensions.pluginFolders + folder
-                settingsRepository.saveSettings(
-                    settings.copy(
-                        extensions = settings.extensions.copy(pluginFolders = updated)
-                    )
-                )
-                refreshManagedFolders()
+                settingsRepository.updateSettings { settings ->
+                    if (settings.extensions.pluginFolders.contains(folder)) settings
+                    else {
+                        val updated = settings.extensions.pluginFolders + folder
+                        settings.copy(
+                            extensions = settings.extensions.copy(pluginFolders = updated)
+                        )
+                    }
+                }
             }
         }
     }
@@ -132,7 +129,6 @@ class PluginManagerViewModel(
                     onConfirm = {}
                 )
             }
-            refreshManagedFolders()
         }
     }
 

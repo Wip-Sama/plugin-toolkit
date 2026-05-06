@@ -5,6 +5,7 @@ import com.google.devtools.ksp.symbol.*
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.annotations.PluginInfo as PluginInfoAnnotation
+import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import java.io.File
 
 class ManifestProcessorProvider : SymbolProcessorProvider {
@@ -30,7 +31,7 @@ class ManifestProcessor(
 
     private fun generatePluginMetadata(classDeclaration: KSClassDeclaration, resolver: Resolver) {
         val pluginInfoAnnotation = classDeclaration.annotations.find {
-            it.shortName.asString() == "PluginInfo"
+            it.hasQualifiedName(PLUGIN_INFO_ANNOTATION)
         } ?: return
 
         val id = pluginInfoAnnotation.arguments.find { it.name?.asString() == "id" }?.value as String
@@ -41,15 +42,15 @@ class ManifestProcessor(
         val minExecutionTimeMs = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minExecutionTimeMs" }?.value as Int
 
         val functions = classDeclaration.getAllFunctions().filter { 
-            it.annotations.any { ann -> ann.shortName.asString() == "Capability" }
+            it.annotations.any { ann -> ann.hasQualifiedName(CAPABILITY_ANNOTATION) }
         }.toList()
 
         val settingsProperties = classDeclaration.getAllProperties().filter { 
-            it.annotations.any { ann -> ann.shortName.asString() == "PluginSetting" }
+            it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
         }.toList()
 
         val actions = classDeclaration.getAllFunctions().filter { 
-            it.annotations.any { ann -> ann.shortName.asString() == "PluginAction" }
+            it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
         }.toList()
 
         val packageName = classDeclaration.packageName.asString()

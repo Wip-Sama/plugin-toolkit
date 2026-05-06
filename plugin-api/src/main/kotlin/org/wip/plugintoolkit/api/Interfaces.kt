@@ -228,21 +228,10 @@ interface PluginContext : PluginLogger, ProgressReporter {
             if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toDoubleOrNull() else null
         } ?: defaultValue
     }
-}
 
-/**
- * Deprecated alias for [PluginContext] to provide a smoother migration path.
- */
-@Deprecated("Use PluginContext instead", ReplaceWith("PluginContext"))
-interface ExecutionContext : PluginContext {
     /**
-     * Terminate the current execution and report a resume state.
-     * Note: This will be removed in a future version. Prefer returning [ExecutionResult.Paused].
+     * Register a block to handle lifecycle signals (Pause, Cancel).
      */
-    fun pause(resumeState: JsonElement): Nothing {
-        throw IllegalStateException("Pause via exception is no longer supported. Return ExecutionResult.Paused instead.")
-    }
-
     fun onSignal(handler: suspend (PluginSignal) -> Unit) = signals.onSignal(handler)
 }
 
@@ -268,7 +257,7 @@ interface DataProcessor {
     /**
      * Set the execution context for the processor.
      */
-    fun setExecutionContext(context: PluginContext) {}
+    fun setPluginContext(context: PluginContext) {}
 
     /**
      * Observe processing progress (0.0 to 1.0).

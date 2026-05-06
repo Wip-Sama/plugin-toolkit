@@ -4,6 +4,7 @@ import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toTypeName
+import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 
 object KotlinGenerator {
     fun generate(
@@ -68,14 +69,14 @@ object KotlinGenerator {
         capabilitiesCode.add("listOf(\n")
         capabilitiesCode.indent()
         functions.forEachIndexed { index, func ->
-            val capAnn = func.annotations.first { it.shortName.asString() == "Capability" }
+            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
             val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
             val supportsCancel = capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
 
             val hasResumeState = func.parameters.any { param -> 
-                param.annotations.any { it.shortName.asString() == "ResumeState" }
+                param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }
             }
 
             capabilitiesCode.add("Capability(\n")
@@ -89,7 +90,7 @@ object KotlinGenerator {
             
             val paramsList = func.parameters
             paramsList.forEachIndexed { pIndex, param ->
-                val paramAnn = param.annotations.find { it.shortName.asString() == "CapabilityParam" }
+                val paramAnn = param.annotations.find { it.hasQualifiedName(CAPABILITY_PARAM_ANNOTATION) }
                 val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
                 val defaultValue = paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
                 val paramNameStr = param.name?.asString() ?: ""
@@ -99,7 +100,6 @@ object KotlinGenerator {
                 val isInfrastructure = typeStr == "org.wip.plugintoolkit.api.PluginLogger" || 
                                      typeStr == "org.wip.plugintoolkit.api.ProgressReporter" || 
                                      typeStr == "org.wip.plugintoolkit.api.PluginFileSystem" || 
-                                     typeStr == "org.wip.plugintoolkit.api.ExecutionContext" ||
                                      typeStr == "org.wip.plugintoolkit.api.PluginContext"
 
                 if (!isInfrastructure) {
@@ -140,7 +140,7 @@ object KotlinGenerator {
         settingsCode.add("mapOf(\n")
         settingsCode.indent()
         settingsProperties.forEachIndexed { index, prop ->
-            val ann = prop.annotations.first { it.shortName.asString() == "PluginSetting" }
+            val ann = prop.annotations.first { it.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
             val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
             val propName = prop.simpleName.asString()
@@ -161,7 +161,7 @@ object KotlinGenerator {
         actionsCode.add("listOf(\n")
         actionsCode.indent()
         actions.forEachIndexed { index, func ->
-            val ann = func.annotations.first { it.shortName.asString() == "PluginAction" }
+            val ann = func.annotations.first { it.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             
@@ -237,7 +237,7 @@ object KotlinGenerator {
                     .build()
             )
             .addFunction(
-                FunSpec.builder("setExecutionContext")
+                FunSpec.builder("setPluginContext")
                     .addModifiers(KModifier.OVERRIDE)
                     .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
                     .addStatement("this.context = context")
@@ -258,7 +258,7 @@ object KotlinGenerator {
         mapCode.indent()
         
         functions.forEachIndexed { index, func ->
-            val capAnn = func.annotations.first { it.shortName.asString() == "Capability" }
+            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
                 val methodName = func.simpleName.asString()
             
@@ -281,9 +281,9 @@ object KotlinGenerator {
                    mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
                 } else if (typeStr == "org.wip.plugintoolkit.api.PluginFileSystem") {
                     mapCode.add("context?.fileSystem ?: throw IllegalStateException(%S)", "FileSystem not available")
-                } else if (typeStr == "org.wip.plugintoolkit.api.ExecutionContext" || typeStr == "org.wip.plugintoolkit.api.PluginContext") {
+                } else if (typeStr == "org.wip.plugintoolkit.api.PluginContext") {
                     mapCode.add("context ?: throw IllegalStateException(%S)", "PluginContext not available")
-                } else if (param.annotations.any { it.shortName.asString() == "ResumeState" }) {
+                } else if (param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }) {
                     mapCode.add("request.resumeState?.let { Json.decodeFromJsonElement<%T>(it) }", paramType)
                 } else if (hasDefault) {
                     mapCode.add("if (request.parameters.containsKey(%S)) Json.decodeFromJsonElement<%T>(request.parameters[%S]!!) else null", paramName, paramType.copy(nullable = false), paramName)
@@ -386,7 +386,6 @@ object KotlinGenerator {
                     "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
                     "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
                     "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
-                    "org.wip.plugintoolkit.api.ExecutionContext" -> "context"
                     "org.wip.plugintoolkit.api.PluginContext" -> "context"
                     else -> param.name?.asString() ?: ""
                 }
@@ -458,14 +457,6 @@ object KotlinGenerator {
                     .build()
             )
             .addFunction(
-                FunSpec.builder("initialize")
-                    .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-                    .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
-                    .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
-                    .addStatement("return processor.initialize(context)")
-                    .build()
-            )
-            .addFunction(
                 FunSpec.builder("getKoinModule")
                     .addModifiers(KModifier.OVERRIDE)
                     .returns(ClassName("org.koin.core.module", "Module"))
@@ -500,8 +491,8 @@ object KotlinGenerator {
                     .build()
             )
 
-        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "PluginSetup" } }
-        val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.shortName.asString() == "PluginValidate" } }
+        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
+        val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_VALIDATE_ANNOTATION) } }
 
         // 3. performSetup
         val setupFunBuilder = FunSpec.builder("performSetup")
@@ -517,7 +508,6 @@ object KotlinGenerator {
                     "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
                     "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
                     "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
-                    "org.wip.plugintoolkit.api.ExecutionContext" -> "context"
                     "org.wip.plugintoolkit.api.PluginContext" -> "context"
                     else -> param.name?.asString() ?: ""
                 }
@@ -542,7 +532,6 @@ object KotlinGenerator {
                     "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
                     "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
                     "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
-                    "org.wip.plugintoolkit.api.ExecutionContext" -> "context"
                     "org.wip.plugintoolkit.api.PluginContext" -> "context"
                     else -> param.name?.asString() ?: ""
                 }
@@ -560,7 +549,7 @@ object KotlinGenerator {
         val registryType = TypeSpec.objectBuilder(registryName)
         
         actions.forEach { func ->
-            val ann = func.annotations.first { it.shortName.asString() == "PluginAction" }
+            val ann = func.annotations.first { it.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val constName = actName.uppercase().replace(" ", "_")
             

@@ -6,9 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import org.wip.plugintoolkit.api.ExecutionContext
-import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -127,11 +126,12 @@ class PluginManager(
         pkgs.forEach { lifecycleManager.unloadPlugin(it) }
 
         // Remove from settings
-        val settings = settingsRepository.loadSettings()
-        val updatedFolders = settings.extensions.pluginFolders.filter { 
-            it.replace('\\', '/').removeSuffix("/") != normalizedFolder 
+        settingsRepository.updateSettings { settings ->
+            val updatedFolders = settings.extensions.pluginFolders.filter { 
+                it.replace('\\', '/').removeSuffix("/") != normalizedFolder 
+            }
+            settings.copy(extensions = settings.extensions.copy(pluginFolders = updatedFolders))
         }
-        settingsRepository.saveSettings(settings.copy(extensions = settings.extensions.copy(pluginFolders = updatedFolders)))
 
         // Remove from registry
         pkgs.forEach { registry.removePlugin(it) }
@@ -169,9 +169,6 @@ class PluginManager(
 
     fun createPluginContext(pkg: String, jobId: String? = null): PluginContext = 
         lifecycleManager.createPluginContext(pkg, jobId)
-
-    fun createExecutionContext(pkg: String, jobId: String? = null): ExecutionContext = 
-        lifecycleManager.createExecutionContext(pkg, jobId)
 
     suspend fun validatePluginInJob(pkg: String): Result<Unit> {
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin not found"))

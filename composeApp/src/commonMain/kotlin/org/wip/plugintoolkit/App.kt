@@ -44,6 +44,7 @@ import org.wip.plugintoolkit.features.plugin.ui.PluginManagerView
 import org.wip.plugintoolkit.features.plugin.ui.PluginSectionScreen
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.repository.ui.PluginRepoView
+import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.ui.SettingsScreen
 import org.wip.plugintoolkit.features.settings.ui.UpdateDialog
 import org.wip.plugintoolkit.features.settings.ui.UpdateProgressOverlay
@@ -61,6 +62,7 @@ fun App(
     notificationService: NotificationService = koinInject(),
     dialogService: DialogService = koinInject()
 ) {
+    val settings by viewModel.settings.collectAsState()
     val languageCode by viewModel.currentLanguageCode.collectAsState()
 
 
@@ -69,24 +71,24 @@ fun App(
     }
 
     LaunchedEffect(Unit) {
-        val settings = viewModel.settings
         if (settings.autoUpdate.enabled && settings.autoUpdate.checkOnStartup) {
             viewModel.checkForUpdates()
         }
     }
 
-    AppContent(viewModel, pluginViewModel, appViewModel, notificationService, dialogService)
+    AppContent(settings, viewModel, pluginViewModel, appViewModel, notificationService, dialogService)
 }
 
 @Composable
 private fun AppContent(
+    settings: AppSettings,
     viewModel: SettingsViewModel,
     pluginViewModel: PluginViewModel,
     appViewModel: AppViewModel,
     notificationService: NotificationService,
     dialogService: DialogService
 ) {
-    val general = viewModel.settings.general
+    val general = settings.general
     val density = LocalDensity.current
     val customDensity = remember(density, general.scaling) {
         Density(
@@ -95,7 +97,7 @@ private fun AppContent(
     }
 
     CompositionLocalProvider(LocalDensity provides customDensity) {
-        AppTheme(appearance = viewModel.settings.appearance) {
+        AppTheme(appearance = settings.appearance) {
             var isNavbarCollapsed by remember { mutableStateOf(false) }
 
             val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
@@ -160,7 +162,7 @@ private fun AppContent(
 
 
                     ToastHost(
-                        notificationService = notificationService, settings = viewModel.settings.notifications
+                        notificationService = notificationService, settings = settings.notifications
                     )
                     DialogHost(dialogService)
 

@@ -60,6 +60,15 @@ import org.wip.plugintoolkit.features.settings.utils.resolve
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import androidx.compose.runtime.LaunchedEffect
+import org.jetbrains.compose.resources.getString
+import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.settings.model.SettingsEvent
+import org.wip.plugintoolkit.features.settings.model.SettingsToast
+import plugintoolkit.composeapp.generated.resources.update_check_failed
+import plugintoolkit.composeapp.generated.resources.update_check_started
+import plugintoolkit.composeapp.generated.resources.update_new_version_found
+import plugintoolkit.composeapp.generated.resources.update_no_updates
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
@@ -127,8 +136,29 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinInject(),
     searchViewModel: SettingsSearchViewModel = koinInject(),
-    notificationViewModel: NotificationViewModel = koinInject()
+    notificationViewModel: NotificationViewModel = koinInject(),
+    notificationService: NotificationService = koinInject()
 ) {
+    val settings by viewModel.settings.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is SettingsEvent.ShowToast -> {
+                    val message = when (event.toast) {
+                        SettingsToast.UpdateCheckStarted -> getString(Res.string.update_check_started)
+                        SettingsToast.UpdateNewVersionFound -> getString(
+                            Res.string.update_new_version_found,
+                            *event.args.toTypedArray()
+                        )
+                        SettingsToast.UpdateNoUpdates -> getString(Res.string.update_no_updates)
+                        SettingsToast.UpdateCheckFailed -> getString(Res.string.update_check_failed)
+                    }
+                    notificationService.toast(message)
+                }
+            }
+        }
+    }
     // Start with Appearance — showing settings immediately
     val backStack = rememberNavBackStack(SettingNavConfig, SettingNavKey.Appearance as SettingNavKey)
     val currentKey = backStack.lastOrNull() ?: SettingNavKey.BroadSearch

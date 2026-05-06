@@ -58,6 +58,8 @@ import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
+import org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.LogLevel
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
@@ -75,8 +77,9 @@ fun main(args: Array<String>) {
     FileKit.init(appId = "org.wip.plugintoolkit")
 
     // Check if we should start minimized
-    val repository = SettingsRepository()
-    val initialSettings = repository.loadSettings()
+    // Determine initial window state based on persistence directly
+    val persistence = JvmSettingsPersistence()
+    val initialSettings = persistence.load()
 
     // We need a late-init provider for settings because viewModel is created after startKoin
     // but viewModel needs NotificationService which needs settings.
@@ -85,8 +88,12 @@ fun main(args: Array<String>) {
 
     startKoin {
         modules(module {
-            single { repository }
-            single<NotificationService> { JvmNotificationService { viewModelProvider()!!.settings } }
+            single<SettingsPersistence> { JvmSettingsPersistence() }
+            single { SettingsRepository(get()) }
+            single<NotificationService> {
+                val repository = get<SettingsRepository>()
+                JvmNotificationService { viewModelProvider()?.settings?.value ?: repository.settings.value }
+            }
             single { SettingsRegistry() }
             single { RepoManager(get()) }
             single { DialogService() }
@@ -98,7 +105,7 @@ fun main(args: Array<String>) {
             single {
                 JobManager(
                     CoroutineScope(SupervisorJob() + Dispatchers.Default),
-                    repository.loadSettings().jobs.maxConcurrentJobs
+                    get<SettingsRepository>().loadSettings().jobs.maxConcurrentJobs
                 )
             }
             single { PluginViewModel(get(), get(), get()) }
@@ -125,10 +132,10 @@ fun main(args: Array<String>) {
     val logDirPath = "${PlatformPathUtils.getAppDataDir()}/${KeepTrack.LOGS_DIR_NAME}"
     val logDir = Path(logDirPath)
 
-    Logger.setLogWriters(platformLogWriter(), FileLogWriter(logDir) { viewModel.settings.logging })
+    Logger.setLogWriters(platformLogWriter(), FileLogWriter(logDir) { viewModel.settings.value.logging })
 
     // Sync logger severity with settings
-    snapshotFlow { viewModel.settings.logging.level }.onEach { level ->
+    snapshotFlow { viewModel.settings.value.logging.level }.onEach { level ->
         val severity = when (level) {
             LogLevel.Verbose -> Severity.Verbose
             LogLevel.Debug -> Severity.Debug
@@ -198,7 +205,7 @@ fun main(args: Array<String>) {
         if (isVisible) {
             Window(
                 onCloseRequest = {
-                    if (viewModel.settings.general.closeToTray) {
+                    if (viewModel.settings.value.general.closeToTray) {
                         isVisible = false
                     } else {
                         exitApplication()

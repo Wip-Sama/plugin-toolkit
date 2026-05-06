@@ -56,6 +56,7 @@ fun AutoSettingsView(
     }
 
     val grouped = filteredDefinitions.groupBy { it.sectionTitle }
+    val settings by viewModel.settings.collectAsState()
 
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         grouped.forEach { (sectionTitle, definitions) ->
@@ -64,7 +65,7 @@ fun AutoSettingsView(
                 definitions.forEach { definition ->
                     RenderSettingDefinition(
                         definition = definition,
-                        settings = viewModel.settings,
+                        settings = settings,
                         onUpdate = { updated ->
                             viewModel.updateSettings { updated }
                             // Execute side-effect if any

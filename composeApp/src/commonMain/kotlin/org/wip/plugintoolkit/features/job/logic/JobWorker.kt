@@ -14,12 +14,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.JobHandle
-import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.PluginRequest
-import org.wip.plugintoolkit.api.ExecutionContext
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -106,7 +103,7 @@ class JobWorker(
 
         val processor = plugin.getProcessor()
         val context = pluginManager.createPluginContext(job.pluginId, job.id)
-        processor.setExecutionContext(context)
+        processor.setPluginContext(context)
 
         val request = PluginRequest(
             method = job.capabilityName,

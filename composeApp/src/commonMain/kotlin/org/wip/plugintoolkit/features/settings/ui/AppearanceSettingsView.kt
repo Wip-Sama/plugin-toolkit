@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,9 +59,10 @@ import plugintoolkit.composeapp.generated.resources.setting_use_system_language_
 
 @Composable
 fun AppearanceSettingsView(viewModel: SettingsViewModel) {
-    val appearance = viewModel.settings.appearance
-    val localization = viewModel.settings.localization
-    val general = viewModel.settings.general
+    val settings by viewModel.settings.collectAsState()
+    val appearance = settings.appearance
+    val localization = settings.localization
+    val general = settings.general
 
     var showColorPicker by remember { mutableStateOf(false) }
 

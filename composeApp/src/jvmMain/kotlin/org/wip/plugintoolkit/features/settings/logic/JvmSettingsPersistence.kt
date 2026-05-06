@@ -11,7 +11,7 @@ import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 
-actual class SettingsRepository actual constructor() {
+class JvmSettingsPersistence : SettingsPersistence {
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -22,9 +22,9 @@ actual class SettingsRepository actual constructor() {
     private val settingsDir = Path(settingsDirPath)
     private val settingsFile = Path("$settingsDirPath/${KeepTrack.SETTINGS_FILE_NAME}")
 
-    actual fun getSettingsDir(): String = settingsDirPath
+    override fun getSettingsDir(): String = settingsDirPath
 
-    actual fun getJobsDir(): String {
+    override fun getJobsDir(): String {
         val jobsDirPath = "$settingsDirPath/${KeepTrack.JOBS_DIR_NAME}"
         val jobsDir = Path(jobsDirPath)
         if (!SystemFileSystem.exists(jobsDir)) {
@@ -33,7 +33,7 @@ actual class SettingsRepository actual constructor() {
         return jobsDirPath
     }
 
-    actual fun loadSettings(): AppSettings {
+    override fun load(): AppSettings {
         return try {
             if (SystemFileSystem.exists(settingsFile)) {
                 val content = SystemFileSystem.source(settingsFile).buffered().use { it.readString() }
@@ -51,7 +51,7 @@ actual class SettingsRepository actual constructor() {
         }
     }
 
-    actual fun saveSettings(settings: AppSettings) {
+    override fun save(settings: AppSettings) {
         try {
             if (!SystemFileSystem.exists(settingsDir)) {
                 SystemFileSystem.createDirectories(settingsDir)
@@ -63,7 +63,7 @@ actual class SettingsRepository actual constructor() {
         }
     }
 
-    actual fun openLogFolder() {
+    override fun openLogFolder() {
         try {
             val logDirPath = "$settingsDirPath/${KeepTrack.LOGS_DIR_NAME}"
             val logDir = Path(logDirPath)

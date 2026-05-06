@@ -27,12 +27,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.utils.StartupManager
 import org.wip.plugintoolkit.features.settings.model.LogLevel
+import org.wip.plugintoolkit.features.settings.model.UpdateState
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
@@ -43,6 +46,8 @@ import org.wip.plugintoolkit.shared.components.settings.SettingsNumericInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsSwitch
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_check_for_updates
+import plugintoolkit.composeapp.generated.resources.update_check_started
+import plugintoolkit.composeapp.generated.resources.update_new_version_found
 import plugintoolkit.composeapp.generated.resources.section_auto_update
 import plugintoolkit.composeapp.generated.resources.section_logging
 import plugintoolkit.composeapp.generated.resources.section_notifications
@@ -76,12 +81,14 @@ import plugintoolkit.composeapp.generated.resources.setting_toast_auto_dismiss
 import plugintoolkit.composeapp.generated.resources.setting_toast_dismiss_time
 import plugintoolkit.composeapp.generated.resources.setting_window_start_mode
 import plugintoolkit.composeapp.generated.resources.setting_window_start_mode_subtitle
+import plugintoolkit.composeapp.generated.resources.update_new_version_found
 
 @Composable
 fun SystemSettingsView(
     viewModel: SettingsViewModel, notificationViewModel: NotificationViewModel = koinInject()
 ) {
-    val general = viewModel.settings.general
+    val settings by viewModel.settings.collectAsState()
+    val general = settings.general
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SettingsGroup(title = stringResource(Res.string.section_system)) {
@@ -152,7 +159,7 @@ fun SystemSettingsView(
         }
 
         SettingsGroup(title = stringResource(Res.string.section_logging)) {
-            val logging = viewModel.settings.logging
+            val logging = settings.logging
 
             SettingsItem(
                 title = stringResource(Res.string.setting_log_level),
@@ -222,7 +229,7 @@ fun SystemSettingsView(
         }
 
         SettingsGroup(title = stringResource(Res.string.section_toasts)) {
-            val notifications = viewModel.settings.notifications
+            val notifications = settings.notifications
 
             SettingsItem(
                 title = stringResource(Res.string.setting_enable_toasts), icon = Icons.Default.ChatBubble, control = {
@@ -263,7 +270,7 @@ fun SystemSettingsView(
         }
 
         SettingsGroup(title = stringResource(Res.string.section_notifications)) {
-            val notifications = viewModel.settings.notifications
+            val notifications = settings.notifications
 
             SettingsItem(
                 title = stringResource(Res.string.setting_enable_system_notifications),
@@ -364,7 +371,7 @@ fun SystemSettingsView(
                     }
                 })
             SettingsGroup(title = stringResource(Res.string.section_auto_update)) {
-                val autoUpdate = viewModel.settings.autoUpdate
+                val autoUpdate = settings.autoUpdate
 
                 SettingsItem(
                     title = stringResource(Res.string.setting_enable_auto_update),
@@ -379,9 +386,21 @@ fun SystemSettingsView(
                             })
                     })
 
+                val updateState by viewModel.updateState.collectAsState()
+                val currentUpdateState = updateState
+
                 SettingsItem(
                     title = stringResource(Res.string.action_check_for_updates),
+                    subtitle = when (currentUpdateState) {
+                        is UpdateState.Checking -> stringResource(Res.string.update_check_started)
+                        is UpdateState.UpdateAvailable -> stringResource(
+                            Res.string.update_new_version_found,
+                            currentUpdateState.info.version
+                        )
+                        else -> null
+                    },
                     icon = Icons.Default.Notifications,
+                    enabled = currentUpdateState !is UpdateState.Checking,
                     onClick = {
                         viewModel.checkForUpdates(isManual = true)
                     }

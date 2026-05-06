@@ -45,12 +45,12 @@ class RepoManager(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
-        val settings = settingsRepository.loadSettings()
-        _repositories.value = settings.extensions.repositories
+        scope.launch {
+            settingsRepository.settings.collect { settings ->
+                _repositories.value = settings.extensions.repositories
+            }
+        }
 
-        // Initial load from memory (if we had a cache, we'd load it here)
-        // For now, we refresh on launch
-        Logger.i { "Initializing RepoManager with ${settings.extensions.repositories.size} repositories" }
         scope.launch {
             refreshAll()
         }
@@ -148,12 +148,9 @@ class RepoManager(
     }
 
     private fun saveReposToSettings(repos: List<ExtensionRepo>) {
-        val settings = settingsRepository.loadSettings()
-        settingsRepository.saveSettings(
-            settings.copy(
-                extensions = settings.extensions.copy(repositories = repos)
-            )
-        )
+        settingsRepository.updateSettings { 
+            it.copy(extensions = it.extensions.copy(repositories = repos))
+        }
     }
 
     suspend fun fetchText(url: String): String? {
@@ -166,14 +163,13 @@ class RepoManager(
     }
 
     fun setPackageSourceOverride(pkg: String, repoUrl: String) {
-        val settings = settingsRepository.loadSettings()
-        settingsRepository.saveSettings(
-            settings.copy(
-                extensions = settings.extensions.copy(
-                    packageSourceOverrides = settings.extensions.packageSourceOverrides + (pkg to repoUrl)
+        settingsRepository.updateSettings { 
+            it.copy(
+                extensions = it.extensions.copy(
+                    packageSourceOverrides = it.extensions.packageSourceOverrides + (pkg to repoUrl)
                 )
             )
-        )
+        }
     }
 
     fun getPackageSourceOverride(pkg: String): String? {

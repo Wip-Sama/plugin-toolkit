@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.*
 import org.wip.plugintoolkit.api.Changelog
+import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 
 object ManifestJsonGenerator {
     fun generate(
@@ -21,7 +22,7 @@ object ManifestJsonGenerator {
         changelogObj: Changelog?
     ): String {
         val manifestCapabilities = functions.map { func ->
-            val capAnn = func.annotations.first { it.shortName.asString() == "Capability" }
+            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
             val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
@@ -32,9 +33,9 @@ object ManifestJsonGenerator {
                 paramType != PluginLogger::class.qualifiedName && 
                 paramType != ProgressReporter::class.qualifiedName && 
                 paramType != PluginFileSystem::class.qualifiedName && 
-                paramType != ExecutionContext::class.qualifiedName
+                paramType != PluginContext::class.qualifiedName
             }.associate { param ->
-                val paramAnn = param.annotations.find { it.shortName.asString() == "CapabilityParam" }
+                val paramAnn = param.annotations.find { it.hasQualifiedName(CAPABILITY_PARAM_ANNOTATION) }
                 val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
                 val defaultValue = paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
                 val paramName = param.name?.asString() ?: ""
@@ -77,7 +78,7 @@ object ManifestJsonGenerator {
             }
             
             val hasResumeState = func.parameters.any { param -> 
-                param.annotations.any { it.shortName.asString() == "ResumeState" }
+                param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }
             }
 
             Capability(
@@ -91,7 +92,7 @@ object ManifestJsonGenerator {
         }
 
         val manifestSettings = settingsProperties.associate { prop ->
-            val ann = prop.annotations.first { it.shortName.asString() == "PluginSetting" }
+            val ann = prop.annotations.first { it.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
             val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
             val propName = prop.simpleName.asString()
@@ -109,7 +110,7 @@ object ManifestJsonGenerator {
         }
 
         val manifestActions = actions.map { func ->
-            val ann = func.annotations.first { it.shortName.asString() == "PluginAction" }
+            val ann = func.annotations.first { it.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             
