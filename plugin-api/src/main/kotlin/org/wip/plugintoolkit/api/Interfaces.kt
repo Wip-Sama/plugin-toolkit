@@ -17,7 +17,7 @@ interface PluginEntry {
      * Initialize the plugin. Runs in a background thread.
      * @param context The execution context providing logger and file system access.
      */
-    suspend fun initialize(context: ExecutionContext): Result<Unit> = Result.success(Unit)
+    suspend fun initialize(context: PluginContext): Result<Unit> = Result.success(Unit)
 
     /**
      * Provide the plugin's Koin module.
@@ -44,13 +44,13 @@ interface PluginEntry {
      * Optional setup step called by the host application.
      * @param context The execution context providing logger, progress, and file system access.
      */
-    suspend fun performSetup(context: ExecutionContext): Result<Unit> = Result.success(Unit)
+    suspend fun performSetup(context: PluginContext): Result<Unit> = Result.success(Unit)
 
     /**
      * Validate the plugin installation and status.
      * @param context The execution context providing logger, progress, and file system access.
      */
-    suspend fun validate(context: ExecutionContext): Result<Unit> = Result.success(Unit)
+    suspend fun validate(context: PluginContext): Result<Unit> = Result.success(Unit)
 
     /**
      * Clean up resources.
@@ -118,9 +118,43 @@ enum class PluginSignal {
 }
 
 /**
- * Exception thrown by a plugin to indicate it has paused and saved its state.
+ * Manage signals for a running plugin task.
  */
-class PluginPausedException(val resumeState: JsonElement) : Exception("Plugin paused")
+interface PluginSignalManager {
+    /**
+     * Register a block to handle lifecycle signals (Pause, Cancel).
+     */
+    fun onSignal(handler: suspend (PluginSignal) -> Unit)
+
+    /**
+     * Internal method for the Host to send signals to the plugin.
+     */
+    suspend fun sendSignal(signal: PluginSignal)
+}
+
+/**
+ * The result of a plugin capability execution.
+ */
+sealed class ExecutionResult {
+    /**
+     * The task completed successfully.
+     * @property response The response data.
+     */
+    data class Success(val response: PluginResponse) : ExecutionResult()
+
+    /**
+     * The task has paused and saved its state.
+     * @property resumeState The state to be used for resumption.
+     */
+    data class Paused(val resumeState: JsonElement) : ExecutionResult()
+
+    /**
+     * The task failed with an error.
+     * @property message A human-readable error message.
+     * @property throwable The underlying cause of the failure.
+     */
+    data class Error(val message: String, val throwable: Throwable? = null) : ExecutionResult()
+}
 
 /**
  * Handle to control a running plugin task.
@@ -131,11 +165,11 @@ interface JobHandle {
     /**
      * The deferred result of the task.
      */
-    val result: Deferred<Result<PluginResponse>>
+    val result: Deferred<ExecutionResult>
 
     /**
      * Request the task to pause. The task must handle this by saving its state
-     * and throwing a [PluginPausedException].
+     * and returning [ExecutionResult.Paused].
      */
     fun pause()
 
@@ -150,43 +184,23 @@ interface JobHandle {
  * Context provided to a plugin during execution.
  *
  * It provides access to infrastructure services like logging, progress reporting,
- * and isolated file system access. It also handles lifecycle signals like PAUSE and CANCEL.
- *
- * @property logger The logger to use for reporting status and errors.
- * @property progress The reporter to use for updating task progress.
- * @property fileSystem Access to the plugin's persistent data storage.
- * @property cacheFileSystem Access to the plugin's temporary/cache storage.
+ * and isolated file system access.
  */
-class ExecutionContext(
-    val logger: PluginLogger,
-    val progress: ProgressReporter,
-    val fileSystem: PluginFileSystem,
-    val cacheFileSystem: PluginFileSystem,
-    val settings: Map<String, JsonElement> = emptyMap()
-) {
-    private val signalHandlers = mutableListOf<suspend (PluginSignal) -> Unit>()
+interface PluginContext : PluginLogger, ProgressReporter {
+    val logger: PluginLogger
+    val progress: ProgressReporter
+    val fileSystem: PluginFileSystem
+    val cacheFileSystem: PluginFileSystem
+    val settings: Map<String, JsonElement>
+    val signals: PluginSignalManager
 
-    /**
-     * Internal method for the Host to send signals to the plugin.
-     */
-    suspend fun sendSignal(signal: PluginSignal) {
-        signalHandlers.forEach { it(signal) }
-    }
-
-    /**
-     * Register a block to handle lifecycle signals (Pause, Resume, Cancel).
-     */
-    fun onSignal(handler: suspend (PluginSignal) -> Unit) {
-        signalHandlers.add(handler)
-    }
-
-    /**
-     * Terminate the current execution and report a resume state.
-     * This should be called by the plugin when it handles a PAUSE signal.
-     */
-    fun pause(resumeState: JsonElement): Nothing {
-        throw PluginPausedException(resumeState)
-    }
+    // Forwarding methods for convenience
+    override fun verbose(message: String) = logger.verbose(message)
+    override fun debug(message: String) = logger.debug(message)
+    override fun info(message: String) = logger.info(message)
+    override fun warn(message: String) = logger.warn(message)
+    override fun error(message: String, throwable: Throwable?) = logger.error(message, throwable)
+    override fun report(progress: Float) = this.progress.report(progress)
 
     /**
      * Typed helpers for settings access.
@@ -217,6 +231,22 @@ class ExecutionContext(
 }
 
 /**
+ * Deprecated alias for [PluginContext] to provide a smoother migration path.
+ */
+@Deprecated("Use PluginContext instead", ReplaceWith("PluginContext"))
+interface ExecutionContext : PluginContext {
+    /**
+     * Terminate the current execution and report a resume state.
+     * Note: This will be removed in a future version. Prefer returning [ExecutionResult.Paused].
+     */
+    fun pause(resumeState: JsonElement): Nothing {
+        throw IllegalStateException("Pause via exception is no longer supported. Return ExecutionResult.Paused instead.")
+    }
+
+    fun onSignal(handler: suspend (PluginSignal) -> Unit) = signals.onSignal(handler)
+}
+
+/**
  * The actual processor performing the business logic.
  *
  * This interface is typically implemented by the class annotated with `@PluginInfo`.
@@ -228,7 +258,7 @@ interface DataProcessor {
      * @param request Native request object.
      * @return Result wrapping native response.
      */
-    suspend fun process(request: PluginRequest): Result<PluginResponse>
+    suspend fun process(request: PluginRequest): ExecutionResult
 
     /**
      * Set the debug mode for the processor.
@@ -238,7 +268,7 @@ interface DataProcessor {
     /**
      * Set the execution context for the processor.
      */
-    fun setExecutionContext(context: ExecutionContext) {}
+    fun setExecutionContext(context: PluginContext) {}
 
     /**
      * Observe processing progress (0.0 to 1.0).
@@ -254,10 +284,10 @@ interface DataProcessor {
 
     /**
      * Run a custom action.
-     * @param actionName The name of the action function to call.
+     * @param action The metadata of the action to call.
      * @param context The execution context.
      */
-    suspend fun runAction(actionName: String, context: ExecutionContext): Result<Unit> {
+    suspend fun runAction(action: PluginAction, context: PluginContext): Result<Unit> {
         return Result.failure(NotImplementedError("runAction not implemented"))
     }
 }

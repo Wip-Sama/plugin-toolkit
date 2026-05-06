@@ -30,4 +30,9 @@
     <string name="setting_plugin_unplug_behavior_subtitle">Cosa fare quando si disabilita o disinstalla un plugin con lavori attivi</string>
     <string name="setting_plugin_unplug_behavior_block">Impedisci la rimozione durante il lavoro</string>
     <string name="setting_plugin_unplug_behavior_stop">Ferma tutto e rimuovi</string>
+    <string name="update_check_failed">Controllo aggiornamenti fallito</string>
+    <string name="update_no_updates">Stai già usando l\'ultima versione</string>
+    <string name="update_check_started">Ricerca aggiornamenti in corso...</string>
+    <string name="update_new_version_found">Nuova versione disponibile: %1$s</string>
+    <string name="action_check_for_updates">Controlla Aggiornamenti</string>
 </resources>

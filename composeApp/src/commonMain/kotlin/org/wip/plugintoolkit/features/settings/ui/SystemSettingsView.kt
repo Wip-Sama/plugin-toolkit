@@ -383,7 +383,7 @@ fun SystemSettingsView(
                     title = stringResource(Res.string.action_check_for_updates),
                     icon = Icons.Default.Notifications,
                     onClick = {
-                        viewModel.checkForUpdates()
+                        viewModel.checkForUpdates(isManual = true)
                     }
                 )
             }

@@ -9,7 +9,10 @@ import org.wip.plugintoolkit.api.annotations.PluginValidate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
-import org.wip.plugintoolkit.api.ExecutionContext
+import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.PluginFileSystem
+import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.PluginSignal
 import java.io.File
 
@@ -39,7 +42,7 @@ class BetterManhwa {
         @CapabilityParam(description = "Output image format", defaultValue = "WEBP") outputFormat: OutputFormat,
         @CapabilityParam(description = "Output folder (leave null to auto-create)", defaultValue = "null") outFolder: String? = null,
         @ResumeState resumeState: JsonElement? = null,
-        context: ExecutionContext
+        context: PluginContext
     ): String {
         // Validate input folder
         val inputDir = File(folder)
@@ -138,7 +141,7 @@ class BetterManhwa {
             }
         }
 
-        context.onSignal { signal ->
+        context.signals.onSignal { signal ->
             when(signal) {
                 PluginSignal.PAUSE -> {
                     logger.info("Received pause signal. Killing process...")
@@ -157,7 +160,7 @@ class BetterManhwa {
     }
 
     @PluginSetup
-    suspend fun setup(context: ExecutionContext): Result<Unit> {
+    suspend fun setup(context: PluginContext): Result<Unit> {
         return try {
             val fileSystem = context.fileSystem
             val logger = context.logger
@@ -222,7 +225,7 @@ class BetterManhwa {
     }
 
     @PluginValidate
-    suspend fun validate(context: ExecutionContext): Result<Unit> {
+    suspend fun validate(context: PluginContext): Result<Unit> {
         return try {
             val fileSystem = context.fileSystem
             val logger = context.logger

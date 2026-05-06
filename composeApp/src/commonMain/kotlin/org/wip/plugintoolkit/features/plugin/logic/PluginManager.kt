@@ -9,9 +9,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.PluginSignalManager
+import org.wip.plugintoolkit.api.PluginAction
+import org.wip.plugintoolkit.api.PluginSignal
+import org.wip.plugintoolkit.api.ProgressReporter
+import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.ExecutionContext
 import org.wip.plugintoolkit.api.PluginManifest
-import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
@@ -641,7 +646,7 @@ class PluginManager(
         }
     }
 
-    fun createExecutionContext(pkg: String, jobId: String? = null): ExecutionContext {
+    fun createPluginContext(pkg: String, jobId: String? = null): PluginContext {
         val plugin = _installedPlugins.value.find { it.pkg == pkg }
         val installPath = plugin?.installPath ?: ""
         val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }
@@ -661,17 +666,28 @@ class PluginManager(
         // 2. Override with stored user settings
         mergedSettings.putAll(storedSettings.settings)
 
-        return ExecutionContext(
-            logger = jobManager.getPluginLogger(pkg, jobId),
-            progress = object : ProgressReporter {
-                override fun report(progress: Float) {
-                    if (jobId != null) jobManager.updateJobProgress(jobId, progress)
-                }
-            },
+        val pluginLogger = jobManager.getPluginLogger(pkg, jobId)
+        val progressReporter = object : ProgressReporter {
+            override fun report(progress: Float) {
+                if (jobId != null) jobManager.updateJobProgress(jobId, progress)
+            }
+        }
+
+        return DefaultPluginContext(
+            logger = pluginLogger,
+            progress = progressReporter,
             fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
             cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath),
             settings = mergedSettings
         )
+    }
+
+    // Compatibility method
+    fun createExecutionContext(pkg: String, jobId: String? = null): ExecutionContext {
+        val context = createPluginContext(pkg, jobId)
+        return object : ExecutionContext, PluginContext by context {
+            override val signals: PluginSignalManager = context.signals
+        }
     }
 
     suspend fun validatePluginInJob(pkg: String): Result<Unit> {
@@ -697,7 +713,7 @@ class PluginManager(
     suspend fun validatePlugin(pkg: String): Result<Unit> {
         //TODO: This is the direct call, but we should prefer validatePluginInJob for UI visibility
         val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
-        return plugin.validate(createExecutionContext(pkg))
+        return plugin.validate(createPluginContext(pkg))
     }
 
     suspend fun enqueueSetupJob(pkg: String) {
@@ -721,24 +737,24 @@ class PluginManager(
         jobManager.enqueueJob(job)
     }
 
-    suspend fun runAction(pkg: String, actionName: String) {
+    suspend fun runAction(pkg: String, action: PluginAction) {
         val plugin = _installedPlugins.value.find { it.pkg == pkg } ?: return
         
-        Logger.i { "Enqueuing custom action: $actionName for plugin: $pkg" }
+        Logger.i { "Enqueuing custom action: ${action.name} (function: ${action.functionName}) for plugin: $pkg" }
 
         // Ensure it's loaded in PluginLoader
         val loadResult = loadPlugin(pkg)
         if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for action $actionName: ${loadResult.exceptionOrNull()?.message}" }
+            Logger.e { "Failed to load plugin $pkg for action ${action.name}: ${loadResult.exceptionOrNull()?.message}" }
             return
         }
 
         val job = BackgroundJob(
-            id = "action_${pkg}_${actionName}_${Clock.System.now().toEpochMilliseconds()}",
-            name = "Action: $actionName (${plugin.name})",
+            id = "action_${pkg}_${action.functionName}_${Clock.System.now().toEpochMilliseconds()}",
+            name = "Action: ${action.name} (${plugin.name})",
             type = JobType.PluginAction,
             pluginId = pkg,
-            capabilityName = actionName,
+            capabilityName = action.functionName,
             keepResult = false
         )
         jobManager.enqueueJob(job)
@@ -758,3 +774,24 @@ class PluginManager(
         scope.launch { loadPlugin(pkg) }
     }
 }
+
+class DefaultPluginSignalManager : PluginSignalManager {
+    private val signalHandlers = mutableListOf<suspend (PluginSignal) -> Unit>()
+
+    override fun onSignal(handler: suspend (PluginSignal) -> Unit) {
+        signalHandlers.add(handler)
+    }
+
+    override suspend fun sendSignal(signal: PluginSignal) {
+        signalHandlers.forEach { it(signal) }
+    }
+}
+
+class DefaultPluginContext(
+    override val logger: PluginLogger,
+    override val progress: ProgressReporter,
+    override val fileSystem: org.wip.plugintoolkit.api.PluginFileSystem,
+    override val cacheFileSystem: org.wip.plugintoolkit.api.PluginFileSystem,
+    override val settings: Map<String, kotlinx.serialization.json.JsonElement>,
+    override val signals: PluginSignalManager = DefaultPluginSignalManager()
+) : PluginContext

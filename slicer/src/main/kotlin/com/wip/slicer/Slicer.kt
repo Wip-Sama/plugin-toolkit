@@ -1,6 +1,8 @@
 package com.wip.slicer
 
-import org.wip.plugintoolkit.api.ExecutionContext
+import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.annotations.Capability
 import org.wip.plugintoolkit.api.annotations.PluginInfo
 import org.wip.plugintoolkit.api.annotations.CapabilityParam
@@ -31,7 +33,7 @@ class Slicer {
         @CapabilityParam(description = "Maximum Height", defaultValue = "10000") maxHeight: Int,
         @CapabilityParam(description = "Prioritize smaller", defaultValue = "true") prioritizeSmallerImages: Boolean,
         @CapabilityParam(description = "Cut tolerance", defaultValue = "5") cutTolerance: Int,
-        context: ExecutionContext
+        context: PluginContext
     ): String {
         val logger = context.logger
         val progressReporter = context.progress
@@ -81,7 +83,7 @@ class Slicer {
     fun maxDistanceForCuts(
         @CapabilityParam(description = "List of items to slice") folderPath: String,
         @CapabilityParam(description = "Cut tolerance", defaultValue = "5") cutTolerance: Int,
-        context: ExecutionContext
+        context: PluginContext
     ): Int {
         val logger = context.logger
         val progressReporter = context.progress

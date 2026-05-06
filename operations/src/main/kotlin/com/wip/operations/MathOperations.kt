@@ -1,7 +1,8 @@
 package com.wip.operations
 
 import org.wip.plugintoolkit.api.annotations.*
-import org.wip.plugintoolkit.api.ExecutionContext
+import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.ProgressReporter
 import kotlinx.coroutines.delay
 
 @PluginInfo(
@@ -19,21 +20,21 @@ class MathProcessor {
     var decimalPlaces: Int = 2
 
     @PluginAction(name = "Reset Statistics", description = "Resets all internal math counters and history.")
-    suspend fun resetStats(context: ExecutionContext) {
-        context.logger.info("Resetting statistics...")
+    suspend fun resetStats(logger: PluginLogger) {
+        logger.info("Resetting statistics...")
         delay(2000) // Simulate work
-        context.logger.info("Statistics reset successfully.")
+        logger.info("Statistics reset successfully.")
     }
 
     @PluginAction(name = "Run Diagnostics", description = "Checks the health of the math engine.")
-    suspend fun runDiagnostics(context: ExecutionContext) {
-        context.logger.info("Starting diagnostics...")
+    suspend fun runDiagnostics(logger: PluginLogger, progress: ProgressReporter) {
+        logger.info("Starting diagnostics...")
         for (i in 1..5) {
-            context.progress.report(i / 5f)
+            progress.report(i / 5f)
             delay(500)
-            context.logger.info("Step $i complete")
+            logger.info("Step $i complete")
         }
-        context.logger.info("Diagnostics finished.")
+        logger.info("Diagnostics finished.")
     }
 
     @Capability(name = "sum", description = "Calculates the sum of a list of numbers")

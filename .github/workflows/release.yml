@@ -30,13 +30,13 @@ jobs:
         run: .\gradlew test
 
       - name: Build Release Distribution
-        run: .\gradlew packageReleaseDistributionForCurrentOS
+        run: .\gradlew packageReleaseDistributionForCurrentOS packageReleaseUberJarForCurrentOS
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-${{ matrix.os }}
-          path: composeApp/build/compose/binaries/main/
+          path: composeApp/build/compose/
 
   release:
     name: Create Release
@@ -74,5 +74,6 @@ jobs:
             all-artifacts/**/*.dmg
             all-artifacts/**/*.deb
             all-artifacts/**/*.pkg
+            all-artifacts/**/*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

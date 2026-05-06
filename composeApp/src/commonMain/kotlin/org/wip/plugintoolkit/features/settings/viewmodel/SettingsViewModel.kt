@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.update.UpdateInfo
 import org.wip.plugintoolkit.core.update.UpdateService
 import org.wip.plugintoolkit.core.utils.PlatformLocalization
@@ -18,10 +20,17 @@ import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppLanguage
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.update_check_failed
+import plugintoolkit.composeapp.generated.resources.update_check_started
+import plugintoolkit.composeapp.generated.resources.update_new_version_found
+import plugintoolkit.composeapp.generated.resources.update_no_updates
+import co.touchlab.kermit.Logger
 
 class SettingsViewModel(
     private val repository: SettingsRepository,
-    private val updateService: UpdateService
+    private val updateService: UpdateService,
+    private val notificationService: NotificationService
 ) : ViewModel() {
 
     var availableUpdate by mutableStateOf<UpdateInfo?>(null)
@@ -32,9 +41,24 @@ class SettingsViewModel(
 
     val downloadProgress = updateService.downloadProgress
 
-    fun checkForUpdates() {
+    fun checkForUpdates(isManual: Boolean = false) {
         viewModelScope.launch {
-            availableUpdate = updateService.checkForUpdates()
+            Logger.i { "Checking for updates" }
+            if (isManual) {
+                notificationService.toast(getString(Res.string.update_check_started))
+            }
+            val update = updateService.checkForUpdates()
+            availableUpdate = update
+
+            if (isManual) {
+                if (update != null) {
+                    Logger.i { "New version found: ${update.version}" }
+                    notificationService.toast(getString(Res.string.update_new_version_found, update.version))
+                } else {
+                    Logger.i { "No updates found" }
+                    notificationService.toast(getString(Res.string.update_no_updates))
+                }
+            }
         }
     }
 
@@ -52,7 +76,7 @@ class SettingsViewModel(
                 PlatformUtils.installUpdate(dest)
             } else {
                 isDownloadingUpdate = false
-                // TODO: Show error toast
+                notificationService.toast(getString(Res.string.update_check_failed))
             }
         }
     }

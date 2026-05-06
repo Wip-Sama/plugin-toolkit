@@ -14,11 +14,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import org.wip.plugintoolkit.api.ExecutionContext
+import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.JobHandle
-import org.wip.plugintoolkit.api.PluginPausedException
-import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PluginResponse
+import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.ExecutionContext
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -104,7 +105,7 @@ class JobWorker(
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
         val processor = plugin.getProcessor()
-        val context = createExecutionContext(job)
+        val context = pluginManager.createPluginContext(job.pluginId, job.id)
         processor.setExecutionContext(context)
 
         val request = PluginRequest(
@@ -132,24 +133,22 @@ class JobWorker(
 
         val result = try {
             handle.result.await()
+        } catch (e: Exception) {
+            ExecutionResult.Error(e.message ?: "Unknown error", e)
         } finally {
             progressJob?.cancel()
         }
 
-        if (result.isSuccess) {
-            val response = result.getOrNull()
-            val resumeState = response?.resumeState
-            if (resumeState != null) {
-                manager.tryPauseJob(job.id, resumeState)
-            } else {
-                manager.tryCompleteJob(job.id, response?.result?.toString())
+        when (result) {
+            is ExecutionResult.Success -> {
+                val response = result.response
+                manager.tryCompleteJob(job.id, response.result?.toString())
             }
-        } else {
-            val exception = result.exceptionOrNull()
-            if (exception is PluginPausedException) {
-                manager.tryPauseJob(job.id, exception.resumeState)
-            } else {
-                manager.tryFailJob(job.id, exception?.message ?: "Unknown error")
+            is ExecutionResult.Paused -> {
+                manager.tryPauseJob(job.id, result.resumeState)
+            }
+            is ExecutionResult.Error -> {
+                manager.tryFailJob(job.id, result.message)
             }
         }
     }
@@ -158,12 +157,12 @@ class JobWorker(
         val plugin = PluginLoader.getPluginById(job.pluginId)
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
-        val context = createExecutionContext(job)
+        val context = pluginManager.createPluginContext(job.pluginId, job.id)
 
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: kotlinx.coroutines.Deferred<Result<PluginResponse>>
+            override val result: kotlinx.coroutines.Deferred<ExecutionResult>
                 get() = throw UnsupportedOperationException("Not used for setup")
 
             override fun pause() { /* Not supported */
@@ -203,12 +202,12 @@ class JobWorker(
         val plugin = PluginLoader.getPluginById(job.pluginId)
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
-        val context = createExecutionContext(job)
-
-        // Register a simple handle for cancellation
-        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
-        manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: kotlinx.coroutines.Deferred<Result<PluginResponse>>
+        val context = pluginManager.createPluginContext(job.pluginId, job.id)
+ 
+         // Register a simple handle for cancellation
+         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+         manager.registerJobHandle(job.id, object : JobHandle {
+            override val result: kotlinx.coroutines.Deferred<ExecutionResult>
                 get() = throw UnsupportedOperationException("Not used for validation")
 
             override fun pause() { /* Not supported */
@@ -239,12 +238,12 @@ class JobWorker(
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
         val processor = plugin.getProcessor()
-        val context = createExecutionContext(job)
+        val context = pluginManager.createPluginContext(job.pluginId, job.id)
 
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: kotlinx.coroutines.Deferred<Result<PluginResponse>>
+            override val result: kotlinx.coroutines.Deferred<ExecutionResult>
                 get() = throw UnsupportedOperationException("Not used for actions")
 
             override fun pause() { /* Not supported for actions currently */ }
@@ -257,7 +256,11 @@ class JobWorker(
         manager.updateJobProgress(job.id, 0.1f)
         manager.addJobLog(job.id, "Executing action: ${job.capabilityName}")
 
-        val result = processor.runAction(job.capabilityName, context)
+        val manifest = plugin.getManifest()
+        val action = manifest.actions.find { it.functionName == job.capabilityName }
+            ?: throw Exception("Action ${job.capabilityName} not found in manifest")
+
+        val result = processor.runAction(action, context)
         
         if (result.isSuccess) {
             manager.updateJobProgress(job.id, 1.0f)
@@ -269,13 +272,8 @@ class JobWorker(
         }
     }
 
-    private fun createExecutionContext(job: BackgroundJob): ExecutionContext {
-        return pluginManager.createExecutionContext(job.pluginId, job.id)
-    }
-
     fun stop() {
         isActive = false
         workerJob.cancel()
     }
 }
-

@@ -56,7 +56,10 @@ class PluginSettingsViewModel(
 
     fun runAction(actionName: String) {
         viewModelScope.launch {
-            pluginManager.runAction(pkg, actionName)
+            val action = manifest?.actions?.find { it.functionName == actionName || it.name == actionName }
+            if (action != null) {
+                pluginManager.runAction(pkg, action)
+            }
         }
     }
 }

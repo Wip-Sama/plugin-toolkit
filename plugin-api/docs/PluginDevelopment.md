@@ -98,43 +98,66 @@ Initial:
 1.  **Initialize**: `initialize(context)` is called when the plugin is first loaded. Use this to set up global resources.
 2.  **Setup**: `performSetup(context)` (triggered by `@PluginSetup`) is called during installation or manual setup. Use this for one-time tasks like extracting resources or installing dependencies.
 3.  **Validate**: `validate(context)` (triggered by `@PluginValidate`) is called to ensure the plugin is healthy and ready to run.
-4.  **Execute**: When a capability is invoked, the `DataProcessor` handles the request.
+4.  **Execute**: When a capability is invoked, the `DataProcessor` handles the request. This can return either a direct result or an `ExecutionResult` for complex lifecycle control.
 5.  **Shutdown**: `shutdown()` is called when the plugin is unloaded.
 
 ## State Management (Pause & Resume)
 
-For long-running tasks, you can support Pause/Resume.
+For long-running tasks, you can support Pause/Resume using the `ExecutionResult` sealed class.
+
 1.  Set `supportsPause = true` in the `@Capability` annotation.
 2.  Add a parameter annotated with `@ResumeState` of type `JsonElement?`.
-3.  Inside your function, check for signals or use the `ExecutionContext` to save state.
+3.  Use `context.signals.onSignal` to listen for lifecycle events.
+4.  Return `ExecutionResult.Paused(state)` when pausing.
 
 ```kotlin
 @Capability(name = "Long Task", supportsPause = true)
 suspend fun longTask(
     @ResumeState resumeState: JsonElement?,
-    context: ExecutionContext
-): String {
-    var progress = resumeState?.toProgress() ?: 0
+    context: PluginContext
+): ExecutionResult {
+    var currentProgress = resumeState?.toProgress() ?: 0
+    var isPaused = false
     
-    context.onSignal { signal ->
+    context.signals.onSignal { signal ->
         if (signal == PluginSignal.PAUSE) {
-            val state = saveCurrentState(progress)
-            context.pause(state) // Throws PluginPausedException
+            isPaused = true
         }
     }
     
-    // ... work ...
+    // Loop with pause check
+    while (currentProgress < 100) {
+        if (isPaused) {
+            return ExecutionResult.Paused(Json.encodeToJsonElement(currentProgress))
+        }
+        // ... do work ...
+    }
+    
+    return ExecutionResult.Success(PluginResponse("Completed"))
 }
 ```
+> [!NOTE]
+> `PluginPausedException` is deprecated. Use `ExecutionResult` for clean control flow.
 Signals also allow for special handling of cancellation if the plugin need to clean resources.
 While you can set a plugin to "not support cancellation" the host app can force-cancel the execution.
 
-## Working with the Host
+### Working with the Host
 
-The `ExecutionContext` provides access to host services:
-- **Logger**: `context.logger.info("Message")`
-- **File System**: `context.fileSystem` (for plugin data) and `context.cacheFileSystem` (for temporary files).
-- **Progress**: `context.progress.report(0.5f)`
+The `PluginContext` (and focused interfaces like `PluginLogger`, `PluginFileSystem`) provide access to host services:
+- **Logger**: `PluginLogger` (e.g. `logger.info("Message")`)
+- **File System**: `PluginFileSystem` (e.g. `fileSystem.getBasePath()`)
+- **Progress**: `ProgressReporter` (e.g. `progress.report(0.5f)`)
+- **Signals**: `PluginSignalManager` (e.g. `context.signals.onSignal { ... }`)
+
+You can inject either the full `PluginContext` or just the specific interfaces your function needs:
+
+```kotlin
+@PluginAction(name = "Clean Logs")
+suspend fun cleanLogs(logger: PluginLogger, fileSystem: PluginFileSystem) {
+    logger.info("Cleaning logs in ${fileSystem.getBasePath()}")
+    // ...
+}
+```
 
 ### Extracting Bundled Resources
 
@@ -144,18 +167,20 @@ This is typically done inside the `@PluginSetup` function:
 
 ```kotlin
 @PluginSetup
-suspend fun setup(context: ExecutionContext): Result<Unit> {
-    context.logger.info("Extracting native tools...")
+suspend fun setup(context: PluginContext): Result<Unit> {
+    val logger = context.logger
+    val fileSystem = context.fileSystem
+    logger.info("Extracting native tools...")
     
     // Extract "tools/helper.exe" from JAR to "[plugin-dir]/bin/helper.exe"
-    return context.fileSystem.extractResource(
+    return fileSystem.extractResource(
         resourcePath = "tools/helper.exe",
         targetRelativePath = "bin/helper.exe"
     )
 }
 ```
 
-Once extracted, you can use `context.fileSystem.getBasePath()` to get the absolute path if you need to execute a file via `ProcessBuilder`.
+Once extracted, you can use `fileSystem.getBasePath()` to get the absolute path if you need to execute a file via `ProcessBuilder`.
 
 ## Best Practices
 

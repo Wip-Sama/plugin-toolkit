@@ -94,7 +94,7 @@ fun main(args: Array<String>) {
                 )
             }
             single { PluginViewModel(get(), get(), get()) }
-            factory { SettingsViewModel(get(), get()) }
+            factory { SettingsViewModel(get(), get(), get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get()) }

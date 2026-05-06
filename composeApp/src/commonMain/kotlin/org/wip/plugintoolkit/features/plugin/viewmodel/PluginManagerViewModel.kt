@@ -269,7 +269,13 @@ class PluginManagerViewModel(
 
     fun runAction(pkg: String, actionName: String) {
         viewModelScope.launch {
-            pluginManager.runAction(pkg, actionName)
+            val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+            val action = manifest?.actions?.find { it.name == actionName || it.functionName == actionName }
+            if (action != null) {
+                pluginManager.runAction(pkg, action)
+            } else {
+                co.touchlab.kermit.Logger.e { "Action $actionName not found for plugin $pkg" }
+            }
         }
     }
 }

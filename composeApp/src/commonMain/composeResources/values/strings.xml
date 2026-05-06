@@ -119,6 +119,8 @@
     <string name="update_changelog_title">What\'s New</string>
     <string name="update_check_failed">Failed to check for updates</string>
     <string name="update_no_updates">You are running the latest version</string>
+    <string name="update_check_started">Checking for updates...</string>
+    <string name="update_new_version_found">New version available: %1$s</string>
     <string name="action_check_for_updates">Check for Updates</string>
 
     <!-- General / Common -->

@@ -26,7 +26,7 @@ object KotlinGenerator {
         val entryName = baseClassName + "PluginEntry"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
-            .addImport("org.wip.plugintoolkit.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "PluginAction", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType", "JobHandle", "PluginSignal")
+            .addImport("org.wip.plugintoolkit.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "PluginAction", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType", "JobHandle", "PluginSignal", "PluginContext", "PluginLogger", "PluginFileSystem", "ProgressReporter", "ExecutionResult")
             .addImport("kotlinx.serialization.json", "Json", "decodeFromJsonElement", "encodeToJsonElement")
             .addImport("kotlinx.coroutines", "CoroutineScope", "Dispatchers", "SupervisorJob", "async", "launch", "cancel")
 
@@ -41,6 +41,11 @@ object KotlinGenerator {
         // 3. Generate Entry Class
         val entryType = generateEntryClass(entryName, packageName, baseClassName, manifestName, dispatcherName, classDeclaration)
         fileSpec.addType(entryType)
+
+        // 4. Generate Action Registry
+        val registryName = baseClassName + "Actions"
+        val registryType = generateActionRegistry(registryName, actions)
+        fileSpec.addType(registryType)
 
         return fileSpec.build()
     }
@@ -91,7 +96,13 @@ object KotlinGenerator {
                 val paramType = param.type.resolve().toTypeName()
                 
                 val typeStr = paramType.toString()
-                if (typeStr != "org.wip.plugintoolkit.api.PluginLogger" && typeStr != "org.wip.plugintoolkit.api.ProgressReporter" && typeStr != "org.wip.plugintoolkit.api.PluginFileSystem" && typeStr != "org.wip.plugintoolkit.api.ExecutionContext") {
+                val isInfrastructure = typeStr == "org.wip.plugintoolkit.api.PluginLogger" || 
+                                     typeStr == "org.wip.plugintoolkit.api.ProgressReporter" || 
+                                     typeStr == "org.wip.plugintoolkit.api.PluginFileSystem" || 
+                                     typeStr == "org.wip.plugintoolkit.api.ExecutionContext" ||
+                                     typeStr == "org.wip.plugintoolkit.api.PluginContext"
+
+                if (!isInfrastructure) {
                     val defaultValueCode = if (defaultValue.isNotEmpty()) "Json.parseToJsonElement(%S)" else "%L"
                     val defaultValueVal = defaultValue.ifEmpty { "null" }
                     
@@ -205,7 +216,7 @@ object KotlinGenerator {
                     .build()
             )
             .addProperty(
-                PropertySpec.builder("context", ClassName("org.wip.plugintoolkit.api", "ExecutionContext").copy(nullable = true))
+                PropertySpec.builder("context", ClassName("org.wip.plugintoolkit.api", "PluginContext").copy(nullable = true))
                     .mutable(true)
                     .initializer("null")
                     .addModifiers(KModifier.PRIVATE)
@@ -228,7 +239,7 @@ object KotlinGenerator {
             .addFunction(
                 FunSpec.builder("setExecutionContext")
                     .addModifiers(KModifier.OVERRIDE)
-                    .addParameter("context", ClassName("org.wip.plugintoolkit.api", "ExecutionContext"))
+                    .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
                     .addStatement("this.context = context")
                     .build()
             )
@@ -238,7 +249,7 @@ object KotlinGenerator {
             String::class.asClassName(),
             LambdaTypeName.get(
                 parameters = listOf(ParameterSpec.unnamed(ClassName("org.wip.plugintoolkit.api", "PluginRequest"))),
-                returnType = ClassName("org.wip.plugintoolkit.api", "PluginResponse")
+                returnType = ClassName("org.wip.plugintoolkit.api", "ExecutionResult")
             ).copy(suspending = true)
         )
 
@@ -249,7 +260,7 @@ object KotlinGenerator {
         functions.forEachIndexed { index, func ->
             val capAnn = func.annotations.first { it.shortName.asString() == "Capability" }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
-            val methodName = func.simpleName.asString()
+                val methodName = func.simpleName.asString()
             
             mapCode.add("%S to { request ->\n", capName.lowercase())
             mapCode.indent()
@@ -264,15 +275,14 @@ object KotlinGenerator {
                 val isNullable = param.type.resolve().isMarkedNullable
                 val hasDefault = param.hasDefault
                 
-                // if (typeStr == "org.wip.plugintoolkit.api.PluginLogger") {
-                //    mapCode.add("context?.logger ?: throw IllegalStateException(%S)", "Logger not available")
-                // } else if (typeStr == "org.wip.plugintoolkit.api.ProgressReporter") {
-                //    mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
-                // } else if (typeStr == "org.wip.plugintoolkit.api.PluginFileSystem") {
-                //     mapCode.add("context?.fileSystem ?: throw IllegalStateException(%S)", "FileSystem not available")
-                // } else
-                if (typeStr == "org.wip.plugintoolkit.api.ExecutionContext") {
-                    mapCode.add("context ?: throw IllegalStateException(%S)", "ExecutionContext not available")
+                if (typeStr == "org.wip.plugintoolkit.api.PluginLogger") {
+                   mapCode.add("context?.logger ?: throw IllegalStateException(%S)", "Logger not available")
+                } else if (typeStr == "org.wip.plugintoolkit.api.ProgressReporter") {
+                   mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
+                } else if (typeStr == "org.wip.plugintoolkit.api.PluginFileSystem") {
+                    mapCode.add("context?.fileSystem ?: throw IllegalStateException(%S)", "FileSystem not available")
+                } else if (typeStr == "org.wip.plugintoolkit.api.ExecutionContext" || typeStr == "org.wip.plugintoolkit.api.PluginContext") {
+                    mapCode.add("context ?: throw IllegalStateException(%S)", "PluginContext not available")
                 } else if (param.annotations.any { it.shortName.asString() == "ResumeState" }) {
                     mapCode.add("request.resumeState?.let { Json.decodeFromJsonElement<%T>(it) }", paramType)
                 } else if (hasDefault) {
@@ -286,7 +296,13 @@ object KotlinGenerator {
             }
             mapCode.unindent()
             mapCode.add(")\n")
-            mapCode.add("PluginResponse(result = Json.encodeToJsonElement(result), metadata = mapOf(\"status\" to \"success\"))\n")
+            
+            val returnType = func.returnType?.resolve()?.toTypeName()?.toString()
+            if (returnType == "org.wip.plugintoolkit.api.ExecutionResult") {
+                mapCode.add("result\n")
+            } else {
+                mapCode.add("ExecutionResult.Success(PluginResponse(result = Json.encodeToJsonElement(result), metadata = mapOf(\"status\" to \"success\")))\n")
+            }
             mapCode.unindent()
             mapCode.add("}")
             if (index < functions.size - 1) mapCode.add(",\n") else mapCode.add("\n")
@@ -305,12 +321,12 @@ object KotlinGenerator {
         val processFunc = FunSpec.builder("process")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("request", ClassName("org.wip.plugintoolkit.api", "PluginRequest"))
-            .returns(ClassName("kotlin", "Result").parameterizedBy(ClassName("org.wip.plugintoolkit.api", "PluginResponse")))
+            .returns(ClassName("org.wip.plugintoolkit.api", "ExecutionResult"))
             .beginControlFlow("return try")
             .addStatement("val handler = handlers[request.method.lowercase()] ?: throw IllegalArgumentException(%S)", "Unknown method: \${request.method}")
-            .addStatement("Result.success(handler(request))")
+            .addStatement("handler(request)")
             .nextControlFlow("catch (e: Exception)")
-            .addStatement("Result.failure(e)")
+            .addStatement("ExecutionResult.Error(e.message ?: \"Unknown error\", e)")
             .endControlFlow()
         
         dispatcherType.addFunction(processFunc.build())
@@ -323,18 +339,20 @@ object KotlinGenerator {
                 val handler = handlers[request.method.lowercase()] ?: throw IllegalArgumentException("Unknown method: ${'$'}{request.method}")
                 val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
                 val deferred = scope.async {
-                    runCatching {
+                    try {
                         handler(request)
+                    } catch (e: Exception) {
+                        ExecutionResult.Error(e.message ?: "Unknown error", e)
                     }
                 }
                 
                 return object : JobHandle {
                     override val result = deferred
                     override fun pause() {
-                        scope.launch { context?.sendSignal(PluginSignal.PAUSE) }
+                        scope.launch { context?.signals?.sendSignal(PluginSignal.PAUSE) }
                     }
                     override fun cancel(force: Boolean) {
-                        scope.launch { context?.sendSignal(PluginSignal.CANCEL) }
+                        scope.launch { context?.signals?.sendSignal(PluginSignal.CANCEL) }
                         deferred.cancel()
                         if (force) {
                             scope.cancel()
@@ -349,7 +367,7 @@ object KotlinGenerator {
         val actionMapType = ClassName("kotlin.collections", "Map").parameterizedBy(
             String::class.asClassName(),
             LambdaTypeName.get(
-                parameters = listOf(ParameterSpec.unnamed(ClassName("org.wip.plugintoolkit.api", "ExecutionContext"))),
+                parameters = listOf(ParameterSpec.unnamed(ClassName("org.wip.plugintoolkit.api", "PluginContext"))),
                 returnType = ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName())
             ).copy(suspending = true)
         )
@@ -361,7 +379,19 @@ object KotlinGenerator {
             val methodName = func.simpleName.asString()
             actionMapCode.add("%S to { context ->\n", methodName.lowercase())
             actionMapCode.indent()
-            actionMapCode.add("runCatching { processor.%L(context) }\n", methodName)
+            val actParams = func.parameters
+            val actArgs = actParams.joinToString(", ") { param ->
+                val t = param.type.resolve().toTypeName().toString()
+                when (t) {
+                    "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
+                    "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
+                    "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
+                    "org.wip.plugintoolkit.api.ExecutionContext" -> "context"
+                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
+                    else -> param.name?.asString() ?: ""
+                }
+            }
+            actionMapCode.add("runCatching { processor.%L($actArgs) }\n", methodName)
             actionMapCode.unindent()
             actionMapCode.add("}")
             if (index < actions.size - 1) actionMapCode.add(",\n") else actionMapCode.add("\n")
@@ -378,10 +408,10 @@ object KotlinGenerator {
 
         val runActionFunc = FunSpec.builder("runAction")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("actionName", String::class)
-            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "ExecutionContext"))
+            .addParameter("action", ClassName("org.wip.plugintoolkit.api", "PluginAction"))
+            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
             .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
-            .addStatement("val handler = actionHandlers[actionName.lowercase()] ?: return Result.failure(IllegalArgumentException(\"Unknown action: \$actionName\"))")
+            .addStatement("val handler = actionHandlers[action.functionName.lowercase()] ?: return Result.failure(IllegalArgumentException(\"Unknown action: \${action.functionName}\"))")
             .addStatement("return handler(context)")
         
         dispatcherType.addFunction(runActionFunc.build())
@@ -430,9 +460,9 @@ object KotlinGenerator {
             .addFunction(
                 FunSpec.builder("initialize")
                     .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-                    .addParameter("context", ClassName("org.wip.plugintoolkit.api", "ExecutionContext"))
+                    .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
                     .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
-                    .addStatement("return Result.success(Unit)")
+                    .addStatement("return processor.initialize(context)")
                     .build()
             )
             .addFunction(
@@ -476,7 +506,7 @@ object KotlinGenerator {
         // 3. performSetup
         val setupFunBuilder = FunSpec.builder("performSetup")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "ExecutionContext"))
+            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
             .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
 
         if (setupFunction != null) {
@@ -488,6 +518,7 @@ object KotlinGenerator {
                     "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
                     "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
                     "org.wip.plugintoolkit.api.ExecutionContext" -> "context"
+                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
                     else -> param.name?.asString() ?: ""
                 }
             }
@@ -500,7 +531,7 @@ object KotlinGenerator {
         // 4. validate
         val validateFunBuilder = FunSpec.builder("validate")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "ExecutionContext"))
+            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
             .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
 
         if (validateFunction != null) {
@@ -512,6 +543,7 @@ object KotlinGenerator {
                     "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
                     "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
                     "org.wip.plugintoolkit.api.ExecutionContext" -> "context"
+                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
                     else -> param.name?.asString() ?: ""
                 }
             }
@@ -522,5 +554,24 @@ object KotlinGenerator {
         entryType.addFunction(validateFunBuilder.build())
 
         return entryType.build()
+    }
+
+    private fun generateActionRegistry(registryName: String, actions: List<KSFunctionDeclaration>): TypeSpec {
+        val registryType = TypeSpec.objectBuilder(registryName)
+        
+        actions.forEach { func ->
+            val ann = func.annotations.first { it.shortName.asString() == "PluginAction" }
+            val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
+            val constName = actName.uppercase().replace(" ", "_")
+            
+            registryType.addProperty(
+                PropertySpec.builder(constName, String::class)
+                    .addModifiers(KModifier.CONST)
+                    .initializer("%S", func.simpleName.asString())
+                    .build()
+            )
+        }
+        
+        return registryType.build()
     }
 }
