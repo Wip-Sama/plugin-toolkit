@@ -15,7 +15,7 @@ private data class LoadedPlugin(
     val jarPath: String,
     val entry: PluginEntry,
     val classLoader: URLClassLoader,
-    val koin: Koin
+    val koinApp: org.koin.core.KoinApplication
 )
 
 actual object PluginLoader {
@@ -69,7 +69,7 @@ actual object PluginLoader {
                 val koin = koinApp.koin
                 val pluginEntry = koin.get<PluginEntry>()
 
-                val loadedPlugin = LoadedPlugin(normalizedPath, pluginEntry, newClassLoader, koin)
+                val loadedPlugin = LoadedPlugin(normalizedPath, pluginEntry, newClassLoader, koinApp)
                 loadedPlugins[normalizedPath] = loadedPlugin
 
                 Logger.i { "Successfully loaded plugin from $normalizedPath (Total tracked: ${loadedPlugins.size})" }
@@ -87,8 +87,9 @@ actual object PluginLoader {
             Logger.i { "Unloading plugin: $normalizedPath" }
             try {
                 it.entry.shutdown()
+                it.koinApp.close()
                 it.classLoader.close()
-                Logger.i { "Successfully unloaded and closed classloader for $normalizedPath" }
+                Logger.i { "Successfully unloaded, closed Koin app and classloader for $normalizedPath" }
             } catch (e: Exception) {
                 Logger.e(e) { "Error during shutdown of plugin at $normalizedPath" }
             }
