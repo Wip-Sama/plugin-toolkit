@@ -35,5 +35,3 @@ plugins {
 include(":composeApp")
 include(":plugin-api")
 include(":operations")
-include(":slicer")
-include(":bettermanhwa")

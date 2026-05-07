@@ -3,6 +3,7 @@ Plugin:
 
 Plugin Api:
 - (?) Plan to switch of plugins access files in a way that allow the main app to preload/prepare the needed resources to have more control on how the plugins operate
+- Add pause/cancel call to be able to properly pause the program
 - Byte cose scanning for future security settings
 - Documentation for update plugin api (make it work)
 - Documentation for plugin setting page (make it work)
@@ -16,7 +17,7 @@ Gradle:
 Documentation:
 - The api interface should have documentation for the various annotations and what / how to use it, probably with Dokka
 - Define repo in the documentation
-- Better .md 
+- Better .md
 
 Job:
 - Currently there is no handling for when a plugin is plugged out and a job is running
@@ -48,6 +49,8 @@ Auto update:
 General:
 - Notify that to set the system startup in the registry you need to start the application as administrator
 > Possibly implement a way to start a subprocess to avoid restarting teh app and spawn that as administrator
+- Add app author
+- Add app image
 
 Security:
 - Sign App releases
@@ -56,9 +59,5 @@ Security:
 - Sign modules
 > Same procedure as app for modules update
 
-General:
-- Remove hardcoded strings
-- Check if the app is able to successfully update itself
-- The resolver in ManifestProcessor could probably be removed
-
 Bugs:
+- For some reasons when updating the app teh first start will not load all plugins

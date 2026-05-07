@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
@@ -59,7 +58,6 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
-import org.wip.plugintoolkit.features.plugin.ui.PluginSettingsDialog
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
@@ -151,13 +149,13 @@ fun PluginManagerView(
                     onToggle = { viewModel.toggleEnabled(plugin.pkg, it) },
                     onAction = { action ->
                         when (action) {
-                            PluginAction.Uninstall -> viewModel.uninstall(plugin.pkg)
-                            PluginAction.Reload -> viewModel.reload(plugin.pkg)
-                            PluginAction.Update -> viewModel.updatePlugin(plugin.pkg)
-                            PluginAction.Validate -> viewModel.validatePlugin(plugin.pkg)
-                            PluginAction.Changelog -> viewModel.showChangelog(plugin.pkg)
-                            PluginAction.Settings -> viewModel.openSettings(plugin.pkg)
-                            is PluginAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
+                            PluginStatusAction.Uninstall -> viewModel.uninstall(plugin.pkg)
+                            PluginStatusAction.Reload -> viewModel.reload(plugin.pkg)
+                            PluginStatusAction.Update -> viewModel.updatePlugin(plugin.pkg)
+                            PluginStatusAction.Validate -> viewModel.validatePlugin(plugin.pkg)
+                            PluginStatusAction.Changelog -> viewModel.showChangelog(plugin.pkg)
+                            PluginStatusAction.Settings -> viewModel.openSettings(plugin.pkg)
+                            is PluginStatusAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
                         }
                     }
                 )
@@ -222,7 +220,7 @@ fun PluginCard(
     hasUpdate: Boolean,
     customActions: List<org.wip.plugintoolkit.api.PluginAction>,
     onToggle: (Boolean) -> Unit,
-    onAction: (PluginAction) -> Unit
+    onAction: (PluginStatusAction) -> Unit
 ) {
     val statusColor = if (plugin.loadError != null) MaterialTheme.colorScheme.error
     else if (isLoaded) ToolkitTheme.colors.success
@@ -297,7 +295,7 @@ fun PluginCard(
                 )
                 if (plugin.loadError != null) {
                     Text(
-                        plugin.loadError!!,
+                        plugin.loadError,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 4.dp)
@@ -309,7 +307,7 @@ fun PluginCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (hasUpdate) {
                     Button(
-                        onClick = { onAction(PluginAction.Update) },
+                        onClick = { onAction(PluginStatusAction.Update) },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                         modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
                     ) {
@@ -317,7 +315,7 @@ fun PluginCard(
                     }
                 } else {
                     OutlinedButton(
-                        onClick = { onAction(PluginAction.Update) },
+                        onClick = { onAction(PluginStatusAction.Update) },
                         modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
                     ) {
                         Text(stringResource(Res.string.plugin_update_local))
@@ -335,33 +333,24 @@ fun PluginCard(
                         )
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        customActions.forEach { action ->
-                            DropdownMenuItem(
-                                text = { Text(action.name) },
-                                onClick = { onAction(PluginAction.Custom(action.functionName)); expanded = false },
-                                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
-                            )
-                        }
-                        if (customActions.isNotEmpty()) HorizontalDivider()
-
                         DropdownMenuItem(
                             text = { Text(stringResource(Res.string.plugin_reload)) },
-                            onClick = { onAction(PluginAction.Reload); expanded = false },
+                            onClick = { onAction(PluginStatusAction.Reload); expanded = false },
                             leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(Res.string.plugin_validate)) },
-                            onClick = { onAction(PluginAction.Validate); expanded = false },
+                            onClick = { onAction(PluginStatusAction.Validate); expanded = false },
                             leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(Res.string.plugin_changelog)) },
-                            onClick = { onAction(PluginAction.Changelog); expanded = false },
+                            onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
                             leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(Res.string.plugin_settings)) },
-                            onClick = { onAction(PluginAction.Settings); expanded = false },
+                            onClick = { onAction(PluginStatusAction.Settings); expanded = false },
                             leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
                         )
                         HorizontalDivider()
@@ -372,7 +361,7 @@ fun PluginCard(
                                     color = MaterialTheme.colorScheme.error
                                 )
                             },
-                            onClick = { onAction(PluginAction.Uninstall); expanded = false },
+                            onClick = { onAction(PluginStatusAction.Uninstall); expanded = false },
                             leadingIcon = {
                                 Icon(
                                     Icons.Default.Delete,
@@ -408,12 +397,12 @@ private fun StatusBadge(text: String, color: Color) {
     }
 }
 
-sealed class PluginAction {
-    object Uninstall : PluginAction()
-    object Reload : PluginAction()
-    object Validate : PluginAction()
-    object Update : PluginAction()
-    object Changelog : PluginAction()
-    object Settings : PluginAction()
-    data class Custom(val name: String) : PluginAction()
+sealed class PluginStatusAction {
+    object Uninstall : PluginStatusAction()
+    object Reload : PluginStatusAction()
+    object Validate : PluginStatusAction()
+    object Update : PluginStatusAction()
+    object Changelog : PluginStatusAction()
+    object Settings : PluginStatusAction()
+    data class Custom(val name: String) : PluginStatusAction()
 }

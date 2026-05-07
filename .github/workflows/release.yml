@@ -30,7 +30,8 @@ jobs:
         run: .\gradlew test
 
       - name: Build Release Distribution
-        run: .\gradlew packageReleaseDistributionForCurrentOS packageReleaseUberJarForCurrentOS
+        run: .\gradlew packageDistributionForCurrentOS packageUberJarForCurrentOS
+        # run: .\gradlew packageReleaseDistributionForCurrentOS packageReleaseUberJarForCurrentOS
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

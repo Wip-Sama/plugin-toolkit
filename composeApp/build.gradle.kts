@@ -79,8 +79,30 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "org.wip.plugintoolkit"
+            packageName = "PluginToolkit"
             packageVersion = libs.versions.app.get()
+            includeAllModules = true
+            // Explicitly include modules often required by JNA/DBus, reflection, and core features
+            modules(
+                "java.instrument", 
+                "jdk.unsupported", 
+                "java.naming", 
+                "java.sql", 
+                "java.management", 
+                "jdk.crypto.ec",
+                "java.desktop",
+                "java.xml",
+                "java.scripting",
+                "java.logging",
+                "jdk.charsets"
+            )
+        }
+
+        jvmArgs("-Dcompose.desktop.verbose=true", "-Xmx2G")
+
+        buildTypes.release.proguard {
+            obfuscate.set(false)
+            configurationFiles.from(project.file("compose-desktop.pro"))
         }
     }
 }

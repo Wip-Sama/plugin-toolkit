@@ -74,9 +74,23 @@ import java.awt.Dimension
 
 
 fun main(args: Array<String>) {
+    try {
+        runMain(args)
+    } catch (e: Throwable) {
+        e.printStackTrace()
+        javax.swing.JOptionPane.showMessageDialog(
+            null,
+            "Error during startup:\n${e.message}\n\nCheck logs for details.",
+            "Startup Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE
+        )
+        System.exit(1)
+    }
+}
+
+fun runMain(args: Array<String>) {
     FileKit.init(appId = "org.wip.plugintoolkit")
 
-    // Check if we should start minimized
     // Determine initial window state based on persistence directly
     val persistence = JvmSettingsPersistence()
     val initialSettings = persistence.load()
