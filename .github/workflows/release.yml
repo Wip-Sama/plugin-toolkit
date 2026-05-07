@@ -36,7 +36,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-${{ matrix.os }}
-          path: composeApp/build/compose/
+          path: |
+            composeApp/build/compose/
+            !composeApp/build/compose/tmp/**
 
   release:
     name: Create Release
