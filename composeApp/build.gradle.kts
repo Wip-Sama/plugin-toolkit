@@ -81,6 +81,8 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "PluginToolkit"
             packageVersion = libs.versions.app.get()
+            vendor = "Wip-Sama"
+            description = "A working toolkit for using plugins."
             includeAllModules = true
             // Explicitly include modules often required by JNA/DBus, reflection, and core features
             modules(

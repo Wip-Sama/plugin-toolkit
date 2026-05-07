@@ -1,10 +1,13 @@
 Version: 1.3.0
 Date: 06-05-2026
+Added:
+  - App logo by [Muh_zakaria](https://www.svgrepo.com/author/muh_zakaria/)
+  - Changelog for 1.2.0
 Fixes:
   - release.yml no longer add all the tmp files to the release
-  - added changelog for 1.2.0
 Planned:
   - switch to proGuard (release distribution) for actual releases, for now it removes too much from the jar to mak this viable
+  - Markdown support in changelog
 ----------------------------------------------------------------------------------------------------
 Version: 1.2.0
 Date: 06-05-2026

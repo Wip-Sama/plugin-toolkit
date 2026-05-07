@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
@@ -218,7 +219,7 @@ fun PluginCard(
     plugin: InstalledPlugin,
     isLoaded: Boolean,
     hasUpdate: Boolean,
-    customActions: List<org.wip.plugintoolkit.api.PluginAction>,
+    customActions: List<PluginAction>,
     onToggle: (Boolean) -> Unit,
     onAction: (PluginStatusAction) -> Unit
 ) {

@@ -68,8 +68,8 @@ import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.app_logo
 import plugintoolkit.composeapp.generated.resources.app_name
-import plugintoolkit.composeapp.generated.resources.compose_multiplatform
 import java.awt.Dimension
 
 
@@ -206,7 +206,7 @@ fun runMain(args: Array<String>) {
 
         Tray(
             state = trayState,
-            icon = painterResource(Res.drawable.compose_multiplatform),
+            icon = painterResource(Res.drawable.app_logo),
             tooltip = stringResource(Res.string.app_name),
             onAction = { isVisible = true },
             menu = {
@@ -226,6 +226,7 @@ fun runMain(args: Array<String>) {
                     }
                 },
                 title = stringResource(Res.string.app_name),
+                icon = painterResource(Res.drawable.app_logo),
                 state = windowState
             ) {
                 // Set minimum window size

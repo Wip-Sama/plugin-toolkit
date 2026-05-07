@@ -49,8 +49,9 @@ Auto update:
 General:
 - Notify that to set the system startup in the registry you need to start the application as administrator
 > Possibly implement a way to start a subprocess to avoid restarting teh app and spawn that as administrator
-- Add app author
-- Add app image
+- [x] Add app author
+- [x] Add app image
+- [ ] Add icon provider attribution (muh_zakaria from SVGRepo) in the About section (https://www.svgrepo.com/author/muh_zakaria/)
 
 Security:
 - Sign App releases
@@ -61,3 +62,7 @@ Security:
 
 Bugs:
 - For some reasons when updating the app teh first start will not load all plugins
+
+Changelog:
+- Markdown support
+- Switch changelog.txt to changelog.md
