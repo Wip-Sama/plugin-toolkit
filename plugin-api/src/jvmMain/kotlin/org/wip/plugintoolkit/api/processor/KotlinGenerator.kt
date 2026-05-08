@@ -27,12 +27,15 @@ object KotlinGenerator {
         val entryName = baseClassName + "PluginEntry"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
-            .addImport("org.wip.plugintoolkit.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "PluginAction", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "UpdateType", "JobHandle", "PluginSignal", "PluginContext", "PluginLogger", "PluginFileSystem", "ProgressReporter", "ExecutionResult")
+            .addImport("org.wip.plugintoolkit.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "PluginAction", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "JobHandle", "PluginSignal", "PluginContext", "PluginLogger", "PluginFileSystem", "ProgressReporter", "ExecutionResult")
             .addImport("kotlinx.serialization.json", "Json", "decodeFromJsonElement", "encodeToJsonElement")
             .addImport("kotlinx.coroutines", "CoroutineScope", "Dispatchers", "SupervisorJob", "async", "launch", "cancel")
 
         // 1. Generate Manifest Object
-        val manifestType = generateManifestObject(manifestName, id, name, version, description, minMemoryMb, minExecutionTimeMs, functions, settingsProperties, actions)
+        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
+        val updateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
+        
+        val manifestType = generateManifestObject(manifestName, id, name, version, description, minMemoryMb, minExecutionTimeMs, functions, settingsProperties, actions, updateFunction != null, setupFunction != null)
         fileSpec.addType(manifestType)
 
         // 2. Generate Dispatcher Class
@@ -61,7 +64,9 @@ object KotlinGenerator {
         minExecutionTimeMs: Int,
         functions: List<KSFunctionDeclaration>,
         settingsProperties: List<KSPropertyDeclaration>,
-        actions: List<KSFunctionDeclaration>
+        actions: List<KSFunctionDeclaration>,
+        hasUpdateHandler: Boolean,
+        hasSetupHandler: Boolean
     ): TypeSpec {
         val manifestType = TypeSpec.objectBuilder(manifestName)
         
@@ -186,6 +191,7 @@ object KotlinGenerator {
                         .add(actionsCode.build())
                         .add(",\nsettings = ")
                         .add(settingsCode.build())
+                        .add(",\nhasUpdateHandler = %L,\nhasSetupHandler = %L\n", hasUpdateHandler, hasSetupHandler)
                         .unindent()
                         .add(")")
                         .build()
@@ -494,8 +500,9 @@ object KotlinGenerator {
         val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
         val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_VALIDATE_ANNOTATION) } }
         val loadFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_LOAD_ANNOTATION) } }
+        val updateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
 
-        // 3. performLoad
+        // performLoad
         val loadFunBuilder = FunSpec.builder("performLoad")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
@@ -519,7 +526,7 @@ object KotlinGenerator {
         }
         entryType.addFunction(loadFunBuilder.build())
 
-        // 4. performSetup
+        // performSetup
         val setupFunBuilder = FunSpec.builder("performSetup")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
@@ -543,7 +550,7 @@ object KotlinGenerator {
         }
         entryType.addFunction(setupFunBuilder.build())
 
-        // 5. validate
+        // performValidate
         val validateFunBuilder = FunSpec.builder("validate")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
@@ -566,6 +573,31 @@ object KotlinGenerator {
             validateFunBuilder.addStatement("return Result.success(Unit)")
         }
         entryType.addFunction(validateFunBuilder.build())
+        
+        // performUpdate
+        val updateFunBuilder = FunSpec.builder("performUpdate")
+            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
+            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+
+        if (updateFunction != null) {
+            val updateParams = updateFunction.parameters
+            val callArgs = updateParams.joinToString(", ") { param ->
+                val t = param.type.resolve().toTypeName().toString()
+                val qualifiedT = param.type.resolve().declaration.qualifiedName?.asString()
+                when (qualifiedT) {
+                    "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
+                    "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
+                    "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
+                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
+                    else -> param.name?.asString() ?: ""
+                }
+            }
+            updateFunBuilder.addStatement("return processor.${updateFunction.simpleName.asString()}($callArgs)")
+        } else {
+            updateFunBuilder.addStatement("return Result.success(Unit)")
+        }
+        entryType.addFunction(updateFunBuilder.build())
 
         return entryType.build()
     }

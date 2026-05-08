@@ -96,11 +96,25 @@ Initial:
 ## Plugin Lifecycle
 
 1.  **Initialize**: `initialize(context)` is called when the plugin is first loaded. Use this to set up global resources.
-2.  **Setup**: `performSetup(context)` (triggered by `@PluginSetup`) is called during installation or manual setup. Use this for one-time tasks like extracting resources or installing dependencies.
-3.  **Load**: `load(context)` (triggered by `@PluginLoad`) is called to allow the plugin to do some checks, should not be used to modify the files/plugin.
-4.  **Validate**: `validate(context)` (triggered by `@PluginValidate`) is called to ensure the plugin is healthy and ready to run.
-5.  **Execute**: When a capability is invoked, the `DataProcessor` handles the request. This can return either a direct result or an `ExecutionResult` for complex lifecycle control.
-6.  **Shutdown**: `shutdown()` is called when the plugin is unloaded.
+2.  **Setup**: `performSetup(context)` (triggered by `@PluginSetup`) is called during installation or manual setup. Use this for one-time tasks like extracting resources.
+3.  **Update**: `performUpdate(context)` (triggered by `@PluginUpdate`) is called when the plugin is being updated to a newer version.
+4.  **Load**: `performLoad(context)` (triggered by `@PluginLoad`) is called after initialization or immediately after a successful setup/update. Use this for runtime checks or environment validation.
+5.  **Validate**: `validate(context)` (triggered by `@PluginValidate`) is called before execution to ensure the plugin is healthy.
+6.  **Execute**: When a capability is invoked, the `DataProcessor` handles the request.
+7.  **Shutdown**: `shutdown()` is called when the plugin is unloaded.
+
+## Updating Plugins
+
+When a new version of a plugin is installed over an existing one, the toolkit follows a specific execution logic:
+
+1.  **@PluginUpdate**: If the new version defines a function annotated with `@PluginUpdate`, this function is called.
+2.  **@PluginSetup (Fallback)**: If no update handler is found, but a `@PluginSetup` handler exists, the toolkit will **clear the `files` directory** and then call the setup function.
+3.  **Replacement (Default)**: If neither handler is defined, the toolkit simply replaces the JAR file.
+
+In all cases, a successful update or setup is followed by an immediate call to the `@PluginLoad` handler (if present) to ensure the plugin is ready for its new version.
+
+> [!CAUTION]
+> If you rely on `@PluginSetup` for updates, be aware that your `files` folder will be wiped. If you need to preserve user data during an update, you **must** use `@PluginUpdate`.
 
 ## State Management (Pause & Resume)
 

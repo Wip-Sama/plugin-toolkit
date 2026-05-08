@@ -23,23 +23,13 @@ class PluginInstaller(
     /**
      * Installs a plugin from a local JAR file.
      */
-    suspend fun installLocal(filePath: String, targetFolderPath: String): Result<Unit> {
+    suspend fun installLocal(filePath: String, targetFolderPath: String): Result<PluginManifest?> {
         Logger.i { "Installing local plugin from: $filePath into $targetFolderPath" }
         return try {
             PlatformUtils.mkdirs(targetFolderPath)
 
             // Try to read manifest from JAR
-            val manifestContent = PlatformUtils.readFileFromZip(filePath, "manifest.json")
-                ?: PlatformUtils.readFileFromZip(filePath, "META-INF/manifest.json")
-
-            val manifest = manifestContent?.let {
-                try {
-                    json.decodeFromString<PluginManifest>(it)
-                } catch (e: Exception) {
-                    Logger.w { "Failed to parse manifest from zip: ${e.message}" }
-                    null
-                }
-            }
+            val manifest = getManifestFromJar(filePath)
 
             val pkg = manifest?.plugin?.id ?: filePath.replace('\\', '/').substringAfterLast("/").substringBeforeLast(".")
             val name = manifest?.plugin?.name ?: pkg
@@ -65,17 +55,31 @@ class PluginInstaller(
 
             registry.addOrUpdatePlugin(newPlugin)
             Logger.i { "Successfully installed local plugin: $pkg" }
-            Result.success(Unit)
+            Result.success(manifest)
         } catch (t: Throwable) {
             Logger.e(t) { "Failed local installation: $filePath" }
             Result.failure(t)
         }
     }
 
+    fun getManifestFromJar(jarPath: String): PluginManifest? {
+        val manifestContent = PlatformUtils.readFileFromZip(jarPath, "manifest.json")
+            ?: PlatformUtils.readFileFromZip(jarPath, "META-INF/manifest.json")
+
+        return manifestContent?.let {
+            try {
+                json.decodeFromString<PluginManifest>(it)
+            } catch (e: Exception) {
+                Logger.w { "Failed to parse manifest from jar $jarPath: ${e.message}" }
+                null
+            }
+        }
+    }
+
     /**
      * Installs a plugin from a remote repository.
      */
-    suspend fun installRemote(plugin: ExtensionPlugin, targetFolderPath: String): Result<Unit> {
+    suspend fun installRemote(plugin: ExtensionPlugin, targetFolderPath: String): Result<PluginManifest?> {
         Logger.i { "Installing remote plugin: ${plugin.pkg} from ${plugin.repoUrl}" }
         return try {
             PlatformUtils.mkdirs(targetFolderPath)
@@ -108,7 +112,7 @@ class PluginInstaller(
             )
             registry.addOrUpdatePlugin(newPlugin)
             Logger.i { "Successfully installed remote plugin: ${plugin.pkg}" }
-            Result.success(Unit)
+            Result.success(getManifestFromJar(destFile))
         } catch (t: Throwable) {
             Logger.e(t) { "Failed remote installation: ${plugin.pkg}" }
             Result.failure(t)
@@ -138,7 +142,7 @@ class PluginInstaller(
     /**
      * Updates a local plugin by installing a new JAR over the existing path.
      */
-    suspend fun updateLocal(pkg: String, newJarPath: String): Result<Unit> {
+    suspend fun updateLocal(pkg: String, newJarPath: String): Result<PluginManifest?> {
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin $pkg not found"))
         try {
             lifecycleManager.unloadPlugin(pkg)
@@ -151,7 +155,7 @@ class PluginInstaller(
     /**
      * Updates a remote plugin.
      */
-    suspend fun updateRemote(pkg: String): Result<Unit> {
+    suspend fun updateRemote(pkg: String): Result<PluginManifest?> {
         val update = getUpdate(pkg) ?: return Result.failure(Exception("No update available for $pkg"))
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin $pkg not found"))
         try {
@@ -160,6 +164,31 @@ class PluginInstaller(
             return Result.failure(e)
         }
         return installRemote(update, plugin.installPath.substringBeforeLast("/"))
+    }
+
+    /**
+     * Clears the plugin's file directory.
+     */
+    fun clearFiles(pkg: String): Result<Unit> {
+        val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin $pkg not found"))
+        val filesPath = "${plugin.installPath}/files"
+        return if (PlatformUtils.exists(filesPath)) {
+            try {
+                // We don't delete the "files" folder itself, only its content
+                PlatformUtils.listFiles(filesPath).forEach { 
+                    val path = "$filesPath/$it"
+                    // Note: deleteDirectory works for files too in some implementations, 
+                    // but we might need a more robust way if it's a mix.
+                    // Assuming PlatformUtils.deleteDirectory handles nested deletion.
+                    PlatformUtils.deleteDirectory(path) 
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        } else {
+            Result.success(Unit)
+        }
     }
 
     /**

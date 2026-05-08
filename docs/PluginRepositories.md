@@ -47,25 +47,25 @@ The `index.json` is the entry point of the repository. It contains metadata abou
 
 ### Fields
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `name` | String | Human-readable name of the repository. |
-| `url` | String | Absolute URL to this `index.json`. |
+| Field           | Type   | Description                                                                       |
+|:----------------|:-------|:----------------------------------------------------------------------------------|
+| `name`          | String | Human-readable name of the repository.                                            |
+| `url`           | String | Absolute URL to this `index.json`.                                                |
 | `pluginsFolder` | String | (Optional) Relative path to the folder containing plugins. Defaults to `plugins`. |
-| `plugins` | Array | List of plugin metadata objects. |
-| `signPublicKey` | String | (Optional) Public key used for verifying plugin signatures. |
-| `signAlgorithm` | String | (Optional) Algorithm used for signing (e.g., `SHA256`). |
+| `plugins`       | Array  | List of plugin metadata objects.                                                  |
+| `signPublicKey` | String | (Optional) Public key used for verifying plugin signatures.                       |
+| `signAlgorithm` | String | (Optional) Algorithm used for signing (e.g., `SHA256`).                           |
 
 ### Plugin Object Fields
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `name` | String | Name of the plugin. |
-| `pkg` | String | Unique identifier (package ID) of the plugin. |
-| `version` | String | Semantic version of the plugin. |
-| `fileName` | String | Name of the file to download (located in `pluginsFolder/{pkg}/`). |
-| `description` | String | Short description of the plugin. |
-| `minAppVersion`| String | (Optional) Minimum version of the host app required. |
+| Field           | Type   | Description                                                       |
+|:----------------|:-------|:------------------------------------------------------------------|
+| `name`          | String | Name of the plugin.                                               |
+| `pkg`           | String | Unique identifier (package ID) of the plugin.                     |
+| `version`       | String | Semantic version of the plugin.                                   |
+| `fileName`      | String | Name of the file to download (located in `pluginsFolder/{pkg}/`). |
+| `description`   | String | Short description of the plugin.                                  |
+| `minAppVersion` | String | (Optional) Minimum version of the host app required.              |
 
 ## Plugin Assets
 
@@ -87,14 +87,19 @@ The host application attempts to download additional assets for each plugin to i
 - **Icon**: `icon.png`, `icon.webp`, `icon.svg`, or `icon.jpg`.
 - **Manifest**: `manifest.json`. This allows the application to preload the plugin's capabilities and settings before it is installed.
 
-## How Installation Works
+## Installation & Updates
 
 1. **Discovery**: The user adds the `index.json` URL to the application.
 2. **Indexing**: The app fetches `index.json` and parses the `plugins` list, preloading `manifest.json` if available.
-3. **Resolution**: When a user clicks "Install", the app constructs the download URL:
+3. **Resolution**: When a user clicks "Install" or "Update", the app constructs the download URL:
    `{repo_base_url}/{pluginsFolder}/{pkg}/{fileName}`
-4. **Extraction**: The `.jar` is placed directly in the plugin's folder.
-5. **Registration**: The plugin is added to the local registry and becomes available for loading.
+4. **Execution**:
+    - **Fresh Install**: The JAR is copied, and the `@PluginSetup` handler is called (if present).
+    - **Update**: 
+        - If `@PluginUpdate` is present in the new version, it is executed.
+        - If not, but `@PluginSetup` is present, the plugin's `files/` directory is cleared and `@PluginSetup` is executed.
+        - If neither is present, only the JAR is replaced.
+5. **Registration**: The plugin state is updated in the local registry.
 
 ## Package Source Overrides
 

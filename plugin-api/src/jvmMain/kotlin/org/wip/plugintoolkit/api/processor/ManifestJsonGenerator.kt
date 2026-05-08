@@ -121,6 +121,9 @@ object ManifestJsonGenerator {
             )
         }
 
+        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
+        val updateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
+
         val manifestObj = PluginManifest(
             manifestVersion = "1.0",
             plugin = PluginInfo(
@@ -136,7 +139,9 @@ object ManifestJsonGenerator {
             capabilities = manifestCapabilities,
             actions = manifestActions,
             settings = manifestSettings.ifEmpty { null },
-            changelog = changelogObj
+            changelog = changelogObj,
+            hasUpdateHandler = updateFunction != null,
+            hasSetupHandler = setupFunction != null
         )
         
         val json = Json { prettyPrint = true }

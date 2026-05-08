@@ -5,6 +5,8 @@ Added:
   - Changelog for 1.2.0
   - Manifest Preloading for Repositories
   - Support for **bold**, _italic_, ~strikethrough~, `monospace`, [links](https://www.google.com) in changelog
+  - Plugin-Api PluginLoad endpoint executed after setup before validation
+  - Plugin-Api required action feedback loop
 Changes:
   - Unified changelog parser
   - Migrates plugin-api from java-library to KPM

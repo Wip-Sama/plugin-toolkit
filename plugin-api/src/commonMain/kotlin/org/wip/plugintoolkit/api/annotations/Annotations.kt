@@ -131,6 +131,16 @@ annotation class PluginAction(
 )
 
 /**
+ * Marks a function to be called during the plugin's update phase.
+ *
+ * This function is executed when a new version of the plugin is installed over
+ * an existing one.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class PluginUpdate
+
+/**
  * Marks a parameter to receive the saved resume state for a pausable capability.
  *
  * The parameter must be of type `JsonElement?`. If the capability is being resumed,

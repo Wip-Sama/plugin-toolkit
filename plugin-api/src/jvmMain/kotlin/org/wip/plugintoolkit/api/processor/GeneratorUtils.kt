@@ -13,6 +13,7 @@ const val RESUME_STATE_ANNOTATION = "org.wip.plugintoolkit.api.annotations.Resum
 const val PLUGIN_SETUP_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginSetup"
 const val PLUGIN_VALIDATE_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginValidate"
 const val PLUGIN_LOAD_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginLoad"
+const val PLUGIN_UPDATE_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginUpdate"
 
 object GeneratorUtils {
     fun mapKSTypeToDataType(ksType: KSType): DataType {

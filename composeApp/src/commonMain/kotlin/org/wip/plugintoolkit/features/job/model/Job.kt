@@ -20,6 +20,7 @@ enum class JobType {
     Capability,
     Flow,
     Setup,
+    Update,
     Validation,
     PluginAction
 }

@@ -49,10 +49,6 @@ class JobWorker(
                     }
 
                     try {
-                        // Registration now happens inside executeJob because we need the JobHandle from the plugin
-
-                        // Just wait for the job to complete or be canceled.
-                        // Cancellation is cooperatively handled by jobExecution.cancel() from JobManager.
                         jobExecution.join()
                     } catch (e: Exception) {
                         Logger.e(e) { "Worker $workerId: Error during job coordination" }
@@ -60,11 +56,10 @@ class JobWorker(
                     }
 
                 } catch (e: CancellationException) {
-                    // Normal cancellation, just continue or exit if worker is stopping
                     if (!isActive) break
                 } catch (e: Exception) {
                     Logger.e(e) { "Worker $workerId encountered error in loop" }
-                    delay(2000) //TODO: maybe remove this
+                    // delay(2000) //TODO: maybe remove this
                     // Cooling-off period on error
                 }
             }
@@ -84,6 +79,7 @@ class JobWorker(
             when (job.type) {
                 JobType.Capability -> executeCapabilityJob(job)
                 JobType.Setup -> executeSetupJob(job)
+                JobType.Update -> executeUpdateJob(job)
                 JobType.Validation -> executeValidationJob(job)
                 JobType.PluginAction -> executePluginActionJob(job)
                 else -> throw Exception("Unsupported job type: ${job.type}")
@@ -190,8 +186,62 @@ class JobWorker(
             return
         }
 
+        manager.updateJobProgress(job.id, 0.9f)
+        manager.addJobLog(job.id, "Setup completed successfully. Performing load check...")
+
+        val loadResult = plugin.performLoad(context)
+        if (loadResult.isFailure) {
+            val error = loadResult.exceptionOrNull()?.message ?: "Load check failed"
+            manager.tryFailJob(job.id, error)
+            return
+        }
+
         manager.updateJobProgress(job.id, 1.0f)
-        manager.addJobLog(job.id, "Setup completed successfully.")
+        manager.addJobLog(job.id, "Plugin ready.")
+        manager.tryCompleteJob(job.id, "Success")
+    }
+
+    private suspend fun executeUpdateJob(job: BackgroundJob) {
+        val plugin = PluginLoader.getPluginById(job.pluginId)
+            ?: throw Exception("Plugin ${job.pluginId} not found")
+
+        val context = pluginManager.createPluginContext(job.pluginId, job.id)
+
+        // Register a simple handle for cancellation
+        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        manager.registerJobHandle(job.id, object : JobHandle {
+            override val result: kotlinx.coroutines.Deferred<ExecutionResult>
+                get() = throw UnsupportedOperationException("Not used for update")
+
+            override fun pause() { /* Not supported */ }
+
+            override fun cancel(force: Boolean) {
+                jobExecution.cancel()
+            }
+        })
+
+        manager.updateJobProgress(job.id, 0.2f)
+        manager.addJobLog(job.id, "Running update handler for ${plugin.getManifest().plugin.name}...")
+
+        val updateResult = plugin.performUpdate(context)
+        if (updateResult.isFailure) {
+            val error = updateResult.exceptionOrNull()?.message ?: "Update failed"
+            manager.tryFailJob(job.id, error)
+            return
+        }
+
+        manager.updateJobProgress(job.id, 0.9f)
+        manager.addJobLog(job.id, "Update handler completed successfully. Performing load check...")
+
+        val loadResult = plugin.performLoad(context)
+        if (loadResult.isFailure) {
+            val error = loadResult.exceptionOrNull()?.message ?: "Load check failed"
+            manager.tryFailJob(job.id, error)
+            return
+        }
+
+        manager.updateJobProgress(job.id, 1.0f)
+        manager.addJobLog(job.id, "Plugin updated and ready.")
         manager.tryCompleteJob(job.id, "Success")
     }
 

@@ -51,6 +51,12 @@ interface PluginEntry {
      * @param context The execution context providing logger, progress, and file system access.
      */
     suspend fun performSetup(context: PluginContext): Result<Unit> = Result.success(Unit)
+    
+    /**
+     * Optional update step called by the host application during plugin update.
+     * @param context The execution context providing logger, progress, and file system access.
+     */
+    suspend fun performUpdate(context: PluginContext): Result<Unit> = Result.success(Unit)
 
     /**
      * Validate the plugin installation and status.

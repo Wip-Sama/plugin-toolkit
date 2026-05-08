@@ -5,9 +5,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.koin.core.component.KoinComponent
 import org.wip.plugintoolkit.api.*
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
@@ -73,13 +73,16 @@ class PluginLifecycleManager(
                     return Result.failure(error)
                 }
 
-                // Perform load step
-                val loadResult = entry.performLoad(createPluginContext(pkg))
-                if (loadResult.isFailure) {
-                    val error = loadResult.exceptionOrNull() ?: Exception("Load failed")
-                    Logger.e(error) { "Load failed for $pkg" }
-                    updateLoadError(pkg, error.message)
-                    return Result.failure(error)
+                // Perform load step only if already validated.
+                // For new installations/updates, this is handled by the JobWorker after setup/update.
+                if (plugin.isValidated) {
+                    val loadResult = entry.performLoad(createPluginContext(pkg))
+                    if (loadResult.isFailure) {
+                        val error = loadResult.exceptionOrNull() ?: Exception("Load failed")
+                        Logger.e(error) { "Load failed for $pkg" }
+                        updateLoadError(pkg, error.message)
+                        return Result.failure(error)
+                    }
                 }
 
                 if (plugin.isValidated) {
@@ -133,6 +136,22 @@ class PluginLifecycleManager(
     suspend fun reloadPlugin(pkg: String) {
         unloadPlugin(pkg)
         loadPlugin(pkg)
+    }
+
+    /**
+     * Executes the setup phase for a plugin.
+     */
+    suspend fun performSetup(pkg: String): Result<Unit> {
+        val entry = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin $pkg not loaded"))
+        return entry.performSetup(createPluginContext(pkg))
+    }
+
+    /**
+     * Executes the update phase for a plugin.
+     */
+    suspend fun performUpdate(pkg: String): Result<Unit> {
+        val entry = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin $pkg not loaded"))
+        return entry.performUpdate(createPluginContext(pkg))
     }
 
     /**

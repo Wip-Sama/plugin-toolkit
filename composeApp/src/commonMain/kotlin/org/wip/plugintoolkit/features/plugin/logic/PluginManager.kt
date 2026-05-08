@@ -45,7 +45,7 @@ class PluginManager(
             jobManager.jobs.collect { jobs ->
                 jobs.forEach { job ->
                     if (job.status == JobStatus.Completed) {
-                        if (job.type == JobType.Validation || job.type == JobType.Setup) {
+                        if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
                             markAsValidated(job.pluginId)
                         }
                         if (job.type == JobType.PluginAction) {
@@ -60,16 +60,34 @@ class PluginManager(
     // --- Installation & Updates ---
 
     suspend fun installLocal(filePath: String, targetFolderPath: String) = 
-        installer.installLocal(filePath, targetFolderPath)
+        installer.installLocal(filePath, targetFolderPath).onSuccess { manifest ->
+            if (manifest != null) {
+                handlePostInstall(manifest.plugin.id, manifest)
+            }
+        }.map { Unit }
 
     suspend fun installRemote(plugin: ExtensionPlugin, targetFolderPath: String) = 
-        installer.installRemote(plugin, targetFolderPath)
+        installer.installRemote(plugin, targetFolderPath).onSuccess { manifest ->
+            if (manifest != null) {
+                handlePostInstall(plugin.pkg, manifest)
+            }
+        }.map { Unit }
 
     suspend fun uninstall(pkg: String) = installer.uninstall(pkg)
 
-    suspend fun updateLocal(pkg: String, newJarPath: String) = installer.updateLocal(pkg, newJarPath)
+    suspend fun updateLocal(pkg: String, newJarPath: String) = 
+        installer.updateLocal(pkg, newJarPath).onSuccess { manifest ->
+            if (manifest != null) {
+                handlePostUpdate(pkg, manifest)
+            }
+        }.map { Unit }
 
-    suspend fun updateRemote(pkg: String) = installer.updateRemote(pkg)
+    suspend fun updateRemote(pkg: String) = 
+        installer.updateRemote(pkg).onSuccess { manifest ->
+            if (manifest != null) {
+                handlePostUpdate(pkg, manifest)
+            }
+        }.map { Unit }
 
     fun getUpdate(pkg: String) = installer.getUpdate(pkg)
 
@@ -162,7 +180,17 @@ class PluginManager(
         if (enabled) {
             val plugin = registry.getPlugin(pkg)
             if (plugin != null) {
-                if (plugin.isValidated) loadPlugin(pkg) else enqueueSetupJob(pkg)
+                if (plugin.isValidated) {
+                    loadPlugin(pkg)
+                } else {
+                    // Try to get manifest to check for setup handler
+                    val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+                    if (manifest?.hasSetupHandler == true) {
+                        enqueueSetupJob(pkg)
+                    } else {
+                        markAsValidated(pkg)
+                    }
+                }
             }
         }
         return Result.success(Unit)
@@ -250,5 +278,44 @@ class PluginManager(
         scope.launch {
             registry.updatePlugin(pkg) { it.copy(requiredAction = null) }
         }
+    }
+
+    private suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) {
+        if (manifest.hasSetupHandler) {
+            enqueueSetupJob(pkg)
+        } else {
+            markAsValidated(pkg)
+        }
+    }
+
+    private suspend fun handlePostUpdate(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) {
+        if (manifest.hasUpdateHandler) {
+            enqueueUpdateJob(pkg)
+        } else if (manifest.hasSetupHandler) {
+            installer.clearFiles(pkg)
+            enqueueSetupJob(pkg)
+        } else {
+            // Nothing to do, just reload
+            reloadPlugin(pkg)
+        }
+    }
+
+    suspend fun enqueueUpdateJob(pkg: String) {
+        val plugin = registry.getPlugin(pkg) ?: return
+        val loadResult = loadPlugin(pkg)
+        if (loadResult.isFailure) {
+            Logger.e { "Failed to load plugin $pkg for update: ${loadResult.exceptionOrNull()?.message}" }
+            return
+        }
+
+        val job = BackgroundJob(
+            id = "update_$pkg",
+            name = "Update: ${plugin.name}",
+            type = JobType.Update,
+            pluginId = pkg,
+            capabilityName = "update", // This is the convention for @PluginUpdate
+            keepResult = false
+        )
+        jobManager.enqueueJob(job)
     }
 }

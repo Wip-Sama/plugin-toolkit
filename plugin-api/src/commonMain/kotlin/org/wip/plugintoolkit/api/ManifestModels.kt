@@ -43,10 +43,6 @@ enum class PrimitiveType {
     DOUBLE, INT, STRING, BOOLEAN, UNIT, ANY
 }
 
-@Serializable
-enum class UpdateType {
-    REPLACE_ALL, SCRIPT, PATCH
-}
 
 @Serializable
 data class ParameterConstraints(
@@ -82,7 +78,8 @@ data class PluginManifest(
     val actions: List<PluginAction> = emptyList(),
     val settings: Map<String, SettingMetadata>? = null,
     val changelog: Changelog? = null,
-    val updateType: UpdateType = UpdateType.REPLACE_ALL
+    val hasUpdateHandler: Boolean = false,
+    val hasSetupHandler: Boolean = false
 )
 
 @Serializable
