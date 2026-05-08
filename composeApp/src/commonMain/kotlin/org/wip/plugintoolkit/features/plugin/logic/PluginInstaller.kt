@@ -95,7 +95,7 @@ class PluginInstaller(
             listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach { 
                 PlatformUtils.downloadFile("$baseUrl/$it", "$pluginDir/$it")
             }
-            PlatformUtils.downloadFile("$baseUrl/changelog.txt", "$pluginDir/changelog.txt")
+            PlatformUtils.downloadFile("$baseUrl/changelog.md", "$pluginDir/changelog.md")
 
             val newPlugin = InstalledPlugin(
                 pkg = plugin.pkg,

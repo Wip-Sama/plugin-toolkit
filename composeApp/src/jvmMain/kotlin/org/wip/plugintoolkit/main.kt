@@ -111,7 +111,7 @@ fun runMain(args: Array<String>) {
             single { SettingsRegistry() }
             single { RepoManager(get()) }
             single { DialogService() }
-            single { PluginRegistry(get()) }
+            single { PluginRegistry(get(), CoroutineScope(SupervisorJob() + Dispatchers.Default)) }
             single { PluginLifecycleManager(get(), get(), get()) }
             single { PluginInstaller(get(), get(), get(), get()) }
             single { PluginScanner(get()) }

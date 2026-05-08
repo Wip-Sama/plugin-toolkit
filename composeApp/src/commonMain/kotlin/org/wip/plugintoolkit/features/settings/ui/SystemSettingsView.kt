@@ -369,43 +369,44 @@ fun SystemSettingsView(
                             Icon(Icons.Default.ChatBubble, contentDescription = "Toast")
                         }
                     }
+                }
+            )
+        }
+        SettingsGroup(title = stringResource(Res.string.section_auto_update)) {
+            val autoUpdate = settings.autoUpdate
+
+            SettingsItem(
+                title = stringResource(Res.string.setting_enable_auto_update),
+                subtitle = stringResource(Res.string.setting_enable_auto_update_subtitle),
+                icon = Icons.Default.RocketLaunch,
+                control = {
+                    SettingsSwitch(
+                        checked = autoUpdate.enabled, onCheckedChange = { checked ->
+                            viewModel.updateSettings {
+                                it.copy(autoUpdate = it.autoUpdate.copy(enabled = checked))
+                            }
+                        })
                 })
-            SettingsGroup(title = stringResource(Res.string.section_auto_update)) {
-                val autoUpdate = settings.autoUpdate
 
-                SettingsItem(
-                    title = stringResource(Res.string.setting_enable_auto_update),
-                    subtitle = stringResource(Res.string.setting_enable_auto_update_subtitle),
-                    icon = Icons.Default.RocketLaunch,
-                    control = {
-                        SettingsSwitch(
-                            checked = autoUpdate.enabled, onCheckedChange = { checked ->
-                                viewModel.updateSettings {
-                                    it.copy(autoUpdate = it.autoUpdate.copy(enabled = checked))
-                                }
-                            })
-                    })
+            val updateState by viewModel.updateState.collectAsState()
+            val currentUpdateState = updateState
 
-                val updateState by viewModel.updateState.collectAsState()
-                val currentUpdateState = updateState
-
-                SettingsItem(
-                    title = stringResource(Res.string.action_check_for_updates),
-                    subtitle = when (currentUpdateState) {
-                        is UpdateState.Checking -> stringResource(Res.string.update_check_started)
-                        is UpdateState.UpdateAvailable -> stringResource(
-                            Res.string.update_new_version_found,
-                            currentUpdateState.info.version
-                        )
-                        else -> null
-                    },
-                    icon = Icons.Default.Notifications,
-                    enabled = currentUpdateState !is UpdateState.Checking,
-                    onClick = {
-                        viewModel.checkForUpdates(isManual = true)
-                    }
-                )
-            }
+            SettingsItem(
+                title = stringResource(Res.string.action_check_for_updates),
+                subtitle = when (currentUpdateState) {
+                    is UpdateState.Checking -> stringResource(Res.string.update_check_started)
+                    is UpdateState.UpdateAvailable -> stringResource(
+                        Res.string.update_new_version_found,
+                        currentUpdateState.info.version
+                    )
+                    else -> null
+                },
+                icon = Icons.Default.Notifications,
+                enabled = currentUpdateState !is UpdateState.Checking,
+                onClick = {
+                    viewModel.checkForUpdates(isManual = true)
+                }
+            )
         }
     }
 }

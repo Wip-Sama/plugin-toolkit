@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.api.Release
+import org.wip.plugintoolkit.core.ui.MarkdownText
 
 enum class FilterLevel {
     Everything, Major, Minor, Patch
@@ -311,8 +312,8 @@ fun CategoryGroup(name: String, voices: List<String>, showHeader: Boolean = true
         voices.forEach { voice ->
             Row(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
                 Text("•", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 8.dp))
-                Text(
-                    voice,
+                MarkdownText(
+                    text = voice,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )

@@ -48,6 +48,9 @@ class PluginManager(
                         if (job.type == JobType.Validation || job.type == JobType.Setup) {
                             markAsValidated(job.pluginId)
                         }
+                        if (job.type == JobType.PluginAction) {
+                            clearRequiredAction(job.pluginId)
+                        }
                     }
                 }
             }
@@ -75,7 +78,7 @@ class PluginManager(
         val repoUrl = remote.repoUrl ?: return null
         val pluginsFolder = repoUrl.substringBeforeLast("/") + "/plugins"
         val baseUrl = "$pluginsFolder/${remote.pkg}"
-        return repoManager.fetchText("$baseUrl/changelog.txt")
+        return repoManager.fetchText("$baseUrl/changelog.md")
     }
 
     // --- Lifecycle Management ---
@@ -240,6 +243,12 @@ class PluginManager(
         scope.launch {
             registry.updatePlugin(pkg) { it.copy(isValidated = true) }
             loadPlugin(pkg)
+        }
+    }
+
+    private fun clearRequiredAction(pkg: String) {
+        scope.launch {
+            registry.updatePlugin(pkg) { it.copy(requiredAction = null) }
         }
     }
 }

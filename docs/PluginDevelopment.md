@@ -63,12 +63,12 @@ While useing suspend function if a good practice is not obligatory
 
 ### 3. Changelog Management
 
-The toolkit automatically parses a `changelog.txt` file and includes it in the plugin manifest. This allows the host application to display update details to users.
+The toolkit automatically parses a `changelog.md` file and includes it in the plugin manifest. This allows the host application to display update details to users.
 
 #### Location
-Place the `changelog.txt` file in one of the following locations:
+Place the `changelog.md` file in one of the following locations:
 - The root directory of your plugin module.
-- `src/main/resources/changelog.txt`
+- `src/main/resources/changelog.md`
 
 #### Format
 The file should follow a specific plain-text format:
@@ -97,9 +97,10 @@ Initial:
 
 1.  **Initialize**: `initialize(context)` is called when the plugin is first loaded. Use this to set up global resources.
 2.  **Setup**: `performSetup(context)` (triggered by `@PluginSetup`) is called during installation or manual setup. Use this for one-time tasks like extracting resources or installing dependencies.
-3.  **Validate**: `validate(context)` (triggered by `@PluginValidate`) is called to ensure the plugin is healthy and ready to run.
-4.  **Execute**: When a capability is invoked, the `DataProcessor` handles the request. This can return either a direct result or an `ExecutionResult` for complex lifecycle control.
-5.  **Shutdown**: `shutdown()` is called when the plugin is unloaded.
+3.  **Load**: `load(context)` (triggered by `@PluginLoad`) is called to allow the plugin to do some checks, should not be used to modify the files/plugin.
+4.  **Validate**: `validate(context)` (triggered by `@PluginValidate`) is called to ensure the plugin is healthy and ready to run.
+5.  **Execute**: When a capability is invoked, the `DataProcessor` handles the request. This can return either a direct result or an `ExecutionResult` for complex lifecycle control.
+6.  **Shutdown**: `shutdown()` is called when the plugin is unloaded.
 
 ## State Management (Pause & Resume)
 

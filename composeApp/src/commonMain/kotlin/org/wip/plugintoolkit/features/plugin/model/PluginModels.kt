@@ -13,7 +13,8 @@ data class InstalledPlugin(
     val repoUrl: String? = null, // Source repository URL if remote
     val jarFileName: String? = null,
     val description: String? = null,
-    val loadError: String? = null
+    val loadError: String? = null,
+    val requiredAction: String? = null
 )
 
 sealed class InstallationSource {

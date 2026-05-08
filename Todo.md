@@ -60,8 +60,7 @@ Security:
 > Same procedure as app for modules update
 
 Bugs:
-- For some reasons when updating the app teh first start will not load all plugins
+- For some reasons when updating the app the first start will not load all plugins
 
 Changelog:
-- Markdown support
 - Switch changelog.txt to changelog.md

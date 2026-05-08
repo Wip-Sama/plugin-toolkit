@@ -224,6 +224,7 @@ fun PluginCard(
     onAction: (PluginStatusAction) -> Unit
 ) {
     val statusColor = if (plugin.loadError != null) MaterialTheme.colorScheme.error
+    else if (plugin.requiredAction != null) ToolkitTheme.colors.warning
     else if (isLoaded) ToolkitTheme.colors.success
     else if (plugin.isValidated) ToolkitTheme.colors.validated
     else MaterialTheme.colorScheme.outline
@@ -275,6 +276,11 @@ fun PluginCard(
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                         StatusBadge(stringResource(Res.string.plugin_loaded), ToolkitTheme.colors.success)
                     }
+
+                    if (plugin.requiredAction != null) {
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        StatusBadge("Action Required", ToolkitTheme.colors.warning)
+                    }
                     
                     if (plugin.loadError == null) {
                         if (plugin.isValidated) {
@@ -306,6 +312,17 @@ fun PluginCard(
 
             // Actions
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (plugin.requiredAction != null) {
+                    val action = customActions.find { it.functionName == plugin.requiredAction }
+                    Button(
+                        onClick = { onAction(PluginStatusAction.Custom(plugin.requiredAction)) },
+                        colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
+                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
+                    ) {
+                        Text(action?.name ?: "Fix Issue")
+                    }
+                }
+
                 if (hasUpdate) {
                     Button(
                         onClick = { onAction(PluginStatusAction.Update) },

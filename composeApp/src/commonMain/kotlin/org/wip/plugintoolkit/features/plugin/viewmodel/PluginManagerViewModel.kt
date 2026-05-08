@@ -221,9 +221,9 @@ class PluginManagerViewModel(
                 // Fetch from JAR resources
                 val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
                 val jarPath = plugin.installPath + "/" + jarFileName
-                content = PlatformUtils.readFileFromZip(jarPath, "resources/changelog.txt")
+                content = PlatformUtils.readFileFromZip(jarPath, "resources/changelog.md")
                 if (content == null) {
-                    content = PlatformUtils.readFileFromZip(jarPath, "changelog.txt")
+                    content = PlatformUtils.readFileFromZip(jarPath, "changelog.md")
                 }
             } else {
                 // Fetch from remote repository

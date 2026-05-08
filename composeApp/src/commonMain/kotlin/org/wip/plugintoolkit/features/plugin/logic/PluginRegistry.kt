@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,7 +18,8 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
  * Ensures atomic updates to the plugin list and disk synchronization.
  */
 class PluginRegistry(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    val scope: CoroutineScope
 ) {
     private val _installedPlugins = MutableStateFlow<List<InstalledPlugin>>(emptyList())
     val installedPlugins: StateFlow<List<InstalledPlugin>> = _installedPlugins.asStateFlow()

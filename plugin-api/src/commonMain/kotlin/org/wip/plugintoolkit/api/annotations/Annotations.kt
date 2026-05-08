@@ -105,6 +105,16 @@ annotation class PluginSetup
 annotation class PluginValidate
 
 /**
+ * Marks a function to be called during the plugin's load phase.
+ *
+ * This function is executed after [org.wip.plugintoolkit.api.PluginEntry.initialize]
+ * but before any validation or capability execution.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class PluginLoad
+
+/**
  * Marks a function as a custom action for the plugin.
  *
  * Actions are simple functions that can be triggered from the UI.

@@ -73,6 +73,15 @@ class PluginLifecycleManager(
                     return Result.failure(error)
                 }
 
+                // Perform load step
+                val loadResult = entry.performLoad(createPluginContext(pkg))
+                if (loadResult.isFailure) {
+                    val error = loadResult.exceptionOrNull() ?: Exception("Load failed")
+                    Logger.e(error) { "Load failed for $pkg" }
+                    updateLoadError(pkg, error.message)
+                    return Result.failure(error)
+                }
+
                 if (plugin.isValidated) {
                     _loadedPlugins.update { it + pkg }
                     updateLoadError(pkg, null) // Clear errors on success
@@ -211,7 +220,12 @@ class PluginLifecycleManager(
             progress = progressReporter,
             fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
             cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath),
-            settings = mergedSettings
+            settings = mergedSettings,
+            onRequiredActionChange = { actionName ->
+                registry.scope.launch {
+                    registry.updatePlugin(pkg) { it.copy(requiredAction = actionName) }
+                }
+            }
         )
     }
 
@@ -242,5 +256,10 @@ class DefaultPluginContext(
     override val fileSystem: org.wip.plugintoolkit.api.PluginFileSystem,
     override val cacheFileSystem: org.wip.plugintoolkit.api.PluginFileSystem,
     override val settings: Map<String, kotlinx.serialization.json.JsonElement>,
-    override val signals: PluginSignalManager = DefaultPluginSignalManager()
-) : PluginContext
+    override val signals: PluginSignalManager = DefaultPluginSignalManager(),
+    private val onRequiredActionChange: (String?) -> Unit = {}
+) : PluginContext {
+    override fun setRequiredAction(actionName: String?) {
+        onRequiredActionChange(actionName)
+    }
+}

@@ -12,7 +12,7 @@ repository-root/
 └── plugins/                   # Folder containing plugins
     ├── com.example.plugin/    # Plugin ID as folder name
     │   ├── plugin-1.0.0.jar   # The plugin JAR file
-    │   ├── changelog.txt      # Optional: Detailed changelog
+    │   ├── changelog.md      # Optional: Detailed changelog
     │   ├── icon.png           # Optional: Plugin icon (png, webp, svg, jpg)
     │   └── manifest.json      # Optional: Preloads plugin capabilities and settings
     └── org.another.plugin/
@@ -71,7 +71,7 @@ The `index.json` is the entry point of the repository. It contains metadata abou
 
 The host application attempts to download additional assets for each plugin to improve the UI experience. These should be placed in the same folder as the plugin file:
 
-- **Changelog**: `changelog.txt` or `changelog.md`. The format must be strictly as follows:
+- **Changelog**: `changelog.md`. The format must be strictly as follows:
   ```text
   Date: 2026-05-03
   Version: 1.1.0
@@ -79,6 +79,8 @@ The host application attempts to download additional assets for each plugin to i
     - New capability for data sync
   Fixed:
     - Memory leak in scanner
+  ...
+    - ...
   ---------------------------------------------------------------------------------------------------
   ```
   Note: The separator must be exactly 100 dashes.

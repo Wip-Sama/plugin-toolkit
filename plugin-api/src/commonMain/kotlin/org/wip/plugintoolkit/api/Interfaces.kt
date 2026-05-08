@@ -41,6 +41,12 @@ interface PluginEntry {
     fun setDebug(isDebug: Boolean)
 
     /**
+     * Optional load step called by the host application after initialization.
+     * @param context The execution context providing logger, progress, and file system access.
+     */
+    suspend fun performLoad(context: PluginContext): Result<Unit> = Result.success(Unit)
+
+    /**
      * Optional setup step called by the host application.
      * @param context The execution context providing logger, progress, and file system access.
      */
@@ -193,6 +199,12 @@ interface PluginContext : PluginLogger, ProgressReporter {
     val cacheFileSystem: PluginFileSystem
     val settings: Map<String, JsonElement>
     val signals: PluginSignalManager
+
+    /**
+     * Inform the host that a user action is required for the plugin to function correctly.
+     * @param actionName The function name of the action to be displayed, or null to clear.
+     */
+    fun setRequiredAction(actionName: String?)
 
     // Forwarding methods for convenience
     override fun verbose(message: String) = logger.verbose(message)

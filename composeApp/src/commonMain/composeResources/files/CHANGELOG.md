@@ -1,17 +1,19 @@
 Version: 1.3.0
-Date: 06-05-2026
+Date: 08-05-2026
 Added:
   - App logo by [Muh_zakaria](https://www.svgrepo.com/author/muh_zakaria/)
   - Changelog for 1.2.0
   - Manifest Preloading for Repositories
+  - Support for **bold**, _italic_, ~strikethrough~, `monospace`, [links](https://www.google.com) in changelog
 Changes:
   - Unified changelog parser
   - Migrates plugin-api from java-library to KPM
+Removed:
+  - changelog in .txt format
 Fixes:
   - release.yml no longer add all the tmp files to the release
 Planned:
   - switch to proGuard (release distribution) for actual releases, for now it removes too much from the jar to mak this viable
-  - Markdown support in changelog
 ----------------------------------------------------------------------------------------------------
 Version: 1.2.0
 Date: 06-05-2026

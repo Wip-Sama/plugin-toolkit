@@ -493,8 +493,33 @@ object KotlinGenerator {
 
         val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
         val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_VALIDATE_ANNOTATION) } }
+        val loadFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_LOAD_ANNOTATION) } }
 
-        // 3. performSetup
+        // 3. performLoad
+        val loadFunBuilder = FunSpec.builder("performLoad")
+            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
+            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+
+        if (loadFunction != null) {
+            val loadParams = loadFunction.parameters
+            val callArgs = loadParams.joinToString(", ") { param ->
+                val t = param.type.resolve().toTypeName().toString()
+                when (t) {
+                    "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
+                    "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
+                    "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
+                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
+                    else -> param.name?.asString() ?: ""
+                }
+            }
+            loadFunBuilder.addStatement("return processor.${loadFunction.simpleName.asString()}($callArgs)")
+        } else {
+            loadFunBuilder.addStatement("return Result.success(Unit)")
+        }
+        entryType.addFunction(loadFunBuilder.build())
+
+        // 4. performSetup
         val setupFunBuilder = FunSpec.builder("performSetup")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
@@ -518,7 +543,7 @@ object KotlinGenerator {
         }
         entryType.addFunction(setupFunBuilder.build())
 
-        // 4. validate
+        // 5. validate
         val validateFunBuilder = FunSpec.builder("validate")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
