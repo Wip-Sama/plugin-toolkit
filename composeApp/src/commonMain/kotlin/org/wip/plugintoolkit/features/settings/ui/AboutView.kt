@@ -28,8 +28,8 @@ import org.koin.compose.koinInject
 import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.DialogService
-import org.wip.plugintoolkit.features.plugin.logic.ChangelogParser
-import org.wip.plugintoolkit.features.plugin.logic.ChangelogVersion
+import org.wip.plugintoolkit.api.utils.ChangelogParser
+import org.wip.plugintoolkit.api.Release
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.about_built_by
 import plugintoolkit.composeapp.generated.resources.about_libraries
@@ -42,12 +42,13 @@ import plugintoolkit.composeapp.generated.resources.plugin_changelog
 fun AboutView(
     dialogService: DialogService = koinInject()
 ) {
-    var changelogVersions by remember { mutableStateOf<List<ChangelogVersion>>(emptyList()) }
+    var changelogVersions by remember { mutableStateOf<List<Release>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         try {
             val content = Res.readBytes("files/CHANGELOG.md").decodeToString()
-            changelogVersions = ChangelogParser.parse(content)
+            changelogVersions = ChangelogParser.parse(content).releases
+
         } catch (e: Exception) {
             // Log or handle error
         }

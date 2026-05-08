@@ -233,7 +233,7 @@ class PluginManagerViewModel(
             val name = plugin?.name ?: pkg
 
             if (content != null) {
-                val versions = org.wip.plugintoolkit.features.plugin.logic.ChangelogParser.parse(content)
+                val versions = org.wip.plugintoolkit.api.utils.ChangelogParser.parse(content).releases
                 dialogService.showChangelog(name, versions)
             } else {
                 val errorMsg = if (plugin != null) {

@@ -89,11 +89,7 @@ class PluginInstaller(
             val pluginFileUrl = "$baseUrl/${plugin.fileName}"
             val destFile = "$pluginDir/${plugin.fileName}"
 
-            PlatformUtils.downloadFile(pluginFileUrl, destFile).onSuccess {
-                if (plugin.fileName.endsWith(".zip")) {
-                    PlatformUtils.unzip(destFile, pluginDir, 100 * 1024 * 1024).onFailure { return Result.failure(it) }
-                }
-            }.onFailure { return Result.failure(it) }
+            PlatformUtils.downloadFile(pluginFileUrl, destFile).onFailure { return Result.failure(it) }
 
             // Download optional assets
             listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach { 

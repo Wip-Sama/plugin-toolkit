@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.features.repository.model
 
 import kotlinx.serialization.Serializable
+import org.wip.plugintoolkit.api.PluginManifest
 
 @Serializable
 data class ExtensionRepo(
@@ -29,11 +30,6 @@ data class ExtensionPlugin(
     val pkg: String,
     val version: String,
     val minAppVersion: String? = null,
-    val repoUrl: String? = null // Filled during parsing to track source
-)
-
-data class PluginChangelog(
-    val date: String,
-    val version: String,
-    val categories: Map<String, List<String>>
+    val repoUrl: String? = null, // Filled during parsing to track source
+    val manifest: PluginManifest? = null
 )

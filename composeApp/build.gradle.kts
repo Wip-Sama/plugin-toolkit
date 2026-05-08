@@ -41,6 +41,7 @@ kotlin {
             implementation(libs.filekit.dialogs.compose)
             implementation(libs.filekit.coil)
             implementation(libs.kotlinx.io.core)
+            implementation(project(":plugin-api"))
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -51,7 +52,6 @@ kotlin {
             implementation(libs.jna)
             implementation(libs.jna.platform)
             implementation(libs.dbus.java.core)
-            implementation(project(":plugin-api"))
             implementation(libs.ktor.client.cio)
             implementation(libs.slf4j.simple)
             implementation(libs.kotlinx.datetime)
@@ -78,7 +78,7 @@ compose.desktop {
         mainClass = "org.wip.plugintoolkit.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
             packageName = "PluginToolkit"
             packageVersion = libs.versions.app.get()
             vendor = "Wip-Sama"

@@ -45,7 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.features.plugin.logic.ChangelogVersion
+import org.wip.plugintoolkit.api.Release
 
 enum class FilterLevel {
     Everything, Major, Minor, Patch
@@ -55,7 +55,7 @@ enum class FilterLevel {
 @Composable
 fun ChangelogView(
     pluginName: String,
-    versions: List<ChangelogVersion>,
+    versions: List<Release>,
     onClose: () -> Unit
 ) {
     var selectedLevel by remember { mutableStateOf(FilterLevel.Everything) }
@@ -83,7 +83,7 @@ fun ChangelogView(
     // Category Logic
     val allCategories = remember(filteredByLevel) {
         val cats = mutableSetOf<String>()
-        filteredByLevel.forEach { v -> cats.addAll(v.tags.keys) }
+        filteredByLevel.forEach { v -> cats.addAll(v.categories.keys) }
         listOf("General") + cats.toList().sorted()
     }
 
@@ -236,7 +236,7 @@ fun ChangelogView(
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
         ) {
             val displayVersions = filteredByLevel.filter { v ->
-                selectedCategory == "General" || v.tags.containsKey(selectedCategory)
+                selectedCategory == "General" || v.categories.containsKey(selectedCategory)
             }
 
             items(displayVersions) { version ->
@@ -248,7 +248,7 @@ fun ChangelogView(
 
 @Composable
 fun VersionCard(
-    version: ChangelogVersion,
+    version: Release,
     selectedCategory: String
 ) {
     ElevatedCard(
@@ -283,12 +283,12 @@ fun VersionCard(
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
             if (selectedCategory == "General") {
-                version.tags.forEach { (tag, voices) ->
+                version.categories.forEach { (tag, voices) ->
                     CategoryGroup(tag, voices)
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                 }
             } else {
-                version.tags[selectedCategory]?.let { voices ->
+                version.categories[selectedCategory]?.let { voices ->
                     CategoryGroup(selectedCategory, voices, showHeader = false)
                 }
             }

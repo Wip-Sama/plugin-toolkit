@@ -13,23 +13,28 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import org.wip.plugintoolkit.features.repository.model.PluginChangelog
 import org.wip.plugintoolkit.features.repository.model.RepoIndex
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import org.wip.plugintoolkit.api.PluginManifest
 
 class RepoManager(
     private val settingsRepository: SettingsRepository
 ) {
+    private val jsonConfig = Json {
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+    }
+    
     private val client = HttpClient {
         install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                coerceInputValues = true
-            })
+            json(jsonConfig)
         }
     }
 
@@ -80,7 +85,23 @@ class RepoManager(
 
             saveReposToSettings(updatedRepos)
 
-            _plugins.value += (url to index.plugins.map { it.copy(repoUrl = url) })
+            coroutineScope {
+                val updatedPlugins = index.plugins.map { plugin ->
+                    async {
+                        val baseUrl = url.substringBeforeLast("/") + "/" + (index.pluginsFolder ?: "plugins") + "/${plugin.pkg}"
+                        val manifestContent = fetchText("$baseUrl/manifest.json")
+                        val manifest = manifestContent?.let {
+                            try {
+                                jsonConfig.decodeFromString<PluginManifest>(it)
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+                        plugin.copy(repoUrl = url, manifest = manifest)
+                    }
+                }.awaitAll()
+                _plugins.value += (url to updatedPlugins)
+            }
 
             Logger.i { "Successfully added repository: ${newRepo.name} ($url)" }
             AddRepoResult.Success
@@ -104,7 +125,24 @@ class RepoManager(
         Logger.d { "Refreshing repository: $url" }
         try {
             val index: RepoIndex = client.get(url).body()
-            _plugins.value += (url to index.plugins.map { it.copy(repoUrl = url) })
+            
+            coroutineScope {
+                val updatedPlugins = index.plugins.map { plugin ->
+                    async {
+                        val baseUrl = url.substringBeforeLast("/") + "/" + (index.pluginsFolder ?: "plugins") + "/${plugin.pkg}"
+                        val manifestContent = fetchText("$baseUrl/manifest.json")
+                        val manifest = manifestContent?.let {
+                            try {
+                                jsonConfig.decodeFromString<PluginManifest>(it)
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+                        plugin.copy(repoUrl = url, manifest = manifest)
+                    }
+                }.awaitAll()
+                _plugins.value += (url to updatedPlugins)
+            }
 
             // Update repo metadata if changed
             val updatedRepos = _repositories.value.map {
@@ -157,7 +195,7 @@ class RepoManager(
         return try {
             client.get(url).body<String>()
         } catch (e: Exception) {
-            co.touchlab.kermit.Logger.e(e) { "Failed to fetch text from: $url" }
+            Logger.e(e) { "Failed to fetch text from: $url" }
             null
         }
     }
@@ -174,40 +212,6 @@ class RepoManager(
 
     fun getPackageSourceOverride(pkg: String): String? {
         return settingsRepository.loadSettings().extensions.packageSourceOverrides[pkg]
-    }
-
-    fun parseChangelog(content: String): List<PluginChangelog> {
-        val lines = content.lines()
-        val changelogs = mutableListOf<PluginChangelog>()
-        var currentChangelog: PluginChangelog? = null
-        var currentCategory: String? = null
-
-        val headerRegex = Regex("""\[(\d{2}/\d{2}/\d{4})\] Version: (.*)""")
-
-        for (line in lines) {
-            val trimmed = line.trim()
-            if (trimmed.isEmpty()) continue
-
-            val match = headerRegex.matchEntire(trimmed)
-            if (match != null) {
-                if (currentChangelog != null) {
-                    changelogs.add(currentChangelog)
-                }
-                currentChangelog = PluginChangelog(match.groupValues[1], match.groupValues[2], mutableMapOf())
-                currentCategory = null
-            } else if (trimmed.endsWith(":")) {
-                currentCategory = trimmed.removeSuffix(":")
-            } else if (trimmed.startsWith("-") && currentCategory != null && currentChangelog != null) {
-                val voice = trimmed.removePrefix("-").trim()
-                val categories = currentChangelog.categories as MutableMap<String, MutableList<String>>
-                val voices = categories.getOrPut(currentCategory) { mutableListOf() }
-                voices.add(voice)
-            }
-        }
-        if (currentChangelog != null) {
-            changelogs.add(currentChangelog)
-        }
-        return changelogs
     }
 }
 

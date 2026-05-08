@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.plugin.logic
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.wip.plugintoolkit.api.utils.ChangelogParser
 
 class ChangelogParserTest {
     private val separator = "-".repeat(100)
@@ -22,7 +23,7 @@ class ChangelogParserTest {
               - Bug fix
         """.trimIndent()
 
-        val versions = ChangelogParser.parse(content)
+        val versions = ChangelogParser.parse(content).releases
         assertEquals(2, versions.size)
 
         assertEquals("1.0.0", versions[0].version)
@@ -43,7 +44,7 @@ class ChangelogParserTest {
             Date: 2026-04-01
         """.trimIndent()
 
-        val versions = ChangelogParser.parse(content)
+        val versions = ChangelogParser.parse(content).releases
         // Only one version is produced (the last one found in the block)
         assertEquals(1, versions.size)
         assertEquals("0.9.0", versions[0].version)
@@ -59,7 +60,7 @@ class ChangelogParserTest {
               - Item 1
         """.trimIndent()
 
-        val versions = ChangelogParser.parse(content)
+        val versions = ChangelogParser.parse(content).releases
         assertEquals(1, versions.size)
         assertEquals("1.0.0", versions[0].version)
         assertEquals("2026-05-05", versions[0].date)
@@ -83,7 +84,7 @@ class ChangelogParserTest {
             
         """.trimIndent()
 
-        val versions = ChangelogParser.parse(content)
+        val versions = ChangelogParser.parse(content).releases
         assertEquals(1, versions.size)
         assertEquals("1.0.0", versions[0].version)
     }

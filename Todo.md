@@ -1,20 +1,18 @@
 Plugin:
 - If a plugin is installed in an "invalid location" (non managed folder) it should show it as unmanaged, and should not be possible to update it, only to remove it
+> now the plugin installation status is linked to the managed folder so they will (should) disappear
 
 Plugin Api:
-- (?) Plan to switch of plugins access files in a way that allow the main app to preload/prepare the needed resources to have more control on how the plugins operate
 - Add pause/cancel call to be able to properly pause the program
+> sorta done
 - Byte cose scanning for future security settings
-- Documentation for update plugin api (make it work)
-- Documentation for plugin setting page (make it work)
-- Documentation for plugin custom action page (make it work)
-
-Gradle:
-- (?) Change the naming output of the plugin file to include the version
-- Change the main app versioning to follow what gradle saves to avoid hardcoded strings
-- Support for signing the plugins with a key
+- Properly test plugin update api
+- Allow plugin to define custom types, share custom types
+- Allow plugin to request special things like path/files (with specific types)
 
 Documentation:
+- Documentation for update plugin api
+- Documentation for plugin setting page
 - The api interface should have documentation for the various annotations and what / how to use it, probably with Dokka
 - Define repo in the documentation
 - Better .md
@@ -30,6 +28,7 @@ Flows:
 > How connection behave when replacing has to be seen, a GUI to select where to connect what may be useful
 - Default entrypoint, with local/remote support
 - Data Duplication entrypoint
+- Conditional nodes like: is result (something) then (something else)
 
 Repo:
 - Test and make it work

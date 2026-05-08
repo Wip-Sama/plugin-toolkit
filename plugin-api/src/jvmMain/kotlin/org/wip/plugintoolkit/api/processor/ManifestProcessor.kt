@@ -63,10 +63,11 @@ class ManifestProcessor(
         
         if (changelogFile != null) {
             val content = changelogFile.readText()
-            changelogObj = ChangelogParser.parse(content)
+            changelogObj = org.wip.plugintoolkit.api.utils.ChangelogParser.parse(content)
             
-            // Bundle changelog.txt into resources
-            writeFile(sourceFile, "", "resources/changelog", "txt", content)
+            // Bundle changelog into resources
+            val extension = changelogFile.extension
+            writeFile(sourceFile, "", "resources/changelog", extension, content)
         }
 
         // 2. Generate Kotlin Classes
@@ -110,16 +111,22 @@ class ManifestProcessor(
     private fun findChangelogFile(sourceFile: KSFile): File? {
         var currentDir = File(sourceFile.filePath).parentFile
         while (currentDir != null) {
-            val changelog = File(currentDir, "changelog.txt")
-            if (changelog.exists()) return changelog
+            val changelogTxt = File(currentDir, "changelog.txt")
+            if (changelogTxt.exists()) return changelogTxt
+            val changelogMd = File(currentDir, "changelog.md")
+            if (changelogMd.exists()) return changelogMd
             
-            val resourcesChangelog = File(currentDir, "src/main/resources/changelog.txt")
-            if (resourcesChangelog.exists()) return resourcesChangelog
+            val resourcesChangelogTxt = File(currentDir, "src/main/resources/changelog.txt")
+            if (resourcesChangelogTxt.exists()) return resourcesChangelogTxt
+            val resourcesChangelogMd = File(currentDir, "src/main/resources/changelog.md")
+            if (resourcesChangelogMd.exists()) return resourcesChangelogMd
 
             if (File(currentDir, "build.gradle.kts").exists() || File(currentDir, "build.gradle").exists()) {
-                val modResources = File(currentDir, "src/main/resources/changelog.txt")
-                if (modResources.exists()) return modResources
-                return if (changelog.exists()) changelog else null
+                val modResourcesTxt = File(currentDir, "src/main/resources/changelog.txt")
+                if (modResourcesTxt.exists()) return modResourcesTxt
+                val modResourcesMd = File(currentDir, "src/main/resources/changelog.md")
+                if (modResourcesMd.exists()) return modResourcesMd
+                return if (changelogTxt.exists()) changelogTxt else if (changelogMd.exists()) changelogMd else null
             }
             currentDir = currentDir.parentFile
         }

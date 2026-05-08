@@ -3,6 +3,10 @@ Date: 06-05-2026
 Added:
   - App logo by [Muh_zakaria](https://www.svgrepo.com/author/muh_zakaria/)
   - Changelog for 1.2.0
+  - Manifest Preloading for Repositories
+Changes:
+  - Unified changelog parser
+  - Migrates plugin-api from java-library to KPM
 Fixes:
   - release.yml no longer add all the tmp files to the release
 Planned:
