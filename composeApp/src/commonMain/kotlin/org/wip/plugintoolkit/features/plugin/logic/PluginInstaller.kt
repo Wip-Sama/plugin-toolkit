@@ -1,8 +1,14 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.readBytes
+import io.ktor.http.HttpHeaders
+import io.ktor.utils.io.readAvailable
 import org.wip.plugintoolkit.api.PluginManifest
-import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
@@ -16,7 +22,9 @@ class PluginInstaller(
     private val registry: PluginRegistry,
     private val repoManager: RepoManager,
     private val lifecycleManager: PluginLifecycleManager,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val client: HttpClient,
+    private val fileSystem: FileSystem
 ) {
     private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
@@ -26,22 +34,21 @@ class PluginInstaller(
     suspend fun installLocal(filePath: String, targetFolderPath: String): Result<PluginManifest?> {
         Logger.i { "Installing local plugin from: $filePath into $targetFolderPath" }
         return try {
-            PlatformUtils.mkdirs(targetFolderPath)
+            fileSystem.mkdirs(targetFolderPath)
 
-            // Try to read manifest from JAR
             val manifest = getManifestFromJar(filePath)
-
             val pkg = manifest?.plugin?.id ?: filePath.replace('\\', '/').substringAfterLast("/").substringBeforeLast(".")
             val name = manifest?.plugin?.name ?: pkg
             val version = manifest?.plugin?.version ?: "1.0.0"
             val description = manifest?.plugin?.description
-
             val pluginDir = "$targetFolderPath/$pkg"
-            PlatformUtils.mkdirs(pluginDir)
+
+            fileSystem.mkdirs(pluginDir)
 
             val jarFileName = filePath.replace('\\', '/').substringAfterLast("/")
             val dest = "$pluginDir/$jarFileName"
-            PlatformUtils.copyFile(filePath, dest)
+
+            fileSystem.copyFile(filePath, dest)
 
             val newPlugin = InstalledPlugin(
                 pkg = pkg,
@@ -63,8 +70,8 @@ class PluginInstaller(
     }
 
     fun getManifestFromJar(jarPath: String): PluginManifest? {
-        val manifestContent = PlatformUtils.readFileFromZip(jarPath, "manifest.json")
-            ?: PlatformUtils.readFileFromZip(jarPath, "META-INF/manifest.json")
+        val manifestContent = fileSystem.readFileFromZip(jarPath, "manifest.json")
+            ?: fileSystem.readFileFromZip(jarPath, "META-INF/manifest.json")
 
         return manifestContent?.let {
             try {
@@ -79,12 +86,16 @@ class PluginInstaller(
     /**
      * Installs a plugin from a remote repository.
      */
-    suspend fun installRemote(plugin: ExtensionPlugin, targetFolderPath: String): Result<PluginManifest?> {
+    suspend fun installRemote(
+        plugin: ExtensionPlugin,
+        targetFolderPath: String,
+        onProgress: ((Float) -> Unit)? = null
+    ): Result<PluginManifest?> {
         Logger.i { "Installing remote plugin: ${plugin.pkg} from ${plugin.repoUrl}" }
         return try {
-            PlatformUtils.mkdirs(targetFolderPath)
+            fileSystem.mkdirs(targetFolderPath)
             val pluginDir = "$targetFolderPath/${plugin.pkg}"
-            PlatformUtils.mkdirs(pluginDir)
+            fileSystem.mkdirs(pluginDir)
 
             val repoUrl = plugin.repoUrl ?: return Result.failure(Exception("Missing repo URL"))
             val pluginsFolder = repoUrl.substringBeforeLast("/") + "/plugins"
@@ -93,13 +104,13 @@ class PluginInstaller(
             val pluginFileUrl = "$baseUrl/${plugin.fileName}"
             val destFile = "$pluginDir/${plugin.fileName}"
 
-            PlatformUtils.downloadFile(pluginFileUrl, destFile).onFailure { return Result.failure(it) }
+            downloadFile(pluginFileUrl, destFile, onProgress).onFailure { return Result.failure(it) }
 
             // Download optional assets
             listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach { 
-                PlatformUtils.downloadFile("$baseUrl/$it", "$pluginDir/$it")
+                downloadFile("$baseUrl/$it", "$pluginDir/$it")
             }
-            PlatformUtils.downloadFile("$baseUrl/changelog.md", "$pluginDir/changelog.md")
+            downloadFile("$baseUrl/changelog.md", "$pluginDir/changelog.md")
 
             val newPlugin = InstalledPlugin(
                 pkg = plugin.pkg,
@@ -133,7 +144,7 @@ class PluginInstaller(
             return Result.failure(e)
         }
 
-        PlatformUtils.deleteDirectory(plugin.installPath)
+        fileSystem.deleteDirectory(plugin.installPath)
         registry.removePlugin(pkg)
         Logger.i { "Successfully uninstalled plugin: $pkg" }
         return Result.success(Unit)
@@ -172,15 +183,12 @@ class PluginInstaller(
     fun clearFiles(pkg: String): Result<Unit> {
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin $pkg not found"))
         val filesPath = "${plugin.installPath}/files"
-        return if (PlatformUtils.exists(filesPath)) {
+        return if (fileSystem.exists(filesPath)) {
             try {
                 // We don't delete the "files" folder itself, only its content
-                PlatformUtils.listFiles(filesPath).forEach { 
+                fileSystem.listFiles(filesPath).forEach { 
                     val path = "$filesPath/$it"
-                    // Note: deleteDirectory works for files too in some implementations, 
-                    // but we might need a more robust way if it's a mix.
-                    // Assuming PlatformUtils.deleteDirectory handles nested deletion.
-                    PlatformUtils.deleteDirectory(path) 
+                    fileSystem.deleteDirectory(path) 
                 }
                 Result.success(Unit)
             } catch (e: Exception) {
@@ -211,5 +219,38 @@ class PluginInstaller(
             if (s1[i] < s2[i]) return false
         }
         return s1.size > s2.size
+    }
+
+    private suspend fun downloadFile(url: String, dest: String, onProgress: ((Float) -> Unit)? = null): Result<Unit> {
+        return try {
+            val response = client.get(url)
+            if (response.status.value !in 200..299) {
+                return Result.failure(Exception("Failed to download: ${response.status}"))
+            }
+            
+            val contentLength = response.headers[io.ktor.http.HttpHeaders.ContentLength]?.toLong()
+            val bytes = if (contentLength != null && onProgress != null) {
+                val channel = response.bodyAsChannel()
+                val buffer = ByteArray(8192)
+                var totalRead = 0L
+                val output = mutableListOf<Byte>()
+                while (!channel.isClosedForRead) {
+                    val read = channel.readAvailable(buffer)
+                    if (read == -1) break
+                    totalRead += read
+                    for (i in 0 until read) output.add(buffer[i])
+                    onProgress(totalRead.toFloat() / contentLength)
+                }
+                output.toByteArray()
+            } else {
+                response.readBytes()
+            }
+
+            fileSystem.saveFile(dest, bytes)
+            onProgress?.invoke(1.0f)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

@@ -22,7 +22,8 @@ enum class JobType {
     Setup,
     Update,
     Validation,
-    PluginAction
+    PluginAction,
+    PluginInstallation
 }
 
 @Serializable

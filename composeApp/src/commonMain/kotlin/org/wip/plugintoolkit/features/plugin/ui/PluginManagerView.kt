@@ -101,6 +101,21 @@ fun PluginManagerView(
         )
     }
 
+    val showRemoteInstall by viewModel.showRemoteInstall.collectAsState()
+    if (showRemoteInstall) {
+        val availablePlugins by viewModel.availableRemotePlugins.collectAsState()
+        val installedPlugins by viewModel.installedPlugins.collectAsState()
+        val activeJobs by viewModel.activePluginInstallationJobs.collectAsState()
+        
+        RemotePluginInstallDialog(
+            availablePlugins = availablePlugins,
+            installedPackageNames = installedPlugins.map { it.pkg }.toSet(),
+            activeJobs = activeJobs,
+            onInstall = { viewModel.installRemote(it) },
+            onDismiss = { viewModel.closeRemoteInstall() }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Toolbar
         Row(
@@ -123,6 +138,11 @@ fun PluginManagerView(
                 Text(stringResource(Res.string.plugin_reload_all))
             }
             Spacer(modifier = Modifier.weight(1f))
+            Button(onClick = { viewModel.openRemoteInstall() }) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                Text("Install Remote")
+            }
             Button(onClick = { viewModel.installLocal() }) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))

@@ -9,7 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.wip.plugintoolkit.api.*
-import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
@@ -24,7 +24,8 @@ import java.util.concurrent.ConcurrentHashMap
 class PluginLifecycleManager(
     private val registry: PluginRegistry,
     private val jobManager: JobManager,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val fileSystem: FileSystem
 ) {
     private val _loadedPlugins = MutableStateFlow<Set<String>>(emptySet())
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
@@ -187,7 +188,7 @@ class PluginLifecycleManager(
     fun loadPluginSettings(pkg: String): PluginSettingsStore {
         val plugin = registry.getPlugin(pkg) ?: return PluginSettingsStore()
         val settingsFile = "${plugin.installPath}/settings.json"
-        val content = PlatformUtils.readFile(settingsFile)
+        val content = fileSystem.readFile(settingsFile)
         return if (content != null) {
             try {
                 json.decodeFromString<PluginSettingsStore>(content)
@@ -204,7 +205,7 @@ class PluginLifecycleManager(
         val plugin = registry.getPlugin(pkg) ?: return
         val settingsFile = "${plugin.installPath}/settings.json"
         try {
-            PlatformUtils.writeFile(settingsFile, json.encodeToString(store))
+            fileSystem.writeFile(settingsFile, json.encodeToString(store))
         } catch (t: Throwable) {
             Logger.e(t) { "Failed to save settings for $pkg" }
         }

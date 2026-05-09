@@ -8,7 +8,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -82,6 +81,7 @@ class JobWorker(
                 JobType.Update -> executeUpdateJob(job)
                 JobType.Validation -> executeValidationJob(job)
                 JobType.PluginAction -> executePluginActionJob(job)
+                JobType.PluginInstallation -> executeInstallationJob(job)
                 else -> throw Exception("Unsupported job type: ${job.type}")
             }
         } catch (e: CancellationException) {
@@ -315,6 +315,47 @@ class JobWorker(
             manager.tryCompleteJob(job.id, "Success")
         } else {
             val error = result.exceptionOrNull()?.message ?: "Action failed"
+            manager.tryFailJob(job.id, error)
+        }
+    }
+
+    private suspend fun executeInstallationJob(job: BackgroundJob) {
+        manager.addJobLog(job.id, "Starting remote installation for ${job.pluginId}...")
+        manager.updateJobProgress(job.id, 0.05f)
+
+        val pluginJson = job.parameters["pluginJson"] ?: throw Exception("Missing pluginJson parameter")
+        val targetFolderPath = job.parameters["targetFolderPath"]?.let {
+            if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString().removeSurrounding("\"")
+        } ?: throw Exception("Missing targetFolderPath parameter")
+
+        val plugin = kotlinx.serialization.json.Json.decodeFromJsonElement(
+            org.wip.plugintoolkit.features.repository.model.ExtensionPlugin.serializer(),
+            pluginJson
+        )
+
+        // Register a simple handle for cancellation
+        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        manager.registerJobHandle(job.id, object : JobHandle {
+            override val result: kotlinx.coroutines.Deferred<ExecutionResult>
+                get() = throw UnsupportedOperationException("Not used for installation")
+
+            override fun pause() { /* Not supported */ }
+
+            override fun cancel(force: Boolean) {
+                jobExecution.cancel()
+            }
+        })
+
+        val result = pluginManager.installRemote(plugin, targetFolderPath) { progress ->
+            manager.updateJobProgress(job.id, progress)
+        }
+
+        if (result.isSuccess) {
+            manager.updateJobProgress(job.id, 1.0f)
+            manager.addJobLog(job.id, "Installation completed successfully.")
+            manager.tryCompleteJob(job.id, "Success")
+        } else {
+            val error = result.exceptionOrNull()?.message ?: "Installation failed"
             manager.tryFailJob(job.id, error)
         }
     }

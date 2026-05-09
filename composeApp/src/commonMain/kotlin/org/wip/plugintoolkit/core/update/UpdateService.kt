@@ -6,7 +6,10 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.onDownload
 import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +41,7 @@ class UpdateService(
                     if (asset != null) {
                         return@withContext UpdateInfo(
                             version = latestVersion,
-                            changelog = release.body,
+                            changelog = release.body ?: release.name, // Fallback to release name if body is empty
                             downloadUrl = asset.downloadUrl,
                             fileName = asset.name,
                             size = asset.size
@@ -76,29 +79,38 @@ class UpdateService(
 
     suspend fun downloadUpdate(info: UpdateInfo, destinationPath: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val response = client.get(info.downloadUrl) {
+            val response = client.prepareGet(info.downloadUrl) {
                 onDownload { bytesSentTotal, contentLength ->
                     contentLength?.let {
                         if (it > 0) {
                             _downloadProgress.value = bytesSentTotal.toFloat() / contentLength
-                        } else {
-                            _downloadProgress.value = 0f
                         }
                     }
                 }
+            }.execute { response ->
+                if (response.status.value in 200..299) {
+                    val channel = response.bodyAsChannel()
+                    val file = java.io.File(destinationPath)
+                    file.parentFile?.mkdirs()
+                    
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(8192)
+                        var totalRead = 0L
+                        while (!channel.isClosedForRead) {
+                            val read = channel.readAvailable(buffer, 0, buffer.size)
+                            if (read == -1) break
+                            if (read > 0) {
+                                output.write(buffer, 0, read)
+                                totalRead += read
+                            }
+                        }
+                    }
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception("Failed to download: ${response.status}"))
+                }
             }
-
-            if (response.status.value in 200..299) {
-                val bytes = response.body<ByteArray>()
-                // Note: For very large files, streaming to disk is better.
-                // But for installers (~50-100MB), this might be okay.
-                // Let's use streaming just in case.
-                val file = java.io.File(destinationPath)
-                file.writeBytes(bytes)
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception("Failed to download: ${response.status}"))
-            }
+            response
         } catch (e: Exception) {
             Logger.e(e) { "Error downloading update" }
             Result.failure(e)

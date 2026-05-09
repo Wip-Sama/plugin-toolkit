@@ -24,6 +24,10 @@ import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.platformLogWriter
 import io.github.vinceglb.filekit.FileKit
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +35,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
+import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.context.startKoin
@@ -44,7 +49,9 @@ import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.update.UpdateService
+import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
+import org.wip.plugintoolkit.core.utils.RealFileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
@@ -109,11 +116,25 @@ fun runMain(args: Array<String>) {
                 JvmNotificationService { viewModelProvider()?.settings?.value ?: repository.settings.value }
             }
             single { SettingsRegistry() }
-            single { RepoManager(get()) }
+            single<FileSystem> { RealFileSystem() }
+            single {
+                Json {
+                    ignoreUnknownKeys = true
+                    coerceInputValues = true
+                }
+            }
+            single {
+                HttpClient(CIO) {
+                    install(ContentNegotiation) {
+                        json(get<Json>())
+                    }
+                }
+            }
+            single { RepoManager(get(), get(), get()) }
             single { DialogService() }
             single { PluginRegistry(get(), CoroutineScope(SupervisorJob() + Dispatchers.Default)) }
-            single { PluginLifecycleManager(get(), get(), get()) }
-            single { PluginInstaller(get(), get(), get(), get()) }
+            single { PluginLifecycleManager(get(), get(), get(), get()) }
+            single { PluginInstaller(get(), get(), get(), get(), get(), get()) }
             single { PluginScanner(get()) }
             single { PluginManager(get(), get(), get(), get(), get(), get(), get()) }
             single {
@@ -123,11 +144,11 @@ fun runMain(args: Array<String>) {
                 )
             }
             single { PluginViewModel(get(), get(), get()) }
-            factory { SettingsViewModel(get(), get(), get()) }
+            single { SettingsViewModel(get(), get(), get(), get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get()) }
-            factory { PluginManagerViewModel(get(), get(), get()) }
+            factory { PluginManagerViewModel(get(), get(), get(), get(), get()) }
             factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
             factory { JobViewModel(get()) }
             factory { AppViewModel(get(), get()) }
@@ -138,6 +159,12 @@ fun runMain(args: Array<String>) {
     val koin = getKoin()
     val viewModel = koin.get<SettingsViewModel>()
     koin.get<RepoManager>() // Trigger initialization and background refresh
+
+    // Check for updates on startup if enabled
+    val settings = viewModel.settings.value
+    if (settings.autoUpdate.enabled && settings.autoUpdate.checkOnStartup) {
+        viewModel.checkForUpdates()
+    }
     val pluginManager = koin.get<PluginManager>()
 
     viewModelProvider = { viewModel }
@@ -220,6 +247,7 @@ fun runMain(args: Array<String>) {
             Window(
                 onCloseRequest = {
                     if (viewModel.settings.value.general.closeToTray) {
+                        // Just hide the window, background jobs and processes continue to run
                         isVisible = false
                     } else {
                         exitApplication()

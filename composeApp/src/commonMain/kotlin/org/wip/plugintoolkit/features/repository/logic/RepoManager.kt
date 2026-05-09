@@ -25,18 +25,10 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.api.PluginManifest
 
 class RepoManager(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val client: HttpClient,
+    private val jsonConfig: Json
 ) {
-    private val jsonConfig = Json {
-        ignoreUnknownKeys = true
-        coerceInputValues = true
-    }
-    
-    private val client = HttpClient {
-        install(ContentNegotiation) {
-            json(jsonConfig)
-        }
-    }
 
     private val _repositories = MutableStateFlow<List<ExtensionRepo>>(emptyList())
     val repositories: StateFlow<List<ExtensionRepo>> = _repositories.asStateFlow()

@@ -18,6 +18,8 @@ import kotlinx.io.writeString
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forSessionBus
 import org.freedesktop.dbus.interfaces.DBusInterface
 import org.freedesktop.dbus.types.Variant
+import java.awt.Desktop
+import java.io.File
 
 actual object PlatformUtils {
     actual val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
@@ -249,31 +251,65 @@ actual object PlatformUtils {
         }
     }
 
-    actual fun installUpdate(path: String) {
-        val file = java.io.File(path)
-        if (!file.exists()) return
+    private fun getCurrentInstallDir(): String? {
+        return try {
+            val exePath = ProcessHandle.current().info().command().orElse(null) ?: return null
+            val file = File(exePath)
+            // Basic check to avoid passing IDE/Java paths
+            val name = file.name.lowercase()
+            if (name.contains("java") || name.contains("idea") || name.contains("kotlinc")) {
+                return null
+            }
+            file.parentFile.absolutePath
+        } catch (e: Exception) {
+            null
+        }
+    }
 
+    actual fun installUpdate(path: String) {
+        val file = File(path)
+        if (!file.exists()) {
+            Logger.e { "Installer file not found at $path" }
+            return
+        }
+
+        val currentInstallDir = getCurrentInstallDir()
+        Logger.i { "Launching installer: $path (Target Dir: ${currentInstallDir ?: "Default"})" }
+        
         try {
             if (isWindows) {
-                if (path.endsWith(".msi")) {
-                    ProcessBuilder("msiexec", "/i", path).start()
+                val normalizedPath = path.replace("/", "\\")
+                if (normalizedPath.endsWith(".msi")) {
+                    val command = mutableListOf("msiexec", "/i", normalizedPath)
+                    if (currentInstallDir != null) {
+                        command.add("INSTALLDIR=$currentInstallDir")
+                    }
+                    ProcessBuilder(command).start()
+                } else if (normalizedPath.endsWith(".exe")) {
+                    val command = mutableListOf(normalizedPath)
+                    if (currentInstallDir != null) {
+                        command.add("/DIR=$currentInstallDir")
+                    }
+                    ProcessBuilder(command).start()
                 } else {
-                    java.awt.Desktop.getDesktop().open(file)
+                    Desktop.getDesktop().open(File(normalizedPath))
                 }
             } else if (isLinux) {
                 if (path.endsWith(".deb")) {
-                    // Try to use a system tool to install it
                     ProcessBuilder("pkexec", "dpkg", "-i", path).start()
                 } else {
-                    java.awt.Desktop.getDesktop().open(file)
+                    Desktop.getDesktop().open(file)
                 }
             } else {
-                java.awt.Desktop.getDesktop().open(file)
+                Desktop.getDesktop().open(file)
             }
-            // Exit the application to allow the installer to replace files
+            
+            // Give it a moment to start before we kill the current process
+            Thread.sleep(1000)
+            Logger.i { "Application exiting for update installation" }
             System.exit(0)
         } catch (e: Exception) {
-            Logger.e(e) { "Failed to launch installer" }
+            Logger.e(e) { "Failed to launch installer at $path" }
         }
     }
 }

@@ -66,12 +66,33 @@ class PluginManager(
             }
         }.map { Unit }
 
-    suspend fun installRemote(plugin: ExtensionPlugin, targetFolderPath: String) = 
-        installer.installRemote(plugin, targetFolderPath).onSuccess { manifest ->
-            if (manifest != null) {
-                handlePostInstall(plugin.pkg, manifest)
-            }
-        }.map { Unit }
+    suspend fun enqueueRemoteInstall(plugin: ExtensionPlugin, targetFolderPath: String) {
+        Logger.i { "Enqueuing remote installation for: ${plugin.pkg}" }
+        val job = BackgroundJob(
+            id = "install_${plugin.pkg}_${Clock.System.now().toEpochMilliseconds()}",
+            name = "Installing: ${plugin.name}",
+            type = JobType.PluginInstallation,
+            pluginId = plugin.pkg,
+            capabilityName = "install",
+            parameters = mapOf(
+                "pluginJson" to kotlinx.serialization.json.Json.encodeToJsonElement(ExtensionPlugin.serializer(), plugin),
+                "targetFolderPath" to kotlinx.serialization.json.JsonPrimitive(targetFolderPath)
+            ),
+            isCancellable = true,
+            isPausable = false
+        )
+        jobManager.enqueueJob(job)
+    }
+
+    suspend fun installRemote(
+        plugin: ExtensionPlugin,
+        targetFolderPath: String,
+        onProgress: ((Float) -> Unit)? = null
+    ) = installer.installRemote(plugin, targetFolderPath, onProgress).onSuccess { manifest ->
+        if (manifest != null) {
+            handlePostInstall(plugin.pkg, manifest)
+        }
+    }.map { Unit }
 
     suspend fun uninstall(pkg: String) = installer.uninstall(pkg)
 

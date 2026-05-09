@@ -41,11 +41,13 @@ import plugintoolkit.composeapp.generated.resources.update_now
 @Composable
 fun UpdateDialog(
     updateInfo: UpdateInfo,
+    isDownloading: Boolean,
+    progress: Float,
     onDownload: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = if (isDownloading) ({}) else onDismiss,
         title = {
             Text(
                 stringResource(Res.string.update_available_title, updateInfo.version),
@@ -78,15 +80,43 @@ fun UpdateDialog(
                         }
                     }
                 }
+
+                if (isDownloading) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = stringResource(Res.string.update_downloading),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${(progress * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
-            Button(onClick = onDownload) {
+            Button(
+                onClick = onDownload,
+                enabled = !isDownloading
+            ) {
                 Text(stringResource(Res.string.update_now))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isDownloading
+            ) {
                 Text(stringResource(Res.string.update_later))
             }
         }
@@ -94,52 +124,39 @@ fun UpdateDialog(
 }
 
 @Composable
-fun UpdateProgressOverlay(
-    progress: Float,
-    status: String = stringResource(Res.string.update_downloading)
+fun UpdateConfirmationDialog(
+    runningJobsCount: Int,
+    onConfirm: (Boolean) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    // Full screen overlay that blocks interaction
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Card(
-            modifier = Modifier.width(320.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Running Jobs Detected",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
+        text = {
+            Text(
+                "There are $runningJobsCount jobs currently running. Updating now will stop all active jobs. Do you want to proceed?",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(true) },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error).run {
+                    androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                }
             ) {
-                CircularProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.size(48.dp)
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Text(
-                    text = status,
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "${(progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
-                )
+                Text("Stop Jobs & Update")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Update Later")
             }
         }
-    }
+    )
 }
