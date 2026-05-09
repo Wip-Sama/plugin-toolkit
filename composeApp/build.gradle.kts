@@ -84,13 +84,17 @@ compose.desktop {
             vendor = "Wip-Sama"
             description = "A working toolkit for using plugins."
             includeAllModules = true
-            // Explicitly include modules often required by JNA/DBus, reflection, and core features
+
+            windows {
+                upgradeUuid = "8ddd074e-db0a-4ae3-ba98-35013c6ae5cc"
+            }
+            // Modules often required by JNA/DBus, reflection, and core features
             modules(
-                "java.instrument", 
-                "jdk.unsupported", 
-                "java.naming", 
-                "java.sql", 
-                "java.management", 
+                "java.instrument",
+                "jdk.unsupported",
+                "java.naming",
+                "java.sql",
+                "java.management",
                 "jdk.crypto.ec",
                 "java.desktop",
                 "java.xml",

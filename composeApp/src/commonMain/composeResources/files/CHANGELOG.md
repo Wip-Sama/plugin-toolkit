@@ -3,6 +3,7 @@ Date: 09-05-2026
 Added:
 	- Checking for active jobs before updating
 	- Update file is preserver to avoid downloading it every time
+	- Updater now knows the correct installation path on windows
 Changes:
 	- Remove custom downloading update popup
 Fixed:

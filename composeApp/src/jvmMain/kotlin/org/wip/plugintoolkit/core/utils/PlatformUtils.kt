@@ -251,6 +251,21 @@ actual object PlatformUtils {
         }
     }
 
+    private fun getCurrentInstallDir(): String? {
+        return try {
+            val exePath = ProcessHandle.current().info().command().orElse(null) ?: return null
+            val file = File(exePath)
+            // Basic check to avoid passing IDE/Java paths
+            val name = file.name.lowercase()
+            if (name.contains("java") || name.contains("idea") || name.contains("kotlinc")) {
+                return null
+            }
+            file.parentFile.absolutePath
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     actual fun installUpdate(path: String) {
         val file = File(path)
         if (!file.exists()) {
@@ -258,14 +273,24 @@ actual object PlatformUtils {
             return
         }
 
-        Logger.i { "Launching installer: $path" }
+        val currentInstallDir = getCurrentInstallDir()
+        Logger.i { "Launching installer: $path (Target Dir: ${currentInstallDir ?: "Default"})" }
+        
         try {
             if (isWindows) {
                 val normalizedPath = path.replace("/", "\\")
                 if (normalizedPath.endsWith(".msi")) {
-                    ProcessBuilder("msiexec", "/i", normalizedPath).start()
+                    val command = mutableListOf("msiexec", "/i", normalizedPath)
+                    if (currentInstallDir != null) {
+                        command.add("INSTALLDIR=$currentInstallDir")
+                    }
+                    ProcessBuilder(command).start()
                 } else if (normalizedPath.endsWith(".exe")) {
-                    ProcessBuilder(normalizedPath).start()
+                    val command = mutableListOf(normalizedPath)
+                    if (currentInstallDir != null) {
+                        command.add("/DIR=$currentInstallDir")
+                    }
+                    ProcessBuilder(command).start()
                 } else {
                     Desktop.getDesktop().open(File(normalizedPath))
                 }

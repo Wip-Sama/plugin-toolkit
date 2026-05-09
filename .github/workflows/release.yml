@@ -5,6 +5,10 @@ on:
     branches:
       - master
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build:
     name: Build and Release
@@ -33,6 +37,11 @@ jobs:
         run: .\gradlew packageDistributionForCurrentOS packageUberJarForCurrentOS
         # run: .\gradlew packageReleaseDistributionForCurrentOS packageReleaseUberJarForCurrentOS
 
+      - name: Publish Plugin API
+        run: .\gradlew :plugin-api:publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -45,8 +54,6 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
