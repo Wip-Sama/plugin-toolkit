@@ -31,5 +31,8 @@ data class ExtensionPlugin(
     val version: String,
     val minAppVersion: String? = null,
     val repoUrl: String? = null, // Filled during parsing to track source
+    val size: Long? = null,
+    val hash: String? = null,
+    val signature: String? = null,
     val manifest: PluginManifest? = null
 )

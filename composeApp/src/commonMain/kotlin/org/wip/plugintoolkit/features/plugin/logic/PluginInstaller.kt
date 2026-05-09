@@ -3,7 +3,10 @@ package org.wip.plugintoolkit.features.plugin.logic
 import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.readBytes
+import io.ktor.http.HttpHeaders
+import io.ktor.utils.io.readAvailable
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
@@ -83,7 +86,11 @@ class PluginInstaller(
     /**
      * Installs a plugin from a remote repository.
      */
-    suspend fun installRemote(plugin: ExtensionPlugin, targetFolderPath: String): Result<PluginManifest?> {
+    suspend fun installRemote(
+        plugin: ExtensionPlugin,
+        targetFolderPath: String,
+        onProgress: ((Float) -> Unit)? = null
+    ): Result<PluginManifest?> {
         Logger.i { "Installing remote plugin: ${plugin.pkg} from ${plugin.repoUrl}" }
         return try {
             fileSystem.mkdirs(targetFolderPath)
@@ -97,7 +104,7 @@ class PluginInstaller(
             val pluginFileUrl = "$baseUrl/${plugin.fileName}"
             val destFile = "$pluginDir/${plugin.fileName}"
 
-            downloadFile(pluginFileUrl, destFile).onFailure { return Result.failure(it) }
+            downloadFile(pluginFileUrl, destFile, onProgress).onFailure { return Result.failure(it) }
 
             // Download optional assets
             listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach { 
@@ -214,11 +221,33 @@ class PluginInstaller(
         return s1.size > s2.size
     }
 
-    private suspend fun downloadFile(url: String, dest: String): Result<Unit> {
+    private suspend fun downloadFile(url: String, dest: String, onProgress: ((Float) -> Unit)? = null): Result<Unit> {
         return try {
             val response = client.get(url)
-            val bytes = response.readBytes()
+            if (response.status.value !in 200..299) {
+                return Result.failure(Exception("Failed to download: ${response.status}"))
+            }
+            
+            val contentLength = response.headers[io.ktor.http.HttpHeaders.ContentLength]?.toLong()
+            val bytes = if (contentLength != null && onProgress != null) {
+                val channel = response.bodyAsChannel()
+                val buffer = ByteArray(8192)
+                var totalRead = 0L
+                val output = mutableListOf<Byte>()
+                while (!channel.isClosedForRead) {
+                    val read = channel.readAvailable(buffer)
+                    if (read == -1) break
+                    totalRead += read
+                    for (i in 0 until read) output.add(buffer[i])
+                    onProgress(totalRead.toFloat() / contentLength)
+                }
+                output.toByteArray()
+            } else {
+                response.readBytes()
+            }
+
             fileSystem.saveFile(dest, bytes)
+            onProgress?.invoke(1.0f)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

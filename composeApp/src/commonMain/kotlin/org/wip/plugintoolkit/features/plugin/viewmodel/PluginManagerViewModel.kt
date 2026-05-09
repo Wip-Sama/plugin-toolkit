@@ -16,7 +16,12 @@ import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.repository.logic.RepoManager
+import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.plugin_action_blocked
@@ -24,7 +29,6 @@ import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.plugin_changelog_not_found_jar
 import plugintoolkit.composeapp.generated.resources.plugin_changelog_not_found_remote
 import plugintoolkit.composeapp.generated.resources.plugin_choose_install_location
-import plugintoolkit.composeapp.generated.resources.plugin_settings
 import plugintoolkit.composeapp.generated.resources.plugin_state_change_error
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall_blocked
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall_confirmation
@@ -37,7 +41,9 @@ import plugintoolkit.composeapp.generated.resources.plugin_validation_result
 class PluginManagerViewModel(
     private val pluginManager: PluginManager,
     private val dialogService: DialogService,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val repoManager: RepoManager,
+    private val jobManager: JobManager
 ) : ViewModel() {
 
     val installedPlugins = pluginManager.installedPlugins
@@ -53,6 +59,20 @@ class PluginManagerViewModel(
 
     private val _settingsPkg = MutableStateFlow<String?>(null)
     val settingsPkg: StateFlow<String?> = _settingsPkg.asStateFlow()
+
+    private val _showRemoteInstall = MutableStateFlow(false)
+    val showRemoteInstall: StateFlow<Boolean> = _showRemoteInstall.asStateFlow()
+
+    val availableRemotePlugins: StateFlow<List<ExtensionPlugin>> = repoManager.plugins
+        .map { it.values.flatten() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val activePluginInstallationJobs: StateFlow<Map<String, Float>> = jobManager.jobProgress
+        .combine(jobManager.jobs) { progressMap, jobs ->
+            jobs.filter { it.type == JobType.PluginInstallation && it.status == JobStatus.Running }
+                .associate { it.pluginId to (progressMap[it.id] ?: 0f) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     init {
         PlatformUtils.mkdirs(defaultPluginFolder)
@@ -76,6 +96,24 @@ class PluginManagerViewModel(
                     viewModelScope.launch {
                         pluginManager.installLocal(filePath, target)
                     }
+                }
+            }
+        }
+    }
+
+    fun openRemoteInstall() {
+        _showRemoteInstall.value = true
+    }
+
+    fun closeRemoteInstall() {
+        _showRemoteInstall.value = false
+    }
+
+    fun installRemote(plugin: ExtensionPlugin) {
+        viewModelScope.launch {
+            pickInstallLocation { target ->
+                viewModelScope.launch {
+                    pluginManager.enqueueRemoteInstall(plugin, target)
                 }
             }
         }

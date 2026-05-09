@@ -4,6 +4,7 @@ Added:
 	- Checking for active jobs before updating
 	- Update file is preserver to avoid downloading it every time
 	- Updater now knows the correct installation path on windows
+	- Added search popup for installing plugins from remote
 Changes:
 	- Remove custom downloading update popup
 Fixed:
