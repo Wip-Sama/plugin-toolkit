@@ -64,6 +64,7 @@ ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 # JNA / DBus
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
@@ -91,6 +92,7 @@ junit = { module = "junit:junit", version.ref = "junit" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-framework = { module = "io.kotest:kotest-framework-engine", version.ref = "kotest" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 [plugins]

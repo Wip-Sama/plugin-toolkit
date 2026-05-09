@@ -22,16 +22,18 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 
 class PluginViewModel(
     private val jobManager: JobManager,
-    private val notificationService: org.wip.plugintoolkit.core.notification.NotificationService,
+    private val notificationService: NotificationService,
     private val pluginManager: PluginManager
 ) : ViewModel() {
     var jarPath by mutableStateOf("")
@@ -39,7 +41,7 @@ class PluginViewModel(
     var selectedCapability by mutableStateOf<Capability?>(null)
     var loadedPlugins by mutableStateOf(PluginLoader.getPlugins())
 
-    var saveResults by mutableStateOf(true) // Default to true as requested "ability to save"
+    var saveResults by mutableStateOf(true)
     val activeJobs = jobManager.jobs // Flow<List<BackgroundJob>>
     val jobProgress = jobManager.jobProgress // Flow<Map<String, Float>>
 
@@ -63,10 +65,10 @@ class PluginViewModel(
                         false
                     }
                 }
-                // If the selected plugin was unloaded, clear it
                 val selectedId = try {
                     selectedPlugin?.getManifest()?.plugin?.id
                 } catch (t: Throwable) {
+                    //TODO: maybe do something
                     null
                 }
                 if (selectedPlugin != null && (selectedId == null || !activeIds.contains(selectedId))) {
