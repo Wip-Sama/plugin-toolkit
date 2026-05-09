@@ -123,7 +123,7 @@ fun runMain(args: Array<String>) {
                 )
             }
             single { PluginViewModel(get(), get(), get()) }
-            factory { SettingsViewModel(get(), get(), get()) }
+            single { SettingsViewModel(get(), get(), get(), get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get()) }
@@ -138,6 +138,12 @@ fun runMain(args: Array<String>) {
     val koin = getKoin()
     val viewModel = koin.get<SettingsViewModel>()
     koin.get<RepoManager>() // Trigger initialization and background refresh
+
+    // Check for updates on startup if enabled
+    val settings = viewModel.settings.value
+    if (settings.autoUpdate.enabled && settings.autoUpdate.checkOnStartup) {
+        viewModel.checkForUpdates()
+    }
     val pluginManager = koin.get<PluginManager>()
 
     viewModelProvider = { viewModel }
@@ -220,6 +226,7 @@ fun runMain(args: Array<String>) {
             Window(
                 onCloseRequest = {
                     if (viewModel.settings.value.general.closeToTray) {
+                        // Just hide the window, background jobs and processes continue to run
                         isVisible = false
                     } else {
                         exitApplication()

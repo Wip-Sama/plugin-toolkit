@@ -1,3 +1,15 @@
+Version: 1.3.1
+Date: 09-05-2026
+Added:
+	- Checking for active jobs before updating
+	- Update file is preserver to avoid downloading it every time
+Changes:
+	- Remove custom downloading update popup
+Fixed:
+	- Application no longer checks for update every time it's opened when closed to tray
+	- Application update progress bar correctly reports progress
+	- Updates are now installed correctly (at least on windows)
+---------------------------------------------------------------------------------------------------
 Version: 1.3.0
 Date: 08-05-2026
 Added:
@@ -15,7 +27,7 @@ Removed:
 Fixes:
   - release.yml no longer add all the tmp files to the release
 Planned:
-  - switch to proGuard (release distribution) for actual releases, for now it removes too much from the jar to mak this viable
+  - switch to proGuard (release distribution) for actual releases, for now it removes too much from the jar to make this viable
 ----------------------------------------------------------------------------------------------------
 Version: 1.2.0
 Date: 06-05-2026

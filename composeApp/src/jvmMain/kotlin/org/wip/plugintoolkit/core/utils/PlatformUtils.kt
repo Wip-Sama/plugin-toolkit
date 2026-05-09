@@ -18,6 +18,8 @@ import kotlinx.io.writeString
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forSessionBus
 import org.freedesktop.dbus.interfaces.DBusInterface
 import org.freedesktop.dbus.types.Variant
+import java.awt.Desktop
+import java.io.File
 
 actual object PlatformUtils {
     actual val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
@@ -250,30 +252,39 @@ actual object PlatformUtils {
     }
 
     actual fun installUpdate(path: String) {
-        val file = java.io.File(path)
-        if (!file.exists()) return
+        val file = File(path)
+        if (!file.exists()) {
+            Logger.e { "Installer file not found at $path" }
+            return
+        }
 
+        Logger.i { "Launching installer: $path" }
         try {
             if (isWindows) {
-                if (path.endsWith(".msi")) {
-                    ProcessBuilder("msiexec", "/i", path).start()
+                val normalizedPath = path.replace("/", "\\")
+                if (normalizedPath.endsWith(".msi")) {
+                    ProcessBuilder("msiexec", "/i", normalizedPath).start()
+                } else if (normalizedPath.endsWith(".exe")) {
+                    ProcessBuilder(normalizedPath).start()
                 } else {
-                    java.awt.Desktop.getDesktop().open(file)
+                    Desktop.getDesktop().open(File(normalizedPath))
                 }
             } else if (isLinux) {
                 if (path.endsWith(".deb")) {
-                    // Try to use a system tool to install it
                     ProcessBuilder("pkexec", "dpkg", "-i", path).start()
                 } else {
-                    java.awt.Desktop.getDesktop().open(file)
+                    Desktop.getDesktop().open(file)
                 }
             } else {
-                java.awt.Desktop.getDesktop().open(file)
+                Desktop.getDesktop().open(file)
             }
-            // Exit the application to allow the installer to replace files
+            
+            // Give it a moment to start before we kill the current process
+            Thread.sleep(1000)
+            Logger.i { "Application exiting for update installation" }
             System.exit(0)
         } catch (e: Exception) {
-            Logger.e(e) { "Failed to launch installer" }
+            Logger.e(e) { "Failed to launch installer at $path" }
         }
     }
 }

@@ -45,9 +45,10 @@ import org.wip.plugintoolkit.features.plugin.ui.PluginSectionScreen
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.repository.ui.PluginRepoView
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.UpdateState
 import org.wip.plugintoolkit.features.settings.ui.SettingsScreen
+import org.wip.plugintoolkit.features.settings.ui.UpdateConfirmationDialog
 import org.wip.plugintoolkit.features.settings.ui.UpdateDialog
-import org.wip.plugintoolkit.features.settings.ui.UpdateProgressOverlay
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import org.wip.plugintoolkit.shared.components.ToastHost
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
@@ -68,12 +69,6 @@ fun App(
 
     LaunchedEffect(languageCode) {
         PlatformLocalization.setApplicationLanguage(languageCode)
-    }
-
-    LaunchedEffect(Unit) {
-        if (settings.autoUpdate.enabled && settings.autoUpdate.checkOnStartup) {
-            viewModel.checkForUpdates()
-        }
     }
 
     AppContent(settings, viewModel, pluginViewModel, appViewModel, notificationService, dialogService)
@@ -168,18 +163,26 @@ private fun AppContent(
 
                     // Update Handling UI (Global)
                     val availableUpdate = viewModel.availableUpdate
+                    val updateState by viewModel.updateState.collectAsState()
                     val isDownloading = viewModel.isDownloadingUpdate
                     val downloadProgress by viewModel.downloadProgress.collectAsState()
 
-                    if (availableUpdate != null) {
+                    if (availableUpdate != null && updateState !is UpdateState.NeedsConfirmation) {
                         UpdateDialog(
                             updateInfo = availableUpdate,
+                            isDownloading = isDownloading,
+                            progress = downloadProgress,
                             onDownload = { viewModel.downloadAndInstallUpdate() },
                             onDismiss = { viewModel.dismissUpdate() })
                     }
 
-                    if (isDownloading) {
-                        UpdateProgressOverlay(progress = downloadProgress)
+                    if (updateState is UpdateState.NeedsConfirmation) {
+                        val state = updateState as UpdateState.NeedsConfirmation
+                        UpdateConfirmationDialog(
+                            runningJobsCount = state.runningJobsCount,
+                            onConfirm = { force -> viewModel.confirmUpdate(force) },
+                            onDismiss = { viewModel.dismissUpdate() }
+                        )
                     }
                 }
             }

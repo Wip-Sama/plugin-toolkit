@@ -21,6 +21,8 @@ import org.wip.plugintoolkit.core.update.UpdateInfo
 import org.wip.plugintoolkit.core.update.UpdateService
 import org.wip.plugintoolkit.core.utils.PlatformLocalization
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppLanguage
 import org.wip.plugintoolkit.features.settings.model.AppSettings
@@ -31,7 +33,8 @@ import org.wip.plugintoolkit.features.settings.model.UpdateState
 class SettingsViewModel(
     private val repository: SettingsRepository,
     private val updateService: UpdateService,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val jobManager: JobManager
 ) : ViewModel() {
 
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
@@ -80,12 +83,47 @@ class SettingsViewModel(
 
     fun downloadAndInstallUpdate() {
         val update = availableUpdate ?: return
+        
+        // Check for running jobs first
+        val runningJobs = jobManager.jobs.value.filter { it.status == JobStatus.Running }
+        if (runningJobs.isNotEmpty()) {
+            _updateState.value = UpdateState.NeedsConfirmation(update, runningJobs.size)
+            return
+        }
+
+        performUpdate(update)
+    }
+
+    fun confirmUpdate(force: Boolean) {
+        val update = availableUpdate ?: return
+        viewModelScope.launch {
+            if (force) {
+                Logger.i { "Force updating: stopping all jobs" }
+                jobManager.stopAll()
+            }
+            performUpdate(update)
+        }
+    }
+
+    private fun performUpdate(update: UpdateInfo) {
         viewModelScope.launch {
             isDownloadingUpdate = true
             val dest = "${repository.getSettingsDir()}/${update.fileName}"
+            val file = java.io.File(dest)
+            
+            // Caching check: If file exists and size matches, skip download
+            if (file.exists() && file.length() == update.size) {
+                Logger.i { "Update already downloaded: $dest" }
+                PlatformUtils.installUpdate(dest)
+                isDownloadingUpdate = false
+                return@launch
+            }
+
             val result = updateService.downloadUpdate(update, dest)
             if (result.isSuccess) {
                 PlatformUtils.installUpdate(dest)
+                // If we reach here, it means the installer failed to launch or didn't exit the app
+                isDownloadingUpdate = false
             } else {
                 isDownloadingUpdate = false
                 _events.emit(SettingsEvent.ShowToast(SettingsToast.UpdateCheckFailed))
