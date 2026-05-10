@@ -1,3 +1,11 @@
+Version: 1.3.3
+Date: 10-05-2026
+Fixed:
+	- Updater on windows not launching correctly
+	- App icon in the exe
+	- After n_worker canceled jobs the application would be unable to start other jobs
+  - Validation step would be run before installation
+----------------------------------------------------------------------------------------------------
 Version: 1.3.2
 Date: 10-05-2026
 Changes:

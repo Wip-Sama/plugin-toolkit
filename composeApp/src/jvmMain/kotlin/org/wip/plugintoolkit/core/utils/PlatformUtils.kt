@@ -279,21 +279,28 @@ actual object PlatformUtils {
         try {
             if (isWindows) {
                 val normalizedPath = path.replace("/", "\\")
+                // Use cmd /c start to detach the process and handle UAC correctly.
+                // The empty quotes "" are for the start command's title argument.
+                val command = mutableListOf("cmd", "/c", "start", "\"Updating App\"")
+                
                 if (normalizedPath.endsWith(".msi")) {
-                    val command = mutableListOf("msiexec", "/i", normalizedPath)
+                    command.add("msiexec")
+                    command.add("/i")
+                    command.add(normalizedPath)
                     if (currentInstallDir != null) {
-                        command.add("INSTALLDIR=$currentInstallDir")
+                        command.add("INSTALLDIR=\"$currentInstallDir\"")
                     }
-                    ProcessBuilder(command).start()
                 } else if (normalizedPath.endsWith(".exe")) {
-                    val command = mutableListOf(normalizedPath)
+                    command.add(normalizedPath)
                     if (currentInstallDir != null) {
-                        command.add("/DIR=$currentInstallDir")
+                        command.add("/DIR=\"$currentInstallDir\"")
                     }
-                    ProcessBuilder(command).start()
                 } else {
-                    Desktop.getDesktop().open(File(normalizedPath))
+                    command.add(normalizedPath)
                 }
+                
+                Logger.i { "Executing detachment command: ${command.joinToString(" ")}" }
+                ProcessBuilder(command).start()
             } else if (isLinux) {
                 if (path.endsWith(".deb")) {
                     ProcessBuilder("pkexec", "dpkg", "-i", path).start()
@@ -305,7 +312,7 @@ actual object PlatformUtils {
             }
             
             // Give it a moment to start before we kill the current process
-            Thread.sleep(1000)
+            Thread.sleep(1500)
             Logger.i { "Application exiting for update installation" }
             System.exit(0)
         } catch (e: Exception) {

@@ -89,6 +89,13 @@ compose.desktop {
 
             windows {
                 upgradeUuid = "8ddd074e-db0a-4ae3-ba98-35013c6ae5cc"
+                iconFile.set(project.file("src/commonMain/composeResources/files/app_logo.ico"))
+            }
+            macOS {
+                iconFile.set(project.file("src/commonMain/composeResources/drawable/icon.icns"))
+            }
+            linux {
+                iconFile.set(project.file("src/commonMain/composeResources/drawable/icon.png"))
             }
             // Modules often required by JNA/DBus, reflection, and core features
             modules(

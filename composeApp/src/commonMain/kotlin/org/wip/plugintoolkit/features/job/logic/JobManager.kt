@@ -115,6 +115,9 @@ class JobManager(
             }
             addHistoryEntryInternal(jobId, jobName, "Cancelled")
             Logger.i { "Job $jobId ($jobName) cancelled (force=$force)" }
+            // Wake up any workers waiting for jobs in case this was the only job they were waiting for
+            // or in case we want to re-evaluate the queue immediately.
+            jobSignal.trySend(Unit)
         }
     }
 
@@ -204,6 +207,12 @@ class JobManager(
 
             // Wait for signal if no jobs are queued
             Logger.v { "No queued jobs, worker waiting for signal..." }
+            
+            // Before receiving, do one more quick check to avoid unnecessary suspension
+            if (_jobs.value.any { it.status == JobStatus.Queued }) {
+                continue
+            }
+            
             jobSignal.receive()
         }
     }

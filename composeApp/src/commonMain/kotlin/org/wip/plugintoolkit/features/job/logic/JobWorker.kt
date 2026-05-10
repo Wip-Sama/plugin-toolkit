@@ -36,13 +36,16 @@ class JobWorker(
         workerScope.launch {
             while (isActive) {
                 try {
+                    Logger.d { "Worker $workerId: Waiting for next job..." }
                     val next = manager.waitForNextJob()
+                    Logger.d { "Worker $workerId: Picked up job ${next.id} (${next.name})" }
 
                     // Link this execution to the manager for cancellation support
                     val jobExecution = launch {
                         try {
                             executeJob(next)
                         } finally {
+                            Logger.d { "Worker $workerId: Finished job ${next.id}" }
                             manager.unregisterJobHandle(next.id)
                         }
                     }
@@ -50,16 +53,25 @@ class JobWorker(
                     try {
                         jobExecution.join()
                     } catch (e: Exception) {
+                        if (e is CancellationException) {
+                            Logger.i { "Worker $workerId: Loop coroutine cancelled while joining job execution" }
+                            jobExecution.cancelAndJoin()
+                            throw e
+                        }
                         Logger.e(e) { "Worker $workerId: Error during job coordination" }
                         jobExecution.cancelAndJoin()
                     }
 
                 } catch (e: CancellationException) {
-                    if (!isActive) break
+                    Logger.i { "Worker $workerId: Loop received cancellation" }
+                    if (!isActive) {
+                        Logger.i { "Worker $workerId: Stopping loop" }
+                        break
+                    }
                 } catch (e: Exception) {
                     Logger.e(e) { "Worker $workerId encountered error in loop" }
-                    // delay(2000) //TODO: maybe remove this
                     // Cooling-off period on error
+                    kotlinx.coroutines.delay(1000)
                 }
             }
         }
@@ -122,11 +134,26 @@ class JobWorker(
         }
 
         val handle = processor.processAsync(request)
-        manager.registerJobHandle(job.id, handle)
+        val currentJob = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+
+        // Wrap the handle to ensure that cancelling it also cancels our worker coroutine.
+        // This prevents hanging in await() if the processor doesn't handle cancellation correctly.
+        val wrappedHandle = object : JobHandle by handle {
+            override fun cancel(force: Boolean) {
+                Logger.d { "Worker $workerId: Cancelling capability job ${job.id} (force=$force)" }
+                handle.cancel(force)
+                currentJob.cancel()
+            }
+        }
+        manager.registerJobHandle(job.id, wrappedHandle)
 
         val result = try {
             handle.result.await()
+        } catch (e: CancellationException) {
+            Logger.w { "Worker $workerId: Capability job ${job.id} was cancelled during await" }
+            throw e
         } catch (e: Exception) {
+            Logger.e(e) { "Worker $workerId: Capability job ${job.id} failed with exception" }
             ExecutionResult.Error(e.message ?: "Unknown error", e)
         } finally {
             progressJob?.cancel()
@@ -167,21 +194,21 @@ class JobWorker(
         })
 
         manager.updateJobProgress(job.id, 0.1f)
-        manager.addJobLog(job.id, "Starting validation for ${plugin.getManifest().plugin.name}...")
+        manager.addJobLog(job.id, "Performing setup for ${plugin.getManifest().plugin.name}...")
 
-        val validationResult = plugin.validate(context)
-        if (validationResult.isFailure) {
-            val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
+        val setupResult = plugin.performSetup(context)
+        if (setupResult.isFailure) {
+            val error = setupResult.exceptionOrNull()?.message ?: "Setup failed"
             manager.tryFailJob(job.id, error)
             return
         }
 
         manager.updateJobProgress(job.id, 0.5f)
-        manager.addJobLog(job.id, "Validation successful. Performing setup...")
+        manager.addJobLog(job.id, "Setup successful. Validating installation...")
 
-        val setupResult = plugin.performSetup(context)
-        if (setupResult.isFailure) {
-            val error = setupResult.exceptionOrNull()?.message ?: "Setup failed"
+        val validationResult = plugin.validate(context)
+        if (validationResult.isFailure) {
+            val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
             manager.tryFailJob(job.id, error)
             return
         }
