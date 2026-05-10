@@ -43,13 +43,16 @@ class RepoManager(
 
     init {
         scope.launch {
+            var startupHandled = false
+            // Synchronize repositories with settings and trigger initial load
             settingsRepository.settings.collect { settings ->
                 _repositories.value = settings.extensions.repositories
-            }
-        }
 
-        scope.launch {
-            refreshAll()
+                if (!startupHandled) {
+                    startupHandled = true
+                    refreshAll()
+                }
+            }
         }
     }
 

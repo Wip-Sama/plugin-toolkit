@@ -2,9 +2,11 @@ Version: 1.3.2
 Date: 10-05-2026
 Changes:
   - Install from remote ui is less of a mess
+  - ChangelogParser is a bit more lenient with the separators, now anything longer than 50 "-" will count
 Fixed:
   - Adding repo would fail due to hidden characters
   - Improper changelog divider
+  - Repositories are correctly refreshed are start
 ----------------------------------------------------------------------------------------------------
 Version: 1.3.1
 Date: 09-05-2026
