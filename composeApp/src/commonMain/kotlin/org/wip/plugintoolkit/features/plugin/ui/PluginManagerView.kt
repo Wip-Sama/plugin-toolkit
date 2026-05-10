@@ -174,6 +174,7 @@ fun PluginManagerView(
                             PluginStatusAction.Reload -> viewModel.reload(plugin.pkg)
                             PluginStatusAction.Update -> viewModel.updatePlugin(plugin.pkg)
                             PluginStatusAction.Validate -> viewModel.validatePlugin(plugin.pkg)
+                            PluginStatusAction.RerunSetup -> viewModel.rerunSetup(plugin.pkg)
                             PluginStatusAction.Changelog -> viewModel.showChangelog(plugin.pkg)
                             PluginStatusAction.Settings -> viewModel.openSettings(plugin.pkg)
                             is PluginStatusAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
@@ -382,6 +383,11 @@ fun PluginCard(
                             leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
                         )
                         DropdownMenuItem(
+                            text = { Text("Rerun Setup") },
+                            onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
+                            leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
                             text = { Text(stringResource(Res.string.plugin_changelog)) },
                             onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
                             leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
@@ -440,6 +446,7 @@ sealed class PluginStatusAction {
     object Reload : PluginStatusAction()
     object Validate : PluginStatusAction()
     object Update : PluginStatusAction()
+    object RerunSetup : PluginStatusAction()
     object Changelog : PluginStatusAction()
     object Settings : PluginStatusAction()
     data class Custom(val name: String) : PluginStatusAction()

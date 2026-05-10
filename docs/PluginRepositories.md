@@ -29,6 +29,7 @@ The `index.json` is the entry point of the repository. It contains metadata abou
 {
   "name": "My Plugin Repository",
   "url": "https://example.com/repo/index.json",
+  "schemaVersion": 1,
   "pluginsFolder": "plugins",
   "plugins": [
     {
@@ -51,6 +52,7 @@ The `index.json` is the entry point of the repository. It contains metadata abou
 |:----------------|:-------|:----------------------------------------------------------------------------------|
 | `name`          | String | Human-readable name of the repository.                                            |
 | `url`           | String | Absolute URL to this `index.json`.                                                |
+| `schemaVersion` | Int    | Version of the repository manifest schema. Defaults to `1`.                       |
 | `pluginsFolder` | String | (Optional) Relative path to the folder containing plugins. Defaults to `plugins`. |
 | `plugins`       | Array  | List of plugin metadata objects.                                                  |
 | `signPublicKey` | String | (Optional) Public key used for verifying plugin signatures.                       |

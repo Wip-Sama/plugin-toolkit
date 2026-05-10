@@ -26,13 +26,18 @@ import plugintoolkit.composeapp.generated.resources.repo_plugin_installed
 import plugintoolkit.composeapp.generated.resources.repo_refreshed
 import plugintoolkit.composeapp.generated.resources.repo_removed
 import plugintoolkit.composeapp.generated.resources.repo_source_updated
+import kotlinx.coroutines.flow.combine
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 
 class PluginRepoViewModel(
     private val repoManager: RepoManager,
     private val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager,
     private val notificationService: NotificationService,
     private val dialogService: org.wip.plugintoolkit.core.ui.DialogService,
-    private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+    private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository,
+    private val jobManager: JobManager
 ) : ViewModel() {
 
     private val ResStrings = plugintoolkit.composeapp.generated.resources.Res.string
@@ -62,6 +67,13 @@ class PluginRepoViewModel(
             urls.mapNotNull { repos[it] }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val activePluginInstallationJobs: StateFlow<Map<String, Float>> = jobManager.jobProgress
+        .combine(jobManager.jobs) { progressMap, jobs ->
+            jobs.filter { it.type == JobType.PluginInstallation && it.status == JobStatus.Running }
+                .associate { it.pluginId to (progressMap[it.id] ?: 0f) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     fun addRepository() {
         val url = repoUrlInput.trim()
@@ -121,18 +133,7 @@ class PluginRepoViewModel(
     fun installPlugin(plugin: ExtensionPlugin) {
         pickInstallLocation { target ->
             viewModelScope.launch {
-                val result = pluginManager.installRemote(plugin, target)
-                if (result.isSuccess) {
-                    notificationService.toast(getString(ResStrings.repo_plugin_installed, plugin.name))
-                } else {
-                    notificationService.toast(
-                        getString(
-                            ResStrings.repo_install_failed,
-                            plugin.name,
-                            result.exceptionOrNull()?.message ?: "Unknown error"
-                        )
-                    )
-                }
+                pluginManager.enqueueRemoteInstall(plugin, target)
             }
         }
     }

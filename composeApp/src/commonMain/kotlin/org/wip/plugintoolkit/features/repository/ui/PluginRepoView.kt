@@ -226,7 +226,18 @@ fun PluginRepoView(
                             icon = Icons.Default.Extension,
                             control = {
                                 val isInstalled = viewModel.isInstalled(plugin.pkg)
-                                if (isInstalled) {
+                                val activeJobs by viewModel.activePluginInstallationJobs.collectAsState()
+                                val progress = activeJobs[plugin.pkg]
+
+                                if (progress != null) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(
+                                            progress = { progress },
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 3.dp
+                                        )
+                                    }
+                                } else if (isInstalled) {
                                     Surface(
                                         color = MaterialTheme.colorScheme.primaryContainer,
                                         shape = MaterialTheme.shapes.extraSmall

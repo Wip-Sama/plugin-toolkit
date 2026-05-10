@@ -3,9 +3,9 @@ package org.wip.plugintoolkit.features.repository.logic
 import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -54,23 +54,38 @@ class RepoManager(
     }
 
     suspend fun addRepository(url: String): AddRepoResult {
-        if (_repositories.value.any { it.url == url }) {
-            Logger.w { "Repository already added: $url" }
+        // Aggressively clean the URL to remove any hidden characters or whitespace
+        val trimmedUrl = url.replace(Regex("\\s+"), "").replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
+        
+        if (_repositories.value.any { it.url == trimmedUrl }) {
+
+            Logger.w { "Repository already added: $trimmedUrl" }
             return AddRepoResult.AlreadyAdded
         }
 
-        Logger.i { "Adding repository: $url" }
+        Logger.i { "Adding repository: $trimmedUrl" }
         return try {
-            val response = client.get(url)
-            val index: RepoIndex = response.body()
+            val response = client.get(trimmedUrl)
+            if (!response.status.isSuccess()) {
+                val errorBody = response.bodyAsText()
+                throw Exception("Server returned ${response.status}: $errorBody")
+            }
+
+            val responseBody = response.bodyAsText()
+            val index = jsonConfig.decodeFromString<RepoIndex>(responseBody)
+
+            Logger.v { "Index: $index" }
+
 
             val newRepo = ExtensionRepo(
-                name = index.name ?: url.substringAfterLast("/").substringBeforeLast("."),
-                url = url,
+                name = index.name ?: trimmedUrl.substringAfterLast("/").substringBeforeLast("."),
+                url = trimmedUrl,
+                schemaVersion = index.schemaVersion,
                 signPublicKey = index.signPublicKey,
                 signAlgorithm = index.signAlgorithm ?: "SHA256",
                 pluginsFolder = index.pluginsFolder
             )
+
 
             val updatedRepos = _repositories.value + newRepo
             _repositories.value = updatedRepos
@@ -80,7 +95,7 @@ class RepoManager(
             coroutineScope {
                 val updatedPlugins = index.plugins.map { plugin ->
                     async {
-                        val baseUrl = url.substringBeforeLast("/") + "/" + (index.pluginsFolder ?: "plugins") + "/${plugin.pkg}"
+                        val baseUrl = trimmedUrl.substringBeforeLast("/") + "/" + (index.pluginsFolder ?: "plugins") + "/${plugin.pkg}"
                         val manifestContent = fetchText("$baseUrl/manifest.json")
                         val manifest = manifestContent?.let {
                             try {
@@ -89,18 +104,21 @@ class RepoManager(
                                 null
                             }
                         }
-                        plugin.copy(repoUrl = url, manifest = manifest)
+                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest)
                     }
                 }.awaitAll()
-                _plugins.value += (url to updatedPlugins)
+                _plugins.value += (trimmedUrl to updatedPlugins)
             }
 
-            Logger.i { "Successfully added repository: ${newRepo.name} ($url)" }
+
+            Logger.i { "Successfully added repository: ${newRepo.name} ($trimmedUrl)" }
+
             AddRepoResult.Success
         } catch (e: Exception) {
             Logger.e(e) { "Failed to add repository: $url" }
             AddRepoResult.Error(e.message ?: "Unknown error")
         }
+
     }
 
     fun removeRepository(url: String) {
@@ -114,14 +132,23 @@ class RepoManager(
     }
 
     suspend fun refreshRepository(url: String) {
-        Logger.d { "Refreshing repository: $url" }
+        val trimmedUrl = url.replace(Regex("\\s+"), "").replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
+        Logger.d { "Refreshing repository: $trimmedUrl" }
         try {
-            val index: RepoIndex = client.get(url).body()
+            val response = client.get(trimmedUrl)
+
+            if (!response.status.isSuccess()) {
+                val errorBody = response.bodyAsText()
+                throw Exception("Server returned ${response.status}: $errorBody")
+            }
+            val responseBody = response.bodyAsText()
+            val index = jsonConfig.decodeFromString<RepoIndex>(responseBody)
             
             coroutineScope {
                 val updatedPlugins = index.plugins.map { plugin ->
                     async {
-                        val baseUrl = url.substringBeforeLast("/") + "/" + (index.pluginsFolder ?: "plugins") + "/${plugin.pkg}"
+                        val baseUrl = trimmedUrl.substringBeforeLast("/") + "/" + (index.pluginsFolder ?: "plugins") + "/${plugin.pkg}"
+
                         val manifestContent = fetchText("$baseUrl/manifest.json")
                         val manifest = manifestContent?.let {
                             try {
@@ -130,17 +157,19 @@ class RepoManager(
                                 null
                             }
                         }
-                        plugin.copy(repoUrl = url, manifest = manifest)
+                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest)
                     }
                 }.awaitAll()
-                _plugins.value += (url to updatedPlugins)
+                _plugins.value += (trimmedUrl to updatedPlugins)
             }
 
             // Update repo metadata if changed
             val updatedRepos = _repositories.value.map {
-                if (it.url == url) {
+                if (it.url == trimmedUrl) {
+
                     it.copy(
                         name = index.name ?: it.name,
+                        schemaVersion = index.schemaVersion,
                         signPublicKey = index.signPublicKey ?: it.signPublicKey,
                         signAlgorithm = index.signAlgorithm ?: it.signAlgorithm,
                         pluginsFolder = index.pluginsFolder ?: it.pluginsFolder
@@ -151,16 +180,17 @@ class RepoManager(
                 _repositories.value = updatedRepos
                 saveReposToSettings(updatedRepos)
             }
-            Logger.d { "Successfully refreshed repository: $url" }
+            Logger.d { "Successfully refreshed repository: $trimmedUrl" }
             NotificationEvent.Toast(
                 "Repository refreshed: ${
-                    index.name ?: url.substringAfterLast("/").substringBeforeLast(".")
+                    index.name ?: trimmedUrl.substringAfterLast("/").substringBeforeLast(".")
                 }"
             )
         } catch (e: Exception) {
-            Logger.e(e) { "Failed to refresh repository: $url" }
-            NotificationEvent.Toast("Failed to refresh repository: $url")
+            Logger.e(e) { "Failed to refresh repository: $trimmedUrl" }
+            NotificationEvent.Toast("Failed to refresh repository: $trimmedUrl")
         }
+
     }
 
     suspend fun refreshAll() {

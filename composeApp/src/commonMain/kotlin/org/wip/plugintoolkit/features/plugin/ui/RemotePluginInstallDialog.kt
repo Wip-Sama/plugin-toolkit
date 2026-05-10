@@ -122,7 +122,8 @@ fun RemotePluginCard(
     onInstall: () -> Unit
 ) {
     val alpha = if (isInstalled) 0.6f else 1f
-    
+    var showInfo by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth().alpha(alpha),
         colors = CardDefaults.cardColors(
@@ -132,7 +133,10 @@ fun RemotePluginCard(
         border = if (progress != null) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
     ) {
         Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 // Icon
                 Box(
                     modifier = Modifier
@@ -178,11 +182,13 @@ fun RemotePluginCard(
                     )
                 }
 
-                var showInfo by remember { mutableStateOf(false) }
-                
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { showInfo = !showInfo }) {
-                        Icon(Icons.Default.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary)
+                        Icon(
+                            Icons.Default.Info, 
+                            contentDescription = "Info", 
+                            tint = if (showInfo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     
                     if (progress != null) {
@@ -191,10 +197,9 @@ fun RemotePluginCard(
                             modifier = Modifier.size(32.dp).padding(4.dp),
                             strokeWidth = 3.dp
                         )
-                    } else {
+                    } else if (!isInstalled) {
                         Button(
                             onClick = onInstall,
-                            enabled = !isInstalled,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -203,34 +208,34 @@ fun RemotePluginCard(
                         }
                     }
                 }
+            }
+
+            if (showInfo) {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(modifier = Modifier.alpha(0.5f))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 if (plugin.description != null) {
                     Text(
                         plugin.description,
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 8.dp),
-                        maxLines = 2
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
-                if (showInfo) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
+                InfoRow("Repository", plugin.repoUrl ?: "Unknown")
+                plugin.size?.let { InfoRow("Size", formatSize(it)) }
+                plugin.hash?.let { InfoRow("Hash", it) }
+                plugin.signature?.let { InfoRow("Signature", it) }
+            }
 
-                    InfoRow("Repository", plugin.repoUrl ?: "Unknown")
-                    plugin.size?.let { InfoRow("Size", formatSize(it)) }
-                    plugin.hash?.let { InfoRow("Hash", it) }
-                    plugin.signature?.let { InfoRow("Signature", it) }
-                }
-
-                if (progress != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(MaterialTheme.shapes.extraSmall)
-                    )
-                }
+            if (progress != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(MaterialTheme.shapes.extraSmall)
+                )
             }
         }
     }

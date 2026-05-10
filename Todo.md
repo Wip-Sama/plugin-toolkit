@@ -48,9 +48,7 @@ Auto update:
 General:
 - Notify that to set the system startup in the registry you need to start the application as administrator
 > Possibly implement a way to start a subprocess to avoid restarting teh app and spawn that as administrator
-- [x] Add app author
-- [x] Add app image
-- [ ] Add icon provider attribution (muh_zakaria from SVGRepo) in the About section (https://www.svgrepo.com/author/muh_zakaria/)
+- Add icon provider attribution (muh_zakaria from SVGRepo) in the About section (https://www.svgrepo.com/author/muh_zakaria/)
 
 Security:
 - Sign App releases

@@ -263,6 +263,18 @@ class PluginManager(
         jobManager.enqueueJob(job)
     }
 
+    suspend fun rerunSetup(pkg: String) {
+        Logger.i { "Rerunning setup for plugin: $pkg" }
+        // 1. Unload
+        lifecycleManager.unloadPlugin(pkg)
+        // 2. Clear files
+        installer.clearFiles(pkg)
+        // 3. Mark as not validated
+        registry.updatePlugin(pkg) { it.copy(isValidated = false) }
+        // 4. Enqueue setup job
+        enqueueSetupJob(pkg)
+    }
+
     suspend fun runAction(pkg: String, action: PluginAction) {
         val plugin = registry.getPlugin(pkg) ?: return
         Logger.i { "Enqueuing custom action: ${action.name} for plugin: $pkg" }

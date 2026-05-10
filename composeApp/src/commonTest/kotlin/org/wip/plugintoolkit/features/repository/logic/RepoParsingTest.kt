@@ -40,6 +40,7 @@ class RepoParsingTest {
                         content = """
                             {
                                 "name": "Test Repo",
+                                "schemaVersion": 1,
                                 "pluginsFolder": "custom-plugins",
                                 "plugins": [
                                     {
@@ -116,6 +117,7 @@ class RepoParsingTest {
                         content = """
                             {
                                 "name": "Test Repo",
+                                "schemaVersion": 1,
                                 "plugins": [
                                     {
                                         "name": "Broken Plugin",
@@ -159,4 +161,42 @@ class RepoParsingTest {
         assertEquals("org.broken.plugin", plugins[0].pkg)
         assertNull(plugins[0].manifest, "Manifest should be null for invalid JSON")
     }
+
+    @Test
+    fun testAddRepositoryWithTextPlainContentType() = runTest {
+        val mockEngine = MockEngine { request ->
+            when (request.url.toString()) {
+                "https://example.com/repo/index.json" -> {
+                    respond(
+                        content = """
+                            {
+                                "name": "Text Repo",
+                                "schemaVersion": 1,
+                                "plugins": []
+                            }
+                        """.trimIndent(),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence)
+        val repoManager = RepoManager(settingsRepo, client, json)
+
+        val result = repoManager.addRepository("https://example.com/repo/index.json")
+        
+        assertEquals(AddRepoResult.Success, result)
+        assertEquals("Text Repo", repoManager.repositories.value[0].name)
+    }
 }
+
