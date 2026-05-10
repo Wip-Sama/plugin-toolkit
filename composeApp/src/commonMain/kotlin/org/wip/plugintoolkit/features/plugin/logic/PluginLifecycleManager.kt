@@ -189,7 +189,7 @@ class PluginLifecycleManager(
         val plugin = registry.getPlugin(pkg) ?: return PluginSettingsStore()
         val settingsFile = "${plugin.installPath}/settings.json"
         val content = fileSystem.readFile(settingsFile)
-        return if (content != null) {
+        val store = if (content != null) {
             try {
                 json.decodeFromString<PluginSettingsStore>(content)
             } catch (e: Exception) {
@@ -199,13 +199,38 @@ class PluginLifecycleManager(
         } else {
             PluginSettingsStore()
         }
+
+        val manifest = PluginLoader.getPluginById(pkg)?.getManifest() ?: return store
+        
+        val decryptedSettings = store.settings.mapValues { (key, value) ->
+            val isSecret = manifest.settings?.get(key)?.secret == true
+            if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
+                kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.decrypt(value.content))
+            } else {
+                value
+            }
+        }
+
+        return store.copy(settings = decryptedSettings)
     }
 
     fun savePluginSettings(pkg: String, store: PluginSettingsStore) {
         val plugin = registry.getPlugin(pkg) ?: return
         val settingsFile = "${plugin.installPath}/settings.json"
+        
+        val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+        val encryptedSettings = store.settings.mapValues { (key, value) ->
+            val isSecret = manifest?.settings?.get(key)?.secret == true
+            if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
+                kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.encrypt(value.content))
+            } else {
+                value
+            }
+        }
+        val storeToSave = store.copy(settings = encryptedSettings)
+
         try {
-            fileSystem.writeFile(settingsFile, json.encodeToString(store))
+            fileSystem.writeFile(settingsFile, json.encodeToString(storeToSave))
         } catch (t: Throwable) {
             Logger.e(t) { "Failed to save settings for $pkg" }
         }

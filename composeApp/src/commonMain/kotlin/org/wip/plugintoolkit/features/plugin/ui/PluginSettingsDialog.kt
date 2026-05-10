@@ -84,7 +84,9 @@ fun PluginSettingsDialog(
                                 metadata = ParameterMetadata(
                                     description = meta.description,
                                     type = meta.type,
-                                    defaultValue = meta.defaultValue
+                                    defaultValue = meta.defaultValue,
+                                    required = meta.required,
+                                    secret = meta.secret
                                 ),
                                 value = SettingsUtils.jsonToString(value, meta.type),
                                 onValueChange = { viewModel.updateSetting(key, SettingsUtils.stringToJson(it, meta.type)) },

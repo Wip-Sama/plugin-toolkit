@@ -21,6 +21,7 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 
 class JobWorker(
     val workerId: Int,
@@ -28,6 +29,7 @@ class JobWorker(
     private val scope: CoroutineScope
 ) : KoinComponent {
     private val pluginManager: PluginManager by inject()
+    private val lifecycleCoordinator: PluginLifecycleCoordinator by inject()
     private var isActive = true
     private val workerJob = SupervisorJob()
     private val workerScope = scope + workerJob + Dispatchers.Default
@@ -101,6 +103,7 @@ class JobWorker(
             throw e
         } catch (e: Exception) {
             manager.tryFailJob(job.id, e.message)
+            lifecycleCoordinator.onLifecycleJobFailed(job, e.message)
             Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
         }
     }
@@ -163,12 +166,14 @@ class JobWorker(
             is ExecutionResult.Success -> {
                 val response = result.response
                 manager.tryCompleteJob(job.id, response.result?.toString())
+                lifecycleCoordinator.onLifecycleJobCompleted(job)
             }
             is ExecutionResult.Paused -> {
                 manager.tryPauseJob(job.id, result.resumeState)
             }
             is ExecutionResult.Error -> {
                 manager.tryFailJob(job.id, result.message)
+                lifecycleCoordinator.onLifecycleJobFailed(job, result.message)
             }
         }
     }
@@ -196,15 +201,19 @@ class JobWorker(
         manager.updateJobProgress(job.id, 0.1f)
         manager.addJobLog(job.id, "Performing setup for ${plugin.getManifest().plugin.name}...")
 
-        val setupResult = plugin.performSetup(context)
-        if (setupResult.isFailure) {
-            val error = setupResult.exceptionOrNull()?.message ?: "Setup failed"
-            manager.tryFailJob(job.id, error)
-            return
+        if (!plugin.getManifest().hasSetupHandler) {
+            manager.addJobLog(job.id, "No setup handler found, skipping setup phase.")
+            manager.updateJobProgress(job.id, 0.5f)
+        } else {
+            val setupResult = plugin.performSetup(context)
+            if (setupResult.isFailure) {
+                val error = setupResult.exceptionOrNull()?.message ?: "Setup failed"
+                manager.tryFailJob(job.id, error)
+                return
+            }
+            manager.updateJobProgress(job.id, 0.5f)
+            manager.addJobLog(job.id, "Setup successful. Validating installation...")
         }
-
-        manager.updateJobProgress(job.id, 0.5f)
-        manager.addJobLog(job.id, "Setup successful. Validating installation...")
 
         val validationResult = plugin.validate(context)
         if (validationResult.isFailure) {
@@ -226,6 +235,7 @@ class JobWorker(
         manager.updateJobProgress(job.id, 1.0f)
         manager.addJobLog(job.id, "Plugin ready.")
         manager.tryCompleteJob(job.id, "Success")
+        lifecycleCoordinator.onLifecycleJobCompleted(job)
     }
 
     private suspend fun executeUpdateJob(job: BackgroundJob) {
@@ -250,15 +260,19 @@ class JobWorker(
         manager.updateJobProgress(job.id, 0.2f)
         manager.addJobLog(job.id, "Running update handler for ${plugin.getManifest().plugin.name}...")
 
-        val updateResult = plugin.performUpdate(context)
-        if (updateResult.isFailure) {
-            val error = updateResult.exceptionOrNull()?.message ?: "Update failed"
-            manager.tryFailJob(job.id, error)
-            return
+        if (!plugin.getManifest().hasUpdateHandler) {
+            manager.addJobLog(job.id, "No update handler found, skipping update phase.")
+            manager.updateJobProgress(job.id, 0.9f)
+        } else {
+            val updateResult = plugin.performUpdate(context)
+            if (updateResult.isFailure) {
+                val error = updateResult.exceptionOrNull()?.message ?: "Update failed"
+                manager.tryFailJob(job.id, error)
+                return
+            }
+            manager.updateJobProgress(job.id, 0.9f)
+            manager.addJobLog(job.id, "Update handler completed successfully. Performing load check...")
         }
-
-        manager.updateJobProgress(job.id, 0.9f)
-        manager.addJobLog(job.id, "Update handler completed successfully. Performing load check...")
 
         val loadResult = plugin.performLoad(context)
         if (loadResult.isFailure) {
@@ -270,6 +284,7 @@ class JobWorker(
         manager.updateJobProgress(job.id, 1.0f)
         manager.addJobLog(job.id, "Plugin updated and ready.")
         manager.tryCompleteJob(job.id, "Success")
+        lifecycleCoordinator.onLifecycleJobCompleted(job)
     }
 
     private suspend fun executeValidationJob(job: BackgroundJob) {
@@ -305,6 +320,7 @@ class JobWorker(
         manager.updateJobProgress(job.id, 1.0f)
         manager.addJobLog(job.id, "Validation successful.")
         manager.tryCompleteJob(job.id, "Success")
+        lifecycleCoordinator.onLifecycleJobCompleted(job)
     }
 
     private suspend fun executePluginActionJob(job: BackgroundJob) {
@@ -340,9 +356,11 @@ class JobWorker(
             manager.updateJobProgress(job.id, 1.0f)
             manager.addJobLog(job.id, "Action completed successfully.")
             manager.tryCompleteJob(job.id, "Success")
+            lifecycleCoordinator.onLifecycleJobCompleted(job)
         } else {
             val error = result.exceptionOrNull()?.message ?: "Action failed"
             manager.tryFailJob(job.id, error)
+            lifecycleCoordinator.onLifecycleJobFailed(job, error)
         }
     }
 
@@ -381,9 +399,11 @@ class JobWorker(
             manager.updateJobProgress(job.id, 1.0f)
             manager.addJobLog(job.id, "Installation completed successfully.")
             manager.tryCompleteJob(job.id, "Success")
+            lifecycleCoordinator.onLifecycleJobCompleted(job)
         } else {
             val error = result.exceptionOrNull()?.message ?: "Installation failed"
             manager.tryFailJob(job.id, error)
+            lifecycleCoordinator.onLifecycleJobFailed(job, error)
         }
     }
 

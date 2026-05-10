@@ -52,6 +52,9 @@ class PluginSettingsViewModel(
 
     fun save() {
         pluginManager.savePluginSettings(pkg, _store.value)
+        viewModelScope.launch {
+            pluginManager.checkAndResumeSetup(pkg)
+        }
     }
 
     fun runAction(actionName: String) {

@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.features.job.logic.JobManager
@@ -30,7 +31,8 @@ class PluginManager(
     private val registry: PluginRegistry,
     private val installer: PluginInstaller,
     private val lifecycleManager: PluginLifecycleManager,
-    private val scanner: PluginScanner
+    private val scanner: PluginScanner,
+    private val coordinator: PluginLifecycleCoordinator
 ) {
     val installedPlugins: StateFlow<List<InstalledPlugin>> = registry.installedPlugins
     val loadedPlugins: StateFlow<Set<String>> = lifecycleManager.loadedPlugins
@@ -39,22 +41,6 @@ class PluginManager(
 
     init {
         Logger.i { "Initializing PluginManager facade" }
-        
-        // Observe jobs to mark plugins as validated or set up
-        scope.launch {
-            jobManager.jobs.collect { jobs ->
-                jobs.forEach { job ->
-                    if (job.status == JobStatus.Completed) {
-                        if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
-                            markAsValidated(job.pluginId)
-                        }
-                        if (job.type == JobType.PluginAction) {
-                            clearRequiredAction(job.pluginId)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // --- Installation & Updates ---
@@ -62,7 +48,7 @@ class PluginManager(
     suspend fun installLocal(filePath: String, targetFolderPath: String) = 
         installer.installLocal(filePath, targetFolderPath).onSuccess { manifest ->
             if (manifest != null) {
-                handlePostInstall(manifest.plugin.id, manifest)
+                coordinator.handlePostInstall(manifest.plugin.id, manifest)
             }
         }.map { Unit }
 
@@ -90,7 +76,7 @@ class PluginManager(
         onProgress: ((Float) -> Unit)? = null
     ) = installer.installRemote(plugin, targetFolderPath, onProgress).onSuccess { manifest ->
         if (manifest != null) {
-            handlePostInstall(plugin.pkg, manifest)
+            coordinator.handlePostInstall(plugin.pkg, manifest)
         }
     }.map { Unit }
 
@@ -99,14 +85,14 @@ class PluginManager(
     suspend fun updateLocal(pkg: String, newJarPath: String) = 
         installer.updateLocal(pkg, newJarPath).onSuccess { manifest ->
             if (manifest != null) {
-                handlePostUpdate(pkg, manifest)
+                coordinator.handlePostUpdate(pkg, manifest, installer)
             }
         }.map { Unit }
 
     suspend fun updateRemote(pkg: String) = 
         installer.updateRemote(pkg).onSuccess { manifest ->
             if (manifest != null) {
-                handlePostUpdate(pkg, manifest)
+                coordinator.handlePostUpdate(pkg, manifest, installer)
             }
         }.map { Unit }
 
@@ -207,9 +193,9 @@ class PluginManager(
                     // Try to get manifest to check for setup handler
                     val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
                     if (manifest?.hasSetupHandler == true) {
-                        enqueueSetupJob(pkg)
+                        coordinator.enqueueSetupJob(pkg)
                     } else {
-                        markAsValidated(pkg)
+                        coordinator.triggerValidation(pkg)
                     }
                 }
             }
@@ -222,58 +208,26 @@ class PluginManager(
     fun createPluginContext(pkg: String, jobId: String? = null): PluginContext = 
         lifecycleManager.createPluginContext(pkg, jobId)
 
-    suspend fun validatePluginInJob(pkg: String): Result<Unit> {
-        val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin not found"))
-        val loadResult = loadPlugin(pkg)
-        if (loadResult.isFailure) return Result.failure(loadResult.exceptionOrNull()!!)
-
-        val job = BackgroundJob(
-            id = "val_$pkg",
-            name = "Validation: ${plugin.name}",
-            type = JobType.Validation,
-            pluginId = pkg,
-            capabilityName = "validate",
-            keepResult = false
-        )
-        jobManager.enqueueJob(job)
-        return Result.success(Unit)
-    }
+    suspend fun validatePluginInJob(pkg: String): Result<Unit> = coordinator.triggerValidation(pkg)
 
     suspend fun validatePlugin(pkg: String): Result<Unit> {
         val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
-        return plugin.validate(createPluginContext(pkg))
-    }
-
-    suspend fun enqueueSetupJob(pkg: String) {
-        val plugin = registry.getPlugin(pkg) ?: return
-        val loadResult = loadPlugin(pkg)
-        if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for setup: ${loadResult.exceptionOrNull()?.message}" }
-            return
+        val result = plugin.validate(createPluginContext(pkg))
+        // Status updates should be handled elsewhere or we can let JobWorker or Coordinator handle it.
+        // Actually, validatePlugin is a direct call (synchronous), we should let coordinator update state.
+        if (result.isSuccess) {
+            val job = BackgroundJob(id = "val_$pkg", name = "Validation", type = JobType.Validation, pluginId = pkg, capabilityName = "validate", keepResult = false)
+            coordinator.onLifecycleJobCompleted(job)
+        } else {
+            val job = BackgroundJob(id = "val_$pkg", name = "Validation", type = JobType.Validation, pluginId = pkg, capabilityName = "validate", keepResult = false)
+            coordinator.onLifecycleJobFailed(job, result.exceptionOrNull()?.message)
         }
-
-        val job = BackgroundJob(
-            id = "setup_$pkg",
-            name = "Setup: ${plugin.name}",
-            type = JobType.Setup,
-            pluginId = pkg,
-            capabilityName = "setup",
-            keepResult = false
-        )
-        jobManager.enqueueJob(job)
+        return result
     }
 
-    suspend fun rerunSetup(pkg: String) {
-        Logger.i { "Rerunning setup for plugin: $pkg" }
-        // 1. Unload
-        lifecycleManager.unloadPlugin(pkg)
-        // 2. Clear files
-        installer.clearFiles(pkg)
-        // 3. Mark as not validated
-        registry.updatePlugin(pkg) { it.copy(isValidated = false) }
-        // 4. Enqueue setup job
-        enqueueSetupJob(pkg)
-    }
+    suspend fun enqueueSetupJob(pkg: String) = coordinator.enqueueSetupJob(pkg)
+
+    suspend fun rerunSetup(pkg: String) = coordinator.rerunSetup(pkg, installer)
 
     suspend fun runAction(pkg: String, action: PluginAction) {
         val plugin = registry.getPlugin(pkg) ?: return
@@ -296,59 +250,7 @@ class PluginManager(
         jobManager.enqueueJob(job)
     }
 
-    private fun markAsValidated(pkg: String) {
-        val plugin = registry.getPlugin(pkg) ?: return
-        if (plugin.isValidated) return
+    suspend fun enqueueUpdateJob(pkg: String) = coordinator.enqueueUpdateJob(pkg)
 
-        Logger.i { "Marking plugin $pkg as validated and activating" }
-        scope.launch {
-            registry.updatePlugin(pkg) { it.copy(isValidated = true) }
-            loadPlugin(pkg)
-        }
-    }
-
-    private fun clearRequiredAction(pkg: String) {
-        scope.launch {
-            registry.updatePlugin(pkg) { it.copy(requiredAction = null) }
-        }
-    }
-
-    private suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) {
-        if (manifest.hasSetupHandler) {
-            enqueueSetupJob(pkg)
-        } else {
-            markAsValidated(pkg)
-        }
-    }
-
-    private suspend fun handlePostUpdate(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) {
-        if (manifest.hasUpdateHandler) {
-            enqueueUpdateJob(pkg)
-        } else if (manifest.hasSetupHandler) {
-            installer.clearFiles(pkg)
-            enqueueSetupJob(pkg)
-        } else {
-            // Nothing to do, just reload
-            reloadPlugin(pkg)
-        }
-    }
-
-    suspend fun enqueueUpdateJob(pkg: String) {
-        val plugin = registry.getPlugin(pkg) ?: return
-        val loadResult = loadPlugin(pkg)
-        if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for update: ${loadResult.exceptionOrNull()?.message}" }
-            return
-        }
-
-        val job = BackgroundJob(
-            id = "update_$pkg",
-            name = "Update: ${plugin.name}",
-            type = JobType.Update,
-            pluginId = pkg,
-            capabilityName = "update", // This is the convention for @PluginUpdate
-            keepResult = false
-        )
-        jobManager.enqueueJob(job)
-    }
+    suspend fun checkAndResumeSetup(pkg: String) = coordinator.checkAndResumeSetup(pkg)
 }

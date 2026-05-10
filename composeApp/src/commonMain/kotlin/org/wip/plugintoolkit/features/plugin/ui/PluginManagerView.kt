@@ -300,7 +300,8 @@ fun PluginCard(
 
                     if (plugin.requiredAction != null) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        StatusBadge("Action Required", ToolkitTheme.colors.warning)
+                        val badgeText = if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Setup Required" else "Action Required"
+                        StatusBadge(badgeText, ToolkitTheme.colors.warning)
                     }
                     
                     if (plugin.loadError == null) {
@@ -336,11 +337,17 @@ fun PluginCard(
                 if (plugin.requiredAction != null) {
                     val action = customActions.find { it.functionName == plugin.requiredAction }
                     Button(
-                        onClick = { onAction(PluginStatusAction.Custom(plugin.requiredAction)) },
+                        onClick = { 
+                            if (plugin.requiredAction == "CONFIGURE_SETTINGS") {
+                                onAction(PluginStatusAction.Settings)
+                            } else {
+                                onAction(PluginStatusAction.Custom(plugin.requiredAction!!)) 
+                            }
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
                         modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
                     ) {
-                        Text(action?.name ?: "Fix Issue")
+                        Text(if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue"))
                     }
                 }
 

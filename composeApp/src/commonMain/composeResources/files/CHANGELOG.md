@@ -1,3 +1,12 @@
+Version: 1.3.4
+Date: 10-05-2026
+Added:
+  - Support for required and secret settings.
+Changes:
+  - Invalidating plugin on vlidation fail
+Fixed:
+  - Installing puling would be stuck on "required setup" whgen updating from local in some cases
+----------------------------------------------------------------------------------------------------
 Version: 1.3.3
 Date: 10-05-2026
 Fixed:

@@ -4,9 +4,57 @@ import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toTypeName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import org.wip.plugintoolkit.api.*
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 
 object KotlinGenerator {
+    private val API_PACKAGE = "org.wip.plugintoolkit.api"
+    
+    // API Classes
+    private val CN_PLUGIN_MANIFEST = PluginManifest::class.asClassName()
+    private val CN_PLUGIN_INFO = PluginInfo::class.asClassName()
+    private val CN_REQUIREMENTS = Requirements::class.asClassName()
+    private val CN_CAPABILITY = Capability::class.asClassName()
+    private val CN_PLUGIN_ACTION = PluginAction::class.asClassName()
+    private val CN_PARAMETER_METADATA = ParameterMetadata::class.asClassName()
+    private val CN_PARAMETER_CONSTRAINTS = ParameterConstraints::class.asClassName()
+    private val CN_DATA_PROCESSOR = DataProcessor::class.asClassName()
+    private val CN_PLUGIN_REQUEST = PluginRequest::class.asClassName()
+    private val CN_PLUGIN_RESPONSE = PluginResponse::class.asClassName()
+    private val CN_PLUGIN_ENTRY = PluginEntry::class.asClassName()
+    private val CN_SETTING_METADATA = SettingMetadata::class.asClassName()
+    private val CN_JOB_HANDLE = JobHandle::class.asClassName()
+    private val CN_PLUGIN_SIGNAL = PluginSignal::class.asClassName()
+    private val CN_PLUGIN_CONTEXT = PluginContext::class.asClassName()
+    private val CN_PLUGIN_LOGGER = PluginLogger::class.asClassName()
+    private val CN_PLUGIN_FILESYSTEM = PluginFileSystem::class.asClassName()
+    private val CN_PROGRESS_REPORTER = ProgressReporter::class.asClassName()
+    private val CN_EXECUTION_RESULT = ExecutionResult::class.asClassName()
+    private val CN_EXECUTION_RESULT_SUCCESS = ExecutionResult.Success::class.asClassName()
+    private val CN_EXECUTION_RESULT_ERROR = ExecutionResult.Error::class.asClassName()
+    
+    // Functions and Members
+    private val MN_GET_DATA_TYPE = MemberName(API_PACKAGE, "getDataType")
+    private val MN_JSON = Json::class.asClassName()
+    private val MN_DECODE_FROM_JSON_ELEMENT = MemberName("kotlinx.serialization.json", "decodeFromJsonElement")
+    private val MN_ENCODE_FROM_JSON_ELEMENT = MemberName("kotlinx.serialization.json", "encodeToJsonElement")
+    
+    private val CN_COROUTINE_SCOPE = CoroutineScope::class.asClassName()
+    private val CN_DISPATCHERS = Dispatchers::class.asClassName()
+    private val MN_SUPERVISOR_JOB = MemberName("kotlinx.coroutines", "SupervisorJob")
+    private val MN_ASYNC = MemberName("kotlinx.coroutines", "async")
+    private val MN_LAUNCH = MemberName("kotlinx.coroutines", "launch")
+    private val MN_CANCEL = MemberName("kotlinx.coroutines", "cancel")
+
     fun generate(
         packageName: String,
         baseClassName: String,
@@ -27,9 +75,6 @@ object KotlinGenerator {
         val entryName = baseClassName + "PluginEntry"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
-            .addImport("org.wip.plugintoolkit.api", "PluginManifest", "PluginInfo", "Requirements", "Capability", "PluginAction", "ParameterMetadata", "ParameterConstraints", "DataProcessor", "PluginRequest", "PluginResponse", "PluginEntry", "getDataType", "SettingMetadata", "JobHandle", "PluginSignal", "PluginContext", "PluginLogger", "PluginFileSystem", "ProgressReporter", "ExecutionResult")
-            .addImport("kotlinx.serialization.json", "Json", "decodeFromJsonElement", "encodeToJsonElement")
-            .addImport("kotlinx.coroutines", "CoroutineScope", "Dispatchers", "SupervisorJob", "async", "launch", "cancel")
 
         // 1. Generate Manifest Object
         val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
@@ -84,7 +129,7 @@ object KotlinGenerator {
                 param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }
             }
 
-            capabilitiesCode.add("Capability(\n")
+            capabilitiesCode.add("%T(\n", CN_CAPABILITY)
             capabilitiesCode.indent()
             capabilitiesCode.add("name = %S,\n", capName)
             capabilitiesCode.add("description = %S,\n", capDesc)
@@ -108,8 +153,11 @@ object KotlinGenerator {
                                      typeStr == "org.wip.plugintoolkit.api.PluginContext"
 
                 if (!isInfrastructure) {
-                    val defaultValueCode = if (defaultValue.isNotEmpty()) "Json.parseToJsonElement(%S)" else "%L"
-                    val defaultValueVal = defaultValue.ifEmpty { "null" }
+                    val defaultValueCode = if (defaultValue.isNotEmpty()) {
+                        CodeBlock.of("%T.parseToJsonElement(%S)", MN_JSON, defaultValue)
+                    } else {
+                        CodeBlock.of("%L", "null")
+                    }
                     
                     val minValue = paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
                     val maxValue = paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
@@ -119,14 +167,16 @@ object KotlinGenerator {
                     val multiSelect = paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
                     val minChoices = paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
                     val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
+                    val required = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+                    val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
                     
                     val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
                     
                     val constraintsCode = if (hasConstraints) {
-                        "ParameterConstraints(minValue = ${if (!minValue.isNaN()) minValue else "null"}, maxValue = ${if (!maxValue.isNaN()) maxValue else "null"}, minLength = ${if (minLength != -1) minLength else "null"}, maxLength = ${if (maxLength != -1) maxLength else "null"}, regex = ${if (regex.isNotEmpty()) "\"$regex\"" else "null"}, multiSelect = ${if (multiSelect) "true" else "null"}, minChoices = ${if (minChoices != -1) minChoices else "null"}, maxChoices = ${if (maxChoices != -1) maxChoices else "null"})"
+                        CodeBlock.of("%T(minValue = ${if (!minValue.isNaN()) minValue else "null"}, maxValue = ${if (!maxValue.isNaN()) maxValue else "null"}, minLength = ${if (minLength != -1) minLength else "null"}, maxLength = ${if (maxLength != -1) maxLength else "null"}, regex = ${if (regex.isNotEmpty()) "\"$regex\"" else "null"}, multiSelect = ${if (multiSelect) "true" else "null"}, minChoices = ${if (minChoices != -1) minChoices else "null"}, maxChoices = ${if (maxChoices != -1) maxChoices else "null"})", CN_PARAMETER_CONSTRAINTS)
                     } else "null"
                     
-                    capabilitiesCode.add("%S to ParameterMetadata(defaultValue = $defaultValueCode, description = %S, type = getDataType<%T>(), constraints = $constraintsCode)", paramNameStr, defaultValueVal, paramDesc, paramType)
+                    capabilitiesCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L)", paramNameStr, CN_PARAMETER_METADATA, defaultValueCode, paramDesc, MN_GET_DATA_TYPE, paramType, constraintsCode, required, secret)
                     if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
                 }
             }
@@ -134,7 +184,7 @@ object KotlinGenerator {
             capabilitiesCode.add("),\n")
             
             val returnType = func.returnType?.resolve()?.toTypeName() ?: UNIT
-            capabilitiesCode.add("returnType = getDataType<%T>()\n", returnType)
+            capabilitiesCode.add("returnType = %M<%T>()\n", MN_GET_DATA_TYPE, returnType)
             capabilitiesCode.unindent()
             if (index < functions.size - 1) capabilitiesCode.add("),\n") else capabilitiesCode.add(")\n")
         }
@@ -148,15 +198,17 @@ object KotlinGenerator {
             val ann = prop.annotations.first { it.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
             val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
+            val required = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+            val secret = ann.arguments.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
             val propName = prop.simpleName.asString()
             val propType = prop.type.resolve().toTypeName()
-            val defaultValueCode = if (defaultVal.isNotEmpty()) "Json.parseToJsonElement(%S)" else "null"
-            
-            if (defaultVal.isNotEmpty()) {
-               settingsCode.add("%S to SettingMetadata($defaultValueCode, %S, getDataType<%T>())", propName, defaultVal, desc, propType)
+            val defaultValueCode = if (defaultVal.isNotEmpty()) {
+                CodeBlock.of("%T.parseToJsonElement(%S)", MN_JSON, defaultVal)
             } else {
-               settingsCode.add("%S to SettingMetadata(null, %S, getDataType<%T>())", propName, desc, propType)
+                CodeBlock.of("null")
             }
+            
+            settingsCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), required = %L, secret = %L)", propName, CN_SETTING_METADATA, defaultValueCode, desc, MN_GET_DATA_TYPE, propType, required, secret)
             if (index < settingsProperties.size - 1) settingsCode.add(",\n") else settingsCode.add("\n")
         }
         settingsCode.unindent()
@@ -170,21 +222,21 @@ object KotlinGenerator {
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             
-            actionsCode.add("PluginAction(name = %S, description = %S, functionName = %S)", actName, actDesc, func.simpleName.asString())
+            actionsCode.add("%T(name = %S, description = %S, functionName = %S)", CN_PLUGIN_ACTION, actName, actDesc, func.simpleName.asString())
             if (index < actions.size - 1) actionsCode.add(",\n") else actionsCode.add("\n")
         }
         actionsCode.unindent()
         actionsCode.add(")\n")
 
         manifestType.addProperty(
-            PropertySpec.builder("manifest", ClassName("org.wip.plugintoolkit.api", "PluginManifest"))
+            PropertySpec.builder("manifest", CN_PLUGIN_MANIFEST)
                 .initializer(
                     CodeBlock.builder()
-                        .add("PluginManifest(\n")
+                        .add("%T(\n", CN_PLUGIN_MANIFEST)
                         .indent()
                         .add("manifestVersion = %S,\n", "1.0")
-                        .add("plugin = PluginInfo(id = %S, name = %S, version = %S, description = %S),\n", id, name, version, description)
-                        .add("requirements = Requirements(minMemoryMb = %L, minExecutionTimeMs = %L),\n", minMemoryMb, minExecutionTimeMs)
+                        .add("plugin = %T(id = %S, name = %S, version = %S, description = %S),\n", CN_PLUGIN_INFO, id, name, version, description)
+                        .add("requirements = %T(minMemoryMb = %L, minExecutionTimeMs = %L),\n", CN_REQUIREMENTS, minMemoryMb, minExecutionTimeMs)
                         .add("capabilities = ")
                         .add(capabilitiesCode.build())
                         .add(",\nactions = ")
@@ -209,7 +261,7 @@ object KotlinGenerator {
         actions: List<KSFunctionDeclaration>
     ): TypeSpec {
         val dispatcherType = TypeSpec.classBuilder(dispatcherName)
-            .addSuperinterface(ClassName("org.wip.plugintoolkit.api", "DataProcessor"))
+            .addSuperinterface(CN_DATA_PROCESSOR)
             .primaryConstructor(
                 FunSpec.constructorBuilder()
                     .addParameter("processor", ClassName(packageName, baseClassName))
@@ -222,7 +274,7 @@ object KotlinGenerator {
                     .build()
             )
             .addProperty(
-                PropertySpec.builder("context", ClassName("org.wip.plugintoolkit.api", "PluginContext").copy(nullable = true))
+                PropertySpec.builder("context", CN_PLUGIN_CONTEXT.copy(nullable = true))
                     .mutable(true)
                     .initializer("null")
                     .addModifiers(KModifier.PRIVATE)
@@ -245,7 +297,7 @@ object KotlinGenerator {
             .addFunction(
                 FunSpec.builder("setPluginContext")
                     .addModifiers(KModifier.OVERRIDE)
-                    .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
+                    .addParameter("context", CN_PLUGIN_CONTEXT)
                     .addStatement("this.context = context")
                     .build()
             )
@@ -254,8 +306,8 @@ object KotlinGenerator {
         val mapType = ClassName("kotlin.collections", "Map").parameterizedBy(
             String::class.asClassName(),
             LambdaTypeName.get(
-                parameters = listOf(ParameterSpec.unnamed(ClassName("org.wip.plugintoolkit.api", "PluginRequest"))),
-                returnType = ClassName("org.wip.plugintoolkit.api", "ExecutionResult")
+                parameters = listOf(ParameterSpec.unnamed(CN_PLUGIN_REQUEST)),
+                returnType = CN_EXECUTION_RESULT
             ).copy(suspending = true)
         )
 
@@ -290,24 +342,24 @@ object KotlinGenerator {
                 } else if (typeStr == "org.wip.plugintoolkit.api.PluginContext") {
                     mapCode.add("context ?: throw IllegalStateException(%S)", "PluginContext not available")
                 } else if (param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }) {
-                    mapCode.add("request.resumeState?.let { Json.decodeFromJsonElement<%T>(it) }", paramType)
+                    mapCode.add("request.resumeState?.let { %T.%M<%T>(it) }", MN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType)
                 } else if (hasDefault) {
-                    mapCode.add("if (request.parameters.containsKey(%S)) Json.decodeFromJsonElement<%T>(request.parameters[%S]!!) else null", paramName, paramType.copy(nullable = false), paramName)
+                    mapCode.add("if (request.parameters.containsKey(%S)) %T.%M<%T>(request.parameters[%S]!!) else null", paramName, MN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType.copy(nullable = false), paramName)
                 } else if (isNullable) {
-                    mapCode.add("request.parameters[%S]?.let { Json.decodeFromJsonElement<%T>(it) }", paramName, paramType)
+                    mapCode.add("request.parameters[%S]?.let { %T.%M<%T>(it) }", paramName, MN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType)
                 } else {
-                    mapCode.add("Json.decodeFromJsonElement<%T>(request.parameters[%S] ?: throw IllegalArgumentException(%S))", paramType, paramName, "Missing mandatory parameter: $paramName")
+                    mapCode.add("%T.%M<%T>(request.parameters[%S] ?: throw IllegalArgumentException(%S))", MN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType, paramName, "Missing mandatory parameter: $paramName")
                 }
                 if (pIndex < paramsList.size - 1) mapCode.add(",\n") else mapCode.add("\n")
             }
             mapCode.unindent()
             mapCode.add(")\n")
             
-            val returnType = func.returnType?.resolve()?.toTypeName()?.toString()
-            if (returnType == "org.wip.plugintoolkit.api.ExecutionResult") {
+            val returnType = func.returnType?.resolve()?.toTypeName()
+            if (returnType == CN_EXECUTION_RESULT) {
                 mapCode.add("result\n")
             } else {
-                mapCode.add("ExecutionResult.Success(PluginResponse(result = Json.encodeToJsonElement(result), metadata = mapOf(\"status\" to \"success\")))\n")
+                mapCode.add("%T.Success(%T(result = %T.%M(result), metadata = mapOf(\"status\" to \"success\")))\n", CN_EXECUTION_RESULT, CN_PLUGIN_RESPONSE, MN_JSON, MN_ENCODE_FROM_JSON_ELEMENT)
             }
             mapCode.unindent()
             mapCode.add("}")
@@ -326,46 +378,46 @@ object KotlinGenerator {
 
         val processFunc = FunSpec.builder("process")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("request", ClassName("org.wip.plugintoolkit.api", "PluginRequest"))
-            .returns(ClassName("org.wip.plugintoolkit.api", "ExecutionResult"))
+            .addParameter("request", CN_PLUGIN_REQUEST)
+            .returns(CN_EXECUTION_RESULT)
             .beginControlFlow("return try")
             .addStatement("val handler = handlers[request.method.lowercase()] ?: throw IllegalArgumentException(%S)", "Unknown method: \${request.method}")
             .addStatement("handler(request)")
             .nextControlFlow("catch (e: Exception)")
-            .addStatement("ExecutionResult.Error(e.message ?: \"Unknown error\", e)")
+            .addStatement("%T.Error(e.message ?: \"Unknown error\", e)", CN_EXECUTION_RESULT)
             .endControlFlow()
         
         dispatcherType.addFunction(processFunc.build())
 
         val processAsyncFunc = FunSpec.builder("processAsync")
             .addModifiers(KModifier.OVERRIDE)
-            .addParameter("request", ClassName("org.wip.plugintoolkit.api", "PluginRequest"))
-            .returns(ClassName("org.wip.plugintoolkit.api", "JobHandle"))
-            .addCode("""
-                val handler = handlers[request.method.lowercase()] ?: throw IllegalArgumentException("Unknown method: ${'$'}{request.method}")
-                val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-                val deferred = scope.async {
-                    try {
-                        handler(request)
-                    } catch (e: Exception) {
-                        ExecutionResult.Error(e.message ?: "Unknown error", e)
-                    }
-                }
-                
-                return object : JobHandle {
-                    override val result = deferred
-                    override fun pause() {
-                        scope.launch { context?.signals?.sendSignal(PluginSignal.PAUSE) }
-                    }
-                    override fun cancel(force: Boolean) {
-                        scope.launch { context?.signals?.sendSignal(PluginSignal.CANCEL) }
-                        deferred.cancel()
-                        if (force) {
-                            scope.cancel()
-                        }
-                    }
-                }
-            """.trimIndent())
+            .addParameter("request", CN_PLUGIN_REQUEST)
+            .returns(CN_JOB_HANDLE)
+            .addCode(CodeBlock.builder()
+                .addStatement("val handler = handlers[request.method.lowercase()] ?: throw IllegalArgumentException(%S)", "Unknown method: \${request.method}")
+                .addStatement("val scope = %T(%T.Default + %M())", CN_COROUTINE_SCOPE, CN_DISPATCHERS, MN_SUPERVISOR_JOB)
+                .beginControlFlow("val deferred = scope.%M", MN_ASYNC)
+                .beginControlFlow("try")
+                .addStatement("handler(request)")
+                .nextControlFlow("catch (e: Exception)")
+                .addStatement("%T.Error(e.message ?: \"Unknown error\", e)", CN_EXECUTION_RESULT)
+                .endControlFlow()
+                .endControlFlow()
+                .add("\n")
+                .beginControlFlow("return object : %T", CN_JOB_HANDLE)
+                .addStatement("override val result = deferred")
+                .beginControlFlow("override fun pause()")
+                .addStatement("scope.%M { context?.signals?.sendSignal(%T.PAUSE) }", MN_LAUNCH, CN_PLUGIN_SIGNAL)
+                .endControlFlow()
+                .beginControlFlow("override fun cancel(force: Boolean)")
+                .addStatement("scope.%M { context?.signals?.sendSignal(%T.CANCEL) }", MN_LAUNCH, CN_PLUGIN_SIGNAL)
+                .addStatement("deferred.cancel()")
+                .beginControlFlow("if (force)")
+                .addStatement("scope.%M()", MN_CANCEL)
+                .endControlFlow()
+                .endControlFlow()
+                .endControlFlow()
+                .build())
         
         dispatcherType.addFunction(processAsyncFunc.build())
 
@@ -373,7 +425,7 @@ object KotlinGenerator {
         val actionMapType = ClassName("kotlin.collections", "Map").parameterizedBy(
             String::class.asClassName(),
             LambdaTypeName.get(
-                parameters = listOf(ParameterSpec.unnamed(ClassName("org.wip.plugintoolkit.api", "PluginContext"))),
+                parameters = listOf(ParameterSpec.unnamed(CN_PLUGIN_CONTEXT)),
                 returnType = ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName())
             ).copy(suspending = true)
         )
@@ -389,10 +441,10 @@ object KotlinGenerator {
             val actArgs = actParams.joinToString(", ") { param ->
                 val t = param.type.resolve().toTypeName().toString()
                 when (t) {
-                    "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
-                    "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
-                    "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
-                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
+                    CN_PLUGIN_FILESYSTEM.toString() -> "context.fileSystem"
+                    CN_PLUGIN_LOGGER.toString() -> "context.logger"
+                    CN_PROGRESS_REPORTER.toString() -> "context.progress"
+                    CN_PLUGIN_CONTEXT.toString() -> "context"
                     else -> param.name?.asString() ?: ""
                 }
             }
@@ -413,8 +465,8 @@ object KotlinGenerator {
 
         val runActionFunc = FunSpec.builder("runAction")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("action", ClassName("org.wip.plugintoolkit.api", "PluginAction"))
-            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
+            .addParameter("action", CN_PLUGIN_ACTION)
+            .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
             .addStatement("val handler = actionHandlers[action.functionName.lowercase()] ?: return Result.failure(IllegalArgumentException(\"Unknown action: \${action.functionName}\"))")
             .addStatement("return handler(context)")
@@ -433,7 +485,7 @@ object KotlinGenerator {
         classDeclaration: KSClassDeclaration
     ): TypeSpec {
         val entryType = TypeSpec.classBuilder(entryName)
-            .addSuperinterface(ClassName("org.wip.plugintoolkit.api", "PluginEntry"))
+            .addSuperinterface(CN_PLUGIN_ENTRY)
             .primaryConstructor(
                 FunSpec.constructorBuilder()
                     .addParameter(
@@ -466,20 +518,20 @@ object KotlinGenerator {
                 FunSpec.builder("getKoinModule")
                     .addModifiers(KModifier.OVERRIDE)
                     .returns(ClassName("org.koin.core.module", "Module"))
-                    .addCode("return org.koin.dsl.module {\n  single { processor }\n  single<PluginEntry> { this@%L }\n}\n", entryName)
+                    .addCode("return org.koin.dsl.module {\n  single { processor }\n  single<%T> { this@%L }\n}\n", CN_PLUGIN_ENTRY, entryName)
                     .build()
             )
             .addFunction(
                 FunSpec.builder("getProcessor")
                     .addModifiers(KModifier.OVERRIDE)
-                    .returns(ClassName("org.wip.plugintoolkit.api", "DataProcessor"))
+                    .returns(CN_DATA_PROCESSOR)
                     .addStatement("return dispatcher")
                     .build()
             )
             .addFunction(
                 FunSpec.builder("getManifest")
                     .addModifiers(KModifier.OVERRIDE)
-                    .returns(ClassName("org.wip.plugintoolkit.api", "PluginManifest"))
+                    .returns(CN_PLUGIN_MANIFEST)
                     .addStatement("return %L.manifest", manifestName)
                     .build()
             )
@@ -505,7 +557,7 @@ object KotlinGenerator {
         // performLoad
         val loadFunBuilder = FunSpec.builder("performLoad")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
+            .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
 
         if (loadFunction != null) {
@@ -513,10 +565,10 @@ object KotlinGenerator {
             val callArgs = loadParams.joinToString(", ") { param ->
                 val t = param.type.resolve().toTypeName().toString()
                 when (t) {
-                    "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
-                    "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
-                    "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
-                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
+                    CN_PLUGIN_FILESYSTEM.toString() -> "context.fileSystem"
+                    CN_PLUGIN_LOGGER.toString() -> "context.logger"
+                    CN_PROGRESS_REPORTER.toString() -> "context.progress"
+                    CN_PLUGIN_CONTEXT.toString() -> "context"
                     else -> param.name?.asString() ?: ""
                 }
             }
@@ -529,7 +581,7 @@ object KotlinGenerator {
         // performSetup
         val setupFunBuilder = FunSpec.builder("performSetup")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
+            .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
 
         if (setupFunction != null) {
@@ -537,10 +589,10 @@ object KotlinGenerator {
             val callArgs = setupParams.joinToString(", ") { param ->
                 val t = param.type.resolve().toTypeName().toString()
                 when (t) {
-                    "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
-                    "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
-                    "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
-                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
+                    CN_PLUGIN_FILESYSTEM.toString() -> "context.fileSystem"
+                    CN_PLUGIN_LOGGER.toString() -> "context.logger"
+                    CN_PROGRESS_REPORTER.toString() -> "context.progress"
+                    CN_PLUGIN_CONTEXT.toString() -> "context"
                     else -> param.name?.asString() ?: ""
                 }
             }
@@ -553,7 +605,7 @@ object KotlinGenerator {
         // performValidate
         val validateFunBuilder = FunSpec.builder("validate")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
+            .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
 
         if (validateFunction != null) {
@@ -561,10 +613,10 @@ object KotlinGenerator {
             val callArgs = validateParams.joinToString(", ") { param ->
                 val t = param.type.resolve().toTypeName().toString()
                 when (t) {
-                    "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
-                    "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
-                    "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
-                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
+                    CN_PLUGIN_FILESYSTEM.toString() -> "context.fileSystem"
+                    CN_PLUGIN_LOGGER.toString() -> "context.logger"
+                    CN_PROGRESS_REPORTER.toString() -> "context.progress"
+                    CN_PLUGIN_CONTEXT.toString() -> "context"
                     else -> param.name?.asString() ?: ""
                 }
             }
@@ -577,19 +629,18 @@ object KotlinGenerator {
         // performUpdate
         val updateFunBuilder = FunSpec.builder("performUpdate")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("context", ClassName("org.wip.plugintoolkit.api", "PluginContext"))
+            .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
 
         if (updateFunction != null) {
             val updateParams = updateFunction.parameters
             val callArgs = updateParams.joinToString(", ") { param ->
                 val t = param.type.resolve().toTypeName().toString()
-                val qualifiedT = param.type.resolve().declaration.qualifiedName?.asString()
-                when (qualifiedT) {
-                    "org.wip.plugintoolkit.api.PluginFileSystem" -> "context.fileSystem"
-                    "org.wip.plugintoolkit.api.PluginLogger" -> "context.logger"
-                    "org.wip.plugintoolkit.api.ProgressReporter" -> "context.progress"
-                    "org.wip.plugintoolkit.api.PluginContext" -> "context"
+                when (t) {
+                    CN_PLUGIN_FILESYSTEM.toString() -> "context.fileSystem"
+                    CN_PLUGIN_LOGGER.toString() -> "context.logger"
+                    CN_PROGRESS_REPORTER.toString() -> "context.progress"
+                    CN_PLUGIN_CONTEXT.toString() -> "context"
                     else -> param.name?.asString() ?: ""
                 }
             }

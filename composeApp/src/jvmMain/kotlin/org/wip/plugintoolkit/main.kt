@@ -56,6 +56,7 @@ import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginInstaller
+import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
@@ -134,9 +135,10 @@ fun runMain(args: Array<String>) {
             single { DialogService() }
             single { PluginRegistry(get(), CoroutineScope(SupervisorJob() + Dispatchers.Default)) }
             single { PluginLifecycleManager(get(), get(), get(), get()) }
+            single { PluginLifecycleCoordinator(get(), get(), get()) }
             single { PluginInstaller(get(), get(), get(), get(), get(), get()) }
             single { PluginScanner(get()) }
-            single { PluginManager(get(), get(), get(), get(), get(), get(), get()) }
+            single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get()) }
             single {
                 JobManager(
                     CoroutineScope(SupervisorJob() + Dispatchers.Default),

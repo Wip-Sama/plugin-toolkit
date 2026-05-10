@@ -197,6 +197,49 @@ suspend fun setup(context: PluginContext): Result<Unit> {
 
 Once extracted, you can use `fileSystem.getBasePath()` to get the absolute path if you need to execute a file via `ProcessBuilder`.
 
+## Plugin Settings
+
+Plugins can define settings in their `manifest.json` under the `settings` object. These settings are automatically rendered in the host application's UI, allowing users to configure the plugin.
+
+### Defining Settings
+
+Each setting requires metadata to dictate how it is rendered and validated:
+
+```json
+"settings": {
+  "apiKey": {
+    "description": "API Key for external service",
+    "type": "STRING",
+    "required": true,
+    "secret": true
+  },
+  "maxRetries": {
+    "description": "Maximum number of retry attempts",
+    "type": "INTEGER",
+    "defaultValue": 3
+  }
+}
+```
+
+### Important Metadata Fields
+
+*   `required` (Boolean): If `true`, the user **must** provide a value before the plugin can run its setup or validation. The plugin will be blocked in a "Requires Configuration" state until all required fields are filled.
+*   `secret` (Boolean): If `true`, the host application will mask the input in the UI (like a password field) and securely encrypt the value on disk using OS-native secure storage (DPAPI on Windows, Keychain on macOS, Secret Service on Linux).
+
+### Accessing Settings
+
+In your plugin code, you can access these settings via the `PluginContext`:
+
+```kotlin
+@PluginAction(name = "Fetch Data")
+suspend fun fetchData(context: PluginContext) {
+    // Read the setting (decrypted automatically if it was marked as secret)
+    val apiKey = context.settings["apiKey"]?.jsonPrimitive?.content
+    
+    // ... use the key
+}
+```
+
 ## Best Practices
 
 - **Non-blocking**: Always use `suspend` functions for I/O or heavy computation.

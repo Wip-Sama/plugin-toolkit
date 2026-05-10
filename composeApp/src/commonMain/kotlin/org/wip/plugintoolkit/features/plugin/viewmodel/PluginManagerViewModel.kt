@@ -73,9 +73,28 @@ class PluginManagerViewModel(
                 .associate { it.pluginId to (progressMap[it.id] ?: 0f) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+    
+    private val autoOpenedSettings = mutableSetOf<String>()
 
     init {
         PlatformUtils.mkdirs(defaultPluginFolder)
+
+        viewModelScope.launch {
+            installedPlugins.collect { plugins ->
+                plugins.forEach { plugin ->
+                    if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !autoOpenedSettings.contains(plugin.pkg)) {
+                        autoOpenedSettings.add(plugin.pkg)
+                        dialogService.showConfirmation(
+                            title = "Configuration Required",
+                            message = "Plugin ${plugin.name} requires configuration. Would you like to configure it now?",
+                            onConfirm = { openSettings(plugin.pkg) }
+                        )
+                    } else if (plugin.requiredAction != "CONFIGURE_SETTINGS") {
+                        autoOpenedSettings.remove(plugin.pkg)
+                    }
+                }
+            }
+        }
     }
 
     val sortedPlugins: StateFlow<List<InstalledPlugin>> = combine(
@@ -308,10 +327,15 @@ class PluginManagerViewModel(
     }
 
     fun closeSettings() {
+        _settingsPkg.value?.let { autoOpenedSettings.remove(it) }
         _settingsPkg.value = null
     }
 
     fun getUpdate(pkg: String) = pluginManager.getUpdate(pkg)
+    
+    fun fixIssue(pkg: String) {
+        openSettings(pkg)
+    }
 
     fun getActions(pkg: String) = try {
         PluginLoader.getPluginById(pkg)?.getManifest()?.actions ?: emptyList()

@@ -28,6 +28,8 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PrimitiveType
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 
 @Composable
@@ -44,8 +46,17 @@ fun DynamicParameterInput(
             Text(
                 text = name,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = if (metadata.required && value.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
             )
+            if (metadata.required) {
+                Text(
+                    text = " *",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
@@ -89,7 +100,9 @@ fun DynamicParameterInput(
                             allowDecimal = false,
                             placeholder = "Enter integer",
                             constraints = metadata.constraints,
-                            enabled = enabled
+                            enabled = enabled,
+                            isSecret = metadata.secret,
+                            isRequired = metadata.required
                         )
                     }
 
@@ -100,7 +113,9 @@ fun DynamicParameterInput(
                             allowDecimal = true,
                             placeholder = "Enter decimal number",
                             constraints = metadata.constraints,
-                            enabled = enabled
+                            enabled = enabled,
+                            isSecret = metadata.secret,
+                            isRequired = metadata.required
                         )
                     }
 
@@ -110,7 +125,9 @@ fun DynamicParameterInput(
                             onValueChange = onValueChange,
                             placeholder = "Enter ${type.primitiveType.name.lowercase()}",
                             constraints = metadata.constraints,
-                            enabled = enabled
+                            enabled = enabled,
+                            isSecret = metadata.secret,
+                            isRequired = metadata.required
                         )
                     }
                 }
@@ -122,7 +139,9 @@ fun DynamicParameterInput(
                     onValueChange = onValueChange,
                     placeholder = "Enter values separated by comma (,)",
                     constraints = metadata.constraints,
-                    enabled = enabled
+                    enabled = enabled,
+                    isSecret = metadata.secret,
+                    isRequired = metadata.required
                 )
             }
 
@@ -136,7 +155,9 @@ fun DynamicParameterInput(
                         onValueChange = onValueChange,
                         placeholder = "Enter comma-separated options: ${options.joinToString()}",
                         constraints = metadata.constraints,
-                        enabled = enabled
+                        enabled = enabled,
+                        isSecret = metadata.secret,
+                        isRequired = metadata.required
                     )
                 } else {
                     ExpressiveMenu(
@@ -155,7 +176,9 @@ fun DynamicParameterInput(
                     onValueChange = onValueChange,
                     placeholder = "Enter value",
                     constraints = metadata.constraints,
-                    enabled = enabled
+                    enabled = enabled,
+                    isSecret = metadata.secret,
+                    isRequired = metadata.required
                 )
             }
         }
@@ -169,10 +192,17 @@ private fun NumericTextField(
     allowDecimal: Boolean,
     placeholder: String,
     constraints: ParameterConstraints? = null,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    isSecret: Boolean = false,
+    isRequired: Boolean = false
 ) {
-    var isError by remember(value) { mutableStateOf(false) }
-    var errorMessage by remember(value) { mutableStateOf("") }
+    var isError by remember(value) { 
+        mutableStateOf(isRequired && value.isBlank()) 
+    }
+    var errorMessage by remember(value) { 
+        mutableStateOf(if (isRequired && value.isBlank()) "Required" else "") 
+    }
+    var isVisible by remember { mutableStateOf(!isSecret) }
 
     // Validate on value change
     val validate: (String) -> Unit = { newValue ->
@@ -233,6 +263,17 @@ private fun NumericTextField(
         keyboardOptions = KeyboardOptions(
             keyboardType = if (allowDecimal) KeyboardType.Decimal else KeyboardType.Number
         ),
+        visualTransformation = if (isSecret && !isVisible) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        trailingIcon = if (isSecret) {
+            {
+                androidx.compose.material3.IconButton(onClick = { isVisible = !isVisible }) {
+                    androidx.compose.material3.Icon(
+                        imageVector = if (isVisible) androidx.compose.material.icons.Icons.Default.VisibilityOff else androidx.compose.material.icons.Icons.Default.Visibility,
+                        contentDescription = if (isVisible) "Hide" else "Show"
+                    )
+                }
+            }
+        } else null,
         singleLine = true,
         isError = isError,
         supportingText = if (isError) {
@@ -247,10 +288,17 @@ private fun StandardTextField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     constraints: ParameterConstraints? = null,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    isSecret: Boolean = false,
+    isRequired: Boolean = false
 ) {
-    var isError by remember(value) { mutableStateOf(false) }
-    var errorMessage by remember(value) { mutableStateOf("") }
+    var isError by remember(value) { 
+        mutableStateOf(isRequired && value.isBlank()) 
+    }
+    var errorMessage by remember(value) { 
+        mutableStateOf(if (isRequired && value.isBlank()) "Required" else "") 
+    }
+    var isVisible by remember { mutableStateOf(!isSecret) }
 
     val validate: (String) -> Unit = { newValue ->
         isError = false
@@ -285,6 +333,17 @@ private fun StandardTextField(
         shape = MaterialTheme.shapes.medium,
         placeholder = { Text(placeholder, style = MaterialTheme.typography.bodySmall) },
         singleLine = true,
+        visualTransformation = if (isSecret && !isVisible) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        trailingIcon = if (isSecret) {
+            {
+                androidx.compose.material3.IconButton(onClick = { isVisible = !isVisible }) {
+                    androidx.compose.material3.Icon(
+                        imageVector = if (isVisible) androidx.compose.material.icons.Icons.Default.VisibilityOff else androidx.compose.material.icons.Icons.Default.Visibility,
+                        contentDescription = if (isVisible) "Hide" else "Show"
+                    )
+                }
+            }
+        } else null,
         isError = isError,
         supportingText = if (isError) {
             { Text(errorMessage) }

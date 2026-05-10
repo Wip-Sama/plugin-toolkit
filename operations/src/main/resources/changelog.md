@@ -1,3 +1,11 @@
+Version: 1.3.6
+Date: 2026-05-10
+Features:
+  - Added support for required and secret settings.
+  - Added 'serverToken' (secret) and 'operatorName' (required) settings.
+Changes:
+  - Updated manifest schema to support configuration validation enforcement.
+----------------------------------------------------------------------------------------------------
 Version: 1.3.1
 Date: 2026-05-01
 Changes:

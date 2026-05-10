@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 expect object PlatformUtils {
     val isWindows: Boolean
     val isLinux: Boolean
+    val isMac: Boolean
     fun getSystemAccentColor(): Color?
     suspend fun pickFolder(): String?
     suspend fun pickFile(): String?

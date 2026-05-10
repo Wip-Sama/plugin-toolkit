@@ -60,7 +60,9 @@ data class ParameterConstraints(
 data class SettingMetadata(
     val defaultValue: JsonElement? = null,
     val description: String,
-    val type: DataType
+    val type: DataType,
+    val required: Boolean = false,
+    val secret: Boolean = false
 )
 
 /**
@@ -113,7 +115,9 @@ data class ParameterMetadata(
     val defaultValue: JsonElement? = null,
     val description: String,
     val type: DataType,
-    val constraints: ParameterConstraints? = null
+    val constraints: ParameterConstraints? = null,
+    val required: Boolean = false,
+    val secret: Boolean = false
 )
 
 /**
