@@ -249,6 +249,25 @@ class PluginManagerViewModel(
         }
     }
 
+    fun rerunSetup(pkg: String) {
+        viewModelScope.launch {
+            val plugin = pluginManager.installedPlugins.value.find { it.pkg == pkg } ?: return@launch
+            if (plugin.isValidated) {
+                dialogService.showConfirmation(
+                    "Rerun Setup",
+                    "The plugin is already set up. If you rerun the setup, all previous configuration and files will be wiped. Continue?",
+                    onConfirm = {
+                        viewModelScope.launch {
+                            pluginManager.rerunSetup(pkg)
+                        }
+                    }
+                )
+            } else {
+                pluginManager.rerunSetup(pkg)
+            }
+        }
+    }
+
     fun showChangelog(pkg: String) {
         viewModelScope.launch {
             val plugin = pluginManager.installedPlugins.value.find { it.pkg == pkg }

@@ -147,7 +147,7 @@ fun runMain(args: Array<String>) {
             single { SettingsViewModel(get(), get(), get(), get()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
-            factory { PluginRepoViewModel(get(), get(), get(), get(), get()) }
+            factory { PluginRepoViewModel(get(), get(), get(), get(), get(), get()) }
             factory { PluginManagerViewModel(get(), get(), get(), get(), get()) }
             factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
             factory { JobViewModel(get()) }

@@ -7,6 +7,7 @@ import org.wip.plugintoolkit.api.PluginManifest
 data class ExtensionRepo(
     val name: String,
     val url: String, // index.json url
+    val schemaVersion: Int = 1,
     val signPublicKey: String? = null,
     val signAlgorithm: String = "SHA256",
     val pluginsFolder: String? = null
@@ -16,6 +17,7 @@ data class ExtensionRepo(
 data class RepoIndex(
     val name: String? = null,
     val url: String? = null,
+    val schemaVersion: Int = 1,
     val signPublicKey: String? = null,
     val signAlgorithm: String? = null,
     val pluginsFolder: String? = null,

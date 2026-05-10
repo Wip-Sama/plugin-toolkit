@@ -4,8 +4,6 @@ import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.Release
 
 object ChangelogParser {
-    private val SEPARATOR = "-".repeat(100)
-
     fun parse(content: String): Changelog {
         val releases = mutableListOf<Release>()
         var currentDate = ""
@@ -19,7 +17,7 @@ object ChangelogParser {
             val trimmed = line.trim()
             if (trimmed.isEmpty()) continue
 
-            if (trimmed == SEPARATOR) {
+            if (trimmed.all { it == '-' } && trimmed.length >= 50) {
                 if (currentVersion.isNotEmpty()) {
                     releases.add(Release(currentVersion, currentDate, currentCategories))
                     currentDate = ""
