@@ -211,15 +211,7 @@ interface PluginContext {
      * @param actionName The function name of the action to be displayed, or null to clear.
      */
     fun setRequiredAction(actionName: String?)
-
-    // Forwarding methods for convenience
-    fun verbose(message: String) = logger.verbose(message)
-    fun debug(message: String) = logger.debug(message)
-    fun info(message: String) = logger.info(message)
-    fun warn(message: String) = logger.warn(message)
-    fun error(message: String, throwable: Throwable? = null) = logger.error(message, throwable)
-    fun report(progress: Float) = this.progress.report(progress)
-
+    
     /**
      * Typed helpers for settings access.
      */

@@ -61,6 +61,8 @@ Bugs:
 - If the validation fails it should be unvalidated and unloaded  
 - When the validation fails it gets stuck in pending setup even if the setup completed
 - The repositories should have a button to "share" copy the repo link
+- Add options to contextual menu in windows
 - Reload should call the validation if it's not validated
 - Reload should call the load function in the plugin
-- Add options to contextual menu in windows
+- If the validation fails but the plugin is Loaded it should be unvalidated and unloaded  
+- Open latest logs
