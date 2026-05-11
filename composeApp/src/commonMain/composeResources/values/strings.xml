@@ -53,6 +53,8 @@
     <string name="setting_compressed_logs_to_keep_subtitle">Number of compressed log files to retain</string>
     <string name="setting_open_log_folder">Open log folder</string>
     <string name="setting_open_log_folder_subtitle">Open the folder where log files are stored</string>
+    <string name="setting_open_latest_log">Open latest log</string>
+    <string name="setting_open_latest_log_subtitle">Open the log file for the current day</string>
     <string name="section_notifications">Notifications</string>
     <string name="section_toasts">In-App Toasts</string>
     <string name="setting_enable_toasts">Enable Toasts</string>

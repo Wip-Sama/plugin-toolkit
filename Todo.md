@@ -64,5 +64,5 @@ Bugs:
 - Add options to contextual menu in windows
 - Reload should call the validation if it's not validated
 - Reload should call the load function in the plugin
-- If the validation fails but the plugin is Loaded it should be unvalidated and unloaded  
-- Open latest logs
+- Option to select the number of worker
+> When decreasing under the number of active worker the change will take effect when each worker finishes to the number required jobs (min 1)

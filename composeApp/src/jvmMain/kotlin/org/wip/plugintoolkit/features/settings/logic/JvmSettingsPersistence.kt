@@ -77,4 +77,24 @@ class JvmSettingsPersistence : SettingsPersistence {
             Logger.e(e) { "Error opening log folder" }
         }
     }
+
+    override fun openLatestLog() {
+        try {
+            val logDirPath = "$settingsDirPath/${KeepTrack.LOGS_DIR_NAME}"
+            val dateString = java.text.SimpleDateFormat("yyyy_MM_dd", java.util.Locale.getDefault()).format(java.util.Date())
+            val logFilePath = "$logDirPath/$dateString.log"
+            val logFile = java.io.File(logFilePath)
+
+            if (java.awt.Desktop.isDesktopSupported()) {
+                if (logFile.exists()) {
+                    java.awt.Desktop.getDesktop().open(logFile)
+                } else {
+                    // If today's log doesn't exist yet, just open the folder
+                    openLogFolder()
+                }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Error opening latest log" }
+        }
+    }
 }

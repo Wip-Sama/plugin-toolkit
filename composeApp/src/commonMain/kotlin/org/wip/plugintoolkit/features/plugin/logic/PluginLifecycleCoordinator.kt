@@ -348,10 +348,14 @@ class PluginLifecycleCoordinator(
 
     private suspend fun markAsInvalidated(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
-        if (!plugin.isValidated) return
 
         Logger.i { "Marking plugin $pkg as invalidated" }
         registry.updatePlugin(pkg) { it.copy(isValidated = false) }
+
+        if (lifecycleManager.loadedPlugins.value.contains(pkg)) {
+            Logger.i { "Plugin $pkg is loaded but invalidated, unloading." }
+            lifecycleManager.unloadPlugin(pkg)
+        }
     }
 
     private suspend fun clearRequiredAction(pkg: String) {

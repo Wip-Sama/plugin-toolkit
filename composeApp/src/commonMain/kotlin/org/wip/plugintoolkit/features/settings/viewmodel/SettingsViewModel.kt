@@ -156,4 +156,8 @@ class SettingsViewModel(
     fun openLogFolder() {
         repository.openLogFolder()
     }
+
+    fun openLatestLog() {
+        repository.openLatestLog()
+    }
 }

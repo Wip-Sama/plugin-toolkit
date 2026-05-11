@@ -43,6 +43,8 @@ class SettingsRepository(
     fun getJobsDir(): String = persistence.getJobsDir()
     
     fun openLogFolder() = persistence.openLogFolder()
+    
+    fun openLatestLog() = persistence.openLatestLog()
 
     /**
      * Legacy method for immediate access. Use [settings] Flow for reactive updates.
