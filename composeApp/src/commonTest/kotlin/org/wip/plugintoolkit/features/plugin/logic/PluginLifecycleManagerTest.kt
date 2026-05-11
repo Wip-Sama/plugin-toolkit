@@ -49,10 +49,6 @@ class PluginLifecycleManagerTest {
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
 
         val pkg = "test.plugin"
-        // Wait for registry to be ready (it loads from disk in init)
-        while (!registry.isReady.value) {
-            kotlinx.coroutines.yield()
-        }
         registry.addOrUpdatePlugin(InstalledPlugin(pkg = pkg, name = "Test", version = "1.0.0", installPath = "/tmp/test.plugin"))
 
         val store = PluginSettingsStore(settings = mapOf("key" to JsonPrimitive("value")))
