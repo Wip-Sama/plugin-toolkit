@@ -14,7 +14,6 @@ import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
-import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -48,6 +47,7 @@ class PluginManagerViewModel(
 
     val installedPlugins = pluginManager.installedPlugins
     val loadedPlugins = pluginManager.loadedPlugins
+    val isRegistryReady = pluginManager.isRegistryReady
 
     val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
 
@@ -73,9 +73,28 @@ class PluginManagerViewModel(
                 .associate { it.pluginId to (progressMap[it.id] ?: 0f) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+    
+    private val autoOpenedSettings = mutableSetOf<String>()
 
     init {
         PlatformUtils.mkdirs(defaultPluginFolder)
+
+        viewModelScope.launch {
+            installedPlugins.collect { plugins ->
+                plugins.forEach { plugin ->
+                    if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !autoOpenedSettings.contains(plugin.pkg)) {
+                        autoOpenedSettings.add(plugin.pkg)
+                        dialogService.showConfirmation(
+                            title = "Configuration Required",
+                            message = "Plugin ${plugin.name} requires configuration. Would you like to configure it now?",
+                            onConfirm = { openSettings(plugin.pkg) }
+                        )
+                    } else if (plugin.requiredAction != "CONFIGURE_SETTINGS") {
+                        autoOpenedSettings.remove(plugin.pkg)
+                    }
+                }
+            }
+        }
     }
 
     val sortedPlugins: StateFlow<List<InstalledPlugin>> = combine(
@@ -175,7 +194,9 @@ class PluginManagerViewModel(
     }
 
     fun refreshList() {
-        pluginManager.refreshInstalledPlugins()
+        viewModelScope.launch {
+            pluginManager.refreshInstalledPlugins()
+        }
     }
 
     fun rescan() {
@@ -308,13 +329,18 @@ class PluginManagerViewModel(
     }
 
     fun closeSettings() {
+        _settingsPkg.value?.let { autoOpenedSettings.remove(it) }
         _settingsPkg.value = null
     }
 
     fun getUpdate(pkg: String) = pluginManager.getUpdate(pkg)
+    
+    fun fixIssue(pkg: String) {
+        openSettings(pkg)
+    }
 
     fun getActions(pkg: String) = try {
-        PluginLoader.getPluginById(pkg)?.getManifest()?.actions ?: emptyList()
+        pluginManager.getManifest(pkg)?.actions ?: emptyList()
     } catch (t: Throwable) {
         co.touchlab.kermit.Logger.e(t) { "Failed to get actions for $pkg" }
         emptyList()
@@ -322,7 +348,7 @@ class PluginManagerViewModel(
 
     fun runAction(pkg: String, actionName: String) {
         viewModelScope.launch {
-            val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+            val manifest = pluginManager.getManifest(pkg)
             val action = manifest?.actions?.find { it.name == actionName || it.functionName == actionName }
             if (action != null) {
                 pluginManager.runAction(pkg, action)

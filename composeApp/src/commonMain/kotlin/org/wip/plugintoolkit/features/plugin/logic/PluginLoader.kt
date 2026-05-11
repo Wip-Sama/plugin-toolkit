@@ -1,10 +1,12 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import org.wip.plugintoolkit.api.PluginEntry
+import kotlinx.serialization.json.JsonElement
 
 expect object PluginLoader {
     fun loadPlugin(
-        jarPath: String
+        jarPath: String,
+        settings: Map<String, JsonElement> = emptyMap()
     ): Result<PluginEntry>
 
     fun unloadPlugin(jarPath: String)

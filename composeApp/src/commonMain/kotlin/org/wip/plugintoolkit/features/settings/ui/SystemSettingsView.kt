@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
@@ -72,6 +73,8 @@ import plugintoolkit.composeapp.generated.resources.setting_log_level
 import plugintoolkit.composeapp.generated.resources.setting_log_level_subtitle
 import plugintoolkit.composeapp.generated.resources.setting_logs_to_keep
 import plugintoolkit.composeapp.generated.resources.setting_logs_to_keep_subtitle
+import plugintoolkit.composeapp.generated.resources.setting_open_latest_log
+import plugintoolkit.composeapp.generated.resources.setting_open_latest_log_subtitle
 import plugintoolkit.composeapp.generated.resources.setting_open_log_folder
 import plugintoolkit.composeapp.generated.resources.setting_open_log_folder_subtitle
 import plugintoolkit.composeapp.generated.resources.setting_show_error
@@ -225,6 +228,14 @@ fun SystemSettingsView(
                 icon = Icons.Default.FolderOpen,
                 onClick = {
                     viewModel.openLogFolder()
+                })
+
+            SettingsItem(
+                title = stringResource(Res.string.setting_open_latest_log),
+                subtitle = stringResource(Res.string.setting_open_latest_log_subtitle),
+                icon = Icons.Default.Description,
+                onClick = {
+                    viewModel.openLatestLog()
                 })
         }
 

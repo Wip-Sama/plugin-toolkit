@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.serialization.json.JsonElement
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
-import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 
 class PluginSettingsViewModel(
@@ -23,7 +22,7 @@ class PluginSettingsViewModel(
     private val _isBusy = MutableStateFlow(false)
     val isBusy = _isBusy.asStateFlow()
 
-    val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+    val manifest = pluginManager.getManifest(pkg)
 
     init {
         viewModelScope.launch {
@@ -52,6 +51,9 @@ class PluginSettingsViewModel(
 
     fun save() {
         pluginManager.savePluginSettings(pkg, _store.value)
+        viewModelScope.launch {
+            pluginManager.checkAndResumeSetup(pkg)
+        }
     }
 
     fun runAction(actionName: String) {

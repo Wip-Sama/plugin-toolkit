@@ -7,8 +7,6 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +25,8 @@ import org.wip.plugintoolkit.api.PluginManifest
 class RepoManager(
     private val settingsRepository: SettingsRepository,
     private val client: HttpClient,
-    private val jsonConfig: Json
+    private val jsonConfig: Json,
+    private val scope: CoroutineScope
 ) {
 
     private val _repositories = MutableStateFlow<List<ExtensionRepo>>(emptyList())
@@ -38,8 +37,6 @@ class RepoManager(
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         scope.launch {
@@ -237,6 +234,14 @@ class RepoManager(
 
     fun getPackageSourceOverride(pkg: String): String? {
         return settingsRepository.loadSettings().extensions.packageSourceOverrides[pkg]
+    }
+
+    suspend fun fetchRemoteChangelog(pkg: String): String? {
+        val remote = _plugins.value.values.flatten().find { it.pkg == pkg } ?: return null
+        val repoUrl = remote.repoUrl ?: return null
+        val pluginsFolder = repoUrl.substringBeforeLast("/") + "/plugins"
+        val baseUrl = "$pluginsFolder/${remote.pkg}"
+        return fetchText("$baseUrl/changelog.md")
     }
 }
 

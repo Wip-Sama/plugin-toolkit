@@ -120,7 +120,7 @@ class PluginScanner(
     /**
      * Quickly refreshes the registry from the installed_plugins.json files without scanning JARs.
      */
-    fun refreshInstalledPlugins() {
+    suspend fun refreshInstalledPlugins() {
         registry.loadFromManagedFolders()
     }
 }

@@ -2,7 +2,7 @@ package org.wip.plugintoolkit.api
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.*
 
 /**
  * Represents the type of data exchanged between the host and the plugin.
@@ -10,32 +10,61 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 sealed class DataType {
     /**
+     * Checks if a value is "provided" for this data type.
+     * This is used to validate required settings or parameters.
+     * For example, a String is provided if it's not blank.
+     * An Array is provided if it's not empty.
+     */
+    abstract fun isProvided(value: JsonElement?): Boolean
+
+    /**
      * A basic primitive type (String, Int, Boolean, etc.).
      */
     @Serializable
     @SerialName("primitive")
-    data class Primitive(val primitiveType: PrimitiveType) : DataType()
+    data class Primitive(val primitiveType: PrimitiveType) : DataType() {
+        override fun isProvided(value: JsonElement?): Boolean {
+            if (value == null || value is JsonNull) return false
+            return when (primitiveType) {
+                PrimitiveType.STRING -> (value as? JsonPrimitive)?.content?.isNotBlank() ?: false
+                else -> true // Other primitives are provided if they exist
+            }
+        }
+    }
 
     /**
      * A collection of items of the same type.
      */
     @Serializable
     @SerialName("array")
-    data class Array(val items: DataType) : DataType()
+    data class Array(val items: DataType) : DataType() {
+        override fun isProvided(value: JsonElement?): Boolean {
+            if (value == null || value is JsonNull) return false
+            return (value as? JsonArray)?.isNotEmpty() ?: true
+        }
+    }
 
     /**
      * A custom object type represented by its class name.
      */
     @Serializable
     @SerialName("object")
-    data class Object(val className: String) : DataType()
+    data class Object(val className: String) : DataType() {
+        override fun isProvided(value: JsonElement?): Boolean {
+            return value != null && value !is JsonNull
+        }
+    }
 
     /**
      * An enumeration type with a set of predefined options.
      */
     @Serializable
     @SerialName("enum")
-    data class Enum(val className: String, val options: List<String>) : DataType()
+    data class Enum(val className: String, val options: List<String>) : DataType() {
+        override fun isProvided(value: JsonElement?): Boolean {
+            return value != null && value !is JsonNull
+        }
+    }
 }
 
 @Serializable
@@ -60,7 +89,9 @@ data class ParameterConstraints(
 data class SettingMetadata(
     val defaultValue: JsonElement? = null,
     val description: String,
-    val type: DataType
+    val type: DataType,
+    val required: Boolean = false,
+    val secret: Boolean = false
 )
 
 /**
@@ -113,7 +144,9 @@ data class ParameterMetadata(
     val defaultValue: JsonElement? = null,
     val description: String,
     val type: DataType,
-    val constraints: ParameterConstraints? = null
+    val constraints: ParameterConstraints? = null,
+    val required: Boolean = false,
+    val secret: Boolean = false
 )
 
 /**

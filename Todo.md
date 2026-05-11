@@ -37,12 +37,9 @@ Schedule:
 - Scheduler
 
 Auto update:
-- Check for updates
-- Download updates (is auto update is enabled)
 - Install updates (?)
 > On Startup check if something exist, if it does run the update (?)
 > Maybe when installing execute the install script, then close the main app and let the update script work
-- Auto compile update with github actions
 - Recheck if the modules are still supported in the new version of the application
 
 General:
@@ -60,5 +57,12 @@ Security:
 Bugs:
 - For some reasons when updating the app the first start will not load all plugins
 
-Changelog:
-- Switch changelog.txt to changelog.md
+- Reload should also revalidate
+- If the validation fails it should be unvalidated and unloaded  
+- When the validation fails it gets stuck in pending setup even if the setup completed
+- The repositories should have a button to "share" copy the repo link
+- Add options to contextual menu in windows
+- Reload should call the validation if it's not validated
+- Reload should call the load function in the plugin
+- Option to select the number of worker
+> When decreasing under the number of active worker the change will take effect when each worker finishes to the number required jobs (min 1)

@@ -4,20 +4,46 @@ import org.wip.plugintoolkit.api.annotations.*
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.ProgressReporter
 import kotlinx.coroutines.delay
+import org.wip.plugintoolkit.api.PluginContext
+
+data class MathProcessorSettings(
+    @PluginSetting(
+        description = "API Key for Google services",
+        defaultValue = "null",
+    )
+    val googleApiKey: String = "null",
+
+    @PluginSetting(
+        description = "Secure token for the operations server",
+        required = true,
+        secret = true
+    )
+    val serverToken: String = "",
+
+    @PluginSetting(
+        description = "Name of the person performing the operations",
+        required = true
+    )
+    val operatorName: String = ""
+)
 
 @PluginInfo(
     id = "com.wip.operations.math",
     name = "Math Operations",
-    version = "1.3.1",
+    version = "1.4.0",
     description = "A module that provides mathematical operations on lists of numbers."
 )
-class MathProcessor {
+class MathProcessor(val settings: MathProcessorSettings) {
 
-    @PluginSetting(description = "Enable advanced math logs", defaultValue = "false")
-    var enableAdvancedLogs: Boolean = false
 
-    @PluginSetting(description = "Preferred decimal places", defaultValue = "2")
-    var decimalPlaces: Int = 2
+    @PluginValidate()
+    fun validate(
+        logger: PluginLogger,
+        pluginContext: PluginContext
+    ): Result<Unit> {
+        if (settings.googleApiKey != "null") return Result.success(Unit)
+        return Result.failure(Exception("Validation failed"))
+    }
 
     @PluginAction(name = "Reset Statistics", description = "Resets all internal math counters and history.")
     suspend fun resetStats(logger: PluginLogger) {

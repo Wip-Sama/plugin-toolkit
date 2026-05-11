@@ -24,6 +24,7 @@ import java.io.File
 actual object PlatformUtils {
     actual val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
     actual val isLinux: Boolean = System.getProperty("os.name").lowercase().contains("nux")
+    actual val isMac: Boolean = System.getProperty("os.name").lowercase().contains("mac")
 
     actual fun getSystemAccentColor(): Color? {
         return when {

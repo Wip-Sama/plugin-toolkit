@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -113,12 +114,12 @@ class PluginPluginInstallationTest {
 
         val fileSystem = FakeFileSystem()
         val persistence = FakeSettingsPersistence()
-        val settingsRepo = SettingsRepository(persistence)
-        val registry = PluginRegistry(settingsRepo, CoroutineScope(SupervisorJob() + Dispatchers.Default))
-        val jobManager = JobManager(CoroutineScope(SupervisorJob() + Dispatchers.Default), 1)
-        val repoManager = RepoManager(settingsRepo, client, json)
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val jobManager = JobManager(backgroundScope, 1)
+        val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
-        val installer = PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, client, fileSystem)
+        val installer = PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, jobManager, client, fileSystem)
 
         // 1. Initial Installation
         repoManager.addRepository("https://example.com/repo/index.json")

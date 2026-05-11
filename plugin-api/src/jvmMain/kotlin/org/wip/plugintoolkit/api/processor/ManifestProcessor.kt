@@ -6,6 +6,10 @@ import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.annotations.PluginInfo as PluginInfoAnnotation
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_INFO_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import java.io.File
 
 class ManifestProcessorProvider : SymbolProcessorProvider {
@@ -41,20 +45,28 @@ class ManifestProcessor(
         val minMemoryMb = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minMemoryMb" }?.value as Int
         val minExecutionTimeMs = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minExecutionTimeMs" }?.value as Int
 
+        val packageName = classDeclaration.packageName.asString()
+        val baseClassName = classDeclaration.simpleName.asString()
+
+        // Find all classes in this module that have @PluginSetting annotations
+        val settingsClasses = resolver.getSymbolsWithAnnotation(PLUGIN_SETTING_ANNOTATION)
+            .mapNotNull { 
+                var current = it.parent
+                while (current != null && current !is KSClassDeclaration) {
+                    current = current.parent
+                }
+                current as? KSClassDeclaration
+            }
+            .distinct()
+            .toList()
+
         val functions = classDeclaration.getAllFunctions().filter { 
             it.annotations.any { ann -> ann.hasQualifiedName(CAPABILITY_ANNOTATION) }
-        }.toList()
-
-        val settingsProperties = classDeclaration.getAllProperties().filter { 
-            it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
         }.toList()
 
         val actions = classDeclaration.getAllFunctions().filter { 
             it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
         }.toList()
-
-        val packageName = classDeclaration.packageName.asString()
-        val baseClassName = classDeclaration.simpleName.asString()
 
         // 1. Parse Changelog
         var changelogObj: Changelog? = null
@@ -73,7 +85,7 @@ class ManifestProcessor(
         // 2. Generate Kotlin Classes
         val fileSpec = KotlinGenerator.generate(
             packageName, baseClassName, id, name, version, description,
-            minMemoryMb, minExecutionTimeMs, functions, settingsProperties, actions, classDeclaration
+            minMemoryMb, minExecutionTimeMs, functions, settingsClasses, actions, classDeclaration
         )
         
         val generatedFileName = baseClassName + "Generated"
@@ -87,13 +99,14 @@ class ManifestProcessor(
         }
 
         // 3. Generate SPI Service File
-        val entryName = baseClassName + "PluginEntry"
-        writeFile(sourceFile, "", "META-INF/services/${PluginEntry::class.qualifiedName}", "", "$packageName.$entryName")
+        val providerName = baseClassName + "ModuleProvider"
+        writeFile(sourceFile, "", "META-INF/services/${org.wip.plugintoolkit.api.PluginModuleProvider::class.qualifiedName}", "", "$packageName.$providerName")
 
         // 4. Generate manifest.json
+        val allSettingsProperties = settingsClasses.flatMap { it.getAllProperties().filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } } }.toList()
         val manifestJson = ManifestJsonGenerator.generate(
             classDeclaration, id, name, version, description,
-            minMemoryMb, minExecutionTimeMs, functions, settingsProperties, actions, changelogObj
+            minMemoryMb, minExecutionTimeMs, functions, allSettingsProperties, actions, changelogObj
         )
         writeFile(sourceFile, "", "META-INF/manifest", "json", manifestJson)
     }

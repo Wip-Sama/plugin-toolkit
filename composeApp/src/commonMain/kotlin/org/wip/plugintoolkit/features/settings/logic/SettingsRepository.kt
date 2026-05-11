@@ -1,8 +1,6 @@
 package org.wip.plugintoolkit.features.settings.logic
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,9 +11,9 @@ import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 
 class SettingsRepository(
-    private val persistence: SettingsPersistence
+    private val persistence: SettingsPersistence,
+    private val scope: CoroutineScope
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
     private val _settings = MutableStateFlow(persistence.load())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -45,6 +43,8 @@ class SettingsRepository(
     fun getJobsDir(): String = persistence.getJobsDir()
     
     fun openLogFolder() = persistence.openLogFolder()
+    
+    fun openLatestLog() = persistence.openLatestLog()
 
     /**
      * Legacy method for immediate access. Use [settings] Flow for reactive updates.

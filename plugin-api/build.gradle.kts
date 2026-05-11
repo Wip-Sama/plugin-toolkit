@@ -9,11 +9,18 @@ group = "org.wip.plugintoolkit"
 version = libs.versions.app.get()
 
 kotlin {
-    jvm()
+    jvm {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+        }
+    }
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.serialization.json)
             api(libs.kotlinx.coroutines.core)
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
         jvmMain.dependencies {
             implementation(project.dependencies.platform(libs.koin.bom))

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.AppConfig
+import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 
 class UpdateService(
@@ -28,7 +29,7 @@ class UpdateService(
     private val _downloadProgress = MutableStateFlow(0f)
     val downloadProgress: StateFlow<Float> = _downloadProgress
 
-    suspend fun checkForUpdates(): UpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(): UpdateInfo? = withContext(loomDispatcher) {
         try {
             val response = client.get("https://api.github.com/repos/Wip-Sama/plugin-toolkit/releases/latest")
             if (response.status.value in 200..299) {
@@ -77,7 +78,7 @@ class UpdateService(
         }
     }
 
-    suspend fun downloadUpdate(info: UpdateInfo, destinationPath: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun downloadUpdate(info: UpdateInfo, destinationPath: String): Result<Unit> = withContext(loomDispatcher) {
         try {
             val response = client.prepareGet(info.downloadUrl) {
                 onDownload { bytesSentTotal, contentLength ->

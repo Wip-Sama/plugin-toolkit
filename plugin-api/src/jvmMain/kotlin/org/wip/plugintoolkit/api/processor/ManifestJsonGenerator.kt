@@ -6,6 +6,13 @@ import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.*
 import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_UPDATE_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object ManifestJsonGenerator {
     fun generate(
@@ -53,6 +60,8 @@ object ManifestJsonGenerator {
                 val multiSelect = paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
                 val minChoices = paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
                 val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
+                val required = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+                val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
                 
                 val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
                 
@@ -73,7 +82,9 @@ object ManifestJsonGenerator {
                     defaultValue = defaultJson,
                     description = paramDesc,
                     type = GeneratorUtils.mapKSTypeToDataType(ksType),
-                    constraints = constraints
+                    constraints = constraints,
+                    required = required,
+                    secret = secret
                 )
             }
             
@@ -97,6 +108,8 @@ object ManifestJsonGenerator {
             val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
             val propName = prop.simpleName.asString()
             val ksType = prop.type.resolve()
+            val required = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+            val secret = ann.arguments.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
             
             val defaultJson = if (defaultVal.isNotEmpty()) {
                 try { Json.parseToJsonElement(defaultVal) } catch(e: Exception) { null }
@@ -105,7 +118,9 @@ object ManifestJsonGenerator {
             propName to SettingMetadata(
                 defaultValue = defaultJson,
                 description = desc,
-                type = GeneratorUtils.mapKSTypeToDataType(ksType)
+                type = GeneratorUtils.mapKSTypeToDataType(ksType),
+                required = required,
+                secret = secret
             )
         }
 

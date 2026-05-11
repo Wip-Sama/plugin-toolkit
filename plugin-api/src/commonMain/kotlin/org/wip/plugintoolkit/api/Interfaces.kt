@@ -20,19 +20,15 @@ interface PluginEntry {
     suspend fun initialize(context: PluginContext): Result<Unit> = Result.success(Unit)
 
     /**
-     * Provide the plugin's Koin module.
+     * Get the plugin manifest information.
      */
-    fun getKoinModule(): Module
+    fun getManifest(): PluginManifest
 
     /**
      * Provide the worker instance.
      */
     fun getProcessor(): DataProcessor
 
-    /**
-     * Get the plugin manifest information.
-     */
-    fun getManifest(): PluginManifest
 
     /**
      * Set the debug mode for the plugin.
@@ -68,6 +64,17 @@ interface PluginEntry {
      * Clean up resources.
      */
     fun shutdown()
+}
+
+/**
+ * Interface used by ServiceLoader to discover the plugin's Koin module.
+ */
+interface PluginModuleProvider {
+    /**
+     * Provide the plugin's Koin module, pre-configured with the given settings.
+     * @param settings The current plugin settings.
+     */
+    fun getKoinModule(settings: Map<String, JsonElement>): Module
 }
 
 /**
@@ -198,7 +205,7 @@ interface JobHandle {
  * It provides access to infrastructure services like logging, progress reporting,
  * and isolated file system access.
  */
-interface PluginContext : PluginLogger, ProgressReporter {
+interface PluginContext {
     val logger: PluginLogger
     val progress: ProgressReporter
     val fileSystem: PluginFileSystem
@@ -211,15 +218,7 @@ interface PluginContext : PluginLogger, ProgressReporter {
      * @param actionName The function name of the action to be displayed, or null to clear.
      */
     fun setRequiredAction(actionName: String?)
-
-    // Forwarding methods for convenience
-    override fun verbose(message: String) = logger.verbose(message)
-    override fun debug(message: String) = logger.debug(message)
-    override fun info(message: String) = logger.info(message)
-    override fun warn(message: String) = logger.warn(message)
-    override fun error(message: String, throwable: Throwable?) = logger.error(message, throwable)
-    override fun report(progress: Float) = this.progress.report(progress)
-
+    
     /**
      * Typed helpers for settings access.
      */
@@ -263,19 +262,15 @@ interface DataProcessor {
     /**
      * Process data natively without serialization.
      * @param request Native request object.
+     * @param context The execution context.
      * @return Result wrapping native response.
      */
-    suspend fun process(request: PluginRequest): ExecutionResult
+    suspend fun process(request: PluginRequest, context: PluginContext): ExecutionResult
 
     /**
      * Set the debug mode for the processor.
      */
     fun setDebug(isDebug: Boolean) {}
-
-    /**
-     * Set the execution context for the processor.
-     */
-    fun setPluginContext(context: PluginContext) {}
 
     /**
      * Observe processing progress (0.0 to 1.0).
@@ -284,8 +279,10 @@ interface DataProcessor {
 
     /**
      * Process data asynchronously, returning a handle to control the task.
+     * @param request Native request object.
+     * @param context The execution context.
      */
-    fun processAsync(request: PluginRequest): JobHandle {
+    fun processAsync(request: PluginRequest, context: PluginContext): JobHandle {
         throw NotImplementedError("processAsync not implemented")
     }
 

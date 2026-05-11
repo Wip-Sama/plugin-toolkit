@@ -3,8 +3,6 @@ package org.wip.plugintoolkit.core.logging
 import co.touchlab.kermit.LogWriter
 import co.touchlab.kermit.Severity
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.io.asInputStream
 import kotlinx.io.asOutputStream
@@ -16,20 +14,17 @@ import java.io.PrintWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.Executors
 import java.util.zip.GZIPOutputStream
 
 class FileLogWriter(
     private val logsDir: Path,
+    private val scope: CoroutineScope,
     private val settingsProvider: () -> LoggingSettings
 ) : LogWriter() {
 
     private val settings get() = settingsProvider()
 
-    private val executor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "FileLogThread").apply { isDaemon = true }
-    }
-    private val scope = CoroutineScope(SupervisorJob() + executor.asCoroutineDispatcher())
+    // We use the injected scope (which is LoomScope).
     private val timeFormatter = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
     private val dateFormatter = SimpleDateFormat("yyyy_MM_dd", Locale.getDefault())
 

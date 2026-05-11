@@ -5,8 +5,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -18,6 +21,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -26,11 +30,16 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import kotlin.time.Clock
 
 class JobManager(
+    /** Injected [AppScope] for managing job lifecycles and worker coordination. */
     private val scope: CoroutineScope,
     private val maxConcurrentJobs: Int = 2
 ) {
     private val _jobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
     val jobs: StateFlow<List<BackgroundJob>> = _jobs.asStateFlow()
+
+    val activeJobIds: StateFlow<Set<String>> = _jobs.map { list ->
+        list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running }.map { it.id }.toSet()
+    }.stateIn(scope, SharingStarted.Eagerly, emptySet())
 
     private val _jobProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
     val jobProgress: StateFlow<Map<String, Float>> = _jobProgress.asStateFlow()
@@ -396,7 +405,7 @@ class JobManager(
         // We need PluginLoader to get the path.
         val installPath = PluginLoader.getPluginInstallPath(job.pluginId)
         if (installPath != null) {
-            scope.launch(Dispatchers.Default) {
+            scope.launch(loomDispatcher) {
                 val fs = DefaultPluginFileSystem.createCacheOnly(installPath)
                 val json = Json { prettyPrint = true }
                 val stateString = json.encodeToString(JsonElement.serializer(), job.resumeState ?: JsonNull)

@@ -88,8 +88,8 @@ class RepoParsingTest {
         }
 
         val persistence = FakeSettingsPersistence()
-        val settingsRepo = SettingsRepository(persistence)
-        val repoManager = RepoManager(settingsRepo, client, json)
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
 
         val result = repoManager.addRepository("https://example.com/repo/index.json")
         
@@ -150,8 +150,8 @@ class RepoParsingTest {
         }
 
         val persistence = FakeSettingsPersistence()
-        val settingsRepo = SettingsRepository(persistence)
-        val repoManager = RepoManager(settingsRepo, client, json)
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
 
         repoManager.addRepository("https://example.com/repo/index.json")
 
@@ -190,8 +190,8 @@ class RepoParsingTest {
         }
 
         val persistence = FakeSettingsPersistence()
-        val settingsRepo = SettingsRepository(persistence)
-        val repoManager = RepoManager(settingsRepo, client, json)
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
 
         val result = repoManager.addRepository("https://example.com/repo/index.json")
         

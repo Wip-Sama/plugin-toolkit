@@ -71,7 +71,9 @@ annotation class CapabilityParam(
     val regex: String = "",
     val multiSelect: Boolean = false,
     val minChoices: Int = -1,
-    val maxChoices: Int = -1
+    val maxChoices: Int = -1,
+    val required: Boolean = false,
+    val secret: Boolean = false
 )
 
 /**
@@ -82,12 +84,16 @@ annotation class CapabilityParam(
  *
  * @property description A description of the setting.
  * @property defaultValue The default value for the setting (as a string).
+ * @property required Whether the setting is mandatory for the plugin to function.
+ * @property secret Whether the setting contains sensitive information (e.g., API keys).
  */
 @Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.SOURCE)
 annotation class PluginSetting(
     val description: String,
-    val defaultValue: String = ""
+    val defaultValue: String = "",
+    val required: Boolean = false,
+    val secret: Boolean = false
 )
 
 /**

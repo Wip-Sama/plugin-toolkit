@@ -1,3 +1,14 @@
+Version: 1.4.0
+Date: 12-05-2026
+Added:
+  - Support for required and secret settings.
+  - Button to directly open latest log
+Changes:
+  - Invalidating and unloading plugins on validation fail
+  - Major refactor
+Fixed:
+  - Installing puling would be stuck on "required setup" whgen updating from local in some cases
+----------------------------------------------------------------------------------------------------
 Version: 1.3.3
 Date: 10-05-2026
 Fixed:

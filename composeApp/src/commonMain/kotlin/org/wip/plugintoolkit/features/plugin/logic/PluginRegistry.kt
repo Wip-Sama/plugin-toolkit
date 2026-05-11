@@ -1,13 +1,16 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
@@ -19,10 +22,14 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
  */
 class PluginRegistry(
     private val settingsRepository: SettingsRepository,
-    val scope: CoroutineScope
+    val scope: CoroutineScope,
+    private val loomDispatcher: CoroutineDispatcher
 ) {
     private val _installedPlugins = MutableStateFlow<List<InstalledPlugin>>(emptyList())
     val installedPlugins: StateFlow<List<InstalledPlugin>> = _installedPlugins.asStateFlow()
+
+    private val _isReady = MutableStateFlow(false)
+    val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
 
     private val mutex = Mutex()
     private val json = kotlinx.serialization.json.Json {
@@ -35,8 +42,23 @@ class PluginRegistry(
 
     init {
         Logger.i { "Initializing PluginRegistry" }
-        PlatformUtils.mkdirs(defaultPluginFolder)
-        loadFromManagedFolders()
+    }
+
+    /**
+     * Initializes the registry by loading plugins from managed folders.
+     * This should be called asynchronously during application startup.
+     */
+    suspend fun initialize() = withContext(loomDispatcher) {
+        Logger.i { "Starting PluginRegistry initialization" }
+        try {
+            PlatformUtils.mkdirs(defaultPluginFolder)
+            loadFromManagedFolders()
+            _isReady.value = true
+            Logger.i { "PluginRegistry initialization complete. Ready." }
+        } catch (t: Throwable) {
+            Logger.e(t) { "PluginRegistry initialization failed" }
+            throw t
+        }
     }
 
     /**
@@ -54,7 +76,7 @@ class PluginRegistry(
     /**
      * Refreshes the in-memory state from the installed_plugins.json files in all managed folders.
      */
-    fun loadFromManagedFolders() {
+    suspend fun loadFromManagedFolders() = withContext(loomDispatcher) {
         val allPlugins = mutableListOf<InstalledPlugin>()
         getManagedFolders().forEach { folderPath ->
             val file = "${normalizePath(folderPath)}/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
@@ -76,14 +98,20 @@ class PluginRegistry(
      * Atomically updates the plugin list and saves it to disk.
      */
     suspend fun updatePlugins(transform: (List<InstalledPlugin>) -> List<InstalledPlugin>) {
-        mutex.withLock {
+        val updated = mutex.withLock {
             val current = _installedPlugins.value
-            val updated = transform(current)
-            if (current != updated) {
-                _installedPlugins.value = updated
-                saveToManagedFolders(updated)
-                Logger.d { "Plugin list updated and persisted (Total: ${updated.size})" }
+            val next = transform(current)
+            if (current != next) {
+                _installedPlugins.value = next
+                next
+            } else {
+                null
             }
+        }
+
+        if (updated != null) {
+            saveToManagedFolders(updated)
+            Logger.d { "Plugin list updated and persisted (Total: ${updated.size})" }
         }
     }
 
@@ -114,7 +142,7 @@ class PluginRegistry(
         }
     }
 
-    private fun saveToManagedFolders(plugins: List<InstalledPlugin>) {
+    private suspend fun saveToManagedFolders(plugins: List<InstalledPlugin>) = withContext(loomDispatcher) {
         val folders = getManagedFolders()
         folders.forEach { folderPath ->
             val normalizedFolder = normalizePath(folderPath)

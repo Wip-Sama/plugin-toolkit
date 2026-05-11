@@ -8,4 +8,5 @@ interface SettingsPersistence {
     fun getSettingsDir(): String
     fun getJobsDir(): String
     fun openLogFolder()
+    fun openLatestLog()
 }
