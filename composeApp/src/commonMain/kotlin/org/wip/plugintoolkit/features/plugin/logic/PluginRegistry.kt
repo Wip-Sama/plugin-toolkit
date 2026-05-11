@@ -42,13 +42,16 @@ class PluginRegistry(
 
     init {
         Logger.i { "Initializing PluginRegistry" }
-        scope.launch {
-            withContext(loomDispatcher) {
-                PlatformUtils.mkdirs(defaultPluginFolder)
-                loadFromManagedFolders()
-            }
-            _isReady.value = true
-        }
+    }
+
+    /**
+     * Initializes the registry by loading plugins from managed folders.
+     * This should be called asynchronously during application startup.
+     */
+    suspend fun initialize() = withContext(loomDispatcher) {
+        PlatformUtils.mkdirs(defaultPluginFolder)
+        loadFromManagedFolders()
+        _isReady.value = true
     }
 
     /**

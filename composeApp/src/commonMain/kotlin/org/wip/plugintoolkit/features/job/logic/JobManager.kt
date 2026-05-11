@@ -5,8 +5,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -33,6 +36,10 @@ class JobManager(
 ) {
     private val _jobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
     val jobs: StateFlow<List<BackgroundJob>> = _jobs.asStateFlow()
+
+    val activeJobIds: StateFlow<Set<String>> = _jobs.map { list ->
+        list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running }.map { it.id }.toSet()
+    }.stateIn(scope, SharingStarted.Eagerly, emptySet())
 
     private val _jobProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
     val jobProgress: StateFlow<Map<String, Float>> = _jobProgress.asStateFlow()

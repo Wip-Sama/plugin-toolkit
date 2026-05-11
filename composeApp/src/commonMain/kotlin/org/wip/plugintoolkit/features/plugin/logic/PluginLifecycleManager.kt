@@ -26,13 +26,11 @@ class PluginLifecycleManager(
     private val registry: PluginRegistry,
     private val jobManager: JobManager,
     private val settingsRepository: SettingsRepository,
-    private val fileSystem: FileSystem
+    private val fileSystem: FileSystem,
+    private val lockProvider: PluginLockProvider
 ) {
     private val _loadedPlugins = MutableStateFlow<Set<String>>(emptySet())
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
-
-    // Mutex per plugin ID to prevent concurrent load/unload/reload for the same plugin
-    private val pluginMutexes = ConcurrentHashMap<String, Mutex>()
 
     // Cache for decrypted plugin settings to avoid redundant IO and decryption
     private val settingsCache = ConcurrentHashMap<String, PluginSettingsStore>()
@@ -43,7 +41,7 @@ class PluginLifecycleManager(
         encodeDefaults = true
     }
 
-    private fun getMutex(pkg: String) = pluginMutexes.getOrPut(pkg) { Mutex() }
+    private fun getMutex(pkg: String) = lockProvider.getMutex(pkg)
 
     /**
      * Loads a plugin into the JVM and initializes it.

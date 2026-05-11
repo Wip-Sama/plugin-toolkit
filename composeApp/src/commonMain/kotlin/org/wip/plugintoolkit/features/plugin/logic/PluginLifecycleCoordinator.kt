@@ -24,12 +24,12 @@ class PluginLifecycleCoordinator(
     private val registry: PluginRegistry,
     private val jobManager: JobManager,
     private val lifecycleManager: PluginLifecycleManager,
+    private val lockProvider: PluginLockProvider,
     /** Injected [AppScope] for non-blocking logic and state transitions. */
     private val scope: CoroutineScope
 ) {
 
-    private val pluginMutexes = ConcurrentHashMap<String, Mutex>()
-    private fun getMutex(pkg: String) = pluginMutexes.getOrPut(pkg) { Mutex() }
+    private fun getMutex(pkg: String) = lockProvider.getMutex(pkg)
 
     private suspend inline fun <T> withPluginLock(pkg: String, crossinline block: suspend () -> T): T {
         return getMutex(pkg).withLock { block() }
@@ -313,7 +313,7 @@ class PluginLifecycleCoordinator(
     }
 
     private fun isJobPendingOrRunning(jobId: String): Boolean {
-        return jobManager.jobs.value.any { it.id == jobId && (it.status == JobStatus.Queued || it.status == JobStatus.Running) }
+        return jobManager.activeJobIds.value.contains(jobId)
     }
 
 
