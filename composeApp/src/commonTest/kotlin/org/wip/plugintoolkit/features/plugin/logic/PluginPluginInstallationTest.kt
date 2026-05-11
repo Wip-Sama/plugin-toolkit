@@ -113,10 +113,10 @@ class PluginPluginInstallationTest {
 
         val fileSystem = FakeFileSystem()
         val persistence = FakeSettingsPersistence()
-        val settingsRepo = SettingsRepository(persistence)
-        val registry = PluginRegistry(settingsRepo, CoroutineScope(SupervisorJob() + Dispatchers.Default))
-        val jobManager = JobManager(CoroutineScope(SupervisorJob() + Dispatchers.Default), 1)
-        val repoManager = RepoManager(settingsRepo, client, json)
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val registry = PluginRegistry(settingsRepo, backgroundScope)
+        val jobManager = JobManager(backgroundScope, 1)
+        val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
         val installer = PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, client, fileSystem)
 

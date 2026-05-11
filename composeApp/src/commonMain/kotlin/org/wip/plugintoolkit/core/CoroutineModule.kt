@@ -1,0 +1,31 @@
+package org.wip.plugintoolkit.core
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import org.koin.core.qualifier.named
+import org.koin.dsl.module
+import org.koin.dsl.onClose
+
+val coroutineModule = module {
+    /**
+     * AppScope is tied to Dispatchers.Default.
+     * Use this for CPU-intensive background tasks (e.g., parsing, logic, calculations).
+     */
+    single(named("AppScope")) { 
+        CoroutineScope(SupervisorJob() + Dispatchers.Default) 
+    } onClose { 
+        it?.cancel() 
+    }
+
+    /**
+     * IoScope is tied to Dispatchers.IO.
+     * Use this for blocking I/O operations (e.g., file system, networking, database).
+     */
+    single(named("IoScope")) { 
+        CoroutineScope(SupervisorJob() + Dispatchers.IO) 
+    } onClose { 
+        it?.cancel() 
+    }
+}

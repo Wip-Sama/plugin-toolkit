@@ -26,6 +26,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import kotlin.time.Clock
 
 class JobManager(
+    /** Injected [AppScope] for managing job lifecycles and worker coordination. */
     private val scope: CoroutineScope,
     private val maxConcurrentJobs: Int = 2
 ) {

@@ -19,6 +19,9 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             api(libs.kotlinx.coroutines.core)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
         jvmMain.dependencies {
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)

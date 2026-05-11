@@ -2,8 +2,6 @@ package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
@@ -20,9 +18,10 @@ import kotlin.time.Clock
 class PluginLifecycleCoordinator(
     private val registry: PluginRegistry,
     private val jobManager: JobManager,
-    private val lifecycleManager: PluginLifecycleManager
+    private val lifecycleManager: PluginLifecycleManager,
+    /** Injected [AppScope] for non-blocking logic and state transitions. */
+    private val scope: CoroutineScope
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /**
      * Called by JobWorker when a lifecycle job completes successfully.
@@ -228,13 +227,7 @@ class PluginLifecycleCoordinator(
 
             val value = store.settings[key] ?: return@any true
 
-            // For string primitives, check if they are blank
-            val type = meta.type
-            if (type is DataType.Primitive &&
-                type.primitiveType == PrimitiveType.STRING) {
-                val strValue = (value as? kotlinx.serialization.json.JsonPrimitive)?.content ?: ""
-                return@any strValue.isBlank()
-            }
+            if (!meta.type.isProvided(value)) return@any true
 
             false
         }

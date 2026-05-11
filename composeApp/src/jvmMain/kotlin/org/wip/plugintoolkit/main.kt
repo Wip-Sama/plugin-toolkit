@@ -40,8 +40,10 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
+import org.koin.core.qualifier.named
 import org.koin.mp.KoinPlatform.getKoin
 import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.coroutineModule
 import org.wip.plugintoolkit.core.logging.FileLogWriter
 import org.wip.plugintoolkit.core.notification.JvmNotificationService
 import org.wip.plugintoolkit.core.notification.NotificationEvent
@@ -109,12 +111,14 @@ fun runMain(args: Array<String>) {
     var viewModelProvider: () -> SettingsViewModel? = { null }
 
     startKoin {
-        modules(module {
+        modules(coroutineModule, module {
             single<SettingsPersistence> { JvmSettingsPersistence() }
-            single { SettingsRepository(get()) }
+            single { SettingsRepository(get(), get(named("IoScope"))) }
             single<NotificationService> {
                 val repository = get<SettingsRepository>()
-                JvmNotificationService { viewModelProvider()?.settings?.value ?: repository.settings.value }
+                JvmNotificationService(get(named("IoScope"))) { 
+                    viewModelProvider()?.settings?.value ?: repository.settings.value 
+                }
             }
             single { SettingsRegistry() }
             single<FileSystem> { RealFileSystem() }
@@ -131,17 +135,17 @@ fun runMain(args: Array<String>) {
                     }
                 }
             }
-            single { RepoManager(get(), get(), get()) }
+            single { RepoManager(get(), get(), get(), get(named("IoScope"))) }
             single { DialogService() }
-            single { PluginRegistry(get(), CoroutineScope(SupervisorJob() + Dispatchers.Default)) }
+            single { PluginRegistry(get(), get(named("AppScope"))) }
             single { PluginLifecycleManager(get(), get(), get(), get()) }
-            single { PluginLifecycleCoordinator(get(), get(), get()) }
+            single { PluginLifecycleCoordinator(get(), get(), get(), get(named("AppScope"))) }
             single { PluginInstaller(get(), get(), get(), get(), get(), get()) }
             single { PluginScanner(get()) }
-            single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get()) }
+            single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(), get(named("IoScope"))) }
             single {
                 JobManager(
-                    CoroutineScope(SupervisorJob() + Dispatchers.Default),
+                    get(named("AppScope")),
                     get<SettingsRepository>().loadSettings().jobs.maxConcurrentJobs
                 )
             }
@@ -175,7 +179,10 @@ fun runMain(args: Array<String>) {
     val logDirPath = "${PlatformPathUtils.getAppDataDir()}/${KeepTrack.LOGS_DIR_NAME}"
     val logDir = Path(logDirPath)
 
-    Logger.setLogWriters(platformLogWriter(), FileLogWriter(logDir) { viewModel.settings.value.logging })
+    Logger.setLogWriters(
+        platformLogWriter(), 
+        FileLogWriter(logDir, getKoin().get(named("IoScope"))) { viewModel.settings.value.logging }
+    )
 
     // Sync logger severity with settings
     snapshotFlow { viewModel.settings.value.logging.level }.onEach { level ->
@@ -188,13 +195,13 @@ fun runMain(args: Array<String>) {
             LogLevel.Assert -> Severity.Assert
         }
         Logger.setMinSeverity(severity)
-    }.launchIn(CoroutineScope(Dispatchers.Default))
+    }.launchIn(getKoin().get(named("AppScope")))
 
     Logger.i { "Application started. Logging initialized at: $logDir" }
 
 
     // Load enabled and validated plugins at startup
-    val startupScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    val startupScope = getKoin().get<CoroutineScope>(named("AppScope"))
     val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
     Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
 

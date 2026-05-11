@@ -2,8 +2,6 @@ package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.api.DataType
@@ -32,12 +30,11 @@ class PluginManager(
     private val installer: PluginInstaller,
     private val lifecycleManager: PluginLifecycleManager,
     private val scanner: PluginScanner,
-    private val coordinator: PluginLifecycleCoordinator
+    private val coordinator: PluginLifecycleCoordinator,
+    private val scope: CoroutineScope
 ) {
     val installedPlugins: StateFlow<List<InstalledPlugin>> = registry.installedPlugins
     val loadedPlugins: StateFlow<Set<String>> = lifecycleManager.loadedPlugins
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         Logger.i { "Initializing PluginManager facade" }

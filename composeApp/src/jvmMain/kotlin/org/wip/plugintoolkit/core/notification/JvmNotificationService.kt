@@ -2,8 +2,6 @@ package org.wip.plugintoolkit.core.notification
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,9 +24,9 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 class JvmNotificationService(
+    private val scope: CoroutineScope,
     private val settingsProvider: () -> AppSettings
 ) : NotificationService {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _events = MutableSharedFlow<NotificationEvent>(extraBufferCapacity = 64)
     override val events: SharedFlow<NotificationEvent> = _events.asSharedFlow()

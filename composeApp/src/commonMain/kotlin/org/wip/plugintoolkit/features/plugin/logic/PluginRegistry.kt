@@ -19,6 +19,7 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
  */
 class PluginRegistry(
     private val settingsRepository: SettingsRepository,
+    /** Injected [AppScope] for managing the lifecycle of the plugin registry state. */
     val scope: CoroutineScope
 ) {
     private val _installedPlugins = MutableStateFlow<List<InstalledPlugin>>(emptyList())
