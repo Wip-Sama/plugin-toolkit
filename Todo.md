@@ -63,5 +63,4 @@ Bugs:
 - The repositories should have a button to "share" copy the repo link
 - Reload should call the validation if it's not validated
 - Reload should call the load function in the plugin
-- Analyze and try to speedup load time
-- Add options to contextual menu
+- Add options to contextual menu in windows

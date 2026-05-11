@@ -198,7 +198,7 @@ interface JobHandle {
  * It provides access to infrastructure services like logging, progress reporting,
  * and isolated file system access.
  */
-interface PluginContext : PluginLogger, ProgressReporter {
+interface PluginContext {
     val logger: PluginLogger
     val progress: ProgressReporter
     val fileSystem: PluginFileSystem
@@ -213,12 +213,12 @@ interface PluginContext : PluginLogger, ProgressReporter {
     fun setRequiredAction(actionName: String?)
 
     // Forwarding methods for convenience
-    override fun verbose(message: String) = logger.verbose(message)
-    override fun debug(message: String) = logger.debug(message)
-    override fun info(message: String) = logger.info(message)
-    override fun warn(message: String) = logger.warn(message)
-    override fun error(message: String, throwable: Throwable?) = logger.error(message, throwable)
-    override fun report(progress: Float) = this.progress.report(progress)
+    fun verbose(message: String) = logger.verbose(message)
+    fun debug(message: String) = logger.debug(message)
+    fun info(message: String) = logger.info(message)
+    fun warn(message: String) = logger.warn(message)
+    fun error(message: String, throwable: Throwable? = null) = logger.error(message, throwable)
+    fun report(progress: Float) = this.progress.report(progress)
 
     /**
      * Typed helpers for settings access.
@@ -263,19 +263,15 @@ interface DataProcessor {
     /**
      * Process data natively without serialization.
      * @param request Native request object.
+     * @param context The execution context.
      * @return Result wrapping native response.
      */
-    suspend fun process(request: PluginRequest): ExecutionResult
+    suspend fun process(request: PluginRequest, context: PluginContext): ExecutionResult
 
     /**
      * Set the debug mode for the processor.
      */
     fun setDebug(isDebug: Boolean) {}
-
-    /**
-     * Set the execution context for the processor.
-     */
-    fun setPluginContext(context: PluginContext) {}
 
     /**
      * Observe processing progress (0.0 to 1.0).
@@ -284,8 +280,10 @@ interface DataProcessor {
 
     /**
      * Process data asynchronously, returning a handle to control the task.
+     * @param request Native request object.
+     * @param context The execution context.
      */
-    fun processAsync(request: PluginRequest): JobHandle {
+    fun processAsync(request: PluginRequest, context: PluginContext): JobHandle {
         throw NotImplementedError("processAsync not implemented")
     }
 

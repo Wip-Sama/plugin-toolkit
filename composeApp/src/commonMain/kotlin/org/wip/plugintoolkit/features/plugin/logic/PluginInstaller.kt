@@ -13,6 +13,10 @@ import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobType
+import kotlin.time.Clock
 
 /**
  * Handles the installation and removal of plugin files.
@@ -23,6 +27,7 @@ class PluginInstaller(
     private val repoManager: RepoManager,
     private val lifecycleManager: PluginLifecycleManager,
     private val settingsRepository: SettingsRepository,
+    private val jobManager: JobManager,
     private val client: HttpClient,
     private val fileSystem: FileSystem
 ) {
@@ -128,6 +133,24 @@ class PluginInstaller(
             Logger.e(t) { "Failed remote installation: ${plugin.pkg}" }
             Result.failure(t)
         }
+    }
+
+    suspend fun enqueueRemoteInstall(plugin: ExtensionPlugin, targetFolderPath: String) {
+        Logger.i { "Enqueuing remote installation for: ${plugin.pkg}" }
+        val job = BackgroundJob(
+            id = "install_${plugin.pkg}_${Clock.System.now().toEpochMilliseconds()}",
+            name = "Installing: ${plugin.name}",
+            type = JobType.PluginInstallation,
+            pluginId = plugin.pkg,
+            capabilityName = "install",
+            parameters = mapOf(
+                "pluginJson" to kotlinx.serialization.json.Json.encodeToJsonElement(ExtensionPlugin.serializer(), plugin),
+                "targetFolderPath" to kotlinx.serialization.json.JsonPrimitive(targetFolderPath)
+            ),
+            isCancellable = true,
+            isPausable = false
+        )
+        jobManager.enqueueJob(job)
     }
 
     /**

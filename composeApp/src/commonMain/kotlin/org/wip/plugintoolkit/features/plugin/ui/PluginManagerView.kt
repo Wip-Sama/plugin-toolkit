@@ -92,6 +92,7 @@ fun PluginManagerView(
 ) {
     val plugins by viewModel.sortedPlugins.collectAsState()
     val loadedPlugins by viewModel.loadedPlugins.collectAsState()
+    val isReady by viewModel.isRegistryReady.collectAsState()
     val settingsPkg by viewModel.settingsPkg.collectAsState()
 
     if (settingsPkg != null) {
@@ -117,33 +118,44 @@ fun PluginManagerView(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        if (!isReady) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(ToolkitTheme.spacing.extraSmall),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
         // Toolbar
         Row(
             modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.small),
             horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
         ) {
-            Button(onClick = { viewModel.refreshList() }) {
+            Button(onClick = { viewModel.refreshList() }, enabled = isReady) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.plugin_refresh_list))
             }
-            OutlinedButton(onClick = { viewModel.rescan() }) {
+            OutlinedButton(onClick = { viewModel.rescan() }, enabled = isReady) {
                 Icon(Icons.Default.Folder, contentDescription = null)
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.plugin_rescan))
             }
-            OutlinedButton(onClick = { viewModel.reloadAll() }) {
+            OutlinedButton(onClick = { viewModel.reloadAll() }, enabled = isReady) {
                 Icon(Icons.Default.Replay, contentDescription = null)
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.plugin_reload_all))
             }
             Spacer(modifier = Modifier.weight(1f))
-            Button(onClick = { viewModel.openRemoteInstall() }) {
+            Button(onClick = { viewModel.openRemoteInstall() }, enabled = isReady) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 Text("Install Remote")
             }
-            Button(onClick = { viewModel.installLocal() }) {
+            Button(onClick = { viewModel.installLocal() }, enabled = isReady) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.plugin_install_local))
@@ -167,17 +179,20 @@ fun PluginManagerView(
                     isLoaded = loadedPlugins.contains(plugin.pkg),
                     hasUpdate = viewModel.getUpdate(plugin.pkg) != null,
                     customActions = viewModel.getActions(plugin.pkg),
-                    onToggle = { viewModel.toggleEnabled(plugin.pkg, it) },
+                    enabled = isReady,
+                    onToggle = { if (isReady) viewModel.toggleEnabled(plugin.pkg, it) },
                     onAction = { action ->
-                        when (action) {
-                            PluginStatusAction.Uninstall -> viewModel.uninstall(plugin.pkg)
-                            PluginStatusAction.Reload -> viewModel.reload(plugin.pkg)
-                            PluginStatusAction.Update -> viewModel.updatePlugin(plugin.pkg)
-                            PluginStatusAction.Validate -> viewModel.validatePlugin(plugin.pkg)
-                            PluginStatusAction.RerunSetup -> viewModel.rerunSetup(plugin.pkg)
-                            PluginStatusAction.Changelog -> viewModel.showChangelog(plugin.pkg)
-                            PluginStatusAction.Settings -> viewModel.openSettings(plugin.pkg)
-                            is PluginStatusAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
+                        if (isReady) {
+                            when (action) {
+                                PluginStatusAction.Uninstall -> viewModel.uninstall(plugin.pkg)
+                                PluginStatusAction.Reload -> viewModel.reload(plugin.pkg)
+                                PluginStatusAction.Update -> viewModel.updatePlugin(plugin.pkg)
+                                PluginStatusAction.Validate -> viewModel.validatePlugin(plugin.pkg)
+                                PluginStatusAction.RerunSetup -> viewModel.rerunSetup(plugin.pkg)
+                                PluginStatusAction.Changelog -> viewModel.showChangelog(plugin.pkg)
+                                PluginStatusAction.Settings -> viewModel.openSettings(plugin.pkg)
+                                is PluginStatusAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
+                            }
                         }
                     }
                 )
@@ -204,11 +219,14 @@ fun PluginManagerView(
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 shape = MaterialTheme.shapes.extraSmall,
-                                modifier = Modifier.padding(end = 8.dp)
+                                modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
                             ) {
                                 Text(
                                     stringResource(Res.string.plugin_default_tag),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    modifier = Modifier.padding(
+                                        horizontal = ToolkitTheme.spacing.extraSmall + 2.dp,
+                                        vertical = ToolkitTheme.spacing.extraSmall / 2
+                                    ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.Bold
@@ -241,6 +259,7 @@ fun PluginCard(
     isLoaded: Boolean,
     hasUpdate: Boolean,
     customActions: List<PluginAction>,
+    enabled: Boolean = true,
     onToggle: (Boolean) -> Unit,
     onAction: (PluginStatusAction) -> Unit
 ) {
@@ -327,7 +346,7 @@ fun PluginCard(
                         plugin.loadError,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
                     )
                 }
             }
@@ -355,24 +374,26 @@ fun PluginCard(
                     Button(
                         onClick = { onAction(PluginStatusAction.Update) },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
+                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small),
+                        enabled = enabled
                     ) {
                         Text(stringResource(Res.string.plugin_update))
                     }
                 } else {
                     OutlinedButton(
                         onClick = { onAction(PluginStatusAction.Update) },
-                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
+                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small),
+                        enabled = enabled
                     ) {
                         Text(stringResource(Res.string.plugin_update_local))
                     }
                 }
 
-                Switch(checked = plugin.isEnabled, onCheckedChange = onToggle)
+                Switch(checked = plugin.isEnabled, onCheckedChange = onToggle, enabled = enabled)
 
                 var expanded by remember { mutableStateOf(false) }
                 Box {
-                    IconButton(onClick = { expanded = true }) {
+                    IconButton(onClick = { expanded = true }, enabled = enabled) {
                         Icon(
                             Icons.Default.MoreVert,
                             contentDescription = stringResource(Res.string.action_more_actions)

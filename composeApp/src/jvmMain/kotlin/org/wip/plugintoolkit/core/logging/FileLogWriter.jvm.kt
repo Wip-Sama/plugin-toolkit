@@ -24,7 +24,7 @@ class FileLogWriter(
 
     private val settings get() = settingsProvider()
 
-    // We use the injected scope (which is IoScope).
+    // We use the injected scope (which is LoomScope).
     private val timeFormatter = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
     private val dateFormatter = SimpleDateFormat("yyyy_MM_dd", Locale.getDefault())
 

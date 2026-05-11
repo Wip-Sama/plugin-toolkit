@@ -21,14 +21,9 @@ val coroutineModule = module {
     }
 
     /**
-     * IoScope is tied to Dispatchers.IO.
-     * Use this for blocking I/O operations (e.g., file system, networking, database).
+     * LoomDispatcher for injection. All blocking/I/O work should use this.
      */
-    single(named("IoScope")) { 
-        CoroutineScope(SupervisorJob() + Dispatchers.IO) 
-    } onClose { 
-        it?.cancel() 
-    }
+    single(named("LoomDispatcher")) { loomDispatcher }
 
     /**
      * LoomScope is tied to Virtual Threads (Project Loom).

@@ -57,13 +57,6 @@ object DispatcherGenerator {
                     .build()
             )
             .addProperty(
-                PropertySpec.builder("context", CN_PLUGIN_CONTEXT.copy(nullable = true))
-                    .mutable(true)
-                    .initializer("null")
-                    .addModifiers(KModifier.PRIVATE)
-                    .build()
-            )
-            .addProperty(
                 PropertySpec.builder("isDebug", Boolean::class)
                     .mutable(true)
                     .initializer("false")
@@ -77,19 +70,12 @@ object DispatcherGenerator {
                     .addStatement("this.isDebug = isDebug")
                     .build()
             )
-            .addFunction(
-                FunSpec.builder("setPluginContext")
-                    .addModifiers(KModifier.OVERRIDE)
-                    .addParameter("context", CN_PLUGIN_CONTEXT)
-                    .addStatement("this.context = context")
-                    .build()
-            )
 
         // Map of handlers
         val mapType = CN_MAP.parameterizedBy(
             String::class.asClassName(),
             LambdaTypeName.get(
-                parameters = listOf(ParameterSpec.unnamed(CN_PLUGIN_REQUEST)),
+                parameters = listOf(ParameterSpec.unnamed(CN_PLUGIN_REQUEST), ParameterSpec.unnamed(CN_PLUGIN_CONTEXT)),
                 returnType = CN_EXECUTION_RESULT
             ).copy(suspending = true)
         )
@@ -103,7 +89,7 @@ object DispatcherGenerator {
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val methodName = func.simpleName.asString()
             
-            mapCode.add("%S to { request ->\n", capName.lowercase())
+            mapCode.add("%S to { request, context ->\n", capName.lowercase())
             mapCode.indent()
             mapCode.add("val result = processor.%L(\n", methodName)
             mapCode.indent()
@@ -117,16 +103,16 @@ object DispatcherGenerator {
                 
                 when {
                     paramType == CN_PLUGIN_LOGGER -> {
-                        mapCode.add("context?.logger ?: throw %T(%S)", CN_ILLEGAL_STATE_EXCEPTION, "Logger not available")
+                        mapCode.add("context.logger")
                     }
                     paramType == CN_PROGRESS_REPORTER -> {
-                        mapCode.add("context?.progress ?: throw %T(%S)", CN_ILLEGAL_STATE_EXCEPTION, "Progress reporter not available")
+                        mapCode.add("context.progress")
                     }
                     paramType == CN_PLUGIN_FILESYSTEM -> {
-                        mapCode.add("context?.fileSystem ?: throw %T(%S)", CN_ILLEGAL_STATE_EXCEPTION, "FileSystem not available")
+                        mapCode.add("context.fileSystem")
                     }
                     paramType == CN_PLUGIN_CONTEXT -> {
-                        mapCode.add("context ?: throw %T(%S)", CN_ILLEGAL_STATE_EXCEPTION, "PluginContext not available")
+                        mapCode.add("context")
                     }
                     param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) } -> {
                         mapCode.add("request.resumeState?.let { %T.%M<%T>(it) }", CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType)
@@ -170,10 +156,11 @@ object DispatcherGenerator {
         val processFunc = FunSpec.builder("process")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("request", CN_PLUGIN_REQUEST)
+            .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(CN_EXECUTION_RESULT)
             .beginControlFlow("return try")
             .addStatement("val handler = handlers[request.method.lowercase()] ?: throw %T(%S)", CN_ILLEGAL_ARGUMENT_EXCEPTION, "Unknown method: \${request.method}")
-            .addStatement("handler(request)")
+            .addStatement("handler(request, context)")
             .nextControlFlow("catch (e: Exception)")
             .addStatement("%T.Error(e.message ?: \"Unknown error\", e)", CN_EXECUTION_RESULT)
             .endControlFlow()
@@ -183,13 +170,14 @@ object DispatcherGenerator {
         val processAsyncFunc = FunSpec.builder("processAsync")
             .addModifiers(KModifier.OVERRIDE)
             .addParameter("request", CN_PLUGIN_REQUEST)
+            .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(CN_JOB_HANDLE)
             .addCode(CodeBlock.builder()
                 .addStatement("val handler = handlers[request.method.lowercase()] ?: throw %T(%S)", CN_ILLEGAL_ARGUMENT_EXCEPTION, "Unknown method: \${request.method}")
                 .addStatement("val scope = %T(%T.Default + %M())", CN_COROUTINE_SCOPE, CN_DISPATCHERS, MN_SUPERVISOR_JOB)
                 .beginControlFlow("val deferred = scope.%M", MN_ASYNC)
                 .beginControlFlow("try")
-                .addStatement("handler(request)")
+                .addStatement("handler(request, context)")
                 .nextControlFlow("catch (e: Exception)")
                 .addStatement("%T.Error(e.message ?: \"Unknown error\", e)", CN_EXECUTION_RESULT)
                 .endControlFlow()
@@ -198,10 +186,10 @@ object DispatcherGenerator {
                 .beginControlFlow("return object : %T", CN_JOB_HANDLE)
                 .addStatement("override val result = deferred")
                 .beginControlFlow("override fun pause()")
-                .addStatement("scope.%M { context?.signals?.sendSignal(%T.%M) }", MN_LAUNCH, CN_PLUGIN_SIGNAL, MN_SIGNAL_PAUSE)
+                .addStatement("scope.%M { context.signals.sendSignal(%T.%M) }", MN_LAUNCH, CN_PLUGIN_SIGNAL, MN_SIGNAL_PAUSE)
                 .endControlFlow()
                 .beginControlFlow("override fun cancel(force: Boolean)")
-                .addStatement("scope.%M { context?.signals?.sendSignal(%T.%M) }", MN_LAUNCH, CN_PLUGIN_SIGNAL, MN_SIGNAL_CANCEL)
+                .addStatement("scope.%M { context.signals.sendSignal(%T.%M) }", MN_LAUNCH, CN_PLUGIN_SIGNAL, MN_SIGNAL_CANCEL)
                 .addStatement("deferred.cancel()")
                 .beginControlFlow("if (force)")
                 .addStatement("scope.%M()", MN_CANCEL)

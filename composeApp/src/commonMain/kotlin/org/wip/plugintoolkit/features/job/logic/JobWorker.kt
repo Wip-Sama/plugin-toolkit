@@ -114,7 +114,6 @@ class JobWorker(
 
         val processor = plugin.getProcessor()
         val context = pluginManager.createPluginContext(job.pluginId, job.id)
-        processor.setPluginContext(context)
 
         val request = PluginRequest(
             method = job.capabilityName,
@@ -136,7 +135,7 @@ class JobWorker(
             }
         }
 
-        val handle = processor.processAsync(request)
+        val handle = processor.processAsync(request, context)
         val currentJob = currentCoroutineContext()[kotlinx.coroutines.Job]!!
 
         // Wrap the handle to ensure that cancelling it also cancels our worker coroutine.
@@ -203,7 +202,6 @@ class JobWorker(
 
         if (!plugin.getManifest().hasSetupHandler) {
             manager.addJobLog(job.id, "No setup handler found, skipping setup phase.")
-            manager.updateJobProgress(job.id, 0.5f)
         } else {
             val setupResult = plugin.performSetup(context)
             if (setupResult.isFailure) {
@@ -211,29 +209,11 @@ class JobWorker(
                 manager.tryFailJob(job.id, error)
                 return
             }
-            manager.updateJobProgress(job.id, 0.5f)
-            manager.addJobLog(job.id, "Setup successful. Validating installation...")
-        }
-
-        val validationResult = plugin.validate(context)
-        if (validationResult.isFailure) {
-            val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
-            manager.tryFailJob(job.id, error)
-            return
-        }
-
-        manager.updateJobProgress(job.id, 0.9f)
-        manager.addJobLog(job.id, "Setup completed successfully. Performing load check...")
-
-        val loadResult = plugin.performLoad(context)
-        if (loadResult.isFailure) {
-            val error = loadResult.exceptionOrNull()?.message ?: "Load check failed"
-            manager.tryFailJob(job.id, error)
-            return
+            manager.addJobLog(job.id, "Setup successful.")
         }
 
         manager.updateJobProgress(job.id, 1.0f)
-        manager.addJobLog(job.id, "Plugin ready.")
+        manager.addJobLog(job.id, "Setup phase completed.")
         manager.tryCompleteJob(job.id, "Success")
         lifecycleCoordinator.onLifecycleJobCompleted(job)
     }
@@ -262,7 +242,6 @@ class JobWorker(
 
         if (!plugin.getManifest().hasUpdateHandler) {
             manager.addJobLog(job.id, "No update handler found, skipping update phase.")
-            manager.updateJobProgress(job.id, 0.9f)
         } else {
             val updateResult = plugin.performUpdate(context)
             if (updateResult.isFailure) {
@@ -270,19 +249,11 @@ class JobWorker(
                 manager.tryFailJob(job.id, error)
                 return
             }
-            manager.updateJobProgress(job.id, 0.9f)
-            manager.addJobLog(job.id, "Update handler completed successfully. Performing load check...")
-        }
-
-        val loadResult = plugin.performLoad(context)
-        if (loadResult.isFailure) {
-            val error = loadResult.exceptionOrNull()?.message ?: "Load check failed"
-            manager.tryFailJob(job.id, error)
-            return
+            manager.addJobLog(job.id, "Update successful.")
         }
 
         manager.updateJobProgress(job.id, 1.0f)
-        manager.addJobLog(job.id, "Plugin updated and ready.")
+        manager.addJobLog(job.id, "Update phase completed.")
         manager.tryCompleteJob(job.id, "Success")
         lifecycleCoordinator.onLifecycleJobCompleted(job)
     }

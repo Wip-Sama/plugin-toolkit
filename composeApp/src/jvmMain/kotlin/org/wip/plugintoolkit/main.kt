@@ -31,6 +31,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -63,6 +64,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.plugin.logic.PluginScanner
+import org.wip.plugintoolkit.features.plugin.logic.PluginFolderManager
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
@@ -113,10 +115,10 @@ fun runMain(args: Array<String>) {
     startKoin {
         modules(coroutineModule, module {
             single<SettingsPersistence> { JvmSettingsPersistence() }
-            single { SettingsRepository(get(), get(named("IoScope"))) }
+            single { SettingsRepository(get(), get(named("LoomScope"))) }
             single<NotificationService> {
                 val repository = get<SettingsRepository>()
-                JvmNotificationService(get(named("IoScope"))) { 
+                JvmNotificationService(get(named("LoomScope"))) { 
                     viewModelProvider()?.settings?.value ?: repository.settings.value 
                 }
             }
@@ -137,12 +139,13 @@ fun runMain(args: Array<String>) {
             }
             single { RepoManager(get(), get(), get(), get(named("LoomScope"))) }
             single { DialogService() }
-            single { PluginRegistry(get(), get(named("AppScope"))) }
+            single { PluginRegistry(get(), get(named("AppScope")), get(named("LoomDispatcher"))) }
             single { PluginLifecycleManager(get(), get(), get(), get()) }
             single { PluginLifecycleCoordinator(get(), get(), get(), get(named("AppScope"))) }
-            single { PluginInstaller(get(), get(), get(), get(), get(), get()) }
+            single { PluginFolderManager(get(), get(), get()) }
+            single { PluginInstaller(get(), get(), get(), get(), get(), get(), get()) }
             single { PluginScanner(get()) }
-            single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(), get(named("LoomScope"))) }
+            single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(named("LoomScope"))) }
             single {
                 JobManager(
                     get(named("LoomScope")),
@@ -181,7 +184,7 @@ fun runMain(args: Array<String>) {
 
     Logger.setLogWriters(
         platformLogWriter(), 
-        FileLogWriter(logDir, getKoin().get(named("IoScope"))) { viewModel.settings.value.logging }
+        FileLogWriter(logDir, getKoin().get(named("LoomScope"))) { viewModel.settings.value.logging }
     )
 
     // Sync logger severity with settings
@@ -202,22 +205,29 @@ fun runMain(args: Array<String>) {
 
     // Load enabled and validated plugins at startup
     val startupScope = getKoin().get<CoroutineScope>(named("AppScope"))
-    val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
-    Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
+    val registry = getKoin().get<PluginRegistry>()
+    
+    startupScope.launch {
+        // Wait for registry to be ready (loaded from disk)
+        registry.isReady.first { it }
+        
+        val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
+        Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
 
-    pluginsToLoad.forEach { plugin ->
-        if (plugin.isValidated) {
-            Logger.d { "Startup: Launching load for validated plugin ${plugin.pkg}" }
-            startupScope.launch {
-                val result = pluginManager.loadPlugin(plugin.pkg)
-                if (result.isFailure) {
-                    Logger.e { "Startup: Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
+        pluginsToLoad.forEach { plugin ->
+            if (plugin.isValidated) {
+                Logger.d { "Startup: Launching load for validated plugin ${plugin.pkg}" }
+                launch {
+                    val result = pluginManager.loadPlugin(plugin.pkg)
+                    if (result.isFailure) {
+                        Logger.e { "Startup: Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
+                    }
                 }
-            }
-        } else {
-            Logger.i { "Startup: Plugin ${plugin.pkg} is enabled but not validated, triggering background setup" }
-            startupScope.launch {
-                pluginManager.enqueueSetupJob(plugin.pkg)
+            } else {
+                Logger.i { "Startup: Plugin ${plugin.pkg} is enabled but not validated, triggering background setup" }
+                launch {
+                    pluginManager.enqueueSetupJob(plugin.pkg)
+                }
             }
         }
     }

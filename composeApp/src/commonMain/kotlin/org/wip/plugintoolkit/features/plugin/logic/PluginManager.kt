@@ -4,37 +4,25 @@ import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginAction
-import org.wip.plugintoolkit.features.job.logic.JobManager
-import org.wip.plugintoolkit.features.job.model.BackgroundJob
-import org.wip.plugintoolkit.features.job.model.JobStatus
-import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
-import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
-import kotlin.time.Clock
 
-/**
- * Facade class that coordinates plugin management by delegating to specialized components.
- * Maintains compatibility with existing UI components while providing a cleaner internal structure.
- */
 class PluginManager(
-    private val settingsRepository: SettingsRepository,
     private val repoManager: RepoManager,
-    private val jobManager: JobManager,
     private val registry: PluginRegistry,
     private val installer: PluginInstaller,
     private val lifecycleManager: PluginLifecycleManager,
     private val scanner: PluginScanner,
     private val coordinator: PluginLifecycleCoordinator,
+    private val folderManager: PluginFolderManager,
     private val scope: CoroutineScope
 ) {
     val installedPlugins: StateFlow<List<InstalledPlugin>> = registry.installedPlugins
     val loadedPlugins: StateFlow<Set<String>> = lifecycleManager.loadedPlugins
+    val isRegistryReady: StateFlow<Boolean> = registry.isReady
 
     init {
         Logger.i { "Initializing PluginManager facade" }
@@ -49,23 +37,8 @@ class PluginManager(
             }
         }.map { Unit }
 
-    suspend fun enqueueRemoteInstall(plugin: ExtensionPlugin, targetFolderPath: String) {
-        Logger.i { "Enqueuing remote installation for: ${plugin.pkg}" }
-        val job = BackgroundJob(
-            id = "install_${plugin.pkg}_${Clock.System.now().toEpochMilliseconds()}",
-            name = "Installing: ${plugin.name}",
-            type = JobType.PluginInstallation,
-            pluginId = plugin.pkg,
-            capabilityName = "install",
-            parameters = mapOf(
-                "pluginJson" to kotlinx.serialization.json.Json.encodeToJsonElement(ExtensionPlugin.serializer(), plugin),
-                "targetFolderPath" to kotlinx.serialization.json.JsonPrimitive(targetFolderPath)
-            ),
-            isCancellable = true,
-            isPausable = false
-        )
-        jobManager.enqueueJob(job)
-    }
+    suspend fun enqueueRemoteInstall(plugin: ExtensionPlugin, targetFolderPath: String) =
+        installer.enqueueRemoteInstall(plugin, targetFolderPath)
 
     suspend fun installRemote(
         plugin: ExtensionPlugin,
@@ -95,13 +68,8 @@ class PluginManager(
 
     fun getUpdate(pkg: String) = installer.getUpdate(pkg)
 
-    suspend fun fetchRemoteChangelog(pkg: String): String? {
-        val remote = repoManager.plugins.value.values.flatten().find { it.pkg == pkg } ?: return null
-        val repoUrl = remote.repoUrl ?: return null
-        val pluginsFolder = repoUrl.substringBeforeLast("/") + "/plugins"
-        val baseUrl = "$pluginsFolder/${remote.pkg}"
-        return repoManager.fetchText("$baseUrl/changelog.md")
-    }
+    suspend fun fetchRemoteChangelog(pkg: String): String? = 
+        repoManager.fetchRemoteChangelog(pkg)
 
     // --- Lifecycle Management ---
 
@@ -119,7 +87,7 @@ class PluginManager(
 
     // --- Scanning ---
 
-    fun refreshInstalledPlugins() = scanner.refreshInstalledPlugins()
+    suspend fun refreshInstalledPlugins() = scanner.refreshInstalledPlugins()
 
     fun rescanManagedFolders() {
         scope.launch {
@@ -132,38 +100,9 @@ class PluginManager(
 
     // --- Folder Management ---
 
-    fun getManagedFolders() = registry.getManagedFolders()
+    fun getManagedFolders() = folderManager.getManagedFolders()
 
-    suspend fun removeManagedFolder(folderPath: String): Result<Unit> {
-        val defaultFolder = registry.getDefaultPluginFolder()
-        if (folderPath.replace('\\', '/').removeSuffix("/") == defaultFolder.replace('\\', '/').removeSuffix("/")) {
-            return Result.failure(Exception("Cannot remove default plugins folder"))
-        }
-
-        val normalizedFolder = folderPath.replace('\\', '/').removeSuffix("/")
-        val pluginsInFolder = installedPlugins.value.filter { 
-            it.installPath.replace('\\', '/').removeSuffix("/").startsWith(normalizedFolder) 
-        }
-        val pkgs = pluginsInFolder.map { it.pkg }
-
-        // Safety check and unload
-        lifecycleManager.ensureSafeToUnload(pkgs).onFailure { return Result.failure(it) }
-        pkgs.forEach { lifecycleManager.unloadPlugin(it) }
-
-        // Remove from settings
-        settingsRepository.updateSettings { settings ->
-            val updatedFolders = settings.extensions.pluginFolders.filter { 
-                it.replace('\\', '/').removeSuffix("/") != normalizedFolder 
-            }
-            settings.copy(extensions = settings.extensions.copy(pluginFolders = updatedFolders))
-        }
-
-        // Remove from registry
-        pkgs.forEach { registry.removePlugin(it) }
-
-        Logger.i { "Removed managed folder: $folderPath. ${pkgs.size} plugins removed from management." }
-        return Result.success(Unit)
-    }
+    suspend fun removeManagedFolder(folderPath: String) = folderManager.removeManagedFolder(folderPath)
 
     // --- Settings ---
 
@@ -171,73 +110,22 @@ class PluginManager(
 
     fun savePluginSettings(pkg: String, store: PluginSettingsStore) = lifecycleManager.savePluginSettings(pkg, store)
 
-    suspend fun setEnabled(pkg: String, enabled: Boolean): Result<Unit> {
-        Logger.i { "Setting plugin $pkg enabled: $enabled" }
-
-        if (!enabled) {
-            lifecycleManager.ensureSafeToUnload(listOf(pkg)).onFailure { return Result.failure(it) }
-            lifecycleManager.unloadPlugin(pkg)
-        }
-
-        registry.updatePlugin(pkg) { it.copy(isEnabled = enabled) }
-
-        if (enabled) {
-            val plugin = registry.getPlugin(pkg)
-            if (plugin != null) {
-                if (plugin.isValidated) {
-                    loadPlugin(pkg)
-                } else {
-                    // Try to get manifest to check for setup handler
-                    val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
-                    if (manifest?.hasSetupHandler == true) {
-                        coordinator.enqueueSetupJob(pkg)
-                    } else {
-                        coordinator.triggerValidation(pkg)
-                    }
-                }
-            }
-        }
-        return Result.success(Unit)
-    }
+    suspend fun setEnabled(pkg: String, enabled: Boolean) = coordinator.setEnabled(pkg, enabled)
 
     // --- Context & Jobs ---
 
-    fun createPluginContext(pkg: String, jobId: String? = null): PluginContext = 
+    fun createPluginContext(pkg: String, jobId: String? = null) = 
         lifecycleManager.createPluginContext(pkg, jobId)
 
-    suspend fun validatePluginInJob(pkg: String): Result<Unit> = coordinator.triggerValidation(pkg)
+    suspend fun validatePluginInJob(pkg: String) = coordinator.triggerValidation(pkg)
 
-    suspend fun validatePlugin(pkg: String): Result<Unit> {
-        val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
-        val result = plugin.validate(createPluginContext(pkg))
-        coordinator.onManualValidationCompleted(pkg, result)
-        return result
-    }
+    suspend fun validatePlugin(pkg: String) = coordinator.validatePlugin(pkg)
 
     suspend fun enqueueSetupJob(pkg: String) = coordinator.enqueueSetupJob(pkg)
 
     suspend fun rerunSetup(pkg: String) = coordinator.rerunSetup(pkg, installer)
 
-    suspend fun runAction(pkg: String, action: PluginAction) {
-        val plugin = registry.getPlugin(pkg) ?: return
-        Logger.i { "Enqueuing custom action: ${action.name} for plugin: $pkg" }
-
-        val loadResult = loadPlugin(pkg)
-        if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for action ${action.name}" }
-            return
-        }
-
-        val job = BackgroundJob(
-            id = "action_${pkg}_${action.functionName}_${Clock.System.now().toEpochMilliseconds()}",
-            name = "Action: ${action.name} (${plugin.name})",
-            type = JobType.PluginAction,
-            pluginId = pkg,
-            capabilityName = action.functionName,
-            keepResult = false
-        )
-        jobManager.enqueueJob(job)
-    }
+    suspend fun runAction(pkg: String, action: PluginAction) = coordinator.runAction(pkg, action)
 
     suspend fun enqueueUpdateJob(pkg: String) = coordinator.enqueueUpdateJob(pkg)
 

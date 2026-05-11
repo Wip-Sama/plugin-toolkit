@@ -140,7 +140,7 @@ fun RemotePluginCard(
                 // Icon
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(ToolkitTheme.dimensions.pluginIcon)
                         .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
                     contentAlignment = Alignment.Center
                 ) {
@@ -161,14 +161,17 @@ fun RemotePluginCard(
                             fontWeight = FontWeight.Bold
                         )
                         if (isInstalled) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                             Surface(
                                 color = MaterialTheme.colorScheme.secondaryContainer,
                                 shape = MaterialTheme.shapes.extraSmall
                             ) {
                                 Text(
                                     "Installed",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    modifier = Modifier.padding(
+                                        horizontal = ToolkitTheme.spacing.extraSmall + 2.dp,
+                                        vertical = ToolkitTheme.spacing.extraSmall / 2
+                                    ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
@@ -194,16 +197,23 @@ fun RemotePluginCard(
                     if (progress != null) {
                         CircularProgressIndicator(
                             progress = { progress },
-                            modifier = Modifier.size(32.dp).padding(4.dp),
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge).padding(ToolkitTheme.spacing.extraSmall),
                             strokeWidth = 3.dp
                         )
                     } else if (!isInstalled) {
                         Button(
                             onClick = onInstall,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(
+                                horizontal = ToolkitTheme.spacing.mediumSmall,
+                                vertical = ToolkitTheme.spacing.small
+                            )
                         ) {
-                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.CloudDownload, 
+                                contentDescription = null, 
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall + 2.dp)
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text("Install")
                         }
                     }
@@ -211,15 +221,15 @@ fun RemotePluginCard(
             }
 
             if (showInfo) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                 HorizontalDivider(modifier = Modifier.alpha(0.5f))
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
                 if (plugin.description != null) {
                     Text(
                         plugin.description,
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
+                        modifier = Modifier.padding(bottom = ToolkitTheme.spacing.small),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -231,10 +241,12 @@ fun RemotePluginCard(
             }
 
             if (progress != null) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(MaterialTheme.shapes.extraSmall)
+                    modifier = Modifier.fillMaxWidth()
+                        .height(ToolkitTheme.spacing.extraSmall)
+                        .clip(MaterialTheme.shapes.extraSmall)
                 )
             }
         }

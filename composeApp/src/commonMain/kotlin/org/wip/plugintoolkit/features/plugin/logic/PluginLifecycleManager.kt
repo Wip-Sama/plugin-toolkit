@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonElement
 import org.wip.plugintoolkit.api.*
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
@@ -32,6 +33,9 @@ class PluginLifecycleManager(
 
     // Mutex per plugin ID to prevent concurrent load/unload/reload for the same plugin
     private val pluginMutexes = ConcurrentHashMap<String, Mutex>()
+
+    // Cache for decrypted plugin settings to avoid redundant IO and decryption
+    private val settingsCache = ConcurrentHashMap<String, PluginSettingsStore>()
     
     private val json = kotlinx.serialization.json.Json {
         prettyPrint = true
@@ -62,11 +66,9 @@ class PluginLifecycleManager(
         return if (result.isSuccess) {
             val entry = result.getOrThrow()
             try {
-                // Validate manifest can be read
-                entry.getManifest()
-                
                 // Initialize with context
-                val initResult = entry.initialize(createPluginContext(pkg))
+                val manifest = entry.getManifest()
+                val initResult = entry.initialize(createPluginContext(pkg, manifest = manifest))
                 if (initResult.isFailure) {
                     val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")
                     Logger.e(error) { "Initialization failed for $pkg" }
@@ -77,7 +79,7 @@ class PluginLifecycleManager(
                 // Perform load step only if already validated.
                 // For new installations/updates, this is handled by the JobWorker after setup/update.
                 if (plugin.isValidated) {
-                    val loadResult = entry.performLoad(createPluginContext(pkg))
+                    val loadResult = entry.performLoad(createPluginContext(pkg, manifest = manifest))
                     if (loadResult.isFailure) {
                         val error = loadResult.exceptionOrNull() ?: Exception("Load failed")
                         Logger.e(error) { "Load failed for $pkg" }
@@ -186,6 +188,9 @@ class PluginLifecycleManager(
     }
 
     fun loadPluginSettings(pkg: String): PluginSettingsStore {
+        // Return from cache if available
+        settingsCache[pkg]?.let { return it }
+
         val plugin = registry.getPlugin(pkg) ?: return PluginSettingsStore()
         val settingsFile = "${plugin.installPath}/settings.json"
         val content = fileSystem.readFile(settingsFile)
@@ -200,10 +205,10 @@ class PluginLifecycleManager(
             PluginSettingsStore()
         }
 
-        val manifest = PluginLoader.getPluginById(pkg)?.getManifest() ?: return store
+        val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
         
         val decryptedSettings = store.settings.mapValues { (key, value) ->
-            val isSecret = manifest.settings?.get(key)?.secret == true
+            val isSecret = manifest?.settings?.get(key)?.secret == true
             if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
                 kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.decrypt(value.content))
             } else {
@@ -211,7 +216,9 @@ class PluginLifecycleManager(
             }
         }
 
-        return store.copy(settings = decryptedSettings)
+        val decryptedStore = store.copy(settings = decryptedSettings)
+        settingsCache[pkg] = decryptedStore
+        return decryptedStore
     }
 
     fun savePluginSettings(pkg: String, store: PluginSettingsStore) {
@@ -231,22 +238,24 @@ class PluginLifecycleManager(
 
         try {
             fileSystem.writeFile(settingsFile, json.encodeToString(storeToSave))
+            // Update cache with the decrypted store
+            settingsCache[pkg] = store
         } catch (t: Throwable) {
             Logger.e(t) { "Failed to save settings for $pkg" }
         }
     }
 
-    fun createPluginContext(pkg: String, jobId: String? = null): PluginContext {
+    fun createPluginContext(pkg: String, jobId: String? = null, manifest: PluginManifest? = null): PluginContext {
         val plugin = registry.getPlugin(pkg)
         val installPath = plugin?.installPath ?: ""
         val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }
 
         val storedSettings = loadPluginSettings(pkg)
-        val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
-        val mergedSettings = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+        val actualManifest = manifest ?: PluginLoader.getPluginById(pkg)?.getManifest()
+        val mergedSettings = mutableMapOf<String, JsonElement>()
         
         // 1. Manifest defaults
-        manifest?.settings?.forEach { (key, meta) ->
+        actualManifest?.settings?.forEach { (key, meta) ->
             meta.defaultValue?.let { mergedSettings[key] = it }
         }
         
@@ -298,9 +307,9 @@ class DefaultPluginSignalManager : PluginSignalManager {
 class DefaultPluginContext(
     override val logger: PluginLogger,
     override val progress: ProgressReporter,
-    override val fileSystem: org.wip.plugintoolkit.api.PluginFileSystem,
-    override val cacheFileSystem: org.wip.plugintoolkit.api.PluginFileSystem,
-    override val settings: Map<String, kotlinx.serialization.json.JsonElement>,
+    override val fileSystem: PluginFileSystem,
+    override val cacheFileSystem: PluginFileSystem,
+    override val settings: Map<String, JsonElement>,
     override val signals: PluginSignalManager = DefaultPluginSignalManager(),
     private val onRequiredActionChange: (String?) -> Unit = {}
 ) : PluginContext {

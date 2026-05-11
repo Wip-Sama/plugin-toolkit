@@ -235,6 +235,14 @@ class RepoManager(
     fun getPackageSourceOverride(pkg: String): String? {
         return settingsRepository.loadSettings().extensions.packageSourceOverrides[pkg]
     }
+
+    suspend fun fetchRemoteChangelog(pkg: String): String? {
+        val remote = _plugins.value.values.flatten().find { it.pkg == pkg } ?: return null
+        val repoUrl = remote.repoUrl ?: return null
+        val pluginsFolder = repoUrl.substringBeforeLast("/") + "/plugins"
+        val baseUrl = "$pluginsFolder/${remote.pkg}"
+        return fetchText("$baseUrl/changelog.md")
+    }
 }
 
 sealed class AddRepoResult {

@@ -3,11 +3,16 @@ package org.wip.plugintoolkit.features.plugin.logic
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 
 /**
@@ -23,24 +28,30 @@ class PluginLifecycleCoordinator(
     private val scope: CoroutineScope
 ) {
 
+    private val pluginMutexes = ConcurrentHashMap<String, Mutex>()
+    private fun getMutex(pkg: String) = pluginMutexes.getOrPut(pkg) { Mutex() }
+
+    private suspend inline fun <T> withPluginLock(pkg: String, crossinline block: suspend () -> T): T {
+        return getMutex(pkg).withLock { block() }
+    }
+
     /**
      * Called by JobWorker when a lifecycle job completes successfully.
      */
-    fun onLifecycleJobCompleted(job: BackgroundJob) {
-        scope.launch {
-            when (job.type) {
-                JobType.Validation -> {
-                    markAsValidated(job.pluginId)
-                }
-                JobType.Setup, JobType.Update -> {
-                    triggerValidation(job.pluginId)
-                }
-                JobType.PluginAction -> {
-                    clearRequiredAction(job.pluginId)
-                }
-                else -> {
-                    // Not a lifecycle job we manage state for directly here
-                }
+    suspend fun onLifecycleJobCompleted(job: BackgroundJob) = withPluginLock(job.pluginId) {
+        Logger.d { "Lifecycle job completed for ${job.pluginId}: ${job.type}" }
+        when (job.type) {
+            JobType.Validation -> {
+                markAsValidated(job.pluginId)
+            }
+            JobType.Setup, JobType.Update -> {
+                triggerValidationInternal(job.pluginId)
+            }
+            JobType.PluginAction -> {
+                clearRequiredAction(job.pluginId)
+            }
+            else -> {
+                // Not a lifecycle job we manage state for directly here
             }
         }
     }
@@ -48,50 +59,58 @@ class PluginLifecycleCoordinator(
     /**
      * Called by JobWorker when a lifecycle job fails.
      */
-    fun onLifecycleJobFailed(job: BackgroundJob, error: String?) {
-        scope.launch {
-            if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
-                markAsInvalidated(job.pluginId)
-            }
+    suspend fun onLifecycleJobFailed(job: BackgroundJob, error: String?) = withPluginLock(job.pluginId) {
+        Logger.w { "Lifecycle job failed for ${job.pluginId}: ${job.type} - $error" }
+        if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
+            markAsInvalidated(job.pluginId)
         }
     }
 
     /**
      * Called by PluginManager when a manual (synchronous) validation completes.
      */
-    fun onManualValidationCompleted(pkg: String, result: Result<Unit>) {
-        scope.launch {
-            if (result.isSuccess) {
-                markAsValidated(pkg)
-            } else {
-                markAsInvalidated(pkg)
-            }
+    suspend fun onManualValidationCompleted(pkg: String, result: Result<Unit>) = withPluginLock(pkg) {
+        if (result.isSuccess) {
+            markAsValidated(pkg)
+        } else {
+            markAsInvalidated(pkg)
         }
     }
 
     // --- State Transitions ---
 
-    suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) {
+    suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) = withPluginLock(pkg) {
         if (manifest.hasSetupHandler) {
-            enqueueSetupJob(pkg)
+            enqueueSetupJobInternal(pkg)
         } else {
-            triggerValidation(pkg)
+            triggerValidationInternal(pkg)
         }
     }
 
-    suspend fun handlePostUpdate(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest, installer: PluginInstaller) {
+    suspend fun handlePostUpdate(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest, installer: PluginInstaller) = withPluginLock(pkg) {
         if (manifest.hasUpdateHandler) {
-            enqueueUpdateJob(pkg)
+            enqueueUpdateJobInternal(pkg)
         } else if (manifest.hasSetupHandler) {
             installer.clearFiles(pkg)
-            enqueueSetupJob(pkg)
+            enqueueSetupJobInternal(pkg)
         } else {
-            triggerValidation(pkg)
+            triggerValidationInternal(pkg)
         }
     }
 
-    suspend fun enqueueSetupJob(pkg: String) {
+    suspend fun enqueueSetupJob(pkg: String) = withPluginLock(pkg) {
+        enqueueSetupJobInternal(pkg)
+    }
+
+    private suspend fun enqueueSetupJobInternal(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
+        
+        // Prevent redundant setup jobs
+        if (isJobPendingOrRunning("setup_$pkg")) {
+            Logger.d { "Setup job for $pkg is already pending or running, skipping enqueue." }
+            return
+        }
+
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
             Logger.e { "Failed to load plugin $pkg for setup: ${loadResult.exceptionOrNull()?.message}" }
@@ -101,7 +120,7 @@ class PluginLifecycleCoordinator(
         val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
         if (manifest?.hasSetupHandler != true) {
             Logger.i { "Plugin $pkg has no setup handler, skipping setup job and triggering validation." }
-            triggerValidation(pkg)
+            triggerValidationInternal(pkg)
             return
         }
 
@@ -122,8 +141,19 @@ class PluginLifecycleCoordinator(
         jobManager.enqueueJob(job)
     }
 
-    suspend fun enqueueUpdateJob(pkg: String) {
+    suspend fun enqueueUpdateJob(pkg: String) = withPluginLock(pkg) {
+        enqueueUpdateJobInternal(pkg)
+    }
+
+    private suspend fun enqueueUpdateJobInternal(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
+
+        // Prevent redundant update jobs
+        if (isJobPendingOrRunning("update_$pkg")) {
+            Logger.d { "Update job for $pkg is already pending or running, skipping enqueue." }
+            return
+        }
+
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
             Logger.e { "Failed to load plugin $pkg for update: ${loadResult.exceptionOrNull()?.message}" }
@@ -133,7 +163,7 @@ class PluginLifecycleCoordinator(
         val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
         if (manifest?.hasUpdateHandler != true) {
             Logger.i { "Plugin $pkg has no update handler, skipping update job and triggering validation." }
-            triggerValidation(pkg)
+            triggerValidationInternal(pkg)
             return
         }
 
@@ -154,8 +184,23 @@ class PluginLifecycleCoordinator(
         jobManager.enqueueJob(job)
     }
 
-    suspend fun triggerValidation(pkg: String): Result<Unit> {
+    suspend fun triggerValidation(pkg: String): Result<Unit> = withPluginLock(pkg) {
+        triggerValidationInternal(pkg)
+    }
+
+    private suspend fun triggerValidationInternal(pkg: String): Result<Unit> {
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin not found"))
+
+        if (plugin.isValidated) {
+            Logger.d { "Plugin $pkg is already validated, skipping trigger." }
+            return Result.success(Unit)
+        }
+
+        // Prevent redundant validation jobs
+        if (isJobPendingOrRunning("val_$pkg")) {
+            Logger.d { "Validation job for $pkg is already pending or running." }
+            return Result.success(Unit)
+        }
 
         if (hasMissingRequiredSettings(pkg)) {
             Logger.w { "Plugin $pkg has missing required settings, blocking validation." }
@@ -178,23 +223,23 @@ class PluginLifecycleCoordinator(
         return Result.success(Unit)
     }
 
-    suspend fun checkAndResumeSetup(pkg: String) {
-        val plugin = registry.getPlugin(pkg) ?: return
+    suspend fun checkAndResumeSetup(pkg: String) = withPluginLock(pkg) {
+        val plugin = registry.getPlugin(pkg) ?: return@withPluginLock
         if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !hasMissingRequiredSettings(pkg)) {
             Logger.i { "Required settings provided for $pkg. Resuming setup/update." }
             clearRequiredAction(pkg)
             val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
             if (manifest?.hasUpdateHandler == true) {
-                enqueueUpdateJob(pkg)
+                enqueueUpdateJobInternal(pkg)
             } else if (manifest?.hasSetupHandler == true) {
-                enqueueSetupJob(pkg)
+                enqueueSetupJobInternal(pkg)
             } else {
-                triggerValidation(pkg)
+                triggerValidationInternal(pkg)
             }
         }
     }
     
-    suspend fun rerunSetup(pkg: String, installer: PluginInstaller) {
+    suspend fun rerunSetup(pkg: String, installer: PluginInstaller) = withPluginLock(pkg) {
         Logger.i { "Rerunning setup for plugin: $pkg" }
         // 1. Unload
         lifecycleManager.unloadPlugin(pkg)
@@ -203,7 +248,72 @@ class PluginLifecycleCoordinator(
         // 3. Mark as not validated and clear errors
         registry.updatePlugin(pkg) { it.copy(isValidated = false, loadError = null) }
         // 4. Enqueue setup job
-        enqueueSetupJob(pkg)
+        enqueueSetupJobInternal(pkg)
+    }
+
+    suspend fun setEnabled(pkg: String, enabled: Boolean): Result<Unit> = withPluginLock(pkg) {
+        Logger.i { "Setting plugin $pkg enabled: $enabled" }
+
+        if (!enabled) {
+            lifecycleManager.ensureSafeToUnload(listOf(pkg)).onFailure { return@withPluginLock Result.failure(it) }
+            lifecycleManager.unloadPlugin(pkg)
+        }
+
+        registry.updatePlugin(pkg) { it.copy(isEnabled = enabled) }
+
+        if (enabled) {
+            val plugin = registry.getPlugin(pkg)
+            if (plugin != null) {
+                if (plugin.isValidated) {
+                    lifecycleManager.loadPlugin(pkg)
+                } else {
+                    // Try to get manifest to check for setup handler
+                    val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+                    if (manifest?.hasSetupHandler == true) {
+                        enqueueSetupJobInternal(pkg)
+                    } else {
+                        triggerValidationInternal(pkg)
+                    }
+                }
+            }
+        }
+        Result.success(Unit)
+    }
+
+    suspend fun validatePlugin(pkg: String): Result<Unit> = withPluginLock(pkg) {
+        val plugin = PluginLoader.getPluginById(pkg) ?: return@withPluginLock Result.failure(Exception("Plugin not loaded"))
+        val result = plugin.validate(lifecycleManager.createPluginContext(pkg))
+        if (result.isSuccess) {
+            markAsValidated(pkg)
+        } else {
+            markAsInvalidated(pkg)
+        }
+        result
+    }
+
+    suspend fun runAction(pkg: String, action: PluginAction) = withPluginLock(pkg) {
+        val plugin = registry.getPlugin(pkg) ?: return@withPluginLock
+        Logger.i { "Enqueuing custom action: ${action.name} for plugin: $pkg" }
+
+        val loadResult = lifecycleManager.loadPlugin(pkg)
+        if (loadResult.isFailure) {
+            Logger.e { "Failed to load plugin $pkg for action ${action.name}" }
+            return@withPluginLock
+        }
+
+        val job = BackgroundJob(
+            id = "action_${pkg}_${action.functionName}_${Clock.System.now().toEpochMilliseconds()}",
+            name = "Action: ${action.name} (${plugin.name})",
+            type = JobType.PluginAction,
+            pluginId = pkg,
+            capabilityName = action.functionName,
+            keepResult = false
+        )
+        jobManager.enqueueJob(job)
+    }
+
+    private fun isJobPendingOrRunning(jobId: String): Boolean {
+        return jobManager.jobs.value.any { it.id == jobId && (it.status == JobStatus.Queued || it.status == JobStatus.Running) }
     }
 
 

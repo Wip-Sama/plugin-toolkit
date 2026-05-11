@@ -48,6 +48,7 @@ class PluginManagerViewModel(
 
     val installedPlugins = pluginManager.installedPlugins
     val loadedPlugins = pluginManager.loadedPlugins
+    val isRegistryReady = pluginManager.isRegistryReady
 
     val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
 
@@ -194,7 +195,9 @@ class PluginManagerViewModel(
     }
 
     fun refreshList() {
-        pluginManager.refreshInstalledPlugins()
+        viewModelScope.launch {
+            pluginManager.refreshInstalledPlugins()
+        }
     }
 
     fun rescan() {
