@@ -135,17 +135,17 @@ fun runMain(args: Array<String>) {
                     }
                 }
             }
-            single { RepoManager(get(), get(), get(), get(named("IoScope"))) }
+            single { RepoManager(get(), get(), get(), get(named("LoomScope"))) }
             single { DialogService() }
             single { PluginRegistry(get(), get(named("AppScope"))) }
             single { PluginLifecycleManager(get(), get(), get(), get()) }
             single { PluginLifecycleCoordinator(get(), get(), get(), get(named("AppScope"))) }
             single { PluginInstaller(get(), get(), get(), get(), get(), get()) }
             single { PluginScanner(get()) }
-            single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(), get(named("IoScope"))) }
+            single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(), get(named("LoomScope"))) }
             single {
                 JobManager(
-                    get(named("AppScope")),
+                    get(named("LoomScope")),
                     get<SettingsRepository>().loadSettings().jobs.maxConcurrentJobs
                 )
             }

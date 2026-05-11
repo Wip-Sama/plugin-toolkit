@@ -3,6 +3,8 @@ package org.wip.plugintoolkit.api.processor
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_UPDATE_ANNOTATION
 import org.wip.plugintoolkit.api.processor.generators.ActionRegistryGenerator
 import org.wip.plugintoolkit.api.processor.generators.DispatcherGenerator
 import org.wip.plugintoolkit.api.processor.generators.EntryGenerator

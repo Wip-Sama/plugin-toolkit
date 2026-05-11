@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.core
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,4 +29,19 @@ val coroutineModule = module {
     } onClose { 
         it?.cancel() 
     }
+
+    /**
+     * LoomScope is tied to Virtual Threads (Project Loom).
+     * Use this for massive concurrency and blocking I/O in plugins.
+     */
+    single(named("LoomScope")) {
+        CoroutineScope(SupervisorJob() + loomDispatcher)
+    } onClose {
+        it?.cancel()
+    }
 }
+
+/**
+ * Platform-specific dispatcher for Virtual Threads.
+ */
+expect val loomDispatcher: CoroutineDispatcher

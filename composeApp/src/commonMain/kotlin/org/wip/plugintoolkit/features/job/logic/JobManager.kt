@@ -18,6 +18,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -397,7 +398,7 @@ class JobManager(
         // We need PluginLoader to get the path.
         val installPath = PluginLoader.getPluginInstallPath(job.pluginId)
         if (installPath != null) {
-            scope.launch(Dispatchers.Default) {
+            scope.launch(loomDispatcher) {
                 val fs = DefaultPluginFileSystem.createCacheOnly(installPath)
                 val json = Json { prettyPrint = true }
                 val stateString = json.encodeToString(JsonElement.serializer(), job.resumeState ?: JsonNull)

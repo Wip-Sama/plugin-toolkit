@@ -9,6 +9,7 @@ import kotlinx.io.readByteArray
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import org.wip.plugintoolkit.api.PluginFileSystem
+import org.wip.plugintoolkit.core.loomDispatcher
 import java.io.File
 import java.util.jar.JarFile
 
@@ -92,7 +93,7 @@ class DefaultPluginFileSystem(
 
     override suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit> {
         return try {
-            withContext(Dispatchers.IO) {
+            withContext(loomDispatcher) {
                 val jar = jarPath
                     ?: return@withContext Result.failure(Exception("No JAR path configured for resource extraction"))
                 val jarFile = JarFile(File(jar))

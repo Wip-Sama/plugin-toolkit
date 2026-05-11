@@ -210,15 +210,7 @@ class PluginManager(
     suspend fun validatePlugin(pkg: String): Result<Unit> {
         val plugin = PluginLoader.getPluginById(pkg) ?: return Result.failure(Exception("Plugin not loaded"))
         val result = plugin.validate(createPluginContext(pkg))
-        // Status updates should be handled elsewhere or we can let JobWorker or Coordinator handle it.
-        // Actually, validatePlugin is a direct call (synchronous), we should let coordinator update state.
-        if (result.isSuccess) {
-            val job = BackgroundJob(id = "val_$pkg", name = "Validation", type = JobType.Validation, pluginId = pkg, capabilityName = "validate", keepResult = false)
-            coordinator.onLifecycleJobCompleted(job)
-        } else {
-            val job = BackgroundJob(id = "val_$pkg", name = "Validation", type = JobType.Validation, pluginId = pkg, capabilityName = "validate", keepResult = false)
-            coordinator.onLifecycleJobFailed(job, result.exceptionOrNull()?.message)
-        }
+        coordinator.onManualValidationCompleted(pkg, result)
         return result
     }
 

@@ -6,6 +6,13 @@ import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.*
 import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_UPDATE_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object ManifestJsonGenerator {
     fun generate(

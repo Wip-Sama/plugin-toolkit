@@ -5,10 +5,6 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
-import org.wip.plugintoolkit.api.processor.PLUGIN_LOAD_ANNOTATION
-import org.wip.plugintoolkit.api.processor.PLUGIN_SETUP_ANNOTATION
-import org.wip.plugintoolkit.api.processor.PLUGIN_UPDATE_ANNOTATION
-import org.wip.plugintoolkit.api.processor.PLUGIN_VALIDATE_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DATA_PROCESSOR
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_CONTEXT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ENTRY
@@ -16,6 +12,11 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_MANIFEST
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_FILESYSTEM
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_LOGGER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PROGRESS_REPORTER
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_RESULT
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_LOAD_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_UPDATE_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_VALIDATE_ANNOTATION
 
 object EntryGenerator {
     fun generateEntryClass(
@@ -100,7 +101,7 @@ object EntryGenerator {
         val loadFunBuilder = FunSpec.builder("performLoad")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", CN_PLUGIN_CONTEXT)
-            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+            .returns(CN_RESULT.parameterizedBy(Unit::class.asClassName()))
 
         if (loadFunction != null) {
             val loadParams = loadFunction.parameters
@@ -124,7 +125,7 @@ object EntryGenerator {
         val setupFunBuilder = FunSpec.builder("performSetup")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", CN_PLUGIN_CONTEXT)
-            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+            .returns(CN_RESULT.parameterizedBy(Unit::class.asClassName()))
 
         if (setupFunction != null) {
             val setupParams = setupFunction.parameters
@@ -148,7 +149,7 @@ object EntryGenerator {
         val validateFunBuilder = FunSpec.builder("validate")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", CN_PLUGIN_CONTEXT)
-            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+            .returns(CN_RESULT.parameterizedBy(Unit::class.asClassName()))
 
         if (validateFunction != null) {
             val validateParams = validateFunction.parameters
@@ -172,7 +173,7 @@ object EntryGenerator {
         val updateFunBuilder = FunSpec.builder("performUpdate")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", CN_PLUGIN_CONTEXT)
-            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
+            .returns(CN_RESULT.parameterizedBy(Unit::class.asClassName()))
 
         if (updateFunction != null) {
             val updateParams = updateFunction.parameters

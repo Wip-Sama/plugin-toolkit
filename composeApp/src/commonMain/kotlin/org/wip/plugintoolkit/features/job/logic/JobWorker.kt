@@ -31,8 +31,8 @@ class JobWorker(
     private val pluginManager: PluginManager by inject()
     private val lifecycleCoordinator: PluginLifecycleCoordinator by inject()
     private var isActive = true
-    private val workerJob = SupervisorJob()
-    private val workerScope = scope + workerJob + Dispatchers.Default
+    private val workerJob = SupervisorJob(scope.coroutineContext[kotlinx.coroutines.Job])
+    private val workerScope = scope + workerJob
 
     fun start() {
         workerScope.launch {

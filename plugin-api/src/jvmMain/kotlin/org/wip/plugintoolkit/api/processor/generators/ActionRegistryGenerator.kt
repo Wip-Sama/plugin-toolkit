@@ -5,7 +5,7 @@ import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
-import org.wip.plugintoolkit.api.processor.PLUGIN_ACTION_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
 
 object ActionRegistryGenerator {
     fun generateActionRegistry(registryName: String, actions: List<KSFunctionDeclaration>): TypeSpec {

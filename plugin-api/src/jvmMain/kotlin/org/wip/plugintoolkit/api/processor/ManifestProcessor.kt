@@ -6,6 +6,10 @@ import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.annotations.PluginInfo as PluginInfoAnnotation
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_INFO_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import java.io.File
 
 class ManifestProcessorProvider : SymbolProcessorProvider {

@@ -4,17 +4,6 @@ import com.google.devtools.ksp.symbol.*
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
 
-const val PLUGIN_INFO_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginInfo"
-const val CAPABILITY_ANNOTATION = "org.wip.plugintoolkit.api.annotations.Capability"
-const val CAPABILITY_PARAM_ANNOTATION = "org.wip.plugintoolkit.api.annotations.CapabilityParam"
-const val PLUGIN_SETTING_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginSetting"
-const val PLUGIN_ACTION_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginAction"
-const val RESUME_STATE_ANNOTATION = "org.wip.plugintoolkit.api.annotations.ResumeState"
-const val PLUGIN_SETUP_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginSetup"
-const val PLUGIN_VALIDATE_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginValidate"
-const val PLUGIN_LOAD_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginLoad"
-const val PLUGIN_UPDATE_ANNOTATION = "org.wip.plugintoolkit.api.annotations.PluginUpdate"
-
 object GeneratorUtils {
     fun mapKSTypeToDataType(ksType: KSType): DataType {
         val declaration = ksType.declaration

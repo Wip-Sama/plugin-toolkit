@@ -4,11 +4,11 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.toTypeName
-import org.wip.plugintoolkit.api.processor.CAPABILITY_ANNOTATION
-import org.wip.plugintoolkit.api.processor.CAPABILITY_PARAM_ANNOTATION
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
-import org.wip.plugintoolkit.api.processor.PLUGIN_ACTION_ANNOTATION
-import org.wip.plugintoolkit.api.processor.PLUGIN_SETTING_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_CAPABILITY
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PARAMETER_CONSTRAINTS
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PARAMETER_METADATA
@@ -20,7 +20,7 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_SETTING_METADAT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.INFRASTRUCTURE_TYPES
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_GET_DATA_TYPE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
-import org.wip.plugintoolkit.api.processor.RESUME_STATE_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object ManifestGenerator {
     fun generateManifestObject(

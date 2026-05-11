@@ -4,29 +4,36 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toTypeName
-import org.wip.plugintoolkit.api.processor.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_COROUTINE_SCOPE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DATA_PROCESSOR
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DISPATCHERS
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_RESULT
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_ILLEGAL_ARGUMENT_EXCEPTION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_ILLEGAL_STATE_EXCEPTION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JOB_HANDLE
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_LIST
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_MAP
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ACTION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_CONTEXT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_REQUEST
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_RESPONSE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_SIGNAL
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_RESULT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_ASYNC
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_CANCEL
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_DECODE_FROM_JSON_ELEMENT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_ENCODE_FROM_JSON_ELEMENT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_LAUNCH
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SIGNAL_CANCEL
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SIGNAL_PAUSE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SUPERVISOR_JOB
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_LOGGER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PROGRESS_REPORTER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_FILESYSTEM
-import org.wip.plugintoolkit.api.processor.RESUME_STATE_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object DispatcherGenerator {
     fun generateDispatcherClass(
@@ -79,7 +86,7 @@ object DispatcherGenerator {
             )
 
         // Map of handlers
-        val mapType = ClassName("kotlin.collections", "Map").parameterizedBy(
+        val mapType = CN_MAP.parameterizedBy(
             String::class.asClassName(),
             LambdaTypeName.get(
                 parameters = listOf(ParameterSpec.unnamed(CN_PLUGIN_REQUEST)),
@@ -110,16 +117,16 @@ object DispatcherGenerator {
                 
                 when {
                     paramType == CN_PLUGIN_LOGGER -> {
-                        mapCode.add("context?.logger ?: throw IllegalStateException(%S)", "Logger not available")
+                        mapCode.add("context?.logger ?: throw %T(%S)", CN_ILLEGAL_STATE_EXCEPTION, "Logger not available")
                     }
                     paramType == CN_PROGRESS_REPORTER -> {
-                        mapCode.add("context?.progress ?: throw IllegalStateException(%S)", "Progress reporter not available")
+                        mapCode.add("context?.progress ?: throw %T(%S)", CN_ILLEGAL_STATE_EXCEPTION, "Progress reporter not available")
                     }
                     paramType == CN_PLUGIN_FILESYSTEM -> {
-                        mapCode.add("context?.fileSystem ?: throw IllegalStateException(%S)", "FileSystem not available")
+                        mapCode.add("context?.fileSystem ?: throw %T(%S)", CN_ILLEGAL_STATE_EXCEPTION, "FileSystem not available")
                     }
                     paramType == CN_PLUGIN_CONTEXT -> {
-                        mapCode.add("context ?: throw IllegalStateException(%S)", "PluginContext not available")
+                        mapCode.add("context ?: throw %T(%S)", CN_ILLEGAL_STATE_EXCEPTION, "PluginContext not available")
                     }
                     param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) } -> {
                         mapCode.add("request.resumeState?.let { %T.%M<%T>(it) }", CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType)
@@ -131,7 +138,7 @@ object DispatcherGenerator {
                         mapCode.add("request.parameters[%S]?.let { %T.%M<%T>(it) }", paramName, CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType)
                     }
                     else -> {
-                        mapCode.add("%T.%M<%T>(request.parameters[%S] ?: throw IllegalArgumentException(%S))", CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType, paramName, "Missing mandatory parameter: $paramName")
+                        mapCode.add("%T.%M<%T>(request.parameters[%S] ?: throw %T(%S))", CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType, paramName, CN_ILLEGAL_ARGUMENT_EXCEPTION, "Missing mandatory parameter: $paramName")
                     }
                 }
                 if (pIndex < paramsList.size - 1) mapCode.add(",\n") else mapCode.add("\n")
@@ -165,7 +172,7 @@ object DispatcherGenerator {
             .addParameter("request", CN_PLUGIN_REQUEST)
             .returns(CN_EXECUTION_RESULT)
             .beginControlFlow("return try")
-            .addStatement("val handler = handlers[request.method.lowercase()] ?: throw IllegalArgumentException(%S)", "Unknown method: \${request.method}")
+            .addStatement("val handler = handlers[request.method.lowercase()] ?: throw %T(%S)", CN_ILLEGAL_ARGUMENT_EXCEPTION, "Unknown method: \${request.method}")
             .addStatement("handler(request)")
             .nextControlFlow("catch (e: Exception)")
             .addStatement("%T.Error(e.message ?: \"Unknown error\", e)", CN_EXECUTION_RESULT)
@@ -178,7 +185,7 @@ object DispatcherGenerator {
             .addParameter("request", CN_PLUGIN_REQUEST)
             .returns(CN_JOB_HANDLE)
             .addCode(CodeBlock.builder()
-                .addStatement("val handler = handlers[request.method.lowercase()] ?: throw IllegalArgumentException(%S)", "Unknown method: \${request.method}")
+                .addStatement("val handler = handlers[request.method.lowercase()] ?: throw %T(%S)", CN_ILLEGAL_ARGUMENT_EXCEPTION, "Unknown method: \${request.method}")
                 .addStatement("val scope = %T(%T.Default + %M())", CN_COROUTINE_SCOPE, CN_DISPATCHERS, MN_SUPERVISOR_JOB)
                 .beginControlFlow("val deferred = scope.%M", MN_ASYNC)
                 .beginControlFlow("try")
@@ -191,10 +198,10 @@ object DispatcherGenerator {
                 .beginControlFlow("return object : %T", CN_JOB_HANDLE)
                 .addStatement("override val result = deferred")
                 .beginControlFlow("override fun pause()")
-                .addStatement("scope.%M { context?.signals?.sendSignal(%T.PAUSE) }", MN_LAUNCH, CN_PLUGIN_SIGNAL)
+                .addStatement("scope.%M { context?.signals?.sendSignal(%T.%M) }", MN_LAUNCH, CN_PLUGIN_SIGNAL, MN_SIGNAL_PAUSE)
                 .endControlFlow()
                 .beginControlFlow("override fun cancel(force: Boolean)")
-                .addStatement("scope.%M { context?.signals?.sendSignal(%T.CANCEL) }", MN_LAUNCH, CN_PLUGIN_SIGNAL)
+                .addStatement("scope.%M { context?.signals?.sendSignal(%T.%M) }", MN_LAUNCH, CN_PLUGIN_SIGNAL, MN_SIGNAL_CANCEL)
                 .addStatement("deferred.cancel()")
                 .beginControlFlow("if (force)")
                 .addStatement("scope.%M()", MN_CANCEL)
@@ -206,11 +213,11 @@ object DispatcherGenerator {
         dispatcherType.addFunction(processAsyncFunc.build())
 
         // RunAction
-        val actionMapType = ClassName("kotlin.collections", "Map").parameterizedBy(
+        val actionMapType = CN_MAP.parameterizedBy(
             String::class.asClassName(),
             LambdaTypeName.get(
                 parameters = listOf(ParameterSpec.unnamed(CN_PLUGIN_CONTEXT)),
-                returnType = ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName())
+                returnType = CN_RESULT.parameterizedBy(Unit::class.asClassName())
             ).copy(suspending = true)
         )
 
@@ -251,8 +258,8 @@ object DispatcherGenerator {
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("action", CN_PLUGIN_ACTION)
             .addParameter("context", CN_PLUGIN_CONTEXT)
-            .returns(ClassName("kotlin", "Result").parameterizedBy(Unit::class.asClassName()))
-            .addStatement("val handler = actionHandlers[action.functionName.lowercase()] ?: return Result.failure(IllegalArgumentException(\"Unknown action: \${action.functionName}\"))")
+            .returns(CN_RESULT.parameterizedBy(Unit::class.asClassName()))
+            .addStatement("val handler = actionHandlers[action.functionName.lowercase()] ?: return %T.failure(%T(\"Unknown action: \${action.functionName}\"))", CN_RESULT, CN_ILLEGAL_ARGUMENT_EXCEPTION)
             .addStatement("return handler(context)")
         
         dispatcherType.addFunction(runActionFunc.build())

@@ -56,6 +56,19 @@ class PluginLifecycleCoordinator(
         }
     }
 
+    /**
+     * Called by PluginManager when a manual (synchronous) validation completes.
+     */
+    fun onManualValidationCompleted(pkg: String, result: Result<Unit>) {
+        scope.launch {
+            if (result.isSuccess) {
+                markAsValidated(pkg)
+            } else {
+                markAsInvalidated(pkg)
+            }
+        }
+    }
+
     // --- State Transitions ---
 
     suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) {

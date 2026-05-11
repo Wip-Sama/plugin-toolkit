@@ -10,7 +10,20 @@ import org.wip.plugintoolkit.api.*
 
 object ProcessorConstants {
     const val API_PACKAGE = "org.wip.plugintoolkit.api"
+    const val ANNOTATION_PACKAGE = "$API_PACKAGE.annotations"
     
+    // Annotations
+    const val PLUGIN_INFO_ANNOTATION = "$ANNOTATION_PACKAGE.PluginInfo"
+    const val CAPABILITY_ANNOTATION = "$ANNOTATION_PACKAGE.Capability"
+    const val CAPABILITY_PARAM_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityParam"
+    const val PLUGIN_SETTING_ANNOTATION = "$ANNOTATION_PACKAGE.PluginSetting"
+    const val PLUGIN_ACTION_ANNOTATION = "$ANNOTATION_PACKAGE.PluginAction"
+    const val RESUME_STATE_ANNOTATION = "$ANNOTATION_PACKAGE.ResumeState"
+    const val PLUGIN_SETUP_ANNOTATION = "$ANNOTATION_PACKAGE.PluginSetup"
+    const val PLUGIN_VALIDATE_ANNOTATION = "$ANNOTATION_PACKAGE.PluginValidate"
+    const val PLUGIN_LOAD_ANNOTATION = "$ANNOTATION_PACKAGE.PluginLoad"
+    const val PLUGIN_UPDATE_ANNOTATION = "$ANNOTATION_PACKAGE.PluginUpdate"
+
     // API Classes
     val CN_PLUGIN_MANIFEST = PluginManifest::class.asClassName()
     val CN_PLUGIN_INFO = PluginInfo::class.asClassName()
@@ -34,6 +47,14 @@ object ProcessorConstants {
     val CN_EXECUTION_RESULT_SUCCESS = ExecutionResult.Success::class.asClassName()
     val CN_EXECUTION_RESULT_ERROR = ExecutionResult.Error::class.asClassName()
     
+    // Common Types
+    val CN_MAP = ClassName("kotlin.collections", "Map")
+    val CN_LIST = ClassName("kotlin.collections", "List")
+    val CN_RESULT = ClassName("kotlin", "Result")
+    val CN_UNIT = Unit::class.asClassName()
+    val CN_ILLEGAL_ARGUMENT_EXCEPTION = ClassName("kotlin", "IllegalArgumentException")
+    val CN_ILLEGAL_STATE_EXCEPTION = ClassName("kotlin", "IllegalStateException")
+
     // Functions and Members
     val MN_GET_DATA_TYPE = MemberName(API_PACKAGE, "getDataType")
     val CN_JSON = Json::class.asClassName()
@@ -46,6 +67,9 @@ object ProcessorConstants {
     val MN_ASYNC = MemberName("kotlinx.coroutines", "async")
     val MN_LAUNCH = MemberName("kotlinx.coroutines", "launch")
     val MN_CANCEL = MemberName("kotlinx.coroutines", "cancel")
+
+    val MN_SIGNAL_PAUSE = MemberName(CN_PLUGIN_SIGNAL, "PAUSE")
+    val MN_SIGNAL_CANCEL = MemberName(CN_PLUGIN_SIGNAL, "CANCEL")
 
     // Infrastructure Types for comparison
     val INFRASTRUCTURE_TYPES = setOf(
