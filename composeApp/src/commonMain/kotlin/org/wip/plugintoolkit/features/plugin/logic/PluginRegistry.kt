@@ -49,9 +49,16 @@ class PluginRegistry(
      * This should be called asynchronously during application startup.
      */
     suspend fun initialize() = withContext(loomDispatcher) {
-        PlatformUtils.mkdirs(defaultPluginFolder)
-        loadFromManagedFolders()
-        _isReady.value = true
+        Logger.i { "Starting PluginRegistry initialization" }
+        try {
+            PlatformUtils.mkdirs(defaultPluginFolder)
+            loadFromManagedFolders()
+            _isReady.value = true
+            Logger.i { "PluginRegistry initialization complete. Ready." }
+        } catch (t: Throwable) {
+            Logger.e(t) { "PluginRegistry initialization failed" }
+            throw t
+        }
     }
 
     /**

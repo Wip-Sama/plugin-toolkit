@@ -6,32 +6,34 @@ import org.wip.plugintoolkit.api.ProgressReporter
 import kotlinx.coroutines.delay
 import org.wip.plugintoolkit.api.PluginContext
 
-@PluginInfo(
-    id = "com.wip.operations.math",
-    name = "Math Operations",
-    version = "1.3.6",
-    description = "A module that provides mathematical operations on lists of numbers."
-)
-class MathProcessor {
-
+data class MathProcessorSettings(
     @PluginSetting(
         description = "API Key for Google services",
         defaultValue = "null",
     )
-    var googleApiKey: String = "null"
+    val googleApiKey: String = "null",
 
     @PluginSetting(
         description = "Secure token for the operations server",
         required = true,
         secret = true
     )
-    var serverToken: String = ""
+    val serverToken: String = "",
 
     @PluginSetting(
         description = "Name of the person performing the operations",
         required = true
     )
-    var operatorName: String = ""
+    val operatorName: String = ""
+)
+
+@PluginInfo(
+    id = "com.wip.operations.math",
+    name = "Math Operations",
+    version = "1.3.6",
+    description = "A module that provides mathematical operations on lists of numbers."
+)
+class MathProcessor(val settings: MathProcessorSettings) {
 
 
     @PluginValidate()
@@ -39,7 +41,7 @@ class MathProcessor {
         logger: PluginLogger,
         pluginContext: PluginContext
     ): Result<Unit> {
-        if (pluginContext.settings["googleApiKey"].toString() != "null") return Result.success(Unit)
+        if (settings.googleApiKey != "null") return Result.success(Unit)
         return Result.failure(Exception("Validation failed"))
     }
 

@@ -10,7 +10,7 @@ The toolkit uses a modular architecture where plugins are loaded dynamically at 
 
 ### 1. The Plugin Entry Point
 
-Every plugin must have a class that implements `PluginEntry`. However, you don't usually implement this manually. Instead, you use the `@PluginInfo` annotation on your main class, and the toolkit's KSP processor will generate the bridge code.
+Every plugin must define a main class. You don't usually implement the bridge code manually. Instead, you use the `@PluginInfo` annotation on your main class, and the toolkit's KSP processor will generate the `PluginEntry` and `PluginModuleProvider` for you.
 
 ```kotlin
 @PluginInfo(
@@ -19,10 +19,14 @@ Every plugin must have a class that implements `PluginEntry`. However, you don't
     version = "1.0.0",
     description = "Does amazing things."
 )
-class MyPlugin : DataProcessor {
-    // Dara [DataProcessor] may be omitted and it will be auto added by the ksp at compile time
-    // Implementation
+class MyPlugin(val settings: MyPluginSettings) : DataProcessor {
+    // KSP finds the @PluginSetting annotations in your module and
+    // generates the code to populate MyPluginSettings via Koin.
 }
+
+data class MyPluginSettings(
+    @PluginSetting(description = "API Key") val apiKey: String
+)
 ```
 
 ### 2. Capabilities
@@ -199,7 +203,15 @@ Once extracted, you can use `fileSystem.getBasePath()` to get the absolute path 
 
 ## Plugin Settings
 
-Plugins can define settings in their `manifest.json` under the `settings` object. These settings are automatically rendered in the host application's UI, allowing users to configure the plugin.
+Plugins can define settings that are automatically rendered in the host application's UI and securely stored.
+
+### Why Separate Settings Classes?
+
+The toolkit encourages (and KSP enforces) defining settings in a separate `data class` rather than as mutable properties in your main processor. This architecture provides several key benefits:
+
+*   **Statelessness & Thread Safety**: By using immutable `data class` properties (`val`), you ensure that your plugin components are stateless. This prevents race conditions when multiple jobs execute concurrently.
+*   **Wide Availability**: Defining settings in a separate class allows any component in your plugin (not just the main processor) to inject the settings via Koin.
+*   **Clean Testability**: You can easily unit test your logic by instantiating your processor with a mock settings object, without needing to mock the entire `PluginContext` or a Koin container.
 
 ### Defining Settings
 
@@ -228,15 +240,23 @@ Each setting requires metadata to dictate how it is rendered and validated:
 
 ### Accessing Settings
 
-In your plugin code, you can access these settings via the `PluginContext`:
+The recommended way to access settings is via **Constructor Injection**. KSP generates a typesafe settings class for your processor:
+
+```kotlin
+class MyProcessor(val settings: MyProcessorSettings) {
+    @PluginAction(name = "Fetch Data")
+    suspend fun fetchData() {
+        val apiKey = settings.apiKey // Typesafe and immutable
+    }
+}
+```
+
+Alternatively, you can still access raw settings via `PluginContext`:
 
 ```kotlin
 @PluginAction(name = "Fetch Data")
 suspend fun fetchData(context: PluginContext) {
-    // Read the setting (decrypted automatically if it was marked as secret)
     val apiKey = context.settings["apiKey"]?.jsonPrimitive?.content
-    
-    // ... use the key
 }
 ```
 

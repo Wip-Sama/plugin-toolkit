@@ -77,6 +77,20 @@ class PluginLifecycleCoordinator(
         }
     }
 
+    // --- Lifecycle Wrappers ---
+
+    suspend fun loadPlugin(pkg: String): Result<Unit> = withPluginLock(pkg) {
+        lifecycleManager.loadPlugin(pkg)
+    }
+
+    suspend fun unloadPlugin(pkg: String) = withPluginLock(pkg) {
+        lifecycleManager.unloadPlugin(pkg)
+    }
+
+    suspend fun reloadPlugin(pkg: String) = withPluginLock(pkg) {
+        lifecycleManager.reloadPlugin(pkg)
+    }
+
     // --- State Transitions ---
 
     suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) = withPluginLock(pkg) {
@@ -111,22 +125,23 @@ class PluginLifecycleCoordinator(
             return
         }
 
+        val manifest = lifecycleManager.getManifest(pkg)
+
+        if (hasMissingRequiredSettings(pkg, manifest)) {
+            Logger.w { "Plugin $pkg has missing required settings, blocking setup." }
+            registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
+            return
+        }
+
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
             Logger.e { "Failed to load plugin $pkg for setup: ${loadResult.exceptionOrNull()?.message}" }
             return
         }
 
-        val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
         if (manifest?.hasSetupHandler != true) {
             Logger.i { "Plugin $pkg has no setup handler, skipping setup job and triggering validation." }
             triggerValidationInternal(pkg)
-            return
-        }
-
-        if (hasMissingRequiredSettings(pkg)) {
-            Logger.w { "Plugin $pkg has missing required settings, blocking setup." }
-            registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
             return
         }
 
@@ -154,22 +169,23 @@ class PluginLifecycleCoordinator(
             return
         }
 
+        val manifest = lifecycleManager.getManifest(pkg)
+
+        if (hasMissingRequiredSettings(pkg, manifest)) {
+            Logger.w { "Plugin $pkg has missing required settings, blocking update." }
+            registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
+            return
+        }
+
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
             Logger.e { "Failed to load plugin $pkg for update: ${loadResult.exceptionOrNull()?.message}" }
             return
         }
 
-        val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
         if (manifest?.hasUpdateHandler != true) {
             Logger.i { "Plugin $pkg has no update handler, skipping update job and triggering validation." }
             triggerValidationInternal(pkg)
-            return
-        }
-
-        if (hasMissingRequiredSettings(pkg)) {
-            Logger.w { "Plugin $pkg has missing required settings, blocking update." }
-            registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
             return
         }
 
@@ -202,7 +218,9 @@ class PluginLifecycleCoordinator(
             return Result.success(Unit)
         }
 
-        if (hasMissingRequiredSettings(pkg)) {
+        val manifest = lifecycleManager.getManifest(pkg)
+
+        if (hasMissingRequiredSettings(pkg, manifest)) {
             Logger.w { "Plugin $pkg has missing required settings, blocking validation." }
             registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
             return Result.failure(Exception("Missing required settings"))
@@ -228,7 +246,7 @@ class PluginLifecycleCoordinator(
         if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !hasMissingRequiredSettings(pkg)) {
             Logger.i { "Required settings provided for $pkg. Resuming setup/update." }
             clearRequiredAction(pkg)
-            val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+            val manifest = lifecycleManager.getManifest(pkg)
             if (manifest?.hasUpdateHandler == true) {
                 enqueueUpdateJobInternal(pkg)
             } else if (manifest?.hasSetupHandler == true) {
@@ -268,7 +286,7 @@ class PluginLifecycleCoordinator(
                     lifecycleManager.loadPlugin(pkg)
                 } else {
                     // Try to get manifest to check for setup handler
-                    val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+                    val manifest = lifecycleManager.getManifest(pkg)
                     if (manifest?.hasSetupHandler == true) {
                         enqueueSetupJobInternal(pkg)
                     } else {
@@ -340,12 +358,12 @@ class PluginLifecycleCoordinator(
         registry.updatePlugin(pkg) { it.copy(requiredAction = null) }
     }
 
-    private fun hasMissingRequiredSettings(pkg: String): Boolean {
-        val manifest = PluginLoader.getPluginById(pkg)?.getManifest() ?: return false
-        if (manifest.settings.isNullOrEmpty()) return false
+    private fun hasMissingRequiredSettings(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest? = null): Boolean {
+        val actualManifest = manifest ?: lifecycleManager.getManifest(pkg) ?: return false
+        if (actualManifest.settings.isNullOrEmpty()) return false
 
         val store = lifecycleManager.loadPluginSettings(pkg)
-        val missing = manifest.settings!!.any { (key, meta) ->
+        val missing = actualManifest.settings!!.any { (key, meta) ->
             if (!meta.required) return@any false
 
             val value = store.settings[key] ?: return@any true

@@ -142,7 +142,7 @@ fun runMain(args: Array<String>) {
             single { DialogService() }
             single { PluginLockProvider() }
             single { PluginRegistry(get(), get(named("AppScope")), get(named("LoomDispatcher"))) }
-            single { PluginLifecycleManager(get(), get(), get(), get(), get()) }
+            single { PluginLifecycleManager(get(), get(), get(), get()) }
             single { PluginLifecycleCoordinator(get(), get(), get(), get(), get(named("AppScope"))) }
             single { PluginFolderManager(get(), get(), get()) }
             single { PluginInstaller(get(), get(), get(), get(), get(), get(), get()) }
@@ -175,7 +175,11 @@ fun runMain(args: Array<String>) {
 
     // Initialize registry and subsequently load plugins
     appScope.launch {
-        registry.initialize()
+        try {
+            registry.initialize()
+        } catch (e: Throwable) {
+            Logger.e(e) { "Startup: Failed to initialize PluginRegistry" }
+        }
         
         val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
         Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
@@ -184,15 +188,23 @@ fun runMain(args: Array<String>) {
             if (plugin.isValidated) {
                 Logger.d { "Startup: Launching load for validated plugin ${plugin.pkg}" }
                 launch {
-                    val result = pluginManager.loadPlugin(plugin.pkg)
-                    if (result.isFailure) {
-                        Logger.e { "Startup: Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
+                    try {
+                        val result = pluginManager.loadPlugin(plugin.pkg)
+                        if (result.isFailure) {
+                            Logger.e { "Startup: Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
+                        }
+                    } catch (e: Throwable) {
+                        Logger.e(e) { "Startup: Unexpected error while loading plugin ${plugin.pkg}" }
                     }
                 }
             } else {
                 Logger.i { "Startup: Plugin ${plugin.pkg} is enabled but not validated, triggering background setup" }
                 launch {
-                    pluginManager.enqueueSetupJob(plugin.pkg)
+                    try {
+                        pluginManager.enqueueSetupJob(plugin.pkg)
+                    } catch (e: Throwable) {
+                        Logger.e(e) { "Startup: Unexpected error while enqueuing setup for plugin ${plugin.pkg}" }
+                    }
                 }
             }
         }

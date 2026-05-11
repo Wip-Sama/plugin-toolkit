@@ -40,6 +40,7 @@ object ProcessorConstants {
     val CN_JOB_HANDLE = JobHandle::class.asClassName()
     val CN_PLUGIN_SIGNAL = PluginSignal::class.asClassName()
     val CN_PLUGIN_CONTEXT = PluginContext::class.asClassName()
+    val CN_PLUGIN_MODULE_PROVIDER = PluginModuleProvider::class.asClassName()
     val CN_PLUGIN_LOGGER = PluginLogger::class.asClassName()
     val CN_PLUGIN_FILESYSTEM = PluginFileSystem::class.asClassName()
     val CN_PROGRESS_REPORTER = ProgressReporter::class.asClassName()

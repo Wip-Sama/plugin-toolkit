@@ -26,8 +26,7 @@ class PluginLifecycleManager(
     private val registry: PluginRegistry,
     private val jobManager: JobManager,
     private val settingsRepository: SettingsRepository,
-    private val fileSystem: FileSystem,
-    private val lockProvider: PluginLockProvider
+    private val fileSystem: FileSystem
 ) {
     private val _loadedPlugins = MutableStateFlow<Set<String>>(emptySet())
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
@@ -41,12 +40,10 @@ class PluginLifecycleManager(
         encodeDefaults = true
     }
 
-    private fun getMutex(pkg: String) = lockProvider.getMutex(pkg)
-
     /**
      * Loads a plugin into the JVM and initializes it.
      */
-    suspend fun loadPlugin(pkg: String): Result<Unit> = getMutex(pkg).withLock {
+    suspend fun loadPlugin(pkg: String): Result<Unit> {
         Logger.i { "Loading plugin: $pkg" }
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin $pkg not found in registry"))
         
@@ -59,7 +56,8 @@ class PluginLifecycleManager(
         val jarFile = "${plugin.installPath}/$jarFileName"
 
         Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
-        val result = PluginLoader.loadPlugin(jarFile)
+        val settings = loadPluginSettings(pkg)
+        val result = PluginLoader.loadPlugin(jarFile, settings.settings)
         
         return if (result.isSuccess) {
             val entry = result.getOrThrow()
@@ -111,7 +109,7 @@ class PluginLifecycleManager(
     /**
      * Unloads a plugin from the runtime.
      */
-    suspend fun unloadPlugin(pkg: String) = getMutex(pkg).withLock {
+    suspend fun unloadPlugin(pkg: String) {
         Logger.i { "Unloading plugin: $pkg" }
         
         // Safety check for running jobs
@@ -120,7 +118,7 @@ class PluginLifecycleManager(
         val plugin = registry.getPlugin(pkg)
         if (plugin == null) {
             Logger.w { "Cannot unload $pkg: not found in registry" }
-            return@withLock
+            return
         }
         
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
@@ -203,7 +201,7 @@ class PluginLifecycleManager(
             PluginSettingsStore()
         }
 
-        val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+        val manifest = getManifest(pkg)
         
         val decryptedSettings = store.settings.mapValues { (key, value) ->
             val isSecret = manifest?.settings?.get(key)?.secret == true
@@ -223,7 +221,7 @@ class PluginLifecycleManager(
         val plugin = registry.getPlugin(pkg) ?: return
         val settingsFile = "${plugin.installPath}/settings.json"
         
-        val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+        val manifest = getManifest(pkg)
         val encryptedSettings = store.settings.mapValues { (key, value) ->
             val isSecret = manifest?.settings?.get(key)?.secret == true
             if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
@@ -249,7 +247,7 @@ class PluginLifecycleManager(
         val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }
 
         val storedSettings = loadPluginSettings(pkg)
-        val actualManifest = manifest ?: PluginLoader.getPluginById(pkg)?.getManifest()
+        val actualManifest = manifest ?: getManifest(pkg)
         val mergedSettings = mutableMapOf<String, JsonElement>()
         
         // 1. Manifest defaults
@@ -281,6 +279,23 @@ class PluginLifecycleManager(
         )
     }
 
+    fun getManifest(pkg: String): PluginManifest? {
+        val plugin = registry.getPlugin(pkg) ?: return null
+        val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
+        val jarFile = "${plugin.installPath}/$jarFileName"
+        
+        val manifestContent = fileSystem.readFileFromZip(jarFile, "manifest.json")
+            ?: fileSystem.readFileFromZip(jarFile, "META-INF/manifest.json")
+            
+        return manifestContent?.let {
+            try {
+                json.decodeFromString<PluginManifest>(it)
+            } catch (e: Exception) {
+                Logger.w { "Failed to parse manifest for $pkg: ${e.message}" }
+                null
+            }
+        }
+    }
 
 }
 

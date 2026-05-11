@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.api.PluginAction
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
@@ -73,12 +74,12 @@ class PluginManager(
 
     // --- Lifecycle Management ---
 
-    suspend fun loadPlugin(pkg: String) = lifecycleManager.loadPlugin(pkg)
+    suspend fun loadPlugin(pkg: String) = coordinator.loadPlugin(pkg)
 
-    suspend fun unloadPlugin(pkg: String) = lifecycleManager.unloadPlugin(pkg)
+    suspend fun unloadPlugin(pkg: String) = coordinator.unloadPlugin(pkg)
 
     fun reloadPlugin(pkg: String) {
-        scope.launch { lifecycleManager.reloadPlugin(pkg) }
+        scope.launch { coordinator.reloadPlugin(pkg) }
     }
 
     fun reloadAll() {
@@ -109,6 +110,8 @@ class PluginManager(
     fun loadPluginSettings(pkg: String) = lifecycleManager.loadPluginSettings(pkg)
 
     fun savePluginSettings(pkg: String, store: PluginSettingsStore) = lifecycleManager.savePluginSettings(pkg, store)
+
+    fun getManifest(pkg: String): PluginManifest? = lifecycleManager.getManifest(pkg)
 
     suspend fun setEnabled(pkg: String, enabled: Boolean) = coordinator.setEnabled(pkg, enabled)
 

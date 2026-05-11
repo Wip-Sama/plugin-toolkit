@@ -9,6 +9,7 @@ import org.wip.plugintoolkit.api.processor.generators.ActionRegistryGenerator
 import org.wip.plugintoolkit.api.processor.generators.DispatcherGenerator
 import org.wip.plugintoolkit.api.processor.generators.EntryGenerator
 import org.wip.plugintoolkit.api.processor.generators.ManifestGenerator
+import org.wip.plugintoolkit.api.processor.generators.ModuleGenerator
 
 object KotlinGenerator {
     fun generate(
@@ -21,7 +22,7 @@ object KotlinGenerator {
         minMemoryMb: Int,
         minExecutionTimeMs: Int,
         functions: List<KSFunctionDeclaration>,
-        settingsProperties: List<KSPropertyDeclaration>,
+        settingsClasses: List<KSClassDeclaration>,
         actions: List<KSFunctionDeclaration>,
         classDeclaration: KSClassDeclaration
     ): FileSpec {
@@ -29,6 +30,7 @@ object KotlinGenerator {
         val manifestName = baseClassName + "Manifest"
         val dispatcherName = baseClassName + "Dispatcher"
         val entryName = baseClassName + "PluginEntry"
+        val moduleProviderName = baseClassName + "ModuleProvider"
 
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
 
@@ -39,7 +41,8 @@ object KotlinGenerator {
         val manifestType = ManifestGenerator.generateManifestObject(
             manifestName, id, name, version, description, 
             minMemoryMb, minExecutionTimeMs, functions, 
-            settingsProperties, actions, updateFunction != null, setupFunction != null
+            settingsClasses.flatMap { it.getAllProperties().filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } } }.toList(), 
+            actions, updateFunction != null, setupFunction != null
         )
         fileSpec.addType(manifestType)
 
@@ -55,7 +58,13 @@ object KotlinGenerator {
         )
         fileSpec.addType(entryType)
 
-        // 4. Generate Action Registry
+        // 4. Generate Module Provider
+        val moduleProviderType = ModuleGenerator.generateModuleProvider(
+            moduleProviderName, packageName, baseClassName, dispatcherName, entryName, settingsClasses
+        )
+        fileSpec.addType(moduleProviderType)
+
+        // 5. Generate Action Registry
         val registryName = baseClassName + "Actions"
         val registryType = ActionRegistryGenerator.generateActionRegistry(registryName, actions)
         fileSpec.addType(registryType)

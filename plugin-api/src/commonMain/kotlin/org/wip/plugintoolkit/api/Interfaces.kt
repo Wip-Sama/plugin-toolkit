@@ -20,19 +20,15 @@ interface PluginEntry {
     suspend fun initialize(context: PluginContext): Result<Unit> = Result.success(Unit)
 
     /**
-     * Provide the plugin's Koin module.
+     * Get the plugin manifest information.
      */
-    fun getKoinModule(): Module
+    fun getManifest(): PluginManifest
 
     /**
      * Provide the worker instance.
      */
     fun getProcessor(): DataProcessor
 
-    /**
-     * Get the plugin manifest information.
-     */
-    fun getManifest(): PluginManifest
 
     /**
      * Set the debug mode for the plugin.
@@ -68,6 +64,17 @@ interface PluginEntry {
      * Clean up resources.
      */
     fun shutdown()
+}
+
+/**
+ * Interface used by ServiceLoader to discover the plugin's Koin module.
+ */
+interface PluginModuleProvider {
+    /**
+     * Provide the plugin's Koin module, pre-configured with the given settings.
+     * @param settings The current plugin settings.
+     */
+    fun getKoinModule(settings: Map<String, JsonElement>): Module
 }
 
 /**

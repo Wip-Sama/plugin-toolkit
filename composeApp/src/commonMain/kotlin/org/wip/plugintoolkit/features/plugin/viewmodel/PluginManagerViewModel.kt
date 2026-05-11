@@ -14,7 +14,6 @@ import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
-import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -341,7 +340,7 @@ class PluginManagerViewModel(
     }
 
     fun getActions(pkg: String) = try {
-        PluginLoader.getPluginById(pkg)?.getManifest()?.actions ?: emptyList()
+        pluginManager.getManifest(pkg)?.actions ?: emptyList()
     } catch (t: Throwable) {
         co.touchlab.kermit.Logger.e(t) { "Failed to get actions for $pkg" }
         emptyList()
@@ -349,7 +348,7 @@ class PluginManagerViewModel(
 
     fun runAction(pkg: String, actionName: String) {
         viewModelScope.launch {
-            val manifest = PluginLoader.getPluginById(pkg)?.getManifest()
+            val manifest = pluginManager.getManifest(pkg)
             val action = manifest?.actions?.find { it.name == actionName || it.functionName == actionName }
             if (action != null) {
                 pluginManager.runAction(pkg, action)

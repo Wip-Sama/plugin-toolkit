@@ -31,11 +31,7 @@ object EntryGenerator {
             .addSuperinterface(CN_PLUGIN_ENTRY)
             .primaryConstructor(
                 FunSpec.constructorBuilder()
-                    .addParameter(
-                        ParameterSpec.builder("processor", ClassName(packageName, baseClassName))
-                            .defaultValue("%T()", ClassName(packageName, baseClassName))
-                            .build()
-                    )
+                    .addParameter("processor", ClassName(packageName, baseClassName))
                     .build()
             )
             .addProperty(
@@ -55,13 +51,6 @@ object EntryGenerator {
                     .mutable(true)
                     .initializer("false")
                     .addModifiers(KModifier.PRIVATE)
-                    .build()
-            )
-            .addFunction(
-                FunSpec.builder("getKoinModule")
-                    .addModifiers(KModifier.OVERRIDE)
-                    .returns(ClassName("org.koin.core.module", "Module"))
-                    .addCode("return org.koin.dsl.module {\n  single { processor }\n  single<%T> { this@%L }\n}\n", CN_PLUGIN_ENTRY, entryName)
                     .build()
             )
             .addFunction(

@@ -6,6 +6,8 @@ import kotlinx.io.files.SystemFileSystem
 import org.koin.core.Koin
 import org.koin.dsl.koinApplication
 import org.wip.plugintoolkit.api.PluginEntry
+import org.wip.plugintoolkit.api.PluginModuleProvider
+import kotlinx.serialization.json.JsonElement
 import java.io.File
 import java.net.URLClassLoader
 import java.util.ServiceLoader
@@ -36,7 +38,8 @@ actual object PluginLoader {
     }
 
     actual fun loadPlugin(
-        jarPath: String
+        jarPath: String,
+        settings: Map<String, JsonElement>
     ): Result<PluginEntry> {
         val normalizedPath = normalizePath(jarPath)
 
@@ -60,15 +63,18 @@ actual object PluginLoader {
                 val url = File(normalizedPath).toURI().toURL()
                 val newClassLoader = ChildFirstClassLoader(arrayOf(url), this.javaClass.classLoader)
 
-                // Use ServiceLoader to find the PluginEntry implementation
-                val loader = ServiceLoader.load(PluginEntry::class.java, newClassLoader)
-                val pluginEntry =
-                    loader.firstOrNull() ?: throw Exception("No PluginEntry implementation found in $normalizedPath")
+                // Use ServiceLoader to find the PluginModuleProvider implementation
+                val loader = ServiceLoader.load(PluginModuleProvider::class.java, newClassLoader)
+                val moduleProvider =
+                    loader.firstOrNull() ?: throw Exception("No PluginModuleProvider implementation found in $normalizedPath")
 
                 // Create an isolated Koin application for this plugin
                 val koinApp = koinApplication {
-                    modules(pluginEntry.getKoinModule())
+                    modules(moduleProvider.getKoinModule(settings))
                 }
+
+                // Retrieve the real PluginEntry from Koin
+                val pluginEntry = koinApp.koin.get<PluginEntry>()
 
                 // Cache the ID for O(1) lookups
                 val manifest = pluginEntry.getManifest()
