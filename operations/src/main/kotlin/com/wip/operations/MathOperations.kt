@@ -30,7 +30,7 @@ data class MathProcessorSettings(
 @PluginInfo(
     id = "com.wip.operations.math",
     name = "Math Operations",
-    version = "1.3.6",
+    version = "1.4.0",
     description = "A module that provides mathematical operations on lists of numbers."
 )
 class MathProcessor(val settings: MathProcessorSettings) {

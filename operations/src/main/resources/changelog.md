@@ -1,10 +1,16 @@
-Version: 1.3.6
-Date: 2026-05-10
+Version: 1.4.0
+Date: 2026-05-12
 Features:
   - Added support for required and secret settings.
   - Added 'serverToken' (secret) and 'operatorName' (required) settings.
 Changes:
   - Updated manifest schema to support configuration validation enforcement.
+----------------------------------------------------------------------------------------------------
+Version: 1.3.2
+Date: 2026-05-09
+Changes:
+-	Changelog is now .md
+- Moved from JVM_11 to JVM_21
 ----------------------------------------------------------------------------------------------------
 Version: 1.3.1
 Date: 2026-05-01
