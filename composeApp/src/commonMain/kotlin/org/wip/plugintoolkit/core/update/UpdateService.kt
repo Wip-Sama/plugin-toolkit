@@ -3,14 +3,15 @@ package org.wip.plugintoolkit.core.update
 import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.onDownload
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.readAvailable
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -18,11 +19,18 @@ import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 
 class UpdateService(
     private val client: HttpClient = HttpClient {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60000
+            connectTimeoutMillis = 15000
+            socketTimeoutMillis = 30000
         }
     }
 ) {
@@ -58,7 +66,7 @@ class UpdateService(
         null
     }
 
-    private fun isNewer(latest: String, current: String): Boolean {
+    internal fun isNewer(latest: String, current: String): Boolean {
         val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
         val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
 
@@ -67,6 +75,43 @@ class UpdateService(
             if (latestParts[i] < currentParts[i]) return false
         }
         return latestParts.size > currentParts.size
+    }
+
+    private fun extractVersion(fileName: String): String? {
+        val regex = """(\d+\.\d+\.\d+)""".toRegex()
+        return regex.find(fileName)?.value
+    }
+
+    /**
+     * Deletes update installers in the data directory that have a version lower than the current app version.
+     */
+    fun cleanupOldUpdates(dataDir: String) {
+        val path = Path(dataDir)
+        try {
+            if (!SystemFileSystem.exists(path)) return
+
+            val currentVersion = AppConfig.VERSION.removePrefix("v")
+            val extensions = listOf(".exe", ".msi", ".deb", ".AppImage")
+
+            Logger.d { "Starting update cleanup in $dataDir (current version: $currentVersion)" }
+
+            SystemFileSystem.list(path).forEach { file ->
+                val name = file.name
+                if (extensions.any { name.endsWith(it, ignoreCase = true) }) {
+                    val fileVersion = extractVersion(name)
+                    if (fileVersion != null && isNewer(currentVersion, fileVersion)) {
+                        Logger.i { "Deleting old update file: $name (current: $currentVersion, file: $fileVersion)" }
+                        try {
+                            SystemFileSystem.delete(file)
+                        } catch (e: Exception) {
+                            Logger.e(e) { "Failed to delete old update file: $name" }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Error during update cleanup" }
+        }
     }
 
     private fun findBestAsset(assets: List<GithubAsset>): GithubAsset? {
@@ -81,6 +126,10 @@ class UpdateService(
     suspend fun downloadUpdate(info: UpdateInfo, destinationPath: String): Result<Unit> = withContext(loomDispatcher) {
         try {
             val response = client.prepareGet(info.downloadUrl) {
+                timeout {
+                    requestTimeoutMillis = 30 * 60 * 1000 // 30 minutes
+                    socketTimeoutMillis = 30000 // 30 seconds inactivity timeout
+                }
                 onDownload { bytesSentTotal, contentLength ->
                     contentLength?.let {
                         if (it > 0) {

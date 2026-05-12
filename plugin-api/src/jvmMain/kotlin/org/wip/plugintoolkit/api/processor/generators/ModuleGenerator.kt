@@ -64,7 +64,8 @@ object ModuleGenerator {
             getModuleFunc.addCode("  }\n")
         }
         
-        getModuleFunc.addStatement("  single { %T(get()) }", ClassName(packageName, baseClassName))
+        val constructorArgs = settingsClasses.joinToString(", ") { "get()" }
+        getModuleFunc.addStatement("  single { %T($constructorArgs) }", ClassName(packageName, baseClassName))
         getModuleFunc.addStatement("  single<%T> { %T(get()) }", CN_PLUGIN_ENTRY, ClassName(packageName, entryName))
         
         getModuleFunc.addCode("}\n")

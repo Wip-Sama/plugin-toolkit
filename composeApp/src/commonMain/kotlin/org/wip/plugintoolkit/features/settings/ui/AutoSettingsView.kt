@@ -32,11 +32,10 @@ import org.wip.plugintoolkit.shared.components.settings.SettingsSwitch
 @Composable
 fun AutoSettingsView(
     navKey: SettingNavKey, viewModel: SettingsViewModel, registry: SettingsRegistry, modifier: Modifier = Modifier,
-    /** Optional overrides for specific definitions (keyed by definition hashCode).
-     *  Useful for injecting ViewModel-dependent controls like "Test Notifications". */
-    controlOverrides: Map<Int, @Composable (AppSettings, (AppSettings) -> Unit) -> Unit> = emptyMap(),
-    /** Optional action overrides for ActionSettings that need late-bound onClick (keyed by definition hashCode). */
-    actionOverrides: Map<Int, () -> Unit> = emptyMap()
+    /** Optional local overrides for specific definitions (keyed by definition ID). */
+    controlOverrides: Map<String, @Composable (AppSettings, (AppSettings) -> Unit) -> Unit> = emptyMap(),
+    /** Optional local action overrides for ActionSettings (keyed by definition ID). */
+    actionOverrides: Map<String, () -> Unit> = emptyMap()
 ) {
     val allDefinitions by registry.definitions.collectAsState()
     val searchQuery = LocalSettingsSearchQuery.current
@@ -63,16 +62,20 @@ fun AutoSettingsView(
             val sectionName = sectionTitle.resolve()
             SettingsGroup(title = sectionName) {
                 definitions.forEach { definition ->
+                    // Merge local overrides (passed to AutoSettingsView)
+                    val effectiveControl = controlOverrides[definition.id]
+                    val effectiveAction = actionOverrides[definition.id]
+
                     RenderSettingDefinition(
                         definition = definition,
                         settings = settings,
                         onUpdate = { updated ->
                             viewModel.updateSettings { updated }
                             // Execute side-effect if any
-                            registry.getSideEffect(definition)?.invoke(updated)
+                            registry.triggerSideEffects(settings, updated)
                         },
-                        controlOverride = controlOverrides[definition.hashCode()],
-                        actionOverride = actionOverrides[definition.hashCode()]
+                        controlOverride = effectiveControl,
+                        actionOverride = effectiveAction
                     )
                 }
             }
@@ -153,13 +156,17 @@ private fun RenderSettingDefinition(
         }
 
         is SettingDefinition.ActionSetting -> {
-            SettingsItem(
-                title = definition.title.resolve(),
-                subtitle = definition.subtitle?.resolve(),
-                icon = definition.icon,
-                enabled = isEnabled,
-                onClick = actionOverride ?: definition.onClick
-            )
+            if (controlOverride != null) {
+                controlOverride(settings, onUpdate)
+            } else {
+                SettingsItem(
+                    title = definition.title.resolve(),
+                    subtitle = definition.subtitle?.resolve(),
+                    icon = definition.icon,
+                    enabled = isEnabled,
+                    onClick = actionOverride ?: definition.onClick
+                )
+            }
         }
 
         is SettingDefinition.CustomSetting -> {

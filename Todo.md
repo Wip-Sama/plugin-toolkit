@@ -66,3 +66,5 @@ Bugs:
 - Reload should call the load function in the plugin
 - Option to select the number of worker
 > When decreasing under the number of active worker the change will take effect when each worker finishes to the number required jobs (min 1)
+- Job Lifecycle like Plugin Lifecycle
+- Use annotations and reflections to auto define SettingsRegistry.build { ... } in main.kt (Koin) if possible

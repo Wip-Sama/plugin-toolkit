@@ -15,27 +15,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubble
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -45,30 +43,22 @@ import androidx.savedstate.serialization.SavedStateConfiguration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.model.localized
-import org.wip.plugintoolkit.core.notification.NotificationType
+import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.SettingDefinition
+import org.wip.plugintoolkit.features.settings.model.SettingsEvent
+import org.wip.plugintoolkit.features.settings.model.SettingsToast
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsRegistry
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsResolvedStrings
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.resolve
-import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
-import androidx.compose.runtime.LaunchedEffect
-import org.jetbrains.compose.resources.getString
-import org.wip.plugintoolkit.core.notification.NotificationService
-import org.wip.plugintoolkit.features.settings.model.SettingsEvent
-import org.wip.plugintoolkit.features.settings.model.SettingsToast
-import plugintoolkit.composeapp.generated.resources.update_check_failed
-import plugintoolkit.composeapp.generated.resources.update_check_started
-import plugintoolkit.composeapp.generated.resources.update_new_version_found
-import plugintoolkit.composeapp.generated.resources.update_no_updates
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
@@ -82,12 +72,15 @@ import plugintoolkit.composeapp.generated.resources.section_plugins_manager
 import plugintoolkit.composeapp.generated.resources.section_plugins_repositories
 import plugintoolkit.composeapp.generated.resources.section_system
 import plugintoolkit.composeapp.generated.resources.setting_appearance
-import plugintoolkit.composeapp.generated.resources.setting_open_log_folder
 import plugintoolkit.composeapp.generated.resources.settings
 import plugintoolkit.composeapp.generated.resources.settings_feature_placeholder
 import plugintoolkit.composeapp.generated.resources.settings_no_results
 import plugintoolkit.composeapp.generated.resources.settings_search_placeholder
 import plugintoolkit.composeapp.generated.resources.settings_search_whole
+import plugintoolkit.composeapp.generated.resources.update_check_failed
+import plugintoolkit.composeapp.generated.resources.update_check_started
+import plugintoolkit.composeapp.generated.resources.update_new_version_found
+import plugintoolkit.composeapp.generated.resources.update_no_updates
 
 /**
  * Internal route keys for the Settings master-detail navigation.
@@ -136,7 +129,6 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinInject(),
     searchViewModel: SettingsSearchViewModel = koinInject(),
-    notificationViewModel: NotificationViewModel = koinInject(),
     notificationService: NotificationService = koinInject()
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -159,7 +151,7 @@ fun SettingsScreen(
             }
         }
     }
-    // Start with Appearance — showing settings immediately
+
     val backStack = rememberNavBackStack(SettingNavConfig, SettingNavKey.Appearance as SettingNavKey)
     val currentKey = backStack.lastOrNull() ?: SettingNavKey.BroadSearch
     val searchQuery = searchViewModel.searchQuery
@@ -170,44 +162,6 @@ fun SettingsScreen(
     val resolvedStrings = allDefinitions.flatMap {
         listOfNotNull(it.title, it.subtitle, it.sectionTitle)
     }.distinct().associateWith { it.resolve() }
-
-    // Build control overrides for definitions that need ViewModel-dependent controls
-    val testNotificationOverride: @Composable (AppSettings, (AppSettings) -> Unit) -> Unit = { _, _ ->
-        Row {
-            IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Info) }) {
-                Icon(Icons.Default.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Warning) }) {
-                Icon(
-                    Icons.Default.Warning,
-                    contentDescription = "Warning",
-                    tint = androidx.compose.ui.graphics.Color(0xFFFFA500)
-                )
-            }
-            IconButton(onClick = { notificationViewModel.testSystemNotification(NotificationType.Error) }) {
-                Icon(Icons.Default.Error, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
-            }
-            IconButton(onClick = { notificationViewModel.testToastNotification() }) {
-                Icon(Icons.Default.ChatBubble, contentDescription = "Toast")
-            }
-        }
-    }
-
-    // Find the "Test Notifications" definition's hashCode for the override
-    val testNotifDef = allDefinitions.find {
-        it.title == SettingText.Raw("Test Notifications")
-    }
-    val controlOverrides = buildMap {
-        testNotifDef?.let { put(it.hashCode(), testNotificationOverride) }
-    }
-
-    // Build action overrides for ActionSettings that need ViewModel-level callbacks
-    val openLogDef = allDefinitions.find {
-        it.title == SettingText.Resource(Res.string.setting_open_log_folder) && it is SettingDefinition.ActionSetting
-    }
-    val actionOverrides = buildMap {
-        openLogDef?.let { put(it.hashCode()) { viewModel.openLogFolder() } }
-    }
 
     val applicationSection = SidebarSectionData(
         title = Res.string.section_general.localized, elements = listOf(
@@ -220,7 +174,6 @@ fun SettingsScreen(
             ),
         )
     )
-
 
     val aboutSection = SidebarSectionData(
         title = Res.string.section_about.localized, elements = listOf(
@@ -299,7 +252,8 @@ fun SettingsScreen(
                     ) {
                         Text(
                             stringResource(Res.string.settings_no_results, titleText),
-                            style = MaterialTheme.typography.bodyLarge
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                         Button(onClick = {
@@ -318,15 +272,14 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxSize(),
                         onBack = { if (backStack.size > 1) backStack.removeLast() }) { key ->
                         when (key) {
-                            // Application
-                            SettingNavKey.Appearance -> NavEntry(key) { AppearanceSettingsView(viewModel) }
-                            SettingNavKey.SystemSettings -> NavEntry(key) { SystemSettingsView(viewModel) }
+                            SettingNavKey.Appearance -> NavEntry(key) {
+                                AutoSettingsView(key as SettingNavKey, viewModel, registry)
+                            }
+                            SettingNavKey.SystemSettings -> NavEntry(key) {
+                                AutoSettingsView(key as SettingNavKey, viewModel, registry)
+                            }
                             SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
-
-                            // About
                             SettingNavKey.About -> NavEntry(key) { AboutView() }
-
-                            // ── Broad search (initial entry state) ────────
                             SettingNavKey.BroadSearch -> NavEntry(key) {
                                 BroadSearchResultsView(
                                     searchQuery = searchQuery,
@@ -339,7 +292,6 @@ fun SettingsScreen(
                                         }
                                     })
                             }
-
                             else -> NavEntry(key) { PlaceholderView("Error") }
                         }
                     }
@@ -357,8 +309,6 @@ fun BroadSearchResultsView(
     resolvedStrings: Map<SettingText, String>,
     onNavigate: (SettingNavKey) -> Unit
 ) {
-    // We now show all settings when blank, handled by the ViewModel
-
     val grouped = searchViewModel.getBroadSearchResults(allDefinitions, resolvedStrings)
 
     if (grouped.isEmpty()) {
@@ -390,7 +340,11 @@ fun PlaceholderView(text: String) {
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = MaterialTheme.shapes.medium
         ), contentAlignment = Alignment.Center
     ) {
-        Text(stringResource(Res.string.settings_feature_placeholder, text), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            stringResource(Res.string.settings_feature_placeholder, text),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

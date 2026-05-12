@@ -17,6 +17,7 @@ class JobViewModel(
     val jobProgress = jobManager.jobProgress
     val jobLogs = jobManager.jobLogs
     val history = jobManager.history
+    val endedJobs = jobManager.endedJobs
 
     val runningJobs = jobs.map { list ->
         list.filter { it.status == JobStatus.Running }
@@ -57,6 +58,18 @@ class JobViewModel(
     fun reorderQueue(fromIndex: Int, toIndex: Int) {
         viewModelScope.launch {
             jobManager.reorderQueue(fromIndex, toIndex)
+        }
+    }
+
+    fun clearEndedJob(jobId: String) {
+        viewModelScope.launch {
+            jobManager.clearEndedJob(jobId)
+        }
+    }
+
+    fun clearAllEndedJobs() {
+        viewModelScope.launch {
+            jobManager.clearAllEndedJobs()
         }
     }
 }

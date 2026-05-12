@@ -27,11 +27,9 @@ import io.github.vinceglb.filekit.FileKit
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -50,36 +48,23 @@ import org.wip.plugintoolkit.core.notification.JvmNotificationService
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.notification.NotificationType
-import org.wip.plugintoolkit.core.ui.DialogService
+import org.wip.plugintoolkit.features.settings.utils.*
+import org.wip.plugintoolkit.features.settings.definitions.*
+import org.wip.plugintoolkit.features.settings.viewmodel.*
+import org.wip.plugintoolkit.features.settings.logic.*
+import org.wip.plugintoolkit.features.settings.model.*
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.core.update.UpdateService
+import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import org.wip.plugintoolkit.core.utils.RealFileSystem
-import org.wip.plugintoolkit.features.job.logic.JobManager
-import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
-import org.wip.plugintoolkit.features.plugin.logic.PluginInstaller
-import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
-import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleManager
-import org.wip.plugintoolkit.features.plugin.logic.PluginManager
-import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
-import org.wip.plugintoolkit.features.plugin.logic.PluginScanner
-import org.wip.plugintoolkit.features.plugin.logic.PluginFolderManager
-import org.wip.plugintoolkit.features.plugin.logic.PluginLockProvider
-import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
-import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
-import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
+import org.wip.plugintoolkit.features.plugin.logic.*
+import org.wip.plugintoolkit.features.plugin.viewmodel.*
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
-import org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence
-import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
-import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
-import org.wip.plugintoolkit.features.settings.model.LogLevel
-import org.wip.plugintoolkit.features.settings.model.WindowStartMode
-import org.wip.plugintoolkit.features.settings.utils.SettingsRegistry
-import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
-import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
-import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_logo
 import plugintoolkit.composeapp.generated.resources.app_name
@@ -123,7 +108,19 @@ fun runMain(args: Array<String>) {
                     viewModelProvider()?.settings?.value ?: repository.settings.value 
                 }
             }
-            single { SettingsRegistry() }
+            single<SettingsRegistry> {
+                val settingsViewModel: SettingsViewModel = get()
+                val notificationViewModel: NotificationViewModel = get()
+                
+                SettingsRegistry.build {
+                    appearanceDefinitions()
+                    systemDefinitions(settingsViewModel)
+                    loggingDefinitions(settingsViewModel)
+                    jobDefinitions()
+                    notificationDefinitions(notificationViewModel)
+                    pluginDefinitions()
+                }
+            }
             single<FileSystem> { RealFileSystem() }
             single {
                 Json {
@@ -135,6 +132,11 @@ fun runMain(args: Array<String>) {
                 HttpClient(CIO) {
                     install(ContentNegotiation) {
                         json(get<Json>())
+                    }
+                    install(HttpTimeout) {
+                        requestTimeoutMillis = 60000
+                        connectTimeoutMillis = 15000
+                        socketTimeoutMillis = 30000
                     }
                 }
             }
@@ -151,7 +153,7 @@ fun runMain(args: Array<String>) {
             single {
                 JobManager(
                     get(named("LoomScope")),
-                    get<SettingsRepository>().loadSettings().jobs.maxConcurrentJobs
+                    get()
                 )
             }
             single { PluginViewModel(get(), get(), get()) }
@@ -163,7 +165,7 @@ fun runMain(args: Array<String>) {
             factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
             factory { JobViewModel(get()) }
             factory { AppViewModel(get(), get()) }
-            single { UpdateService() }
+            single { UpdateService(get()) }
         })
     }
 
@@ -172,6 +174,11 @@ fun runMain(args: Array<String>) {
     val registry = koin.get<PluginRegistry>()
     val pluginManager = koin.get<PluginManager>()
     val appScope = koin.get<CoroutineScope>(named("AppScope"))
+    val settingsRepository = koin.get<SettingsRepository>()
+    val updateService = koin.get<UpdateService>()
+
+    // Cleanup old updates on startup
+    updateService.cleanupOldUpdates(settingsRepository.getSettingsDir())
 
     // Initialize registry and subsequently load plugins
     appScope.launch {

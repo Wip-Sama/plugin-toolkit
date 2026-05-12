@@ -43,6 +43,7 @@ class PluginViewModel(
 
     var saveResults by mutableStateOf(true)
     val activeJobs = jobManager.jobs // Flow<List<BackgroundJob>>
+    val endedJobs = jobManager.endedJobs // Flow<List<BackgroundJob>>
     val jobProgress = jobManager.jobProgress // Flow<Map<String, Float>>
 
     val parameterValues = mutableStateMapOf<String, String>()
@@ -188,6 +189,10 @@ class PluginViewModel(
         jobManager.removeJobs { it.id == jobId }
     }
 
+    fun removeEndedJob(jobId: String) {
+        jobManager.clearEndedJob(jobId)
+    }
+
     fun clearCapabilityHistory() {
         val pluginId = try {
             selectedPlugin?.getManifest()?.plugin?.id
@@ -200,6 +205,10 @@ class PluginViewModel(
                 it.pluginId == pluginId &&
                         it.capabilityName == capName &&
                         (it.status == JobStatus.Completed || it.status == JobStatus.Failed || it.status == JobStatus.Cancelled)
+            }
+            // Also clear from endedJobs if any
+            jobManager.endedJobs.value.filter { it.pluginId == pluginId && it.capabilityName == capName }.forEach {
+                jobManager.clearEndedJob(it.id)
             }
         }
     }

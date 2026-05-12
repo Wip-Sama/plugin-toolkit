@@ -55,6 +55,7 @@ class PluginPluginInstallationTest {
         override fun getSettingsDir(): String = ""
         override fun getJobsDir(): String = ""
         override fun openLogFolder() {}
+        override fun openLatestLog() {}
     }
 
     @Test
@@ -116,7 +117,7 @@ class PluginPluginInstallationTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
         val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
-        val jobManager = JobManager(backgroundScope, 1)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
         val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
         val installer = PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, jobManager, client, fileSystem)

@@ -1,3 +1,16 @@
+Version: 1.4.1
+Date: 12-05-2026
+Added
+	- Ended jobs tab to see the logs and what happened 
+Changes:
+  - Incremented time to download the update before closing the connection (cut if not data has been transferred in 30s)
+  - Implemented new system for the settings generation and control
+Fixed:
+  - Updater on windows not launching correctly (again)
+  - Plugin-api failed to generate proper plugin if not settings were defined
+Planned:
+  - The update page now correctly displays the change description
+----------------------------------------------------------------------------------------------------
 Version: 1.4.0
 Date: 12-05-2026
 Added:

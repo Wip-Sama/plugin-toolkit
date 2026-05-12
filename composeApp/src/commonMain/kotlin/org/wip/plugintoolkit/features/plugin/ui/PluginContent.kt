@@ -81,7 +81,9 @@ fun PluginContent(
 ) {
     Box(modifier = modifier.fillMaxHeight()) {
         val selectedCapability = viewModel.selectedCapability
-        val allJobs by viewModel.activeJobs.collectAsState(initial = emptyList())
+        val activeJobs by viewModel.activeJobs.collectAsState(initial = emptyList())
+        val endedJobs by viewModel.endedJobs.collectAsState(initial = emptyList())
+        val allJobs = remember(activeJobs, endedJobs) { activeJobs + endedJobs }
 
         val jobProgressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
         val capabilityJobs = remember(allJobs, viewModel.selectedPlugin, selectedCapability) {
@@ -141,7 +143,13 @@ fun PluginContent(
                             JobResultItem(
                                 job = job,
                                 progress = jobProgressMap[job.id] ?: 0f,
-                                onDelete = { viewModel.removeJob(job.id) }
+                                onDelete = { 
+                                    if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
+                                        viewModel.removeEndedJob(job.id)
+                                    } else {
+                                        viewModel.removeJob(job.id)
+                                    }
+                                }
                             )
                         }
                     }

@@ -160,3 +160,30 @@ fun UpdateConfirmationDialog(
         }
     )
 }
+
+@Composable
+fun TestNotificationButtons(viewModel: org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel) {
+    androidx.compose.foundation.layout.Row(
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+    ) {
+        Button(
+            onClick = { viewModel.testSystemNotification(org.wip.plugintoolkit.core.notification.NotificationType.Info) },
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("Test Info")
+        }
+        Button(
+            onClick = { viewModel.testSystemNotification(org.wip.plugintoolkit.core.notification.NotificationType.Error) },
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("Test Error")
+        }
+        Button(
+            onClick = { viewModel.testToastNotification() },
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("Test Toast")
+        }
+    }
+}

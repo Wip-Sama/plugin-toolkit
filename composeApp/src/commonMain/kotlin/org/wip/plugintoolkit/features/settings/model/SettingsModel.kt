@@ -115,7 +115,8 @@ data class ExtensionSettings(
 data class JobSettings(
     val maxConcurrentJobs: Int = 2,
     val saveHistory: Boolean = true,
-    val historyRetentionDays: Int = 30
+    val maxHistoryLength: Int = 200,
+    val maxEndedJobs: Int = 20
 )
 
 @Serializable

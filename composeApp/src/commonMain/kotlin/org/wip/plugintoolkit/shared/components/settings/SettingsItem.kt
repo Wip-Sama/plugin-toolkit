@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun SettingsItem(
@@ -72,11 +73,11 @@ fun SettingsItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(ToolkitTheme.spacing.mediumSmall))
                 .background(backgroundColor)
                 .hoverable(interactionSource, enabled = enabled)
                 .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
-                .padding(12.dp), verticalAlignment = Alignment.CenterVertically
+                .padding(ToolkitTheme.spacing.small), verticalAlignment = Alignment.CenterVertically
         ) {
             val alpha = if (enabled) 1f else 0.5f
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)) {
@@ -85,10 +86,10 @@ fun SettingsItem(
                         imageVector = icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
-                        modifier = Modifier.size(36.dp).padding(end = 16.dp)
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge).padding(end = ToolkitTheme.spacing.medium)
                     )
                 } else {
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
@@ -108,7 +109,7 @@ fun SettingsItem(
                 }
 
                 if (control != null) {
-                    Box(modifier = Modifier.padding(start = 16.dp)) {
+                    Box(modifier = Modifier.padding(start = ToolkitTheme.spacing.medium)) {
                         control()
                     }
                 }

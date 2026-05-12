@@ -14,6 +14,9 @@ import org.wip.plugintoolkit.features.settings.utils.SettingText
  *   2. Add a rendering branch in AutoSettingsView
  */
 sealed class SettingDefinition {
+    /** Unique identifier for the setting (e.g., "appearance_theme") */
+    abstract val id: String
+
     /** Display title for the setting */
     abstract val title: SettingText
 
@@ -34,6 +37,7 @@ sealed class SettingDefinition {
 
     // ── Boolean toggle ───────────────────────────────────────────────────
     data class SwitchSetting(
+        override val id: String,
         override val title: SettingText,
         override val subtitle: SettingText?,
         override val icon: ImageVector,
@@ -46,6 +50,7 @@ sealed class SettingDefinition {
 
     // ── Dropdown selection ───────────────────────────────────────────────
     data class DropdownSetting<T>(
+        override val id: String,
         override val title: SettingText,
         override val subtitle: SettingText?,
         override val icon: ImageVector,
@@ -60,6 +65,7 @@ sealed class SettingDefinition {
 
     // ── Float slider ─────────────────────────────────────────────────────
     data class SliderSetting(
+        override val id: String,
         override val title: SettingText,
         override val subtitle: SettingText?,
         override val icon: ImageVector,
@@ -76,6 +82,7 @@ sealed class SettingDefinition {
 
     // ── Integer numeric input ────────────────────────────────────────────
     data class NumericSetting(
+        override val id: String,
         override val title: SettingText,
         override val subtitle: SettingText?,
         override val icon: ImageVector,
@@ -89,6 +96,7 @@ sealed class SettingDefinition {
 
     // ── Clickable action (no persistent state) ───────────────────────────
     data class ActionSetting(
+        override val id: String,
         override val title: SettingText,
         override val subtitle: SettingText?,
         override val icon: ImageVector,
@@ -104,6 +112,7 @@ sealed class SettingDefinition {
      * The [content] lambda receives the current AppSettings and an update callback.
      */
     data class CustomSetting(
+        override val id: String,
         override val title: SettingText,
         override val subtitle: SettingText?,
         override val icon: ImageVector,

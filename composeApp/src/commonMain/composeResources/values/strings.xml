@@ -99,6 +99,7 @@
     <string name="nav_job_archive">Archive</string>
     <string name="nav_job_scheduler">Scheduler</string>
     <string name="nav_job_history">History</string>
+    <string name="nav_job_ended">Ended</string>
     <string name="section_jobs">Jobs</string>
     <string name="setting_plugin_unplug_behavior">Plugin Unplug Behavior</string>
     <string name="setting_plugin_unplug_behavior_subtitle">What to do when disabling or uninstalling a plugin with active jobs</string>
@@ -108,8 +109,10 @@
     <string name="setting_max_concurrent_jobs_subtitle">Number of workers available to run background tasks</string>
     <string name="setting_save_job_history">Save Job History</string>
     <string name="setting_save_job_history_subtitle">Keep a log of all executed jobs and their results</string>
-    <string name="setting_history_retention_days">History Retention Days</string>
-    <string name="setting_history_retention_days_subtitle">Number of days to keep job history before automatic deletion</string>
+    <string name="setting_max_history_length">Max History Length</string>
+    <string name="setting_max_history_length_subtitle">Maximum number of events to keep in the history log</string>
+    <string name="setting_max_ended_jobs">Max Ended Jobs to Keep</string>
+    <string name="setting_max_ended_jobs_subtitle">Number of finished jobs to keep in the Ended tab</string>
     <string name="section_auto_update">Auto Update</string>
     <string name="setting_enable_auto_update">Check for Updates Automatically</string>
     <string name="setting_enable_auto_update_subtitle">The application will check for new versions on startup</string>
@@ -132,6 +135,7 @@
     <string name="action_delete">Delete</string>
     <string name="action_remove">Remove</string>
     <string name="action_clear">Clear</string>
+    <string name="action_clear_all">Clear All</string>
     <string name="action_more_actions">More actions</string>
     <string name="action_refresh">Refresh</string>
     <string name="action_install">Install</string>
@@ -145,9 +149,9 @@
     <!-- Settings -->
     <string name="plugin_settings_title">Settings: %1$s</string>
     <string name="settings_search_placeholder">Search settings...</string>
-    <string name="settings_no_results">No results found in %s</string>
+    <string name="settings_no_results">No results found in %1$s</string>
     <string name="settings_search_whole">Search in whole settings</string>
-    <string name="settings_feature_placeholder">Content for %s will appear here.</string>
+    <string name="settings_feature_placeholder">Content for %1$s will appear here.</string>
 
     <!-- Jobs -->
     <string name="job_running_jobs">Running Jobs</string>
@@ -155,6 +159,8 @@
     <string name="job_paused_jobs">Paused Jobs</string>
     <string name="job_no_active">No active or queued jobs</string>
     <string name="job_no_archived">No archived jobs</string>
+    <string name="job_ended_jobs">Ended Jobs</string>
+    <string name="job_no_ended">No ended jobs recorded yet</string>
     <string name="job_scheduler_soon">Scheduler coming soon</string>
     <string name="job_error_format">Error: %1$s</string>
 

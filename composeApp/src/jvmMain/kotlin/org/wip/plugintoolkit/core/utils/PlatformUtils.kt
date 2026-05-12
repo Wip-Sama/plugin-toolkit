@@ -5,6 +5,8 @@ import androidx.compose.ui.graphics.Color
 import co.touchlab.kermit.Logger
 import com.sun.jna.platform.win32.Advapi32Util.registryGetIntValue
 import com.sun.jna.platform.win32.Advapi32Util.registryValueExists
+import com.sun.jna.platform.win32.Shell32
+import com.sun.jna.platform.win32.WinUser
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
@@ -276,32 +278,38 @@ actual object PlatformUtils {
 
         val currentInstallDir = getCurrentInstallDir()
         Logger.i { "Launching installer: $path (Target Dir: ${currentInstallDir ?: "Default"})" }
-        
+
         try {
             if (isWindows) {
                 val normalizedPath = path.replace("/", "\\")
-                // Use cmd /c start to detach the process and handle UAC correctly.
-                // The empty quotes "" are for the start command's title argument.
-                val command = mutableListOf("cmd", "/c", "start", "\"Updating App\"")
-                
-                if (normalizedPath.endsWith(".msi")) {
-                    command.add("msiexec")
-                    command.add("/i")
-                    command.add(normalizedPath)
-                    if (currentInstallDir != null) {
-                        command.add("INSTALLDIR=\"$currentInstallDir\"")
+                val params = when {
+                    normalizedPath.endsWith(".msi") -> {
+                        val base = "/i \"$normalizedPath\""
+                        if (currentInstallDir != null) "$base INSTALLDIR=\"$currentInstallDir\"" else base
                     }
-                } else if (normalizedPath.endsWith(".exe")) {
-                    command.add(normalizedPath)
-                    if (currentInstallDir != null) {
-                        command.add("/DIR=\"$currentInstallDir\"")
+                    normalizedPath.endsWith(".exe") -> {
+                        if (currentInstallDir != null) "/DIR=\"$currentInstallDir\"" else ""
                     }
-                } else {
-                    command.add(normalizedPath)
+                    else -> ""
                 }
+
+                val executable = if (normalizedPath.endsWith(".msi")) "msiexec.exe" else normalizedPath
                 
-                Logger.i { "Executing detachment command: ${command.joinToString(" ")}" }
-                ProcessBuilder(command).start()
+                Logger.i { "Executing ShellExecute: $executable $params" }
+                
+                val result = Shell32.INSTANCE.ShellExecute(
+                    null,
+                    "open",
+                    executable,
+                    params,
+                    null,
+                    WinUser.SW_SHOWNORMAL
+                )
+                
+                val resultCode = com.sun.jna.Pointer.nativeValue(result.toPointer())
+                if (resultCode <= 32) {
+                    throw Exception("ShellExecute failed with code $resultCode")
+                }
             } else if (isLinux) {
                 if (path.endsWith(".deb")) {
                     ProcessBuilder("pkexec", "dpkg", "-i", path).start()
@@ -311,7 +319,7 @@ actual object PlatformUtils {
             } else {
                 Desktop.getDesktop().open(file)
             }
-            
+
             // Give it a moment to start before we kill the current process
             Thread.sleep(1500)
             Logger.i { "Application exiting for update installation" }

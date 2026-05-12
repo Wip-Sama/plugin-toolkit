@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsRegistry
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 import org.wip.plugintoolkit.features.settings.utils.resolve
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun SettingsGroup(
@@ -71,12 +72,12 @@ fun SettingsGroup(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp)
+                .padding(vertical = ToolkitTheme.spacing.small)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 8.dp, bottom = 8.dp),
+                    .padding(start = ToolkitTheme.spacing.small, bottom = ToolkitTheme.spacing.extraSmall),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -90,7 +91,7 @@ fun SettingsGroup(
                 if (collapsible) {
                     IconButton(
                         onClick = { isExpanded = !isExpanded },
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                     ) {
                         Icon(
                             imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -108,10 +109,10 @@ fun SettingsGroup(
             ) {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(ToolkitTheme.spacing.medium),
                     modifier = Modifier.fillMaxWidth().animateContentSize()
                 ) {
-                    Column(modifier = Modifier.padding(4.dp)) {
+                    Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
                         content()
                     }
                 }

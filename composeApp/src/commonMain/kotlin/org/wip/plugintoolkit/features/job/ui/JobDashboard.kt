@@ -86,19 +86,24 @@ import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_clear
+import plugintoolkit.composeapp.generated.resources.action_clear_all
 import plugintoolkit.composeapp.generated.resources.action_collapse
 import plugintoolkit.composeapp.generated.resources.action_expand
 import plugintoolkit.composeapp.generated.resources.action_pause
 import plugintoolkit.composeapp.generated.resources.action_resume
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
+import plugintoolkit.composeapp.generated.resources.job_ended_jobs
 import plugintoolkit.composeapp.generated.resources.job_error_format
 import plugintoolkit.composeapp.generated.resources.job_no_active
 import plugintoolkit.composeapp.generated.resources.job_no_archived
+import plugintoolkit.composeapp.generated.resources.job_no_ended
 import plugintoolkit.composeapp.generated.resources.job_paused_jobs
 import plugintoolkit.composeapp.generated.resources.job_queue
 import plugintoolkit.composeapp.generated.resources.job_running_jobs
 import plugintoolkit.composeapp.generated.resources.job_scheduler_soon
 import plugintoolkit.composeapp.generated.resources.nav_job_archive
+import plugintoolkit.composeapp.generated.resources.nav_job_ended
 import plugintoolkit.composeapp.generated.resources.nav_job_general
 import plugintoolkit.composeapp.generated.resources.nav_job_history
 import plugintoolkit.composeapp.generated.resources.nav_job_scheduler
@@ -120,6 +125,9 @@ sealed interface JobNavKey : NavKey {
 
     @Serializable
     data object History : JobNavKey
+
+    @Serializable
+    data object Ended : JobNavKey
 }
 
 val JobNavConfig = SavedStateConfiguration {
@@ -129,6 +137,7 @@ val JobNavConfig = SavedStateConfiguration {
             subclass(JobNavKey.Archive::class, JobNavKey.Archive.serializer())
             subclass(JobNavKey.Scheduler::class, JobNavKey.Scheduler.serializer())
             subclass(JobNavKey.History::class, JobNavKey.History.serializer())
+            subclass(JobNavKey.Ended::class, JobNavKey.Ended.serializer())
         }
     }
 }
@@ -146,6 +155,7 @@ fun JobDashboard(
             elements = listOf(
                 SidebarElement(JobNavKey.General, Icons.Default.Dashboard, Res.string.nav_job_general.localized),
                 SidebarElement(JobNavKey.Archive, Icons.Default.Archive, Res.string.nav_job_archive.localized),
+                SidebarElement(JobNavKey.Ended, Icons.Default.CheckCircle, Res.string.nav_job_ended.localized),
                 SidebarElement(JobNavKey.Scheduler, Icons.Default.Schedule, Res.string.nav_job_scheduler.localized),
                 SidebarElement(JobNavKey.History, Icons.Default.History, Res.string.nav_job_history.localized),
             )
@@ -174,6 +184,7 @@ fun JobDashboard(
             val titleText = when (currentKey) {
                 JobNavKey.General -> stringResource(Res.string.nav_job_general)
                 JobNavKey.Archive -> stringResource(Res.string.nav_job_archive)
+                JobNavKey.Ended -> stringResource(Res.string.nav_job_ended)
                 JobNavKey.Scheduler -> stringResource(Res.string.nav_job_scheduler)
                 JobNavKey.History -> stringResource(Res.string.nav_job_history)
                 else -> "Jobs"
@@ -197,6 +208,7 @@ fun JobDashboard(
                     when (key) {
                         is JobNavKey.General -> NavEntry(key) { GeneralTab(viewModel) }
                         is JobNavKey.Archive -> NavEntry(key) { ArchiveTab(viewModel) }
+                        is JobNavKey.Ended -> NavEntry(key) { EndedTab(viewModel) }
                         is JobNavKey.Scheduler -> NavEntry(key) { SchedulerTab() }
                         is JobNavKey.History -> NavEntry(key) { HistoryTab(viewModel) }
                         else -> NavEntry(key) { }
@@ -296,6 +308,54 @@ fun ArchiveTab(viewModel: JobViewModel) {
 }
 
 @Composable
+fun EndedTab(viewModel: JobViewModel) {
+    val endedJobs by viewModel.endedJobs.collectAsState()
+    val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
+    val expandedJobs = remember { mutableStateMapOf<String, Boolean>() }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = { viewModel.clearAllEndedJobs() },
+                enabled = endedJobs.isNotEmpty(),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Icon(Icons.Default.Cancel, contentDescription = null)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(stringResource(Res.string.action_clear_all))
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            if (endedJobs.isNotEmpty()) {
+                item {
+                    SectionHeader(title = stringResource(Res.string.job_ended_jobs), icon = Icons.Default.CheckCircle)
+                }
+                items(endedJobs) { job ->
+                    JobCard(
+                        job = job,
+                        logs = logsMap[job.id] ?: emptyList(),
+                        isExpanded = expandedJobs[job.id] ?: false,
+                        onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
+                        onClear = { viewModel.clearEndedJob(job.id) }
+                    )
+                }
+            } else {
+                item {
+                    EmptyState(text = stringResource(Res.string.job_no_ended), icon = Icons.Default.Inbox)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SchedulerTab() {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -384,7 +444,8 @@ fun JobCard(
     onToggleExpand: () -> Unit = {},
     onCancel: (Boolean) -> Unit = {},
     onPause: () -> Unit = {},
-    onResume: () -> Unit = {}
+    onResume: () -> Unit = {},
+    onClear: () -> Unit = {}
 ) {
     // Ticker to force recomposition every second for running jobs
     var ticker by remember { mutableStateOf(0) }
@@ -491,6 +552,16 @@ fun JobCard(
                         Icon(Icons.Default.Cancel, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(if (isShiftPressed) "Force Cancel" else stringResource(Res.string.dialog_cancel))
+                    }
+                }
+                if (job.status == JobStatus.Completed || job.status == JobStatus.Cancelled || job.status == JobStatus.Failed) {
+                    TextButton(
+                        onClick = onClear,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.outline)
+                    ) {
+                        Icon(Icons.Default.Cancel, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(Res.string.action_clear))
                     }
                 }
             }

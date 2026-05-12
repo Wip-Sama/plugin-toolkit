@@ -41,6 +41,7 @@ class PluginSettingsSecurityTest {
         override fun getSettingsDir(): String = "/tmp"
         override fun getJobsDir(): String = "/tmp/jobs"
         override fun openLogFolder() {}
+        override fun openLatestLog() {}
     }
 
     private val json = Json { 
@@ -54,7 +55,7 @@ class PluginSettingsSecurityTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
         val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
-        val jobManager = JobManager(backgroundScope, 1)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
 
         val pkg = "test.plugin.secret"
@@ -125,7 +126,7 @@ class PluginSettingsSecurityTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
         val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
-        val jobManager = JobManager(backgroundScope, 1)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
 
         val pkg = "test.plugin.secret.nonstring"

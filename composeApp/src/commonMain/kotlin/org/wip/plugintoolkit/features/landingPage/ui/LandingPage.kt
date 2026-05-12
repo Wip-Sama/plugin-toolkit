@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +71,8 @@ fun LandingPage(
     jobManager: JobManager = koinInject()
 ) {
     val jobs by jobManager.jobs.collectAsState()
+    val endedJobs by jobManager.endedJobs.collectAsState()
+    val allJobs = remember(jobs, endedJobs) { jobs + endedJobs }
     val loadedPlugins = viewModel.loadedPlugins
 
     val activeJobsCount = jobs.count { it.status == JobStatus.Running }
@@ -137,7 +140,7 @@ fun LandingPage(
                     )
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
-                    if (jobs.isEmpty()) {
+                    if (allJobs.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
                                 stringResource(Res.string.landing_no_activity),
@@ -146,7 +149,7 @@ fun LandingPage(
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)) {
-                            jobs.take(5).forEach { job ->
+                            allJobs.sortedByDescending { it.enqueuedAt }.take(5).forEach { job ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically

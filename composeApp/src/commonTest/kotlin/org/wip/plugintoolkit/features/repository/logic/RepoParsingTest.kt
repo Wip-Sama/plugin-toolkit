@@ -29,6 +29,7 @@ class RepoParsingTest {
         override fun getSettingsDir(): String = ""
         override fun getJobsDir(): String = ""
         override fun openLogFolder() {}
+        override fun openLatestLog() {}
     }
 
     @Test

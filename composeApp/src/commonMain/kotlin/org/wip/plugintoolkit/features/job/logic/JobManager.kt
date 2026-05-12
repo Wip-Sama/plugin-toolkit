@@ -29,17 +29,26 @@ import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import kotlin.time.Clock
 
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+
 class JobManager(
     /** Injected [AppScope] for managing job lifecycles and worker coordination. */
     private val scope: CoroutineScope,
-    private val maxConcurrentJobs: Int = 2
+    private val settingsRepository: SettingsRepository
 ) {
+    private val maxConcurrentJobs get() = settingsRepository.settings.value.jobs.maxConcurrentJobs
+    private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
+    private val maxHistoryLength get() = settingsRepository.settings.value.jobs.maxHistoryLength
+
     private val _jobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
     val jobs: StateFlow<List<BackgroundJob>> = _jobs.asStateFlow()
 
     val activeJobIds: StateFlow<Set<String>> = _jobs.map { list ->
         list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running }.map { it.id }.toSet()
     }.stateIn(scope, SharingStarted.Eagerly, emptySet())
+
+    private val _endedJobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
+    val endedJobs: StateFlow<List<BackgroundJob>> = _endedJobs.asStateFlow()
 
     private val _jobProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
     val jobProgress: StateFlow<Map<String, Float>> = _jobProgress.asStateFlow()
@@ -60,7 +69,6 @@ class JobManager(
     private val handlesMutex = Mutex()
     private val activeJobHandles = mutableMapOf<String, JobHandle>()
 
-    private val MAX_HISTORY_SIZE = 100
 
     init {
         startWorkers()
@@ -121,6 +129,11 @@ class JobManager(
         if (cancelled) {
             handlesMutex.withLock {
                 activeJobHandles.remove(jobId)?.cancel(force = force)
+            }
+            val finishedJob = _jobs.value.find { it.id == jobId }
+            if (finishedJob != null) {
+                _jobs.update { it.filterNot { it.id == jobId } }
+                _endedJobs.update { (listOf(finishedJob) + it).take(maxEndedJobs) }
             }
             addHistoryEntryInternal(jobId, jobName, "Cancelled")
             Logger.i { "Job $jobId ($jobName) cancelled (force=$force)" }
@@ -279,6 +292,11 @@ class JobManager(
         }
 
         if (completed) {
+            val finishedJob = _jobs.value.find { it.id == jobId }
+            if (finishedJob != null) {
+                _jobs.update { it.filterNot { it.id == jobId } }
+                _endedJobs.update { (listOf(finishedJob) + it).take(maxEndedJobs) }
+            }
             addHistoryEntryInternal(jobId, jobName, "Completed")
             Logger.i { "Job $jobId ($jobName) completed successfully" }
         } else {
@@ -309,6 +327,11 @@ class JobManager(
         }
 
         if (failed) {
+            val finishedJob = _jobs.value.find { it.id == jobId }
+            if (finishedJob != null) {
+                _jobs.update { it.filterNot { it.id == jobId } }
+                _endedJobs.update { (listOf(finishedJob) + it).take(maxEndedJobs) }
+            }
             addHistoryEntryInternal(jobId, jobName, "Failed", errorMessage)
             Logger.e { "Job $jobId ($jobName) failed: $errorMessage" }
         } else {
@@ -437,8 +460,8 @@ class JobManager(
         val entry = JobHistoryEntry(jobId, jobName, event = event, details = details)
         _history.update { currentList ->
             val newList = listOf(entry) + currentList
-            if (newList.size > MAX_HISTORY_SIZE) {
-                newList.take(MAX_HISTORY_SIZE)
+            if (newList.size > maxHistoryLength) {
+                newList.take(maxHistoryLength)
             } else {
                 newList
             }
@@ -447,6 +470,17 @@ class JobManager(
 
     fun removeJobs(predicate: (BackgroundJob) -> Boolean) {
         _jobs.update { it.filterNot(predicate) }
+    }
+
+    fun clearEndedJob(jobId: String) {
+        _endedJobs.update { it.filterNot { it.id == jobId } }
+        _jobLogs.update { it - jobId }
+    }
+
+    fun clearAllEndedJobs() {
+        val endedIds = _endedJobs.value.map { it.id }
+        _endedJobs.value = emptyList()
+        _jobLogs.update { it.filterKeys { k -> k !in endedIds } }
     }
 
     suspend fun stopAll() {
