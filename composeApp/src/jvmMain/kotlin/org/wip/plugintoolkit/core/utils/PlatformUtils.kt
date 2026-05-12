@@ -288,15 +288,16 @@ actual object PlatformUtils {
                         if (currentInstallDir != null) "$base INSTALLDIR=\"$currentInstallDir\"" else base
                     }
                     normalizedPath.endsWith(".exe") -> {
-                        if (currentInstallDir != null) "/DIR=\"$currentInstallDir\"" else ""
+                        print(currentInstallDir)
+                        if (currentInstallDir != null) "INSTALLDIR=\"$currentInstallDir\"" else ""
                     }
                     else -> ""
                 }
 
                 val executable = if (normalizedPath.endsWith(".msi")) "msiexec.exe" else normalizedPath
-                
+
                 Logger.i { "Executing ShellExecute: $executable $params" }
-                
+
                 val result = Shell32.INSTANCE.ShellExecute(
                     null,
                     "open",
@@ -305,7 +306,7 @@ actual object PlatformUtils {
                     null,
                     WinUser.SW_SHOWNORMAL
                 )
-                
+
                 val resultCode = com.sun.jna.Pointer.nativeValue(result.toPointer())
                 if (resultCode <= 32) {
                     throw Exception("ShellExecute failed with code $resultCode")
