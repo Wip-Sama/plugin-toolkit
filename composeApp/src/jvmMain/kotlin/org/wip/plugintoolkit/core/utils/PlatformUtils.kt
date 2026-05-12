@@ -288,7 +288,8 @@ actual object PlatformUtils {
                         if (currentInstallDir != null) "$base INSTALLDIR=\"$currentInstallDir\"" else base
                     }
                     normalizedPath.endsWith(".exe") -> {
-                        if (currentInstallDir != null) "/DIR=\"$currentInstallDir\"" else ""
+                        print(currentInstallDir)
+                        if (currentInstallDir != null) "INSTALLDIR=\"$currentInstallDir\"" else ""
                     }
                     else -> ""
                 }
