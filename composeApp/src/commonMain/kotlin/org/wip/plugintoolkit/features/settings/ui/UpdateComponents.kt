@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.core.ui.MarkdownText
 import org.wip.plugintoolkit.core.update.UpdateInfo
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.update_available_title
@@ -73,7 +74,7 @@ fun UpdateDialog(
                 ) {
                     SelectionContainer {
                         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                            Text(
+                            MarkdownText(
                                 text = updateInfo.changelog ?: "No release notes available.",
                                 style = MaterialTheme.typography.bodyMedium
                             )

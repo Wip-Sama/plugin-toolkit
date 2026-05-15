@@ -48,6 +48,7 @@ fun SettingsItem(
     icon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
+    extraContent: @Composable (() -> Unit)? = null,
     control: @Composable (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -105,6 +106,9 @@ fun SettingsItem(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
                         )
+                    }
+                    if (extraContent != null) {
+                        extraContent()
                     }
                 }
 

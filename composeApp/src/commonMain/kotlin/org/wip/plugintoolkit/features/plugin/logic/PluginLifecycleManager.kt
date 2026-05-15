@@ -55,6 +55,25 @@ class PluginLifecycleManager(
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"
 
+        // Runtime signature verification for remote plugins
+        if (plugin.repoUrl != null) {
+            val repo = settingsRepository.loadSettings().extensions.repositories.find { it.url == plugin.repoUrl }
+            val publicKey = repo?.signPublicKey
+            val strictChecking = settingsRepository.loadSettings().extensions.strictSignatureChecking
+
+            if (publicKey != null) {
+                val isSignatureValid = PluginSecurity.verify(jarFile, publicKey)
+                if (!isSignatureValid) {
+                    val msg = "Plugin signature verification failed for ${plugin.pkg}"
+                    Logger.w { msg }
+                    if (strictChecking || plugin.requiredAction == "CONFIRM_SIGNATURE") {
+                        updateLoadError(pkg, msg)
+                        return Result.failure(Exception(msg))
+                    }
+                }
+            }
+        }
+
         Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
         val settings = loadPluginSettings(pkg)
         val result = PluginLoader.loadPlugin(jarFile, settings.settings)

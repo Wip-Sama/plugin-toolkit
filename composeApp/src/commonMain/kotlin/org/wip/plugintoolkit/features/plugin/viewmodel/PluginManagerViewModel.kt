@@ -89,8 +89,23 @@ class PluginManagerViewModel(
                             message = "Plugin ${plugin.name} requires configuration. Would you like to configure it now?",
                             onConfirm = { openSettings(plugin.pkg) }
                         )
-                    } else if (plugin.requiredAction != "CONFIGURE_SETTINGS") {
+                    } else if (plugin.requiredAction == "CONFIRM_SIGNATURE" && !autoOpenedSettings.contains(plugin.pkg + "_sig")) {
+                        autoOpenedSettings.add(plugin.pkg + "_sig")
+                        dialogService.showConfirmation(
+                            title = "Invalid Signature",
+                            message = "Plugin ${plugin.name} has an invalid signature. Do you want to load it anyway? If you ignore, the plugin will remain locked and unloaded.",
+                            onConfirm = { 
+                                viewModelScope.launch {
+                                    pluginManager.updatePlugin(plugin.pkg) { p ->
+                                        p.copy(requiredAction = null, isEnabled = true, loadError = null, isValidated = true) 
+                                    }
+                                    pluginManager.reloadPlugin(plugin.pkg)
+                                }
+                            }
+                        )
+                    } else if (plugin.requiredAction != "CONFIGURE_SETTINGS" && plugin.requiredAction != "CONFIRM_SIGNATURE") {
                         autoOpenedSettings.remove(plugin.pkg)
+                        autoOpenedSettings.remove(plugin.pkg + "_sig")
                     }
                 }
             }

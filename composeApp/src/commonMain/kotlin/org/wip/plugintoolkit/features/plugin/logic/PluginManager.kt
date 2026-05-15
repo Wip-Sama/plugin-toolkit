@@ -115,6 +115,9 @@ class PluginManager(
 
     suspend fun setEnabled(pkg: String, enabled: Boolean) = coordinator.setEnabled(pkg, enabled)
 
+    suspend fun updatePlugin(pkg: String, transform: (InstalledPlugin) -> InstalledPlugin) = 
+        registry.updatePlugin(pkg, transform)
+
     // --- Context & Jobs ---
 
     fun createPluginContext(pkg: String, jobId: String? = null) = 

@@ -21,6 +21,7 @@ import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.model.RepoIndex
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.features.plugin.logic.PluginSecurity
 
 class RepoManager(
     private val settingsRepository: SettingsRepository,
@@ -104,7 +105,14 @@ class RepoManager(
                                 null
                             }
                         }
-                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest)
+                        val isSignatureValid = if (index.signPublicKey != null && plugin.signature != null && plugin.hash != null) {
+                            PluginSecurity.verifyDetached(
+                                plugin.hash,
+                                plugin.signature,
+                                index.signPublicKey
+                            )
+                        } else null
+                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest, isSignatureValid = isSignatureValid)
                     }
                 }.awaitAll()
                 _plugins.value += (trimmedUrl to updatedPlugins)
@@ -157,7 +165,14 @@ class RepoManager(
                                 null
                             }
                         }
-                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest)
+                        val isSignatureValid = if (index.signPublicKey != null && plugin.signature != null && plugin.hash != null) {
+                            PluginSecurity.verifyDetached(
+                                plugin.hash,
+                                plugin.signature,
+                                index.signPublicKey
+                            )
+                        } else null
+                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest, isSignatureValid = isSignatureValid)
                     }
                 }.awaitAll()
                 _plugins.value += (trimmedUrl to updatedPlugins)
@@ -170,7 +185,7 @@ class RepoManager(
                     it.copy(
                         name = index.name ?: it.name,
                         schemaVersion = index.schemaVersion,
-                        signPublicKey = index.signPublicKey ?: it.signPublicKey,
+                        signPublicKey = index.signPublicKey,
                         signAlgorithm = index.signAlgorithm ?: it.signAlgorithm,
                         pluginsFolder = index.pluginsFolder ?: it.pluginsFolder
                     )

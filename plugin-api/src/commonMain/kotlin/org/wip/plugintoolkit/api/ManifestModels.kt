@@ -136,7 +136,8 @@ data class PluginInfo(
 @Serializable
 data class Requirements(
     val minMemoryMb: Int,
-    val minExecutionTimeMs: Int
+    val minExecutionTimeMs: Int,
+    val targetAppVersion: String? = ApiConfig.VERSION
 )
 
 @Serializable

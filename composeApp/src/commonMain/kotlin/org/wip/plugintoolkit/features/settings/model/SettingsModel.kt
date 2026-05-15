@@ -108,7 +108,8 @@ data class ExtensionSettings(
     val repositories: List<ExtensionRepo> = emptyList(),
     val packageSourceOverrides: Map<String, String> = emptyMap(), // pkg to repo url
     val pluginFolders: List<String> = emptyList(), // managed install locations
-    val pluginUnplugBehavior: PluginUnplugBehavior = PluginUnplugBehavior.Block
+    val pluginUnplugBehavior: PluginUnplugBehavior = PluginUnplugBehavior.Block,
+    val strictSignatureChecking: Boolean = true
 )
 
 @Serializable

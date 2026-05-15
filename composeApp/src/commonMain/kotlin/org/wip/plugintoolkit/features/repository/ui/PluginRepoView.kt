@@ -224,6 +224,22 @@ fun PluginRepoView(
                             title = plugin.name,
                             subtitle = subtitle,
                             icon = Icons.Default.Extension,
+                            extraContent = if (plugin.isSignatureValid == false) {
+                                {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.errorContainer,
+                                        shape = MaterialTheme.shapes.extraSmall,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    ) {
+                                        Text(
+                                            "Wrong Signature",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            } else null,
                             control = {
                                 val isInstalled = viewModel.isInstalled(plugin.pkg)
                                 val activeJobs by viewModel.activePluginInstallationJobs.collectAsState()

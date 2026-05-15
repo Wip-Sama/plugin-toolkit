@@ -236,6 +236,7 @@ Each setting requires metadata to dictate how it is rendered and validated:
 ### Important Metadata Fields
 
 *   `required` (Boolean): If `true`, the user **must** provide a value before the plugin can run its setup or validation. The plugin will be blocked in a "Requires Configuration" state until all required fields are filled.
+*   `targetAppVersion` (String): The version of the host application this plugin was built for. The application uses this to ensure compatibility. If the application has introduced breaking changes since this version, the plugin will be marked as "Incompatible".
 *   `secret` (Boolean): If `true`, the host application will mask the input in the UI (like a password field) and securely encrypt the value on disk using OS-native secure storage (DPAPI on Windows, Keychain on macOS, Secret Service on Linux).
 
 ### Accessing Settings
@@ -260,8 +261,77 @@ suspend fun fetchData(context: PluginContext) {
 }
 ```
 
+## Plugin Requirements
+
+Plugins can specify system and application requirements in their manifest. These are validated by the host application before installation and loading.
+
+```json
+"requirements": {
+  "minMemoryMb": 512,
+  "minExecutionTimeMs": 1000,
+  "targetAppVersion": "1.5.0"
+}
+```
+
+### Compatibility Rules
+
+The toolkit ensures that plugins remain compatible with the host application version:
+
+1.  **Forward Compatibility**: The `targetAppVersion` must be less than or equal to the current application version. You cannot run a plugin built for a future version of the toolkit.
+2.  **Backward Compatibility**: The application defines a minimum compatible version. If a plugin was built for a version older than this threshold (e.g., due to breaking API changes), it will be marked as "Incompatible".
+
+---
+
+## Plugin Security & Signatures
+
+To ensure the integrity and authenticity of plugins, the toolkit supports digital signatures. For plugins distributed via remote repositories, signature verification is **mandatory**.
+
+### 1. Security Overview
+
+The toolkit uses **RSA** digital signatures with **SHA-256**. A plugin is considered valid if:
+- The JAR file is correctly signed.
+- The public key used for signing matches the `signPublicKey` provided by the repository.
+- (For remote plugins) The signature and hash provided in the repository's `index.json` match the downloaded file.
+
+### 2. Generating a Key Pair
+
+You need an RSA key pair to sign your plugins. You can generate one using `keytool` (included with the JDK):
+
+```bash
+keytool -genkeypair -alias plugin-key -keyalg RSA -keysize 2048 -keystore my-release-key.jks -validity 10000
+```
+
+### 3. Signing the Plugin JAR
+
+Once you have your keystore, you can sign your plugin JAR using `jarsigner`:
+
+```bash
+jarsigner -keystore my-release-key.jks my-plugin.jar plugin-key
+```
+
+### 4. Exporting the Public Key
+
+The repository needs your public key in **Base64-encoded X.509** format. You can export it like this:
+
+1. Export the certificate:
+   ```bash
+   keytool -exportcert -alias plugin-key -keystore my-release-key.jks -file plugin-cert.crt
+   ```
+2. Convert to Base64 (on Windows/PowerShell):
+   ```powershell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("plugin-cert.crt"))
+   ```
+3. Use the resulting string as the `signPublicKey` in your repository's `index.json`.
+
+### 5. Local Development
+
+For local development (loading plugins from the local filesystem), signature verification is currently optional but recommended. If a plugin is signed, the toolkit will still verify it if a public key is available.
+
+---
+
 ## Best Practices
 
 - **Non-blocking**: Always use `suspend` functions for I/O or heavy computation.
 - **Resource Cleanup**: Always implement `shutdown()` or use try-finally blocks to clean up resources.
 - **Isolation**: Plugins should not attempt to access files outside their managed folders.
+- **Security**: Never share your private key or keystore password. Store them securely.

@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.TestScope
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
@@ -17,11 +18,16 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import io.mockk.*
+import org.wip.plugintoolkit.features.settings.model.ExtensionSettings
+import kotlin.test.*
 
 class PluginPluginInstallationTest {
+
+    @AfterTest
+    fun tearDown() {
+        unmockkAll()
+    }
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -155,4 +161,85 @@ class PluginPluginInstallationTest {
         assertEquals("1.1.0", registry.getPlugin("org.test.plugin")?.version)
         assertTrue(fileSystem.exists("target/org.test.plugin/test_v2.jar"))
     }
+
+    @Test
+    fun testStrictSignatureChecking() = runTest {
+        mockkObject(PluginSecurity)
+        every { PluginSecurity.verify(any(), any()) } returns false
+
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings(extensions = ExtensionSettings(strictSignatureChecking = true))
+        
+        val (installer, repoManager, registry, fileSystem) = createTestInstaller(persistence)
+
+        val repoUrl = "https://example.com/repo/index.json"
+        repoManager.addRepository(repoUrl)
+        
+        val plugin = repoManager.plugins.value[repoUrl]!![0]
+
+        val result = installer.installRemote(plugin, "target")
+        
+        assertTrue(result.isFailure)
+        assertEquals("Plugin signature verification failed (strict checking enabled)", result.exceptionOrNull()?.message)
+        assertFalse(fileSystem.exists("target/org.test"))
+        unmockkObject(PluginSecurity)
+    }
+
+    @Test
+    fun testLazySignatureChecking() = runTest {
+        mockkObject(PluginSecurity)
+        every { PluginSecurity.verify(any(), any()) } returns false
+
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings(extensions = ExtensionSettings(strictSignatureChecking = false))
+        
+        val (installer, repoManager, registry, fileSystem) = createTestInstaller(persistence)
+
+        val repoUrl = "https://example.com/repo/index.json"
+        repoManager.addRepository(repoUrl)
+        
+        val plugin = repoManager.plugins.value[repoUrl]!![0]
+
+        val result = installer.installRemote(plugin, "target")
+        
+        assertTrue(result.isSuccess)
+        val installed = registry.getPlugin("org.test")
+        assertNotNull(installed)
+        assertEquals("CONFIRM_SIGNATURE", installed.requiredAction)
+        assertEquals("Invalid Signature", installed.loadError)
+        assertFalse(installed.isEnabled)
+        unmockkObject(PluginSecurity)
+    }
+
+    private fun TestScope.createTestInstaller(
+        persistence: FakeSettingsPersistence = FakeSettingsPersistence(),
+        fileSystem: FakeFileSystem = FakeFileSystem()
+    ): TestInstallerComponents {
+        val mockEngine = MockEngine { request ->
+            val url = request.url.toString()
+            when {
+                url.contains("index.json") -> respond(
+                    content = """{ "name": "Test", "signPublicKey": "test-key", "plugins": [ { "name": "Test", "pkg": "org.test", "version": "1.0", "fileName": "test.jar" } ] }""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+                else -> respond(byteArrayOf(1, 2, 3))
+            }
+        }
+        val client = HttpClient(mockEngine) { install(ContentNegotiation) { json(json) } }
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+        val installer = PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, jobManager, client, fileSystem)
+        return TestInstallerComponents(installer, repoManager, registry, fileSystem)
+    }
+
+    private data class TestInstallerComponents(
+        val installer: PluginInstaller,
+        val repoManager: RepoManager,
+        val registry: PluginRegistry,
+        val fileSystem: FakeFileSystem
+    )
 }

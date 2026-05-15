@@ -28,7 +28,9 @@
     <string name="section_about">About</string>
     <string name="about_built_by">Built with ❤️ by: Wip-Sama</string>
     <string name="about_libraries">Libraries used</string>
-    <string name="about_libraries_placeholder">The list of libraries will be available soon.</string>
+    <string name="about_icon_credits">Icon credits</string>
+    <string name="about_icon_author">Muh_zakaria</string>
+    <string name="about_icon_site">SVGRepo</string>
     <string name="section_general">General</string>
     <string name="section_localization">Localization</string>
     <string name="setting_adaptive_color">Adaptive Color</string>

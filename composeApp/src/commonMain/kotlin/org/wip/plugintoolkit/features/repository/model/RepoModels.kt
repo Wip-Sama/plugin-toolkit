@@ -36,5 +36,6 @@ data class ExtensionPlugin(
     val size: Long? = null,
     val hash: String? = null,
     val signature: String? = null,
+    val isSignatureValid: Boolean? = null,
     val manifest: PluginManifest? = null
 )

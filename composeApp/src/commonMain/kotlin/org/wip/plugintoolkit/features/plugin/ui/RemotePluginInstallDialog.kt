@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -220,24 +221,28 @@ fun RemotePluginCard(
                 }
             }
 
-            if (showInfo) {
-                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-                HorizontalDivider(modifier = Modifier.alpha(0.5f))
-                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+            AnimatedVisibility(showInfo) {
+                Column(
+                    modifier = Modifier.padding(top = ToolkitTheme.spacing.small),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+                    HorizontalDivider(modifier = Modifier.alpha(0.5f))
 
-                if (plugin.description != null) {
-                    Text(
-                        plugin.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = ToolkitTheme.spacing.small),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    if (plugin.description != null) {
+                        Text(
+                            plugin.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = ToolkitTheme.spacing.small),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    InfoRow("Repository", plugin.repoUrl ?: "Unknown")
+                    plugin.size?.let { InfoRow("Size", formatSize(it)) }
+                    plugin.hash?.let { InfoRow("Hash", it) }
+                    plugin.signature?.let { InfoRow("Signature", it) }
                 }
-
-                InfoRow("Repository", plugin.repoUrl ?: "Unknown")
-                plugin.size?.let { InfoRow("Size", formatSize(it)) }
-                plugin.hash?.let { InfoRow("Hash", it) }
-                plugin.signature?.let { InfoRow("Signature", it) }
             }
 
             if (progress != null) {

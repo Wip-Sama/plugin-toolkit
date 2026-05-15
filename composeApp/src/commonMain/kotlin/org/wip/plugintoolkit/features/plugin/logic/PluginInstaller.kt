@@ -7,8 +7,10 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.readBytes
 import io.ktor.http.HttpHeaders
 import io.ktor.utils.io.readAvailable
+import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.utils.FileSystem
+import org.wip.plugintoolkit.core.utils.VersionUtils
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
@@ -55,6 +57,8 @@ class PluginInstaller(
 
             fileSystem.copyFile(filePath, dest)
 
+            val (isCompatible, compError) = manifest?.let { checkCompatibility(it) } ?: (true to null as String?)
+
             val newPlugin = InstalledPlugin(
                 pkg = pkg,
                 name = name,
@@ -62,7 +66,9 @@ class PluginInstaller(
                 installPath = pluginDir,
                 jarFileName = jarFileName,
                 description = description,
-                isValidated = false
+                isValidated = false,
+                isCompatible = isCompatible,
+                compatibilityError = compError
             )
 
             registry.addOrUpdatePlugin(newPlugin)
@@ -117,6 +123,29 @@ class PluginInstaller(
             }
             downloadFile("$baseUrl/changelog.md", "$pluginDir/changelog.md")
 
+            // Signature verification
+            val repo = repoManager.repositories.value.find { it.url == repoUrl }
+            val publicKey = repo?.signPublicKey
+            val strictChecking = settingsRepository.loadSettings().extensions.strictSignatureChecking
+
+            var isSignatureValid = true
+            if (publicKey != null) {
+                isSignatureValid = PluginSecurity.verify(destFile, publicKey)
+            } else {
+                Logger.w { "No public key found for repo $repoUrl, treating signature as valid for now." }
+            }
+
+            if (!isSignatureValid) {
+                Logger.w { "Signature verification failed for ${plugin.pkg}" }
+                if (strictChecking) {
+                    fileSystem.deleteDirectory(pluginDir)
+                    return Result.failure(Exception("Plugin signature verification failed (strict checking enabled)"))
+                }
+            }
+
+            val manifest = getManifestFromJar(destFile)
+            val (isCompatible, compError) = manifest?.let { checkCompatibility(it) } ?: (true to null as String?)
+
             val newPlugin = InstalledPlugin(
                 pkg = plugin.pkg,
                 name = plugin.name,
@@ -124,7 +153,12 @@ class PluginInstaller(
                 installPath = pluginDir,
                 repoUrl = repoUrl,
                 jarFileName = plugin.fileName,
-                description = plugin.description
+                description = plugin.description,
+                isEnabled = isSignatureValid,
+                isCompatible = isCompatible,
+                compatibilityError = compError,
+                requiredAction = if (!isSignatureValid) "CONFIRM_SIGNATURE" else null,
+                loadError = if (!isSignatureValid) "Invalid Signature" else null
             )
             registry.addOrUpdatePlugin(newPlugin)
             Logger.i { "Successfully installed remote plugin: ${plugin.pkg}" }
@@ -228,20 +262,24 @@ class PluginInstaller(
     fun getUpdate(pkg: String): ExtensionPlugin? {
         return repoManager.plugins.value.values.flatten().find { it.pkg == pkg }?.let { remote ->
             val installed = registry.getPlugin(pkg)
-            if (installed != null && isNewer(remote.version, installed.version)) {
+            if (installed != null && VersionUtils.compare(remote.version, installed.version) > 0) {
                 remote
             } else null
         }
     }
 
-    private fun isNewer(v1: String, v2: String): Boolean {
-        val s1 = v1.split(".").mapNotNull { it.toIntOrNull() }
-        val s2 = v2.split(".").mapNotNull { it.toIntOrNull() }
-        for (i in 0 until minOf(s1.size, s2.size)) {
-            if (s1[i] > s2[i]) return true
-            if (s1[i] < s2[i]) return false
+    private fun checkCompatibility(manifest: PluginManifest): Pair<Boolean, String?> {
+        val target = manifest.requirements.targetAppVersion ?: return true to null
+        val current = AppConfig.VERSION
+        val min = AppConfig.MIN_COMPATIBLE_PLUGIN_VERSION
+
+        if (VersionUtils.compare(target, current) > 0) {
+            return false to "Plugin requires a newer app version (targeted for $target)"
         }
-        return s1.size > s2.size
+        if (VersionUtils.compare(target, min) < 0) {
+            return false to "Plugin is obsolete (targeted for $target, min supported $min)"
+        }
+        return true to null
     }
 
     private suspend fun downloadFile(url: String, dest: String, onProgress: ((Float) -> Unit)? = null): Result<Unit> {

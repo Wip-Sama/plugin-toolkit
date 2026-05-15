@@ -2,8 +2,23 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.buildkonfig)
     id("maven-publish")
 }
+
+buildkonfig {
+    packageName = "org.wip.plugintoolkit.api"
+    objectName = "ApiConfig"
+
+    defaultConfigs {
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "VERSION",
+            libs.versions.app.get()
+        )
+    }
+}
+
 
 group = "org.wip.plugintoolkit"
 version = libs.versions.app.get()

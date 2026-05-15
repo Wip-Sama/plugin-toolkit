@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.settings.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -7,8 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -21,8 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.AppConfig
@@ -33,15 +41,35 @@ import org.wip.plugintoolkit.api.Release
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.about_built_by
 import plugintoolkit.composeapp.generated.resources.about_libraries
-import plugintoolkit.composeapp.generated.resources.about_libraries_placeholder
+import plugintoolkit.composeapp.generated.resources.about_icon_credits
+import plugintoolkit.composeapp.generated.resources.about_icon_author
+import plugintoolkit.composeapp.generated.resources.about_icon_site
+import plugintoolkit.composeapp.generated.resources.app_logo
 import plugintoolkit.composeapp.generated.resources.app_name
 import plugintoolkit.composeapp.generated.resources.plugin_changelog
 
-@OptIn(ExperimentalResourceApi::class)
+private data class Library(val name: String, val url: String)
+
+private val libraries = listOf(
+    Library("Compose Multiplatform", "https://www.jetbrains.com/lp/compose-multiplatform/"),
+    Library("Kotlin Multiplatform", "https://kotlinlang.org/docs/multiplatform.html"),
+    Library("Koin", "https://insert-koin.io/"),
+    Library("Ktor", "https://ktor.io/"),
+    Library("FileKit", "https://github.com/vinceglb/FileKit"),
+    Library("Kermit", "https://github.com/touchlab/Kermit"),
+    Library("JNA", "https://github.com/java-native-access/jna"),
+    Library("kotlinx.serialization", "https://github.com/Kotlin/kotlinx.serialization"),
+    Library("kotlinx.coroutines", "https://github.com/Kotlin/kotlinx.coroutines"),
+    Library("kotlinx.datetime", "https://github.com/Kotlin/kotlinx-datetime"),
+    Library("kotlinx.io", "https://github.com/Kotlin/kotlinx-io")
+)
+
+@OptIn(ExperimentalResourceApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun AboutView(
     dialogService: DialogService = koinInject()
 ) {
+    val uriHandler = LocalUriHandler.current
     var changelogVersions by remember { mutableStateOf<List<Release>>(emptyList()) }
 
     LaunchedEffect(Unit) {
@@ -64,8 +92,14 @@ fun AboutView(
         // App Identity
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = ToolkitTheme.spacing.large)
+            modifier = Modifier.padding(top = ToolkitTheme.spacing.large),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
         ) {
+            Image(
+                painter = painterResource(Res.drawable.app_logo),
+                contentDescription = stringResource(Res.string.app_name),
+                modifier = Modifier.size(128.dp)
+            )
             Text(
                 text = stringResource(Res.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
@@ -111,11 +145,48 @@ fun AboutView(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
+                ) {
+                    libraries.forEach { library ->
+                        AssistChip(
+                            onClick = { uriHandler.openUri(library.url) },
+                            label = { Text(library.name) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Icon Credits Section
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = ToolkitTheme.spacing.medium)
+        ) {
+            Column(
+                modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+            ) {
                 Text(
-                    text = stringResource(Res.string.about_libraries_placeholder),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = stringResource(Res.string.about_icon_credits),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
+                ) {
+                    AssistChip(
+                        onClick = { uriHandler.openUri("https://www.svgrepo.com/author/muh_zakaria/") },
+                        label = { Text(stringResource(Res.string.about_icon_author)) }
+                    )
+                    AssistChip(
+                        onClick = { uriHandler.openUri("https://www.svgrepo.com/") },
+                        label = { Text(stringResource(Res.string.about_icon_site)) }
+                    )
+                }
             }
         }
 

@@ -10,6 +10,8 @@ data class InstalledPlugin(
     val installPath: String, // Absolute path to the plugin folder
     val isEnabled: Boolean = true,
     val isValidated: Boolean = false,
+    val isCompatible: Boolean = true,
+    val compatibilityError: String? = null,
     val repoUrl: String? = null, // Source repository URL if remote
     val jarFileName: String? = null,
     val description: String? = null,
