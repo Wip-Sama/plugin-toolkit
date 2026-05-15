@@ -4,7 +4,7 @@ Fixed:
 	- Updater on windows now launches with correct path when applicable (.jar is not updatable)
   - The update page now correctly displays the change description
 Added:
-  - Plugin now can define wich os they support (linux, windows, macos)
+  - Plugin now can define which os they support (linux, windows, macos)
   - Check to ensure the plugin is compatible with the app version
   - Plugin signature
   - Library used in the about section

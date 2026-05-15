@@ -1,11 +1,13 @@
 package org.wip.plugintoolkit.features.navigation.viewmodel
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.PendingActions
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.lifecycle.ViewModel
 import org.wip.plugintoolkit.core.model.localized
@@ -67,7 +69,13 @@ class AppViewModel(
         ), SidebarSectionData(
             title = Res.string.section_flows.localized, elements = listOf(
                 SidebarElement(
-                    id = Screen.Board, icon = Icons.Default.Edit, title = Res.string.nav_board.localized
+                    id = Screen.FlowManager, icon = Icons.Default.Dashboard, title = "Manager".localized
+                ),
+                SidebarElement(
+                    id = Screen.FlowRunner, icon = Icons.Default.PlayCircle, title = "View".localized
+                ),
+                SidebarElement(
+                    id = Screen.FlowEditor, icon = Icons.Default.Edit, title = "Editor".localized
                 )
             )
         )

@@ -12,7 +12,13 @@ sealed interface Screen : NavKey {
     data object Main : Screen
 
     @Serializable
-    data object Board : Screen
+    data object FlowManager : Screen
+
+    @Serializable
+    data object FlowRunner : Screen
+
+    @Serializable
+    data object FlowEditor : Screen
 
     @Serializable
     data object Settings : Screen
@@ -38,7 +44,9 @@ val ScreenNavConfig = SavedStateConfiguration {
     serializersModule = SerializersModule {
         polymorphic(NavKey::class) {
             subclass(Screen.Main::class, Screen.Main.serializer())
-            subclass(Screen.Board::class, Screen.Board.serializer())
+            subclass(Screen.FlowManager::class, Screen.FlowManager.serializer())
+            subclass(Screen.FlowRunner::class, Screen.FlowRunner.serializer())
+            subclass(Screen.FlowEditor::class, Screen.FlowEditor.serializer())
             subclass(Screen.Settings::class, Screen.Settings.serializer())
             subclass(Screen.JobDashboard::class, Screen.JobDashboard.serializer())
             subclass(Screen.Plugins::class, Screen.Plugins.serializer())

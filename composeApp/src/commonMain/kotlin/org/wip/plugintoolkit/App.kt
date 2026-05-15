@@ -33,7 +33,11 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.DialogHost
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformLocalization
-import org.wip.plugintoolkit.features.board.ui.BoardScreen
+import org.wip.plugintoolkit.features.board.ui.FlowEditorView
+import org.wip.plugintoolkit.features.board.ui.FlowManagerView
+import org.wip.plugintoolkit.features.board.ui.FlowRunnerView
+import org.wip.plugintoolkit.features.board.viewmodel.FlowViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import org.wip.plugintoolkit.features.job.ui.JobBadge
 import org.wip.plugintoolkit.features.job.ui.JobDashboard
 import org.wip.plugintoolkit.features.landingPage.ui.LandingPage
@@ -81,7 +85,8 @@ private fun AppContent(
     pluginViewModel: PluginViewModel,
     appViewModel: AppViewModel,
     notificationService: NotificationService,
-    dialogService: DialogService
+    dialogService: DialogService,
+    flowViewModel: FlowViewModel = viewModel { FlowViewModel() }
 ) {
     val general = settings.general
     val density = LocalDensity.current
@@ -127,7 +132,18 @@ private fun AppContent(
                             onBack = { if (backStack.size > 1) backStack.removeLast() }) { key ->
                             when (key) {
                                 is Screen.Main -> NavEntry(key) { LandingPage() }
-                                is Screen.Board -> NavEntry(key) { BoardScreen() }
+                                is Screen.FlowManager -> NavEntry(key) {
+                                    FlowManagerView(
+                                        viewModel = flowViewModel,
+                                        onEditFlow = { backStack.add(Screen.FlowEditor) }
+                                    )
+                                }
+                                is Screen.FlowRunner -> NavEntry(key) {
+                                    FlowRunnerView(viewModel = flowViewModel)
+                                }
+                                is Screen.FlowEditor -> NavEntry(key) {
+                                    FlowEditorView(viewModel = flowViewModel)
+                                }
                                 is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
                                 is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
                                 is Screen.Plugins -> NavEntry(key) { PluginSectionScreen() }

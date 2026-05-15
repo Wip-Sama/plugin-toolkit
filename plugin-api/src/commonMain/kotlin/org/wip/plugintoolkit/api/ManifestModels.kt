@@ -147,7 +147,8 @@ data class ParameterMetadata(
     val type: DataType,
     val constraints: ParameterConstraints? = null,
     val required: Boolean = false,
-    val secret: Boolean = false
+    val secret: Boolean = false,
+    val semanticType: String? = null
 )
 
 /**
@@ -159,6 +160,7 @@ data class Capability(
     val description: String,
     val parameters: Map<String, ParameterMetadata>? = null,
     val returnType: DataType,
+    val semanticType: String? = null,
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true
 )

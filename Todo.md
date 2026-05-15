@@ -29,6 +29,9 @@ Flows:
 - Default entrypoint, with local/remote support
 - Data Duplication entrypoint
 - Conditional nodes like: is result (something) then (something else)
+- Add info abot conenction points (mime type and dattype)
+- conenction point should be disabled if a default is used
+- conection point default should represent the datatype (bool should not be a textfield for example)
 
 Repo:
 - Test and make it work
