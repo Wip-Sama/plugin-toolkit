@@ -22,12 +22,12 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowState
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.shared.components.ZoomControls
 
 @Composable
 fun BoardCanvas(
-    state: FlowState,
+    state: FlowEditorState,
     flow: Flow,
     onPan: (Offset) -> Unit,
     onZoom: (Float, Offset) -> Unit,
@@ -112,7 +112,15 @@ fun BoardCanvas(
                 if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                     val startPos = (sourcePortBoardPos * state.scale) + state.offset
                     val endPos = (targetPortBoardPos * state.scale) + state.offset
-                    drawBezierCurve(startPos, endPos, connectionColor)
+                    
+                    val isInvalid = state.validationErrors.any {
+                        it.sourceNodeId == connection.sourceNodeId &&
+                        it.sourcePortId == connection.sourcePortId &&
+                        it.targetNodeId == connection.targetNodeId &&
+                        it.targetPortId == connection.targetPortId
+                    }
+                    val color = if (isInvalid) Color.Red else connectionColor
+                    drawBezierCurve(startPos, endPos, color)
                 }
             }
 

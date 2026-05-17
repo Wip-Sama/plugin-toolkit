@@ -31,31 +31,42 @@ object OffsetSerializer : KSerializer<Offset> {
 object AnySerializer : KSerializer<Any?> {
     override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
 
-    override fun serialize(encoder: Encoder, value: Any?) {
-        val jsonElement = when (value) {
+    private fun toJsonElement(value: Any?): JsonElement {
+        return when (value) {
             null -> JsonNull
             is JsonElement -> value
             is Boolean -> JsonPrimitive(value)
             is Number -> JsonPrimitive(value)
             is String -> JsonPrimitive(value)
+            is Map<*, *> -> JsonObject(value.entries.associate { it.key.toString() to toJsonElement(it.value) })
+            is List<*> -> JsonArray(value.map { toJsonElement(it) })
+            is Array<*> -> JsonArray(value.map { toJsonElement(it) })
             else -> JsonPrimitive(value.toString())
         }
-        encoder.encodeSerializableValue(JsonElement.serializer(), jsonElement)
+    }
+
+    private fun toPrimitiveOrElement(element: JsonElement): Any? {
+        return when (element) {
+            is JsonNull -> null
+            is JsonPrimitive -> {
+                if (element.isString) {
+                    element.content
+                } else {
+                    element.booleanOrNull ?: element.intOrNull ?: element.longOrNull ?: element.doubleOrNull ?: element.content
+                }
+            }
+            is JsonObject -> element.entries.associate { it.key to toPrimitiveOrElement(it.value) }
+            is JsonArray -> element.map { toPrimitiveOrElement(it) }
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: Any?) {
+        encoder.encodeSerializableValue(JsonElement.serializer(), toJsonElement(value))
     }
 
     override fun deserialize(decoder: Decoder): Any? {
         val jsonElement = decoder.decodeSerializableValue(JsonElement.serializer())
-        return when (jsonElement) {
-            is JsonNull -> null
-            is JsonPrimitive -> {
-                if (jsonElement.isString) {
-                    jsonElement.content
-                } else {
-                    jsonElement.booleanOrNull ?: jsonElement.intOrNull ?: jsonElement.longOrNull ?: jsonElement.doubleOrNull ?: jsonElement.content
-                }
-            }
-            else -> jsonElement
-        }
+        return toPrimitiveOrElement(jsonElement)
     }
 }
 
@@ -94,7 +105,7 @@ sealed class Node {
     abstract val outputs: List<OutputPort>
     
     abstract fun copyWithPosition(newPosition: Offset): Node
-    abstract fun copyWithUpdatedInputs(inputValues: Map<Pair<Long, String>, Any?>): Node
+    abstract fun copyWithUpdatedInput(portId: String, value: Any?): Node
 
     @Serializable
     @SerialName("capability")
@@ -108,9 +119,9 @@ sealed class Node {
     ) : Node() {
         override val title: String get() = capability.name
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
-        override fun copyWithUpdatedInputs(inputValues: Map<Pair<Long, String>, Any?>): Node {
+        override fun copyWithUpdatedInput(portId: String, value: Any?): Node {
             return copy(inputs = inputs.map { input ->
-                input.copy(value = inputValues[id to input.id] ?: input.value)
+                if (input.id == portId) input.copy(value = value) else input
             })
         }
     }
@@ -126,9 +137,9 @@ sealed class Node {
         override val outputs: List<OutputPort>
     ) : Node() {
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
-        override fun copyWithUpdatedInputs(inputValues: Map<Pair<Long, String>, Any?>): Node {
+        override fun copyWithUpdatedInput(portId: String, value: Any?): Node {
             return copy(inputs = inputs.map { input ->
-                input.copy(value = inputValues[id to input.id] ?: input.value)
+                if (input.id == portId) input.copy(value = value) else input
             })
         }
     }
@@ -140,10 +151,10 @@ sealed class Node {
         @Serializable(with = OffsetSerializer::class) override val position: Offset,
         override val outputs: List<OutputPort>
     ) : Node() {
-        override val title: String = "Flow Input"
+        override val title: String get() = "Flow Input (${outputs.firstOrNull()?.name ?: "input_data"})"
         override val inputs: List<InputPort> = emptyList() // Uses outputs to provide data into the flow
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
-        override fun copyWithUpdatedInputs(inputValues: Map<Pair<Long, String>, Any?>): Node = this
+        override fun copyWithUpdatedInput(portId: String, value: Any?): Node = this
     }
 
     @Serializable
@@ -153,12 +164,12 @@ sealed class Node {
         @Serializable(with = OffsetSerializer::class) override val position: Offset,
         override val inputs: List<InputPort>
     ) : Node() {
-        override val title: String = "Flow Output"
+        override val title: String get() = "Flow Output (${inputs.firstOrNull()?.name ?: "output_data"})"
         override val outputs: List<OutputPort> = emptyList() // Uses inputs to collect data from the flow
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
-        override fun copyWithUpdatedInputs(inputValues: Map<Pair<Long, String>, Any?>): Node {
+        override fun copyWithUpdatedInput(portId: String, value: Any?): Node {
             return copy(inputs = inputs.map { input ->
-                input.copy(value = inputValues[id to input.id] ?: input.value)
+                if (input.id == portId) input.copy(value = value) else input
             })
         }
     }
@@ -174,9 +185,9 @@ sealed class Node {
     ) : Node() {
         override val title: String get() = flowName
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
-        override fun copyWithUpdatedInputs(inputValues: Map<Pair<Long, String>, Any?>): Node {
+        override fun copyWithUpdatedInput(portId: String, value: Any?): Node {
             return copy(inputs = inputs.map { input ->
-                input.copy(value = inputValues[id to input.id] ?: input.value)
+                if (input.id == portId) input.copy(value = value) else input
             })
         }
     }

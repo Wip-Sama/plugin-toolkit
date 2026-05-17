@@ -30,6 +30,18 @@ fun FlowRunnerView(
     
     // Using a simple selection for flows to run
     var selectedFlowToRun by remember { mutableStateOf(state.flows.firstOrNull()) }
+
+    LaunchedEffect(Unit) {
+        viewModel.reloadFlows()
+    }
+
+    LaunchedEffect(state.flows) {
+        if (selectedFlowToRun == null || !state.flows.any { it.name == selectedFlowToRun?.name }) {
+            selectedFlowToRun = state.flows.firstOrNull()
+        } else {
+            selectedFlowToRun = state.flows.find { it.name == selectedFlowToRun?.name }
+        }
+    }
     
     // We would need to integrate with JobManager here. 
     // For this demonstration, I'll assume viewModel has access or I'll simulate.

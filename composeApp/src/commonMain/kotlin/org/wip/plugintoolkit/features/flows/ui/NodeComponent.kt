@@ -5,13 +5,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,14 +21,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.wip.plugintoolkit.features.flows.model.Node
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.geometry.Offset
@@ -41,8 +39,9 @@ import androidx.compose.ui.platform.LocalDensity
 @Composable
 fun NodeComponent(
     node: Node,
-    inputValues: Map<Pair<Long, String>, Any?>,
     connectedInputPortIds: Set<String>,
+    inferredTypes: Map<Pair<Long, String>, DataType> = emptyMap(),
+    validationErrors: List<ValidationError> = emptyList(),
     onMove: (Long, Offset, Boolean, Boolean) -> Unit, // id, delta, snap, showGhost
     onEndMove: (Long) -> Unit,
     onDelete: (Long) -> Unit,
@@ -53,6 +52,7 @@ fun NodeComponent(
     onDropConnection: () -> Unit = {},
     onPortPositioned: (Long, String, Offset) -> Unit = { _, _, _ -> },
     onPress: (Long) -> Unit = {},
+    onUpdateBoundaryNode: (Long, String, DataType, String?) -> Unit = { _, _, _, _ -> },
     highlightedPortId: String? = null,
     highlightedPortColor: Color? = null,
     boardLayoutCoordinates: LayoutCoordinates?,
@@ -62,6 +62,7 @@ fun NodeComponent(
 ) {
     val density = LocalDensity.current
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showEditBoundaryDialog by remember { mutableStateOf(false) }
     val (headerColor, onHeaderColor) = when (node) {
         is Node.CapabilityNode -> Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
         is Node.SystemNode -> Pair(ToolkitTheme.colors.success, Color.White)
@@ -140,16 +141,33 @@ fun NodeComponent(
                     }
                 }
 
-                IconButton(
-                    onClick = { showDeleteConfirmation = true },
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = onHeaderColor.copy(alpha = 0.8f),
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (node is Node.FlowInputNode || node is Node.FlowOutputNode) {
+                        IconButton(
+                            onClick = { showEditBoundaryDialog = true },
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Edit Port",
+                                tint = onHeaderColor.copy(alpha = 0.8f),
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                    }
+
+                    IconButton(
+                        onClick = { showDeleteConfirmation = true },
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = onHeaderColor.copy(alpha = 0.8f),
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                    }
                 }
             }
 
@@ -162,7 +180,7 @@ fun NodeComponent(
             ) {
                 // Inputs
                 node.inputs.forEach { input ->
-                    val currentPortValue = inputValues[node.id to input.id] ?: input.value ?: input.defaultValue
+                    val currentPortValue = input.value ?: input.defaultValue
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -185,15 +203,35 @@ fun NodeComponent(
                                 }
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(input.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                val inferredType = inferredTypes[Pair(node.id, input.id)] ?: input.dataType
+                                val typeLabel = if (input.dataType is DataType.Primitive && input.dataType.primitiveType == PrimitiveType.ANY &&
+                                                   !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)) {
+                                    "${formatDataType(inferredType)} (Implied)"
+                                } else {
+                                    formatDataType(input.dataType)
+                                }
                                 Text(
-                                    text = formatDataType(input.dataType),
+                                    text = typeLabel,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
                                 if (input.semanticType != null) {
                                     Text(input.semanticType, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                val portErrors = validationErrors.filter {
+                                    (it.sourceNodeId == node.id && it.sourcePortId == input.id) ||
+                                    (it.targetNodeId == node.id && it.targetPortId == input.id)
+                                }
+                                if (portErrors.isNotEmpty()) {
+                                    Text(
+                                        text = portErrors.first().message,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                         }
@@ -223,7 +261,6 @@ fun NodeComponent(
                                                      if (newValue.isEmpty()) {
                                                          onUpdateValue(node.id, input.id, null)
                                                      } else {
-                                                         // Filter only digits and leading minus
                                                          val filtered = newValue.filterIndexed { index, c ->
                                                              c.isDigit() || (c == '-' && index == 0)
                                                          }
@@ -253,7 +290,6 @@ fun NodeComponent(
                                                      if (newValue.isEmpty()) {
                                                          onUpdateValue(node.id, input.id, null)
                                                      } else {
-                                                         // Filter digits, at most one dot, and leading minus
                                                          val hasDot = newValue.count { it == '.' } <= 1
                                                          val validMinus = newValue.lastIndexOf('-') <= 0
                                                          val validChars = newValue.all { it.isDigit() || it == '.' || it == '-' }
@@ -330,7 +366,6 @@ fun NodeComponent(
                     }
                 }
 
-                // Divider if there are both inputs and outputs
                 if (node.inputs.isNotEmpty() && node.outputs.isNotEmpty()) {
                     Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                 }
@@ -344,13 +379,33 @@ fun NodeComponent(
                     ) {
                         Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
                             Text(output.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            val inferredType = inferredTypes[Pair(node.id, output.id)] ?: output.dataType
+                            val typeLabel = if (output.dataType is DataType.Primitive && output.dataType.primitiveType == PrimitiveType.ANY &&
+                                               !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)) {
+                                "${formatDataType(inferredType)} (Implied)"
+                            } else {
+                                formatDataType(output.dataType)
+                            }
                             Text(
-                                text = formatDataType(output.dataType),
+                                text = typeLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                             if (output.semanticType != null) {
                                   Text(output.semanticType, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            val portErrors = validationErrors.filter {
+                                (it.sourceNodeId == node.id && it.sourcePortId == output.id) ||
+                                (it.targetNodeId == node.id && it.targetPortId == output.id)
+                            }
+                            if (portErrors.isNotEmpty()) {
+                                Text(
+                                    text = portErrors.first().message,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
@@ -400,6 +455,142 @@ fun NodeComponent(
                 }
             }
         )
+    }
+
+    if (showEditBoundaryDialog && (node is Node.FlowInputNode || node is Node.FlowOutputNode)) {
+        val port = if (node is Node.FlowInputNode) node.outputs.firstOrNull() else node.inputs.firstOrNull()
+        if (port != null) {
+            var name by remember { mutableStateOf(port.name) }
+            var selectedTypeOption by remember {
+                mutableStateOf(
+                    when (val dt = port.dataType) {
+                        is DataType.Primitive -> {
+                            if (dt.primitiveType == PrimitiveType.ANY) "Any"
+                            else dt.primitiveType.name.lowercase().replaceFirstChar { it.uppercase() }
+                        }
+                        is DataType.Object -> "Object"
+                        is DataType.Array -> "Array"
+                        is DataType.Enum -> "Enum"
+                    }
+                )
+            }
+            var customClassName by remember {
+                mutableStateOf(
+                    when (val dt = port.dataType) {
+                        is DataType.Object -> dt.className
+                        is DataType.Enum -> dt.className
+                        else -> ""
+                    }
+                )
+            }
+            var semanticType by remember { mutableStateOf(port.semanticType ?: "") }
+            
+            AlertDialog(
+                onDismissRequest = { showEditBoundaryDialog = false },
+                title = { 
+                    Text(
+                        text = if (node is Node.FlowInputNode) "Edit Flow Input Port" else "Edit Flow Output Port",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    ) 
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Port Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        val typeOptions = listOf("Any", "String", "Int", "Double", "Boolean", "Object")
+                        var dropdownExpanded by remember { mutableStateOf(false) }
+                        
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = selectedTypeOption,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Data Type") },
+                                trailingIcon = {
+                                    IconButton(onClick = { dropdownExpanded = true }) {
+                                        Icon(Icons.Default.UnfoldMore, contentDescription = "Select Type")
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            DropdownMenu(
+                                expanded = dropdownExpanded,
+                                onDismissRequest = { dropdownExpanded = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                typeOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option) },
+                                        onClick = {
+                                            selectedTypeOption = option
+                                            dropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        
+                        if (selectedTypeOption == "Object") {
+                            OutlinedTextField(
+                                value = customClassName,
+                                onValueChange = { customClassName = it },
+                                label = { Text("Class Name (e.g. org.wip.MyData)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        
+                        OutlinedTextField(
+                            value = semanticType,
+                            onValueChange = { semanticType = it },
+                            label = { Text("Semantic Type / Mimetype (optional)") },
+                            placeholder = { Text("e.g. image/png") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val computedDataType = when (selectedTypeOption) {
+                                "Any" -> DataType.Primitive(PrimitiveType.ANY)
+                                "String" -> DataType.Primitive(PrimitiveType.STRING)
+                                "Int" -> DataType.Primitive(PrimitiveType.INT)
+                                "Double" -> DataType.Primitive(PrimitiveType.DOUBLE)
+                                "Boolean" -> DataType.Primitive(PrimitiveType.BOOLEAN)
+                                "Object" -> DataType.Object(customClassName.ifBlank { "java.lang.Object" })
+                                else -> DataType.Primitive(PrimitiveType.ANY)
+                            }
+                            onUpdateBoundaryNode(
+                                node.id,
+                                name.ifBlank { port.name },
+                                computedDataType,
+                                semanticType.trim().ifBlank { null }
+                            )
+                            showEditBoundaryDialog = false
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEditBoundaryDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 }
 

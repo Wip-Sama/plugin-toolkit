@@ -18,7 +18,7 @@ sealed interface Screen : NavKey {
     data object FlowRunner : Screen
 
     @Serializable
-    data object FlowEditor : Screen
+    data class FlowEditor(val flowName: String = "") : Screen
 
     @Serializable
     data object Settings : Screen

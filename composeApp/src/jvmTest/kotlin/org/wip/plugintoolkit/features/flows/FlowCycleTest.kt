@@ -6,7 +6,7 @@ import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import kotlin.test.Test
@@ -27,7 +27,8 @@ class FlowCycleTest {
 
     @Test
     fun testCyclePrevention() {
-        val viewModel = FlowViewModel(
+        val viewModel = FlowEditorViewModel(
+            initialFlowName = "Default Flow",
             settingsPersistence = MockSettingsPersistence(),
             notificationService = null
         )
@@ -38,7 +39,7 @@ class FlowCycleTest {
         viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(300f, 300f)))
 
         val state = viewModel.state.value
-        val flow = state.currentFlow!!
+        val flow = state.flow
         
         assertEquals(3, flow.nodes.size)
         val nodeA = flow.nodes[0]
@@ -51,14 +52,14 @@ class FlowCycleTest {
         // 3. Connect Node B (output) -> Node C (message)
         viewModel.onEvent(FlowEvent.ConnectPorts(nodeB.id, "output", nodeC.id, "message"))
 
-        assertEquals(2, viewModel.state.value.currentFlow!!.connections.size)
+        assertEquals(2, viewModel.state.value.flow.connections.size)
 
         // 4. Try to connect Node C (output) -> Node A (message) - This forms a cycle: A -> B -> C -> A
         viewModel.onEvent(FlowEvent.ConnectPorts(nodeC.id, "output", nodeA.id, "message"))
 
         // Connection should be rejected, so total connections remain 2
-        assertEquals(2, viewModel.state.value.currentFlow!!.connections.size)
-        assertFalse(viewModel.state.value.currentFlow!!.connections.any { it.sourceNodeId == nodeC.id && it.targetNodeId == nodeA.id })
+        assertEquals(2, viewModel.state.value.flow.connections.size)
+        assertFalse(viewModel.state.value.flow.connections.any { it.sourceNodeId == nodeC.id && it.targetNodeId == nodeA.id })
 
         // 5. Connect Node A (output) -> Node C (message)
         // Note: Node C (message) already has an incoming connection from Node B.
@@ -67,7 +68,7 @@ class FlowCycleTest {
         // Let's verify this is allowed!
         viewModel.onEvent(FlowEvent.ConnectPorts(nodeA.id, "output", nodeC.id, "message"))
 
-        val currentConnections = viewModel.state.value.currentFlow!!.connections
+        val currentConnections = viewModel.state.value.flow.connections
         assertEquals(2, currentConnections.size)
         assertTrue(currentConnections.any { it.sourceNodeId == nodeA.id && it.targetNodeId == nodeC.id })
         assertFalse(currentConnections.any { it.sourceNodeId == nodeB.id && it.targetNodeId == nodeC.id })

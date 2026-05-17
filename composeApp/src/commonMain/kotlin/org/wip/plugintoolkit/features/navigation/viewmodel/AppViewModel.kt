@@ -75,7 +75,7 @@ class AppViewModel(
                     id = Screen.FlowRunner, icon = Icons.Default.PlayCircle, title = "View".localized
                 ),
                 SidebarElement(
-                    id = Screen.FlowEditor, icon = Icons.Default.Edit, title = "Editor".localized
+                    id = Screen.FlowEditor(""), icon = Icons.Default.Edit, title = "Editor".localized
                 )
             )
         )

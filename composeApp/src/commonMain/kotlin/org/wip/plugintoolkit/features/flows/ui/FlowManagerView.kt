@@ -21,12 +21,16 @@ import org.wip.plugintoolkit.shared.components.SectionHeader
 @Composable
 fun FlowManagerView(
     viewModel: FlowViewModel,
-    onEditFlow: () -> Unit,
+    onEditFlow: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFlowName by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        viewModel.reloadFlows()
+    }
 
     Column(modifier = modifier.fillMaxSize().padding(ToolkitTheme.spacing.extraLarge)) {
         Row(
@@ -66,7 +70,7 @@ fun FlowManagerView(
                         onSelect = { viewModel.onEvent(FlowEvent.SelectFlow(flow.name)) },
                         onEdit = { 
                             viewModel.onEvent(FlowEvent.SelectFlow(flow.name))
-                            onEditFlow()
+                            onEditFlow(flow.name)
                         },
                         onDelete = { viewModel.onEvent(FlowEvent.DeleteFlow(flow.name)) }
                     )

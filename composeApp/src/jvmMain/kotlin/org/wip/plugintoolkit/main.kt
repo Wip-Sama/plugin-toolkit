@@ -64,6 +64,7 @@ import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.logic.*
 import org.wip.plugintoolkit.features.plugin.viewmodel.*
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
 import plugintoolkit.composeapp.generated.resources.Res
@@ -160,6 +161,7 @@ fun runMain(args: Array<String>) {
             single { PluginViewModel(get(), get(), get()) }
             single { SettingsViewModel(get(), get(), get(), get()) }
             single { FlowViewModel(getOrNull(), getOrNull(), getOrNull()) }
+            factory { (flowName: String) -> FlowEditorViewModel(flowName, getOrNull(), getOrNull(), getOrNull()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get(), get()) }

@@ -23,7 +23,7 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
@@ -32,12 +32,12 @@ import kotlin.math.roundToInt
 
 @Composable
 fun FlowEditorView(
-    viewModel: FlowViewModel,
+    viewModel: FlowEditorViewModel,
     notificationService: NotificationService,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
-    val flow = state.currentFlow ?: return
+    val flow = state.flow
     val density = androidx.compose.ui.platform.LocalDensity.current
     
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
@@ -137,13 +137,15 @@ fun FlowEditorView(
                     ) {
                         NodeComponent(
                             node = node,
-                            inputValues = state.inputValues,
                             connectedInputPortIds = flow.connections.filter { it.targetNodeId == node.id }.map { it.targetPortId }.toSet(),
+                            inferredTypes = state.inferredTypes,
+                            validationErrors = state.validationErrors,
                             onMove = { id, delta, snap, showGhost -> viewModel.onEvent(FlowEvent.MoveNode(id, delta, snap, showGhost)) },
                             onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id)) },
                             onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
                             onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
                             onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, value)) },
+                            onUpdateBoundaryNode = { id, name, dataType, semanticType -> viewModel.onEvent(FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticType)) },
                             onStartConnection = { nodeId, portId, isOutput -> 
                                 isDrawingConnection = true
                                 connectionStartNodeId = nodeId
@@ -242,7 +244,7 @@ fun FlowEditorView(
 
             // Ghost Preview for Snapping
             state.ghostPosition?.let { ghostPos ->
-                val draggedNode = state.currentFlow?.nodes?.find { it.id == state.draggedNodeId }
+                val draggedNode = state.flow.nodes.find { it.id == state.draggedNodeId }
                 val heightDp = draggedNode?.let { node ->
                     nodeSizes[node.id]?.let { size ->
                         with(density) { size.height.toDp() }

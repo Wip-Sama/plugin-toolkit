@@ -26,6 +26,8 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.koin.compose.koinInject
+import org.koin.core.parameter.parametersOf
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.AppTheme
@@ -136,15 +138,16 @@ private fun AppContent(
                                 is Screen.FlowManager -> NavEntry(key) {
                                     FlowManagerView(
                                         viewModel = flowViewModel,
-                                        onEditFlow = { backStack.add(Screen.FlowEditor) }
+                                        onEditFlow = { flowName -> backStack.add(Screen.FlowEditor(flowName)) }
                                     )
                                 }
                                 is Screen.FlowRunner -> NavEntry(key) {
                                     FlowRunnerView(viewModel = flowViewModel)
                                 }
                                 is Screen.FlowEditor -> NavEntry(key) {
+                                    val editorViewModel: FlowEditorViewModel = koinInject(parameters = { parametersOf(key.flowName) })
                                     FlowEditorView(
-                                        viewModel = flowViewModel,
+                                        viewModel = editorViewModel,
                                         notificationService = notificationService
                                     )
                                 }
