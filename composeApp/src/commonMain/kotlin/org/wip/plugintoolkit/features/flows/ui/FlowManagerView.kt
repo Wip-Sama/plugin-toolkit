@@ -1,4 +1,4 @@
-package org.wip.plugintoolkit.features.board.ui
+package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,9 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.features.board.viewmodel.FlowEvent
-import org.wip.plugintoolkit.features.board.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 
@@ -28,7 +28,7 @@ fun FlowManagerView(
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFlowName by remember { mutableStateOf("") }
 
-    Column(modifier = modifier.fillMaxSize().padding(32.dp)) {
+    Column(modifier = modifier.fillMaxSize().padding(ToolkitTheme.spacing.extraLarge)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -42,16 +42,16 @@ fun FlowManagerView(
 
             Button(onClick = { showCreateDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 Text("Create New Flow")
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
 
         Column(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
         ) {
             if (state.flows.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -118,7 +118,7 @@ private fun FlowItem(
 //        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -126,7 +126,7 @@ private fun FlowItem(
                 Text("$nodeCount nodes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
                 IconButton(onClick = onEdit) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
                 }

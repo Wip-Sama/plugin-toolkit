@@ -33,10 +33,10 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.DialogHost
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformLocalization
-import org.wip.plugintoolkit.features.board.ui.FlowEditorView
-import org.wip.plugintoolkit.features.board.ui.FlowManagerView
-import org.wip.plugintoolkit.features.board.ui.FlowRunnerView
-import org.wip.plugintoolkit.features.board.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.features.flows.ui.FlowEditorView
+import org.wip.plugintoolkit.features.flows.ui.FlowManagerView
+import org.wip.plugintoolkit.features.flows.ui.FlowRunnerView
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.wip.plugintoolkit.features.job.ui.JobBadge
 import org.wip.plugintoolkit.features.job.ui.JobDashboard
@@ -65,7 +65,8 @@ fun App(
     pluginViewModel: PluginViewModel = koinInject(),
     appViewModel: AppViewModel = koinInject(),
     notificationService: NotificationService = koinInject(),
-    dialogService: DialogService = koinInject()
+    dialogService: DialogService = koinInject(),
+    flowViewModel: FlowViewModel = koinInject()
 ) {
     val settings by viewModel.settings.collectAsState()
     val languageCode by viewModel.currentLanguageCode.collectAsState()
@@ -75,7 +76,7 @@ fun App(
         PlatformLocalization.setApplicationLanguage(languageCode)
     }
 
-    AppContent(settings, viewModel, pluginViewModel, appViewModel, notificationService, dialogService)
+    AppContent(settings, viewModel, pluginViewModel, appViewModel, notificationService, dialogService, flowViewModel)
 }
 
 @Composable
@@ -86,7 +87,7 @@ private fun AppContent(
     appViewModel: AppViewModel,
     notificationService: NotificationService,
     dialogService: DialogService,
-    flowViewModel: FlowViewModel = viewModel { FlowViewModel() }
+    flowViewModel: FlowViewModel = koinInject()
 ) {
     val general = settings.general
     val density = LocalDensity.current
@@ -142,7 +143,10 @@ private fun AppContent(
                                     FlowRunnerView(viewModel = flowViewModel)
                                 }
                                 is Screen.FlowEditor -> NavEntry(key) {
-                                    FlowEditorView(viewModel = flowViewModel)
+                                    FlowEditorView(
+                                        viewModel = flowViewModel,
+                                        notificationService = notificationService
+                                    )
                                 }
                                 is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
                                 is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }

@@ -15,6 +15,9 @@ object KeepTrack {
     /** The filename for the application settings. */
     const val SETTINGS_FILE_NAME = "settings.json"
 
+    /** The filename for the visual flows settings. */
+    const val FLOWS_FILE_NAME = "flows.json"
+
     /** The directory for application logs. */
     const val LOGS_DIR_NAME = "logs"
 

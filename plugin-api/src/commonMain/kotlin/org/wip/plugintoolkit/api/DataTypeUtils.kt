@@ -44,3 +44,61 @@ fun SerialDescriptor.toDataType(): DataType {
 inline fun <reified T> getDataType(): DataType {
     return serializer<T>().descriptor.toDataType()
 }
+
+/**
+ * Checks if this [DataType] is compatible with and can connect to another [DataType].
+ *
+ * Compatibility rules:
+ * 1. Two identical datatypes are compatible.
+ * 2. Wildcard [PrimitiveType.ANY] is compatible with any datatype.
+ * 3. Arrays are compatible if their item types are compatible.
+ * 4. Objects are compatible if their class names are equal.
+ * 5. Enums are compatible if their class names are equal (options can differ or be in different order).
+ */
+fun DataType.isCompatibleWith(other: DataType): Boolean {
+    if (this == other) return true
+
+    // Wildcard support: ANY is compatible with any type
+    if (this is DataType.Primitive && this.primitiveType == PrimitiveType.ANY) return true
+    if (other is DataType.Primitive && other.primitiveType == PrimitiveType.ANY) return true
+
+    return when (this) {
+        is DataType.Primitive -> {
+            other is DataType.Primitive && this.primitiveType == other.primitiveType
+        }
+        is DataType.Array -> {
+            other is DataType.Array && this.items.isCompatibleWith(other.items)
+        }
+        is DataType.Object -> {
+            other is DataType.Object && this.className == other.className
+        }
+        is DataType.Enum -> {
+            other is DataType.Enum && this.className == other.className
+        }
+    }
+}
+
+/**
+ * Checks if two semantic types are compatible for a connection.
+ *
+ * If either semantic type is null or blank, they are compatible (lenient matching).
+ * If both are specified, they must match (case-insensitive).
+ */
+fun isSemanticTypeCompatible(source: String?, target: String?): Boolean {
+    if (source.isNullOrBlank() || target.isNullOrBlank()) return true
+    return source.equals(target, ignoreCase = true)
+}
+
+/**
+ * Formats a [DataType] into a user-friendly string representation.
+ */
+fun DataType.format(): String {
+    return when (this) {
+        is DataType.Primitive -> this.primitiveType.name
+        is DataType.Array -> "Array<${this.items.format()}>"
+        is DataType.Object -> this.className.substringAfterLast('.')
+        is DataType.Enum -> this.className.substringAfterLast('.')
+    }
+}
+
+

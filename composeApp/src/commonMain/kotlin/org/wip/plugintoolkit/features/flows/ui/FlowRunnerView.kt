@@ -1,4 +1,4 @@
-package org.wip.plugintoolkit.features.board.ui
+package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,9 +13,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.features.board.viewmodel.FlowEvent
-import org.wip.plugintoolkit.features.board.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.ui.JobResultItem
 import org.wip.plugintoolkit.shared.components.GlassCard
@@ -38,13 +38,13 @@ fun FlowRunnerView(
     Row(modifier = modifier.fillMaxSize()) {
         // Sidebar: Select Flow to Run
         Surface(
-            modifier = Modifier.width(250.dp).fillMaxHeight(),
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+            modifier = Modifier.width(ToolkitTheme.dimensions.sidebarExpandedWidth).fillMaxHeight(),
+            color = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.cardElevation)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                 Text("Select Flow", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+                Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
                     state.flows.forEach { flow ->
                         val isSelected = selectedFlowToRun?.name == flow.name
                         Surface(
@@ -55,7 +55,7 @@ fun FlowRunnerView(
                         ) {
                             Text(
                                 flow.name,
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
@@ -67,7 +67,7 @@ fun FlowRunnerView(
 
         // Main Area: Run and History
         Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(32.dp)
+            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(ToolkitTheme.spacing.extraLarge)
         ) {
             val currentFlow = selectedFlowToRun
             if (currentFlow == null) {
@@ -89,25 +89,25 @@ fun FlowRunnerView(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                     Text("This will execute all nodes in the flow sequence.", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
                     
                     Button(
                         onClick = { /* TODO: Trigger Flow Execution via JobManager */ },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                         Text("Execute Flow")
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraLarge))
 
                 // History Area (Simulated for now, as JobManager integration needs specific setup)
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.medium),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -119,12 +119,12 @@ fun FlowRunnerView(
 
                     TextButton(onClick = { /* viewModel.clearHistory(currentFlow.name) */ }) {
                         Icon(Icons.Default.ClearAll, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                         Text("Clear History")
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)) {
                     // Placeholder for history items
                     Text("No runs recorded for this flow.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

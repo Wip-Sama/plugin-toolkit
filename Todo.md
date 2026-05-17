@@ -19,7 +19,7 @@ Documentation:
 
 Job:
 - Currently there is no handling for when a plugin is plugged out and a job is running
-> A setting should probably be added to define the behaviours like: prevent plugin unplugging while working, stop everything and unplug
+> A setting should probably be added to define the behaviors like: prevent plugin unplugging while working, stop everything and unplug
 
 Flows:
 - Create with support for recursive flow
@@ -29,9 +29,9 @@ Flows:
 - Default entrypoint, with local/remote support
 - Data Duplication entrypoint
 - Conditional nodes like: is result (something) then (something else)
-- Add info abot conenction points (mime type and dattype)
-- conenction point should be disabled if a default is used
-- conection point default should represent the datatype (bool should not be a textfield for example)
+- Add info abot connection points (mime type and datatype)
+- connection point should be disabled if a default is used
+- connection point default should represent the datatype (bool should not be a textfield for example)
 
 Repo:
 - Test and make it work

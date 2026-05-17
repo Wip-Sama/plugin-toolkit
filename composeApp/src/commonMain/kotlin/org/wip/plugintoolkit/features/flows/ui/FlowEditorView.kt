@@ -1,0 +1,364 @@
+package org.wip.plugintoolkit.features.flows.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.api.isCompatibleWith
+import org.wip.plugintoolkit.api.isSemanticTypeCompatible
+import org.wip.plugintoolkit.api.format
+import kotlin.math.roundToInt
+
+@Composable
+fun FlowEditorView(
+    viewModel: FlowViewModel,
+    notificationService: NotificationService,
+    modifier: Modifier = Modifier
+) {
+    val state by viewModel.state.collectAsState()
+    val flow = state.currentFlow ?: return
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    
+    var boardSize by remember { mutableStateOf(IntSize.Zero) }
+    var boardLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var rootLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    // State for temporary connection drawing
+    var isDrawingConnection by remember { mutableStateOf(false) }
+    var connectionStartNodeId by remember { mutableStateOf<Long?>(null) }
+    var connectionStartPortId by remember { mutableStateOf<String?>(null) }
+    var connectionStartIsOutput by remember { mutableStateOf(true) }
+    var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
+
+    // State for port position tracking
+    val portBoardPositions = remember { mutableStateMapOf<Pair<Long, String>, Offset>() }
+    val getPortBoardPosition = { nodeId: Long, portId: String ->
+        portBoardPositions[nodeId to portId]
+    }
+    val nodeSizes = remember { mutableStateMapOf<Long, IntSize>() }
+    var highlightedPortId by remember { mutableStateOf<String?>(null) }
+    var highlightedNodeId by remember { mutableStateOf<Long?>(null) }
+
+    // State for drag and drop from palette
+    var draggingNodeFromPalette by remember { mutableStateOf<PaletteNode?>(null) }
+    var draggingNodePos by remember { mutableStateOf(Offset.Zero) }
+    var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
+
+    val handlePaletteClick = { paletteNode: PaletteNode ->
+        val dropPos = (Offset(boardSize.width / 2f, boardSize.height / 2f) - state.offset) / state.scale
+        when (paletteNode) {
+            is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos))
+            is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos))
+            is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos))
+            is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos))
+            is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos))
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .onGloballyPositioned { rootLayoutCoordinates = it }
+    ) {
+        // 1. Main Board Area (Background Layer)
+        BoardCanvas(
+            state = state,
+            flow = flow,
+            onPan = { viewModel.onEvent(FlowEvent.Pan(it)) },
+            onZoom = { scrollDeltaY, position -> viewModel.onEvent(FlowEvent.Zoom(scrollDeltaY, position)) },
+            isDrawingConnection = isDrawingConnection,
+            draggingNodeFromPalette = draggingNodeFromPalette,
+            getPortBoardPosition = getPortBoardPosition,
+            highlightedPortId = highlightedPortId,
+            highlightedNodeId = highlightedNodeId,
+            connectionStartNodeId = connectionStartNodeId,
+            connectionStartPortId = connectionStartPortId,
+            connectionStartIsOutput = connectionStartIsOutput,
+            connectionCurrentPos = connectionCurrentPos,
+            onBoardLayoutCoordinatesChanged = { boardLayoutCoordinates = it },
+            onBoardSizeChanged = { boardSize = it }
+        ) {
+            // 1.2 Nodes
+            flow.nodes.forEach { node ->
+                key(node.id) {
+                    val isDragged = state.draggedNodeId == node.id
+                    val dragOffset = if (isDragged) state.currentDragOffset else Offset.Zero
+                    
+                    val isNodeHighlighted = highlightedNodeId == node.id
+                    val nodeHighlightedPortId = if (isNodeHighlighted) highlightedPortId else null
+                    
+                    val nodeHighlightedPortColor = if (isNodeHighlighted && highlightedPortId != null && connectionStartNodeId != null && connectionStartPortId != null) {
+                        val startNode = flow.nodes.find { it.id == connectionStartNodeId }
+                        val startPort = if (connectionStartIsOutput) {
+                            startNode?.outputs?.find { it.id == connectionStartPortId }
+                        } else {
+                            startNode?.inputs?.find { it.id == connectionStartPortId }
+                        }
+                        
+                        val targetPort = if (connectionStartIsOutput) {
+                            node.inputs.find { it.id == highlightedPortId }
+                        } else {
+                            node.outputs.find { it.id == highlightedPortId }
+                        }
+                        
+                        if (startPort != null && targetPort != null) {
+                            val compatible = startPort.dataType.isCompatibleWith(targetPort.dataType) &&
+                                             isSemanticTypeCompatible(startPort.semanticType, targetPort.semanticType)
+                            if (compatible) null else Color.Red
+                        } else null
+                    } else null
+                
+                    NodeCardContainer(
+                        nodePosition = node.position,
+                        dragOffset = dragOffset,
+                        scale = state.scale,
+                        boardOffset = state.offset
+                    ) {
+                        NodeComponent(
+                            node = node,
+                            inputValues = state.inputValues,
+                            connectedInputPortIds = flow.connections.filter { it.targetNodeId == node.id }.map { it.targetPortId }.toSet(),
+                            onMove = { id, delta, snap, showGhost -> viewModel.onEvent(FlowEvent.MoveNode(id, delta, snap, showGhost)) },
+                            onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id)) },
+                            onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
+                            onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
+                            onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, value)) },
+                            onStartConnection = { nodeId, portId, isOutput -> 
+                                isDrawingConnection = true
+                                connectionStartNodeId = nodeId
+                                connectionStartPortId = portId
+                                connectionStartIsOutput = isOutput
+                            },
+                            onDragConnection = { cumulativeDragOffset ->
+                                if (connectionStartNodeId != null && connectionStartPortId != null) {
+                                    val startBoardPos = getPortBoardPosition(connectionStartNodeId!!, connectionStartPortId!!)
+                                    if (startBoardPos != null) {
+                                        val boardPosition = startBoardPos + cumulativeDragOffset
+                                        connectionCurrentPos = boardPosition
+
+                                        // Proximity Check: Find closest port in Board Space
+                                        var closestPortId: String? = null
+                                        var closestNodeId: Long? = null
+                                        var minDistance = 30f / state.scale // 30dp radius in board space
+
+                                        flow.nodes.forEach { n ->
+                                            val portsToTrack = if (connectionStartIsOutput) n.inputs else n.outputs
+                                            portsToTrack.forEach { port ->
+                                                val portBoardPos = getPortBoardPosition(n.id, port.id) ?: return@forEach
+                                                val dist = (boardPosition - portBoardPos).getDistance()
+                                                if (dist < minDistance) {
+                                                    minDistance = dist
+                                                    closestPortId = port.id
+                                                    closestNodeId = n.id
+                                                }
+                                            }
+                                        }
+                                        
+                                        highlightedPortId = closestPortId
+                                        highlightedNodeId = closestNodeId
+                                    }
+                                }
+                            },
+                            onDropConnection = {
+                                if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
+                                    val sourceNodeId = if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
+                                    val sourcePortId = if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
+                                    val targetNodeId = if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
+                                    val targetPortId = if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
+
+                                    if (sourceNodeId == targetNodeId) {
+                                        notificationService.toast("Cannot connect: Ports belong to the same node.")
+                                    } else {
+                                        val sourceNode = flow.nodes.find { it.id == sourceNodeId }
+                                        val targetNode = flow.nodes.find { it.id == targetNodeId }
+                                        val sourcePort = sourceNode?.outputs?.find { it.id == sourcePortId }
+                                        val targetPort = targetNode?.inputs?.find { it.id == targetPortId }
+
+                                        if (sourcePort != null && targetPort != null) {
+                                            val typesCompatible = sourcePort.dataType.isCompatibleWith(targetPort.dataType)
+                                            val semanticsCompatible = isSemanticTypeCompatible(sourcePort.semanticType, targetPort.semanticType)
+
+                                            if (typesCompatible && semanticsCompatible) {
+                                                viewModel.onEvent(FlowEvent.ConnectPorts(
+                                                    sourceNodeId, 
+                                                    sourcePortId, 
+                                                    targetNodeId, 
+                                                    targetPortId
+                                                ))
+                                            } else {
+                                                val message = if (!typesCompatible) {
+                                                    "Cannot connect: Incompatible types. Cannot connect ${sourcePort.dataType.format()} to ${targetPort.dataType.format()}."
+                                                } else {
+                                                    "Cannot connect: Incompatible semantic types. '${sourcePort.semanticType}' cannot connect to '${targetPort.semanticType}'."
+                                                }
+                                                notificationService.toast(message)
+                                            }
+                                        }
+                                    }
+                                }
+                                isDrawingConnection = false
+                                connectionStartNodeId = null
+                                connectionStartPortId = null
+                                highlightedPortId = null
+                                highlightedNodeId = null
+                            },
+                            onPortPositioned = { nodeId, portId, boardPos -> 
+                                portBoardPositions[nodeId to portId] = boardPos
+                            },
+                            onPress = { id -> viewModel.onEvent(FlowEvent.BringToFront(id)) },
+                            highlightedPortId = nodeHighlightedPortId,
+                            highlightedPortColor = nodeHighlightedPortColor,
+                            boardLayoutCoordinates = boardLayoutCoordinates,
+                            stateScale = state.scale,
+                            stateOffset = state.offset,
+                            modifier = Modifier.onSizeChanged { size ->
+                                nodeSizes[node.id] = size
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Ghost Preview for Snapping
+            state.ghostPosition?.let { ghostPos ->
+                val draggedNode = state.currentFlow?.nodes?.find { it.id == state.draggedNodeId }
+                val heightDp = draggedNode?.let { node ->
+                    nodeSizes[node.id]?.let { size ->
+                        with(density) { size.height.toDp() }
+                    }
+                } ?: 120.dp
+
+                NodeCardContainer(
+                    nodePosition = ghostPos,
+                    dragOffset = Offset.Zero,
+                    scale = state.scale,
+                    boardOffset = state.offset,
+                    modifier = Modifier.alpha(0.3f)
+                ) {
+                    draggedNode?.let { NodeComponentPlaceholder(it, heightDp) }
+                }
+            }
+        }
+
+        // 2. Left Sidebar (Overlay Layer)
+        PaletteSidebar(
+            flows = state.flows,
+            currentFlowName = flow.name,
+            plugins = viewModel.plugins.collectAsState().value,
+            rootLayoutCoordinates = rootLayoutCoordinates,
+            onDragStart = { paletteNode, initialPos ->
+                draggingNodeFromPalette = paletteNode
+                draggingNodePos = initialPos
+                dragStartPosition = initialPos
+            },
+            onDrag = { cumulativeDrag ->
+                draggingNodePos = dragStartPosition + cumulativeDrag
+            },
+            onDragEnd = {
+                val position = draggingNodePos
+                val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
+                val relativeToBoard = position - boardOffset
+                val isOverBoard = relativeToBoard.x >= 0 && relativeToBoard.y >= 0 && relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+                
+                if (isOverBoard) {
+                    val dropPos = (relativeToBoard - state.offset) / state.scale
+                    draggingNodeFromPalette?.let { paletteNode ->
+                        when (paletteNode) {
+                            is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos))
+                            is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos))
+                            is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos))
+                            is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos))
+                            is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos))
+                        }
+                    }
+                }
+                draggingNodeFromPalette = null
+            },
+            onClick = handlePaletteClick
+        )
+
+        // 3. Top Status Bar (Overlay Layer)
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(ToolkitTheme.spacing.medium),
+            shape = RoundedCornerShape(ToolkitTheme.spacing.large),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+            tonalElevation = ToolkitTheme.spacing.small,
+            shadowElevation = ToolkitTheme.spacing.extraSmall
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+            ) {
+                Column {
+                    Text(
+                        text = "Flow Selected",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = flow.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Button(
+                    onClick = { viewModel.onEvent(FlowEvent.Save) },
+                    enabled = state.hasUnsavedChanges,
+                    contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
+                ) {
+                    Text("Save Changes")
+                }
+            }
+        }
+
+        // 4. Global Dragging Preview (Highest Layer)
+        draggingNodeFromPalette?.let { node ->
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(draggingNodePos.x.roundToInt(), draggingNodePos.y.roundToInt()) }
+                    .alpha(0.7f)
+            ) {
+                PaletteItemPreview(node)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NodeComponentPlaceholder(node: Node, height: Dp = 120.dp) {
+    Surface(
+        modifier = Modifier.width(300.dp).height(height),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+        border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(node.title, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+        }
+    }
+}
