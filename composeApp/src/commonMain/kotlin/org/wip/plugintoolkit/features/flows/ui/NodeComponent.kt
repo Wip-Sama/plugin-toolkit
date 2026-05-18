@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +15,10 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
 import androidx.compose.runtime.*
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,7 +54,7 @@ fun NodeComponent(
     onUpdateValue: (Long, String, Any?) -> Unit,
     onStartConnection: (Long, String, Boolean) -> Unit,
     onDragConnection: (Offset) -> Unit = {},
-    onDropConnection: () -> Unit = {},
+    onDropConnection: (isShiftPressed: Boolean) -> Unit = {},
     onPortPositioned: (Long, String, Offset) -> Unit = { _, _, _ -> },
     onPress: (Long) -> Unit = {},
     onUpdateBoundaryNode: (Long, String, DataType, String?) -> Unit = { _, _, _, _ -> },
@@ -58,6 +63,7 @@ fun NodeComponent(
     boardLayoutCoordinates: LayoutCoordinates?,
     stateScale: Float,
     stateOffset: Offset,
+    selectedNodeIds: Set<Long> = emptySet(),
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -76,11 +82,19 @@ fun NodeComponent(
         is Node.SubFlowNode -> Pair(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.onSecondary)
     }
 
+    val isSelected = remember(node.id, selectedNodeIds) { selectedNodeIds.contains(node.id) }
+    val cardBorder = if (isSelected) {
+        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+    } else {
+        null
+    }
+
     Card(
         modifier = modifier
             .width(300.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.spacing.small),
         shape = MaterialTheme.shapes.medium,
+        border = cardBorder,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column {
@@ -162,9 +176,27 @@ fun NodeComponent(
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                     }
 
+                    var isShiftPressed by remember { mutableStateOf(false) }
                     IconButton(
-                        onClick = { showDeleteConfirmation = true },
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                        onClick = {
+                            if (isShiftPressed) {
+                                onDelete(node.id)
+                            } else {
+                                showDeleteConfirmation = true
+                            }
+                        },
+                        modifier = Modifier
+                            .size(ToolkitTheme.dimensions.iconMedium)
+                            .pointerInput(node.id) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        if (event.type == PointerEventType.Press) {
+                                            isShiftPressed = event.keyboardModifiers.isShiftPressed
+                                        }
+                                    }
+                                }
+                            }
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
@@ -589,7 +621,7 @@ fun PortCircle(
     isHighlighted: Boolean = false,
     onDragStart: () -> Unit,
     onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
+    onDragEnd: (isShiftPressed: Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var cumulativeOffset by remember { mutableStateOf(Offset.Zero) }
@@ -634,23 +666,25 @@ fun PortCircle(
                 }
             }
             .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = {
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitFirstDown()
                         cumulativeOffset = Offset.Zero
                         currentOnDragStart()
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        cumulativeOffset += dragAmount
-                        currentOnDrag(cumulativeOffset)
-                    },
-                    onDragEnd = {
-                        currentOnDragEnd()
-                    },
-                    onDragCancel = {
-                        currentOnDragEnd()
+                        
+                        var isShift = false
+                        
+                        drag(down.id) { change ->
+                            change.consume()
+                            cumulativeOffset += change.position - change.previousPosition
+                            currentOnDrag(cumulativeOffset)
+                            
+                            isShift = currentEvent.keyboardModifiers.isShiftPressed
+                        }
+                        
+                        currentOnDragEnd(isShift)
                     }
-                )
+                }
             }
     )
 }

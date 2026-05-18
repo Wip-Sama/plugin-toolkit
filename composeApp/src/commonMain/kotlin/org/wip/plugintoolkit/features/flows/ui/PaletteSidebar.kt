@@ -204,7 +204,7 @@ private fun SystemPalette(
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
         Text("System Actions", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         
-        listOf("Save", "Load", "Log", "Delay").forEach { action ->
+        listOf("Save", "Load", "Log", "Delay", "Convert", "Merger").forEach { action ->
             val systemNode = PaletteNode.System(action)
             PaletteItem(
                 text = action,

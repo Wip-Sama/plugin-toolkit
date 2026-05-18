@@ -96,5 +96,35 @@ class DataTypeTest {
         assertTrue(isSemanticTypeCompatible("Filepath", "filepath"), "Case-insensitive semantic types should be compatible")
         assertFalse(isSemanticTypeCompatible("filepath", "url"), "Different semantic types should not be compatible")
     }
+
+    @Test
+    fun testCanConvert() {
+        val intType = DataType.Primitive(PrimitiveType.INT)
+        val doubleType = DataType.Primitive(PrimitiveType.DOUBLE)
+        val stringType = DataType.Primitive(PrimitiveType.STRING)
+        
+        val intArray = DataType.Array(intType)
+        val stringArray = DataType.Array(stringType)
+        
+        val tupleType = DataType.Object("Tuple2")
+        val listType = DataType.Object("List")
+        
+        // Rule 1: Int <-> Double conversion
+        assertTrue(intType.canConvert(doubleType), "Int should convert to Double")
+        assertTrue(doubleType.canConvert(intType), "Double should convert to Int")
+        assertFalse(intType.canConvert(stringType), "Int should not convert to String")
+        
+        // Rule 2: Array/List <-> Tuple/Pair/Triple conversion
+        assertTrue(intArray.canConvert(tupleType), "Array of Int should convert to Tuple")
+        assertTrue(tupleType.canConvert(intArray), "Tuple should convert to Array of Int")
+        assertTrue(intArray.canConvert(listType), "Array should convert to List")
+        assertTrue(stringArray.canConvert(tupleType), "Array of String should convert to Tuple")
+        
+        // Rule 3: Single element (Any / Primitive) to List / Tuple
+        val anyType = DataType.Primitive(PrimitiveType.ANY)
+        assertTrue(anyType.canConvert(intArray), "Any should convert to List/Array")
+        assertTrue(anyType.canConvert(tupleType), "Any should convert to Tuple")
+        assertTrue(intType.canConvert(intArray), "Primitive Int should convert to Array")
+    }
 }
 

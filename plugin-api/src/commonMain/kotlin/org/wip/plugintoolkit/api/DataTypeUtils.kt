@@ -101,4 +101,45 @@ fun DataType.format(): String {
     }
 }
 
+/**
+ * Checks if a value of this [DataType] can be automatically converted to another [DataType].
+ *
+ * Conversion rules:
+ * 1. Convert between numeric primitives (INT and DOUBLE).
+ * 2. Convert between list/array and tuple/pair/triple.
+ */
+fun DataType.canConvert(other: DataType): Boolean {
+    if (this == other) return false
+
+    // Rule 2: List / Tuple conversions & Rule 3: Single element (Any / Primitive / Object) to List / Tuple
+    val thisStr = this.format().lowercase()
+    val otherStr = other.format().lowercase()
+
+    val isThisListOrTuple = thisStr.contains("list") || thisStr.contains("array") || thisStr.contains("tuple") || thisStr.contains("pair") || thisStr.contains("triple")
+    val isOtherListOrTuple = otherStr.contains("list") || otherStr.contains("array") || otherStr.contains("tuple") || otherStr.contains("pair") || otherStr.contains("triple")
+
+    if (isThisListOrTuple && isOtherListOrTuple) {
+        return true
+    }
+
+    if (isOtherListOrTuple && !isThisListOrTuple) {
+        return true
+    }
+
+    if (this.isCompatibleWith(other)) return false
+
+    // Rule 1: Numeric primitives
+    if (this is DataType.Primitive && other is DataType.Primitive) {
+        val sType = this.primitiveType
+        val tType = other.primitiveType
+        if ((sType == PrimitiveType.INT && tType == PrimitiveType.DOUBLE) ||
+            (sType == PrimitiveType.DOUBLE && tType == PrimitiveType.INT)) {
+            return true
+        }
+    }
+
+    return false
+}
+
+
 

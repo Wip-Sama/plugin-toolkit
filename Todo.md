@@ -69,4 +69,10 @@ Bugs:
 - Reload should call the load function in the plugin
 - Job Lifecycle like Plugin Lifecycle
 - Use annotations and reflections to auto define SettingsRegistry.build { ... } in main.kt (Koin) if possible
-- Take correct description for teh update
+- Take correct description for teh update (? done)
+
+- execution graph to flows and a setting to allow for parallelization of capabilities when running flows
+- flows cannot be changed while used in other flows / running
+- flows that are used in other flow, show the other flow names in the flow editor as chips
+- capability resources usage estimation function
+- Scanner that execute jobs on events

@@ -56,7 +56,8 @@ data class FlowEditorState(
     val ghostPosition: Offset? = null,
     val flows: List<Flow> = emptyList(),
     val inferredTypes: Map<Pair<Long, String>, DataType> = emptyMap(),
-    val validationErrors: List<ValidationError> = emptyList()
+    val validationErrors: List<ValidationError> = emptyList(),
+    val selectedNodeIds: Set<Long> = emptySet()
 )
 
 class FlowEditorViewModel(
@@ -107,7 +108,63 @@ class FlowEditorViewModel(
     private val _state = MutableStateFlow(FlowEditorState())
     val state: StateFlow<FlowEditorState> = _state.asStateFlow()
 
+    private val undoStack = mutableListOf<Flow>()
+    private val redoStack = mutableListOf<Flow>()
+
+    private fun saveToHistory() {
+        val currentFlow = _state.value.flow
+        if (undoStack.isEmpty() || undoStack.last() != currentFlow) {
+            undoStack.add(currentFlow.copy())
+            redoStack.clear()
+        }
+    }
+
+    fun undo() {
+        if (undoStack.isNotEmpty()) {
+            val previousFlow = undoStack.removeAt(undoStack.size - 1)
+            val currentFlow = _state.value.flow
+            redoStack.add(currentFlow.copy())
+            
+            _state.update { currentState ->
+                val syncFlows = currentState.flows.map { if (it.name == previousFlow.name) previousFlow else it }
+                currentState.copy(
+                    flow = previousFlow,
+                    hasUnsavedChanges = true,
+                    flows = syncFlows
+                )
+            }
+            runTypeInference()
+        }
+    }
+
+    fun redo() {
+        if (redoStack.isNotEmpty()) {
+            val nextFlow = redoStack.removeAt(redoStack.size - 1)
+            val currentFlow = _state.value.flow
+            undoStack.add(currentFlow.copy())
+            
+            _state.update { currentState ->
+                val syncFlows = currentState.flows.map { if (it.name == nextFlow.name) nextFlow else it }
+                currentState.copy(
+                    flow = nextFlow,
+                    hasUnsavedChanges = true,
+                    flows = syncFlows
+                )
+            }
+            runTypeInference()
+        }
+    }
+
+    companion object {
+        var hasUnsavedChanges: Boolean = false
+    }
+
     init {
+        viewModelScope.launch {
+            _state.collect { currentState ->
+                hasUnsavedChanges = currentState.hasUnsavedChanges
+            }
+        }
         loadFlow()
     }
 
@@ -178,19 +235,23 @@ class FlowEditorViewModel(
                 }
 
                 // Determine active flow to load
-                var activeFlowName = initialFlowName
-                if (activeFlowName.isBlank()) {
-                    activeFlowName = allFlows.firstOrNull()?.name ?: "Default Flow"
-                }
+                val activeFlowName = initialFlowName
+                val activeFlow: Flow
 
-                var activeFlow = allFlows.find { it.name == activeFlowName }
-                if (activeFlow == null) {
-                    activeFlow = Flow(activeFlowName)
-                    // Save the new flow immediately in background
-                    val newFile = getFlowPath(appDataDir, activeFlowName)
-                    val content = json.encodeToString(Flow.serializer(), activeFlow)
-                    SystemFileSystem.sink(newFile).buffered().use { it.writeString(content) }
-                    allFlows.add(activeFlow)
+                if (activeFlowName.isBlank()) {
+                    // Decoupled flow editor: start with empty flow, no automatic save or default selection
+                    activeFlow = Flow("")
+                } else {
+                    var flow = allFlows.find { it.name == activeFlowName }
+                    if (flow == null) {
+                        flow = Flow(activeFlowName)
+                        // Save the new flow immediately in background
+                        val newFile = getFlowPath(appDataDir, activeFlowName)
+                        val content = json.encodeToString(Flow.serializer(), flow)
+                        SystemFileSystem.sink(newFile).buffered().use { it.writeString(content) }
+                        allFlows.add(flow)
+                    }
+                    activeFlow = flow
                 }
 
                 val activeFlowWithSyncedSubflows = syncSubflowNodes(activeFlow, allFlows)
@@ -236,42 +297,12 @@ class FlowEditorViewModel(
                         InputPort(key, key, meta.type, meta.semanticType, meta.defaultValue)
                     } ?: emptyList(),
                     outputs = listOf(OutputPort("result", "Result", event.capability.returnType, event.capability.semanticType))
-                )
+                ),
+                density = event.density
             )
             is FlowEvent.AddSystemNode -> {
-                val action = event.systemAction.lowercase()
-                val inputs = when (action) {
-                    "save" -> listOf(
-                        InputPort("data", "Data", DataType.Primitive(PrimitiveType.ANY)),
-                        InputPort("file_path", "File Path", DataType.Primitive(PrimitiveType.STRING), defaultValue = "output.txt")
-                    )
-                    "load" -> listOf(
-                        InputPort("file_path", "File Path", DataType.Primitive(PrimitiveType.STRING), defaultValue = "output.txt")
-                    )
-                    "log" -> listOf(
-                        InputPort("message", "Message", DataType.Primitive(PrimitiveType.ANY))
-                    )
-                    "delay" -> listOf(
-                        InputPort("duration", "Duration (ms)", DataType.Primitive(PrimitiveType.INT), defaultValue = 1000),
-                        InputPort("input_data", "Input", DataType.Primitive(PrimitiveType.ANY))
-                    )
-                    else -> emptyList()
-                }
-                val outputs = when (action) {
-                    "save" -> listOf(
-                        OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
-                    )
-                    "load" -> listOf(
-                        OutputPort("data", "Data", DataType.Primitive(PrimitiveType.ANY))
-                    )
-                    "log" -> listOf(
-                        OutputPort("output", "Output", DataType.Primitive(PrimitiveType.ANY))
-                    )
-                    "delay" -> listOf(
-                        OutputPort("output_data", "Output", DataType.Primitive(PrimitiveType.ANY))
-                    )
-                    else -> emptyList()
-                }
+                val inputs = SystemNodesRegistry.getInputs(event.systemAction)
+                val outputs = SystemNodesRegistry.getOutputs(event.systemAction)
                 handleAddNode(
                     Node.SystemNode(
                         id = _state.value.nextId,
@@ -280,7 +311,8 @@ class FlowEditorViewModel(
                         systemAction = event.systemAction,
                         inputs = inputs,
                         outputs = outputs
-                    )
+                    ),
+                    density = event.density
                 )
             }
             is FlowEvent.AddFlowInputNode -> handleAddNode(
@@ -288,14 +320,16 @@ class FlowEditorViewModel(
                     id = _state.value.nextId,
                     position = event.position.snapToGrid(),
                     outputs = listOf(OutputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY)))
-                )
+                ),
+                density = event.density
             )
             is FlowEvent.AddFlowOutputNode -> handleAddNode(
                 Node.FlowOutputNode(
                     id = _state.value.nextId,
                     position = event.position.snapToGrid(),
                     inputs = listOf(InputPort("output_data", "Output Data", DataType.Primitive(PrimitiveType.ANY)))
-                )
+                ),
+                density = event.density
             )
             is FlowEvent.AddSubFlowNode -> {
                 if (wouldCreateNestedFlowCycle(_state.value.flow.name, event.flowName, _state.value.flows)) {
@@ -334,30 +368,60 @@ class FlowEditorViewModel(
                         outputs = outputs,
                         inputMappings = inputMappings,
                         outputMappings = outputMappings
-                    )
+                    ),
+                    density = event.density
                 )
             }
             is FlowEvent.ExpandSubFlow -> handleExpandSubFlow(event.nodeId)
             is FlowEvent.MoveNode -> handleMoveNode(event.id, event.delta, event.snap, event.showGhost)
-            is FlowEvent.EndMoveNode -> handleEndMoveNode(event.id)
+            is FlowEvent.EndMoveNode -> handleEndMoveNode(event.id, event.density)
             is FlowEvent.DeleteNode -> handleDeleteNode(event.id)
             is FlowEvent.ConnectPorts -> handleConnectPorts(event.sourceNodeId, event.sourcePortId, event.targetNodeId, event.targetPortId)
+            is FlowEvent.AutoConvertAndConnect -> handleAutoConvertAndConnect(event.sourceNodeId, event.sourcePortId, event.targetNodeId, event.targetPortId)
             is FlowEvent.DeleteConnection -> handleDeleteConnection(event.connection)
             is FlowEvent.Pan -> handlePan(event.delta)
             is FlowEvent.Zoom -> handleZoom(event.delta, event.focusPosition)
             is FlowEvent.SetZoom -> handleSetZoom(event.scale)
             is FlowEvent.ResetBoard -> handleResetBoard()
             is FlowEvent.Save -> handleSave()
+            is FlowEvent.SaveAs -> handleSaveAs(event.name)
             is FlowEvent.UpdateInputPortValue -> handleUpdateInputPortValue(event.nodeId, event.portId, event.value)
             is FlowEvent.UpdateBoundaryNode -> handleUpdateBoundaryNode(event.nodeId, event.portName, event.dataType, event.semanticType)
             is FlowEvent.BringToFront -> handleBringToFront(event.nodeId)
+            is FlowEvent.SelectNodes -> {
+                _state.update { currentState ->
+                    currentState.copy(selectedNodeIds = event.ids)
+                }
+            }
+            is FlowEvent.ClearSelection -> {
+                _state.update { currentState ->
+                    currentState.copy(selectedNodeIds = emptySet())
+                }
+            }
+            is FlowEvent.DeleteSelectedNodes -> handleDeleteSelectedNodes()
             else -> {}
         }
     }
 
-    private fun handleAddNode(node: Node) {
+    private fun handleAddNode(node: Node, density: Float) {
+        saveToHistory()
         _state.update { currentState ->
-            val newFlow = currentState.flow.copy(nodes = currentState.flow.nodes + node)
+            val intersection = findCloseConnection(node, currentState.flow.nodes, currentState.flow.connections, density)
+            
+            val newConnections = if (intersection != null) {
+                val (connection, ports) = intersection
+                val (compatibleInput, compatibleOutput) = ports
+                currentState.flow.connections.filter { it != connection } +
+                        Connection(connection.sourceNodeId, connection.sourcePortId, node.id, compatibleInput.id) +
+                        Connection(node.id, compatibleOutput.id, connection.targetNodeId, connection.targetPortId)
+            } else {
+                currentState.flow.connections
+            }
+
+            val newFlow = currentState.flow.copy(
+                nodes = currentState.flow.nodes + node,
+                connections = newConnections
+            )
             currentState.copy(
                 flow = newFlow,
                 nextId = currentState.nextId + 1,
@@ -382,14 +446,45 @@ class FlowEditorViewModel(
         }
     }
 
-    private fun handleEndMoveNode(id: Long) {
+    private fun handleEndMoveNode(id: Long, density: Float) {
+        saveToHistory()
         _state.update { currentState ->
             val node = currentState.flow.nodes.find { it.id == id } ?: return@update currentState
-            val finalPosition = (node.position + currentState.currentDragOffset).snapToGrid()
-            val newFlow = currentState.flow.copy(nodes = currentState.flow.nodes.map { 
-                if (it.id == id) it.copyWithPosition(finalPosition) 
-                else it 
-            })
+            val finalOffset = currentState.currentDragOffset
+            
+            val isSelectedGroupMove = currentState.selectedNodeIds.contains(id)
+            val nodesToMove = if (isSelectedGroupMove) currentState.selectedNodeIds else setOf(id)
+            
+            val newPositions = currentState.flow.nodes.associate {
+                it.id to if (nodesToMove.contains(it.id)) (it.position + finalOffset).snapToGrid() else it.position
+            }
+
+            val updatedNodes = currentState.flow.nodes.map { n ->
+                val newPos = newPositions[n.id]!!
+                if (newPos != n.position) n.copyWithPosition(newPos) else n
+            }
+
+            var newConnections = currentState.flow.connections
+
+            if (nodesToMove.size == 1) {
+                val movedNode = updatedNodes.find { it.id == id }!!
+                val intersection = findCloseConnection(
+                    movedNode,
+                    currentState.flow.nodes.filter { it.id != id },
+                    currentState.flow.connections.filter { it.sourceNodeId != id && it.targetNodeId != id },
+                    density
+                )
+
+                if (intersection != null) {
+                    val (connection, ports) = intersection
+                    val (compatibleInput, compatibleOutput) = ports
+                    newConnections = currentState.flow.connections.filter { it != connection } +
+                            Connection(connection.sourceNodeId, connection.sourcePortId, id, compatibleInput.id) +
+                            Connection(id, compatibleOutput.id, connection.targetNodeId, connection.targetPortId)
+                }
+            }
+
+            val newFlow = currentState.flow.copy(nodes = updatedNodes, connections = newConnections)
             
             currentState.copy(
                 flow = newFlow,
@@ -400,9 +495,11 @@ class FlowEditorViewModel(
                 flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
+        runTypeInference()
     }
 
     private fun handleDeleteNode(id: Long) {
+        saveToHistory()
         _state.update { currentState ->
             val newFlow = currentState.flow.copy(
                 nodes = currentState.flow.nodes.filter { it.id != id },
@@ -410,6 +507,29 @@ class FlowEditorViewModel(
             )
             currentState.copy(
                 flow = newFlow,
+                selectedNodeIds = currentState.selectedNodeIds.filter { it != id }.toSet(),
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+            )
+        }
+        runTypeInference()
+    }
+
+    private fun handleDeleteSelectedNodes() {
+        val selectedIds = _state.value.selectedNodeIds
+        if (selectedIds.isEmpty()) return
+        
+        saveToHistory()
+        _state.update { currentState ->
+            val newFlow = currentState.flow.copy(
+                nodes = currentState.flow.nodes.filter { !selectedIds.contains(it.id) },
+                connections = currentState.flow.connections.filter { 
+                    !selectedIds.contains(it.sourceNodeId) && !selectedIds.contains(it.targetNodeId) 
+                }
+            )
+            currentState.copy(
+                flow = newFlow,
+                selectedNodeIds = emptySet(),
                 hasUnsavedChanges = true,
                 flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
@@ -505,6 +625,7 @@ class FlowEditorViewModel(
     private fun handleConnectPorts(sourceNodeId: Long, sourcePortId: String, targetNodeId: Long, targetPortId: String) {
         if (sourceNodeId == targetNodeId) return
 
+        saveToHistory()
         _state.update { currentState ->
             val sourceNode = currentState.flow.nodes.find { it.id == sourceNodeId }
             val targetNode = currentState.flow.nodes.find { it.id == targetNodeId }
@@ -542,7 +663,63 @@ class FlowEditorViewModel(
         runTypeInference()
     }
 
+    private fun handleAutoConvertAndConnect(
+        sourceNodeId: Long,
+        sourcePortId: String,
+        targetNodeId: Long,
+        targetPortId: String
+    ) {
+        if (sourceNodeId == targetNodeId) return
+
+        saveToHistory()
+        _state.update { currentState ->
+            val sourceNode = currentState.flow.nodes.find { it.id == sourceNodeId }
+            val targetNode = currentState.flow.nodes.find { it.id == targetNodeId }
+            
+            if (sourceNode == null || targetNode == null) return@update currentState
+
+            val sourcePort = sourceNode.outputs.find { it.id == sourcePortId }
+            val targetPort = targetNode.inputs.find { it.id == targetPortId }
+
+            if (sourcePort == null || targetPort == null) return@update currentState
+
+            val midPosition = Offset(
+                (sourceNode.position.x + targetNode.position.x) / 2f,
+                (sourceNode.position.y + targetNode.position.y) / 2f
+            ).snapToGrid()
+
+            val convertNode = Node.SystemNode(
+                id = currentState.nextId,
+                position = midPosition,
+                title = "Convert",
+                systemAction = "convert",
+                inputs = listOf(InputPort("input_data", "Input", sourcePort.dataType)),
+                outputs = listOf(OutputPort("output_data", "Output", targetPort.dataType))
+            )
+
+            val conn1 = Connection(sourceNodeId, sourcePortId, convertNode.id, "input_data")
+            val conn2 = Connection(convertNode.id, "output_data", targetNodeId, targetPortId)
+
+            val filteredConnections = currentState.flow.connections.filterNot { 
+                it.targetNodeId == targetNodeId && it.targetPortId == targetPortId 
+            }
+
+            val newFlow = currentState.flow.copy(
+                nodes = currentState.flow.nodes + convertNode,
+                connections = filteredConnections + conn1 + conn2
+            )
+            currentState.copy(
+                flow = newFlow,
+                nextId = currentState.nextId + 1,
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+            )
+        }
+        runTypeInference()
+    }
+
     private fun handleDeleteConnection(connection: Connection) {
+        saveToHistory()
         _state.update { currentState ->
             val newFlow = currentState.flow.copy(connections = currentState.flow.connections.filter { it != connection })
             currentState.copy(
@@ -689,6 +866,17 @@ class FlowEditorViewModel(
         }
     }
 
+    private fun handleSaveAs(name: String) {
+        _state.update { currentState ->
+            val updatedFlow = currentState.flow.copy(name = name)
+            currentState.copy(
+                flow = updatedFlow,
+                flows = currentState.flows.filter { it.name != name } + updatedFlow
+            )
+        }
+        handleSave()
+    }
+
     private fun handleSave() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -720,6 +908,7 @@ class FlowEditorViewModel(
     }
 
     private fun handleUpdateInputPortValue(nodeId: Long, portId: String, value: Any?) {
+        saveToHistory()
         _state.update { currentState ->
             val updatedNodes = currentState.flow.nodes.map { node ->
                 if (node.id == nodeId) {
@@ -737,6 +926,7 @@ class FlowEditorViewModel(
     }
 
     private fun handleUpdateBoundaryNode(nodeId: Long, portName: String, dataType: DataType, semanticType: String?) {
+        saveToHistory()
         _state.update { currentState ->
             val oldNode = currentState.flow.nodes.find { it.id == nodeId }
             val oldPortId = when (oldNode) {
@@ -807,8 +997,15 @@ class FlowEditorViewModel(
     private fun handleBringToFront(nodeId: Long) {
         _state.update { currentState ->
             val node = currentState.flow.nodes.find { it.id == nodeId } ?: return@update currentState
+            val isAlreadySelected = currentState.selectedNodeIds.contains(nodeId)
+            val newSelection = if (isAlreadySelected) {
+                currentState.selectedNodeIds
+            } else {
+                setOf(nodeId)
+            }
             currentState.copy(
-                flow = currentState.flow.copy(nodes = currentState.flow.nodes.filter { it.id != nodeId } + node)
+                flow = currentState.flow.copy(nodes = currentState.flow.nodes.filter { it.id != nodeId } + node),
+                selectedNodeIds = newSelection
             )
         }
     }
@@ -861,6 +1058,15 @@ class FlowEditorViewModel(
                     if (tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY &&
                         !(srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY)) {
                         inferred[tgtKey] = srcType
+                        changed = true
+                    }
+                }
+            }
+
+            // Custom propagation for special system nodes
+            flow.nodes.forEach { node ->
+                if (node is Node.SystemNode) {
+                    if (SystemNodesRegistry.propagateTypes(node, inferred)) {
                         changed = true
                     }
                 }
@@ -997,5 +1203,126 @@ class FlowEditorViewModel(
             }
         }
         return flow.copy(nodes = updatedNodes)
+    }
+
+    private fun getPortRelativeOffset(node: Node, portId: String, density: Float): Offset {
+        val headerHeight = 48f
+        val bodyTopPadding = 12f
+        val rowHeight = 48f
+        val spacing = 12f
+        val dividerHeight = 0.5f
+
+        val isInput = node.inputs.any { it.id == portId }
+        val isOutput = node.outputs.any { it.id == portId }
+
+        val xDp = if (isInput) 19f else 281f
+
+        var yDp = headerHeight + bodyTopPadding
+        val numInputs = node.inputs.size
+
+        if (isInput) {
+            val index = node.inputs.indexOfFirst { it.id == portId }
+            if (index != -1) {
+                yDp += index * (rowHeight + spacing) + (rowHeight / 2f)
+            }
+        } else if (isOutput) {
+            val index = node.outputs.indexOfFirst { it.id == portId }
+            if (index != -1) {
+                var precedingHeight = numInputs * rowHeight
+                var numGaps = numInputs
+                if (numInputs > 0) {
+                    precedingHeight += dividerHeight
+                    numGaps += 1
+                }
+                yDp += precedingHeight + (numGaps + index) * spacing + index * rowHeight + (rowHeight / 2f)
+            }
+        }
+
+        return Offset(xDp * density, yDp * density)
+    }
+
+    private fun getDistanceToBezier(p: Offset, start: Offset, end: Offset): Float {
+        val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
+        val c1 = Offset(start.x + controlPointOffset, start.y)
+        val c2 = Offset(end.x - controlPointOffset, end.y)
+        
+        var minDistance = Float.MAX_VALUE
+        val steps = 30
+        for (i in 0..steps) {
+            val t = i.toFloat() / steps
+            val mt = 1f - t
+            val bt = start * (mt * mt * mt) + 
+                     c1 * (3f * mt * mt * t) + 
+                     c2 * (3f * mt * t * t) + 
+                     end * (t * t * t)
+            val dist = (p - bt).getDistance()
+            if (dist < minDistance) {
+                minDistance = dist
+            }
+        }
+        return minDistance
+    }
+
+    private fun isNodeCompatibleWithConnection(
+        node: Node,
+        sourceNode: Node,
+        sourcePortId: String,
+        targetNode: Node,
+        targetPortId: String
+    ): Pair<InputPort, OutputPort>? {
+        val sourcePort = sourceNode.outputs.find { it.id == sourcePortId } ?: return null
+        val targetPort = targetNode.inputs.find { it.id == targetPortId } ?: return null
+
+        val compatibleInput = node.inputs.firstOrNull { input ->
+            sourcePort.dataType.isCompatibleWith(input.dataType) &&
+            isSemanticTypeCompatible(sourcePort.semanticType, input.semanticType)
+        } ?: return null
+
+        val compatibleOutput = node.outputs.firstOrNull { output ->
+            output.dataType.isCompatibleWith(targetPort.dataType) &&
+            isSemanticTypeCompatible(output.semanticType, targetPort.semanticType)
+        } ?: return null
+
+        return Pair(compatibleInput, compatibleOutput)
+    }
+
+    private fun findCloseConnection(
+        node: Node,
+        nodes: List<Node>,
+        connections: List<Connection>,
+        density: Float
+    ): Pair<Connection, Pair<InputPort, OutputPort>>? {
+        val nodeWidth = 300f * density
+        val nodeHeight = 180f * density
+        val nodeCenter = node.position + Offset(nodeWidth / 2f, nodeHeight / 2f)
+
+        var closestConnection: Connection? = null
+        var closestPorts: Pair<InputPort, OutputPort>? = null
+        var minDistance = 60f * density
+
+        connections.forEach { connection ->
+            val sourceNode = nodes.find { it.id == connection.sourceNodeId } ?: return@forEach
+            val targetNode = nodes.find { it.id == connection.targetNodeId } ?: return@forEach
+
+            val sourcePortBoardPos = sourceNode.position + getPortRelativeOffset(sourceNode, connection.sourcePortId, density)
+            val targetPortBoardPos = targetNode.position + getPortRelativeOffset(targetNode, connection.targetPortId, density)
+
+            val dist = getDistanceToBezier(nodeCenter, sourcePortBoardPos, targetPortBoardPos)
+            if (dist < minDistance) {
+                val ports = isNodeCompatibleWithConnection(node, sourceNode, connection.sourcePortId, targetNode, connection.targetPortId)
+                if (ports != null) {
+                    minDistance = dist
+                    closestConnection = connection
+                    closestPorts = ports
+                }
+            }
+        }
+
+        val conn = closestConnection
+        val pts = closestPorts
+        if (conn != null && pts != null) {
+            return Pair(conn, pts)
+        }
+        return null
     }
 }

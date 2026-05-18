@@ -33,6 +33,11 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.api.PluginEntry
+import kotlin.time.Clock
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 
 data class FlowState(
     val flows: List<Flow> = emptyList(),
@@ -42,17 +47,18 @@ data class FlowState(
 }
 
 sealed interface FlowEvent {
-    data class AddCapabilityNode(val pluginInfo: PluginInfo, val capability: Capability, val position: Offset) : FlowEvent
-    data class AddSystemNode(val systemAction: String, val position: Offset) : FlowEvent
-    data class AddFlowInputNode(val position: Offset) : FlowEvent
-    data class AddFlowOutputNode(val position: Offset) : FlowEvent
-    data class AddSubFlowNode(val flowName: String, val position: Offset) : FlowEvent
+    data class AddCapabilityNode(val pluginInfo: PluginInfo, val capability: Capability, val position: Offset, val density: Float = 1f) : FlowEvent
+    data class AddSystemNode(val systemAction: String, val position: Offset, val density: Float = 1f) : FlowEvent
+    data class AddFlowInputNode(val position: Offset, val density: Float = 1f) : FlowEvent
+    data class AddFlowOutputNode(val position: Offset, val density: Float = 1f) : FlowEvent
+    data class AddSubFlowNode(val flowName: String, val position: Offset, val density: Float = 1f) : FlowEvent
     
     data class MoveNode(val id: Long, val delta: Offset, val snap: Boolean = false, val showGhost: Boolean = false) : FlowEvent
-    data class EndMoveNode(val id: Long) : FlowEvent
+    data class EndMoveNode(val id: Long, val density: Float = 1f) : FlowEvent
     data class DeleteNode(val id: Long) : FlowEvent
     
     data class ConnectPorts(val sourceNodeId: Long, val sourcePortId: String, val targetNodeId: Long, val targetPortId: String) : FlowEvent
+    data class AutoConvertAndConnect(val sourceNodeId: Long, val sourcePortId: String, val targetNodeId: Long, val targetPortId: String) : FlowEvent
     data class DeleteConnection(val connection: Connection) : FlowEvent
     
     data class Pan(val delta: Offset) : FlowEvent
@@ -68,9 +74,15 @@ sealed interface FlowEvent {
     data class ExpandSubFlow(val nodeId: Long) : FlowEvent
     
     data object Save : FlowEvent
+    data class SaveAs(val name: String) : FlowEvent
     data class UpdateInputPortValue(val nodeId: Long, val portId: String, val value: Any?) : FlowEvent
     data class UpdateBoundaryNode(val nodeId: Long, val portName: String, val dataType: DataType, val semanticType: String?) : FlowEvent
     data class BringToFront(val nodeId: Long) : FlowEvent
+
+    // Selection
+    data class SelectNodes(val ids: Set<Long>) : FlowEvent
+    data object ClearSelection : FlowEvent
+    data object DeleteSelectedNodes : FlowEvent
 }
 
 class FlowViewModel(
@@ -250,6 +262,45 @@ class FlowViewModel(
                 reloadFlows()
             } catch (e: Exception) {
                 Logger.e(e) { "Failed to delete flow: $name" }
+            }
+        }
+    }
+
+    fun executeFlow(flow: Flow, parameterValues: Map<String, String>) {
+        viewModelScope.launch {
+            try {
+                val jobManager = getKoin().get<JobManager>()
+                val jobId = "flow-${flow.name.replace(" ", "_")}-${Clock.System.now().toEpochMilliseconds()}"
+                
+                val params = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                parameterValues.forEach { (key, value) ->
+                    params[key] = kotlinx.serialization.json.JsonPrimitive(value)
+                }
+
+                val job = BackgroundJob(
+                    id = jobId,
+                    name = "Flow: ${flow.name}",
+                    type = JobType.Flow,
+                    status = JobStatus.Queued,
+                    pluginId = "system",
+                    capabilityName = flow.name,
+                    parameters = params,
+                    keepResult = true
+                )
+
+                jobManager.enqueueJob(job)
+                resolvedNotificationService?.notify(
+                    title = "Flow Execution Started",
+                    message = "Flow '${flow.name}' is now queued for execution.",
+                    type = NotificationType.Info
+                )
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to enqueue flow execution" }
+                resolvedNotificationService?.notify(
+                    title = "Flow Execution Failed",
+                    message = "Could not execute flow: ${e.message}",
+                    type = NotificationType.Error
+                )
             }
         }
     }

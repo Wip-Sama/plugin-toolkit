@@ -28,6 +28,11 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalDensity
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
@@ -52,18 +57,35 @@ fun BoardCanvas(
     onBoardLayoutCoordinatesChanged: (LayoutCoordinates) -> Unit,
     onBoardSizeChanged: (IntSize) -> Unit,
     onDeleteConnection: (org.wip.plugintoolkit.features.flows.model.Connection) -> Unit,
+    selectedNodeIds: Set<Long>,
+    onSelectNodes: (Set<Long>) -> Unit,
+    onClearSelection: () -> Unit,
+    onDeleteSelectedNodes: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    nodeSizes: Map<Long, IntSize>,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
     val gridSize = 50f
+    val density = LocalDensity.current
+    val focusRequester = remember { FocusRequester() }
+    
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     var selectedConnection by remember { mutableStateOf<org.wip.plugintoolkit.features.flows.model.Connection?>(null) }
     var hoveredConnection by remember { mutableStateOf<org.wip.plugintoolkit.features.flows.model.Connection?>(null) }
+    
+    var selectionStart by remember { mutableStateOf<Offset?>(null) }
+    var selectionEnd by remember { mutableStateOf<Offset?>(null) }
 
     LaunchedEffect(flow.connections) {
         if (hoveredConnection != null && !flow.connections.contains(hoveredConnection)) {
             hoveredConnection = null
         }
+    }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
     }
 
     val connectionColor = MaterialTheme.colorScheme.primary
@@ -78,6 +100,29 @@ fun BoardCanvas(
                 onBoardSizeChanged(it)
             }
             .background(MaterialTheme.colorScheme.background)
+            .focusRequester(focusRequester)
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when {
+                        keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> {
+                            onDeleteSelectedNodes()
+                            true
+                        }
+                        keyEvent.isCtrlPressed && keyEvent.key == Key.Z -> {
+                            onUndo()
+                            true
+                        }
+                        keyEvent.isCtrlPressed && keyEvent.key == Key.Y -> {
+                            onRedo()
+                            true
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            }
             .pointerInput(isDrawingConnection, draggingNodeFromPalette) {
                 detectTransformGestures { _, pan, _, _ ->
                     if (!isDrawingConnection && draggingNodeFromPalette == null) {
@@ -87,6 +132,7 @@ fun BoardCanvas(
             }
             .pointerInput(flow.connections, state.scale, state.offset, getPortBoardPosition) {
                 detectTapGestures { tapOffset ->
+                    focusRequester.requestFocus()
                     var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
                     var minDistance = 20f * state.scale
                     if (minDistance < 15f) minDistance = 15f
@@ -105,6 +151,59 @@ fun BoardCanvas(
                         }
                     }
                     selectedConnection = bestConnection
+                    if (bestConnection == null) {
+                        onClearSelection()
+                    }
+                }
+            }
+            .pointerInput(state.scale, state.offset, flow.nodes, nodeSizes) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                            focusRequester.requestFocus()
+                            val startPoint = event.changes.first().position
+                            selectionStart = startPoint
+                            selectionEnd = startPoint
+                            
+                            event.changes.forEach { it.consume() }
+                            
+                            while (true) {
+                                val dragEvent = awaitPointerEvent()
+                                if (dragEvent.type == PointerEventType.Move) {
+                                    selectionEnd = dragEvent.changes.first().position
+                                    dragEvent.changes.forEach { it.consume() }
+                                    
+                                    val modelStart = (selectionStart!! - state.offset) / state.scale
+                                    val modelEnd = (selectionEnd!! - state.offset) / state.scale
+                                    val selectLeft = minOf(modelStart.x, modelEnd.x)
+                                    val selectRight = maxOf(modelStart.x, modelEnd.x)
+                                    val selectTop = minOf(modelStart.y, modelEnd.y)
+                                    val selectBottom = maxOf(modelStart.y, modelEnd.y)
+                                    
+                                    val selectedIds = mutableSetOf<Long>()
+                                    flow.nodes.forEach { node ->
+                                        val nodeLeft = node.position.x
+                                        val nodeTop = node.position.y
+                                        val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: (300f * density.density)
+                                        val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
+                                        val nodeRight = nodeLeft + nodeWidth
+                                        val nodeBottom = nodeTop + nodeHeight
+                                        
+                                        if (selectLeft < nodeRight && selectRight > nodeLeft &&
+                                            selectTop < nodeBottom && selectBottom > nodeTop) {
+                                            selectedIds.add(node.id)
+                                        }
+                                    }
+                                    onSelectNodes(selectedIds)
+                                } else if (dragEvent.type == PointerEventType.Release) {
+                                    selectionStart = null
+                                    selectionEnd = null
+                                    break
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .pointerInput(flow.connections, state.scale, state.offset) {
@@ -238,6 +337,28 @@ fun BoardCanvas(
 
         // Render main children (nodes, preview)
         content()
+
+        // Selection Box overlay drawing
+        if (selectionStart != null && selectionEnd != null) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val rectLeft = minOf(selectionStart!!.x, selectionEnd!!.x)
+                val rectRight = maxOf(selectionStart!!.x, selectionEnd!!.x)
+                val rectTop = minOf(selectionStart!!.y, selectionEnd!!.y)
+                val rectBottom = maxOf(selectionStart!!.y, selectionEnd!!.y)
+                
+                drawRect(
+                    color = connectionColor.copy(alpha = 0.15f),
+                    topLeft = Offset(rectLeft, rectTop),
+                    size = androidx.compose.ui.geometry.Size(rectRight - rectLeft, rectBottom - rectTop)
+                )
+                drawRect(
+                    color = connectionColor,
+                    topLeft = Offset(rectLeft, rectTop),
+                    size = androidx.compose.ui.geometry.Size(rectRight - rectLeft, rectBottom - rectTop),
+                    style = Stroke(width = 2.dp.toPx())
+                )
+            }
+        }
 
         // Selected Connection Delete Button Bubble
         selectedConnection?.let { conn ->

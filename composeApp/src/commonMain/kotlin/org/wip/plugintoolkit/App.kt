@@ -132,7 +132,20 @@ private fun AppContent(
                         NavDisplay(
                             backStack = backStack,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
-                            onBack = { if (backStack.size > 1) backStack.removeLast() }) { key ->
+                            onBack = {
+                                if (currentScreen is Screen.FlowEditor && FlowEditorViewModel.hasUnsavedChanges) {
+                                    dialogService.showConfirmation(
+                                        title = "Unsaved Changes",
+                                        message = "All the unsaved data will be lost. Are you sure you want to exit?",
+                                        onConfirm = {
+                                            FlowEditorViewModel.hasUnsavedChanges = false
+                                            if (backStack.size > 1) backStack.removeLast()
+                                        }
+                                    )
+                                } else {
+                                    if (backStack.size > 1) backStack.removeLast()
+                                }
+                            }) { key ->
                             when (key) {
                                 is Screen.Main -> NavEntry(key) { LandingPage() }
                                 is Screen.FlowManager -> NavEntry(key) {
@@ -148,7 +161,31 @@ private fun AppContent(
                                     val editorViewModel: FlowEditorViewModel = koinInject(parameters = { parametersOf(key.flowName) })
                                     FlowEditorView(
                                         viewModel = editorViewModel,
-                                        notificationService = notificationService
+                                        notificationService = notificationService,
+                                        onExit = {
+                                            if (FlowEditorViewModel.hasUnsavedChanges) {
+                                                dialogService.showConfirmation(
+                                                    title = "Unsaved Changes",
+                                                    message = "All the unsaved data will be lost. Are you sure you want to exit?",
+                                                    onConfirm = {
+                                                        FlowEditorViewModel.hasUnsavedChanges = false
+                                                        if (backStack.size > 1) {
+                                                            backStack.removeLast()
+                                                        } else {
+                                                            backStack.clear()
+                                                            backStack.add(Screen.FlowManager)
+                                                        }
+                                                    }
+                                                )
+                                            } else {
+                                                if (backStack.size > 1) {
+                                                    backStack.removeLast()
+                                                } else {
+                                                    backStack.clear()
+                                                    backStack.add(Screen.FlowManager)
+                                                }
+                                            }
+                                        }
                                     )
                                 }
                                 is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
@@ -169,8 +206,20 @@ private fun AppContent(
                         currentScreen = currentScreen,
                         onScreenSelected = { screen ->
                             if (currentScreen != screen) {
-                                backStack.clear()
-                                backStack.add(screen)
+                                if (currentScreen is Screen.FlowEditor && FlowEditorViewModel.hasUnsavedChanges) {
+                                    dialogService.showConfirmation(
+                                        title = "Unsaved Changes",
+                                        message = "All the unsaved data will be lost. Are you sure you want to exit?",
+                                        onConfirm = {
+                                            FlowEditorViewModel.hasUnsavedChanges = false
+                                            backStack.clear()
+                                            backStack.add(screen)
+                                        }
+                                    )
+                                } else {
+                                    backStack.clear()
+                                    backStack.add(screen)
+                                }
                             }
                         },
                         isNavbarCollapsed = isNavbarCollapsed,

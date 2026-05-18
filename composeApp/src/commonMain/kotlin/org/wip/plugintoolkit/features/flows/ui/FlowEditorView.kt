@@ -26,15 +26,18 @@ import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.api.format
+import org.wip.plugintoolkit.api.canConvert
 import kotlin.math.roundToInt
 
 @Composable
 fun FlowEditorView(
     viewModel: FlowEditorViewModel,
     notificationService: NotificationService,
+    onExit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
@@ -44,6 +47,18 @@ fun FlowEditorView(
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     var boardLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var rootLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    var showSaveAsDialog by remember { mutableStateOf(false) }
+    var saveAsName by remember { mutableStateOf("") }
+
+    // State for conversion popup/dialog
+    var showConversionDialog by remember { mutableStateOf(false) }
+    var pendingConnectionSourceNodeId by remember { mutableStateOf<Long?>(null) }
+    var pendingConnectionSourcePortId by remember { mutableStateOf<String?>(null) }
+    var pendingConnectionTargetNodeId by remember { mutableStateOf<Long?>(null) }
+    var pendingConnectionTargetPortId by remember { mutableStateOf<String?>(null) }
+    var pendingConnectionSourceType by remember { mutableStateOf<DataType?>(null) }
+    var pendingConnectionTargetType by remember { mutableStateOf<DataType?>(null) }
 
     // State for temporary connection drawing
     var isDrawingConnection by remember { mutableStateOf(false) }
@@ -75,12 +90,13 @@ fun FlowEditorView(
 
     val handlePaletteClick = { paletteNode: PaletteNode ->
         val dropPos = (Offset(boardSize.width / 2f, boardSize.height / 2f) - state.offset) / state.scale
+        val d = density.density
         when (paletteNode) {
-            is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos))
-            is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos))
-            is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos))
-            is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos))
-            is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos))
+            is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos, d))
+            is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos, d))
+            is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos, d))
+            is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos, d))
+            is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos, d))
         }
     }
 
@@ -106,13 +122,23 @@ fun FlowEditorView(
             connectionCurrentPos = connectionCurrentPos,
             onBoardLayoutCoordinatesChanged = { boardLayoutCoordinates = it },
             onBoardSizeChanged = { boardSize = it },
-            onDeleteConnection = { viewModel.onEvent(FlowEvent.DeleteConnection(it)) }
+            onDeleteConnection = { viewModel.onEvent(FlowEvent.DeleteConnection(it)) },
+            selectedNodeIds = state.selectedNodeIds,
+            onSelectNodes = { viewModel.onEvent(FlowEvent.SelectNodes(it)) },
+            onClearSelection = { viewModel.onEvent(FlowEvent.ClearSelection) },
+            onDeleteSelectedNodes = { viewModel.onEvent(FlowEvent.DeleteSelectedNodes) },
+            onUndo = { viewModel.undo() },
+            onRedo = { viewModel.redo() },
+            nodeSizes = nodeSizes
         ) {
             // 1.2 Nodes
             flow.nodes.forEach { node ->
                 key(node.id) {
                     val isDragged = state.draggedNodeId == node.id
-                    val dragOffset = if (isDragged) state.currentDragOffset else Offset.Zero
+                    val isPartofSelectedGroupDrag = state.draggedNodeId != null &&
+                            state.selectedNodeIds.contains(state.draggedNodeId) &&
+                            state.selectedNodeIds.contains(node.id)
+                    val dragOffset = if (isDragged || isPartofSelectedGroupDrag) state.currentDragOffset else Offset.Zero
                     
                     val isNodeHighlighted = highlightedNodeId == node.id
                     val nodeHighlightedPortId = if (isNodeHighlighted) highlightedPortId else null
@@ -150,7 +176,7 @@ fun FlowEditorView(
                             inferredTypes = state.inferredTypes,
                             validationErrors = state.validationErrors,
                             onMove = { id, delta, snap, showGhost -> viewModel.onEvent(FlowEvent.MoveNode(id, delta, snap, showGhost)) },
-                            onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id)) },
+                            onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
                             onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
                             onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
                             onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, value)) },
@@ -194,7 +220,7 @@ fun FlowEditorView(
                                     }
                                 }
                             },
-                            onDropConnection = {
+                            onDropConnection = { isShiftPressed ->
                                 if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
                                     val sourceNodeId = if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
                                     val sourcePortId = if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
@@ -220,6 +246,23 @@ fun FlowEditorView(
                                                     targetNodeId, 
                                                     targetPortId
                                                 ))
+                                            } else if (semanticsCompatible && sourcePort.dataType.canConvert(targetPort.dataType)) {
+                                                if (isShiftPressed) {
+                                                    viewModel.onEvent(FlowEvent.AutoConvertAndConnect(
+                                                        sourceNodeId,
+                                                        sourcePortId,
+                                                        targetNodeId,
+                                                        targetPortId
+                                                    ))
+                                                } else {
+                                                    pendingConnectionSourceNodeId = sourceNodeId
+                                                    pendingConnectionSourcePortId = sourcePortId
+                                                    pendingConnectionTargetNodeId = targetNodeId
+                                                    pendingConnectionTargetPortId = targetPortId
+                                                    pendingConnectionSourceType = sourcePort.dataType
+                                                    pendingConnectionTargetType = targetPort.dataType
+                                                    showConversionDialog = true
+                                                }
                                             } else {
                                                 val message = if (!typesCompatible) {
                                                     "Cannot connect: Incompatible types. Cannot connect ${sourcePort.dataType.format()} to ${targetPort.dataType.format()}."
@@ -244,6 +287,7 @@ fun FlowEditorView(
                             boardLayoutCoordinates = boardLayoutCoordinates,
                             stateScale = state.scale,
                             stateOffset = state.offset,
+                            selectedNodeIds = state.selectedNodeIds,
                             modifier = Modifier.onSizeChanged { size ->
                                 nodeSizes[node.id] = size
                             }
@@ -306,12 +350,13 @@ fun FlowEditorView(
                 if (isOverBoard) {
                     val dropPos = (relativeToBoard - state.offset) / state.scale
                     draggingNodeFromPalette?.let { paletteNode ->
+                        val d = density.density
                         when (paletteNode) {
-                            is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos))
-                            is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos))
-                            is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos))
-                            is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos))
-                            is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos))
+                            is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos, d))
+                            is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos, d))
+                            is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos, d))
+                            is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos, d))
+                            is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos, d))
                         }
                     }
                 }
@@ -335,25 +380,48 @@ fun FlowEditorView(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
-                Column {
-                    Text(
-                        text = "Flow Selected",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = flow.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    if (flow.name.isBlank()) {
+                        Text(
+                            text = "No flow selected",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        Text(
+                            text = "Flow Selected",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = flow.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Button(
-                    onClick = { viewModel.onEvent(FlowEvent.Save) },
+                    onClick = {
+                        if (flow.name.isBlank()) {
+                            saveAsName = ""
+                            showSaveAsDialog = true
+                        } else {
+                            viewModel.onEvent(FlowEvent.Save)
+                        }
+                    },
                     enabled = state.hasUnsavedChanges,
                     contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
                 ) {
                     Text("Save Changes")
+                }
+
+                OutlinedButton(
+                    onClick = onExit,
+                    contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
+                ) {
+                    Text("Exit")
                 }
             }
         }
@@ -372,6 +440,92 @@ fun FlowEditorView(
             ) {
                 PaletteItemPreview(node)
             }
+        }
+
+        if (showConversionDialog && 
+            pendingConnectionSourceNodeId != null && pendingConnectionSourcePortId != null &&
+            pendingConnectionTargetNodeId != null && pendingConnectionTargetPortId != null
+        ) {
+            AlertDialog(
+                onDismissRequest = { showConversionDialog = false },
+                title = { Text("Incompatible Types - Auto Convert?") },
+                text = {
+                    Text("The source port type (${pendingConnectionSourceType?.format()}) and target port type (${pendingConnectionTargetType?.format()}) are different but convertible.\n\nWould you like to automatically insert a Convert node in between?")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.onEvent(
+                                FlowEvent.AutoConvertAndConnect(
+                                    pendingConnectionSourceNodeId!!,
+                                    pendingConnectionSourcePortId!!,
+                                    pendingConnectionTargetNodeId!!,
+                                    pendingConnectionTargetPortId!!
+                                )
+                            )
+                            showConversionDialog = false
+                        }
+                    ) {
+                        Text("Convert & Connect")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showConversionDialog = false
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showSaveAsDialog) {
+            AlertDialog(
+                onDismissRequest = { showSaveAsDialog = false },
+                title = { Text("Save Flow") },
+                text = {
+                    Column {
+                        Text(
+                            text = "Enter a name for your new flow:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = ToolkitTheme.spacing.medium)
+                        )
+                        TextField(
+                            value = saveAsName,
+                            onValueChange = { saveAsName = it },
+                            label = { Text("Flow Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val trimmedName = saveAsName.trim()
+                            if (trimmedName.isNotBlank()) {
+                                val exists = state.flows.any { it.name.equals(trimmedName, ignoreCase = true) }
+                                if (exists) {
+                                    notificationService.toast("A flow named '$trimmedName' already exists.")
+                                } else {
+                                    viewModel.onEvent(FlowEvent.SaveAs(trimmedName))
+                                    showSaveAsDialog = false
+                                }
+                            }
+                        },
+                        enabled = saveAsName.isNotBlank()
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSaveAsDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }
