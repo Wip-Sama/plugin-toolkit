@@ -49,33 +49,23 @@ class AppViewModel(
                 )
             )
         ), SidebarSectionData(
-            title = Res.string.section_direct_execution.localized, elements = listOf(
-                SidebarElement(
-                    id = Screen.Plugins, icon = Icons.Default.Extension, title = Res.string.nav_plugins.localized
-                )
-            )
-        ), SidebarSectionData(
             title = Res.string.section_plugins.localized, elements = listOf(
                 SidebarElement(
-                    id = Screen.PluginManager,
-                    icon = Icons.Default.Inventory,
-                    title = Res.string.section_plugins.localized
+                    id = Screen.Plugins, icon = Icons.Default.PlayCircle, title = "Execute".localized
                 ), SidebarElement(
-                    id = Screen.PluginRepo,
-                    icon = Icons.Default.Inventory,
-                    title = Res.string.section_plugins_repositories.localized
+                    id = Screen.PluginManager, icon = Icons.Default.Inventory, title = "Manager".localized
+                ), SidebarElement(
+                    id = Screen.PluginRepo, icon = Icons.Default.Inventory, title = "Repositories".localized
                 )
             )
         ), SidebarSectionData(
             title = Res.string.section_flows.localized, elements = listOf(
                 SidebarElement(
-                    id = Screen.FlowManager, icon = Icons.Default.Dashboard, title = "Manager".localized
-                ),
-                SidebarElement(
-                    id = Screen.FlowRunner, icon = Icons.Default.PlayCircle, title = "View".localized
-                ),
-                SidebarElement(
+                    id = Screen.FlowRunner, icon = Icons.Default.PlayCircle, title = "Execute".localized
+                ), SidebarElement(
                     id = Screen.FlowEditor(""), icon = Icons.Default.Edit, title = "Editor".localized
+                ), SidebarElement(
+                    id = Screen.FlowManager, icon = Icons.Default.Dashboard, title = "Manager".localized
                 )
             )
         )

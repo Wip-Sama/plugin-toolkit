@@ -1,6 +1,9 @@
 package org.wip.plugintoolkit.features.flows.viewmodel
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.touchlab.kermit.Logger
@@ -90,6 +93,7 @@ class FlowViewModel(
     private val notificationService: NotificationService? = null,
     private val pluginRegistry: PluginRegistry? = null
 ) : ViewModel() {
+    var saveResults by mutableStateOf(true)
     
     private val resolvedSettingsPersistence: SettingsPersistence by lazy {
         settingsPersistence ?: getKoin().get()
@@ -319,7 +323,7 @@ class FlowViewModel(
                     pluginId = "system",
                     capabilityName = flow.name,
                     parameters = params,
-                    keepResult = true
+                    keepResult = saveResults
                 )
 
                 jobManager.enqueueJob(job)

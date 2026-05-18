@@ -21,6 +21,9 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -39,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
@@ -67,7 +71,7 @@ fun PluginRepoView(
     val conflicts by viewModel.conflicts.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.extraLarge)) {
         // Add Repository Section
         SettingsGroup(title = stringResource(Res.string.repo_add_title)) {
             Row(
@@ -189,6 +193,16 @@ fun PluginRepoView(
                                 )
                             }
                             Row {
+                                val clipboardManager = LocalClipboardManager.current
+                                IconButton(onClick = {
+                                    clipboardManager.setText(AnnotatedString(repo.url))
+                                    viewModel.copyRepositoryLink(repo.url)
+                                }) {
+                                    Icon(
+                                        Icons.Default.Share,
+                                        contentDescription = "Share repository link"
+                                    )
+                                }
                                 IconButton(onClick = { viewModel.refreshRepository(repo.url) }) {
                                     Icon(
                                         Icons.Default.Refresh,

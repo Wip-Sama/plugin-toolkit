@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +32,8 @@ import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.canConvert
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 import kotlin.math.roundToInt
 
 @Composable
@@ -99,6 +102,12 @@ fun FlowEditorView(
             is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos, d))
         }
     }
+
+    // Capture standard error strings for localization
+    val sameNodeWarning = stringResource(Res.string.flow_editor_same_node_warning)
+    val incompatibleTypesMsg = stringResource(Res.string.flow_editor_incompatible_types)
+    val incompatibleSemanticsMsg = stringResource(Res.string.flow_editor_incompatible_semantics)
+    val duplicateFlowMsg = stringResource(Res.string.flow_editor_duplicate_error)
 
     Box(
         modifier = modifier
@@ -228,7 +237,7 @@ fun FlowEditorView(
                                     val targetPortId = if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
 
                                     if (sourceNodeId == targetNodeId) {
-                                        notificationService.toast("Cannot connect: Ports belong to the same node.")
+                                        notificationService.toast(sameNodeWarning)
                                     } else {
                                         val sourceNode = flow.nodes.find { it.id == sourceNodeId }
                                         val targetNode = flow.nodes.find { it.id == targetNodeId }
@@ -265,9 +274,9 @@ fun FlowEditorView(
                                                 }
                                             } else {
                                                 val message = if (!typesCompatible) {
-                                                    "Cannot connect: Incompatible types. Cannot connect ${sourcePort.dataType.format()} to ${targetPort.dataType.format()}."
+                                                    incompatibleTypesMsg.format(sourcePort.dataType.format(), targetPort.dataType.format())
                                                 } else {
-                                                    "Cannot connect: Incompatible semantic types. '${sourcePort.semanticType}' cannot connect to '${targetPort.semanticType}'."
+                                                    incompatibleSemanticsMsg.format(sourcePort.semanticType ?: "", targetPort.semanticType ?: "")
                                                 }
                                                 notificationService.toast(message)
                                             }
@@ -386,7 +395,7 @@ fun FlowEditorView(
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     if (flow.name.isBlank()) {
                         Text(
-                            text = "No flow selected",
+                            text = stringResource(Res.string.flow_editor_no_flow_selected),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.error
@@ -398,7 +407,7 @@ fun FlowEditorView(
                         ) {
                             Column {
                                 Text(
-                                    text = "Flow Selected",
+                                    text = stringResource(Res.string.flow_editor_flow_selected),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -411,14 +420,14 @@ fun FlowEditorView(
                             if (state.isReadOnly) {
                                 Surface(
                                     color = MaterialTheme.colorScheme.errorContainer,
-                                    shape = RoundedCornerShape(percent = 50)
+                                    shape = CircleShape
                                 ) {
                                     Text(
-                                        text = "READ-ONLY",
+                                        text = stringResource(Res.string.flow_editor_read_only),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                                     )
                                 }
                             }
@@ -438,14 +447,14 @@ fun FlowEditorView(
                     enabled = state.hasUnsavedChanges && !state.isReadOnly,
                     contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
                 ) {
-                    Text("Save Changes")
+                    Text(stringResource(Res.string.flow_editor_save_changes))
                 }
 
                 OutlinedButton(
                     onClick = onExit,
                     contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
                 ) {
-                    Text("Exit")
+                    Text(stringResource(Res.string.flow_editor_btn_exit))
                 }
             }
         }
@@ -472,9 +481,13 @@ fun FlowEditorView(
         ) {
             AlertDialog(
                 onDismissRequest = { showConversionDialog = false },
-                title = { Text("Incompatible Types - Auto Convert?") },
+                title = { Text(stringResource(Res.string.flow_editor_incompatible_title)) },
                 text = {
-                    Text("The source port type (${pendingConnectionSourceType?.format()}) and target port type (${pendingConnectionTargetType?.format()}) are different but convertible.\n\nWould you like to automatically insert a Convert node in between?")
+                    Text(stringResource(
+                        Res.string.flow_editor_incompatible_message,
+                        pendingConnectionSourceType?.format() ?: "",
+                        pendingConnectionTargetType?.format() ?: ""
+                    ))
                 },
                 confirmButton = {
                     Button(
@@ -490,7 +503,7 @@ fun FlowEditorView(
                             showConversionDialog = false
                         }
                     ) {
-                        Text("Convert & Connect")
+                        Text(stringResource(Res.string.flow_editor_convert_connect))
                     }
                 },
                 dismissButton = {
@@ -499,7 +512,7 @@ fun FlowEditorView(
                             showConversionDialog = false
                         }
                     ) {
-                        Text("Cancel")
+                        Text(stringResource(Res.string.dialog_cancel))
                     }
                 }
             )
@@ -508,19 +521,20 @@ fun FlowEditorView(
         if (showSaveAsDialog) {
             AlertDialog(
                 onDismissRequest = { showSaveAsDialog = false },
-                title = { Text("Save Flow") },
+                title = { Text(stringResource(Res.string.flow_editor_save_as_title)) },
                 text = {
                     Column {
                         Text(
-                            text = "Enter a name for your new flow:",
+                            text = stringResource(Res.string.flow_editor_enter_name),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(bottom = ToolkitTheme.spacing.medium)
                         )
-                        TextField(
+                        OutlinedTextField(
                             value = saveAsName,
                             onValueChange = { saveAsName = it },
-                            label = { Text("Flow Name") },
+                            label = { Text(stringResource(Res.string.flow_name_label)) },
                             singleLine = true,
+                            shape = MaterialTheme.shapes.medium,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -532,7 +546,7 @@ fun FlowEditorView(
                             if (trimmedName.isNotBlank()) {
                                 val exists = state.flows.any { it.name.equals(trimmedName, ignoreCase = true) }
                                 if (exists) {
-                                    notificationService.toast("A flow named '$trimmedName' already exists.")
+                                    notificationService.toast(duplicateFlowMsg.format(trimmedName))
                                 } else {
                                     viewModel.onEvent(FlowEvent.SaveAs(trimmedName))
                                     showSaveAsDialog = false
@@ -541,12 +555,12 @@ fun FlowEditorView(
                         },
                         enabled = saveAsName.isNotBlank()
                     ) {
-                        Text("Save")
+                        Text(stringResource(Res.string.action_save))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showSaveAsDialog = false }) {
-                        Text("Cancel")
+                        Text(stringResource(Res.string.dialog_cancel))
                     }
                 }
             )
@@ -606,4 +620,3 @@ private fun getPortRelativeOffset(node: Node, portId: String, density: androidx.
         Offset(xDp.dp.toPx(), yDp.dp.toPx())
     }
 }
-

@@ -117,7 +117,7 @@ fun PluginManagerView(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.extraLarge)) {
         if (!isReady) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(ToolkitTheme.spacing.extraSmall),

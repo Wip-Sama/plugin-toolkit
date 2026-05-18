@@ -40,6 +40,8 @@ import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import kotlinx.serialization.json.booleanOrNull
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import androidx.compose.ui.platform.LocalDensity
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun NodeComponent(
@@ -459,8 +461,8 @@ fun NodeComponent(
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
-            title = { Text("Delete Node") },
-            text = { Text("Are you sure you want to delete '${node.title}'? This will also remove all connected lines.") },
+            title = { Text(stringResource(Res.string.node_delete_title)) },
+            text = { Text(stringResource(Res.string.node_delete_confirm, node.title)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -472,12 +474,12 @@ fun NodeComponent(
                         contentColor = MaterialTheme.colorScheme.onError
                     )
                 ) {
-                    Text("Delete")
+                    Text(stringResource(Res.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmation = false }) {
-                    Text("Cancel")
+                    Text(stringResource(Res.string.dialog_cancel))
                 }
             }
         )
@@ -515,7 +517,7 @@ fun NodeComponent(
                 onDismissRequest = { showEditBoundaryDialog = false },
                 title = { 
                     Text(
-                        text = if (node is Node.FlowInputNode) "Edit Flow Input Port" else "Edit Flow Output Port",
+                        text = if (node is Node.FlowInputNode) stringResource(Res.string.node_edit_input_title) else stringResource(Res.string.node_edit_output_title),
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     ) 
@@ -528,7 +530,7 @@ fun NodeComponent(
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            label = { Text("Port Name") },
+                            label = { Text(stringResource(Res.string.node_port_name_label)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -541,7 +543,7 @@ fun NodeComponent(
                                 value = selectedTypeOption,
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Data Type") },
+                                label = { Text(stringResource(Res.string.node_data_type_label)) },
                                 trailingIcon = {
                                     IconButton(onClick = { dropdownExpanded = true }) {
                                         Icon(Icons.Default.UnfoldMore, contentDescription = "Select Type")
@@ -570,7 +572,7 @@ fun NodeComponent(
                             OutlinedTextField(
                                 value = customClassName,
                                 onValueChange = { customClassName = it },
-                                label = { Text("Class Name (e.g. org.wip.MyData)") },
+                                label = { Text(stringResource(Res.string.node_class_name_label)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -579,8 +581,8 @@ fun NodeComponent(
                         OutlinedTextField(
                             value = semanticType,
                             onValueChange = { semanticType = it },
-                            label = { Text("Semantic Type / Mimetype (optional)") },
-                            placeholder = { Text("e.g. image/png") },
+                            label = { Text(stringResource(Res.string.node_semantic_type_label)) },
+                            placeholder = { Text(stringResource(Res.string.node_semantic_type_placeholder)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -607,12 +609,12 @@ fun NodeComponent(
                             showEditBoundaryDialog = false
                         }
                     ) {
-                        Text("Save")
+                        Text(stringResource(Res.string.action_save))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showEditBoundaryDialog = false }) {
-                        Text("Cancel")
+                        Text(stringResource(Res.string.dialog_cancel))
                     }
                 }
             )

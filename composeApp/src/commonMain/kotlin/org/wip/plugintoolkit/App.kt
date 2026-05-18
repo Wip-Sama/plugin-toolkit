@@ -147,7 +147,27 @@ private fun AppContent(
                                 }
                             }) { key ->
                             when (key) {
-                                is Screen.Main -> NavEntry(key) { LandingPage() }
+                                is Screen.Main -> NavEntry(key) {
+                                    val navigate: (Screen) -> Unit = { screen ->
+                                        if (currentScreen != screen) {
+                                            if (currentScreen is Screen.FlowEditor && FlowEditorViewModel.hasUnsavedChanges) {
+                                                dialogService.showConfirmation(
+                                                    title = "Unsaved Changes",
+                                                    message = "All the unsaved data will be lost. Are you sure you want to exit?",
+                                                    onConfirm = {
+                                                        FlowEditorViewModel.hasUnsavedChanges = false
+                                                        backStack.clear()
+                                                        backStack.add(screen)
+                                                    }
+                                                )
+                                            } else {
+                                                backStack.clear()
+                                                backStack.add(screen)
+                                            }
+                                        }
+                                    }
+                                    LandingPage(onNavigate = navigate)
+                                }
                                 is Screen.FlowManager -> NavEntry(key) {
                                     FlowManagerView(
                                         viewModel = flowViewModel,

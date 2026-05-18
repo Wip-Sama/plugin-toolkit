@@ -26,6 +26,7 @@ import plugintoolkit.composeapp.generated.resources.repo_plugin_installed
 import plugintoolkit.composeapp.generated.resources.repo_refreshed
 import plugintoolkit.composeapp.generated.resources.repo_removed
 import plugintoolkit.composeapp.generated.resources.repo_source_updated
+import plugintoolkit.composeapp.generated.resources.repo_link_copied
 import kotlinx.coroutines.flow.combine
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -163,5 +164,11 @@ class PluginRepoViewModel(
 
     fun getInstalledVersion(pkg: String): String? {
         return pluginManager.installedPlugins.value.find { it.pkg == pkg }?.version
+    }
+
+    fun copyRepositoryLink(url: String) {
+        viewModelScope.launch {
+            notificationService.toast(getString(ResStrings.repo_link_copied))
+        }
     }
 }

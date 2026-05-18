@@ -4,7 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -25,6 +25,8 @@ import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun FlowManagerView(
@@ -57,7 +59,7 @@ fun FlowManagerView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SectionHeader(
-                title = "Flow Manager",
+                title = stringResource(Res.string.flow_manager_title),
                 icon = Icons.Default.Add,
                 modifier = Modifier.weight(1f)
             )
@@ -65,21 +67,21 @@ fun FlowManagerView(
             Button(onClick = { showCreateDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                Text("Create New Flow")
+                Text(stringResource(Res.string.flow_create_new))
             }
         }
 
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
-        // Premium Search Bar
+        // Premium Search Bar matching application design system
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search flows...", style = MaterialTheme.typography.bodyMedium) },
+            placeholder = { Text(stringResource(Res.string.flow_search_placeholder), style = MaterialTheme.typography.bodyMedium) },
             modifier = Modifier.fillMaxWidth(),
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             singleLine = true,
-            shape = RoundedCornerShape(percent = 50),
+            shape = CircleShape,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
@@ -97,7 +99,7 @@ fun FlowManagerView(
             if (filteredFlows.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(vertical = ToolkitTheme.spacing.extraLarge), contentAlignment = Alignment.Center) {
                     Text(
-                        text = if (searchQuery.isEmpty()) "No flows created yet." else "No flows matching your search.",
+                        text = if (searchQuery.isEmpty()) stringResource(Res.string.flow_no_flows) else stringResource(Res.string.flow_no_search_results),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -139,13 +141,14 @@ fun FlowManagerView(
     if (showCreateDialog) {
         AlertDialog(
             onDismissRequest = { showCreateDialog = false },
-            title = { Text("Create New Flow") },
+            title = { Text(stringResource(Res.string.flow_create_new)) },
             text = {
-                TextField(
+                OutlinedTextField(
                     value = newFlowName,
                     onValueChange = { newFlowName = it },
-                    label = { Text("Flow Name") },
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text(stringResource(Res.string.flow_name_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium
                 )
             },
             confirmButton = {
@@ -155,10 +158,10 @@ fun FlowManagerView(
                         showCreateDialog = false
                         newFlowName = ""
                     }
-                }) { Text("Create") }
+                }) { Text(stringResource(Res.string.flow_create_button)) }
             },
             dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showCreateDialog = false }) { Text(stringResource(Res.string.dialog_cancel)) }
             }
         )
     }
@@ -172,14 +175,13 @@ fun FlowManagerView(
 
         AlertDialog(
             onDismissRequest = { flowToDelete = null },
-            title = { Text("Delete Flow") },
+            title = { Text(stringResource(Res.string.flow_delete_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
-                    Text("Are you sure you want to delete '$nameOfFlow'?")
+                    Text(stringResource(Res.string.flow_delete_confirm, nameOfFlow))
                     if (parentFlows.isNotEmpty()) {
                         Text(
-                            text = "Warning: This flow is embedded as a subflow inside other flows (Used in: ${parentFlows.joinToString(", ")}). " +
-                                   "Deleting it will inline and unpack all of its nodes directly inside those parent flows.",
+                            text = stringResource(Res.string.flow_delete_warning_subflow, parentFlows.joinToString(", ")),
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium
@@ -198,12 +200,12 @@ fun FlowManagerView(
                         contentColor = MaterialTheme.colorScheme.onError
                     )
                 ) {
-                    Text("Delete")
+                    Text(stringResource(Res.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { flowToDelete = null }) {
-                    Text("Cancel")
+                    Text(stringResource(Res.string.dialog_cancel))
                 }
             }
         )
@@ -236,7 +238,7 @@ private fun FlowItem(
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -251,12 +253,12 @@ private fun FlowItem(
                     if (isBroken) {
                         Surface(
                             color = MaterialTheme.colorScheme.errorContainer,
-                            shape = RoundedCornerShape(percent = 50)
+                            shape = CircleShape
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Warning,
@@ -265,7 +267,7 @@ private fun FlowItem(
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Text(
-                                    text = "Broken",
+                                    text = stringResource(Res.string.flow_broken_tag),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     fontWeight = FontWeight.Bold
@@ -277,10 +279,10 @@ private fun FlowItem(
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                 ) {
                     Text(
-                        text = "$nodeCount nodes",
+                        text = stringResource(Res.string.flow_nodes_count, nodeCount),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -292,7 +294,7 @@ private fun FlowItem(
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
                         Text(
-                            text = "Used in ${parentFlows.size} parent${if (parentFlows.size > 1) "s" else ""}",
+                            text = stringResource(Res.string.flow_used_in_parents, parentFlows.size),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -304,22 +306,22 @@ private fun FlowItem(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp)
+                            .padding(top = ToolkitTheme.spacing.extraSmall)
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         parentFlows.forEach { parentName ->
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                                shape = RoundedCornerShape(percent = 50)
+                                shape = CircleShape
                             ) {
                                 Text(
-                                    text = "Used in: $parentName",
+                                    text = stringResource(Res.string.flow_used_in_chip, parentName),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                                 )
                             }
                         }
@@ -328,14 +330,14 @@ private fun FlowItem(
                             Surface(
                                 color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
                                 border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                                shape = RoundedCornerShape(percent = 50)
+                                shape = CircleShape
                             ) {
                                 Text(
-                                    text = "Missing: $capName",
+                                    text = stringResource(Res.string.flow_missing_chip, capName),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                                 )
                             }
                         }

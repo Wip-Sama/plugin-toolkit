@@ -83,6 +83,22 @@ class JobManager(
     }
 
     fun enqueueJob(job: BackgroundJob) {
+        // Remove previous ended jobs of the same capability/flow that should not be saved in history
+        val jobsToRemove = _endedJobs.value.filter {
+            it.pluginId == job.pluginId &&
+                    it.capabilityName == job.capabilityName &&
+                    !it.keepResult
+        }
+        if (jobsToRemove.isNotEmpty()) {
+            val idsToRemove = jobsToRemove.map { it.id }.toSet()
+            _endedJobs.update { currentList ->
+                currentList.filterNot { it.id in idsToRemove }
+            }
+            _jobLogs.update { currentLogs ->
+                currentLogs.filterKeys { it !in idsToRemove }
+            }
+        }
+
         _jobs.update { currentList ->
             val filtered = if (!job.keepResult) {
                 currentList.filterNot {

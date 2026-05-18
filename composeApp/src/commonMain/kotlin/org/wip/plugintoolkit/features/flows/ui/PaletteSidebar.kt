@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.flows.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,8 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.api.PluginEntry
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 sealed class PaletteNode {
     data class Capability(val pluginInfo: org.wip.plugintoolkit.api.PluginInfo, val capability: org.wip.plugintoolkit.api.Capability) : PaletteNode()
@@ -50,34 +53,49 @@ fun PaletteSidebar(
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     
+    // Aligns perfectly with standard sidebars
     Surface(
-        modifier = modifier.width(300.dp).fillMaxHeight(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = ToolkitTheme.spacing.extraSmall,
-        shadowElevation = ToolkitTheme.spacing.small
+        modifier = modifier.width(280.dp).fillMaxHeight(),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column {
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                    Text("Plugins", modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall), style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        stringResource(Res.string.palette_tab_plugins),
+                        modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
                 Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                    Text("System", modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall), style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        stringResource(Res.string.palette_tab_system),
+                        modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
                 Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
-                    Text("Flows", modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall), style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        stringResource(Res.string.palette_tab_flows),
+                        modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             }
 
-            TextField(
+            // Standard sleek search input matching sidebar inputs
+            OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search nodes...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.small),
-                colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent
+                placeholder = { Text(stringResource(Res.string.palette_search_placeholder), style = MaterialTheme.typography.bodySmall) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.mediumSmall),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
 
@@ -133,18 +151,19 @@ private fun CapabilitiesPalette(
 
     Column(
         modifier = Modifier
-            .padding(ToolkitTheme.spacing.small)
+            .padding(ToolkitTheme.spacing.mediumSmall)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
         groupedCaps.forEach { (plugin, caps) ->
             Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
+                // Sleek sidebar headers
                 Text(
                     text = plugin.name.uppercase(),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small)
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
                 )
                 caps.forEach { cap ->
                     val paletteNode = PaletteNode.Capability(plugin, cap)
@@ -175,46 +194,61 @@ private fun SystemPalette(
         modifier = Modifier
             .padding(ToolkitTheme.spacing.mediumSmall)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
-        Text("Standard Nodes", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        
-        val flowInput = PaletteNode.FlowInput
-        PaletteItem(
-            text = "Flow Input",
-            color = MaterialTheme.colorScheme.tertiary,
-            rootLayoutCoordinates = rootLayoutCoordinates,
-            onDragStart = { pos, grabOffset -> onDragStart(flowInput, pos, grabOffset) },
-            onDrag = onDrag,
-            onDragEnd = onDragEnd,
-            onClick = { onClick(flowInput) }
-        )
-        
-        val flowOutput = PaletteNode.FlowOutput
-        PaletteItem(
-            text = "Flow Output",
-            color = MaterialTheme.colorScheme.tertiary,
-            rootLayoutCoordinates = rootLayoutCoordinates,
-            onDragStart = { pos, grabOffset -> onDragStart(flowOutput, pos, grabOffset) },
-            onDrag = onDrag,
-            onDragEnd = onDragEnd,
-            onClick = { onClick(flowOutput) }
-        )
-        
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-        Text("System Actions", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        
-        listOf("Save", "Load", "Log", "Delay", "Convert", "Merger").forEach { action ->
-            val systemNode = PaletteNode.System(action)
+        Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
+            Text(
+                "STANDARD NODES", 
+                style = MaterialTheme.typography.labelSmall, 
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
+            )
+            
+            val flowInput = PaletteNode.FlowInput
             PaletteItem(
-                text = action,
-                color = ToolkitTheme.colors.success,
+                text = "Flow Input",
+                color = MaterialTheme.colorScheme.tertiary,
                 rootLayoutCoordinates = rootLayoutCoordinates,
-                onDragStart = { pos, grabOffset -> onDragStart(systemNode, pos, grabOffset) },
+                onDragStart = { pos, grabOffset -> onDragStart(flowInput, pos, grabOffset) },
                 onDrag = onDrag,
                 onDragEnd = onDragEnd,
-                onClick = { onClick(systemNode) }
+                onClick = { onClick(flowInput) }
             )
+            
+            val flowOutput = PaletteNode.FlowOutput
+            PaletteItem(
+                text = "Flow Output",
+                color = MaterialTheme.colorScheme.tertiary,
+                rootLayoutCoordinates = rootLayoutCoordinates,
+                onDragStart = { pos, grabOffset -> onDragStart(flowOutput, pos, grabOffset) },
+                onDrag = onDrag,
+                onDragEnd = onDragEnd,
+                onClick = { onClick(flowOutput) }
+            )
+        }
+        
+        Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
+            Text(
+                "SYSTEM ACTIONS", 
+                style = MaterialTheme.typography.labelSmall, 
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
+            )
+            
+            listOf("Save", "Load", "Log", "Delay", "Convert", "Merger").forEach { action ->
+                val systemNode = PaletteNode.System(action)
+                PaletteItem(
+                    text = action,
+                    color = ToolkitTheme.colors.success,
+                    rootLayoutCoordinates = rootLayoutCoordinates,
+                    onDragStart = { pos, grabOffset -> onDragStart(systemNode, pos, grabOffset) },
+                    onDrag = onDrag,
+                    onDragEnd = onDragEnd,
+                    onClick = { onClick(systemNode) }
+                )
+            }
         }
     }
 }
@@ -235,7 +269,7 @@ private fun FlowsPalette(
 
     Column(
         modifier = Modifier
-            .padding(ToolkitTheme.spacing.small)
+            .padding(ToolkitTheme.spacing.mediumSmall)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
     ) {
@@ -271,6 +305,7 @@ private fun PaletteItem(
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     
+    // Styled beautifully as premium interactive sidebar items
     Surface(
         onClick = onClick,
         modifier = Modifier
@@ -299,21 +334,27 @@ private fun PaletteItem(
                 }
                 lastPosition = localPos
             },
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
-            modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
+            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.mediumSmall),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
         ) {
             Box(
                 modifier = Modifier
-                    .size(ToolkitTheme.spacing.small)
+                    .size(8.dp)
                     .background(color, CircleShape)
             )
-            Text(text, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = text, 
+                style = MaterialTheme.typography.bodyMedium, 
+                fontWeight = FontWeight.Medium, 
+                maxLines = 1, 
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -334,7 +375,7 @@ fun PaletteItemPreview(node: PaletteNode) {
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = ToolkitTheme.spacing.small,
         shadowElevation = ToolkitTheme.spacing.mediumSmall,
-        border = androidx.compose.foundation.BorderStroke(2.dp, color)
+        border = BorderStroke(2.dp, color)
     ) {
         Column {
             Box(

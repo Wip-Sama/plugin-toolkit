@@ -6,7 +6,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -35,9 +34,17 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
-import org.wip.plugintoolkit.features.plugin.ui.JobResultItem
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
+import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
+import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
+import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
+import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
+import org.wip.plugintoolkit.core.model.LocalizedString
+import org.wip.plugintoolkit.core.model.localized
+import androidx.compose.ui.draw.scale
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 import kotlinx.serialization.json.Json
 
 data class FlowParameter(
@@ -78,34 +85,24 @@ fun FlowRunnerView(
     }
     
     Row(modifier = modifier.fillMaxSize()) {
-        // Sidebar: Select Flow to Run
-        Surface(
-            modifier = Modifier.width(ToolkitTheme.dimensions.sidebarExpandedWidth).fillMaxHeight(),
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.cardElevation)
-        ) {
-            Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-                Text("Select Flow", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-                Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
-                    state.flows.forEach { flow ->
-                        val isSelected = selectedFlowToRun?.name == flow.name
-                        Surface(
-                            onClick = { selectedFlowToRun = flow },
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                flow.name,
-                                modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-            }
+        // Sidebar: Select Flow to Run (Standard NavigationSidebar)
+        val flowElements = state.flows.map { flow ->
+            SidebarElement(
+                id = flow,
+                icon = Icons.Default.PlayArrow,
+                title = flow.name.localized
+            )
         }
+
+        NavigationSidebar(
+            title = Res.string.flow_select_title.localized,
+            bodySections = listOf(SidebarSectionData(title = null, elements = flowElements)),
+            currentScreen = selectedFlowToRun,
+            onScreenSelected = { selectedFlowToRun = it },
+            isNavbarCollapsed = false,
+            onToggleNavbar = {},
+            canCollapse = false
+        )
 
         // Main Area: Run and History
         Column(
@@ -114,7 +111,7 @@ fun FlowRunnerView(
             val currentFlow = selectedFlowToRun
             if (currentFlow == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Select a flow to see options", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(Res.string.flow_select_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 // Parse parameters
@@ -205,7 +202,7 @@ fun FlowRunnerView(
                     }
                 }
 
-                // Maintain local state for input values
+                // Maintain local state for input values (excluding OUTPUT)
                 val parameterValues = remember(currentFlow, flowParameters) {
                     val map = mutableStateMapOf<String, String>()
                     flowParameters.forEach { param ->
@@ -216,11 +213,11 @@ fun FlowRunnerView(
                     map
                 }
 
-                // Filter parameters
-                val inputs = flowParameters.filter { it.type != ParameterType.OUTPUT }
-                val outputs = flowParameters.filter { it.type == ParameterType.OUTPUT }
+                // Filter parameters: SAVE nodes are classified as outputs!
+                val inputs = flowParameters.filter { it.type != ParameterType.OUTPUT && it.type != ParameterType.SAVE }
+                val outputs = flowParameters.filter { it.type == ParameterType.OUTPUT || it.type == ParameterType.SAVE }
 
-                // Runner Card
+                // Runner Card (Standard GlassCard)
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -228,20 +225,34 @@ fun FlowRunnerView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         SectionHeader(
-                            title = "Run Flow: ${currentFlow.name}",
+                            title = stringResource(Res.string.flow_run_title, currentFlow.name),
                             icon = Icons.Default.PlayArrow,
                             modifier = Modifier.weight(1f)
                         )
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(Res.string.plugin_save_results),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = viewModel.saveResults,
+                                onCheckedChange = { viewModel.saveResults = it },
+                                modifier = Modifier.scale(0.8f)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-                    Text("This will execute all nodes in topological DAG order.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(Res.string.flow_run_description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
 
-                    // Parameter Inputs
+                    // Parameter Inputs (DynamicParameterInput sharing)
                     if (inputs.isNotEmpty()) {
                         Text(
-                            "Execution Inputs",
+                            stringResource(Res.string.flow_inputs_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -249,31 +260,34 @@ fun FlowRunnerView(
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)) {
                             inputs.forEach { param ->
-                                var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }
-                                OutlinedTextField(
-                                    value = value,
-                                    onValueChange = {
-                                        value = it
-                                        parameterValues["${param.nodeId}"] = it
-                                    },
-                                    label = { Text("${param.label} (${param.dataType.format()})") },
-                                    placeholder = { Text(param.defaultValue) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                                val metadata = remember(param) {
+                                    org.wip.plugintoolkit.api.ParameterMetadata(
+                                        defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
+                                        description = "",
+                                        type = param.dataType,
+                                        required = true
                                     )
+                                }
+                                var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }
+                                
+                                org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
+                                    name = param.label,
+                                    metadata = metadata,
+                                    value = value,
+                                    onValueChange = { newValue ->
+                                        value = newValue
+                                        parameterValues["${param.nodeId}"] = newValue
+                                    }
                                 )
                             }
                         }
                         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
                     }
 
-                    // Expected Outputs
+                    // Expected Outputs (including SAVE node outputs)
                     if (outputs.isNotEmpty()) {
                         Text(
-                            "Expected Outputs",
+                            stringResource(Res.string.flow_outputs_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.secondary,
@@ -281,27 +295,48 @@ fun FlowRunnerView(
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
                             outputs.forEach { param ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                                if (param.type == ParameterType.SAVE) {
+                                    val metadata = remember(param) {
+                                        org.wip.plugintoolkit.api.ParameterMetadata(
+                                            defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
+                                            description = "Target path to save flow results",
+                                            type = param.dataType,
+                                            required = true
+                                        )
+                                    }
+                                    var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }
+                                    
+                                    org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
+                                        name = param.label,
+                                        metadata = metadata,
+                                        value = value,
+                                        onValueChange = { newValue ->
+                                            value = newValue
+                                            parameterValues["${param.nodeId}"] = newValue
+                                        }
                                     )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                } else {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
+                                        shape = MaterialTheme.shapes.medium
                                     ) {
-                                        Text(
-                                            "${param.label} (${param.dataType.format()})",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            "Collected automatically",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "${param.label} (${param.dataType.format()})",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                stringResource(Res.string.flow_collected_automatically),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -316,7 +351,7 @@ fun FlowRunnerView(
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        Text("Execute Flow")
+                        Text(stringResource(Res.string.flow_execute_button))
                     }
                 }
 
@@ -339,7 +374,7 @@ fun FlowRunnerView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Execution History",
+                        stringResource(Res.string.flow_history_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -360,201 +395,29 @@ fun FlowRunnerView(
                 }
 
                 if (flowJobs.isEmpty()) {
-                    Text("No runs recorded for this flow.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(Res.string.flow_no_history), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)) {
                         flowJobs.forEach { job ->
-                            var logsExpanded by remember { mutableStateOf(false) }
+                            val progressState = jobViewModel.jobProgress.collectAsState()
+                            val progress = progressState.value[job.id] ?: 0f
 
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                "Run ID: ${job.id.takeLast(12)}",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                "Triggered: ${job.enqueuedAt}",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
+                            val allLogs by jobViewModel.jobLogs.collectAsState()
+                            val logs = allLogs[job.id] ?: emptyList()
 
-                                        // Status Pill Badge
-                                        Surface(
-                                            color = when (job.status) {
-                                                JobStatus.Completed -> MaterialTheme.colorScheme.primaryContainer
-                                                JobStatus.Failed -> MaterialTheme.colorScheme.errorContainer
-                                                JobStatus.Running -> MaterialTheme.colorScheme.secondaryContainer
-                                                else -> MaterialTheme.colorScheme.surface
-                                            },
-                                            shape = RoundedCornerShape(12.dp)
-                                        ) {
-                                            Text(
-                                                job.status.name,
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = when (job.status) {
-                                                    JobStatus.Completed -> MaterialTheme.colorScheme.onPrimaryContainer
-                                                    JobStatus.Failed -> MaterialTheme.colorScheme.onErrorContainer
-                                                    JobStatus.Running -> MaterialTheme.colorScheme.onSecondaryContainer
-                                                    else -> MaterialTheme.colorScheme.onSurface
-                                                }
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-
-                                        IconButton(onClick = { logsExpanded = !logsExpanded }) {
-                                            Icon(
-                                                if (logsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = "Toggle logs"
-                                            )
-                                        }
-                                    }
-
-                                    // Progress Bar for Running
-                                    if (job.status == JobStatus.Running) {
-                                        val progressState = jobViewModel.jobProgress.collectAsState()
-                                        val progress = progressState.value[job.id] ?: 0f
-                                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-                                        LinearProgressIndicator(
-                                            progress = progress,
-                                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-
-                                    // Expanded Log Drawer
-                                    AnimatedVisibility(
-                                        visible = logsExpanded,
-                                        enter = expandVertically(),
-                                        exit = shrinkVertically()
-                                    ) {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = ToolkitTheme.spacing.medium)
-                                        ) {
-                                            Divider(color = MaterialTheme.colorScheme.outlineVariant)
-                                            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-
-                                            // Render parsed outputs if completed successfully
-                                            if (job.status == JobStatus.Completed) {
-                                                val outputsParsed = remember(job.result) {
-                                                    try {
-                                                        job.result?.let {
-                                                            Json.decodeFromString<Map<String, kotlinx.serialization.json.JsonElement>>(it)
-                                                        } ?: emptyMap()
-                                                    } catch (e: Exception) {
-                                                        emptyMap()
-                                                    }
-                                                }
-
-                                                if (outputsParsed.isNotEmpty()) {
-                                                    Text(
-                                                        "Output Results",
-                                                        style = MaterialTheme.typography.titleSmall,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.primary
-                                                    )
-                                                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-                                                    Column(
-                                                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                                            .padding(ToolkitTheme.spacing.medium)
-                                                    ) {
-                                                        outputsParsed.forEach { (portName, element) ->
-                                                            Row(
-                                                                modifier = Modifier.fillMaxWidth(),
-                                                                horizontalArrangement = Arrangement.SpaceBetween
-                                                            ) {
-                                                                Text(
-                                                                    portName,
-                                                                    style = MaterialTheme.typography.bodyMedium,
-                                                                    fontWeight = FontWeight.SemiBold,
-                                                                    color = MaterialTheme.colorScheme.onSurface
-                                                                )
-                                                                Text(
-                                                                    when (element) {
-                                                                        is kotlinx.serialization.json.JsonPrimitive -> {
-                                                                            if (element.isString) element.content else element.toString()
-                                                                        }
-                                                                        else -> element.toString()
-                                                                    },
-                                                                    style = MaterialTheme.typography.bodyMedium,
-                                                                    fontFamily = FontFamily.Monospace,
-                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-                                                }
-                                            }
-
-                                            // Console-Style Run Logs
-                                            Text(
-                                                "Console Log Output",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-
-                                            val allLogs by jobViewModel.jobLogs.collectAsState()
-                                            val logs = allLogs[job.id] ?: emptyList()
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(200.dp)
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                                                    .padding(ToolkitTheme.spacing.medium)
-                                                    .verticalScroll(rememberScrollState())
-                                            ) {
-                                                if (logs.isEmpty()) {
-                                                    Text(
-                                                        "No console output recorded.",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                                    )
-                                                } else {
-                                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                        logs.forEach { logLine ->
-                                                            Text(
-                                                                logLine,
-                                                                style = MaterialTheme.typography.bodySmall,
-                                                                fontFamily = FontFamily.Monospace,
-                                                                color = when {
-                                                                    logLine.contains("[ERROR]", ignoreCase = true) || logLine.startsWith("ERROR:") -> MaterialTheme.colorScheme.error
-                                                                    logLine.contains("[WARN]", ignoreCase = true) || logLine.startsWith("WARN:") -> MaterialTheme.colorScheme.tertiary
-                                                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                                                }
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                            JobResultCard(
+                                job = job,
+                                progress = progress,
+                                logs = logs,
+                                onDelete = {
+                                    if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
+                                        jobViewModel.clearEndedJob(job.id)
+                                    } else {
+                                        jobViewModel.cancelJob(job.id, force = true)
                                     }
                                 }
-                            }
+                            )
+                            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                         }
                     }
                 }

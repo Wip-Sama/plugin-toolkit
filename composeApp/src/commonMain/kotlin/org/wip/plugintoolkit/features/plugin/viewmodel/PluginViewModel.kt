@@ -30,6 +30,7 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
+import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 
 class PluginViewModel(
     private val jobManager: JobManager,
@@ -103,7 +104,7 @@ class PluginViewModel(
                 ?: meta.defaultValue
 
             parameterValues[name] = userValue?.let {
-                if (it is JsonPrimitive && it.isString) it.content else it.toString()
+                SettingsUtils.jsonToString(it, meta.type)
             } ?: ""
         }
     }
@@ -153,7 +154,7 @@ class PluginViewModel(
             val params = selectedCapability?.let { capability ->
                 parameterValues.toMap().mapValues { (name, value) ->
                     val meta = capability.parameters?.get(name)
-                    if (meta != null) parseValue(value, meta.type) else JsonPrimitive(value)
+                    if (meta != null) SettingsUtils.stringToJson(value, meta.type) else JsonPrimitive(value)
                 }
             } ?: emptyMap()
 
@@ -217,46 +218,11 @@ class PluginViewModel(
         val params = mutableMapOf<String, JsonElement>()
         capability.parameters?.forEach { (name, meta) ->
             val stringValue = values[name] ?: ""
-            params[name] = parseValue(stringValue, meta.type)
+            params[name] = SettingsUtils.stringToJson(stringValue, meta.type)
         }
         return PluginRequest(
             method = capability.name,
             parameters = params
         )
-    }
-
-    private fun parseValue(value: String, type: DataType): JsonElement {
-        if (value.isBlank()) return JsonNull
-        return when (type) {
-            is DataType.Primitive -> {
-                when (type.primitiveType) {
-                    PrimitiveType.DOUBLE -> JsonPrimitive(value.toDoubleOrNull() ?: 0.0)
-                    PrimitiveType.INT -> JsonPrimitive(value.toIntOrNull() ?: 0)
-                    PrimitiveType.BOOLEAN -> JsonPrimitive(value.lowercase() == "true")
-                    PrimitiveType.STRING -> JsonPrimitive(value)
-                    else -> JsonPrimitive(value)
-                }
-            }
-
-            is DataType.Array -> {
-                val items = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                buildJsonArray {
-                    items.forEach { add(parseValue(it, type.items)) }
-                }
-            }
-
-            is DataType.Object -> {
-                try {
-                    Json.parseToJsonElement(value)
-                } catch (e: Exception) {
-                    Logger.e("Failed to parse JSON", throwable = e)
-                    JsonPrimitive(value)
-                }
-            }
-
-            is DataType.Enum -> {
-                JsonPrimitive(value)
-            }
-        }
     }
 }
