@@ -117,7 +117,7 @@ class FlowCycleTest {
             initialFlowName = "Flow A",
             settingsPersistence = MockSettingsPersistence(),
             notificationService = null
-        )
+        ).apply { bypassReadOnlyForTesting = true }
 
         // Wait until loadFlow completes and populates state.value.flows
         var loadedA = false
@@ -140,7 +140,7 @@ class FlowCycleTest {
             initialFlowName = "Flow B",
             settingsPersistence = MockSettingsPersistence(),
             notificationService = null
-        )
+        ).apply { bypassReadOnlyForTesting = true }
 
         var loadedB = false
         for (i in 1..50) {
@@ -162,7 +162,7 @@ class FlowCycleTest {
             initialFlowName = "Flow C",
             settingsPersistence = MockSettingsPersistence(),
             notificationService = null
-        )
+        ).apply { bypassReadOnlyForTesting = true }
 
         var loadedC = false
         for (i in 1..50) {

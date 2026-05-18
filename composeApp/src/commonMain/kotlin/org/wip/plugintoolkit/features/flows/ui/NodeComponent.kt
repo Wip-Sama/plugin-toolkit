@@ -64,6 +64,7 @@ fun NodeComponent(
     stateScale: Float,
     stateOffset: Offset,
     selectedNodeIds: Set<Long> = emptySet(),
+    isReadOnly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -114,14 +115,16 @@ fun NodeComponent(
                         }
                     }
                     .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                currentOnMove(node.id, dragAmount, false, true)
-                            },
-                            onDragEnd = { currentOnEndMove(node.id) },
-                            onDragCancel = { currentOnEndMove(node.id) }
-                        )
+                        if (!isReadOnly) {
+                            detectDragGestures(
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    currentOnMove(node.id, dragAmount, false, true)
+                                },
+                                onDragEnd = { currentOnEndMove(node.id) },
+                                onDragCancel = { currentOnEndMove(node.id) }
+                            )
+                        }
                     }
                     .padding(ToolkitTheme.spacing.mediumSmall),
                 verticalAlignment = Alignment.CenterVertically,
@@ -144,7 +147,7 @@ fun NodeComponent(
                         overflow = TextOverflow.Ellipsis
                     )
                     
-                    if (node is Node.SubFlowNode) {
+                    if (node is Node.SubFlowNode && !isReadOnly) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                         IconButton(
                             onClick = { onExpand(node.id) },
@@ -161,7 +164,7 @@ fun NodeComponent(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (node is Node.FlowInputNode || node is Node.FlowOutputNode) {
+                    if ((node is Node.FlowInputNode || node is Node.FlowOutputNode) && !isReadOnly) {
                         IconButton(
                             onClick = { showEditBoundaryDialog = true },
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
@@ -176,34 +179,36 @@ fun NodeComponent(
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                     }
 
-                    var isShiftPressed by remember { mutableStateOf(false) }
-                    IconButton(
-                        onClick = {
-                            if (isShiftPressed) {
-                                onDelete(node.id)
-                            } else {
-                                showDeleteConfirmation = true
-                            }
-                        },
-                        modifier = Modifier
-                            .size(ToolkitTheme.dimensions.iconMedium)
-                            .pointerInput(node.id) {
-                                awaitPointerEventScope {
-                                    while (true) {
-                                        val event = awaitPointerEvent()
-                                        if (event.type == PointerEventType.Press) {
-                                            isShiftPressed = event.keyboardModifiers.isShiftPressed
+                    if (!isReadOnly) {
+                        var isShiftPressed by remember { mutableStateOf(false) }
+                        IconButton(
+                            onClick = {
+                                if (isShiftPressed) {
+                                    onDelete(node.id)
+                                } else {
+                                    showDeleteConfirmation = true
+                                }
+                            },
+                            modifier = Modifier
+                                .size(ToolkitTheme.dimensions.iconMedium)
+                                .pointerInput(node.id) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            if (event.type == PointerEventType.Press) {
+                                                isShiftPressed = event.keyboardModifiers.isShiftPressed
+                                            }
                                         }
                                     }
                                 }
-                            }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = onHeaderColor.copy(alpha = 0.8f),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = onHeaderColor.copy(alpha = 0.8f),
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                        }
                     }
                 }
             }
@@ -227,9 +232,9 @@ fun NodeComponent(
                             PortCircle(
                                 color = if (highlightedPortId == input.id) (highlightedPortColor ?: headerColor) else headerColor,
                                 isHighlighted = highlightedPortId == input.id,
-                                onDragStart = { onStartConnection(node.id, input.id, false) },
-                                onDrag = onDragConnection,
-                                onDragEnd = onDropConnection
+                                onDragStart = { if (!isReadOnly) onStartConnection(node.id, input.id, false) },
+                                onDrag = { if (!isReadOnly) onDragConnection(it) },
+                                onDragEnd = { if (!isReadOnly) onDropConnection(it) }
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                             Column(modifier = Modifier.weight(1f)) {
@@ -278,7 +283,7 @@ fun NodeComponent(
                                             Switch(
                                                 checked = checked,
                                                 onCheckedChange = { onUpdateValue(node.id, input.id, it) },
-                                                enabled = !isConnected,
+                                                enabled = !isConnected && !isReadOnly,
                                                 modifier = Modifier.scale(0.8f)
                                             )
                                         }
@@ -299,7 +304,7 @@ fun NodeComponent(
                                                          }
                                                      }
                                                  },
-                                                 enabled = !isConnected,
+                                                 enabled = !isConnected && !isReadOnly,
                                                  textStyle = MaterialTheme.typography.bodySmall.copy(
                                                      color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                                              else MaterialTheme.colorScheme.onSurface
@@ -328,7 +333,7 @@ fun NodeComponent(
                                                          }
                                                      }
                                                  },
-                                                 enabled = !isConnected,
+                                                 enabled = !isConnected && !isReadOnly,
                                                  textStyle = MaterialTheme.typography.bodySmall.copy(
                                                      color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                                              else MaterialTheme.colorScheme.onSurface
@@ -345,7 +350,7 @@ fun NodeComponent(
                                             BasicTextField(
                                                 value = rawValue,
                                                 onValueChange = { onUpdateValue(node.id, input.id, it) },
-                                                enabled = !isConnected,
+                                                enabled = !isConnected && !isReadOnly,
                                                 textStyle = MaterialTheme.typography.bodySmall.copy(
                                                     color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                                             else MaterialTheme.colorScheme.onSurface
@@ -369,7 +374,7 @@ fun NodeComponent(
                                             selectedOption = selected,
                                             onOptionSelected = { onUpdateValue(node.id, input.id, it) },
                                             labelProvider = { it },
-                                            enabled = !isConnected
+                                            enabled = !isConnected && !isReadOnly
                                         )
                                     }
                                 }
@@ -378,7 +383,7 @@ fun NodeComponent(
                                     BasicTextField(
                                         value = rawValue,
                                         onValueChange = { onUpdateValue(node.id, input.id, it) },
-                                        enabled = !isConnected,
+                                        enabled = !isConnected && !isReadOnly,
                                         textStyle = MaterialTheme.typography.bodySmall.copy(
                                             color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                                     else MaterialTheme.colorScheme.onSurface
@@ -441,9 +446,9 @@ fun NodeComponent(
                         PortCircle(
                             color = if (highlightedPortId == output.id) (highlightedPortColor ?: headerColor) else headerColor,
                             isHighlighted = highlightedPortId == output.id,
-                            onDragStart = { onStartConnection(node.id, output.id, true) },
-                            onDrag = onDragConnection,
-                            onDragEnd = onDropConnection
+                            onDragStart = { if (!isReadOnly) onStartConnection(node.id, output.id, true) },
+                            onDrag = { if (!isReadOnly) onDragConnection(it) },
+                            onDragEnd = { if (!isReadOnly) onDropConnection(it) }
                         )
                     }
                 }

@@ -178,20 +178,11 @@ class FlowViewModel(
                     }
                 }
 
-                if (loadedFlows.isEmpty()) {
-                    val defaultFlow = Flow("Default Flow")
-                    val appDataDir = resolvedSettingsPersistence.getSettingsDir()
-                    val targetFile = getFlowPath(appDataDir, defaultFlow.name)
-                    val flowContent = json.encodeToString(Flow.serializer(), defaultFlow)
-                    SystemFileSystem.sink(targetFile).buffered().use { it.writeString(flowContent) }
-                    loadedFlows.add(defaultFlow)
-                }
-
                 withContext(Dispatchers.Main) {
                     _state.update { currentState ->
                         currentState.copy(
                             flows = loadedFlows,
-                            selectedFlowId = currentState.selectedFlowId ?: loadedFlows.first().name
+                            selectedFlowId = currentState.selectedFlowId ?: loadedFlows.firstOrNull()?.name
                         )
                     }
                 }
@@ -250,11 +241,54 @@ class FlowViewModel(
         }
     }
 
+    fun isFlowRunning(flowName: String): Boolean {
+        return try {
+            val jobManager = getKoin().get<JobManager>()
+            jobManager.jobs.value.any { job ->
+                job.type == JobType.Flow &&
+                job.capabilityName == flowName &&
+                (job.status == JobStatus.Running || job.status == JobStatus.Queued)
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun handleDeleteFlow(name: String) {
+        if (isFlowRunning(name)) {
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast("Cannot delete flow '$name' because it is currently running or queued.")
+            }
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val appDataDir = resolvedSettingsPersistence.getSettingsDir()
                 val file = getFlowPath(appDataDir, name)
+                
+                val currentFlows = _state.value.flows
+                val deletedFlow = currentFlows.find { it.name == name }
+                
+                if (deletedFlow != null) {
+                    currentFlows.filter { it.name != name }.forEach { parentFlow ->
+                        var updatedFlow = parentFlow
+                        var foundSubflowNode: Node.SubFlowNode?
+                        do {
+                            foundSubflowNode = updatedFlow.nodes.find { it is Node.SubFlowNode && it.flowName == name } as? Node.SubFlowNode
+                            if (foundSubflowNode != null) {
+                                updatedFlow = FlowUnpacker.unpackSubflowInFlow(updatedFlow, foundSubflowNode.id, deletedFlow)
+                            }
+                        } while (foundSubflowNode != null)
+                        
+                        if (updatedFlow != parentFlow) {
+                            val targetFile = getFlowPath(appDataDir, updatedFlow.name)
+                            val flowContent = json.encodeToString(Flow.serializer(), updatedFlow)
+                            SystemFileSystem.sink(targetFile).buffered().use { it.writeString(flowContent) }
+                        }
+                    }
+                }
+
                 if (SystemFileSystem.exists(file)) {
                     SystemFileSystem.delete(file)
                 }

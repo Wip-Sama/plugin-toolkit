@@ -32,6 +32,10 @@ import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.features.flows.model.*
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.api.PluginEntry
@@ -57,7 +61,8 @@ data class FlowEditorState(
     val flows: List<Flow> = emptyList(),
     val inferredTypes: Map<Pair<Long, String>, DataType> = emptyMap(),
     val validationErrors: List<ValidationError> = emptyList(),
-    val selectedNodeIds: Set<Long> = emptySet()
+    val selectedNodeIds: Set<Long> = emptySet(),
+    val isReadOnly: Boolean = false
 )
 
 class FlowEditorViewModel(
@@ -165,6 +170,16 @@ class FlowEditorViewModel(
                 hasUnsavedChanges = currentState.hasUnsavedChanges
             }
         }
+        viewModelScope.launch {
+            try {
+                val jobManager = getKoin().get<JobManager>()
+                jobManager.jobs.collect {
+                    updateReadOnlyState()
+                }
+            } catch (e: Exception) {
+                // Ignore if Koin or JobManager not set
+            }
+        }
         loadFlow()
     }
 
@@ -264,6 +279,7 @@ class FlowEditorViewModel(
                         flows = allFlows,
                         hasUnsavedChanges = false
                     )
+                    updateReadOnlyState()
                     runTypeInference()
                 }
             } catch (e: Exception) {
@@ -285,7 +301,36 @@ class FlowEditorViewModel(
         }
     }
 
+    var bypassReadOnlyForTesting: Boolean = false
+
     fun onEvent(event: FlowEvent) {
+        if (_state.value.isReadOnly && !bypassReadOnlyForTesting) {
+            when (event) {
+                is FlowEvent.AddCapabilityNode,
+                is FlowEvent.AddSystemNode,
+                is FlowEvent.AddFlowInputNode,
+                is FlowEvent.AddFlowOutputNode,
+                is FlowEvent.AddSubFlowNode,
+                is FlowEvent.ExpandSubFlow,
+                is FlowEvent.MoveNode,
+                is FlowEvent.EndMoveNode,
+                is FlowEvent.DeleteNode,
+                is FlowEvent.ConnectPorts,
+                is FlowEvent.AutoConvertAndConnect,
+                is FlowEvent.DeleteConnection,
+                is FlowEvent.ResetBoard,
+                is FlowEvent.Save,
+                is FlowEvent.SaveAs,
+                is FlowEvent.UpdateInputPortValue,
+                is FlowEvent.UpdateBoundaryNode,
+                is FlowEvent.DeleteSelectedNodes -> {
+                    resolvedNotificationService?.toast("Cannot modify the flow because it is currently running or used as a subflow in other flows.")
+                    return
+                }
+                else -> {}
+            }
+        }
+
         when (event) {
             is FlowEvent.AddCapabilityNode -> handleAddNode(
                 Node.CapabilityNode(
@@ -785,84 +830,44 @@ class FlowEditorViewModel(
             val subFlowNode = currentState.flow.nodes.find { it.id == nodeId } as? Node.SubFlowNode ?: return@update currentState
             val targetFlow = currentState.flows.find { it.name == subFlowNode.flowName } ?: return@update currentState
 
-            val baseOffset = subFlowNode.position
-            
-            var nextId = currentState.nextId
-            val oldToNewId = mutableMapOf<Long, Long>()
-            targetFlow.nodes.forEach { node ->
-                oldToNewId[node.id] = nextId++
-            }
-            
-            val newNodes = targetFlow.nodes.filter { 
-                it !is Node.FlowInputNode && it !is Node.FlowOutputNode 
-            }.map { node ->
-                val newId = oldToNewId[node.id]!!
-                node.copyWithPosition(node.position + baseOffset).copyWithId(newId)
-            }
-
-            val newConnections = targetFlow.connections.filter { conn ->
-                val sourceNode = targetFlow.nodes.find { it.id == conn.sourceNodeId }
-                val targetNode = targetFlow.nodes.find { it.id == conn.targetNodeId }
-                sourceNode !is Node.FlowInputNode && sourceNode !is Node.FlowOutputNode &&
-                targetNode !is Node.FlowInputNode && targetNode !is Node.FlowOutputNode
-            }.map { conn ->
-                Connection(
-                    sourceNodeId = oldToNewId[conn.sourceNodeId] ?: conn.sourceNodeId,
-                    sourcePortId = conn.sourcePortId,
-                    targetNodeId = oldToNewId[conn.targetNodeId] ?: conn.targetNodeId,
-                    targetPortId = conn.targetPortId
-                )
-            }
-
-            val incomingConnections = currentState.flow.connections.filter { it.targetNodeId == nodeId }
-            val outgoingConnections = currentState.flow.connections.filter { it.sourceNodeId == nodeId }
-
-            val mappedIncomingConnections = incomingConnections.flatMap { conn ->
-                val boundaryNodeId = subFlowNode.inputMappings.find { it.portId == conn.targetPortId }?.boundaryNodeId
-                    ?: conn.targetPortId.toLongOrNull() ?: return@flatMap emptyList()
-                val internalConns = targetFlow.connections.filter { it.sourceNodeId == boundaryNodeId }
-                internalConns.mapNotNull { internalConn ->
-                    val newTargetNodeId = oldToNewId[internalConn.targetNodeId] ?: return@mapNotNull null
-                    Connection(
-                        sourceNodeId = conn.sourceNodeId,
-                        sourcePortId = conn.sourcePortId,
-                        targetNodeId = newTargetNodeId,
-                        targetPortId = internalConn.targetPortId
-                    )
-                }
-            }
-
-            val mappedOutgoingConnections = outgoingConnections.flatMap { conn ->
-                val boundaryNodeId = subFlowNode.outputMappings.find { it.portId == conn.sourcePortId }?.boundaryNodeId
-                    ?: conn.sourcePortId.toLongOrNull() ?: return@flatMap emptyList()
-                val internalConns = targetFlow.connections.filter { it.targetNodeId == boundaryNodeId }
-                internalConns.mapNotNull { internalConn ->
-                    val newSourceNodeId = oldToNewId[internalConn.sourceNodeId] ?: return@mapNotNull null
-                    Connection(
-                        sourceNodeId = newSourceNodeId,
-                        sourcePortId = internalConn.sourcePortId,
-                        targetNodeId = conn.targetNodeId,
-                        targetPortId = conn.targetPortId
-                    )
-                }
-            }
-
-            val updatedNodes = currentState.flow.nodes.filter { it.id != nodeId } + newNodes
-            val externalConnections = currentState.flow.connections.filter { it.sourceNodeId != nodeId && it.targetNodeId != nodeId }
-            val updatedConnections = externalConnections + newConnections + mappedIncomingConnections + mappedOutgoingConnections
-
-            if (hasCycle(updatedConnections)) {
+            val unpackedFlow = FlowUnpacker.unpackSubflowInFlow(currentState.flow, nodeId, targetFlow)
+            if (FlowUnpacker.hasCycle(unpackedFlow.connections)) {
                 resolvedNotificationService?.toast("Cannot expand subflow: Expansion would introduce a cycle. Enforcing Directed Acyclic Graph (DAG).")
                 return@update currentState
             }
 
-            val newFlow = currentState.flow.copy(nodes = updatedNodes, connections = updatedConnections)
+            val nextId = (unpackedFlow.nodes.maxOfOrNull { it.id } ?: -1L) + 1
+
             currentState.copy(
-                flow = newFlow,
+                flow = unpackedFlow,
                 nextId = nextId,
                 hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                flows = currentState.flows.map { if (it.name == unpackedFlow.name) unpackedFlow else it }
             )
+        }
+    }
+
+    fun updateReadOnlyState() {
+        val flowName = _state.value.flow.name
+        if (flowName.isBlank()) return
+        
+        val isRunning = try {
+            val jobManager = getKoin().get<JobManager>()
+            jobManager.jobs.value.any { job ->
+                job.type == JobType.Flow &&
+                job.capabilityName == flowName &&
+                (job.status == JobStatus.Running || job.status == JobStatus.Queued)
+            }
+        } catch (e: Exception) {
+            false
+        }
+
+        val isUsedInOtherFlows = _state.value.flows.filter { it.name != flowName }.any { parentFlow ->
+            parentFlow.nodes.any { it is Node.SubFlowNode && it.flowName == flowName }
+        }
+
+        _state.update { currentState ->
+            currentState.copy(isReadOnly = isRunning || isUsedInOtherFlows)
         }
     }
 

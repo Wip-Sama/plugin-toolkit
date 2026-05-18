@@ -288,6 +288,7 @@ fun FlowEditorView(
                             stateScale = state.scale,
                             stateOffset = state.offset,
                             selectedNodeIds = state.selectedNodeIds,
+                            isReadOnly = state.isReadOnly,
                             modifier = Modifier.onSizeChanged { size ->
                                 nodeSizes[node.id] = size
                             }
@@ -318,52 +319,54 @@ fun FlowEditorView(
         }
 
         // 2. Left Sidebar (Overlay Layer)
-        PaletteSidebar(
-            flows = state.flows,
-            currentFlowName = flow.name,
-            plugins = viewModel.plugins.collectAsState().value,
-            rootLayoutCoordinates = rootLayoutCoordinates,
-            onDragStart = { paletteNode, initialPos, grabOffset ->
-                draggingNodeFromPalette = paletteNode
-                dragStartPosition = initialPos
-                dragGrabOffset = grabOffset
-                draggingNodeScale = 1.0f
-                draggingNodePos = initialPos
-            },
-            onDrag = { cumulativeDrag ->
-                val cursorPos = dragStartPosition + cumulativeDrag
-                val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
-                val relativeToBoard = cursorPos - boardOffset
-                val isOverBoard = boardSize != IntSize.Zero &&
-                        relativeToBoard.x >= 0 && relativeToBoard.y >= 0 &&
-                        relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+        if (!state.isReadOnly) {
+            PaletteSidebar(
+                flows = state.flows,
+                currentFlowName = flow.name,
+                plugins = viewModel.plugins.collectAsState().value,
+                rootLayoutCoordinates = rootLayoutCoordinates,
+                onDragStart = { paletteNode, initialPos, grabOffset ->
+                    draggingNodeFromPalette = paletteNode
+                    dragStartPosition = initialPos
+                    dragGrabOffset = grabOffset
+                    draggingNodeScale = 1.0f
+                    draggingNodePos = initialPos
+                },
+                onDrag = { cumulativeDrag ->
+                    val cursorPos = dragStartPosition + cumulativeDrag
+                    val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
+                    val relativeToBoard = cursorPos - boardOffset
+                    val isOverBoard = boardSize != IntSize.Zero &&
+                            relativeToBoard.x >= 0 && relativeToBoard.y >= 0 &&
+                            relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
 
-                draggingNodeScale = if (isOverBoard) state.scale else 1.0f
-                draggingNodePos = cursorPos - dragGrabOffset * draggingNodeScale
-            },
-            onDragEnd = {
-                val position = draggingNodePos
-                val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
-                val relativeToBoard = position - boardOffset
-                val isOverBoard = relativeToBoard.x >= 0 && relativeToBoard.y >= 0 && relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
-                
-                if (isOverBoard) {
-                    val dropPos = (relativeToBoard - state.offset) / state.scale
-                    draggingNodeFromPalette?.let { paletteNode ->
-                        val d = density.density
-                        when (paletteNode) {
-                            is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos, d))
-                            is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos, d))
-                            is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos, d))
-                            is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos, d))
-                            is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos, d))
+                    draggingNodeScale = if (isOverBoard) state.scale else 1.0f
+                    draggingNodePos = cursorPos - dragGrabOffset * draggingNodeScale
+                },
+                onDragEnd = {
+                    val position = draggingNodePos
+                    val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
+                    val relativeToBoard = position - boardOffset
+                    val isOverBoard = relativeToBoard.x >= 0 && relativeToBoard.y >= 0 && relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+                    
+                    if (isOverBoard) {
+                        val dropPos = (relativeToBoard - state.offset) / state.scale
+                        draggingNodeFromPalette?.let { paletteNode ->
+                            val d = density.density
+                            when (paletteNode) {
+                                is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos, d))
+                                is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos, d))
+                                is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos, d))
+                                is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos, d))
+                                is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos, d))
+                            }
                         }
                     }
-                }
-                draggingNodeFromPalette = null
-            },
-            onClick = handlePaletteClick
-        )
+                    draggingNodeFromPalette = null
+                },
+                onClick = handlePaletteClick
+            )
+        }
 
         // 3. Top Status Bar (Overlay Layer)
         Surface(
@@ -389,16 +392,37 @@ fun FlowEditorView(
                             color = MaterialTheme.colorScheme.error
                         )
                     } else {
-                        Text(
-                            text = "Flow Selected",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = flow.name,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Flow Selected",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = flow.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (state.isReadOnly) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    shape = RoundedCornerShape(percent = 50)
+                                ) {
+                                    Text(
+                                        text = "READ-ONLY",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -411,7 +435,7 @@ fun FlowEditorView(
                             viewModel.onEvent(FlowEvent.Save)
                         }
                     },
-                    enabled = state.hasUnsavedChanges,
+                    enabled = state.hasUnsavedChanges && !state.isReadOnly,
                     contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
                 ) {
                     Text("Save Changes")
