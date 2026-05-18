@@ -193,11 +193,12 @@ class FlowEditorViewModel(
                     allFlows.add(activeFlow)
                 }
 
-                val maxNodeId = activeFlow.nodes.maxOfOrNull { it.id } ?: -1L
+                val activeFlowWithSyncedSubflows = syncSubflowNodes(activeFlow, allFlows)
+                val maxNodeId = activeFlowWithSyncedSubflows.nodes.maxOfOrNull { it.id } ?: -1L
 
                 withContext(Dispatchers.Main) {
                     _state.value = FlowEditorState(
-                        flow = activeFlow,
+                        flow = activeFlowWithSyncedSubflows,
                         nextId = maxNodeId + 1,
                         flows = allFlows,
                         hasUnsavedChanges = false
@@ -297,19 +298,42 @@ class FlowEditorViewModel(
                 )
             )
             is FlowEvent.AddSubFlowNode -> {
+                if (wouldCreateNestedFlowCycle(_state.value.flow.name, event.flowName, _state.value.flows)) {
+                    Logger.w { "Failed to add subflow node: adding subflow '${event.flowName}' to '${_state.value.flow.name}' would create a nested cycle." }
+                    resolvedNotificationService?.toast("Cannot add subflow: Adding this subflow would create a cyclic dependency between flows.")
+                    return
+                }
+
                 val targetFlow = _state.value.flows.find { it.name == event.flowName }
                 val (inputs, outputs) = if (targetFlow != null) {
                     getSubflowPorts(targetFlow)
                 } else {
                     Pair(emptyList(), emptyList())
                 }
+
+                val inputMappings = targetFlow?.nodes?.filterIsInstance<Node.FlowInputNode>()?.map { inputNode ->
+                    SubflowPortMapping(
+                        portId = "input_${inputNode.id}",
+                        boundaryNodeId = inputNode.id
+                    )
+                } ?: emptyList()
+
+                val outputMappings = targetFlow?.nodes?.filterIsInstance<Node.FlowOutputNode>()?.map { outputNode ->
+                    SubflowPortMapping(
+                        portId = "output_${outputNode.id}",
+                        boundaryNodeId = outputNode.id
+                    )
+                } ?: emptyList()
+
                 handleAddNode(
                     Node.SubFlowNode(
                         id = _state.value.nextId,
                         position = event.position.snapToGrid(),
                         flowName = event.flowName,
                         inputs = inputs,
-                        outputs = outputs
+                        outputs = outputs,
+                        inputMappings = inputMappings,
+                        outputMappings = outputMappings
                     )
                 )
             }
@@ -333,10 +357,12 @@ class FlowEditorViewModel(
 
     private fun handleAddNode(node: Node) {
         _state.update { currentState ->
+            val newFlow = currentState.flow.copy(nodes = currentState.flow.nodes + node)
             currentState.copy(
-                flow = currentState.flow.copy(nodes = currentState.flow.nodes + node),
+                flow = newFlow,
                 nextId = currentState.nextId + 1,
-                hasUnsavedChanges = true
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
         runTypeInference()
@@ -360,28 +386,32 @@ class FlowEditorViewModel(
         _state.update { currentState ->
             val node = currentState.flow.nodes.find { it.id == id } ?: return@update currentState
             val finalPosition = (node.position + currentState.currentDragOffset).snapToGrid()
+            val newFlow = currentState.flow.copy(nodes = currentState.flow.nodes.map { 
+                if (it.id == id) it.copyWithPosition(finalPosition) 
+                else it 
+            })
             
             currentState.copy(
-                flow = currentState.flow.copy(nodes = currentState.flow.nodes.map { 
-                    if (it.id == id) it.copyWithPosition(finalPosition) 
-                    else it 
-                }),
+                flow = newFlow,
                 hasUnsavedChanges = true,
                 draggedNodeId = null,
                 currentDragOffset = Offset.Zero,
-                ghostPosition = null
+                ghostPosition = null,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
     }
 
     private fun handleDeleteNode(id: Long) {
         _state.update { currentState ->
+            val newFlow = currentState.flow.copy(
+                nodes = currentState.flow.nodes.filter { it.id != id },
+                connections = currentState.flow.connections.filter { it.sourceNodeId != id && it.targetNodeId != id }
+            )
             currentState.copy(
-                flow = currentState.flow.copy(
-                    nodes = currentState.flow.nodes.filter { it.id != id },
-                    connections = currentState.flow.connections.filter { it.sourceNodeId != id && it.targetNodeId != id }
-                ),
-                hasUnsavedChanges = true
+                flow = newFlow,
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
         runTypeInference()
@@ -410,6 +440,65 @@ class FlowEditorViewModel(
                 }
             }
         }
+        return false
+    }
+
+    private fun hasCycle(connections: List<Connection>): Boolean {
+        val adjacencyList = connections.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
+        val visited = mutableSetOf<Long>()
+        val visiting = mutableSetOf<Long>()
+
+        fun dfs(node: Long): Boolean {
+            if (node in visiting) return true
+            if (node in visited) return false
+
+            visiting.add(node)
+            val neighbors = adjacencyList[node] ?: emptyList()
+            for (neighbor in neighbors) {
+                if (dfs(neighbor)) return true
+            }
+            visiting.remove(node)
+            visited.add(node)
+            return false
+        }
+
+        for (node in adjacencyList.keys) {
+            if (dfs(node)) return true
+        }
+        return false
+    }
+
+    private fun wouldCreateNestedFlowCycle(currentFlowName: String, targetFlowName: String, allFlows: List<Flow>): Boolean {
+        Logger.d { "Checking for nested flow cycle. Current: '$currentFlowName', Target: '$targetFlowName'" }
+        if (currentFlowName == targetFlowName) {
+            Logger.w { "Self-cycle detected! Current flow '$currentFlowName' matches target flow '$targetFlowName'." }
+            return true
+        }
+
+        val visited = mutableSetOf<String>()
+        val queue = ArrayDeque<String>()
+
+        queue.add(targetFlowName)
+        visited.add(targetFlowName)
+
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+            Logger.d { "Visiting flow '$current' in dependency graph check" }
+            if (current == currentFlowName) {
+                Logger.w { "Nested flow cycle detected! Flow '$currentFlowName' is reachable from '$targetFlowName'." }
+                return true
+            }
+            val flow = allFlows.find { it.name == current } ?: continue
+            val subflows = flow.nodes.filterIsInstance<Node.SubFlowNode>().map { it.flowName }
+            Logger.d { "Flow '$current' contains subflows: $subflows" }
+            for (subflow in subflows) {
+                if (subflow !in visited) {
+                    visited.add(subflow)
+                    queue.add(subflow)
+                }
+            }
+        }
+        Logger.d { "No nested flow cycle detected. Adding '$targetFlowName' to '$currentFlowName' is safe." }
         return false
     }
 
@@ -443,9 +532,11 @@ class FlowEditorViewModel(
 
             val newConnection = Connection(sourceNodeId, sourcePortId, targetNodeId, targetPortId)
             
+            val newFlow = currentState.flow.copy(connections = filteredConnections + newConnection)
             currentState.copy(
-                flow = currentState.flow.copy(connections = filteredConnections + newConnection),
-                hasUnsavedChanges = true
+                flow = newFlow,
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
         runTypeInference()
@@ -453,9 +544,11 @@ class FlowEditorViewModel(
 
     private fun handleDeleteConnection(connection: Connection) {
         _state.update { currentState ->
+            val newFlow = currentState.flow.copy(connections = currentState.flow.connections.filter { it != connection })
             currentState.copy(
-                flow = currentState.flow.copy(connections = currentState.flow.connections.filter { it != connection }),
-                hasUnsavedChanges = true
+                flow = newFlow,
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
         runTypeInference()
@@ -499,11 +592,13 @@ class FlowEditorViewModel(
 
     private fun handleResetBoard() {
         _state.update { currentState ->
+            val newFlow = currentState.flow.copy(nodes = emptyList(), connections = emptyList())
             currentState.copy(
-                flow = currentState.flow.copy(nodes = emptyList(), connections = emptyList()),
+                flow = newFlow,
                 offset = Offset.Zero,
                 scale = 1f,
-                hasUnsavedChanges = true
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
     }
@@ -525,15 +620,7 @@ class FlowEditorViewModel(
                 it !is Node.FlowInputNode && it !is Node.FlowOutputNode 
             }.map { node ->
                 val newId = oldToNewId[node.id]!!
-                node.copyWithPosition(node.position + baseOffset).let { 
-                    when(it) {
-                        is Node.CapabilityNode -> it.copy(id = newId)
-                        is Node.SystemNode -> it.copy(id = newId)
-                        is Node.FlowInputNode -> it.copy(id = newId)
-                        is Node.FlowOutputNode -> it.copy(id = newId)
-                        is Node.SubFlowNode -> it.copy(id = newId)
-                    }
-                }
+                node.copyWithPosition(node.position + baseOffset).copyWithId(newId)
             }
 
             val newConnections = targetFlow.connections.filter { conn ->
@@ -554,8 +641,9 @@ class FlowEditorViewModel(
             val outgoingConnections = currentState.flow.connections.filter { it.sourceNodeId == nodeId }
 
             val mappedIncomingConnections = incomingConnections.flatMap { conn ->
-                val oldInputNodeId = conn.targetPortId.toLongOrNull() ?: return@flatMap emptyList()
-                val internalConns = targetFlow.connections.filter { it.sourceNodeId == oldInputNodeId }
+                val boundaryNodeId = subFlowNode.inputMappings.find { it.portId == conn.targetPortId }?.boundaryNodeId
+                    ?: conn.targetPortId.toLongOrNull() ?: return@flatMap emptyList()
+                val internalConns = targetFlow.connections.filter { it.sourceNodeId == boundaryNodeId }
                 internalConns.mapNotNull { internalConn ->
                     val newTargetNodeId = oldToNewId[internalConn.targetNodeId] ?: return@mapNotNull null
                     Connection(
@@ -568,8 +656,9 @@ class FlowEditorViewModel(
             }
 
             val mappedOutgoingConnections = outgoingConnections.flatMap { conn ->
-                val oldOutputNodeId = conn.sourcePortId.toLongOrNull() ?: return@flatMap emptyList()
-                val internalConns = targetFlow.connections.filter { it.targetNodeId == oldOutputNodeId }
+                val boundaryNodeId = subFlowNode.outputMappings.find { it.portId == conn.sourcePortId }?.boundaryNodeId
+                    ?: conn.sourcePortId.toLongOrNull() ?: return@flatMap emptyList()
+                val internalConns = targetFlow.connections.filter { it.targetNodeId == boundaryNodeId }
                 internalConns.mapNotNull { internalConn ->
                     val newSourceNodeId = oldToNewId[internalConn.sourceNodeId] ?: return@mapNotNull null
                     Connection(
@@ -585,10 +674,17 @@ class FlowEditorViewModel(
             val externalConnections = currentState.flow.connections.filter { it.sourceNodeId != nodeId && it.targetNodeId != nodeId }
             val updatedConnections = externalConnections + newConnections + mappedIncomingConnections + mappedOutgoingConnections
 
+            if (hasCycle(updatedConnections)) {
+                resolvedNotificationService?.toast("Cannot expand subflow: Expansion would introduce a cycle. Enforcing Directed Acyclic Graph (DAG).")
+                return@update currentState
+            }
+
+            val newFlow = currentState.flow.copy(nodes = updatedNodes, connections = updatedConnections)
             currentState.copy(
-                flow = currentState.flow.copy(nodes = updatedNodes, connections = updatedConnections),
+                flow = newFlow,
                 nextId = nextId,
-                hasUnsavedChanges = true
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
     }
@@ -630,9 +726,11 @@ class FlowEditorViewModel(
                     node.copyWithUpdatedInput(portId, value)
                 } else node
             }
+            val newFlow = currentState.flow.copy(nodes = updatedNodes)
             currentState.copy(
-                flow = currentState.flow.copy(nodes = updatedNodes),
-                hasUnsavedChanges = true
+                flow = newFlow,
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
         runTypeInference()
@@ -696,9 +794,11 @@ class FlowEditorViewModel(
                 currentState.flow.connections
             }
 
+            val newFlow = currentState.flow.copy(nodes = updatedNodes, connections = updatedConnections)
             currentState.copy(
-                flow = currentState.flow.copy(nodes = updatedNodes, connections = updatedConnections),
-                hasUnsavedChanges = true
+                flow = newFlow,
+                hasUnsavedChanges = true,
+                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
         }
         runTypeInference()
@@ -832,7 +932,7 @@ class FlowEditorViewModel(
             val port = inputNode.outputs.firstOrNull()
             val inferredType = inferred[Pair(inputNode.id, port?.id ?: "")] ?: port?.dataType ?: DataType.Primitive(PrimitiveType.ANY)
             InputPort(
-                id = inputNode.id.toString(),
+                id = "input_${inputNode.id}",
                 name = port?.name ?: "Input Data",
                 dataType = inferredType,
                 semanticType = port?.semanticType
@@ -843,7 +943,7 @@ class FlowEditorViewModel(
             val port = outputNode.inputs.firstOrNull()
             val inferredType = inferred[Pair(outputNode.id, port?.id ?: "")] ?: port?.dataType ?: DataType.Primitive(PrimitiveType.ANY)
             OutputPort(
-                id = outputNode.id.toString(),
+                id = "output_${outputNode.id}",
                 name = port?.name ?: "Output Data",
                 dataType = inferredType,
                 semanticType = port?.semanticType
@@ -860,5 +960,42 @@ class FlowEditorViewModel(
             is DataType.Enum -> this.className.substringAfterLast('.')
             is DataType.Object -> this.className.substringAfterLast('.')
         }
+    }
+
+    private fun syncSubflowNodes(flow: Flow, allFlows: List<Flow>): Flow {
+        val updatedNodes = flow.nodes.map { node ->
+            if (node is Node.SubFlowNode) {
+                val targetFlow = allFlows.find { it.name == node.flowName }
+                if (targetFlow != null) {
+                    val (newInputs, newOutputs) = getSubflowPorts(targetFlow)
+                    
+                    val newInputMappings = targetFlow.nodes.filterIsInstance<Node.FlowInputNode>().map { inputNode ->
+                        SubflowPortMapping(
+                            portId = "input_${inputNode.id}",
+                            boundaryNodeId = inputNode.id
+                        )
+                    }
+                    
+                    val newOutputMappings = targetFlow.nodes.filterIsInstance<Node.FlowOutputNode>().map { outputNode ->
+                        SubflowPortMapping(
+                            portId = "output_${outputNode.id}",
+                            boundaryNodeId = outputNode.id
+                        )
+                    }
+                    
+                    node.copy(
+                        inputs = newInputs,
+                        outputs = newOutputs,
+                        inputMappings = newInputMappings,
+                        outputMappings = newOutputMappings
+                    )
+                } else {
+                    node
+                }
+            } else {
+                node
+            }
+        }
+        return flow.copy(nodes = updatedNodes)
     }
 }

@@ -3,8 +3,14 @@ package org.wip.plugintoolkit.features.flows.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,15 +21,18 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.shared.components.ZoomControls
+import kotlin.math.roundToInt
 
 @Composable
 fun BoardCanvas(
@@ -42,11 +51,20 @@ fun BoardCanvas(
     connectionCurrentPos: Offset,
     onBoardLayoutCoordinatesChanged: (LayoutCoordinates) -> Unit,
     onBoardSizeChanged: (IntSize) -> Unit,
+    onDeleteConnection: (org.wip.plugintoolkit.features.flows.model.Connection) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
     val gridSize = 50f
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
+    var selectedConnection by remember { mutableStateOf<org.wip.plugintoolkit.features.flows.model.Connection?>(null) }
+    var hoveredConnection by remember { mutableStateOf<org.wip.plugintoolkit.features.flows.model.Connection?>(null) }
+
+    LaunchedEffect(flow.connections) {
+        if (hoveredConnection != null && !flow.connections.contains(hoveredConnection)) {
+            hoveredConnection = null
+        }
+    }
 
     val connectionColor = MaterialTheme.colorScheme.primary
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
@@ -60,14 +78,36 @@ fun BoardCanvas(
                 onBoardSizeChanged(it)
             }
             .background(MaterialTheme.colorScheme.background)
-            .pointerInput(Unit) {
+            .pointerInput(isDrawingConnection, draggingNodeFromPalette) {
                 detectTransformGestures { _, pan, _, _ ->
                     if (!isDrawingConnection && draggingNodeFromPalette == null) {
                         onPan(pan)
                     }
                 }
             }
-            .pointerInput(Unit) {
+            .pointerInput(flow.connections, state.scale, state.offset, getPortBoardPosition) {
+                detectTapGestures { tapOffset ->
+                    var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
+                    var minDistance = 20f * state.scale
+                    if (minDistance < 15f) minDistance = 15f
+                    
+                    flow.connections.forEach { connection ->
+                        val sourcePortBoardPos = getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
+                        val targetPortBoardPos = getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
+                        if (sourcePortBoardPos != null && targetPortBoardPos != null) {
+                            val startPos = (sourcePortBoardPos * state.scale) + state.offset
+                            val endPos = (targetPortBoardPos * state.scale) + state.offset
+                            val dist = getDistanceToBezier(tapOffset, startPos, endPos)
+                            if (dist < minDistance) {
+                                minDistance = dist
+                                bestConnection = connection
+                            }
+                        }
+                    }
+                    selectedConnection = bestConnection
+                }
+            }
+            .pointerInput(flow.connections, state.scale, state.offset) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -77,6 +117,37 @@ fun BoardCanvas(
                             val scrollDeltaY = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
                             if (scrollDeltaY != 0f) {
                                 onZoom(scrollDeltaY, position)
+                            }
+                        } else if (event.type == PointerEventType.Move) {
+                            var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
+                            var minDistance = 20f * state.scale
+                            if (minDistance < 15f) minDistance = 15f
+                            
+                            flow.connections.forEach { connection ->
+                                val sourcePortBoardPos = getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
+                                val targetPortBoardPos = getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
+                                if (sourcePortBoardPos != null && targetPortBoardPos != null) {
+                                    val startPos = (sourcePortBoardPos * state.scale) + state.offset
+                                    val endPos = (targetPortBoardPos * state.scale) + state.offset
+                                    val dist = getDistanceToBezier(position, startPos, endPos)
+                                    if (dist < minDistance) {
+                                        minDistance = dist
+                                        bestConnection = connection
+                                    }
+                                }
+                            }
+                            hoveredConnection = bestConnection
+                        } else if (event.type == PointerEventType.Exit) {
+                            hoveredConnection = null
+                        } else if (event.type == PointerEventType.Press) {
+                            if (event.buttons.isSecondaryPressed) {
+                                hoveredConnection?.let { conn ->
+                                    onDeleteConnection(conn)
+                                    hoveredConnection = null
+                                    if (selectedConnection == conn) {
+                                        selectedConnection = null
+                                    }
+                                }
                             }
                         }
                     }
@@ -119,8 +190,24 @@ fun BoardCanvas(
                         it.targetNodeId == connection.targetNodeId &&
                         it.targetPortId == connection.targetPortId
                     }
-                    val color = if (isInvalid) Color.Red else connectionColor
-                    drawBezierCurve(startPos, endPos, color)
+                    val isSelected = selectedConnection == connection
+                    val isHovered = hoveredConnection == connection
+                    val color = if (isSelected) {
+                        Color(0xFFFF9800)
+                    } else if (isHovered) {
+                        Color(0xFFFF2D55)
+                    } else if (isInvalid) {
+                        Color.Red
+                    } else {
+                        connectionColor
+                    }
+                    
+                    if (isHovered) {
+                        drawBezierCurve(startPos, endPos, color.copy(alpha = 0.25f), strokeWidth = 9.dp.toPx())
+                    }
+                    
+                    val strokeWidth = if (isSelected || isHovered) 5.dp.toPx() else 3.dp.toPx()
+                    drawBezierCurve(startPos, endPos, color, strokeWidth)
                 }
             }
 
@@ -152,6 +239,45 @@ fun BoardCanvas(
         // Render main children (nodes, preview)
         content()
 
+        // Selected Connection Delete Button Bubble
+        selectedConnection?.let { conn ->
+            val sourcePortBoardPos = getPortBoardPosition(conn.sourceNodeId, conn.sourcePortId)
+            val targetPortBoardPos = getPortBoardPosition(conn.targetNodeId, conn.targetPortId)
+            if (sourcePortBoardPos != null && targetPortBoardPos != null) {
+                val startPos = (sourcePortBoardPos * state.scale) + state.offset
+                val endPos = (targetPortBoardPos * state.scale) + state.offset
+                val midPoint = getBezierMidpoint(startPos, endPos)
+                
+                Surface(
+                    onClick = {
+                        onDeleteConnection(conn)
+                        selectedConnection = null
+                    },
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                (midPoint.x - 20.dp.toPx()).roundToInt(),
+                                (midPoint.y - 20.dp.toPx()).roundToInt()
+                            )
+                        }
+                        .size(40.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.error,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 6.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Wire",
+                            tint = MaterialTheme.colorScheme.onError,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         // 1.3 Zoom Controls UI - Bottom Right
         val centerPosition = Offset(boardSize.width / 2f, boardSize.height / 2f)
         ZoomControls(
@@ -165,7 +291,41 @@ fun BoardCanvas(
     }
 }
 
-private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color) {
+private fun getDistanceToBezier(p: Offset, start: Offset, end: Offset): Float {
+    val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
+    val c1 = Offset(start.x + controlPointOffset, start.y)
+    val c2 = Offset(end.x - controlPointOffset, end.y)
+    
+    var minDistance = Float.MAX_VALUE
+    val steps = 30
+    for (i in 0..steps) {
+        val t = i.toFloat() / steps
+        val mt = 1f - t
+        val bt = start * (mt * mt * mt) + 
+                 c1 * (3f * mt * mt * t) + 
+                 c2 * (3f * mt * t * t) + 
+                 end * (t * t * t)
+        val dist = (p - bt).getDistance()
+        if (dist < minDistance) {
+            minDistance = dist
+        }
+    }
+    return minDistance
+}
+
+private fun getBezierMidpoint(start: Offset, end: Offset): Offset {
+    val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
+    val c1 = Offset(start.x + controlPointOffset, start.y)
+    val c2 = Offset(end.x - controlPointOffset, end.y)
+    val t = 0.5f
+    val mt = 0.5f
+    return start * (mt * mt * mt) + 
+           c1 * (3f * mt * mt * t) + 
+           c2 * (3f * mt * t * t) + 
+           end * (t * t * t)
+}
+
+private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color, strokeWidth: Float = 3.dp.toPx()) {
     val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
     val path = Path().apply {
         moveTo(start.x, start.y)
@@ -175,5 +335,5 @@ private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color) 
             end.x, end.y
         )
     }
-    drawPath(path = path, color = color, style = Stroke(width = 3.dp.toPx()))
+    drawPath(path = path, color = color, style = Stroke(width = strokeWidth))
 }

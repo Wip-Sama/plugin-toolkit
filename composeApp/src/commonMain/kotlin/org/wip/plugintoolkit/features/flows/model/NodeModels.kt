@@ -96,6 +96,12 @@ data class OutputPort(
 ) : Port
 
 @Serializable
+data class SubflowPortMapping(
+    val portId: String,
+    val boundaryNodeId: Long
+)
+
+@Serializable
 sealed class Node {
     abstract val id: Long
     @Serializable(with = OffsetSerializer::class)
@@ -106,6 +112,7 @@ sealed class Node {
     
     abstract fun copyWithPosition(newPosition: Offset): Node
     abstract fun copyWithUpdatedInput(portId: String, value: Any?): Node
+    abstract fun copyWithId(newId: Long): Node
 
     @Serializable
     @SerialName("capability")
@@ -119,6 +126,7 @@ sealed class Node {
     ) : Node() {
         override val title: String get() = capability.name
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
+        override fun copyWithId(newId: Long) = copy(id = newId)
         override fun copyWithUpdatedInput(portId: String, value: Any?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -137,6 +145,7 @@ sealed class Node {
         override val outputs: List<OutputPort>
     ) : Node() {
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
+        override fun copyWithId(newId: Long) = copy(id = newId)
         override fun copyWithUpdatedInput(portId: String, value: Any?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -154,6 +163,7 @@ sealed class Node {
         override val title: String get() = "Flow Input (${outputs.firstOrNull()?.name ?: "input_data"})"
         override val inputs: List<InputPort> = emptyList() // Uses outputs to provide data into the flow
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
+        override fun copyWithId(newId: Long) = copy(id = newId)
         override fun copyWithUpdatedInput(portId: String, value: Any?): Node = this
     }
 
@@ -167,6 +177,7 @@ sealed class Node {
         override val title: String get() = "Flow Output (${inputs.firstOrNull()?.name ?: "output_data"})"
         override val outputs: List<OutputPort> = emptyList() // Uses inputs to collect data from the flow
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
+        override fun copyWithId(newId: Long) = copy(id = newId)
         override fun copyWithUpdatedInput(portId: String, value: Any?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -181,10 +192,13 @@ sealed class Node {
         @Serializable(with = OffsetSerializer::class) override val position: Offset,
         val flowName: String,
         override val inputs: List<InputPort>,
-        override val outputs: List<OutputPort>
+        override val outputs: List<OutputPort>,
+        val inputMappings: List<SubflowPortMapping> = emptyList(),
+        val outputMappings: List<SubflowPortMapping> = emptyList()
     ) : Node() {
         override val title: String get() = flowName
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
+        override fun copyWithId(newId: Long) = copy(id = newId)
         override fun copyWithUpdatedInput(portId: String, value: Any?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input

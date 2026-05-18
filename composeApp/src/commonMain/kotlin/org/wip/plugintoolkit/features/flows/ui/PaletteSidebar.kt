@@ -41,7 +41,7 @@ fun PaletteSidebar(
     currentFlowName: String,
     plugins: List<PluginEntry>,
     rootLayoutCoordinates: LayoutCoordinates?,
-    onDragStart: (PaletteNode, Offset) -> Unit,
+    onDragStart: (PaletteNode, Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onClick: (PaletteNode) -> Unit,
@@ -119,7 +119,7 @@ private fun CapabilitiesPalette(
     plugins: List<PluginEntry>,
     searchQuery: String, 
     rootLayoutCoordinates: LayoutCoordinates?,
-    onDragStart: (PaletteNode, Offset) -> Unit,
+    onDragStart: (PaletteNode, Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onClick: (PaletteNode) -> Unit
@@ -152,7 +152,7 @@ private fun CapabilitiesPalette(
                         text = cap.name,
                         color = MaterialTheme.colorScheme.primary,
                         rootLayoutCoordinates = rootLayoutCoordinates,
-                        onDragStart = { pos -> onDragStart(paletteNode, pos) },
+                        onDragStart = { pos, grabOffset -> onDragStart(paletteNode, pos, grabOffset) },
                         onDrag = onDrag,
                         onDragEnd = onDragEnd,
                         onClick = { onClick(paletteNode) }
@@ -166,7 +166,7 @@ private fun CapabilitiesPalette(
 @Composable
 private fun SystemPalette(
     rootLayoutCoordinates: LayoutCoordinates?,
-    onDragStart: (PaletteNode, Offset) -> Unit,
+    onDragStart: (PaletteNode, Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onClick: (PaletteNode) -> Unit
@@ -184,7 +184,7 @@ private fun SystemPalette(
             text = "Flow Input",
             color = MaterialTheme.colorScheme.tertiary,
             rootLayoutCoordinates = rootLayoutCoordinates,
-            onDragStart = { onDragStart(flowInput, it) },
+            onDragStart = { pos, grabOffset -> onDragStart(flowInput, pos, grabOffset) },
             onDrag = onDrag,
             onDragEnd = onDragEnd,
             onClick = { onClick(flowInput) }
@@ -195,7 +195,7 @@ private fun SystemPalette(
             text = "Flow Output",
             color = MaterialTheme.colorScheme.tertiary,
             rootLayoutCoordinates = rootLayoutCoordinates,
-            onDragStart = { onDragStart(flowOutput, it) },
+            onDragStart = { pos, grabOffset -> onDragStart(flowOutput, pos, grabOffset) },
             onDrag = onDrag,
             onDragEnd = onDragEnd,
             onClick = { onClick(flowOutput) }
@@ -210,7 +210,7 @@ private fun SystemPalette(
                 text = action,
                 color = ToolkitTheme.colors.success,
                 rootLayoutCoordinates = rootLayoutCoordinates,
-                onDragStart = { onDragStart(systemNode, it) },
+                onDragStart = { pos, grabOffset -> onDragStart(systemNode, pos, grabOffset) },
                 onDrag = onDrag,
                 onDragEnd = onDragEnd,
                 onClick = { onClick(systemNode) }
@@ -224,7 +224,7 @@ private fun FlowsPalette(
     flows: List<Flow>, 
     searchQuery: String, 
     rootLayoutCoordinates: LayoutCoordinates?,
-    onDragStart: (PaletteNode, Offset) -> Unit,
+    onDragStart: (PaletteNode, Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onClick: (PaletteNode) -> Unit
@@ -245,7 +245,7 @@ private fun FlowsPalette(
                 text = flow.name,
                 color = MaterialTheme.colorScheme.secondary,
                 rootLayoutCoordinates = rootLayoutCoordinates,
-                onDragStart = { onDragStart(subFlow, it) },
+                onDragStart = { pos, grabOffset -> onDragStart(subFlow, pos, grabOffset) },
                 onDrag = onDrag,
                 onDragEnd = onDragEnd,
                 onClick = { onClick(subFlow) }
@@ -259,13 +259,17 @@ private fun PaletteItem(
     text: String,
     color: Color = MaterialTheme.colorScheme.primary,
     rootLayoutCoordinates: LayoutCoordinates?,
-    onDragStart: (Offset) -> Unit,
+    onDragStart: (Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onClick: () -> Unit
 ) {
     var lastPosition by remember { mutableStateOf(Offset.Zero) }
     var cumulativeDrag by remember { mutableStateOf(Offset.Zero) }
+    
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     
     Surface(
         onClick = onClick,
@@ -275,15 +279,15 @@ private fun PaletteItem(
                 detectDragGestures(
                     onDragStart = { localOffset ->
                         cumulativeDrag = Offset.Zero
-                        onDragStart(localOffset + lastPosition)
+                        currentOnDragStart(localOffset + lastPosition, localOffset)
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         cumulativeDrag += dragAmount
-                        onDrag(cumulativeDrag)
+                        currentOnDrag(cumulativeDrag)
                     },
-                    onDragEnd = onDragEnd,
-                    onDragCancel = onDragEnd
+                    onDragEnd = currentOnDragEnd,
+                    onDragCancel = currentOnDragEnd
                 )
             }
             .onGloballyPositioned {
@@ -325,7 +329,7 @@ fun PaletteItemPreview(node: PaletteNode) {
     }
 
     Surface(
-        modifier = Modifier.width(220.dp),
+        modifier = Modifier.width(300.dp),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = ToolkitTheme.spacing.small,
@@ -337,7 +341,7 @@ fun PaletteItemPreview(node: PaletteNode) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(color)
-                    .padding(ToolkitTheme.spacing.small)
+                    .padding(ToolkitTheme.spacing.mediumSmall)
             ) {
                 Text(
                     text = when(node) {
@@ -348,21 +352,21 @@ fun PaletteItemPreview(node: PaletteNode) {
                         is PaletteNode.SubFlow -> node.name
                     },
                     color = onColor,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
             }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(ToolkitTheme.spacing.small),
+                    .height(80.dp)
+                    .padding(ToolkitTheme.spacing.mediumSmall),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "Drop to add node",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
         }

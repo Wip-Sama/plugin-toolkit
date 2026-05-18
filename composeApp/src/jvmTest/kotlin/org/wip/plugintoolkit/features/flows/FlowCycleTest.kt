@@ -13,6 +13,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+import org.wip.plugintoolkit.features.flows.model.Flow
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.Path
+import kotlinx.io.buffered
+import kotlinx.io.writeString
 
 class MockSettingsPersistence : SettingsPersistence {
     override fun load(): AppSettings = AppSettings()
@@ -72,5 +79,110 @@ class FlowCycleTest {
         assertEquals(2, currentConnections.size)
         assertTrue(currentConnections.any { it.sourceNodeId == nodeA.id && it.targetNodeId == nodeC.id })
         assertFalse(currentConnections.any { it.sourceNodeId == nodeB.id && it.targetNodeId == nodeC.id })
+    }
+
+    @Test
+    fun testNestedFlowCyclePrevention() = runBlocking {
+        val appDataDir = "build/tmp/test_flows"
+        val flowsDir = Path("$appDataDir/flows")
+        
+        // Clean up or ensure directory exists
+        if (SystemFileSystem.exists(flowsDir)) {
+            SystemFileSystem.list(flowsDir).forEach { SystemFileSystem.delete(it) }
+        } else {
+            SystemFileSystem.createDirectories(flowsDir)
+        }
+
+        // Create Flow A, Flow B, Flow C
+        val flowA = Flow("Flow A")
+        val flowB = Flow("Flow B")
+        val flowC = Flow("Flow C")
+
+        val json = kotlinx.serialization.json.Json { prettyPrint = true }
+        
+        // Write Flow B and Flow C to files so they can be loaded as other flows
+        SystemFileSystem.sink(Path("$appDataDir/flows/Flow_B.json")).buffered().use {
+            it.writeString(json.encodeToString(Flow.serializer(), flowB))
+        }
+        SystemFileSystem.sink(Path("$appDataDir/flows/Flow_C.json")).buffered().use {
+            it.writeString(json.encodeToString(Flow.serializer(), flowC))
+        }
+        // Write Flow A initially so it exists
+        SystemFileSystem.sink(Path("$appDataDir/flows/Flow_A.json")).buffered().use {
+            it.writeString(json.encodeToString(Flow.serializer(), flowA))
+        }
+
+        // 1. Load Flow A
+        val viewModelA = FlowEditorViewModel(
+            initialFlowName = "Flow A",
+            settingsPersistence = MockSettingsPersistence(),
+            notificationService = null
+        )
+
+        // Wait until loadFlow completes and populates state.value.flows
+        var loadedA = false
+        for (i in 1..50) {
+            if (viewModelA.state.value.flows.size >= 3) {
+                loadedA = true
+                break
+            }
+            delay(10)
+        }
+        assertTrue(loadedA, "Flows failed to load in Flow A editor")
+        
+        // 2. Add Flow B as a subflow in Flow A
+        viewModelA.onEvent(FlowEvent.AddSubFlowNode("Flow B", Offset(100f, 100f)))
+        viewModelA.onEvent(FlowEvent.Save)
+        delay(50) // Wait for save to disk to finish
+
+        // 3. Load Flow B
+        val viewModelB = FlowEditorViewModel(
+            initialFlowName = "Flow B",
+            settingsPersistence = MockSettingsPersistence(),
+            notificationService = null
+        )
+
+        var loadedB = false
+        for (i in 1..50) {
+            if (viewModelB.state.value.flows.size >= 3) {
+                loadedB = true
+                break
+            }
+            delay(10)
+        }
+        assertTrue(loadedB, "Flows failed to load in Flow B editor")
+
+        // 4. Add Flow C as a subflow in Flow B
+        viewModelB.onEvent(FlowEvent.AddSubFlowNode("Flow C", Offset(100f, 100f)))
+        viewModelB.onEvent(FlowEvent.Save)
+        delay(50)
+
+        // 5. Load Flow C
+        val viewModelC = FlowEditorViewModel(
+            initialFlowName = "Flow C",
+            settingsPersistence = MockSettingsPersistence(),
+            notificationService = null
+        )
+
+        var loadedC = false
+        for (i in 1..50) {
+            if (viewModelC.state.value.flows.size >= 3) {
+                loadedC = true
+                break
+            }
+            delay(10)
+        }
+        assertTrue(loadedC, "Flows failed to load in Flow C editor")
+
+        // 6. Try to add Flow A as a subflow inside Flow C - This should form a cycle: A -> B -> C -> A
+        val initialNodesCount = viewModelC.state.value.flow.nodes.size
+        viewModelC.onEvent(FlowEvent.AddSubFlowNode("Flow A", Offset(100f, 100f)))
+
+        // Connection/Add should be rejected, so nodes count should remain unchanged
+        assertEquals(initialNodesCount, viewModelC.state.value.flow.nodes.size, "Should reject subflow addition that forms a cycle")
+
+        // 7. Try to add Flow C to itself as a subflow (self-dependency)
+        viewModelC.onEvent(FlowEvent.AddSubFlowNode("Flow C", Offset(100f, 100f)))
+        assertEquals(initialNodesCount, viewModelC.state.value.flow.nodes.size, "Should reject self-referential subflow addition")
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -52,9 +53,14 @@ fun FlowEditorView(
     var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
 
     // State for port position tracking
-    val portBoardPositions = remember { mutableStateMapOf<Pair<Long, String>, Offset>() }
     val getPortBoardPosition = { nodeId: Long, portId: String ->
-        portBoardPositions[nodeId to portId]
+        val node = flow.nodes.find { it.id == nodeId }
+        if (node != null) {
+            val dragOffset = if (state.draggedNodeId == nodeId) state.currentDragOffset else Offset.Zero
+            node.position + dragOffset + getPortRelativeOffset(node, portId, density)
+        } else {
+            null
+        }
     }
     val nodeSizes = remember { mutableStateMapOf<Long, IntSize>() }
     var highlightedPortId by remember { mutableStateOf<String?>(null) }
@@ -64,6 +70,8 @@ fun FlowEditorView(
     var draggingNodeFromPalette by remember { mutableStateOf<PaletteNode?>(null) }
     var draggingNodePos by remember { mutableStateOf(Offset.Zero) }
     var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
+    var dragGrabOffset by remember { mutableStateOf(Offset.Zero) }
+    var draggingNodeScale by remember { mutableStateOf(1f) }
 
     val handlePaletteClick = { paletteNode: PaletteNode ->
         val dropPos = (Offset(boardSize.width / 2f, boardSize.height / 2f) - state.offset) / state.scale
@@ -97,7 +105,8 @@ fun FlowEditorView(
             connectionStartIsOutput = connectionStartIsOutput,
             connectionCurrentPos = connectionCurrentPos,
             onBoardLayoutCoordinatesChanged = { boardLayoutCoordinates = it },
-            onBoardSizeChanged = { boardSize = it }
+            onBoardSizeChanged = { boardSize = it },
+            onDeleteConnection = { viewModel.onEvent(FlowEvent.DeleteConnection(it)) }
         ) {
             // 1.2 Nodes
             flow.nodes.forEach { node ->
@@ -151,6 +160,9 @@ fun FlowEditorView(
                                 connectionStartNodeId = nodeId
                                 connectionStartPortId = portId
                                 connectionStartIsOutput = isOutput
+                                getPortBoardPosition(nodeId, portId)?.let {
+                                    connectionCurrentPos = it
+                                }
                             },
                             onDragConnection = { cumulativeDragOffset ->
                                 if (connectionStartNodeId != null && connectionStartPortId != null) {
@@ -225,9 +237,7 @@ fun FlowEditorView(
                                 highlightedPortId = null
                                 highlightedNodeId = null
                             },
-                            onPortPositioned = { nodeId, portId, boardPos -> 
-                                portBoardPositions[nodeId to portId] = boardPos
-                            },
+
                             onPress = { id -> viewModel.onEvent(FlowEvent.BringToFront(id)) },
                             highlightedPortId = nodeHighlightedPortId,
                             highlightedPortColor = nodeHighlightedPortColor,
@@ -269,13 +279,23 @@ fun FlowEditorView(
             currentFlowName = flow.name,
             plugins = viewModel.plugins.collectAsState().value,
             rootLayoutCoordinates = rootLayoutCoordinates,
-            onDragStart = { paletteNode, initialPos ->
+            onDragStart = { paletteNode, initialPos, grabOffset ->
                 draggingNodeFromPalette = paletteNode
-                draggingNodePos = initialPos
                 dragStartPosition = initialPos
+                dragGrabOffset = grabOffset
+                draggingNodeScale = 1.0f
+                draggingNodePos = initialPos
             },
             onDrag = { cumulativeDrag ->
-                draggingNodePos = dragStartPosition + cumulativeDrag
+                val cursorPos = dragStartPosition + cumulativeDrag
+                val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
+                val relativeToBoard = cursorPos - boardOffset
+                val isOverBoard = boardSize != IntSize.Zero &&
+                        relativeToBoard.x >= 0 && relativeToBoard.y >= 0 &&
+                        relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+
+                draggingNodeScale = if (isOverBoard) state.scale else 1.0f
+                draggingNodePos = cursorPos - dragGrabOffset * draggingNodeScale
             },
             onDragEnd = {
                 val position = draggingNodePos
@@ -343,6 +363,11 @@ fun FlowEditorView(
             Box(
                 modifier = Modifier
                     .offset { IntOffset(draggingNodePos.x.roundToInt(), draggingNodePos.y.roundToInt()) }
+                    .graphicsLayer(
+                        scaleX = draggingNodeScale,
+                        scaleY = draggingNodeScale,
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    )
                     .alpha(0.7f)
             ) {
                 PaletteItemPreview(node)
@@ -364,3 +389,43 @@ private fun NodeComponentPlaceholder(node: Node, height: Dp = 120.dp) {
         }
     }
 }
+
+private fun getPortRelativeOffset(node: Node, portId: String, density: androidx.compose.ui.unit.Density): Offset {
+    val headerHeight = 48f
+    val bodyTopPadding = 12f
+    val rowHeight = 48f
+    val spacing = 12f
+    val dividerHeight = 0.5f
+
+    val isInput = node.inputs.any { it.id == portId }
+    val isOutput = node.outputs.any { it.id == portId }
+
+    val xDp = if (isInput) 19f else 281f
+
+    var yDp = headerHeight + bodyTopPadding
+    val numInputs = node.inputs.size
+    val numOutputs = node.outputs.size
+
+    if (isInput) {
+        val index = node.inputs.indexOfFirst { it.id == portId }
+        if (index != -1) {
+            yDp += index * (rowHeight + spacing) + (rowHeight / 2f)
+        }
+    } else if (isOutput) {
+        val index = node.outputs.indexOfFirst { it.id == portId }
+        if (index != -1) {
+            var precedingHeight = numInputs * rowHeight
+            var numGaps = numInputs
+            if (numInputs > 0) {
+                precedingHeight += dividerHeight
+                numGaps += 1
+            }
+            yDp += precedingHeight + (numGaps + index) * spacing + index * rowHeight + (rowHeight / 2f)
+        }
+    }
+
+    return with(density) {
+        Offset(xDp.dp.toPx(), yDp.dp.toPx())
+    }
+}
+

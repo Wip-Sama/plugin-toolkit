@@ -63,6 +63,11 @@ fun NodeComponent(
     val density = LocalDensity.current
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditBoundaryDialog by remember { mutableStateOf(false) }
+    
+    val currentOnMove by rememberUpdatedState(onMove)
+    val currentOnEndMove by rememberUpdatedState(onEndMove)
+    val currentOnPress by rememberUpdatedState(onPress)
+
     val (headerColor, onHeaderColor) = when (node) {
         is Node.CapabilityNode -> Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
         is Node.SystemNode -> Pair(ToolkitTheme.colors.success, Color.White)
@@ -89,7 +94,7 @@ fun NodeComponent(
                             while (true) {
                                 val event = awaitPointerEvent()
                                 if (event.type == PointerEventType.Press) {
-                                    onPress(node.id)
+                                    currentOnPress(node.id)
                                 }
                             }
                         }
@@ -98,10 +103,10 @@ fun NodeComponent(
                         detectDragGestures(
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                onMove(node.id, dragAmount, false, true)
+                                currentOnMove(node.id, dragAmount, false, true)
                             },
-                            onDragEnd = { onEndMove(node.id) },
-                            onDragCancel = { onEndMove(node.id) }
+                            onDragEnd = { currentOnEndMove(node.id) },
+                            onDragCancel = { currentOnEndMove(node.id) }
                         )
                     }
                     .padding(ToolkitTheme.spacing.mediumSmall),
@@ -182,7 +187,7 @@ fun NodeComponent(
                 node.inputs.forEach { input ->
                     val currentPortValue = input.value ?: input.defaultValue
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -192,15 +197,7 @@ fun NodeComponent(
                                 isHighlighted = highlightedPortId == input.id,
                                 onDragStart = { onStartConnection(node.id, input.id, false) },
                                 onDrag = onDragConnection,
-                                onDragEnd = onDropConnection,
-                                modifier = Modifier.onGloballyPositioned { portCoords ->
-                                    val boardCoords = boardLayoutCoordinates
-                                    if (boardCoords != null && boardCoords.isAttached && portCoords.isAttached) {
-                                        val centerOffset = with(density) { Offset(7.dp.toPx(), 7.dp.toPx()) }
-                                        val boardPos = (boardCoords.localPositionOf(portCoords, centerOffset) - stateOffset) / stateScale
-                                        onPortPositioned(node.id, input.id, boardPos)
-                                    }
-                                }
+                                onDragEnd = onDropConnection
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                             Column(modifier = Modifier.weight(1f)) {
@@ -373,7 +370,7 @@ fun NodeComponent(
                 // Outputs
                 node.outputs.forEach { output ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.End
                     ) {
@@ -414,15 +411,7 @@ fun NodeComponent(
                             isHighlighted = highlightedPortId == output.id,
                             onDragStart = { onStartConnection(node.id, output.id, true) },
                             onDrag = onDragConnection,
-                            onDragEnd = onDropConnection,
-                            modifier = Modifier.onGloballyPositioned { portCoords ->
-                                val boardCoords = boardLayoutCoordinates
-                                if (boardCoords != null && boardCoords.isAttached && portCoords.isAttached) {
-                                    val centerOffset = with(density) { Offset(7.dp.toPx(), 7.dp.toPx()) }
-                                    val boardPos = (boardCoords.localPositionOf(portCoords, centerOffset) - stateOffset) / stateScale
-                                    onPortPositioned(node.id, output.id, boardPos)
-                                }
-                            }
+                            onDragEnd = onDropConnection
                         )
                     }
                 }
@@ -606,6 +595,10 @@ fun PortCircle(
     var cumulativeOffset by remember { mutableStateOf(Offset.Zero) }
     var isMouseHovered by remember { mutableStateOf(false) }
 
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+
     val displayColor = if (isHighlighted) {
         color
     } else if (isMouseHovered) {
@@ -644,18 +637,18 @@ fun PortCircle(
                 detectDragGestures(
                     onDragStart = {
                         cumulativeOffset = Offset.Zero
-                        onDragStart()
+                        currentOnDragStart()
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         cumulativeOffset += dragAmount
-                        onDrag(cumulativeOffset)
+                        currentOnDrag(cumulativeOffset)
                     },
                     onDragEnd = {
-                        onDragEnd()
+                        currentOnDragEnd()
                     },
                     onDragCancel = {
-                        onDragEnd()
+                        currentOnDragEnd()
                     }
                 )
             }
