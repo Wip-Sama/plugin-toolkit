@@ -306,4 +306,20 @@
     <string name="palette_tab_plugins">Plugins</string>
     <string name="palette_tab_system">System</string>
     <string name="palette_tab_flows">Flows</string>
+
+    <!-- PluginRepoView additions -->
+    <string name="repo_share_link_desc">Share repository link</string>
+    <string name="repo_no_repo_selected">No Repository Selected</string>
+    <string name="repo_no_repo_selected_desc">Select a repository from the left panel, or add a new repository URL at the top to explore its plugins and flows.</string>
+    <string name="repo_tab_plugins">Plugins (%1$d)</string>
+    <string name="repo_tab_flows">Flows (%1$d)</string>
+    <string name="repo_search_plugins_placeholder">Search plugins in this repository...</string>
+    <string name="repo_search_flows_placeholder">Search flows in this repository...</string>
+    <string name="repo_no_plugins_found">No plugins found matching search query.</string>
+    <string name="repo_no_flows_found">No flows found matching search query.</string>
+    <string name="repo_wrong_signature">Wrong Signature</string>
+    <string name="repo_plugin_pkg_version_format">Package: %1$s • Version: %2$s</string>
+    <string name="repo_flow_filename_version_format">FileName: %1$s • Version: %2$s</string>
+    <string name="repo_action_update_version">Update to v%1$s</string>
+    <string name="repo_plugin_installed_version_format">Installed (v%1$s)</string>
 </resources>

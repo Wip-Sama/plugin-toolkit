@@ -28,4 +28,5 @@ expect object PlatformUtils {
     fun writeBytes(path: String, bytes: ByteArray)
     fun zipEntries(entries: Map<String, String>): ByteArray
     fun unzipEntries(bytes: ByteArray): Map<String, String>
+    fun clipEntryOf(text: String): androidx.compose.ui.platform.ClipEntry
 }

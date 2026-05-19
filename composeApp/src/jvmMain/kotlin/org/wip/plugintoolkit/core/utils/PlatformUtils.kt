@@ -400,6 +400,11 @@ actual object PlatformUtils {
         }
         return result
     }
+
+    @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+    actual fun clipEntryOf(text: String): androidx.compose.ui.platform.ClipEntry {
+        return androidx.compose.ui.platform.ClipEntry(java.awt.datatransfer.StringSelection(text))
+    }
 }
 
 interface PortalSettings : DBusInterface {

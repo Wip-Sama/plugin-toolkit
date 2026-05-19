@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.repository.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,8 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboard
+import org.wip.plugintoolkit.core.utils.PlatformUtils
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,22 +29,7 @@ import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
-import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.action_install
-import plugintoolkit.composeapp.generated.resources.action_refresh
-import plugintoolkit.composeapp.generated.resources.action_remove
-import plugintoolkit.composeapp.generated.resources.plugin_installed_label
-import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_format
-import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_installed_format
-import plugintoolkit.composeapp.generated.resources.repo_add_button
-import plugintoolkit.composeapp.generated.resources.repo_add_title
-import plugintoolkit.composeapp.generated.resources.repo_conflicts_subtitle
-import plugintoolkit.composeapp.generated.resources.repo_conflicts_title
-import plugintoolkit.composeapp.generated.resources.repo_empty_list
-import plugintoolkit.composeapp.generated.resources.repo_managed_title
-import plugintoolkit.composeapp.generated.resources.repo_refresh_all
-import plugintoolkit.composeapp.generated.resources.repo_url_label
-import plugintoolkit.composeapp.generated.resources.repo_url_placeholder
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun PluginRepoView(
@@ -57,6 +44,8 @@ fun PluginRepoView(
     var selectedRepo by remember { mutableStateOf<ExtensionRepo?>(null) }
     var selectedTab by remember { mutableStateOf(0) } // 0: Plugins, 1: Flows
     var searchQuery by remember { mutableStateOf("") }
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     // If selected repo is removed, reset selection
     LaunchedEffect(repositories) {
@@ -72,9 +61,9 @@ fun PluginRepoView(
         // LEFT COLUMN - Repositories Sidebar
         Column(
             modifier = Modifier
-                .width(340.dp)
+                .width(ToolkitTheme.dimensions.repositorySidebarWidth)
                 .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.sidebarBackground))
                 .padding(ToolkitTheme.spacing.medium)
         ) {
             Text(
@@ -96,7 +85,6 @@ fun PluginRepoView(
                     modifier = Modifier.weight(1f),
                     placeholder = { Text(stringResource(Res.string.repo_url_placeholder), style = MaterialTheme.typography.bodyMedium) },
                     singleLine = true,
-                    label = { Text(stringResource(Res.string.repo_url_label)) },
                     shape = MaterialTheme.shapes.medium,
                     textStyle = MaterialTheme.typography.bodyMedium
                 )
@@ -104,7 +92,7 @@ fun PluginRepoView(
                 FilledIconButton(
                     onClick = { viewModel.addRepository() },
                     shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.size(52.dp)
+                    modifier = Modifier.size(ToolkitTheme.dimensions.textFieldHeight)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = stringResource(Res.string.repo_add_button))
                 }
@@ -119,80 +107,90 @@ fun PluginRepoView(
             ) {
                 items(repositories) { repo ->
                     val isSelected = selectedRepo?.url == repo.url
-                    Card(
+                    OutlinedCard(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
                             .clickable { selectedRepo = repo },
-                        colors = CardDefaults.cardColors(
+                        colors = CardDefaults.outlinedCardColors(
                             containerColor = if (isSelected) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.cardBackground)
                             } else {
-                                MaterialTheme.colorScheme.surface
+                                Color.Transparent
                             }
                         ),
-                        border = if (isSelected) {
-                            CardDefaults.outlinedCardBorder().copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary)
-                            )
-                        } else null,
+                        border = BorderStroke(
+                            width = if (isSelected) ToolkitTheme.dimensions.borderSelected else ToolkitTheme.dimensions.borderUnselected,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.sidebarBackground)
+                        ),
                         shape = MaterialTheme.shapes.medium
                     ) {
-                        Column(
-                            modifier = Modifier.padding(ToolkitTheme.spacing.medium)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = repo.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = repo.url,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-
-                            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = repo.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                               )
+                                Text(
+                                    text = repo.url,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.secondaryText),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
 
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
+                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val clipboardManager = LocalClipboardManager.current
                                 IconButton(
                                     onClick = {
-                                        clipboardManager.setText(AnnotatedString(repo.url))
+                                        scope.launch {
+                                            clipboard.setClipEntry(PlatformUtils.clipEntryOf(repo.url))
+                                        }
                                         viewModel.copyRepositoryLink(repo.url)
                                     },
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                                 ) {
                                     Icon(
                                         Icons.Default.Share,
-                                        contentDescription = "Share repository link",
-                                        modifier = Modifier.size(18.dp)
+                                        contentDescription = stringResource(Res.string.repo_share_link_desc),
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                     )
                                 }
                                 IconButton(
                                     onClick = { viewModel.refreshRepository(repo.url) },
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                                 ) {
                                     Icon(
                                         Icons.Default.Refresh,
                                         contentDescription = stringResource(Res.string.action_refresh),
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                     )
                                 }
                                 IconButton(
                                     onClick = { viewModel.removeRepository(repo.url) },
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                                 ) {
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = stringResource(Res.string.action_remove),
                                         tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                     )
                                 }
                             }
@@ -212,12 +210,12 @@ fun PluginRepoView(
             ) {
                 if (isRefreshing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
+                        strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall))
                 }
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 Text(stringResource(Res.string.repo_refresh_all))
@@ -225,7 +223,7 @@ fun PluginRepoView(
         }
 
         // Divider
-        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider))
 
         // RIGHT COLUMN - Repository Inspector / Details View
         Box(
@@ -247,30 +245,30 @@ fun PluginRepoView(
                         modifier = Modifier.padding(ToolkitTheme.spacing.extraLarge)
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(24.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            shape = MaterialTheme.shapes.extraLarge,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.sidebarBackground),
                             modifier = Modifier.padding(bottom = ToolkitTheme.spacing.medium)
                         ) {
                             Icon(
                                 Icons.Default.CloudDownload,
                                 contentDescription = null,
-                                modifier = Modifier.size(80.dp).padding(ToolkitTheme.spacing.medium),
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                modifier = Modifier.size(ToolkitTheme.dimensions.emptyStateIconSize).padding(ToolkitTheme.spacing.medium),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.disabled)
                             )
                         }
                         Text(
-                            text = "No Repository Selected",
+                            text = stringResource(Res.string.repo_no_repo_selected),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                         Text(
-                            text = "Select a repository from the left panel, or add a new repository URL at the top to explore its plugins and flows.",
+                            text = stringResource(Res.string.repo_no_repo_selected_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.width(420.dp)
+                            modifier = Modifier.width(ToolkitTheme.dimensions.emptyStateTextWidth)
                         )
                     }
                 }
@@ -305,7 +303,7 @@ fun PluginRepoView(
                     if (activeConflicts.isNotEmpty()) {
                         Card(
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = ToolkitTheme.opacity.divider)
                             ),
                             shape = MaterialTheme.shapes.medium,
                             modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.medium)
@@ -328,7 +326,7 @@ fun PluginRepoView(
                                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                                 activeConflicts.forEach { (pkg, repos) ->
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = ToolkitTheme.spacing.extraSmall),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -365,7 +363,7 @@ fun PluginRepoView(
                             onClick = { selectedTab = 0; searchQuery = "" },
                             text = {
                                 Text(
-                                    "Plugins (${repoPlugins.size})",
+                                    stringResource(Res.string.repo_tab_plugins, repoPlugins.size),
                                     fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
@@ -375,7 +373,7 @@ fun PluginRepoView(
                             onClick = { selectedTab = 1; searchQuery = "" },
                             text = {
                                 Text(
-                                    "Flows (${repoFlows.size})",
+                                    stringResource(Res.string.repo_tab_flows, repoFlows.size),
                                     fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
@@ -391,7 +389,7 @@ fun PluginRepoView(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
                             Text(
-                                if (selectedTab == 0) "Search plugins in this repository..." else "Search flows in this repository...",
+                                if (selectedTab == 0) stringResource(Res.string.repo_search_plugins_placeholder) else stringResource(Res.string.repo_search_flows_placeholder),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         },
@@ -413,13 +411,13 @@ fun PluginRepoView(
 
                         if (filteredPlugins.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("No plugins found matching search query.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                                Text(stringResource(Res.string.repo_no_plugins_found), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
                             }
                         } else {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
-                                contentPadding = PaddingValues(bottom = 24.dp)
+                                contentPadding = PaddingValues(bottom = ToolkitTheme.spacing.large)
                             ) {
                                 items(filteredPlugins) { plugin ->
                                     val installedVersion = viewModel.getInstalledVersion(plugin.pkg)
@@ -438,16 +436,16 @@ fun PluginRepoView(
                                         ) {
                                             // Plugin Icon
                                             Surface(
-                                                shape = RoundedCornerShape(12.dp),
+                                                shape = MaterialTheme.shapes.medium,
                                                 color = MaterialTheme.colorScheme.surfaceVariant,
-                                                modifier = Modifier.size(54.dp)
+                                                modifier = Modifier.size(ToolkitTheme.dimensions.listIconSize)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         Icons.Default.Extension,
                                                         contentDescription = null,
                                                         tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(28.dp)
+                                                        modifier = Modifier.size(ToolkitTheme.dimensions.listIconContentSize)
                                                     )
                                                 }
                                             }
@@ -469,8 +467,8 @@ fun PluginRepoView(
                                                             shape = MaterialTheme.shapes.extraSmall
                                                         ) {
                                                             Text(
-                                                                "Wrong Signature",
-                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                                stringResource(Res.string.repo_wrong_signature),
+                                                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = ToolkitTheme.spacing.badgeVertical),
                                                                 style = MaterialTheme.typography.labelSmall,
                                                                 color = MaterialTheme.colorScheme.onErrorContainer
                                                             )
@@ -478,7 +476,7 @@ fun PluginRepoView(
                                                     }
                                                 }
                                                 Text(
-                                                    text = "Package: ${plugin.pkg}  •  Version: ${plugin.version}",
+                                                    text = stringResource(Res.string.repo_plugin_pkg_version_format, plugin.pkg, plugin.version),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.outline
                                                 )
@@ -489,7 +487,7 @@ fun PluginRepoView(
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         maxLines = 2,
                                                         overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier.padding(top = 4.dp)
+                                                        modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
                                                     )
                                                 }
                                             }
@@ -498,11 +496,11 @@ fun PluginRepoView(
 
                                             // Control
                                             if (progress != null) {
-                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(36.dp)) {
+                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(ToolkitTheme.dimensions.progressBoxSize)) {
                                                     CircularProgressIndicator(
                                                         progress = { progress },
-                                                        modifier = Modifier.size(24.dp),
-                                                        strokeWidth = 3.dp
+                                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
+                                                        strokeWidth = ToolkitTheme.dimensions.progressIndicatorStrokeMedium
                                                     )
                                                 }
                                             } else if (isInstalled) {
@@ -511,9 +509,9 @@ fun PluginRepoView(
                                                         onClick = { viewModel.installPlugin(plugin) },
                                                         shape = MaterialTheme.shapes.medium
                                                     ) {
-                                                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Text("Update to v${plugin.version}")
+                                                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall))
+                                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                                        Text(stringResource(Res.string.repo_action_update_version, plugin.version))
                                                     }
                                                 } else {
                                                     Surface(
@@ -521,8 +519,8 @@ fun PluginRepoView(
                                                         shape = MaterialTheme.shapes.medium
                                                     ) {
                                                         Text(
-                                                            stringResource(Res.string.plugin_installed_label) + " (v$installedVersion)",
-                                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                            stringResource(Res.string.repo_plugin_installed_version_format, installedVersion ?: ""),
+                                                            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.badgeHorizontal),
                                                             style = MaterialTheme.typography.labelMedium,
                                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                             fontWeight = FontWeight.Bold
@@ -551,13 +549,13 @@ fun PluginRepoView(
 
                         if (filteredFlows.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("No flows found matching search query.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                                Text(stringResource(Res.string.repo_no_flows_found), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
                             }
                         } else {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
-                                contentPadding = PaddingValues(bottom = 24.dp)
+                                contentPadding = PaddingValues(bottom = ToolkitTheme.spacing.large)
                             ) {
                                 items(filteredFlows) { flow ->
                                     val isInstalled = viewModel.isFlowInstalled(flow.name)
@@ -574,16 +572,16 @@ fun PluginRepoView(
                                         ) {
                                             // Flow Icon
                                             Surface(
-                                                shape = RoundedCornerShape(12.dp),
+                                                shape = MaterialTheme.shapes.medium,
                                                 color = MaterialTheme.colorScheme.surfaceVariant,
-                                                modifier = Modifier.size(54.dp)
+                                                modifier = Modifier.size(ToolkitTheme.dimensions.listIconSize)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         Icons.Default.PlayCircle,
                                                         contentDescription = null,
                                                         tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(28.dp)
+                                                        modifier = Modifier.size(ToolkitTheme.dimensions.listIconContentSize)
                                                     )
                                                 }
                                             }
@@ -605,8 +603,8 @@ fun PluginRepoView(
                                                             shape = MaterialTheme.shapes.extraSmall
                                                         ) {
                                                             Text(
-                                                                "Wrong Signature",
-                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                                stringResource(Res.string.repo_wrong_signature),
+                                                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = ToolkitTheme.spacing.badgeVertical),
                                                                 style = MaterialTheme.typography.labelSmall,
                                                                 color = MaterialTheme.colorScheme.onErrorContainer
                                                             )
@@ -614,7 +612,7 @@ fun PluginRepoView(
                                                     }
                                                 }
                                                 Text(
-                                                    text = "FileName: ${flow.fileName}  •  Version: ${flow.version}",
+                                                    text = stringResource(Res.string.repo_flow_filename_version_format, flow.fileName, flow.version),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.outline
                                                 )
@@ -625,7 +623,7 @@ fun PluginRepoView(
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         maxLines = 2,
                                                         overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier.padding(top = 4.dp)
+                                                        modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
                                                     )
                                                 }
                                             }
@@ -639,9 +637,9 @@ fun PluginRepoView(
                                                         onClick = { viewModel.installFlow(flow) },
                                                         shape = MaterialTheme.shapes.medium
                                                     ) {
-                                                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Text("Update to v${flow.version}")
+                                                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall))
+                                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                                        Text(stringResource(Res.string.repo_action_update_version, flow.version))
                                                     }
                                                 } else {
                                                     Surface(
@@ -649,8 +647,8 @@ fun PluginRepoView(
                                                         shape = MaterialTheme.shapes.medium
                                                     ) {
                                                         Text(
-                                                            "Installed (v$installedVersion)",
-                                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                            stringResource(Res.string.repo_plugin_installed_version_format, installedVersion ?: ""),
+                                                            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.badgeHorizontal),
                                                             style = MaterialTheme.typography.labelMedium,
                                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                             fontWeight = FontWeight.Bold
@@ -662,7 +660,7 @@ fun PluginRepoView(
                                                     onClick = { viewModel.installFlow(flow) },
                                                     shape = MaterialTheme.shapes.medium
                                                 ) {
-                                                    Text("Install")
+                                                    Text(stringResource(Res.string.action_install))
                                                 }
                                             }
                                         }
