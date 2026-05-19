@@ -1,26 +1,27 @@
 package org.wip.plugintoolkit.features.settings.definitions
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Timer
-import org.wip.plugintoolkit.features.settings.model.*
-import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
-import org.wip.plugintoolkit.features.settings.utils.*
-import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
-import plugintoolkit.composeapp.generated.resources.*
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import org.wip.plugintoolkit.core.notification.NotificationType
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.NotificationHistorySettings
+import org.wip.plugintoolkit.features.settings.model.NotificationSettings
+import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
+import org.wip.plugintoolkit.features.settings.utils.SettingText
+import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
+import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 
 fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewModel) {
     nav(SettingNavKey.SystemSettings) {

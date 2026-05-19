@@ -2,14 +2,16 @@ package org.wip.plugintoolkit.api.processor.generators
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
-import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_CAPABILITY
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PARAMETER_CONSTRAINTS
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PARAMETER_METADATA
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ACTION
@@ -19,7 +21,8 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_REQUIREMENTS
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_SETTING_METADATA
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.INFRASTRUCTURE_TYPES
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_GET_DATA_TYPE
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object ManifestGenerator {
@@ -31,6 +34,7 @@ object ManifestGenerator {
         description: String,
         minMemoryMb: Int,
         minExecutionTimeMs: Int,
+        supportedOs: List<org.wip.plugintoolkit.api.OS>,
         functions: List<KSFunctionDeclaration>,
         settingsProperties: List<KSPropertyDeclaration>,
         actions: List<KSFunctionDeclaration>,
@@ -103,8 +107,34 @@ object ManifestGenerator {
             capabilitiesCode.unindent()
             capabilitiesCode.add("),\n")
             
-            val returnType = func.returnType?.resolve()?.toTypeName() ?: UNIT
-            capabilitiesCode.add("returnType = %M<%T>()\n", MN_GET_DATA_TYPE, returnType)
+            val returnTypeKS = func.returnType?.resolve()
+            val returnDataType = if (returnTypeKS != null) org.wip.plugintoolkit.api.processor.GeneratorUtils.mapKSTypeToDataType(returnTypeKS) else org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.UNIT)
+            val returnDataTypeCode = org.wip.plugintoolkit.api.processor.GeneratorUtils.generateDataTypeCode(returnDataType)
+            
+            val outputs = org.wip.plugintoolkit.api.processor.GeneratorUtils.getCapabilityOutputs(func)
+            val outputsCode = CodeBlock.builder()
+            outputsCode.add("listOf(\n")
+            outputsCode.indent()
+            outputs.forEachIndexed { oIndex, out ->
+                val semTypeStr = if (out.semanticType != null) "\"${out.semanticType}\"" else "null"
+                outputsCode.add("%T(name = %S, description = %S, type = %L, semanticType = %L)", 
+                    ClassName("org.wip.plugintoolkit.api", "OutputMetadata"),
+                    out.name,
+                    out.description,
+                    org.wip.plugintoolkit.api.processor.GeneratorUtils.generateDataTypeCode(out.type),
+                    semTypeStr
+                )
+                if (oIndex < outputs.size - 1) outputsCode.add(",\n") else outputsCode.add("\n")
+            }
+            outputsCode.unindent()
+            outputsCode.add(")")
+
+            val semTypeVal = if (outputs.size == 1) outputs.first().semanticType else null
+            val semTypeString = if (semTypeVal != null) "\"$semTypeVal\"" else "null"
+
+            capabilitiesCode.add("returnType = %L,\n", returnDataTypeCode)
+            capabilitiesCode.add("semanticType = %L,\n", semTypeString)
+            capabilitiesCode.add("outputs = %L\n", outputsCode.build())
             capabilitiesCode.unindent()
             if (index < functions.size - 1) capabilitiesCode.add("),\n") else capabilitiesCode.add(")\n")
         }
@@ -148,6 +178,14 @@ object ManifestGenerator {
         actionsCode.unindent()
         actionsCode.add(")\n")
 
+        val supportedOsCode = CodeBlock.builder()
+        supportedOsCode.add("listOf(")
+        supportedOs.forEachIndexed { sIndex, os ->
+            supportedOsCode.add("%T.%L", ClassName("org.wip.plugintoolkit.api", "OS"), os.name)
+            if (sIndex < supportedOs.size - 1) supportedOsCode.add(", ")
+        }
+        supportedOsCode.add(")")
+
         manifestType.addProperty(
             PropertySpec.builder("manifest", CN_PLUGIN_MANIFEST)
                 .initializer(
@@ -155,7 +193,7 @@ object ManifestGenerator {
                         .add("%T(\n", CN_PLUGIN_MANIFEST)
                         .indent()
                         .add("manifestVersion = %S,\n", "1.0")
-                        .add("plugin = %T(id = %S, name = %S, version = %S, description = %S),\n", CN_PLUGIN_INFO, id, name, version, description)
+                        .add("plugin = %T(id = %S, name = %S, version = %S, description = %S, supportedOs = %L),\n", CN_PLUGIN_INFO, id, name, version, description, supportedOsCode.build())
                         .add("requirements = %T(minMemoryMb = %L, minExecutionTimeMs = %L),\n", CN_REQUIREMENTS, minMemoryMb, minExecutionTimeMs)
                         .add("capabilities = ")
                         .add(capabilitiesCode.build())

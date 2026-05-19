@@ -38,8 +38,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 
 @Composable
 fun SettingsItem(

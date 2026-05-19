@@ -5,9 +5,11 @@ import androidx.compose.material.icons.filled.AvTimer
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlaylistAddCheck
 import androidx.compose.material.icons.filled.Save
-import org.wip.plugintoolkit.features.settings.model.*
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.JobSettings
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
-import org.wip.plugintoolkit.features.settings.utils.*
+import org.wip.plugintoolkit.features.settings.utils.SettingText
+import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
 
 fun SettingsRegistryBuilder.jobDefinitions() {
     nav(SettingNavKey.SystemSettings) {

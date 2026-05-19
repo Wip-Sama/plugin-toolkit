@@ -274,6 +274,9 @@
     <string name="flow_editor_duplicate_error">A flow named \'%1$s\' already exists.</string>
     <string name="flow_editor_placeholder_title">Ghost Preview</string>
     <string name="flow_editor_read_only">READ-ONLY</string>
+    <string name="flow_readonly_reason_running">Running</string>
+    <string name="flow_readonly_reason_used_in_other">Used in other flows</string>
+    <string name="flow_editor_read_only_reason">READ-ONLY (%1$s)</string>
     <string name="flow_editor_no_flow_selected">No flow selected</string>
     <string name="flow_editor_flow_selected">Flow Selected</string>
     <string name="flow_editor_save_changes">Save Changes</string>

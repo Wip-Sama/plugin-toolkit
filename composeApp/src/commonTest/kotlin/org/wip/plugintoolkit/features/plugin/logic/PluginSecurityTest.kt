@@ -1,15 +1,15 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
+import java.io.File
+import java.io.FileOutputStream
 import java.security.KeyPairGenerator
 import java.security.Signature
 import java.util.Base64
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import java.io.File
-import java.io.FileOutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 class PluginSecurityTest {
 

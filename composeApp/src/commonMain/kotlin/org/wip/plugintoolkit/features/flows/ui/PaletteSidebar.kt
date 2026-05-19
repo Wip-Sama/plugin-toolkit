@@ -3,17 +3,38 @@ package org.wip.plugintoolkit.features.flows.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -23,12 +44,15 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
-import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
-import org.wip.plugintoolkit.api.PluginEntry
-import org.jetbrains.compose.resources.stringResource
-import plugintoolkit.composeapp.generated.resources.*
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.palette_search_placeholder
+import plugintoolkit.composeapp.generated.resources.palette_tab_flows
+import plugintoolkit.composeapp.generated.resources.palette_tab_plugins
+import plugintoolkit.composeapp.generated.resources.palette_tab_system
 
 sealed class PaletteNode {
     data class Capability(val pluginInfo: org.wip.plugintoolkit.api.PluginInfo, val capability: org.wip.plugintoolkit.api.Capability) : PaletteNode()
@@ -226,6 +250,17 @@ private fun SystemPalette(
                 onDragEnd = onDragEnd,
                 onClick = { onClick(flowOutput) }
             )
+
+            val errorNode = PaletteNode.System("Error")
+            PaletteItem(
+                text = "Error",
+                color = MaterialTheme.colorScheme.error,
+                rootLayoutCoordinates = rootLayoutCoordinates,
+                onDragStart = { pos, grabOffset -> onDragStart(errorNode, pos, grabOffset) },
+                onDrag = onDrag,
+                onDragEnd = onDragEnd,
+                onClick = { onClick(errorNode) }
+            )
         }
         
         Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
@@ -237,7 +272,7 @@ private fun SystemPalette(
                 modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
             )
             
-            listOf("Save", "Load", "Log", "Delay", "Convert", "Merger").forEach { action ->
+            listOf("Save", "Load", "Log", "Delay", "Convert", "Merger", "Conditional").forEach { action ->
                 val systemNode = PaletteNode.System(action)
                 PaletteItem(
                     text = action,
@@ -363,7 +398,13 @@ private fun PaletteItem(
 fun PaletteItemPreview(node: PaletteNode) {
     val (color, onColor) = when (node) {
         is PaletteNode.Capability -> Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
-        is PaletteNode.System -> Pair(ToolkitTheme.colors.success, Color.White)
+        is PaletteNode.System -> {
+            if (node.action.lowercase() == "error") {
+                Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
+            } else {
+                Pair(ToolkitTheme.colors.success, Color.White)
+            }
+        }
         is PaletteNode.FlowInput -> Pair(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary)
         is PaletteNode.FlowOutput -> Pair(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary)
         is PaletteNode.SubFlow -> Pair(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.onSecondary)

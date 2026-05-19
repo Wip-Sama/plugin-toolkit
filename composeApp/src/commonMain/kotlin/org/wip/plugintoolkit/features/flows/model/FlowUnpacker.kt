@@ -1,7 +1,5 @@
 package org.wip.plugintoolkit.features.flows.model
 
-import org.wip.plugintoolkit.features.flows.model.*
-
 object FlowUnpacker {
     fun hasCycle(connections: List<Connection>): Boolean {
         val adjacencyList = connections.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }

@@ -1,14 +1,14 @@
 package org.wip.plugintoolkit.features.job.logic
 
 import kotlinx.coroutines.test.runTest
-import org.wip.plugintoolkit.features.job.logic.JobManager
-import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
-import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
-import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
-import org.wip.plugintoolkit.features.job.model.JobStatus
-import kotlin.test.*
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class JobManagerTest {
 

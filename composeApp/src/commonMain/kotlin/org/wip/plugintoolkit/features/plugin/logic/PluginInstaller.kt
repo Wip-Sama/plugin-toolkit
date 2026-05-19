@@ -5,19 +5,19 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.readBytes
-import io.ktor.http.HttpHeaders
 import io.ktor.utils.io.readAvailable
 import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.utils.FileSystem
+import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.VersionUtils
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
-import org.wip.plugintoolkit.features.job.logic.JobManager
-import org.wip.plugintoolkit.features.job.model.BackgroundJob
-import org.wip.plugintoolkit.features.job.model.JobType
 import kotlin.time.Clock
 
 /**
@@ -279,6 +279,20 @@ class PluginInstaller(
         if (VersionUtils.compare(target, min) < 0) {
             return false to "Plugin is obsolete (targeted for $target, min supported $min)"
         }
+
+        val supportedOs = manifest.plugin.supportedOs
+        if (supportedOs.isNotEmpty()) {
+            val currentOs = when {
+                PlatformUtils.isWindows -> org.wip.plugintoolkit.api.OS.WINDOWS
+                PlatformUtils.isLinux -> org.wip.plugintoolkit.api.OS.LINUX
+                PlatformUtils.isMac -> org.wip.plugintoolkit.api.OS.MACOS
+                else -> null
+            }
+            if (currentOs == null || currentOs !in supportedOs) {
+                return false to "Plugin does not support the current operating system (supported: ${supportedOs.joinToString { it.name }})"
+            }
+        }
+
         return true to null
     }
 

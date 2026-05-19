@@ -7,10 +7,24 @@ import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Schedule
-import org.wip.plugintoolkit.features.settings.model.*
+import org.wip.plugintoolkit.features.settings.model.AppLanguage
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.AppTheme
+import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
+import org.wip.plugintoolkit.features.settings.model.GeneralSettings
+import org.wip.plugintoolkit.features.settings.model.LocalizationSettings
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
-import org.wip.plugintoolkit.features.settings.utils.*
-import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.features.settings.utils.SettingText
+import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
+import org.wip.plugintoolkit.features.settings.utils.TimezoneUtils
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.setting_accent_color
+import plugintoolkit.composeapp.generated.resources.setting_language
+import plugintoolkit.composeapp.generated.resources.setting_scaling
+import plugintoolkit.composeapp.generated.resources.setting_theme
+import plugintoolkit.composeapp.generated.resources.setting_timezone
+import plugintoolkit.composeapp.generated.resources.setting_use_system_language
+import plugintoolkit.composeapp.generated.resources.setting_use_system_language_subtitle
 
 fun SettingsRegistryBuilder.appearanceDefinitions() {
     nav(SettingNavKey.Appearance) {

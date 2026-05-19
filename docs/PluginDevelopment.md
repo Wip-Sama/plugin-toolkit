@@ -63,7 +63,49 @@ suspend fun processMyData(
 ```
 Each capability can define multiple parameters using the `@CapabilityParam` annotation.
 The ParamType is inferred from the type and will use JSON to parse and transmit the object to the plugin.     
-While useing suspend function if a good practice is not obligatory
+While using a suspend function is good practice, it is not obligatory.
+
+#### Customizing Capability Outputs
+
+By default, any capability returning a value (except `Unit`) will expose a single output port named `"result"`. You can customize this behavior using the `@CapabilityOutput` annotation.
+
+##### 1. Single Output Port Customization
+Annotate the capability function itself with `@CapabilityOutput` to specify a custom name, description, and semantic type for its return value:
+
+```kotlin
+@Capability(name = "Format Sum", description = "Returns the sum formatted as text")
+@CapabilityOutput(name = "formattedResult", description = "The sum formatted as currency", semanticType = "text/plain")
+fun formattedSumCapability(
+    @CapabilityParam(description = "Values to sum") values: List<Double>
+): String {
+    return "$${values.sum()}"
+}
+```
+
+##### 2. Multiple Output Ports (Multiple Return Pattern)
+If your capability needs to return multiple output values, define a custom `@Serializable` `data class` where one or more properties are annotated with `@CapabilityOutput`. The toolkit's KSP processor will automatically generate individual output ports for each property in the class:
+
+```kotlin
+@Serializable
+data class DivisionResult(
+    @CapabilityOutput(name = "quotient", description = "The quotient of the division")
+    val quotient: Int,
+    @CapabilityOutput(name = "remainder", description = "The remainder of the division")
+    val remainder: Int
+)
+
+@Capability(name = "Integer Divide", description = "Divides two integers and returns the quotient and remainder")
+fun integerDivideCapability(
+    @CapabilityParam(description = "Dividend") a: Int,
+    @CapabilityParam(description = "Divisor") b: Int
+): DivisionResult {
+    if (b == 0) throw ArithmeticException("Division by zero")
+    return DivisionResult(a / b, a % b)
+}
+```
+
+- **Property Port Names**: If a property is not explicitly annotated with `@CapabilityOutput`, it will still become an output port named after the property name with an empty description.
+- **Type Mapping**: The output port data types will be automatically inferred from the property types in the Kotlin class.
 
 ### 3. Changelog Management
 

@@ -1,7 +1,14 @@
 <?xml version="1.0" ?>
 <!DOCTYPE svg  PUBLIC '-//W3C//DTD SVG 1.1//EN'  'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'>
 <!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg fill="#000000" width="800px" height="800px" viewBox="0 0 129 129" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:serif="http://www.serif.com/" xmlns:xlink="http://www.w3.org/1999/xlink">
+<svg fill="#000000"
+    width="800px"
+    height="800px"
+    viewBox="0 0 129 129"
+    style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+    version="1.1"
+    xml:space="preserve"
+    xmlns="http://www.w3.org/2000/svg">
 <g transform="matrix(1,0,0,1,-630,-169)">
 <g id="toolbox" transform="matrix(1,0,0,1,630.835,169.583)">
 <rect height="128" style="fill:none;" width="128" x="0" y="0"/>

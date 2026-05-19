@@ -44,8 +44,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.api.Release
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.MarkdownText
 
 enum class FilterLevel {

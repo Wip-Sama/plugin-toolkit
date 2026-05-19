@@ -7,11 +7,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.repository.logic.AddRepoResult
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
@@ -21,16 +25,10 @@ import plugintoolkit.composeapp.generated.resources.repo_add_error
 import plugintoolkit.composeapp.generated.resources.repo_add_success
 import plugintoolkit.composeapp.generated.resources.repo_all_refreshed
 import plugintoolkit.composeapp.generated.resources.repo_already_added
-import plugintoolkit.composeapp.generated.resources.repo_install_failed
-import plugintoolkit.composeapp.generated.resources.repo_plugin_installed
+import plugintoolkit.composeapp.generated.resources.repo_link_copied
 import plugintoolkit.composeapp.generated.resources.repo_refreshed
 import plugintoolkit.composeapp.generated.resources.repo_removed
 import plugintoolkit.composeapp.generated.resources.repo_source_updated
-import plugintoolkit.composeapp.generated.resources.repo_link_copied
-import kotlinx.coroutines.flow.combine
-import org.wip.plugintoolkit.features.job.logic.JobManager
-import org.wip.plugintoolkit.features.job.model.JobStatus
-import org.wip.plugintoolkit.features.job.model.JobType
 
 class PluginRepoViewModel(
     private val repoManager: RepoManager,

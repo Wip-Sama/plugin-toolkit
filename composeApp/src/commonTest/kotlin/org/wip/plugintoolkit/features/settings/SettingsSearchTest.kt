@@ -9,7 +9,6 @@ import org.wip.plugintoolkit.features.settings.utils.SettingsRegistry
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class SettingsSearchTest {
 

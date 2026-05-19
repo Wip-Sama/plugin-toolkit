@@ -1,25 +1,21 @@
 package org.wip.plugintoolkit.features.flows
 
 import androidx.compose.ui.geometry.Offset
-import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PrimitiveType
-import org.wip.plugintoolkit.features.flows.model.Connection
-import org.wip.plugintoolkit.features.flows.model.Node
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.writeString
+import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.delay
-import org.wip.plugintoolkit.features.flows.model.Flow
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.files.Path
-import kotlinx.io.buffered
-import kotlinx.io.writeString
 
 class MockSettingsPersistence : SettingsPersistence {
     override fun load(): AppSettings = AppSettings()
@@ -184,5 +180,77 @@ class FlowCycleTest {
         // 7. Try to add Flow C to itself as a subflow (self-dependency)
         viewModelC.onEvent(FlowEvent.AddSubFlowNode("Flow C", Offset(100f, 100f)))
         assertEquals(initialNodesCount, viewModelC.state.value.flow.nodes.size, "Should reject self-referential subflow addition")
+    }
+
+    @Test
+    fun testReadOnlyStateReasons() = runBlocking {
+        val appDataDir = "build/tmp/test_flows"
+        val flowsDir = Path("$appDataDir/flows")
+        
+        // Clean up or ensure directory exists
+        if (SystemFileSystem.exists(flowsDir)) {
+            SystemFileSystem.list(flowsDir).forEach { SystemFileSystem.delete(it) }
+        } else {
+            SystemFileSystem.createDirectories(flowsDir)
+        }
+
+        // Create Flow A and Flow B
+        val flowA = Flow("Flow A")
+        val flowB = Flow("Flow B")
+
+        val json = kotlinx.serialization.json.Json { prettyPrint = true }
+        
+        // Write Flow B to file so it can be loaded
+        SystemFileSystem.sink(Path("$appDataDir/flows/Flow_B.json")).buffered().use {
+            it.writeString(json.encodeToString(Flow.serializer(), flowB))
+        }
+        // Write Flow A initially so it exists
+        SystemFileSystem.sink(Path("$appDataDir/flows/Flow_A.json")).buffered().use {
+            it.writeString(json.encodeToString(Flow.serializer(), flowA))
+        }
+
+        // 1. Load Flow A and add Flow B as a subflow
+        val viewModelA = FlowEditorViewModel(
+            initialFlowName = "Flow A",
+            settingsPersistence = MockSettingsPersistence(),
+            notificationService = null
+        ).apply { bypassReadOnlyForTesting = true }
+
+        var loadedA = false
+        for (i in 1..50) {
+            if (viewModelA.state.value.flows.size >= 2) {
+                loadedA = true
+                break
+            }
+            delay(10)
+        }
+        assertTrue(loadedA, "Flows failed to load in Flow A editor")
+        
+        viewModelA.onEvent(FlowEvent.AddSubFlowNode("Flow B", Offset(100f, 100f)))
+        viewModelA.onEvent(FlowEvent.Save)
+        delay(50) // Wait for save to disk to finish
+
+        // 2. Load Flow B without bypassing read-only
+        val viewModelB = FlowEditorViewModel(
+            initialFlowName = "Flow B",
+            settingsPersistence = MockSettingsPersistence(),
+            notificationService = null
+        )
+
+        var loadedB = false
+        for (i in 1..50) {
+            if (viewModelB.state.value.flows.size >= 2) {
+                loadedB = true
+                break
+            }
+            delay(10)
+        }
+        assertTrue(loadedB, "Flows failed to load in Flow B editor")
+
+        viewModelB.updateReadOnlyState()
+
+        val stateB = viewModelB.state.value
+        assertTrue(stateB.isReadOnly, "Flow B should be read-only because it is used in Flow A")
+        assertTrue(stateB.readOnlyReasons.contains(org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason.UsedInOtherFlows), "Reason should be UsedInOtherFlows")
     }
 }

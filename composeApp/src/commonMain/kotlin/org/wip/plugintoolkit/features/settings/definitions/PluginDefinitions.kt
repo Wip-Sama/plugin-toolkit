@@ -2,11 +2,13 @@ package org.wip.plugintoolkit.features.settings.definitions
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cable
-import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.stringResource
-import org.wip.plugintoolkit.features.settings.model.*
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.ExtensionSettings
+import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
-import org.wip.plugintoolkit.features.settings.utils.*
+import org.wip.plugintoolkit.features.settings.utils.SettingText
+import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.setting_plugin_unplug_behavior_block
 import plugintoolkit.composeapp.generated.resources.setting_plugin_unplug_behavior_stop

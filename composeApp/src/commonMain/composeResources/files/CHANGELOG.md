@@ -5,6 +5,7 @@ Changes:
 Fixed:
 	- Updater on windows now launches with correct path when applicable (.jar is not updatable)
   - The update page now correctly displays the change description
+  - Quick links now works
 Added:
   - Plugin can now define which os they support (linux, windows, macos)
   - Plugin can now define multiple return values

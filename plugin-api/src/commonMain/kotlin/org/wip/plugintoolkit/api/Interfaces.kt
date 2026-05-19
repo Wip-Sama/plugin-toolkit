@@ -1,9 +1,9 @@
 package org.wip.plugintoolkit.api
 
-import org.koin.core.module.Module
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonElement
+import org.koin.core.module.Module
 
 /**
  * The root interface for any plugin.

@@ -3,7 +3,6 @@ package org.wip.plugintoolkit.features.navigation.viewmodel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.PendingActions
@@ -17,14 +16,10 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.nav_board
 import plugintoolkit.composeapp.generated.resources.nav_jobs
 import plugintoolkit.composeapp.generated.resources.nav_main
-import plugintoolkit.composeapp.generated.resources.nav_plugins
-import plugintoolkit.composeapp.generated.resources.section_direct_execution
 import plugintoolkit.composeapp.generated.resources.section_flows
 import plugintoolkit.composeapp.generated.resources.section_plugins
-import plugintoolkit.composeapp.generated.resources.section_plugins_repositories
 import plugintoolkit.composeapp.generated.resources.settings
 
 class AppViewModel(

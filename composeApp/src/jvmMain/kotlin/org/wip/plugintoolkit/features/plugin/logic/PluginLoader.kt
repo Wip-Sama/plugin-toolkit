@@ -3,11 +3,10 @@ package org.wip.plugintoolkit.features.plugin.logic
 import co.touchlab.kermit.Logger
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import org.koin.core.Koin
+import kotlinx.serialization.json.JsonElement
 import org.koin.dsl.koinApplication
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginModuleProvider
-import kotlinx.serialization.json.JsonElement
 import java.io.File
 import java.net.URLClassLoader
 import java.util.ServiceLoader

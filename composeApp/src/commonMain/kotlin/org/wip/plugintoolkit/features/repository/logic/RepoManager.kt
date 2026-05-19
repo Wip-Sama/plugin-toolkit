@@ -7,21 +7,21 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.notification.NotificationEvent
+import org.wip.plugintoolkit.features.plugin.logic.PluginSecurity
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.model.RepoIndex
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
-import org.wip.plugintoolkit.api.PluginManifest
-import org.wip.plugintoolkit.features.plugin.logic.PluginSecurity
 
 class RepoManager(
     private val settingsRepository: SettingsRepository,

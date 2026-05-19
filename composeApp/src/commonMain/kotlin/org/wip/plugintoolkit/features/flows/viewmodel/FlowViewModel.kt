@@ -1,19 +1,16 @@
 package org.wip.plugintoolkit.features.flows.viewmodel
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -25,26 +22,33 @@ import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import org.koin.mp.KoinPlatform.getKoin
 import org.wip.plugintoolkit.api.Capability
-import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.notification.NotificationType
-import org.wip.plugintoolkit.features.flows.model.*
-import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
-import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
-import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
-import org.wip.plugintoolkit.api.PluginEntry
-import kotlin.time.Clock
+import org.wip.plugintoolkit.features.flows.model.Connection
+import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.FlowUnpacker
+import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import org.wip.plugintoolkit.core.utils.PlatformUtils
+import kotlin.time.Clock
+
+enum class ConflictResolutionAction {
+    RENAME, KEEP_LOCAL, KEEP_IMPORTED
+}
 
 data class FlowState(
     val flows: List<Flow> = emptyList(),
-    val selectedFlowId: String? = null
+    val selectedFlowId: String? = null,
+    val importConflicts: List<String> = emptyList(),
+    val pendingImportedFlows: List<Flow> = emptyList()
 ) {
     val currentFlow: Flow? get() = flows.find { it.name == selectedFlowId } ?: flows.firstOrNull()
 }
@@ -86,6 +90,12 @@ sealed interface FlowEvent {
     data class SelectNodes(val ids: Set<Long>) : FlowEvent
     data object ClearSelection : FlowEvent
     data object DeleteSelectedNodes : FlowEvent
+
+    // Import/Export Flow
+    data object TriggerImport : FlowEvent
+    data class ResolveImportConflicts(val resolutions: Map<String, ConflictResolutionAction>) : FlowEvent
+    data object CancelImport : FlowEvent
+    data class ExportFlow(val flowName: String) : FlowEvent
 }
 
 class FlowViewModel(
@@ -202,8 +212,240 @@ class FlowViewModel(
             is FlowEvent.CreateFlow -> handleCreateFlow(event.name)
             is FlowEvent.RenameFlow -> handleRenameFlow(event.oldName, event.newName)
             is FlowEvent.DeleteFlow -> handleDeleteFlow(event.name)
+            is FlowEvent.TriggerImport -> handleTriggerImport()
+            is FlowEvent.ResolveImportConflicts -> handleResolveImportConflicts(event.resolutions)
+            is FlowEvent.CancelImport -> handleCancelImport()
+            is FlowEvent.ExportFlow -> handleExportFlow(event.flowName)
             else -> {}
         }
+    }
+
+    private fun handleExportFlow(flowName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val flow = _state.value.flows.find { it.name == flowName } ?: return@launch
+                
+                // Get all transitively dependent subflows
+                val dependencies = getTransitiveSubflowDependencies(flow, _state.value.flows)
+                val allExportedFlows = listOf(flow) + dependencies
+                
+                // Serialize each flow to JSON
+                val entries = allExportedFlows.associate { it.name + ".json" to json.encodeToString(Flow.serializer(), it) }
+                
+                // Zip entries
+                val zipBytes = PlatformUtils.zipEntries(entries)
+                
+                // Prompt user to save the file
+                withContext(Dispatchers.Main) {
+                    val savedPath = PlatformUtils.saveFile(
+                        baseName = flow.name,
+                        extension = "zip",
+                        bytes = zipBytes
+                    )
+                    if (savedPath != null) {
+                        resolvedNotificationService?.toast("Flow exported successfully to $savedPath")
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to export flow: $flowName" }
+                withContext(Dispatchers.Main) {
+                    resolvedNotificationService?.toast("Failed to export flow: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun getTransitiveSubflowDependencies(flow: Flow, allFlows: List<Flow>): List<Flow> {
+        val dependencies = mutableSetOf<Flow>()
+        val toVisit = mutableListOf(flow)
+        val visited = mutableSetOf<String>()
+        
+        while (toVisit.isNotEmpty()) {
+            val current = toVisit.removeAt(0)
+            if (current.name in visited) continue
+            visited.add(current.name)
+            if (current != flow) {
+                dependencies.add(current)
+            }
+            
+            val subflowNames = current.nodes
+                .filterIsInstance<Node.SubFlowNode>()
+                .map { it.flowName }
+                
+            subflowNames.forEach { subflowName ->
+                val depFlow = allFlows.find { it.name == subflowName }
+                if (depFlow != null && depFlow.name !in visited) {
+                    toVisit.add(depFlow)
+                }
+            }
+        }
+        return dependencies.toList()
+    }
+
+    private fun handleTriggerImport() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Pick a .zip file
+                val pickedPath = PlatformUtils.pickFile(
+                    title = "Import Flow Archive",
+                    allowedExtensions = listOf("zip")
+                ) ?: return@launch
+                
+                val bytes = PlatformUtils.readBytes(pickedPath) ?: return@launch
+                val entries = PlatformUtils.unzipEntries(bytes)
+                
+                val importedFlows = mutableListOf<Flow>()
+                entries.forEach { (name, content) ->
+                    if (name.endsWith(".json")) {
+                        try {
+                            val flow = json.decodeFromString<Flow>(content)
+                            importedFlows.add(flow)
+                        } catch (e: Exception) {
+                            Logger.e(e) { "Failed to parse imported flow entry: $name" }
+                        }
+                    }
+                }
+                
+                if (importedFlows.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        resolvedNotificationService?.toast("No valid flows found in the selected archive.")
+                    }
+                    return@launch
+                }
+                
+                // Find clashes with local flow names
+                val localFlowNames = _state.value.flows.map { it.name }.toSet()
+                val conflicts = importedFlows.map { it.name }.filter { it in localFlowNames }
+                
+                if (conflicts.isEmpty()) {
+                    // No conflicts, write all directly
+                    saveImportedFlows(importedFlows)
+                    withContext(Dispatchers.Main) {
+                        resolvedNotificationService?.toast("Imported ${importedFlows.size} flow(s) successfully.")
+                    }
+                } else {
+                    // Show conflicts dialog
+                    withContext(Dispatchers.Main) {
+                        _state.update { currentState ->
+                            currentState.copy(
+                                importConflicts = conflicts,
+                                pendingImportedFlows = importedFlows
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to import flows" }
+                withContext(Dispatchers.Main) {
+                    resolvedNotificationService?.toast("Failed to import flows: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private suspend fun saveImportedFlows(flows: List<Flow>) {
+        val appDataDir = resolvedSettingsPersistence.getSettingsDir()
+        flows.forEach { flow ->
+            val targetFile = getFlowPath(appDataDir, flow.name)
+            val flowContent = json.encodeToString(Flow.serializer(), flow)
+            SystemFileSystem.sink(targetFile).buffered().use { it.writeString(flowContent) }
+        }
+        reloadFlows()
+    }
+
+    private fun handleResolveImportConflicts(resolutions: Map<String, ConflictResolutionAction>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val localFlows = _state.value.flows
+                val localFlowNames = localFlows.map { it.name }.toMutableSet()
+                
+                // Start with pending imported flows
+                var importedFlows = _state.value.pendingImportedFlows.toMutableList()
+                
+                // Track renames we perform: oldName -> newName
+                val renamedFlows = mutableMapOf<String, String>()
+                
+                // Process each resolution
+                resolutions.forEach { (clashingName, action) ->
+                    val flowIndex = importedFlows.indexOfFirst { it.name == clashingName }
+                    if (flowIndex != -1) {
+                        val flow = importedFlows[flowIndex]
+                        when (action) {
+                            ConflictResolutionAction.KEEP_LOCAL -> {
+                                // Discard the imported flow
+                                importedFlows.removeAt(flowIndex)
+                            }
+                            ConflictResolutionAction.KEEP_IMPORTED -> {
+                                // Keep the imported flow as is (it will overwrite the local one)
+                                // Nothing special to do here, it will just overwrite the file
+                            }
+                            ConflictResolutionAction.RENAME -> {
+                                // Generate a unique name
+                                val existingNames = localFlowNames + importedFlows.map { it.name }.toSet()
+                                val newName = generateUniqueFlowName(flow.name, existingNames)
+                                
+                                // Update name in list
+                                importedFlows[flowIndex] = flow.copy(name = newName)
+                                renamedFlows[flow.name] = newName
+                                localFlowNames.add(newName)
+                            }
+                        }
+                    }
+                }
+                
+                // If we renamed any flows, we MUST update any subflow nodes referencing the old names
+                if (renamedFlows.isNotEmpty()) {
+                    importedFlows = importedFlows.map { flow ->
+                        val updatedNodes = flow.nodes.map { node ->
+                            if (node is Node.SubFlowNode && renamedFlows.containsKey(node.flowName)) {
+                                node.copy(flowName = renamedFlows[node.flowName]!!)
+                            } else {
+                                node
+                            }
+                        }
+                        flow.copy(nodes = updatedNodes)
+                    }.toMutableList()
+                }
+                
+                // Save remaining imported flows
+                saveImportedFlows(importedFlows)
+                
+                // Clear conflict states
+                withContext(Dispatchers.Main) {
+                    _state.update { currentState ->
+                        currentState.copy(
+                            importConflicts = emptyList(),
+                            pendingImportedFlows = emptyList()
+                        )
+                    }
+                    resolvedNotificationService?.toast("Imported flow(s) resolved and saved.")
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to resolve import conflicts" }
+                withContext(Dispatchers.Main) {
+                    resolvedNotificationService?.toast("Failed to resolve conflicts: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun handleCancelImport() {
+        _state.update { currentState ->
+            currentState.copy(
+                importConflicts = emptyList(),
+                pendingImportedFlows = emptyList()
+            )
+        }
+    }
+
+    private fun generateUniqueFlowName(baseName: String, existingNames: Set<String>): String {
+        var candidate = "$baseName (Imported)"
+        var counter = 2
+        while (candidate in existingNames) {
+            candidate = "$baseName (Imported $counter)"
+            counter++
+        }
+        return candidate
     }
 
     private fun handleCreateFlow(name: String) {
@@ -323,7 +565,8 @@ class FlowViewModel(
                     pluginId = "system",
                     capabilityName = flow.name,
                     parameters = params,
-                    keepResult = saveResults
+                    keepResult = saveResults,
+                    isPausable = true
                 )
 
                 jobManager.enqueueJob(job)

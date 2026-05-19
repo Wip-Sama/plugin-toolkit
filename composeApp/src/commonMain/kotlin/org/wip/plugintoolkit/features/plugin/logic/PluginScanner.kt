@@ -35,6 +35,20 @@ class PluginScanner(
         if (VersionUtils.compare(target, min) < 0) {
             return false to "Plugin is obsolete (targeted for $target, min supported $min)"
         }
+
+        val supportedOs = manifest.plugin.supportedOs
+        if (supportedOs.isNotEmpty()) {
+            val currentOs = when {
+                PlatformUtils.isWindows -> org.wip.plugintoolkit.api.OS.WINDOWS
+                PlatformUtils.isLinux -> org.wip.plugintoolkit.api.OS.LINUX
+                PlatformUtils.isMac -> org.wip.plugintoolkit.api.OS.MACOS
+                else -> null
+            }
+            if (currentOs == null || currentOs !in supportedOs) {
+                return false to "Plugin does not support the current operating system (supported: ${supportedOs.joinToString { it.name }})"
+            }
+        }
+
         return true to null
     }
 

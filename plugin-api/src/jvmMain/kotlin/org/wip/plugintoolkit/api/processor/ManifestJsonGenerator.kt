@@ -1,10 +1,25 @@
 package org.wip.plugintoolkit.api.processor
 
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.ksp.toTypeName
 import kotlinx.serialization.json.Json
-import org.wip.plugintoolkit.api.*
+import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.Changelog
+import org.wip.plugintoolkit.api.OS
+import org.wip.plugintoolkit.api.OutputMetadata
+import org.wip.plugintoolkit.api.ParameterConstraints
+import org.wip.plugintoolkit.api.ParameterMetadata
+import org.wip.plugintoolkit.api.PluginAction
+import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.PluginFileSystem
+import org.wip.plugintoolkit.api.PluginInfo
+import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.ProgressReporter
+import org.wip.plugintoolkit.api.Requirements
+import org.wip.plugintoolkit.api.SettingMetadata
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
@@ -23,6 +38,7 @@ object ManifestJsonGenerator {
         description: String,
         minMemoryMb: Int,
         minExecutionTimeMs: Int,
+        supportedOs: List<OS>,
         functions: List<KSFunctionDeclaration>,
         settingsProperties: List<KSPropertyDeclaration>,
         actions: List<KSFunctionDeclaration>,
@@ -92,11 +108,22 @@ object ManifestJsonGenerator {
                 param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }
             }
 
+            val outputs = GeneratorUtils.getCapabilityOutputs(func).map { out ->
+                OutputMetadata(
+                    name = out.name,
+                    description = out.description,
+                    type = out.type,
+                    semanticType = out.semanticType
+                )
+            }
+
             Capability(
                 name = capName,
                 description = capDesc,
                 parameters = params.ifEmpty { null },
                 returnType = GeneratorUtils.mapKSTypeToDataType(func.returnType!!.resolve()),
+                semanticType = if (outputs.size == 1) outputs.first().semanticType else null,
+                outputs = outputs.ifEmpty { null },
                 isPausable = supportsPause || hasResumeState,
                 isCancellable = supportsCancel
             )
@@ -145,7 +172,8 @@ object ManifestJsonGenerator {
                 id = id,
                 name = name,
                 version = version,
-                description = description
+                description = description,
+                supportedOs = supportedOs
             ),
             requirements = Requirements(
                 minMemoryMb = minMemoryMb,

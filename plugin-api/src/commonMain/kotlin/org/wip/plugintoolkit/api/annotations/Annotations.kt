@@ -1,19 +1,7 @@
 package org.wip.plugintoolkit.api.annotations
 
-/**
- * Marks a class as the main entry point for a plugin.
- *
- * A class annotated with `@PluginInfo` must also implement [org.wip.plugintoolkit.api.DataProcessor].
- * The KSP processor will generate the necessary [org.wip.plugintoolkit.api.PluginEntry] implementation and
- * ServiceLoader registration.
- *
- * @property id A unique identifier for the plugin (e.g., "my-plugin").
- * @property name A human-readable name for the plugin.
- * @property version The semantic version of the plugin.
- * @property description A brief summary of what the plugin does.
- * @property minMemoryMb The minimum amount of memory (in MB) required to run the plugin.
- * @property minExecutionTimeMs The estimated minimum execution time for a typical task.
- */
+import org.wip.plugintoolkit.api.OS
+
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 annotation class PluginInfo(
@@ -22,7 +10,21 @@ annotation class PluginInfo(
     val version: String,
     val description: String,
     val minMemoryMb: Int = 128,
-    val minExecutionTimeMs: Int = 10
+    val minExecutionTimeMs: Int = 10,
+    val supportedOs: Array<OS> = []
+)
+
+/**
+ * Provides metadata for a capability output.
+ * Can be applied to a single-return capability function or to properties of a custom data class return type.
+ */
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+@Repeatable
+annotation class CapabilityOutput(
+    val name: String = "",
+    val description: String = "",
+    val semanticType: String = ""
 )
 
 /**

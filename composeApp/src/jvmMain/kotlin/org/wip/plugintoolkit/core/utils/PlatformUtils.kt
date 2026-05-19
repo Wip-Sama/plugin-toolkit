@@ -9,8 +9,10 @@ import com.sun.jna.platform.win32.Shell32
 import com.sun.jna.platform.win32.WinUser
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.dialogs.openFileSaver
 import io.github.vinceglb.filekit.toKotlinxIoPath
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -328,6 +330,75 @@ actual object PlatformUtils {
         } catch (e: Exception) {
             Logger.e(e) { "Failed to launch installer at $path" }
         }
+    }
+
+    actual suspend fun saveFile(baseName: String, extension: String, bytes: ByteArray): String? {
+        return try {
+            val file = FileKit.openFileSaver(
+                suggestedName = baseName,
+                extension = extension
+            )
+            if (file != null) {
+                val pathStr = file.toKotlinxIoPath().toString()
+                java.io.File(pathStr).writeBytes(bytes)
+                pathStr
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to save file using FileKit" }
+            null
+        }
+    }
+
+    actual suspend fun pickFile(title: String, allowedExtensions: List<String>): String? {
+        val type = if (allowedExtensions.isEmpty()) {
+            FileKitType.File()
+        } else {
+            FileKitType.File(extensions = allowedExtensions)
+        }
+        return FileKit.openFilePicker(
+            type = type,
+            dialogSettings = FileKitDialogSettings(title = title)
+        )?.toKotlinxIoPath()?.toString()
+    }
+
+    actual fun readBytes(path: String): ByteArray? {
+        val file = java.io.File(path)
+        return if (file.exists()) file.readBytes() else null
+    }
+
+    actual fun writeBytes(path: String, bytes: ByteArray) {
+        val file = java.io.File(path)
+        file.parentFile?.mkdirs()
+        file.writeBytes(bytes)
+    }
+
+    actual fun zipEntries(entries: Map<String, String>): ByteArray {
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(bos).use { zos ->
+            entries.forEach { (name, content) ->
+                zos.putNextEntry(java.util.zip.ZipEntry(name))
+                zos.write(content.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
+            }
+        }
+        return bos.toByteArray()
+    }
+
+    actual fun unzipEntries(bytes: ByteArray): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory) {
+                    val content = zis.bufferedReader(Charsets.UTF_8).readText()
+                    result[entry.name] = content
+                }
+                entry = zis.nextEntry
+            }
+        }
+        return result
     }
 }
 

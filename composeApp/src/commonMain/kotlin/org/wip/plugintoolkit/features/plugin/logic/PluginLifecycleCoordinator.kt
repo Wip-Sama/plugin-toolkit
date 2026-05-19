@@ -2,17 +2,11 @@ package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.wip.plugintoolkit.api.PluginAction
-import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
-import org.wip.plugintoolkit.features.job.model.JobStatus
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 
 /**

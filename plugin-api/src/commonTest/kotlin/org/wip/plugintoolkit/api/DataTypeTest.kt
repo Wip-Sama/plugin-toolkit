@@ -1,7 +1,15 @@
 package org.wip.plugintoolkit.api
 
-import kotlinx.serialization.json.*
-import kotlin.test.*
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class DataTypeTest {
 
@@ -112,7 +120,7 @@ class DataTypeTest {
         // Rule 1: Int <-> Double conversion
         assertTrue(intType.canConvert(doubleType), "Int should convert to Double")
         assertTrue(doubleType.canConvert(intType), "Double should convert to Int")
-        assertFalse(intType.canConvert(stringType), "Int should not convert to String")
+        assertTrue(intType.canConvert(stringType), "Int should convert to String")
         
         // Rule 2: Array/List <-> Tuple/Pair/Triple conversion
         assertTrue(intArray.canConvert(tupleType), "Array of Int should convert to Tuple")

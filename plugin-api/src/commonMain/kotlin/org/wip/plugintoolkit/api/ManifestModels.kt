@@ -1,8 +1,11 @@
 package org.wip.plugintoolkit.api
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.json.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Represents the type of data exchanged between the host and the plugin.
@@ -126,11 +129,17 @@ data class Release(
 )
 
 @Serializable
+enum class OS {
+    LINUX, WINDOWS, MACOS
+}
+
+@Serializable
 data class PluginInfo(
     val id: String,
     val name: String,
     val version: String,
-    val description: String
+    val description: String,
+    val supportedOs: List<OS> = emptyList()
 )
 
 @Serializable
@@ -151,6 +160,14 @@ data class ParameterMetadata(
     val semanticType: String? = null
 )
 
+@Serializable
+data class OutputMetadata(
+    val name: String,
+    val description: String,
+    val type: DataType,
+    val semanticType: String? = null
+)
+
 /**
  * Metadata for a specific capability provided by the plugin.
  */
@@ -161,6 +178,7 @@ data class Capability(
     val parameters: Map<String, ParameterMetadata>? = null,
     val returnType: DataType,
     val semanticType: String? = null,
+    val outputs: List<OutputMetadata>? = null,
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true
 )

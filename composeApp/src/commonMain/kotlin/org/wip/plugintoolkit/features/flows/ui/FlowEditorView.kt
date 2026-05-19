@@ -1,11 +1,34 @@
 package org.wip.plugintoolkit.features.flows.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -14,26 +37,46 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.features.flows.model.Node
-import org.wip.plugintoolkit.features.flows.model.Flow
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
-import org.wip.plugintoolkit.core.notification.NotificationService
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.canConvert
+import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
-import org.wip.plugintoolkit.api.format
-import org.wip.plugintoolkit.api.canConvert
-import org.jetbrains.compose.resources.stringResource
-import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
+import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_save
+import plugintoolkit.composeapp.generated.resources.dialog_cancel
+import plugintoolkit.composeapp.generated.resources.flow_editor_btn_exit
+import plugintoolkit.composeapp.generated.resources.flow_editor_convert_connect
+import plugintoolkit.composeapp.generated.resources.flow_editor_duplicate_error
+import plugintoolkit.composeapp.generated.resources.flow_editor_enter_name
+import plugintoolkit.composeapp.generated.resources.flow_editor_flow_selected
+import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_message
+import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_semantics
+import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_title
+import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_types
+import plugintoolkit.composeapp.generated.resources.flow_editor_no_flow_selected
+import plugintoolkit.composeapp.generated.resources.flow_editor_read_only
+import plugintoolkit.composeapp.generated.resources.flow_editor_read_only_reason
+import plugintoolkit.composeapp.generated.resources.flow_editor_same_node_warning
+import plugintoolkit.composeapp.generated.resources.flow_editor_save_as_title
+import plugintoolkit.composeapp.generated.resources.flow_editor_save_changes
+import plugintoolkit.composeapp.generated.resources.flow_name_label
+import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_running
+import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_used_in_other
 import kotlin.math.roundToInt
 
 @Composable
@@ -167,8 +210,13 @@ fun FlowEditorView(
                         }
                         
                         if (startPort != null && targetPort != null) {
-                            val compatible = startPort.dataType.isCompatibleWith(targetPort.dataType) &&
-                                             isSemanticTypeCompatible(startPort.semanticType, targetPort.semanticType)
+                            val startInferredType = state.inferredTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)] ?: startPort.dataType
+                            val targetInferredType = state.inferredTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.dataType
+                            val startInferredSemantic = state.inferredSemanticTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)] ?: startPort.semanticType
+                            val targetInferredSemantic = state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.semanticType
+
+                            val compatible = startInferredType.isCompatibleWith(targetInferredType) &&
+                                             isSemanticTypeCompatible(startInferredSemantic, targetInferredSemantic)
                             if (compatible) null else Color.Red
                         } else null
                     } else null
@@ -183,6 +231,7 @@ fun FlowEditorView(
                             node = node,
                             connectedInputPortIds = flow.connections.filter { it.targetNodeId == node.id }.map { it.targetPortId }.toSet(),
                             inferredTypes = state.inferredTypes,
+                            inferredSemanticTypes = state.inferredSemanticTypes,
                             validationErrors = state.validationErrors,
                             onMove = { id, delta, snap, showGhost -> viewModel.onEvent(FlowEvent.MoveNode(id, delta, snap, showGhost)) },
                             onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
@@ -245,8 +294,13 @@ fun FlowEditorView(
                                         val targetPort = targetNode?.inputs?.find { it.id == targetPortId }
 
                                         if (sourcePort != null && targetPort != null) {
-                                            val typesCompatible = sourcePort.dataType.isCompatibleWith(targetPort.dataType)
-                                            val semanticsCompatible = isSemanticTypeCompatible(sourcePort.semanticType, targetPort.semanticType)
+                                            val sourceInferredType = state.inferredTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.dataType
+                                            val targetInferredType = state.inferredTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.dataType
+                                            val sourceInferredSemantic = state.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.semanticType
+                                            val targetInferredSemantic = state.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticType
+
+                                            val typesCompatible = sourceInferredType.isCompatibleWith(targetInferredType)
+                                            val semanticsCompatible = isSemanticTypeCompatible(sourceInferredSemantic, targetInferredSemantic)
 
                                             if (typesCompatible && semanticsCompatible) {
                                                 viewModel.onEvent(FlowEvent.ConnectPorts(
@@ -255,7 +309,7 @@ fun FlowEditorView(
                                                     targetNodeId, 
                                                     targetPortId
                                                 ))
-                                            } else if (semanticsCompatible && sourcePort.dataType.canConvert(targetPort.dataType)) {
+                                            } else if (semanticsCompatible && sourceInferredType.canConvert(targetInferredType)) {
                                                 if (isShiftPressed) {
                                                     viewModel.onEvent(FlowEvent.AutoConvertAndConnect(
                                                         sourceNodeId,
@@ -268,15 +322,15 @@ fun FlowEditorView(
                                                     pendingConnectionSourcePortId = sourcePortId
                                                     pendingConnectionTargetNodeId = targetNodeId
                                                     pendingConnectionTargetPortId = targetPortId
-                                                    pendingConnectionSourceType = sourcePort.dataType
-                                                    pendingConnectionTargetType = targetPort.dataType
+                                                    pendingConnectionSourceType = sourceInferredType
+                                                    pendingConnectionTargetType = targetInferredType
                                                     showConversionDialog = true
                                                 }
                                             } else {
                                                 val message = if (!typesCompatible) {
-                                                    incompatibleTypesMsg.format(sourcePort.dataType.format(), targetPort.dataType.format())
+                                                    incompatibleTypesMsg.format(sourceInferredType.format(), targetInferredType.format())
                                                 } else {
-                                                    incompatibleSemanticsMsg.format(sourcePort.semanticType ?: "", targetPort.semanticType ?: "")
+                                                    incompatibleSemanticsMsg.format(sourceInferredSemantic ?: "", targetInferredSemantic ?: "")
                                                 }
                                                 notificationService.toast(message)
                                             }
@@ -418,12 +472,25 @@ fun FlowEditorView(
                                 )
                             }
                             if (state.isReadOnly) {
+                                val reasonString = state.readOnlyReasons.map { reason ->
+                                    when (reason) {
+                                        ReadOnlyReason.Running -> stringResource(Res.string.flow_readonly_reason_running)
+                                        ReadOnlyReason.UsedInOtherFlows -> stringResource(Res.string.flow_readonly_reason_used_in_other)
+                                    }
+                                }.joinToString(", ")
+
+                                val displayText = if (reasonString.isNotEmpty()) {
+                                    stringResource(Res.string.flow_editor_read_only_reason, reasonString)
+                                } else {
+                                    stringResource(Res.string.flow_editor_read_only)
+                                }
+
                                 Surface(
                                     color = MaterialTheme.colorScheme.errorContainer,
                                     shape = CircleShape
                                 ) {
                                     Text(
-                                        text = stringResource(Res.string.flow_editor_read_only),
+                                        text = displayText,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         fontWeight = FontWeight.Bold,

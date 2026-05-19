@@ -1,25 +1,35 @@
 package org.wip.plugintoolkit.api.processor.generators
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.LambdaTypeName
+import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_COROUTINE_SCOPE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DATA_PROCESSOR
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DISPATCHERS
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_RESULT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_ILLEGAL_ARGUMENT_EXCEPTION
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_ILLEGAL_STATE_EXCEPTION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JOB_HANDLE
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_LIST
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_MAP
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ACTION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_CONTEXT
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_FILESYSTEM
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_LOGGER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_REQUEST
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_RESPONSE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_SIGNAL
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PROGRESS_REPORTER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_RESULT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_ASYNC
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_CANCEL
@@ -29,10 +39,6 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_LAUNCH
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SIGNAL_CANCEL
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SIGNAL_PAUSE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SUPERVISOR_JOB
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_LOGGER
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PROGRESS_REPORTER
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_FILESYSTEM
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object DispatcherGenerator {
@@ -136,7 +142,26 @@ object DispatcherGenerator {
             if (returnType == CN_EXECUTION_RESULT) {
                 mapCode.add("result\n")
             } else {
-                mapCode.add("%T.Success(%T(result = %T.%M(result), metadata = mapOf(\"status\" to \"success\")))\n", CN_EXECUTION_RESULT, CN_PLUGIN_RESPONSE, CN_JSON, MN_ENCODE_FROM_JSON_ELEMENT)
+                val outputs = org.wip.plugintoolkit.api.processor.GeneratorUtils.getCapabilityOutputs(func)
+                if (outputs.size > 1) {
+                    mapCode.add("val jsonResult = %T {\n", ClassName("kotlinx.serialization.json", "buildJsonObject"))
+                    mapCode.indent()
+                    outputs.forEach { out ->
+                        mapCode.add("put(%S, %T.%M(result.%L))\n", out.name, CN_JSON, MN_ENCODE_FROM_JSON_ELEMENT, out.originalName)
+                    }
+                    mapCode.unindent()
+                    mapCode.add("}\n")
+                    mapCode.add("%T.Success(%T(result = jsonResult, metadata = mapOf(\"status\" to \"success\")))\n", CN_EXECUTION_RESULT, CN_PLUGIN_RESPONSE)
+                } else if (outputs.size == 1 && outputs.first().name != "result") {
+                    mapCode.add("val jsonResult = %T {\n", ClassName("kotlinx.serialization.json", "buildJsonObject"))
+                    mapCode.indent()
+                    mapCode.add("put(%S, %T.%M(result))\n", outputs.first().name, CN_JSON, MN_ENCODE_FROM_JSON_ELEMENT)
+                    mapCode.unindent()
+                    mapCode.add("}\n")
+                    mapCode.add("%T.Success(%T(result = jsonResult, metadata = mapOf(\"status\" to \"success\")))\n", CN_EXECUTION_RESULT, CN_PLUGIN_RESPONSE)
+                } else {
+                    mapCode.add("%T.Success(%T(result = %T.%M(result), metadata = mapOf(\"status\" to \"success\")))\n", CN_EXECUTION_RESULT, CN_PLUGIN_RESPONSE, CN_JSON, MN_ENCODE_FROM_JSON_ELEMENT)
+                }
             }
             mapCode.unindent()
             mapCode.add("}")

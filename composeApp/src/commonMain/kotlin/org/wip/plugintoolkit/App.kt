@@ -27,7 +27,6 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.AppTheme
@@ -38,8 +37,8 @@ import org.wip.plugintoolkit.core.utils.PlatformLocalization
 import org.wip.plugintoolkit.features.flows.ui.FlowEditorView
 import org.wip.plugintoolkit.features.flows.ui.FlowManagerView
 import org.wip.plugintoolkit.features.flows.ui.FlowRunnerView
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import org.wip.plugintoolkit.features.job.ui.JobBadge
 import org.wip.plugintoolkit.features.job.ui.JobDashboard
 import org.wip.plugintoolkit.features.landingPage.ui.LandingPage

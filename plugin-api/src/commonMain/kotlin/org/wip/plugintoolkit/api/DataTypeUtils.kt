@@ -4,11 +4,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.serializer
-
 import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.serializer
 
 @OptIn(ExperimentalSerializationApi::class)
 fun SerialDescriptor.toDataType(): DataType {
@@ -128,12 +127,20 @@ fun DataType.canConvert(other: DataType): Boolean {
 
     if (this.isCompatibleWith(other)) return false
 
-    // Rule 1: Numeric primitives
+    // Rule 1: Numeric primitives & String conversions
     if (this is DataType.Primitive && other is DataType.Primitive) {
         val sType = this.primitiveType
         val tType = other.primitiveType
         if ((sType == PrimitiveType.INT && tType == PrimitiveType.DOUBLE) ||
             (sType == PrimitiveType.DOUBLE && tType == PrimitiveType.INT)) {
+            return true
+        }
+        // Allow String to Int, Double, Boolean
+        if (sType == PrimitiveType.STRING && (tType == PrimitiveType.INT || tType == PrimitiveType.DOUBLE || tType == PrimitiveType.BOOLEAN)) {
+            return true
+        }
+        // Allow Int, Double, Boolean to String
+        if ((sType == PrimitiveType.INT || sType == PrimitiveType.DOUBLE || sType == PrimitiveType.BOOLEAN) && tType == PrimitiveType.STRING) {
             return true
         }
     }

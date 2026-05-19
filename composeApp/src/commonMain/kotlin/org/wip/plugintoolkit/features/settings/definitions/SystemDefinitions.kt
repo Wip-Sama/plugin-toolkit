@@ -8,11 +8,21 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Window
 import org.wip.plugintoolkit.core.utils.StartupManager
-import org.wip.plugintoolkit.features.settings.model.*
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.AutoUpdateSettings
+import org.wip.plugintoolkit.features.settings.model.GeneralSettings
+import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
-import org.wip.plugintoolkit.features.settings.utils.*
+import org.wip.plugintoolkit.features.settings.utils.SettingText
+import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
-import plugintoolkit.composeapp.generated.resources.*
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.section_system
+import plugintoolkit.composeapp.generated.resources.setting_close_to_tray
+import plugintoolkit.composeapp.generated.resources.setting_launch_at_startup
+import plugintoolkit.composeapp.generated.resources.setting_launch_minimized_at_startup
+import plugintoolkit.composeapp.generated.resources.setting_launch_minimized_at_startup_subtitle
+import plugintoolkit.composeapp.generated.resources.setting_window_start_mode
 
 fun SettingsRegistryBuilder.systemDefinitions(viewModel: SettingsViewModel) {
     nav(SettingNavKey.SystemSettings) {
