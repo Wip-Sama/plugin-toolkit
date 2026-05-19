@@ -145,4 +145,42 @@ class FlowImportExportTest {
         }
         return dependencies.toList()
     }
+
+    @Test
+    fun testGenerateUniqueFlowNameWithCustomName() {
+        val existingNames = setOf("FlowA", "FlowB", "MyCustomFlow")
+        
+        fun generateUnique(baseName: String): String {
+            if (baseName !in existingNames) return baseName
+            var candidate = "$baseName (Imported)"
+            if (candidate !in existingNames) return candidate
+            var counter = 2
+            while (candidate in existingNames) {
+                candidate = "$baseName (Imported $counter)"
+                counter++
+            }
+            return candidate
+        }
+
+        // Test non-clashing custom name (should return unchanged)
+        assertEquals("NewUniqueFlow", generateUnique("NewUniqueFlow"))
+        
+        // Test clashing base name (should generate a unique name with suffix)
+        assertEquals("FlowA (Imported)", generateUnique("FlowA"))
+        
+        // Test with clashing suffix (should append sequential counter)
+        val existingNamesWithSuffix = existingNames + "FlowA (Imported)"
+        fun generateUnique2(baseName: String): String {
+            if (baseName !in existingNamesWithSuffix) return baseName
+            var candidate = "$baseName (Imported)"
+            if (candidate !in existingNamesWithSuffix) return candidate
+            var counter = 2
+            while (candidate in existingNamesWithSuffix) {
+                candidate = "$baseName (Imported $counter)"
+                counter++
+            }
+            return candidate
+        }
+        assertEquals("FlowA (Imported 2)", generateUnique2("FlowA"))
+    }
 }

@@ -227,5 +227,7 @@ data class Connection(
 data class Flow(
     val name: String,
     val nodes: List<Node> = emptyList(),
-    val connections: List<Connection> = emptyList()
+    val connections: List<Connection> = emptyList(),
+    val version: String = "1.0.0",
+    val description: String? = null
 )

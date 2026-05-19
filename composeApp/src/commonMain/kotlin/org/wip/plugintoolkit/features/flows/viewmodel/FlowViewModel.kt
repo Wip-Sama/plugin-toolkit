@@ -93,7 +93,7 @@ sealed interface FlowEvent {
 
     // Import/Export Flow
     data object TriggerImport : FlowEvent
-    data class ResolveImportConflicts(val resolutions: Map<String, ConflictResolutionAction>) : FlowEvent
+    data class ResolveImportConflicts(val resolutions: Map<String, ConflictResolutionAction>, val customNames: Map<String, String> = emptyMap()) : FlowEvent
     data object CancelImport : FlowEvent
     data class ExportFlow(val flowName: String) : FlowEvent
 }
@@ -213,7 +213,7 @@ class FlowViewModel(
             is FlowEvent.RenameFlow -> handleRenameFlow(event.oldName, event.newName)
             is FlowEvent.DeleteFlow -> handleDeleteFlow(event.name)
             is FlowEvent.TriggerImport -> handleTriggerImport()
-            is FlowEvent.ResolveImportConflicts -> handleResolveImportConflicts(event.resolutions)
+            is FlowEvent.ResolveImportConflicts -> handleResolveImportConflicts(event.resolutions, event.customNames)
             is FlowEvent.CancelImport -> handleCancelImport()
             is FlowEvent.ExportFlow -> handleExportFlow(event.flowName)
             else -> {}
@@ -343,6 +343,67 @@ class FlowViewModel(
         }
     }
 
+    fun importFlowFromBytes(bytes: ByteArray, fileName: String): List<Flow> {
+        val importedFlows = mutableListOf<Flow>()
+        try {
+            if (fileName.endsWith(".zip")) {
+                val entries = PlatformUtils.unzipEntries(bytes)
+                entries.forEach { (name, content) ->
+                    if (name.endsWith(".json")) {
+                        try {
+                            val flow = json.decodeFromString<Flow>(content)
+                            importedFlows.add(flow)
+                        } catch (e: Exception) {
+                            Logger.e(e) { "Failed to parse imported flow entry: $name" }
+                        }
+                    }
+                }
+            } else if (fileName.endsWith(".json")) {
+                try {
+                    val content = bytes.decodeToString()
+                    val flow = json.decodeFromString<Flow>(content)
+                    importedFlows.add(flow)
+                } catch (e: Exception) {
+                    Logger.e(e) { "Failed to parse imported flow: $fileName" }
+                }
+            }
+
+            if (importedFlows.isEmpty()) {
+                viewModelScope.launch(Dispatchers.Main) {
+                    resolvedNotificationService?.toast("No valid flows found in the file.")
+                }
+                return emptyList()
+            }
+
+            viewModelScope.launch(Dispatchers.IO) {
+                val localFlowNames = _state.value.flows.map { it.name }.toSet()
+                val conflicts = importedFlows.map { it.name }.filter { it in localFlowNames }
+
+                if (conflicts.isEmpty()) {
+                    saveImportedFlows(importedFlows)
+                    withContext(Dispatchers.Main) {
+                        resolvedNotificationService?.toast("Imported ${importedFlows.size} flow(s) successfully.")
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _state.update { currentState ->
+                            currentState.copy(
+                                importConflicts = conflicts,
+                                pendingImportedFlows = importedFlows
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to import downloaded flow" }
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast("Failed to import downloaded flow: ${e.message}")
+            }
+        }
+        return importedFlows
+    }
+
     private suspend fun saveImportedFlows(flows: List<Flow>) {
         val appDataDir = resolvedSettingsPersistence.getSettingsDir()
         flows.forEach { flow ->
@@ -353,7 +414,7 @@ class FlowViewModel(
         reloadFlows()
     }
 
-    private fun handleResolveImportConflicts(resolutions: Map<String, ConflictResolutionAction>) {
+    private fun handleResolveImportConflicts(resolutions: Map<String, ConflictResolutionAction>, customNames: Map<String, String>) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val localFlows = _state.value.flows
@@ -380,9 +441,12 @@ class FlowViewModel(
                                 // Nothing special to do here, it will just overwrite the file
                             }
                             ConflictResolutionAction.RENAME -> {
+                                val customName = customNames[clashingName]
+                                val baseRename = if (!customName.isNullOrBlank()) customName else flow.name
+                                
                                 // Generate a unique name
                                 val existingNames = localFlowNames + importedFlows.map { it.name }.toSet()
-                                val newName = generateUniqueFlowName(flow.name, existingNames)
+                                val newName = generateUniqueFlowName(baseRename, existingNames)
                                 
                                 // Update name in list
                                 importedFlows[flowIndex] = flow.copy(name = newName)
@@ -439,7 +503,11 @@ class FlowViewModel(
     }
 
     private fun generateUniqueFlowName(baseName: String, existingNames: Set<String>): String {
+        if (baseName !in existingNames) return baseName
+        
         var candidate = "$baseName (Imported)"
+        if (candidate !in existingNames) return candidate
+        
         var counter = 2
         while (candidate in existingNames) {
             candidate = "$baseName (Imported $counter)"

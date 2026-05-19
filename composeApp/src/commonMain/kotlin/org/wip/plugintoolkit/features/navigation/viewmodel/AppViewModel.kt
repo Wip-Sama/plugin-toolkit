@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.lifecycle.ViewModel
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.update.UpdateService
@@ -49,8 +50,6 @@ class AppViewModel(
                     id = Screen.Plugins, icon = Icons.Default.PlayCircle, title = "Execute".localized
                 ), SidebarElement(
                     id = Screen.PluginManager, icon = Icons.Default.Inventory, title = "Manager".localized
-                ), SidebarElement(
-                    id = Screen.PluginRepo, icon = Icons.Default.Inventory, title = "Repositories".localized
                 )
             )
         ), SidebarSectionData(
@@ -71,6 +70,8 @@ class AppViewModel(
             title = null, elements = listOf(
                 SidebarElement(
                     id = Screen.JobDashboard, icon = Icons.Default.PendingActions, title = Res.string.nav_jobs.localized
+                ), SidebarElement(
+                    id = Screen.PluginRepo, icon = Icons.Default.CloudDownload, title = "Repositories".localized
                 ), SidebarElement(
                     id = Screen.Settings, icon = Icons.Default.Settings, title = Res.string.settings.localized
                 )

@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.flows.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,12 +21,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,9 +56,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
@@ -292,8 +297,8 @@ fun FlowManagerView(
     if (state.importConflicts.isNotEmpty()) {
         ConflictResolutionDialog(
             importConflicts = state.importConflicts,
-            onResolve = { finalResolutions ->
-                viewModel.onEvent(FlowEvent.ResolveImportConflicts(finalResolutions))
+            onResolve = { finalResolutions, customNames ->
+                viewModel.onEvent(FlowEvent.ResolveImportConflicts(finalResolutions, customNames))
             },
             onCancel = { viewModel.onEvent(FlowEvent.CancelImport) }
         )
@@ -303,13 +308,21 @@ fun FlowManagerView(
 @Composable
 private fun ConflictResolutionDialog(
     importConflicts: List<String>,
-    onResolve: (Map<String, ConflictResolutionAction>) -> Unit,
+    onResolve: (Map<String, ConflictResolutionAction>, Map<String, String>) -> Unit,
     onCancel: () -> Unit
 ) {
     val resolutions = remember(importConflicts) {
         mutableStateMapOf<String, ConflictResolutionAction>().apply {
             importConflicts.forEach { name ->
                 put(name, ConflictResolutionAction.RENAME)
+            }
+        }
+    }
+
+    val customNames = remember(importConflicts) {
+        mutableStateMapOf<String, String>().apply {
+            importConflicts.forEach { name ->
+                put(name, "")
             }
         }
     }
@@ -361,21 +374,30 @@ private fun ConflictResolutionDialog(
                                 )
                             }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
-                                verticalAlignment = Alignment.CenterVertically
+                            SegmentedButtonGroup(
+                                options = ConflictResolutionAction.entries,
+                                selectedOption = resolutions[clashingName] ?: ConflictResolutionAction.RENAME,
+                                onOptionSelected = { resolutions[clashingName] = it }
+                            )
+
+                            AnimatedVisibility(
+                                visible = resolutions[clashingName] == ConflictResolutionAction.RENAME
                             ) {
-                                for (action in ConflictResolutionAction.entries) {
-                                    val selected = resolutions[clashingName] == action
-                                    ChoiceChip(
-                                        text = when (action) {
-                                            ConflictResolutionAction.RENAME -> "Rename"
-                                            ConflictResolutionAction.KEEP_LOCAL -> "Keep Local"
-                                            ConflictResolutionAction.KEEP_IMPORTED -> "Keep Imported"
-                                        },
-                                        selected = selected,
-                                        onClick = { resolutions[clashingName] = action }
+                                Column {
+                                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                                    OutlinedTextField(
+                                        value = customNames[clashingName] ?: "",
+                                        onValueChange = { customNames[clashingName] = it },
+                                        label = { Text("New flow name (optional)") },
+                                        placeholder = { Text("Auto-unique fallback") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(20.dp),
+                                        textStyle = MaterialTheme.typography.bodyMedium,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                        )
                                     )
                                 }
                             }
@@ -387,7 +409,7 @@ private fun ConflictResolutionDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onResolve(resolutions.toMap())
+                    onResolve(resolutions.toMap(), customNames.toMap())
                 }
             ) {
                 Text("Import")
@@ -631,28 +653,85 @@ private fun FlowItem(
 }
 
 @Composable
-private fun ChoiceChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit
+private fun SegmentedButtonGroup(
+    options: List<ConflictResolutionAction>,
+    selectedOption: ConflictResolutionAction,
+    onOptionSelected: (ConflictResolutionAction) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-    val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-    val borderStroke = BorderStroke(1.dp, borderColor)
-
+    val outlineColor = MaterialTheme.colorScheme.outline
     Surface(
-        color = containerColor,
-        contentColor = contentColor,
-        border = borderStroke,
-        shape = CircleShape,
-        modifier = Modifier
-            .clickable(onClick = onClick)
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, outlineColor),
+        color = MaterialTheme.colorScheme.surface
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
-        )
+        Row(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            options.forEachIndexed { index, option ->
+                val isSelected = option == selectedOption
+                
+                val containerColor = if (isSelected) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    Color.Transparent
+                }
+                
+                val contentColor = if (isSelected) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(containerColor)
+                        .clickable { onOptionSelected(option) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall)
+                    ) {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                modifier = Modifier.size(16.dp),
+                                tint = contentColor
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        }
+                        Text(
+                            text = when (option) {
+                                ConflictResolutionAction.RENAME -> "Rename"
+                                ConflictResolutionAction.KEEP_LOCAL -> "Keep Local"
+                                ConflictResolutionAction.KEEP_IMPORTED -> "Keep Imported"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = contentColor,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1
+                        )
+                    }
+                }
+                
+                // Add vertical divider if not the last item
+                if (index < options.size - 1) {
+                    Spacer(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(outlineColor)
+                    )
+                }
+            }
+        }
     }
 }

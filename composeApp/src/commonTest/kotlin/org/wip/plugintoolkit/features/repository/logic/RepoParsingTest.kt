@@ -203,5 +203,63 @@ class RepoParsingTest {
         assertEquals(AddRepoResult.Success, result)
         assertEquals("Text Repo", repoManager.repositories.value[0].name)
     }
+
+    @Test
+    fun testAddRepositoryFlowsParsing() = runTest {
+        val mockEngine = MockEngine { request ->
+            when (request.url.toString()) {
+                "https://example.com/repo/index.json" -> {
+                    respond(
+                        content = """
+                            {
+                                "name": "Flows Repo",
+                                "schemaVersion": 1,
+                                "flowsFolder": "custom-flows",
+                                "plugins": [],
+                                "flows": [
+                                    {
+                                        "name": "Test Flow",
+                                        "fileName": "test_flow.json",
+                                        "version": "1.0.1",
+                                        "description": "A test subflow description"
+                                    }
+                                ]
+                            }
+                        """.trimIndent(),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
+
+        val result = repoManager.addRepository("https://example.com/repo/index.json")
+
+        assertEquals(AddRepoResult.Success, result)
+
+        val repos = repoManager.repositories.value
+        assertEquals(1, repos.size)
+        assertEquals("Flows Repo", repos[0].name)
+        assertEquals("custom-flows", repos[0].flowsFolder)
+
+        val flows = repoManager.flows.value["https://example.com/repo/index.json"]
+        assertTrue(flows != null)
+        assertEquals(1, flows.size)
+        assertEquals("Test Flow", flows[0].name)
+        assertEquals("test_flow.json", flows[0].fileName)
+        assertEquals("1.0.1", flows[0].version)
+        assertEquals("A test subflow description", flows[0].description)
+    }
 }
 
