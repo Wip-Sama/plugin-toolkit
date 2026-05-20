@@ -49,7 +49,7 @@ data class Dimensions(
     val cardElevation: Dp = 2.dp,
     val repositorySidebarWidth: Dp = 340.dp,
     val textFieldHeight: Dp = 56.dp,
-    val borderSelected: Dp = 2.dp,
+    val borderSelected: Dp = 3.dp,
     val borderUnselected: Dp = 1.dp,
     val iconMediumSmall: Dp = 18.dp,
     val emptyStateIconSize: Dp = 80.dp,
@@ -58,7 +58,13 @@ data class Dimensions(
     val listIconContentSize: Dp = 28.dp,
     val progressBoxSize: Dp = 36.dp,
     val progressIndicatorStroke: Dp = 2.dp,
-    val progressIndicatorStrokeMedium: Dp = 3.dp
+    val progressIndicatorStrokeMedium: Dp = 3.dp,
+    val textFieldCornerRadius: Dp = 20.dp,
+    val expressiveCardCornerRadius: Dp = 24.dp,
+    val expressiveButtonCornerRadius: Dp = 24.dp,
+    val buttonGroupGap: Dp = 2.dp,
+    val buttonGroupInnerCorner: Dp = 4.dp,
+    val buttonGroupOuterCorner: Dp = 20.dp
 )
 
 data class CustomColors(
@@ -77,7 +83,10 @@ data class Opacity(
     val divider: Float = 0.5f,
     val disabled: Float = 0.6f,
     val secondaryText: Float = 0.8f,
-    val full: Float = 1.0f
+    val full: Float = 1.0f,
+    val textFieldContainer: Float = 0.1f,
+    val textFieldUnfocusedBorder: Float = 0.5f,
+    val buttonBackground: Float = 0.15f
 )
 
 val LocalSpacing = staticCompositionLocalOf { Spacing() }

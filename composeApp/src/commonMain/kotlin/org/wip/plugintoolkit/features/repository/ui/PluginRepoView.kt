@@ -24,11 +24,13 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
@@ -79,13 +81,12 @@ fun PluginRepoView(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
+                ToolkitTextField(
                     value = viewModel.repoUrlInput,
                     onValueChange = { viewModel.repoUrlInput = it },
                     modifier = Modifier.weight(1f),
                     placeholder = { Text(stringResource(Res.string.repo_url_placeholder), style = MaterialTheme.typography.bodyMedium) },
                     singleLine = true,
-                    shape = MaterialTheme.shapes.medium,
                     textStyle = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
@@ -284,7 +285,7 @@ fun PluginRepoView(
                         Column {
                             Text(
                                 text = currentRepo.name,
-                                style = MaterialTheme.typography.headlineMedium,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -352,7 +353,7 @@ fun PluginRepoView(
                     val repoFlows = flowsMap[currentRepo.url] ?: emptyList()
 
                     // Tab Selection (Plugins vs Flows)
-                    TabRow(
+                    PrimaryTabRow(
                         selectedTabIndex = selectedTab,
                         containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.primary,
@@ -383,7 +384,7 @@ fun PluginRepoView(
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
                     // Search input within current list
-                    OutlinedTextField(
+                    ToolkitTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.fillMaxWidth(),
@@ -394,8 +395,7 @@ fun PluginRepoView(
                             )
                         },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        singleLine = true,
-                        shape = MaterialTheme.shapes.medium
+                        singleLine = true
                     )
 
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
@@ -426,9 +426,8 @@ fun PluginRepoView(
                                     val progress = activeJobs[plugin.pkg]
                                     val hasUpdate = installedVersion != null && org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion) > 0
 
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = CardDefaults.outlinedCardColors()
+                                    GlassCard(
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
@@ -562,9 +561,8 @@ fun PluginRepoView(
                                     val installedVersion = viewModel.getInstalledFlowVersion(flow.name)
                                     val hasUpdate = viewModel.getFlowUpdate(flow)
 
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = CardDefaults.outlinedCardColors()
+                                    GlassCard(
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),

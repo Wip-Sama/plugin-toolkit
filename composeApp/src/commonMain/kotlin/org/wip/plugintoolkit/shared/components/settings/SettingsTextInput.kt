@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 
 @Composable
 fun SettingsTextInput(
@@ -27,7 +26,7 @@ fun SettingsTextInput(
 ) {
     var textValue by remember(value) { mutableStateOf(value) }
 
-    OutlinedTextField(
+    ToolkitTextField(
         value = textValue,
         onValueChange = {
             textValue = it
@@ -38,12 +37,7 @@ fun SettingsTextInput(
         enabled = enabled,
         modifier = modifier.width(100.dp).height(48.dp),
         textStyle = MaterialTheme.typography.bodyMedium,
-        singleLine = true,
-        shape = MaterialTheme.shapes.medium,
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
+        singleLine = true
     )
 }
 

@@ -17,14 +17,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.DeviceHub
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -84,43 +86,56 @@ fun PaletteSidebar(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column {
-            TabRow(selectedTabIndex = selectedTab) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                    Text(
-                        stringResource(Res.string.palette_tab_plugins),
-                        modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                    Text(
-                        stringResource(Res.string.palette_tab_system),
-                        modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
-                    Text(
-                        stringResource(Res.string.palette_tab_flows),
-                        modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
+            PrimaryTabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = { Icon(Icons.Default.Extension, contentDescription = null) },
+                    text = {
+                        Text(
+                            stringResource(Res.string.palette_tab_plugins),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = { Icon(Icons.Default.Build, contentDescription = null) },
+                    text = {
+                        Text(
+                            stringResource(Res.string.palette_tab_system),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = { Icon(Icons.Default.DeviceHub, contentDescription = null) },
+                    text = {
+                        Text(
+                            stringResource(Res.string.palette_tab_flows),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                )
             }
 
             // Standard sleek search input matching sidebar inputs
-            OutlinedTextField(
+            ToolkitTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = { Text(stringResource(Res.string.palette_search_placeholder), style = MaterialTheme.typography.bodySmall) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)) },
                 modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.mediumSmall),
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                )
+                singleLine = true
             )
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {

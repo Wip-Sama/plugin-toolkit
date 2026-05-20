@@ -31,6 +31,7 @@ import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 
 @Composable
 fun DynamicParameterInput(
@@ -40,44 +41,74 @@ fun DynamicParameterInput(
     onValueChange: (String) -> Unit,
     enabled: Boolean = true
 ) {
+    val dataType = metadata.type
+    val isBoolean = dataType is DataType.Primitive && dataType.primitiveType == PrimitiveType.BOOLEAN
+    val isEnumDropdown = dataType is DataType.Enum && metadata.constraints?.multiSelect != true
+    val showTopLabel = isBoolean || isEnumDropdown
+
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        // Label and Type info
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (metadata.required && value.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-            )
-            if (metadata.required) {
+        if (showTopLabel) {
+            // Label and Type info on top for Switch and Dropdown only
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = " *",
+                    text = name,
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = if (metadata.required && value.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                 )
+                if (metadata.required) {
+                    Text(
+                        text = " *",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = formatDataType(metadata.type).uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(4.dp)
-            ) {
+
+            if (metadata.description.isNotEmpty()) {
                 Text(
-                    text = formatDataType(metadata.type).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    text = metadata.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
                 )
             }
         }
 
-        if (metadata.description.isNotEmpty()) {
-            Text(
-                text = metadata.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
-            )
+        val inputLabel = @Composable {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = name,
+                    fontWeight = FontWeight.Bold,
+                    color = if (metadata.required && value.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                )
+                if (metadata.required) {
+                    Text(
+                        text = " *",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "(${formatDataType(metadata.type).uppercase()})",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
 
         // Input based on type
@@ -99,6 +130,8 @@ fun DynamicParameterInput(
                             onValueChange = onValueChange,
                             allowDecimal = false,
                             placeholder = "Enter integer",
+                            label = inputLabel,
+                            description = metadata.description,
                             constraints = metadata.constraints,
                             enabled = enabled,
                             isSecret = metadata.secret,
@@ -112,6 +145,8 @@ fun DynamicParameterInput(
                             onValueChange = onValueChange,
                             allowDecimal = true,
                             placeholder = "Enter decimal number",
+                            label = inputLabel,
+                            description = metadata.description,
                             constraints = metadata.constraints,
                             enabled = enabled,
                             isSecret = metadata.secret,
@@ -124,6 +159,8 @@ fun DynamicParameterInput(
                             value = value,
                             onValueChange = onValueChange,
                             placeholder = "Enter ${type.primitiveType.name.lowercase()}",
+                            label = inputLabel,
+                            description = metadata.description,
                             constraints = metadata.constraints,
                             enabled = enabled,
                             isSecret = metadata.secret,
@@ -138,6 +175,8 @@ fun DynamicParameterInput(
                     value = value,
                     onValueChange = onValueChange,
                     placeholder = "Enter values separated by comma (,)",
+                    label = inputLabel,
+                    description = metadata.description,
                     constraints = metadata.constraints,
                     enabled = enabled,
                     isSecret = metadata.secret,
@@ -146,14 +185,14 @@ fun DynamicParameterInput(
             }
 
             is DataType.Enum -> {
-                // Determine options to show. For enums, use type.options.
                 val options = type.options
                 if (metadata.constraints?.multiSelect == true) {
-                    // Simple text field for multi-select for now or comma-separated
                     StandardTextField(
                         value = value,
                         onValueChange = onValueChange,
                         placeholder = "Enter comma-separated options: ${options.joinToString()}",
+                        label = inputLabel,
+                        description = metadata.description,
                         constraints = metadata.constraints,
                         enabled = enabled,
                         isSecret = metadata.secret,
@@ -175,6 +214,8 @@ fun DynamicParameterInput(
                     value = value,
                     onValueChange = onValueChange,
                     placeholder = "Enter value",
+                    label = inputLabel,
+                    description = metadata.description,
                     constraints = metadata.constraints,
                     enabled = enabled,
                     isSecret = metadata.secret,
@@ -191,6 +232,8 @@ private fun NumericTextField(
     onValueChange: (String) -> Unit,
     allowDecimal: Boolean,
     placeholder: String,
+    label: @Composable () -> Unit,
+    description: String,
     constraints: ParameterConstraints? = null,
     enabled: Boolean = true,
     isSecret: Boolean = false,
@@ -231,21 +274,18 @@ private fun NumericTextField(
         }
     }
 
-    OutlinedTextField(
+    ToolkitTextField(
         value = value,
         onValueChange = { newValue ->
             if (newValue.isEmpty()) {
                 onValueChange("")
             } else {
                 val filtered = if (allowDecimal) {
-                    // Allow digits, at most one dot, and leading minus
                     val hasDot = newValue.count { it == '.' } <= 1
                     val validChars = newValue.all { it.isDigit() || it == '.' || it == '-' }
-                    // Check if minus is only at start
                     val validMinus = newValue.lastIndexOf('-') <= 0
                     if (hasDot && validChars && validMinus) newValue else null
                 } else {
-                    // Allow digits and leading minus
                     val validChars = newValue.all { it.isDigit() || it == '-' }
                     val validMinus = newValue.lastIndexOf('-') <= 0
                     if (validChars && validMinus) newValue else null
@@ -258,7 +298,7 @@ private fun NumericTextField(
         },
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
-        shape = MaterialTheme.shapes.medium,
+        label = label,
         placeholder = { Text(placeholder, style = MaterialTheme.typography.bodySmall) },
         keyboardOptions = KeyboardOptions(
             keyboardType = if (allowDecimal) KeyboardType.Decimal else KeyboardType.Number
@@ -276,8 +316,14 @@ private fun NumericTextField(
         } else null,
         singleLine = true,
         isError = isError,
-        supportingText = if (isError) {
-            { Text(errorMessage) }
+        supportingText = if (isError || description.isNotEmpty()) {
+            {
+                if (isError) {
+                    Text(errorMessage)
+                } else {
+                    Text(description)
+                }
+            }
         } else null
     )
 }
@@ -287,6 +333,8 @@ private fun StandardTextField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
+    label: @Composable () -> Unit,
+    description: String,
     constraints: ParameterConstraints? = null,
     enabled: Boolean = true,
     isSecret: Boolean = false,
@@ -322,7 +370,7 @@ private fun StandardTextField(
         }
     }
 
-    OutlinedTextField(
+    ToolkitTextField(
         value = value,
         onValueChange = {
             onValueChange(it)
@@ -330,7 +378,7 @@ private fun StandardTextField(
         },
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
-        shape = MaterialTheme.shapes.medium,
+        label = label,
         placeholder = { Text(placeholder, style = MaterialTheme.typography.bodySmall) },
         singleLine = true,
         visualTransformation = if (isSecret && !isVisible) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
@@ -345,8 +393,14 @@ private fun StandardTextField(
             }
         } else null,
         isError = isError,
-        supportingText = if (isError) {
-            { Text(errorMessage) }
+        supportingText = if (isError || description.isNotEmpty()) {
+            {
+                if (isError) {
+                    Text(errorMessage)
+                } else {
+                    Text(description)
+                }
+            }
         } else null
     )
 }

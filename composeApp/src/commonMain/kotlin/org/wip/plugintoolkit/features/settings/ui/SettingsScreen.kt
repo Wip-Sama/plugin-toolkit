@@ -24,7 +24,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -197,7 +196,7 @@ fun SettingsScreen(
             onToggleNavbar = {},
             canCollapse = false,
             headerContent = {
-                OutlinedTextField(
+                org.wip.plugintoolkit.shared.components.ToolkitTextField(
                     value = searchQuery,
                     onValueChange = { searchViewModel.searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.medium),
@@ -208,8 +207,7 @@ fun SettingsScreen(
                             contentDescription = stringResource(Res.string.settings_search_placeholder)
                         )
                     },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.medium
+                    singleLine = true
                 )
             })
 

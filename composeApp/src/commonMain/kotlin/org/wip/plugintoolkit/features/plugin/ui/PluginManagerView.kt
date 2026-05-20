@@ -60,6 +60,9 @@ import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
+import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
+import androidx.compose.material3.FilledTonalIconButton
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import plugintoolkit.composeapp.generated.resources.Res
@@ -132,33 +135,73 @@ fun PluginManagerView(
         // Toolbar
         Row(
             modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.small),
-            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(onClick = { viewModel.refreshList() }, enabled = isReady) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text(stringResource(Res.string.plugin_refresh_list))
+            ToolkitButtonGroup {
+                item { shape, modifierSpec ->
+                    OutlinedButton(
+                        onClick = { viewModel.refreshList() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_refresh_list))
+                    }
+                }
+                item { shape, modifierSpec ->
+                    OutlinedButton(
+                        onClick = { viewModel.rescan() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Folder, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_rescan))
+                    }
+                }
+                item { shape, modifierSpec ->
+                    OutlinedButton(
+                        onClick = { viewModel.reloadAll() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Replay, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_reload_all))
+                    }
+                }
             }
-            OutlinedButton(onClick = { viewModel.rescan() }, enabled = isReady) {
-                Icon(Icons.Default.Folder, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text(stringResource(Res.string.plugin_rescan))
-            }
-            OutlinedButton(onClick = { viewModel.reloadAll() }, enabled = isReady) {
-                Icon(Icons.Default.Replay, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text(stringResource(Res.string.plugin_reload_all))
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            Button(onClick = { viewModel.openRemoteInstall() }, enabled = isReady) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text("Install Remote")
-            }
-            Button(onClick = { viewModel.installLocal() }, enabled = isReady) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text(stringResource(Res.string.plugin_install_local))
+
+            ToolkitButtonGroup {
+                item { shape, modifierSpec ->
+                    Button(
+                        onClick = { viewModel.openRemoteInstall() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text("Install Remote")
+                    }
+                }
+                item { shape, modifierSpec ->
+                    Button(
+                        onClick = { viewModel.installLocal() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_install_local))
+                    }
+                }
             }
         }
 
@@ -269,25 +312,11 @@ fun PluginCard(
     else if (plugin.isValidated) ToolkitTheme.colors.validated
     else MaterialTheme.colorScheme.outline
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .then(
-                if (isLoaded) Modifier.border(
-                    ToolkitTheme.dimensions.cardElevation,
-                    statusColor,
-                    MaterialTheme.shapes.medium
-                ) else Modifier
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (plugin.loadError != null) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
-            else if (isLoaded) statusColor.copy(alpha = 0.05f)
-            else MaterialTheme.colorScheme.surface
-        )
+    GlassCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon Placeholder
@@ -352,96 +381,136 @@ fun PluginCard(
             }
 
             // Actions
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            var expanded by remember { mutableStateOf(false) }
+
+            ToolkitButtonGroup {
                 if (plugin.requiredAction != null) {
                     val action = customActions.find { it.functionName == plugin.requiredAction }
-                    Button(
-                        onClick = { 
-                            if (plugin.requiredAction == "CONFIGURE_SETTINGS") {
-                                onAction(PluginStatusAction.Settings)
-                            } else {
-                                onAction(PluginStatusAction.Custom(plugin.requiredAction!!)) 
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
-                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
-                    ) {
-                        Text(if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue"))
-                    }
-                }
-
-                if (hasUpdate) {
-                    Button(
-                        onClick = { onAction(PluginStatusAction.Update) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small),
-                        enabled = enabled
-                    ) {
-                        Text(stringResource(Res.string.plugin_update))
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = { onAction(PluginStatusAction.Update) },
-                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small),
-                        enabled = enabled
-                    ) {
-                        Text(stringResource(Res.string.plugin_update_local))
-                    }
-                }
-
-                Switch(checked = plugin.isEnabled, onCheckedChange = onToggle, enabled = enabled)
-
-                var expanded by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { expanded = true }, enabled = enabled) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = stringResource(Res.string.action_more_actions)
-                        )
-                    }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.plugin_reload)) },
-                            onClick = { onAction(PluginStatusAction.Reload); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.plugin_validate)) },
-                            onClick = { onAction(PluginStatusAction.Validate); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Rerun Setup") },
-                            onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.plugin_changelog)) },
-                            onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.plugin_settings)) },
-                            onClick = { onAction(PluginStatusAction.Settings); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
-                        )
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(Res.string.plugin_uninstall),
-                                    color = MaterialTheme.colorScheme.error
-                                )
+                    item { shape, modifierSpec ->
+                        Button(
+                            onClick = { 
+                                if (plugin.requiredAction == "CONFIGURE_SETTINGS") {
+                                    onAction(PluginStatusAction.Settings)
+                                } else {
+                                    onAction(PluginStatusAction.Custom(plugin.requiredAction!!)) 
+                                }
                             },
-                            onClick = { onAction(PluginStatusAction.Uninstall); expanded = false },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
+                            colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
+                            shape = shape,
+                            modifier = modifierSpec,
+                            enabled = enabled
+                        ) {
+                            Text(if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue"))
+                        }
+                    }
+                }
+
+                item { shape, modifierSpec ->
+                    if (hasUpdate) {
+                        Button(
+                            onClick = { onAction(PluginStatusAction.Update) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                            shape = shape,
+                            modifier = modifierSpec,
+                            enabled = enabled
+                        ) {
+                            Text(stringResource(Res.string.plugin_update))
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { onAction(PluginStatusAction.Update) },
+                            shape = shape,
+                            modifier = modifierSpec,
+                            enabled = enabled
+                        ) {
+                            Text(stringResource(Res.string.plugin_update_local))
+                        }
+                    }
+                }
+
+                item { shape, modifierSpec ->
+                    val toggleColor = if (plugin.isEnabled) {
+                        ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         )
+                    } else {
+                        ButtonDefaults.outlinedButtonColors()
+                    }
+                    OutlinedButton(
+                        onClick = { onToggle(!plugin.isEnabled) },
+                        colors = toggleColor,
+                        shape = shape,
+                        modifier = modifierSpec,
+                        enabled = enabled
+                    ) {
+                        Icon(
+                            imageVector = if (plugin.isEnabled) Icons.Default.CheckCircle else Icons.Default.Extension,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(if (plugin.isEnabled) "Active" else "Disabled")
+                    }
+                }
+
+                item { shape, modifierSpec ->
+                    Box {
+                        FilledTonalIconButton(
+                            onClick = { expanded = true },
+                            shape = shape,
+                            modifier = modifierSpec.size(38.dp),
+                            enabled = enabled
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = stringResource(Res.string.action_more_actions)
+                            )
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.plugin_reload)) },
+                                onClick = { onAction(PluginStatusAction.Reload); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.plugin_validate)) },
+                                onClick = { onAction(PluginStatusAction.Validate); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Rerun Setup") },
+                                onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.plugin_changelog)) },
+                                onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.plugin_settings)) },
+                                onClick = { onAction(PluginStatusAction.Settings); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(Res.string.plugin_uninstall),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = { onAction(PluginStatusAction.Uninstall); expanded = false },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }

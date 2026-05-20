@@ -42,8 +42,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,6 +63,8 @@ import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
+import androidx.compose.material3.FilledTonalIconButton
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_delete
@@ -124,26 +125,33 @@ fun FlowManagerView(
                 modifier = Modifier.weight(1f)
             )
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(
-                    onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                ) {
-                    Icon(Icons.Default.Download, contentDescription = "Import Flow")
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text("Import Flow")
+            ToolkitButtonGroup {
+                item { shape, modifierSpec ->
+                    Button(
+                        onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = "Import Flow")
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        Text("Import Flow")
+                    }
                 }
 
-                Button(onClick = { showCreateDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(stringResource(Res.string.flow_create_new))
+                item { shape, modifierSpec ->
+                    Button(
+                        onClick = { showCreateDialog = true },
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        Text(stringResource(Res.string.flow_create_new))
+                    }
                 }
             }
         }
@@ -151,20 +159,13 @@ fun FlowManagerView(
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
         // Premium Search Bar matching application design system
-        OutlinedTextField(
+        ToolkitTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             placeholder = { Text(stringResource(Res.string.flow_search_placeholder), style = MaterialTheme.typography.bodyMedium) },
             modifier = Modifier.fillMaxWidth(),
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-            singleLine = true,
-            shape = CircleShape,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f)
-            )
+            singleLine = true
         )
 
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
@@ -226,12 +227,11 @@ fun FlowManagerView(
             onDismissRequest = { showCreateDialog = false },
             title = { Text(stringResource(Res.string.flow_create_new)) },
             text = {
-                OutlinedTextField(
+                ToolkitTextField(
                     value = newFlowName,
                     onValueChange = { newFlowName = it },
                     label = { Text(stringResource(Res.string.flow_name_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium
+                    modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
@@ -385,19 +385,14 @@ private fun ConflictResolutionDialog(
                             ) {
                                 Column {
                                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
-                                    OutlinedTextField(
+                                    ToolkitTextField(
                                         value = customNames[clashingName] ?: "",
                                         onValueChange = { customNames[clashingName] = it },
                                         label = { Text("New flow name (optional)") },
                                         placeholder = { Text("Auto-unique fallback") },
                                         singleLine = true,
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(20.dp),
-                                        textStyle = MaterialTheme.typography.bodyMedium,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                                        )
+                                        textStyle = MaterialTheme.typography.bodyMedium
                                     )
                                 }
                             }
@@ -445,9 +440,7 @@ private fun FlowItem(
         onClick = onSelect
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -610,42 +603,48 @@ private fun FlowItem(
                 }
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onExport,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Export Flow",
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(20.dp)
-                    )
+            ToolkitButtonGroup {
+                item { shape, modifierSpec ->
+                    FilledTonalIconButton(
+                        onClick = onExport,
+                        shape = shape,
+                        modifier = modifierSpec.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Export Flow",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                item { shape, modifierSpec ->
+                    FilledTonalIconButton(
+                        onClick = onEdit,
+                        shape = shape,
+                        modifier = modifierSpec.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
+                item { shape, modifierSpec ->
+                    FilledTonalIconButton(
+                        onClick = onDelete,
+                        shape = shape,
+                        modifier = modifierSpec.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }

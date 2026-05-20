@@ -35,7 +35,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -624,7 +624,7 @@ fun NodeComponent(
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        OutlinedTextField(
+                        ToolkitTextField(
                             value = name,
                             onValueChange = { name = it },
                             label = { Text(stringResource(Res.string.node_port_name_label)) },
@@ -636,7 +636,7 @@ fun NodeComponent(
                         var dropdownExpanded by remember { mutableStateOf(false) }
                         
                         Box(modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(
+                            ToolkitTextField(
                                 value = selectedTypeOption,
                                 onValueChange = {},
                                 readOnly = true,
@@ -666,7 +666,7 @@ fun NodeComponent(
                         }
                         
                         if (selectedTypeOption == "Object") {
-                            OutlinedTextField(
+                            ToolkitTextField(
                                 value = customClassName,
                                 onValueChange = { customClassName = it },
                                 label = { Text(stringResource(Res.string.node_class_name_label)) },
@@ -675,7 +675,7 @@ fun NodeComponent(
                             )
                         }
                         
-                        OutlinedTextField(
+                        ToolkitTextField(
                             value = semanticType,
                             onValueChange = { semanticType = it },
                             label = { Text(stringResource(Res.string.node_semantic_type_label)) },

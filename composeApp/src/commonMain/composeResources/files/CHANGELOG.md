@@ -1,3 +1,14 @@
+Version: 1.5.1
+Date: 20-05-2026
+Added:
+	- Iterator node
+	- Comparator node
+	- Converter no can convert Int to Bool
+	- Ability to search/type path/folder and them be resolved by the application when working with flows and capabilities
+Changes:
+	- Restiled the ui a bit more
+	- System dialogs are now blocking for the ui
+----------------------------------------------------------------------------------------------------
 Version: 1.5.0
 Date: 20-05-2026
 Changes:

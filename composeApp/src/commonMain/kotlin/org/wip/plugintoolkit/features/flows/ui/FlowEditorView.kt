@@ -17,7 +17,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -596,12 +596,11 @@ fun FlowEditorView(
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(bottom = ToolkitTheme.spacing.medium)
                         )
-                        OutlinedTextField(
+                        ToolkitTextField(
                             value = saveAsName,
                             onValueChange = { saveAsName = it },
                             label = { Text(stringResource(Res.string.flow_name_label)) },
                             singleLine = true,
-                            shape = MaterialTheme.shapes.medium,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
