@@ -15,12 +15,12 @@ import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.core.utils.PlatformUtils
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
 
 class UpdateService(
     private val client: HttpClient = HttpClient {

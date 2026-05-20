@@ -1,7 +1,9 @@
 package org.wip.plugintoolkit.api.processor
 
-import com.google.devtools.ksp.symbol.*
-import com.squareup.kotlinpoet.*
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.squareup.kotlinpoet.FileSpec
+import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_UPDATE_ANNOTATION
@@ -21,6 +23,7 @@ object KotlinGenerator {
         description: String,
         minMemoryMb: Int,
         minExecutionTimeMs: Int,
+        supportedOs: List<OS>,
         functions: List<KSFunctionDeclaration>,
         settingsClasses: List<KSClassDeclaration>,
         actions: List<KSFunctionDeclaration>,
@@ -40,7 +43,7 @@ object KotlinGenerator {
         
         val manifestType = ManifestGenerator.generateManifestObject(
             manifestName, id, name, version, description, 
-            minMemoryMb, minExecutionTimeMs, functions, 
+            minMemoryMb, minExecutionTimeMs, supportedOs, functions, 
             settingsClasses.flatMap { it.getAllProperties().filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } } }.toList(), 
             actions, updateFunction != null, setupFunction != null
         )

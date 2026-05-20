@@ -1,28 +1,28 @@
 package org.wip.plugintoolkit.features.settings.ui
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import org.jetbrains.compose.resources.stringResource
-import org.wip.plugintoolkit.features.settings.model.UpdateState
-import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
-import org.wip.plugintoolkit.shared.components.settings.SettingsItem
-import plugintoolkit.composeapp.generated.resources.*
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
-
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.settings.model.UpdateState
+import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.update_check_started
+import plugintoolkit.composeapp.generated.resources.update_new_version_found
 
 @Composable
 fun CheckForUpdatesControl(viewModel: SettingsViewModel) {

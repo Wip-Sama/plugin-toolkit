@@ -1,16 +1,27 @@
 package org.wip.plugintoolkit.api.processor
 
-import com.google.devtools.ksp.processing.*
-import com.google.devtools.ksp.symbol.*
-import org.wip.plugintoolkit.api.PluginEntry
+import com.google.devtools.ksp.processing.CodeGenerator
+import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.processing.KSPLogger
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.processing.SymbolProcessor
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.processing.SymbolProcessorProvider
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSClassifierReference
+import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.KSType
 import org.wip.plugintoolkit.api.Changelog
-import org.wip.plugintoolkit.api.annotations.PluginInfo as PluginInfoAnnotation
+import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_INFO_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import java.io.File
+import org.wip.plugintoolkit.api.annotations.PluginInfo as PluginInfoAnnotation
 
 class ManifestProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
@@ -44,6 +55,16 @@ class ManifestProcessor(
         val description = pluginInfoAnnotation.arguments.find { it.name?.asString() == "description" }?.value as String
         val minMemoryMb = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minMemoryMb" }?.value as Int
         val minExecutionTimeMs = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minExecutionTimeMs" }?.value as Int
+        val supportedOs = (pluginInfoAnnotation.arguments.find { it.name?.asString() == "supportedOs" }?.value as? List<*>)
+            ?.mapNotNull { item ->
+                val valStr = when (item) {
+                    is KSType -> item.declaration.simpleName.asString()
+                    is KSClassifierReference -> item.referencedName()
+                    is KSDeclaration -> item.simpleName.asString()
+                    else -> item?.toString() ?: ""
+                }
+                try { OS.valueOf(valStr.uppercase()) } catch (e: Exception) { null }
+            } ?: emptyList()
 
         val packageName = classDeclaration.packageName.asString()
         val baseClassName = classDeclaration.simpleName.asString()
@@ -85,7 +106,7 @@ class ManifestProcessor(
         // 2. Generate Kotlin Classes
         val fileSpec = KotlinGenerator.generate(
             packageName, baseClassName, id, name, version, description,
-            minMemoryMb, minExecutionTimeMs, functions, settingsClasses, actions, classDeclaration
+            minMemoryMb, minExecutionTimeMs, supportedOs, functions, settingsClasses, actions, classDeclaration
         )
         
         val generatedFileName = baseClassName + "Generated"
@@ -106,7 +127,7 @@ class ManifestProcessor(
         val allSettingsProperties = settingsClasses.flatMap { it.getAllProperties().filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } } }.toList()
         val manifestJson = ManifestJsonGenerator.generate(
             classDeclaration, id, name, version, description,
-            minMemoryMb, minExecutionTimeMs, functions, allSettingsProperties, actions, changelogObj
+            minMemoryMb, minExecutionTimeMs, supportedOs, functions, allSettingsProperties, actions, changelogObj
         )
         writeFile(sourceFile, "", "META-INF/manifest", "json", manifestJson)
     }

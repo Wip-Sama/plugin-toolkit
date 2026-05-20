@@ -34,7 +34,9 @@ data class Spacing(
     val large: Dp = 24.dp,
     val extraLarge: Dp = 32.dp,
     val huge: Dp = 40.dp,
-    val massive: Dp = 64.dp
+    val massive: Dp = 64.dp,
+    val badgeHorizontal: Dp = 6.dp,
+    val badgeVertical: Dp = 2.dp
 )
 
 data class Dimensions(
@@ -44,7 +46,19 @@ data class Dimensions(
     val iconMedium: Dp = 24.dp,
     val iconLarge: Dp = 32.dp,
     val pluginIcon: Dp = 48.dp,
-    val cardElevation: Dp = 2.dp
+    val cardElevation: Dp = 2.dp,
+    val repositorySidebarWidth: Dp = 340.dp,
+    val textFieldHeight: Dp = 56.dp,
+    val borderSelected: Dp = 2.dp,
+    val borderUnselected: Dp = 1.dp,
+    val iconMediumSmall: Dp = 18.dp,
+    val emptyStateIconSize: Dp = 80.dp,
+    val emptyStateTextWidth: Dp = 420.dp,
+    val listIconSize: Dp = 54.dp,
+    val listIconContentSize: Dp = 28.dp,
+    val progressBoxSize: Dp = 36.dp,
+    val progressIndicatorStroke: Dp = 2.dp,
+    val progressIndicatorStrokeMedium: Dp = 3.dp
 )
 
 data class CustomColors(
@@ -54,9 +68,22 @@ data class CustomColors(
     val validated: Color = Color(0xFFD0BCFF)
 )
 
+data class Opacity(
+    val transparent: Float = 0.0f,
+    val cardBackground: Float = 0.05f,
+    val borderLow: Float = 0.2f,
+    val glassBackground: Float = 0.3f,
+    val sidebarBackground: Float = 0.4f,
+    val divider: Float = 0.5f,
+    val disabled: Float = 0.6f,
+    val secondaryText: Float = 0.8f,
+    val full: Float = 1.0f
+)
+
 val LocalSpacing = staticCompositionLocalOf { Spacing() }
 val LocalDimensions = staticCompositionLocalOf { Dimensions() }
 val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
+val LocalOpacity = staticCompositionLocalOf { Opacity() }
 
 object ToolkitTheme {
     val spacing: Spacing
@@ -73,6 +100,11 @@ object ToolkitTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalCustomColors.current
+
+    val opacity: Opacity
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalOpacity.current
 }
 
 private val DarkColorScheme =
@@ -146,7 +178,8 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
         LocalCustomColors provides CustomColors(
             validated = seedColor,
             success = Color(0xFF4CAF50) //TODO: Could be tuned based on theme
-        )
+        ),
+        LocalOpacity provides Opacity()
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

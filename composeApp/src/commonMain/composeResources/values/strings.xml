@@ -28,7 +28,9 @@
     <string name="section_about">About</string>
     <string name="about_built_by">Built with ❤️ by: Wip-Sama</string>
     <string name="about_libraries">Libraries used</string>
-    <string name="about_libraries_placeholder">The list of libraries will be available soon.</string>
+    <string name="about_icon_credits">Icon credits</string>
+    <string name="about_icon_author">Muh_zakaria</string>
+    <string name="about_icon_site">SVGRepo</string>
     <string name="section_general">General</string>
     <string name="section_localization">Localization</string>
     <string name="setting_adaptive_color">Adaptive Color</string>
@@ -210,6 +212,7 @@
     <string name="repo_plugin_installed">Plugin %1$s installed</string>
     <string name="repo_install_failed">Failed to install %1$s: %2$s</string>
     <string name="repo_url_placeholder">https://.../index.json</string>
+    <string name="repo_link_copied">Repository link copied to clipboard</string>
 
     <!-- Landing Page -->
     <string name="landing_system_overview">System Overview</string>
@@ -225,4 +228,98 @@
     <string name="landing_link_docs">Documentation</string>
     <string name="landing_welcome_title">Welcome to WOToolkit</string>
     <string name="landing_welcome_subtitle">Your central hub for plugin orchestration and automation.</string>
+
+    <!-- Flows Feature -->
+    <string name="flow_manager_title">Flow Manager</string>
+    <string name="flow_create_new">Create New Flow</string>
+    <string name="flow_search_placeholder">Search flows...</string>
+    <string name="flow_no_flows">No flows created yet.</string>
+    <string name="flow_no_search_results">No flows matching your search.</string>
+    <string name="flow_name_label">Flow Name</string>
+    <string name="flow_create_button">Create</string>
+    <string name="flow_delete_title">Delete Flow</string>
+    <string name="flow_delete_confirm">Are you sure you want to delete \'%1$s\'?</string>
+    <string name="flow_delete_warning_subflow">Warning: This flow is embedded as a subflow inside other flows (Used in: %1$s). Deleting it will inline and unpack all of its nodes directly inside those parent flows.</string>
+    <string name="flow_broken_tag">Broken</string>
+    <string name="flow_nodes_count">%1$d nodes</string>
+    <string name="flow_used_in_parent">Used in %1$d parent</string>
+    <string name="flow_used_in_parents">Used in %1$d parents</string>
+    <string name="flow_used_in_chip">Used in: %1$s</string>
+    <string name="flow_missing_chip">Missing: %1$s</string>
+    
+    <!-- Flow Runner -->
+    <string name="flow_select_title">Select Flow</string>
+    <string name="flow_select_hint">Select a flow to see options</string>
+    <string name="flow_run_title">Run Flow: %1$s</string>
+    <string name="flow_run_description">This will execute all nodes in topological DAG order.</string>
+    <string name="flow_inputs_title">Execution Inputs</string>
+    <string name="flow_outputs_title">Expected Outputs</string>
+    <string name="flow_collected_automatically">Collected automatically</string>
+    <string name="flow_execute_button">Execute Flow</string>
+    <string name="flow_history_title">Execution History</string>
+    <string name="flow_no_history">No runs recorded for this flow.</string>
+    <string name="flow_run_id_label">Run ID: %1$s</string>
+    <string name="flow_triggered_label">Triggered: %1$s</string>
+    <string name="flow_toggle_logs_desc">Toggle logs</string>
+    <string name="flow_output_results_title">Output Results</string>
+    <string name="flow_console_logs_title">Console Log Output</string>
+    <string name="flow_no_console_logs">No console output recorded.</string>
+
+    <!-- Flow Editor -->
+    <string name="flow_editor_incompatible_title">Incompatible Types - Auto Convert?</string>
+    <string name="flow_editor_incompatible_message">The source port type (%1$s) and target port type (%2$s) are different but convertible.\n\nWould you like to automatically insert a Convert node in between?</string>
+    <string name="flow_editor_convert_connect">Convert &amp; Connect</string>
+    <string name="flow_editor_enter_name">Enter a name for your new flow:</string>
+    <string name="flow_editor_save_as_title">Save Flow</string>
+    <string name="flow_editor_duplicate_error">A flow named \'%1$s\' already exists.</string>
+    <string name="flow_editor_placeholder_title">Ghost Preview</string>
+    <string name="flow_editor_read_only">READ-ONLY</string>
+    <string name="flow_readonly_reason_running">Running</string>
+    <string name="flow_readonly_reason_used_in_other">Used in other flows</string>
+    <string name="flow_editor_read_only_reason">READ-ONLY (%1$s)</string>
+    <string name="flow_editor_no_flow_selected">No flow selected</string>
+    <string name="flow_editor_flow_selected">Flow Selected</string>
+    <string name="flow_editor_save_changes">Save Changes</string>
+    <string name="flow_editor_same_node_warning">Cannot connect: Ports belong to the same node.</string>
+    <string name="flow_editor_incompatible_types">Cannot connect: Incompatible types. Cannot connect %1$s to %2$s.</string>
+    <string name="flow_editor_incompatible_semantics">Cannot connect: Incompatible semantic types. \'%1$s\' cannot connect to \'%2$s\'.</string>
+    <string name="flow_editor_btn_exit">Exit</string>
+    
+    <!-- Node Component -->
+    <string name="node_expand">Expand</string>
+    <string name="node_edit_port">Edit Port</string>
+    <string name="node_delete">Delete</string>
+    <string name="node_delete_title">Delete Node</string>
+    <string name="node_delete_confirm">Are you sure you want to delete \'%1$s\'? This will also remove all connected lines.</string>
+    <string name="node_port_implied_type">%1$s (Implied)</string>
+    <string name="node_edit_input_title">Edit Flow Input Port</string>
+    <string name="node_edit_output_title">Edit Flow Output Port</string>
+    <string name="node_port_name_label">Port Name</string>
+    <string name="node_data_type_label">Data Type</string>
+    <string name="node_select_type_desc">Select Type</string>
+    <string name="node_class_name_label">Class Name (e.g. org.wip.MyData)</string>
+    <string name="node_semantic_type_label">Semantic Type / Mimetype (optional)</string>
+    <string name="node_semantic_type_placeholder">e.g. image/png</string>
+    
+    <!-- Palette Sidebar -->
+    <string name="palette_search_placeholder">Search nodes...</string>
+    <string name="palette_tab_plugins">Plugins</string>
+    <string name="palette_tab_system">System</string>
+    <string name="palette_tab_flows">Flows</string>
+
+    <!-- PluginRepoView additions -->
+    <string name="repo_share_link_desc">Share repository link</string>
+    <string name="repo_no_repo_selected">No Repository Selected</string>
+    <string name="repo_no_repo_selected_desc">Select a repository from the left panel, or add a new repository URL at the top to explore its plugins and flows.</string>
+    <string name="repo_tab_plugins">Plugins (%1$d)</string>
+    <string name="repo_tab_flows">Flows (%1$d)</string>
+    <string name="repo_search_plugins_placeholder">Search plugins in this repository...</string>
+    <string name="repo_search_flows_placeholder">Search flows in this repository...</string>
+    <string name="repo_no_plugins_found">No plugins found matching search query.</string>
+    <string name="repo_no_flows_found">No flows found matching search query.</string>
+    <string name="repo_wrong_signature">Wrong Signature</string>
+    <string name="repo_plugin_pkg_version_format">Package: %1$s • Version: %2$s</string>
+    <string name="repo_flow_filename_version_format">FileName: %1$s • Version: %2$s</string>
+    <string name="repo_action_update_version">Update to v%1$s</string>
+    <string name="repo_plugin_installed_version_format">Installed (v%1$s)</string>
 </resources>

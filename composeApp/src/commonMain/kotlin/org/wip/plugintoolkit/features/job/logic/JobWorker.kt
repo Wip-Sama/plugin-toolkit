@@ -3,7 +3,6 @@ package org.wip.plugintoolkit.features.job.logic
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
@@ -11,17 +10,40 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readString
+import kotlinx.io.writeString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import kotlinx.serialization.json.longOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
-import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 
 class JobWorker(
     val workerId: Int,
@@ -96,6 +118,7 @@ class JobWorker(
                 JobType.Validation -> executeValidationJob(job)
                 JobType.PluginAction -> executePluginActionJob(job)
                 JobType.PluginInstallation -> executeInstallationJob(job)
+                JobType.Flow -> executeFlowJob(job)
                 else -> throw Exception("Unsupported job type: ${job.type}")
             }
         } catch (e: CancellationException) {
@@ -375,6 +398,952 @@ class JobWorker(
             val error = result.exceptionOrNull()?.message ?: "Installation failed"
             manager.tryFailJob(job.id, error)
             lifecycleCoordinator.onLifecycleJobFailed(job, error)
+        }
+    }
+
+    private suspend fun executeFlowJob(job: BackgroundJob) {
+        manager.addJobLog(job.id, "Starting flow execution for '${job.capabilityName}'...")
+        manager.updateJobProgress(job.id, 0.05f)
+
+        // 1. Resolve Settings Directory and Load Flow
+        val settingsPersistence: SettingsPersistence by inject()
+        val appDataDir = settingsPersistence.getSettingsDir()
+        val safeName = job.capabilityName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+        val file = Path("$appDataDir/flows/$safeName.json")
+        
+        if (!SystemFileSystem.exists(file)) {
+            throw Exception("Flow definition file not found: ${file.name}")
+        }
+        
+        val flowContent = SystemFileSystem.source(file).buffered().use { it.readString() }
+        val flow = Json { 
+            ignoreUnknownKeys = true 
+            encodeDefaults = true
+        }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(flowContent)
+
+        manager.addJobLog(job.id, "Loaded flow '${flow.name}' with ${flow.nodes.size} nodes and ${flow.connections.size} connections.")
+
+        val runtimeInferred = runRuntimeTypeInference(flow)
+
+        // 2. Perform Topological Sort
+        val inDegree = mutableMapOf<Long, Int>()
+        val adj = mutableMapOf<Long, MutableList<Long>>()
+
+        flow.nodes.forEach { node ->
+            inDegree[node.id] = 0
+            adj[node.id] = mutableListOf()
+        }
+
+        flow.connections.forEach { conn ->
+            if (inDegree.containsKey(conn.targetNodeId) && inDegree.containsKey(conn.sourceNodeId)) {
+                adj[conn.sourceNodeId]?.add(conn.targetNodeId)
+                inDegree[conn.targetNodeId] = (inDegree[conn.targetNodeId] ?: 0) + 1
+            }
+        }
+
+        val queue = ArrayDeque<Long>()
+        flow.nodes.forEach { node ->
+            if (inDegree[node.id] == 0) {
+                queue.addLast(node.id)
+            }
+        }
+
+        val executionOrder = mutableListOf<Long>()
+        while (queue.isNotEmpty()) {
+            val nodeId = queue.removeFirst()
+            executionOrder.add(nodeId)
+            adj[nodeId]?.forEach { neighbor ->
+                inDegree[neighbor] = (inDegree[neighbor] ?: 1) - 1
+                if (inDegree[neighbor] == 0) {
+                    queue.addLast(neighbor)
+                }
+            }
+        }
+
+        if (executionOrder.size < flow.nodes.size) {
+            throw Exception("Cycle or invalid connection structure detected in flow graph.")
+        }
+
+        manager.addJobLog(job.id, "Successfully established DAG topological execution sequence.")
+
+        // 3. Execute Nodes in Sequence
+        val computedValues = mutableMapOf<Pair<Long, String>, Any?>()
+        val flowOutputs = mutableMapOf<String, Any?>()
+        val activeNodes = mutableSetOf<Long>()
+        val executedNodeIds = mutableSetOf<Long>()
+        val capabilityResumeStates = mutableMapOf<Long, JsonElement>()
+
+        // Register flow-level job handle
+        val jobExecution = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        var pauseRequested = false
+        var activeCapabilityHandle: org.wip.plugintoolkit.api.JobHandle? = null
+
+        val flowHandle = object : org.wip.plugintoolkit.api.JobHandle {
+            override val result: kotlinx.coroutines.Deferred<org.wip.plugintoolkit.api.ExecutionResult>
+                get() = throw UnsupportedOperationException("Not used directly")
+
+            override fun pause() {
+                pauseRequested = true
+                activeCapabilityHandle?.pause()
+            }
+
+            override fun cancel(force: Boolean) {
+                activeCapabilityHandle?.cancel(force)
+                jobExecution.cancel()
+            }
+        }
+        manager.registerJobHandle(job.id, flowHandle)
+
+        try {
+            val resumeState = job.resumeState as? JsonObject
+            if (resumeState != null) {
+                resumeState["executedNodeIds"]?.jsonArray?.map { it.jsonPrimitive.long }?.let {
+                    executedNodeIds.addAll(it)
+                }
+                resumeState["activeNodes"]?.jsonArray?.map { it.jsonPrimitive.long }?.let {
+                    activeNodes.addAll(it)
+                }
+                resumeState["computedValues"]?.jsonArray?.forEach { entry ->
+                    val obj = entry.jsonObject
+                    val nodeId = obj["nodeId"]?.jsonPrimitive?.long
+                    val portId = obj["portId"]?.jsonPrimitive?.content
+                    val valueJson = obj["value"]
+                    if (nodeId != null && portId != null && valueJson != null) {
+                        computedValues[Pair(nodeId, portId)] = fromJsonElement(valueJson)
+                    }
+                }
+                resumeState["capabilityResumeStates"]?.jsonObject?.forEach { (nodeIdStr, resumeStateJson) ->
+                    nodeIdStr.toLongOrNull()?.let { nodeId ->
+                        capabilityResumeStates[nodeId] = resumeStateJson
+                    }
+                }
+                manager.addJobLog(job.id, "Resuming flow execution from saved state. Executed nodes: ${executedNodeIds.size}, Active nodes: ${activeNodes.size}")
+            } else {
+                flow.nodes.forEach { n ->
+                    val hasIncoming = flow.connections.any { it.targetNodeId == n.id }
+                    if (!hasIncoming) {
+                        activeNodes.add(n.id)
+                    }
+                }
+            }
+
+            executionOrder.forEachIndexed { index, nodeId ->
+                val node = flow.nodes.first { it.id == nodeId }
+                if (executedNodeIds.contains(node.id)) {
+                    return@forEachIndexed
+                }
+                if (!activeNodes.contains(node.id)) {
+                    return@forEachIndexed
+                }
+
+                // Check for pause request before executing a capability node
+                if (pauseRequested && node is org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode) {
+                    manager.addJobLog(job.id, "Flow execution paused before capability: ${node.title}")
+                    val resumeStateJson = JsonObject(mapOf(
+                        "executedNodeIds" to JsonArray(executedNodeIds.map { JsonPrimitive(it) }),
+                        "activeNodes" to JsonArray(activeNodes.map { JsonPrimitive(it) }),
+                        "computedValues" to JsonArray(computedValues.map { (key, value) ->
+                            JsonObject(mapOf(
+                                "nodeId" to JsonPrimitive(key.first),
+                                "portId" to JsonPrimitive(key.second),
+                                "value" to toJsonElement(value)
+                            ))
+                        }),
+                        "capabilityResumeStates" to JsonObject(capabilityResumeStates.mapKeys { it.key.toString() })
+                    ))
+                    manager.tryPauseJob(job.id, resumeStateJson)
+                    return
+                }
+
+                manager.addJobLog(job.id, "Executing node [${node.title}] (${index + 1}/${flow.nodes.size})...")
+                
+                // Periodically report progress (0.1 to 0.95 range)
+                val nodeProgress = 0.1f + (index.toFloat() / flow.nodes.size.toFloat()) * 0.8f
+                manager.updateJobProgress(job.id, nodeProgress)
+
+                // Resolve inputs
+                fun getInputValue(portId: String, defaultValue: Any?): Any? {
+                    val conn = flow.connections.find { it.targetNodeId == node.id && it.targetPortId == portId }
+                    return if (conn != null) {
+                        computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
+                    } else {
+                        val port = node.inputs.find { it.id == portId }
+                        port?.value ?: port?.defaultValue ?: defaultValue
+                    }
+                }
+
+                when (node) {
+                    is org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode -> {
+                        val outputPort = node.outputs.firstOrNull()
+                        if (outputPort != null) {
+                            val key = "${node.id}"
+                            val valueJson = job.parameters[key] ?: job.parameters[outputPort.id]
+                            val rawValue = valueJson?.let { je ->
+                                when (je) {
+                                    is kotlinx.serialization.json.JsonPrimitive -> {
+                                        if (je.isString) je.content
+                                        else je.booleanOrNull ?: je.intOrNull ?: je.longOrNull ?: je.doubleOrNull ?: je.content
+                                    }
+                                    else -> je.toString()
+                                }
+                            } ?: ""
+                            computedValues[Pair(node.id, outputPort.id)] = rawValue
+                            manager.addJobLog(job.id, "Flow input node [${node.title}] populated with: $rawValue")
+                        }
+                    }
+                    is org.wip.plugintoolkit.features.flows.model.Node.SystemNode -> {
+                        when (node.systemAction.lowercase()) {
+                            "save" -> {
+                                val data = getInputValue("data", "")
+                                val filePath = getInputValue("file_path", "output.txt") as String
+                                val dataString = when (data) {
+                                    is kotlinx.serialization.json.JsonElement -> data.toString()
+                                    else -> data?.toString() ?: ""
+                                }
+                                
+                                val fullPath = Path("$appDataDir/$filePath")
+                                val parent = fullPath.parent
+                                if (parent != null && !SystemFileSystem.exists(parent)) {
+                                    SystemFileSystem.createDirectories(parent)
+                                }
+                                SystemFileSystem.sink(fullPath).buffered().use { it.writeString(dataString) }
+                                
+                                computedValues[Pair(node.id, "success")] = true
+                                manager.addJobLog(job.id, "Saved data to file: $filePath")
+                            }
+                            "load" -> {
+                                val filePath = getInputValue("file_path", "output.txt") as String
+                                val fullPath = Path("$appDataDir/$filePath")
+                                
+                                val fileContent = if (SystemFileSystem.exists(fullPath)) {
+                                    SystemFileSystem.source(fullPath).buffered().use { it.readString() }
+                                } else {
+                                    manager.addJobLog(job.id, "Warning: file to load not found, returning empty: $filePath", "WARN")
+                                    ""
+                                }
+                                
+                                computedValues[Pair(node.id, "data")] = fileContent
+                                manager.addJobLog(job.id, "Loaded content from file: $filePath (Size: ${fileContent.length} chars)")
+                            }
+                            "log" -> {
+                                val level = getInputValue("level", "INFO") as String
+                                val message = getInputValue("message", "") as String
+                                val data = getInputValue("data", null)
+                                
+                                val logMessage = buildString {
+                                    append(message)
+                                    if (data != null) {
+                                        append(" | Data: ")
+                                        append(data)
+                                    }
+                                }
+                                manager.addJobLog(job.id, logMessage, level.uppercase())
+                                computedValues[Pair(node.id, "output")] = message
+                            }
+                            "delay" -> {
+                                val duration = when (val dur = getInputValue("duration", 1000)) {
+                                    is Number -> dur.toLong()
+                                    is String -> dur.toLongOrNull() ?: 1000L
+                                    else -> 1000L
+                                }
+                                val inputData = getInputValue("input_data", null)
+                                
+                                manager.addJobLog(job.id, "Sleeping for $duration ms...")
+                                kotlinx.coroutines.delay(duration)
+                                
+                                computedValues[Pair(node.id, "output_data")] = inputData
+                            }
+                            "convert" -> {
+                                val inputData = getInputValue("input_data", null)
+                                val targetType = runtimeInferred[Pair(node.id, "output_data")] ?: DataType.Primitive(PrimitiveType.ANY)
+                                try {
+                                    val converted = convertValue(inputData, targetType)
+                                    computedValues[Pair(node.id, "output_data")] = converted
+                                    computedValues[Pair(node.id, "success")] = true
+                                } catch (e: Exception) {
+                                    manager.addJobLog(job.id, "Conversion warning: ${e.message}", "WARN")
+                                    computedValues[Pair(node.id, "output_data")] = null
+                                    computedValues[Pair(node.id, "success")] = false
+                                }
+                            }
+                            "conditional" -> {
+                                val conditionVal = getInputValue("condition", false)
+                                val condition = when (conditionVal) {
+                                    is Boolean -> conditionVal
+                                    is String -> conditionVal.toBoolean()
+                                    is Number -> conditionVal.toInt() != 0
+                                    else -> false
+                                }
+                                val inputData = getInputValue("input_data", null)
+                                if (condition) {
+                                    computedValues[Pair(node.id, "if_true")] = inputData
+                                    computedValues[Pair(node.id, "if_false")] = null
+                                } else {
+                                    computedValues[Pair(node.id, "if_true")] = null
+                                    computedValues[Pair(node.id, "if_false")] = inputData
+                                }
+                            }
+                            "error" -> {
+                                val message = getInputValue("message", "An error occurred during flow execution") as String
+                                val data = getInputValue("data", null)
+                                val errorMessage = if (data != null) {
+                                    val dataStr = when (data) {
+                                        is kotlinx.serialization.json.JsonPrimitive -> {
+                                            if (data.isString) data.content else data.toString()
+                                        }
+                                        else -> data.toString()
+                                    }
+                                    if (message.endsWith(": ") || message.endsWith(":") || message.endsWith(" ")) {
+                                        "$message$dataStr"
+                                    } else {
+                                        "$message: $dataStr"
+                                    }
+                                } else {
+                                    message
+                                }
+                                throw Exception(errorMessage)
+                            }
+                            "merger" -> {
+                                val list1 = getInputValue("list1", null)
+                                val list2 = getInputValue("list2", null)
+                                
+                                val merged = mutableListOf<Any?>()
+                                
+                                fun addToList(item: Any?) {
+                                    when (item) {
+                                        is List<*> -> merged.addAll(item)
+                                        is Array<*> -> merged.addAll(item)
+                                        is kotlinx.serialization.json.JsonArray -> {
+                                            item.forEach { je ->
+                                                val unwrapped = when (je) {
+                                                    is kotlinx.serialization.json.JsonPrimitive -> {
+                                                        if (je.isString) je.content
+                                                        else je.booleanOrNull ?: je.intOrNull ?: je.longOrNull ?: je.doubleOrNull ?: je.content
+                                                    }
+                                                    else -> je
+                                                }
+                                                merged.add(unwrapped)
+                                            }
+                                        }
+                                        null -> {}
+                                        else -> merged.add(item)
+                                    }
+                                }
+                                
+                                addToList(list1)
+                                addToList(list2)
+                                
+                                computedValues[Pair(node.id, "output")] = merged
+                                manager.addJobLog(job.id, "Merged lists. Item count: ${merged.size}")
+                            }
+                            else -> {
+                                throw Exception("Unsupported system node action: ${node.systemAction}")
+                            }
+                        }
+                    }
+                    is org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode -> {
+                        // Gather inputs as a Map<String, JsonElement>
+                        val capabilityParameters = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                        node.inputs.forEach { port ->
+                            val resolvedVal = getInputValue(port.id, null)
+                            capabilityParameters[port.id] = toJsonElement(resolvedVal)
+                        }
+                        
+                        val plugin = PluginLoader.getPluginById(node.pluginInfo.id)
+                            ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
+                        
+                        val processor = plugin.getProcessor()
+                        val context = pluginManager.createPluginContext(node.pluginInfo.id, job.id)
+                        
+                        val savedCapResumeState = capabilityResumeStates[node.id]
+                        val request = org.wip.plugintoolkit.api.PluginRequest(
+                            method = node.capability.name,
+                            parameters = capabilityParameters,
+                            resumeState = savedCapResumeState
+                        )
+                        
+                        manager.addJobLog(job.id, "Invoking plugin capability: ${node.pluginInfo.name} -> ${node.capability.name}...")
+                        val handle = processor.processAsync(request, context)
+                        
+                        activeCapabilityHandle = handle
+                        
+                        val result = try {
+                            handle.result.await()
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            if (pauseRequested) {
+                                org.wip.plugintoolkit.api.ExecutionResult.Paused(JsonNull)
+                            } else {
+                                throw e
+                            }
+                        } catch (e: Exception) {
+                            throw Exception("Capability ${node.capability.name} failed during await: ${e.message}", e)
+                        } finally {
+                            activeCapabilityHandle = null
+                        }
+                        
+                        when (result) {
+                            is org.wip.plugintoolkit.api.ExecutionResult.Success -> {
+                                capabilityResumeStates.remove(node.id)
+                                val outputVal = result.response.result
+                                computedValues[Pair(node.id, "result")] = outputVal
+                                if (outputVal is JsonObject) {
+                                    for ((key, value) in outputVal) {
+                                        computedValues[Pair(node.id, key)] = value
+                                    }
+                                }
+                                manager.addJobLog(job.id, "Capability invocation succeeded.")
+                            }
+                            is org.wip.plugintoolkit.api.ExecutionResult.Error -> {
+                                capabilityResumeStates.remove(node.id)
+                                throw Exception("Capability invocation failed: ${result.message}")
+                            }
+                            is org.wip.plugintoolkit.api.ExecutionResult.Paused -> {
+                                capabilityResumeStates[node.id] = result.resumeState
+                                manager.addJobLog(job.id, "Capability requested pause mid-work.")
+                                
+                                val resumeStateJson = JsonObject(mapOf(
+                                    "executedNodeIds" to JsonArray(executedNodeIds.map { JsonPrimitive(it) }),
+                                    "activeNodes" to JsonArray(activeNodes.map { JsonPrimitive(it) }),
+                                    "computedValues" to JsonArray(computedValues.map { (key, value) ->
+                                        JsonObject(mapOf(
+                                            "nodeId" to JsonPrimitive(key.first),
+                                            "portId" to JsonPrimitive(key.second),
+                                            "value" to toJsonElement(value)
+                                        ))
+                                    }),
+                                    "capabilityResumeStates" to JsonObject(capabilityResumeStates.mapKeys { it.key.toString() })
+                                ))
+                                manager.tryPauseJob(job.id, resumeStateJson)
+                                return
+                            }
+                        }
+                    }
+                    is org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode -> {
+                        val inputPort = node.inputs.firstOrNull()
+                        if (inputPort != null) {
+                            val finalVal = getInputValue(inputPort.id, null)
+                            flowOutputs[inputPort.name] = finalVal
+                            computedValues[Pair(node.id, inputPort.id)] = finalVal
+                            manager.addJobLog(job.id, "Flow output collected [${inputPort.name}]: $finalVal")
+                        }
+                    }
+                    is org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode -> {
+                        // Recursive subflow execution
+                        manager.addJobLog(job.id, "Entering subflow execution for '${node.flowName}'...")
+                        
+                        val subFlowFile = Path("$appDataDir/flows/${node.flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+                        if (!SystemFileSystem.exists(subFlowFile)) {
+                            throw Exception("Subflow file not found: ${node.flowName}")
+                        }
+                        val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
+                        val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
+                        
+                        // Build nested parameters
+                        val subParameters = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                        node.inputs.forEach { port ->
+                            val mapping = node.inputMappings.find { it.portId == port.id }
+                            if (mapping != null) {
+                                val resolvedVal = getInputValue(port.id, null)
+                                subParameters["${mapping.boundaryNodeId}"] = toJsonElement(resolvedVal)
+                            }
+                        }
+                        
+                        // Create simulated sub-job
+                        val subJob = BackgroundJob(
+                            id = "${job.id}-sub-${node.id}",
+                            name = "Subflow: ${node.flowName}",
+                            type = JobType.Flow,
+                            pluginId = "system",
+                            capabilityName = node.flowName,
+                            parameters = subParameters
+                        )
+                        
+                        val subOutputs = executeSubFlowRecursively(subFlow, subJob, appDataDir)
+                        
+                        // Map subflow outputs back to parent output ports
+                        node.outputs.forEach { port ->
+                            val mapping = node.outputMappings.find { it.portId == port.id }
+                            if (mapping != null) {
+                                val boundaryOutputNode = subFlow.nodes.find { it.id == mapping.boundaryNodeId } as? org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode
+                                val boundaryPortName = boundaryOutputNode?.inputs?.firstOrNull()?.name ?: "output_data"
+                                val valFromSub = subOutputs[boundaryPortName]
+                                computedValues[Pair(node.id, port.id)] = valFromSub
+                            }
+                        }
+                        manager.addJobLog(job.id, "Successfully exited subflow execution for '${node.flowName}'.")
+                    }
+                }
+
+                val activeOutputs = mutableSetOf<String>()
+                when (node) {
+                    is org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode -> activeOutputs.addAll(node.outputs.map { it.id })
+                    is org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode -> activeOutputs.addAll(node.outputs.map { it.id })
+                    is org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode -> activeOutputs.addAll(node.outputs.map { it.id })
+                    is org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode -> activeOutputs.addAll(node.outputs.map { it.id })
+                    is org.wip.plugintoolkit.features.flows.model.Node.SystemNode -> {
+                        if (node.systemAction.lowercase() == "conditional") {
+                            val conditionVal = getInputValue("condition", false)
+                            val condition = when (conditionVal) {
+                                is Boolean -> conditionVal
+                                is String -> conditionVal.toBoolean()
+                                is Number -> conditionVal.toInt() != 0
+                                else -> false
+                            }
+                            if (condition) {
+                                activeOutputs.add("if_true")
+                            } else {
+                                activeOutputs.add("if_false")
+                            }
+                        } else {
+                            activeOutputs.addAll(node.outputs.map { it.id })
+                        }
+                    }
+                }
+
+                activeOutputs.forEach { portId ->
+                    flow.connections.forEach { conn ->
+                        if (conn.sourceNodeId == node.id && conn.sourcePortId == portId) {
+                            activeNodes.add(conn.targetNodeId)
+                        }
+                    }
+                }
+
+                executedNodeIds.add(node.id)
+            }
+
+            // 4. Serialize results and complete job
+            val jsonOutputs = toJsonElement(flowOutputs).toString()
+            manager.addJobLog(job.id, "Flow executed successfully. Final output results: $jsonOutputs")
+            manager.tryCompleteJob(job.id, jsonOutputs)
+            lifecycleCoordinator.onLifecycleJobCompleted(job)
+        } finally {
+            manager.unregisterJobHandle(job.id)
+        }
+    }
+
+    internal suspend fun executeSubFlowRecursively(
+        flow: org.wip.plugintoolkit.features.flows.model.Flow,
+        job: BackgroundJob,
+        appDataDir: String
+    ): Map<String, Any?> {
+        val runtimeInferred = runRuntimeTypeInference(flow)
+        // Build sub-DAG
+        val inDegree = mutableMapOf<Long, Int>()
+        val adj = mutableMapOf<Long, MutableList<Long>>()
+
+        flow.nodes.forEach { node ->
+            inDegree[node.id] = 0
+            adj[node.id] = mutableListOf()
+        }
+
+        flow.connections.forEach { conn ->
+            if (inDegree.containsKey(conn.targetNodeId) && inDegree.containsKey(conn.sourceNodeId)) {
+                adj[conn.sourceNodeId]?.add(conn.targetNodeId)
+                inDegree[conn.targetNodeId] = (inDegree[conn.targetNodeId] ?: 0) + 1
+            }
+        }
+
+        val queue = ArrayDeque<Long>()
+        flow.nodes.forEach { node ->
+            if (inDegree[node.id] == 0) {
+                queue.addLast(node.id)
+            }
+        }
+
+        val executionOrder = mutableListOf<Long>()
+        while (queue.isNotEmpty()) {
+            val nodeId = queue.removeFirst()
+            executionOrder.add(nodeId)
+            adj[nodeId]?.forEach { neighbor ->
+                inDegree[neighbor] = (inDegree[neighbor] ?: 1) - 1
+                if (inDegree[neighbor] == 0) {
+                    queue.addLast(neighbor)
+                }
+            }
+        }
+
+        val computedValues = mutableMapOf<Pair<Long, String>, Any?>()
+        val flowOutputs = mutableMapOf<String, Any?>()
+
+        val activeNodes = mutableSetOf<Long>()
+        flow.nodes.forEach { n ->
+            val hasIncoming = flow.connections.any { it.targetNodeId == n.id }
+            if (!hasIncoming) {
+                activeNodes.add(n.id)
+            }
+        }
+
+        executionOrder.forEach { nodeId ->
+            val node = flow.nodes.first { it.id == nodeId }
+            if (!activeNodes.contains(node.id)) {
+                return@forEach
+            }
+            
+            fun getInputValue(portId: String, defaultValue: Any?): Any? {
+                val conn = flow.connections.find { it.targetNodeId == node.id && it.targetPortId == portId }
+                return if (conn != null) {
+                    computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
+                } else {
+                    val port = node.inputs.find { it.id == portId }
+                    port?.value ?: port?.defaultValue ?: defaultValue
+                }
+            }
+
+            when (node) {
+                is org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode -> {
+                    val outputPort = node.outputs.firstOrNull()
+                    if (outputPort != null) {
+                        val key = "${node.id}"
+                        val valueJson = job.parameters[key] ?: job.parameters[outputPort.id]
+                        val rawValue = valueJson?.let { je ->
+                            when (je) {
+                                is kotlinx.serialization.json.JsonPrimitive -> {
+                                    if (je.isString) je.content
+                                    else je.booleanOrNull ?: je.intOrNull ?: je.longOrNull ?: je.doubleOrNull ?: je.content
+                                }
+                                else -> je.toString()
+                            }
+                        } ?: ""
+                        computedValues[Pair(node.id, outputPort.id)] = rawValue
+                    }
+                }
+                is org.wip.plugintoolkit.features.flows.model.Node.SystemNode -> {
+                    when (node.systemAction.lowercase()) {
+                        "save" -> {
+                            val data = getInputValue("data", "")
+                            val filePath = getInputValue("file_path", "output.txt") as String
+                            val dataString = when (data) {
+                                is kotlinx.serialization.json.JsonElement -> data.toString()
+                                else -> data?.toString() ?: ""
+                            }
+                            
+                            val fullPath = Path("$appDataDir/$filePath")
+                            val parent = fullPath.parent
+                            if (parent != null && !SystemFileSystem.exists(parent)) {
+                                SystemFileSystem.createDirectories(parent)
+                            }
+                            SystemFileSystem.sink(fullPath).buffered().use { it.writeString(dataString) }
+                            computedValues[Pair(node.id, "success")] = true
+                        }
+                        "load" -> {
+                            val filePath = getInputValue("file_path", "output.txt") as String
+                            val fullPath = Path("$appDataDir/$filePath")
+                            val fileContent = if (SystemFileSystem.exists(fullPath)) {
+                                SystemFileSystem.source(fullPath).buffered().use { it.readString() }
+                            } else {
+                                ""
+                            }
+                            computedValues[Pair(node.id, "data")] = fileContent
+                        }
+                        "log" -> {
+                            val message = getInputValue("message", "") as String
+                            computedValues[Pair(node.id, "output")] = message
+                        }
+                        "delay" -> {
+                            val duration = when (val dur = getInputValue("duration", 1000)) {
+                                is Number -> dur.toLong()
+                                is String -> dur.toLongOrNull() ?: 1000L
+                                else -> 1000L
+                            }
+                            val inputData = getInputValue("input_data", null)
+                            kotlinx.coroutines.delay(duration)
+                            computedValues[Pair(node.id, "output_data")] = inputData
+                        }
+                        "convert" -> {
+                            val inputData = getInputValue("input_data", null)
+                            val targetType = runtimeInferred[Pair(node.id, "output_data")] ?: DataType.Primitive(PrimitiveType.ANY)
+                            try {
+                                val converted = convertValue(inputData, targetType)
+                                computedValues[Pair(node.id, "output_data")] = converted
+                                computedValues[Pair(node.id, "success")] = true
+                            } catch (e: Exception) {
+                                computedValues[Pair(node.id, "output_data")] = null
+                                computedValues[Pair(node.id, "success")] = false
+                            }
+                        }
+                        "conditional" -> {
+                            val conditionVal = getInputValue("condition", false)
+                            val condition = when (conditionVal) {
+                                is Boolean -> conditionVal
+                                is String -> conditionVal.toBoolean()
+                                is Number -> conditionVal.toInt() != 0
+                                else -> false
+                            }
+                            val inputData = getInputValue("input_data", null)
+                            if (condition) {
+                                computedValues[Pair(node.id, "if_true")] = inputData
+                                computedValues[Pair(node.id, "if_false")] = null
+                            } else {
+                                computedValues[Pair(node.id, "if_true")] = null
+                                computedValues[Pair(node.id, "if_false")] = inputData
+                            }
+                        }
+                        "error" -> {
+                            val message = getInputValue("message", "An error occurred during flow execution") as String
+                            val data = getInputValue("data", null)
+                            val errorMessage = if (data != null) {
+                                val dataStr = when (data) {
+                                    is kotlinx.serialization.json.JsonPrimitive -> {
+                                        if (data.isString) data.content else data.toString()
+                                    }
+                                    else -> data.toString()
+                                }
+                                if (message.endsWith(": ") || message.endsWith(":") || message.endsWith(" ")) {
+                                    "$message$dataStr"
+                                } else {
+                                    "$message: $dataStr"
+                                }
+                            } else {
+                                message
+                            }
+                            throw Exception(errorMessage)
+                        }
+                        "merger" -> {
+                            val list1 = getInputValue("list1", null)
+                            val list2 = getInputValue("list2", null)
+                            val merged = mutableListOf<Any?>()
+                            fun addToList(item: Any?) {
+                                when (item) {
+                                    is List<*> -> merged.addAll(item)
+                                    is Array<*> -> merged.addAll(item)
+                                    is kotlinx.serialization.json.JsonArray -> {
+                                        item.forEach { je ->
+                                            val unwrapped = when (je) {
+                                                is kotlinx.serialization.json.JsonPrimitive -> {
+                                                    if (je.isString) je.content
+                                                    else je.booleanOrNull ?: je.intOrNull ?: je.longOrNull ?: je.doubleOrNull ?: je.content
+                                                }
+                                                else -> je
+                                            }
+                                            merged.add(unwrapped)
+                                        }
+                                    }
+                                    null -> {}
+                                    else -> merged.add(item)
+                                }
+                            }
+                            addToList(list1)
+                            addToList(list2)
+                            computedValues[Pair(node.id, "output")] = merged
+                        }
+                    }
+                }
+                is org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode -> {
+                    val capabilityParameters = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                    node.inputs.forEach { port ->
+                        val resolvedVal = getInputValue(port.id, null)
+                        capabilityParameters[port.id] = toJsonElement(resolvedVal)
+                    }
+                    
+                    val plugin = PluginLoader.getPluginById(node.pluginInfo.id)
+                        ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
+                    val processor = plugin.getProcessor()
+                    val context = pluginManager.createPluginContext(node.pluginInfo.id, job.id)
+                    val request = org.wip.plugintoolkit.api.PluginRequest(
+                        method = node.capability.name,
+                        parameters = capabilityParameters
+                    )
+                    val handle = processor.processAsync(request, context)
+                    val result = handle.result.await()
+                    
+                    when (result) {
+                        is org.wip.plugintoolkit.api.ExecutionResult.Success -> {
+                            val outputVal = result.response.result
+                            computedValues[Pair(node.id, "result")] = outputVal
+                            if (outputVal is JsonObject) {
+                                for ((key, value) in outputVal) {
+                                    computedValues[Pair(node.id, key)] = value
+                                }
+                            }
+                        }
+                        else -> throw Exception("Subflow Capability execution failed.")
+                    }
+                }
+                is org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode -> {
+                    val inputPort = node.inputs.firstOrNull()
+                    if (inputPort != null) {
+                        val finalVal = getInputValue(inputPort.id, null)
+                        flowOutputs[inputPort.name] = finalVal
+                        computedValues[Pair(node.id, inputPort.id)] = finalVal
+                    }
+                }
+                is org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode -> {
+                    val subFlowFile = Path("$appDataDir/flows/${node.flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+                    if (SystemFileSystem.exists(subFlowFile)) {
+                        val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
+                        val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
+                        
+                        val subParameters = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                        node.inputs.forEach { port ->
+                            val mapping = node.inputMappings.find { it.portId == port.id }
+                            if (mapping != null) {
+                                val resolvedVal = getInputValue(port.id, null)
+                                subParameters["${mapping.boundaryNodeId}"] = toJsonElement(resolvedVal)
+                            }
+                        }
+                        val subJob = BackgroundJob(
+                            id = "${job.id}-sub-${node.id}",
+                            name = "Subflow: ${node.flowName}",
+                            type = JobType.Flow,
+                            pluginId = "system",
+                            capabilityName = node.flowName,
+                            parameters = subParameters
+                        )
+                        val subOutputs = executeSubFlowRecursively(subFlow, subJob, appDataDir)
+                        node.outputs.forEach { port ->
+                            val mapping = node.outputMappings.find { it.portId == port.id }
+                            if (mapping != null) {
+                                val boundaryOutputNode = subFlow.nodes.find { it.id == mapping.boundaryNodeId } as? org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode
+                                val boundaryPortName = boundaryOutputNode?.inputs?.firstOrNull()?.name ?: "output_data"
+                                computedValues[Pair(node.id, port.id)] = subOutputs[boundaryPortName]
+                            }
+                        }
+                    }
+                }
+            }
+
+            val activeOutputs = mutableSetOf<String>()
+            when (node) {
+                is org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode -> activeOutputs.addAll(node.outputs.map { it.id })
+                is org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode -> activeOutputs.addAll(node.outputs.map { it.id })
+                is org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode -> activeOutputs.addAll(node.outputs.map { it.id })
+                is org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode -> activeOutputs.addAll(node.outputs.map { it.id })
+                is org.wip.plugintoolkit.features.flows.model.Node.SystemNode -> {
+                    if (node.systemAction.lowercase() == "conditional") {
+                        val conditionVal = getInputValue("condition", false)
+                        val condition = when (conditionVal) {
+                            is Boolean -> conditionVal
+                            is String -> conditionVal.toBoolean()
+                            is Number -> conditionVal.toInt() != 0
+                            else -> false
+                        }
+                        if (condition) {
+                            activeOutputs.add("if_true")
+                        } else {
+                            activeOutputs.add("if_false")
+                        }
+                    } else {
+                        activeOutputs.addAll(node.outputs.map { it.id })
+                    }
+                }
+            }
+
+            activeOutputs.forEach { portId ->
+                flow.connections.forEach { conn ->
+                    if (conn.sourceNodeId == node.id && conn.sourcePortId == portId) {
+                        activeNodes.add(conn.targetNodeId)
+                    }
+                }
+            }
+        }
+        return flowOutputs
+    }
+
+    private fun toJsonElement(value: Any?): kotlinx.serialization.json.JsonElement {
+        return when (value) {
+            null -> kotlinx.serialization.json.JsonNull
+            is kotlinx.serialization.json.JsonElement -> value
+            is Boolean -> kotlinx.serialization.json.JsonPrimitive(value)
+            is Number -> kotlinx.serialization.json.JsonPrimitive(value)
+            is String -> kotlinx.serialization.json.JsonPrimitive(value)
+            is Map<*, *> -> kotlinx.serialization.json.JsonObject(value.entries.associate { it.key.toString() to toJsonElement(it.value) })
+            is List<*> -> kotlinx.serialization.json.JsonArray(value.map { toJsonElement(it) })
+            is Array<*> -> kotlinx.serialization.json.JsonArray(value.map { toJsonElement(it) })
+            else -> kotlinx.serialization.json.JsonPrimitive(value.toString())
+        }
+    }
+
+    private fun runRuntimeTypeInference(flow: org.wip.plugintoolkit.features.flows.model.Flow): Map<Pair<Long, String>, DataType> {
+        val inferred = mutableMapOf<Pair<Long, String>, DataType>()
+        flow.nodes.forEach { node ->
+            node.inputs.forEach { port -> inferred[Pair(node.id, port.id)] = port.dataType }
+            node.outputs.forEach { port -> inferred[Pair(node.id, port.id)] = port.dataType }
+        }
+        var changed = true
+        var iteration = 0
+        while (changed && iteration < 10) {
+            changed = false
+            iteration++
+            flow.connections.forEach { conn ->
+                val srcKey = Pair(conn.sourceNodeId, conn.sourcePortId)
+                val tgtKey = Pair(conn.targetNodeId, conn.targetPortId)
+                val srcType = inferred[srcKey]
+                val tgtType = inferred[tgtKey]
+                if (srcType != null && tgtType != null) {
+                    if (srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY &&
+                        !(tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY)) {
+                        inferred[srcKey] = tgtType
+                        changed = true
+                    }
+                    if (tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY &&
+                        !(srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY)) {
+                        inferred[tgtKey] = srcType
+                        changed = true
+                    }
+                }
+            }
+            flow.nodes.forEach { node ->
+                if (node is org.wip.plugintoolkit.features.flows.model.Node.SystemNode) {
+                    if (SystemNodesRegistry.propagateTypes(node, inferred)) {
+                        changed = true
+                    }
+                }
+            }
+        }
+        return inferred
+    }
+
+    private fun convertValue(value: Any?, targetType: DataType): Any? {
+        if (value == null) return null
+        if (targetType !is DataType.Primitive) return value
+
+        val targetPrimitive = targetType.primitiveType
+        return when (targetPrimitive) {
+            PrimitiveType.STRING -> value.toString()
+            PrimitiveType.INT -> {
+                if (value is Number) value.toInt()
+                else {
+                    val str = value.toString().trim()
+                    str.toIntOrNull() ?: throw Exception("Failed to convert '$value' to Int")
+                }
+            }
+            PrimitiveType.DOUBLE -> {
+                if (value is Number) value.toDouble()
+                else {
+                    val str = value.toString().trim()
+                    str.toDoubleOrNull() ?: throw Exception("Failed to convert '$value' to Double")
+                }
+            }
+            PrimitiveType.BOOLEAN -> {
+                if (value is Boolean) value
+                else {
+                    val str = value.toString().trim().lowercase()
+                    if (str == "true") true
+                    else if (str == "false") false
+                    else throw Exception("Failed to convert '$value' to Boolean")
+                }
+            }
+            PrimitiveType.ANY -> value
+            PrimitiveType.UNIT -> Unit
+        }
+    }
+
+    private fun fromJsonElement(je: JsonElement): Any? {
+        return when (je) {
+            is JsonNull -> null
+            is JsonPrimitive -> {
+                if (je.isString) {
+                    je.content
+                } else {
+                    je.booleanOrNull ?: je.intOrNull ?: je.longOrNull ?: je.doubleOrNull ?: je.content
+                }
+            }
+            is JsonArray -> {
+                je.map { fromJsonElement(it) }
+            }
+            is JsonObject -> {
+                je.entries.associate { it.key to fromJsonElement(it.value) }
+            }
         }
     }
 

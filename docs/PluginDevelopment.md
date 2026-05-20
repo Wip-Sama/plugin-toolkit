@@ -63,7 +63,49 @@ suspend fun processMyData(
 ```
 Each capability can define multiple parameters using the `@CapabilityParam` annotation.
 The ParamType is inferred from the type and will use JSON to parse and transmit the object to the plugin.     
-While useing suspend function if a good practice is not obligatory
+While using a suspend function is good practice, it is not obligatory.
+
+#### Customizing Capability Outputs
+
+By default, any capability returning a value (except `Unit`) will expose a single output port named `"result"`. You can customize this behavior using the `@CapabilityOutput` annotation.
+
+##### 1. Single Output Port Customization
+Annotate the capability function itself with `@CapabilityOutput` to specify a custom name, description, and semantic type for its return value:
+
+```kotlin
+@Capability(name = "Format Sum", description = "Returns the sum formatted as text")
+@CapabilityOutput(name = "formattedResult", description = "The sum formatted as currency", semanticType = "text/plain")
+fun formattedSumCapability(
+    @CapabilityParam(description = "Values to sum") values: List<Double>
+): String {
+    return "$${values.sum()}"
+}
+```
+
+##### 2. Multiple Output Ports (Multiple Return Pattern)
+If your capability needs to return multiple output values, define a custom `@Serializable` `data class` where one or more properties are annotated with `@CapabilityOutput`. The toolkit's KSP processor will automatically generate individual output ports for each property in the class:
+
+```kotlin
+@Serializable
+data class DivisionResult(
+    @CapabilityOutput(name = "quotient", description = "The quotient of the division")
+    val quotient: Int,
+    @CapabilityOutput(name = "remainder", description = "The remainder of the division")
+    val remainder: Int
+)
+
+@Capability(name = "Integer Divide", description = "Divides two integers and returns the quotient and remainder")
+fun integerDivideCapability(
+    @CapabilityParam(description = "Dividend") a: Int,
+    @CapabilityParam(description = "Divisor") b: Int
+): DivisionResult {
+    if (b == 0) throw ArithmeticException("Division by zero")
+    return DivisionResult(a / b, a % b)
+}
+```
+
+- **Property Port Names**: If a property is not explicitly annotated with `@CapabilityOutput`, it will still become an output port named after the property name with an empty description.
+- **Type Mapping**: The output port data types will be automatically inferred from the property types in the Kotlin class.
 
 ### 3. Changelog Management
 
@@ -236,6 +278,7 @@ Each setting requires metadata to dictate how it is rendered and validated:
 ### Important Metadata Fields
 
 *   `required` (Boolean): If `true`, the user **must** provide a value before the plugin can run its setup or validation. The plugin will be blocked in a "Requires Configuration" state until all required fields are filled.
+*   `targetAppVersion` (String): The version of the host application this plugin was built for. The application uses this to ensure compatibility. If the application has introduced breaking changes since this version, the plugin will be marked as "Incompatible".
 *   `secret` (Boolean): If `true`, the host application will mask the input in the UI (like a password field) and securely encrypt the value on disk using OS-native secure storage (DPAPI on Windows, Keychain on macOS, Secret Service on Linux).
 
 ### Accessing Settings
@@ -260,8 +303,77 @@ suspend fun fetchData(context: PluginContext) {
 }
 ```
 
+## Plugin Requirements
+
+Plugins can specify system and application requirements in their manifest. These are validated by the host application before installation and loading.
+
+```json
+"requirements": {
+  "minMemoryMb": 512,
+  "minExecutionTimeMs": 1000,
+  "targetAppVersion": "1.5.0"
+}
+```
+
+### Compatibility Rules
+
+The toolkit ensures that plugins remain compatible with the host application version:
+
+1.  **Forward Compatibility**: The `targetAppVersion` must be less than or equal to the current application version. You cannot run a plugin built for a future version of the toolkit.
+2.  **Backward Compatibility**: The application defines a minimum compatible version. If a plugin was built for a version older than this threshold (e.g., due to breaking API changes), it will be marked as "Incompatible".
+
+---
+
+## Plugin Security & Signatures
+
+To ensure the integrity and authenticity of plugins, the toolkit supports digital signatures. For plugins distributed via remote repositories, signature verification is **mandatory**.
+
+### 1. Security Overview
+
+The toolkit uses **RSA** digital signatures with **SHA-256**. A plugin is considered valid if:
+- The JAR file is correctly signed.
+- The public key used for signing matches the `signPublicKey` provided by the repository.
+- (For remote plugins) The signature and hash provided in the repository's `index.json` match the downloaded file.
+
+### 2. Generating a Key Pair
+
+You need an RSA key pair to sign your plugins. You can generate one using `keytool` (included with the JDK):
+
+```bash
+keytool -genkeypair -alias plugin-key -keyalg RSA -keysize 2048 -keystore my-release-key.jks -validity 10000
+```
+
+### 3. Signing the Plugin JAR
+
+Once you have your keystore, you can sign your plugin JAR using `jarsigner`:
+
+```bash
+jarsigner -keystore my-release-key.jks my-plugin.jar plugin-key
+```
+
+### 4. Exporting the Public Key
+
+The repository needs your public key in **Base64-encoded X.509** format. You can export it like this:
+
+1. Export the certificate:
+   ```bash
+   keytool -exportcert -alias plugin-key -keystore my-release-key.jks -file plugin-cert.crt
+   ```
+2. Convert to Base64 (on Windows/PowerShell):
+   ```powershell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("plugin-cert.crt"))
+   ```
+3. Use the resulting string as the `signPublicKey` in your repository's `index.json`.
+
+### 5. Local Development
+
+For local development (loading plugins from the local filesystem), signature verification is currently optional but recommended. If a plugin is signed, the toolkit will still verify it if a public key is available.
+
+---
+
 ## Best Practices
 
 - **Non-blocking**: Always use `suspend` functions for I/O or heavy computation.
 - **Resource Cleanup**: Always implement `shutdown()` or use try-finally blocks to clean up resources.
 - **Isolation**: Plugins should not attempt to access files outside their managed folders.
+- **Security**: Never share your private key or keystore password. Store them securely.

@@ -18,19 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ClearAll
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -41,31 +35,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNull
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.PluginManifest
-import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
-import org.wip.plugintoolkit.features.job.ui.StatusBadge
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
-import org.wip.plugintoolkit.shared.components.plugin.ResponseView
+import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_clear
-import plugintoolkit.composeapp.generated.resources.action_delete
 import plugintoolkit.composeapp.generated.resources.plugin_execute_capability
 import plugintoolkit.composeapp.generated.resources.plugin_execute_capability_running
-import plugintoolkit.composeapp.generated.resources.plugin_executing_progress
-import plugintoolkit.composeapp.generated.resources.plugin_execution_id_format
 import plugintoolkit.composeapp.generated.resources.plugin_execution_results
 import plugintoolkit.composeapp.generated.resources.plugin_id_format
 import plugintoolkit.composeapp.generated.resources.plugin_mem_format
@@ -140,9 +126,10 @@ fun PluginContent(
 
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         visibleJobs.forEach { job ->
-                            JobResultItem(
+                            JobResultCard(
                                 job = job,
                                 progress = jobProgressMap[job.id] ?: 0f,
+                                logs = emptyList(),
                                 onDelete = { 
                                     if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
                                         viewModel.removeEndedJob(job.id)
@@ -284,100 +271,6 @@ fun CapabilityTester(
 }
 
 @Composable
-fun JobResultItem(
-    job: BackgroundJob,
-    progress: Float = 0f,
-    onDelete: () -> Unit
-) {
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(Res.string.plugin_execution_id_format, job.id),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusBadge(job.status)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(Res.string.action_delete),
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            when (job.status) {
-                JobStatus.Running, JobStatus.Queued -> {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
-                            color = ProgressIndicatorDefaults.linearColor,
-                            trackColor = ProgressIndicatorDefaults.linearTrackColor,
-                            strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(Res.string.plugin_executing_progress, (progress * 100).toInt()),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                JobStatus.Completed -> {
-                    val jsonResult = remember(job.result) {
-                        job.result?.let {
-                            try {
-                                Json.parseToJsonElement(it)
-                            } catch (e: Exception) {
-                                JsonNull
-                            }
-                        } ?: JsonNull
-                    }
-                    ResponseView(PluginResponse(result = jsonResult))
-                }
-
-                JobStatus.Failed, JobStatus.Cancelled -> {
-                    ErrorView(
-                        job.errorMessage ?: stringResource(
-                            Res.string.plugin_execution_id_format,
-                            job.status.name
-                        )
-                    )
-                }
-
-                else -> {}
-            }
-        }
-    }
-}
-
-@Composable
 fun EmptyState(message: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -391,25 +284,6 @@ fun EmptyState(message: String) {
                 message,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.outline
-            )
-        }
-    }
-}
-
-@Composable
-fun ErrorView(message: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                message,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                style = MaterialTheme.typography.bodyMedium
             )
         }
     }

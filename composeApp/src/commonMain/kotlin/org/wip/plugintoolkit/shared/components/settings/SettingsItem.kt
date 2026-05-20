@@ -38,8 +38,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 
 @Composable
 fun SettingsItem(
@@ -48,6 +48,7 @@ fun SettingsItem(
     icon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
+    extraContent: @Composable (() -> Unit)? = null,
     control: @Composable (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -105,6 +106,9 @@ fun SettingsItem(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
                         )
+                    }
+                    if (extraContent != null) {
+                        extraContent()
                     }
                 }
 

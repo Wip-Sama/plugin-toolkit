@@ -66,11 +66,11 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_more_actions
 import plugintoolkit.composeapp.generated.resources.action_remove
 import plugintoolkit.composeapp.generated.resources.plugin_add_folder
+import plugintoolkit.composeapp.generated.resources.plugin_broken
 import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.plugin_default_folder_label
 import plugintoolkit.composeapp.generated.resources.plugin_default_tag
 import plugintoolkit.composeapp.generated.resources.plugin_install_local
-import plugintoolkit.composeapp.generated.resources.plugin_broken
 import plugintoolkit.composeapp.generated.resources.plugin_loaded
 import plugintoolkit.composeapp.generated.resources.plugin_managed_folders
 import plugintoolkit.composeapp.generated.resources.plugin_refresh_list
@@ -117,7 +117,7 @@ fun PluginManagerView(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.extraLarge)) {
         if (!isReady) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(ToolkitTheme.spacing.extraSmall),

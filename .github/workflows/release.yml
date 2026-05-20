@@ -71,11 +71,16 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Extract Changelog
+        run: |
+          python scripts/extract_changelog.py ${{ env.VERSION }} composeApp/src/commonMain/composeResources/files/CHANGELOG.md --output release_notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
           name: Release v${{ env.VERSION }}
+          body_path: release_notes.md
           draft: false
           prerelease: false
           files: |

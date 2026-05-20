@@ -7,20 +7,23 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.notification.NotificationEvent
+import org.wip.plugintoolkit.features.plugin.logic.PluginSecurity
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.model.RepoIndex
+import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
-import org.wip.plugintoolkit.api.PluginManifest
+import io.ktor.client.statement.readBytes
 
 class RepoManager(
     private val settingsRepository: SettingsRepository,
@@ -34,6 +37,9 @@ class RepoManager(
 
     private val _plugins = MutableStateFlow<Map<String, List<ExtensionPlugin>>>(emptyMap()) // repoUrl -> plugins
     val plugins: StateFlow<Map<String, List<ExtensionPlugin>>> = _plugins.asStateFlow()
+
+    private val _flows = MutableStateFlow<Map<String, List<ExtensionFlow>>>(emptyMap()) // repoUrl -> flows
+    val flows: StateFlow<Map<String, List<ExtensionFlow>>> = _flows.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -83,7 +89,8 @@ class RepoManager(
                 schemaVersion = index.schemaVersion,
                 signPublicKey = index.signPublicKey,
                 signAlgorithm = index.signAlgorithm ?: "SHA256",
-                pluginsFolder = index.pluginsFolder
+                pluginsFolder = index.pluginsFolder,
+                flowsFolder = index.flowsFolder
             )
 
 
@@ -104,10 +111,29 @@ class RepoManager(
                                 null
                             }
                         }
-                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest)
+                        val isSignatureValid = if (index.signPublicKey != null && plugin.signature != null && plugin.hash != null) {
+                            PluginSecurity.verifyDetached(
+                                plugin.hash,
+                                plugin.signature,
+                                index.signPublicKey
+                            )
+                        } else null
+                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest, isSignatureValid = isSignatureValid)
                     }
                 }.awaitAll()
                 _plugins.value += (trimmedUrl to updatedPlugins)
+
+                val updatedFlows = index.flows.map { flow ->
+                    val isSignatureValid = if (index.signPublicKey != null && flow.signature != null && flow.hash != null) {
+                        PluginSecurity.verifyDetached(
+                            flow.hash,
+                            flow.signature,
+                            index.signPublicKey
+                        )
+                    } else null
+                    flow.copy(repoUrl = trimmedUrl, isSignatureValid = isSignatureValid)
+                }
+                _flows.value += (trimmedUrl to updatedFlows)
             }
 
 
@@ -129,6 +155,7 @@ class RepoManager(
         saveReposToSettings(updatedRepos)
 
         _plugins.value -= url
+        _flows.value -= url
     }
 
     suspend fun refreshRepository(url: String) {
@@ -157,10 +184,29 @@ class RepoManager(
                                 null
                             }
                         }
-                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest)
+                        val isSignatureValid = if (index.signPublicKey != null && plugin.signature != null && plugin.hash != null) {
+                            PluginSecurity.verifyDetached(
+                                plugin.hash,
+                                plugin.signature,
+                                index.signPublicKey
+                            )
+                        } else null
+                        plugin.copy(repoUrl = trimmedUrl, manifest = manifest, isSignatureValid = isSignatureValid)
                     }
                 }.awaitAll()
                 _plugins.value += (trimmedUrl to updatedPlugins)
+
+                val updatedFlows = index.flows.map { flow ->
+                    val isSignatureValid = if (index.signPublicKey != null && flow.signature != null && flow.hash != null) {
+                        PluginSecurity.verifyDetached(
+                            flow.hash,
+                            flow.signature,
+                            index.signPublicKey
+                        )
+                    } else null
+                    flow.copy(repoUrl = trimmedUrl, isSignatureValid = isSignatureValid)
+                }
+                _flows.value += (trimmedUrl to updatedFlows)
             }
 
             // Update repo metadata if changed
@@ -170,9 +216,10 @@ class RepoManager(
                     it.copy(
                         name = index.name ?: it.name,
                         schemaVersion = index.schemaVersion,
-                        signPublicKey = index.signPublicKey ?: it.signPublicKey,
+                        signPublicKey = index.signPublicKey,
                         signAlgorithm = index.signAlgorithm ?: it.signAlgorithm,
-                        pluginsFolder = index.pluginsFolder ?: it.pluginsFolder
+                        pluginsFolder = index.pluginsFolder ?: it.pluginsFolder,
+                        flowsFolder = index.flowsFolder ?: it.flowsFolder
                     )
                 } else it
             }
@@ -218,6 +265,15 @@ class RepoManager(
             client.get(url).body<String>()
         } catch (e: Exception) {
             Logger.e(e) { "Failed to fetch text from: $url" }
+            null
+        }
+    }
+
+    suspend fun fetchBytes(url: String): ByteArray? {
+        return try {
+            client.get(url).readBytes()
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to fetch bytes from: $url" }
             null
         }
     }

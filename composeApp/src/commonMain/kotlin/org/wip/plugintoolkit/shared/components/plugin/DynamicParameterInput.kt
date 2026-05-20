@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -28,8 +30,6 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PrimitiveType
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 
 @Composable

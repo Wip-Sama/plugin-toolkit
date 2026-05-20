@@ -1,7 +1,7 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
-import org.wip.plugintoolkit.api.PluginEntry
 import kotlinx.serialization.json.JsonElement
+import org.wip.plugintoolkit.api.PluginEntry
 
 expect object PluginLoader {
     fun loadPlugin(

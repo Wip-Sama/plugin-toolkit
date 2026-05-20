@@ -6,9 +6,12 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.List
-import org.wip.plugintoolkit.features.settings.model.*
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.LogLevel
+import org.wip.plugintoolkit.features.settings.model.LoggingSettings
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
-import org.wip.plugintoolkit.features.settings.utils.*
+import org.wip.plugintoolkit.features.settings.utils.SettingText
+import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 
 fun SettingsRegistryBuilder.loggingDefinitions(viewModel: SettingsViewModel) {

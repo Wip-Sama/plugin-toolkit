@@ -2,11 +2,9 @@ package org.wip.plugintoolkit.core.utils
 
 import co.touchlab.kermit.Logger
 import com.sun.jna.platform.win32.Crypt32Util
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
-import java.util.Base64
 import java.security.MessageDigest
+import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 

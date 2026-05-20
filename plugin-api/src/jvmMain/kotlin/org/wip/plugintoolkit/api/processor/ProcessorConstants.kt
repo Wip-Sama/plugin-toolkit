@@ -6,7 +6,26 @@ import com.squareup.kotlinpoet.asClassName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
-import org.wip.plugintoolkit.api.*
+import org.wip.plugintoolkit.api.Capability
+import org.wip.plugintoolkit.api.DataProcessor
+import org.wip.plugintoolkit.api.ExecutionResult
+import org.wip.plugintoolkit.api.JobHandle
+import org.wip.plugintoolkit.api.ParameterConstraints
+import org.wip.plugintoolkit.api.ParameterMetadata
+import org.wip.plugintoolkit.api.PluginAction
+import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.PluginEntry
+import org.wip.plugintoolkit.api.PluginFileSystem
+import org.wip.plugintoolkit.api.PluginInfo
+import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PluginModuleProvider
+import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.PluginResponse
+import org.wip.plugintoolkit.api.PluginSignal
+import org.wip.plugintoolkit.api.ProgressReporter
+import org.wip.plugintoolkit.api.Requirements
+import org.wip.plugintoolkit.api.SettingMetadata
 
 object ProcessorConstants {
     const val API_PACKAGE = "org.wip.plugintoolkit.api"

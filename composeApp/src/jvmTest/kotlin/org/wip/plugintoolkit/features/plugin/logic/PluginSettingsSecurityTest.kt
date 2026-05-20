@@ -1,21 +1,27 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PluginInfo
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.Requirements
+import org.wip.plugintoolkit.api.SettingMetadata
+import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
-import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
-import kotlinx.serialization.json.*
-import org.wip.plugintoolkit.core.loomDispatcher
-import org.wip.plugintoolkit.core.utils.SecureStorage
-import org.wip.plugintoolkit.api.*
-import kotlin.test.*
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.decodeFromString
-import kotlinx.coroutines.yield
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class PluginSettingsSecurityTest {
 

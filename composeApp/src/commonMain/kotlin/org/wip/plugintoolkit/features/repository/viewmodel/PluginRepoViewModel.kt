@@ -7,33 +7,36 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.repository.logic.AddRepoResult
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
+import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import co.touchlab.kermit.Logger
 import plugintoolkit.composeapp.generated.resources.plugin_choose_install_location
 import plugintoolkit.composeapp.generated.resources.repo_add_error
 import plugintoolkit.composeapp.generated.resources.repo_add_success
 import plugintoolkit.composeapp.generated.resources.repo_all_refreshed
 import plugintoolkit.composeapp.generated.resources.repo_already_added
-import plugintoolkit.composeapp.generated.resources.repo_install_failed
-import plugintoolkit.composeapp.generated.resources.repo_plugin_installed
+import plugintoolkit.composeapp.generated.resources.repo_link_copied
 import plugintoolkit.composeapp.generated.resources.repo_refreshed
 import plugintoolkit.composeapp.generated.resources.repo_removed
 import plugintoolkit.composeapp.generated.resources.repo_source_updated
-import kotlinx.coroutines.flow.combine
-import org.wip.plugintoolkit.features.job.logic.JobManager
-import org.wip.plugintoolkit.features.job.model.JobStatus
-import org.wip.plugintoolkit.features.job.model.JobType
 
 class PluginRepoViewModel(
     private val repoManager: RepoManager,
     private val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager,
+    private val flowViewModel: FlowViewModel,
     private val notificationService: NotificationService,
     private val dialogService: org.wip.plugintoolkit.core.ui.DialogService,
     private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository,
@@ -45,6 +48,8 @@ class PluginRepoViewModel(
         org.jetbrains.compose.resources.getString(resource, *args)
 
     val plugins = repoManager.plugins
+    val flows = repoManager.flows
+
 
     var repoUrlInput by mutableStateOf("")
 
@@ -163,5 +168,105 @@ class PluginRepoViewModel(
 
     fun getInstalledVersion(pkg: String): String? {
         return pluginManager.installedPlugins.value.find { it.pkg == pkg }?.version
+    }
+
+    fun copyRepositoryLink(url: String) {
+        viewModelScope.launch {
+            notificationService.toast(getString(ResStrings.repo_link_copied))
+        }
+    }
+
+    fun isFlowInstalled(name: String): Boolean {
+        return flowViewModel.state.value.flows.any { it.name == name }
+    }
+
+    fun getInstalledFlowVersion(name: String): String? {
+        return flowViewModel.state.value.flows.find { it.name == name }?.version
+    }
+
+    fun getFlowUpdate(flow: ExtensionFlow): Boolean {
+        val installed = getInstalledFlowVersion(flow.name) ?: return false
+        return org.wip.plugintoolkit.core.utils.VersionUtils.compare(flow.version, installed) > 0
+    }
+
+    fun installFlow(flow: ExtensionFlow) {
+        viewModelScope.launch {
+            try {
+                val repoUrl = flow.repoUrl ?: return@launch
+                val repositories = repoManager.repositories.value
+                val repo = repositories.find { it.url == repoUrl }
+                val flowsFolder = repoUrl.substringBeforeLast("/") + "/" + (repo?.flowsFolder ?: "flows")
+                val flowFileUrl = "$flowsFolder/${flow.fileName}"
+
+                val bytes = repoManager.fetchBytes(flowFileUrl) ?: run {
+                    notificationService.toast("Failed to download flow file")
+                    return@launch
+                }
+
+                // Transitive subflow dependency resolution (only if json)
+                if (flow.fileName.endsWith(".json")) {
+                    try {
+                        val flowContent = bytes.decodeToString()
+                        val parsedFlow = org.koin.mp.KoinPlatform.getKoin().get<kotlinx.serialization.json.Json>()
+                            .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(flowContent)
+
+                        val subflows = parsedFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode>()
+                        for (subflow in subflows) {
+                            val name = subflow.flowName
+                            if (!isFlowInstalled(name)) {
+                                // Search for matching flow in repos
+                                val matchingRemote = repoManager.flows.value.values.flatten().find { it.name == name }
+                                if (matchingRemote != null) {
+                                    Logger.i { "Dependency subflow '$name' found in repo. Installing recursively." }
+                                    installFlowRecursive(matchingRemote)
+                                } else {
+                                    Logger.w { "Dependency subflow '$name' not found in repositories." }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Logger.e(e) { "Failed to parse downloaded flow to resolve transitive dependencies" }
+                    }
+                }
+
+                flowViewModel.importFlowFromBytes(bytes, flow.fileName)
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to install flow" }
+                notificationService.toast("Error installing flow: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun installFlowRecursive(flow: ExtensionFlow) {
+        val repoUrl = flow.repoUrl ?: return
+        val repositories = repoManager.repositories.value
+        val repo = repositories.find { it.url == repoUrl }
+        val flowsFolder = repoUrl.substringBeforeLast("/") + "/" + (repo?.flowsFolder ?: "flows")
+        val flowFileUrl = "$flowsFolder/${flow.fileName}"
+
+        val bytes = repoManager.fetchBytes(flowFileUrl) ?: return
+
+        if (flow.fileName.endsWith(".json")) {
+            try {
+                val flowContent = bytes.decodeToString()
+                val parsedFlow = org.koin.mp.KoinPlatform.getKoin().get<kotlinx.serialization.json.Json>()
+                    .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(flowContent)
+
+                val subflows = parsedFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode>()
+                for (subflow in subflows) {
+                    val name = subflow.flowName
+                    if (!isFlowInstalled(name)) {
+                        val matchingRemote = repoManager.flows.value.values.flatten().find { it.name == name }
+                        if (matchingRemote != null) {
+                            installFlowRecursive(matchingRemote)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to parse dependency flow recursively" }
+            }
+        }
+
+        flowViewModel.importFlowFromBytes(bytes, flow.fileName)
     }
 }

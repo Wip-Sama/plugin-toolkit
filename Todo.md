@@ -19,7 +19,7 @@ Documentation:
 
 Job:
 - Currently there is no handling for when a plugin is plugged out and a job is running
-> A setting should probably be added to define the behaviours like: prevent plugin unplugging while working, stop everything and unplug
+> A setting should probably be added to define the behaviors like: prevent plugin unplugging while working, stop everything and unplug
 
 Flows:
 - Create with support for recursive flow
@@ -29,6 +29,9 @@ Flows:
 - Default entrypoint, with local/remote support
 - Data Duplication entrypoint
 - Conditional nodes like: is result (something) then (something else)
+- Add info abot connection points (mime type and datatype)
+- connection point should be disabled if a default is used
+- connection point default should represent the datatype (bool should not be a textfield for example)
 
 Repo:
 - Test and make it work
@@ -64,8 +67,12 @@ Bugs:
 - Add options to contextual menu in windows
 - Reload should call the validation if it's not validated
 - Reload should call the load function in the plugin
-- Option to select the number of worker
-> When decreasing under the number of active worker the change will take effect when each worker finishes to the number required jobs (min 1)
 - Job Lifecycle like Plugin Lifecycle
 - Use annotations and reflections to auto define SettingsRegistry.build { ... } in main.kt (Koin) if possible
-- Take correct description for teh update
+- Take correct description for teh update (? done)
+
+- execution graph to flows and a setting to allow for parallelization of capabilities when running flows
+- flows cannot be changed while used in other flows / running
+- flows that are used in other flow, show the other flow names in the flow editor as chips
+- capability resources usage estimation function
+- Scanner that execute jobs on events

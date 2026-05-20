@@ -1,6 +1,10 @@
 package org.wip.plugintoolkit.features.plugin.utils
 
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
 
@@ -10,8 +14,24 @@ object SettingsUtils {
         return when (type) {
             is DataType.Primitive -> {
                 if (element is JsonPrimitive) {
-                    if (type.primitiveType == PrimitiveType.STRING) element.content else element.toString()
-                } else element.toString()
+                    element.content
+                } else {
+                    element.toString()
+                }
+            }
+            is DataType.Enum -> {
+                if (element is JsonPrimitive) {
+                    element.content
+                } else {
+                    element.toString()
+                }
+            }
+            is DataType.Array -> {
+                if (element is JsonArray) {
+                    element.map { jsonToString(it, type.items) }.joinToString(",")
+                } else {
+                    element.toString()
+                }
             }
             else -> element.toString()
         }
@@ -30,11 +50,18 @@ object SettingsUtils {
             }
             is DataType.Enum -> JsonPrimitive(value)
             is DataType.Array -> {
-                try {
-                    Json.decodeFromString<JsonArray>(value)
-                } catch (e: Exception) {
-                    JsonArray(value.split(",").map { JsonPrimitive(it.trim()) })
+                val cleanedValue = value.trim()
+                val elements = if (cleanedValue.startsWith("[") && cleanedValue.endsWith("]")) {
+                    try {
+                        val parsed = Json.decodeFromString<JsonArray>(cleanedValue)
+                        parsed.map { stringToJson(jsonToString(it, type.items), type.items) }
+                    } catch (e: Exception) {
+                        cleanedValue.removePrefix("[").removeSuffix("]").split(",").map { stringToJson(it.trim(), type.items) }
+                    }
+                } else {
+                    cleanedValue.split(",").map { stringToJson(it.trim(), type.items) }
                 }
+                JsonArray(elements)
             }
             else -> JsonPrimitive(value)
         }

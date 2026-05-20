@@ -2,7 +2,6 @@ package org.wip.plugintoolkit.features.job.logic
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,9 +26,8 @@ import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
-import kotlin.time.Clock
-
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import kotlin.time.Clock
 
 class JobManager(
     /** Injected [AppScope] for managing job lifecycles and worker coordination. */
@@ -83,6 +81,22 @@ class JobManager(
     }
 
     fun enqueueJob(job: BackgroundJob) {
+        // Remove previous ended jobs of the same capability/flow that should not be saved in history
+        val jobsToRemove = _endedJobs.value.filter {
+            it.pluginId == job.pluginId &&
+                    it.capabilityName == job.capabilityName &&
+                    !it.keepResult
+        }
+        if (jobsToRemove.isNotEmpty()) {
+            val idsToRemove = jobsToRemove.map { it.id }.toSet()
+            _endedJobs.update { currentList ->
+                currentList.filterNot { it.id in idsToRemove }
+            }
+            _jobLogs.update { currentLogs ->
+                currentLogs.filterKeys { it !in idsToRemove }
+            }
+        }
+
         _jobs.update { currentList ->
             val filtered = if (!job.keepResult) {
                 currentList.filterNot {
@@ -364,7 +378,7 @@ class JobManager(
         _jobs.update { currentList ->
             val job = currentList.find { it.id == jobId } ?: return@update currentList
             jobName = job.name
-            if (job.status == JobStatus.Running) {
+            if (job.status == JobStatus.Running || job.status == JobStatus.Paused) {
                 paused = true
                 currentList.map {
                     if (it.id == jobId) it.copy(

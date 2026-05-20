@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import plugintoolkit.composeapp.generated.resources.Res
@@ -68,7 +70,8 @@ import plugintoolkit.composeapp.generated.resources.landing_welcome_title
 fun LandingPage(
     modifier: Modifier = Modifier,
     viewModel: PluginViewModel = koinViewModel(),
-    jobManager: JobManager = koinInject()
+    jobManager: JobManager = koinInject(),
+    onNavigate: (Screen) -> Unit = {}
 ) {
     val jobs by jobManager.jobs.collectAsState()
     val endedJobs by jobManager.endedJobs.collectAsState()
@@ -131,7 +134,7 @@ fun LandingPage(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.large)
         ) {
-            GlassCard(modifier = Modifier.weight(1.5f).height(300.dp)) {
+            GlassCard(modifier = Modifier.weight(1.5f).height(320.dp)) {
                 Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                     Text(
                         stringResource(Res.string.landing_recent_activity),
@@ -175,7 +178,7 @@ fun LandingPage(
                 }
             }
 
-            GlassCard(modifier = Modifier.weight(1f).height(300.dp)) {
+            GlassCard(modifier = Modifier.weight(1f).height(320.dp)) {
                 Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                     Text(
                         stringResource(Res.string.landing_quick_links),
@@ -184,10 +187,32 @@ fun LandingPage(
                     )
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
-                    QuickLinkItem(stringResource(Res.string.landing_link_jobs), Icons.Default.Dashboard)
-                    QuickLinkItem(stringResource(Res.string.landing_link_plugins), Icons.Default.SettingsInputComponent)
-                    QuickLinkItem(stringResource(Res.string.landing_link_settings), Icons.Default.Settings)
-                    QuickLinkItem(stringResource(Res.string.landing_link_docs), Icons.Default.Info)
+                    val uriHandler = LocalUriHandler.current
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                    ) {
+                        QuickLinkItem(
+                            title = stringResource(Res.string.landing_link_jobs),
+                            icon = Icons.Default.Dashboard,
+                            onClick = { onNavigate(Screen.JobDashboard) }
+                        )
+                        QuickLinkItem(
+                            title = stringResource(Res.string.landing_link_plugins),
+                            icon = Icons.Default.SettingsInputComponent,
+                            onClick = { onNavigate(Screen.PluginManager) }
+                        )
+                        QuickLinkItem(
+                            title = stringResource(Res.string.landing_link_settings),
+                            icon = Icons.Default.Settings,
+                            onClick = { onNavigate(Screen.Settings) }
+                        )
+                        QuickLinkItem(
+                            title = stringResource(Res.string.landing_link_docs),
+                            icon = Icons.Default.Info,
+                            onClick = { uriHandler.openUri("https://github.com/Wip-Sama/plugin-toolkit/tree/master/docs") }
+                        )
+                    }
                 }
             }
         }
@@ -260,12 +285,21 @@ fun StatCard(
 }
 
 @Composable
-fun QuickLinkItem(title: String, icon: ImageVector) {
+fun QuickLinkItem(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* Navigate */ }
-            .padding(vertical = ToolkitTheme.spacing.small),
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(
+                horizontal = ToolkitTheme.spacing.medium,
+                vertical = ToolkitTheme.spacing.mediumSmall
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -275,13 +309,18 @@ fun QuickLinkItem(title: String, icon: ImageVector) {
             tint = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
-        Text(title, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
         Spacer(modifier = Modifier.weight(1f))
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
-            tint = MaterialTheme.colorScheme.outline
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
         )
     }
 }

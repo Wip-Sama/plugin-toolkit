@@ -1,3 +1,19 @@
+Version: 1.5.0
+Date: 20-05-2026
+Changes:
+	- Major ui rework
+Fixed:
+	- Updater on windows now launches with correct path when applicable (.jar is not updatable)
+  - The update page now correctly displays the change description
+  - Quick links now works
+Added:
+  - Plugin can now define which os they support (linux, windows, macos)
+  - Plugin can now define multiple return values
+  - Plugin can now add custom types (mime/type) to the return values
+  - Check to ensure the plugin is compatible with the app version
+  - Plugin signature
+  - Library used in the about section
+----------------------------------------------------------------------------------------------------
 Version: 1.4.1
 Date: 12-05-2026
 Added

@@ -2,22 +2,22 @@ package org.wip.plugintoolkit.features.plugin.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
-import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
@@ -89,8 +89,23 @@ class PluginManagerViewModel(
                             message = "Plugin ${plugin.name} requires configuration. Would you like to configure it now?",
                             onConfirm = { openSettings(plugin.pkg) }
                         )
-                    } else if (plugin.requiredAction != "CONFIGURE_SETTINGS") {
+                    } else if (plugin.requiredAction == "CONFIRM_SIGNATURE" && !autoOpenedSettings.contains(plugin.pkg + "_sig")) {
+                        autoOpenedSettings.add(plugin.pkg + "_sig")
+                        dialogService.showConfirmation(
+                            title = "Invalid Signature",
+                            message = "Plugin ${plugin.name} has an invalid signature. Do you want to load it anyway? If you ignore, the plugin will remain locked and unloaded.",
+                            onConfirm = { 
+                                viewModelScope.launch {
+                                    pluginManager.updatePlugin(plugin.pkg) { p ->
+                                        p.copy(requiredAction = null, isEnabled = true, loadError = null, isValidated = true) 
+                                    }
+                                    pluginManager.reloadPlugin(plugin.pkg)
+                                }
+                            }
+                        )
+                    } else if (plugin.requiredAction != "CONFIGURE_SETTINGS" && plugin.requiredAction != "CONFIRM_SIGNATURE") {
                         autoOpenedSettings.remove(plugin.pkg)
+                        autoOpenedSettings.remove(plugin.pkg + "_sig")
                     }
                 }
             }

@@ -23,6 +23,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(project(":plugin-api"))
     ksp(project(":plugin-api"))
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 tasks.withType<ProcessResources> {

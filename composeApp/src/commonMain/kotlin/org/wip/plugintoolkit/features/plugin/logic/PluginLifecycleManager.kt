@@ -6,10 +6,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
-import org.wip.plugintoolkit.api.*
+import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.PluginFileSystem
+import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PluginSignal
+import org.wip.plugintoolkit.api.PluginSignalManager
+import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -54,6 +58,25 @@ class PluginLifecycleManager(
 
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"
+
+        // Runtime signature verification for remote plugins
+        if (plugin.repoUrl != null) {
+            val repo = settingsRepository.loadSettings().extensions.repositories.find { it.url == plugin.repoUrl }
+            val publicKey = repo?.signPublicKey
+            val strictChecking = settingsRepository.loadSettings().extensions.strictSignatureChecking
+
+            if (publicKey != null) {
+                val isSignatureValid = PluginSecurity.verify(jarFile, publicKey)
+                if (!isSignatureValid) {
+                    val msg = "Plugin signature verification failed for ${plugin.pkg}"
+                    Logger.w { msg }
+                    if (strictChecking || plugin.requiredAction == "CONFIRM_SIGNATURE") {
+                        updateLoadError(pkg, msg)
+                        return Result.failure(Exception(msg))
+                    }
+                }
+            }
+        }
 
         Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
         val settings = loadPluginSettings(pkg)

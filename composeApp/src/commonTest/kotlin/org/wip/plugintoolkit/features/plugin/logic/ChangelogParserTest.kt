@@ -1,8 +1,8 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
+import org.wip.plugintoolkit.api.utils.ChangelogParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.wip.plugintoolkit.api.utils.ChangelogParser
 
 class ChangelogParserTest {
     private val separator = "-".repeat(100)
