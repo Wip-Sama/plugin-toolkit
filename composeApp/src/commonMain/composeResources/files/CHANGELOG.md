@@ -1,5 +1,5 @@
 Version: 1.5.0
-Date: 15-05-2026
+Date: 20-05-2026
 Changes:
 	- Major ui rework
 Fixed:
