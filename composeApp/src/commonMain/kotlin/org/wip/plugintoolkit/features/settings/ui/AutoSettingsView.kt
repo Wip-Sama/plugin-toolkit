@@ -22,6 +22,8 @@ import org.wip.plugintoolkit.shared.components.settings.SettingsNumericInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsSlider
 import org.wip.plugintoolkit.shared.components.settings.SettingsSwitch
 
+import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
+
 /**
  * A fully auto-generated settings page for use in plugins and dynamic settings.
  * Reads [SettingDefinition]s from the [SettingsRegistry] for the given [navKey],
@@ -61,10 +63,11 @@ fun AutoSettingsView(
         grouped.forEach { (sectionTitle, definitions) ->
             val sectionName = sectionTitle.resolve()
             SettingsGroup(title = sectionName) {
-                definitions.forEach { definition ->
+                definitions.forEachIndexed { index, definition ->
                     // Merge local overrides (passed to AutoSettingsView)
                     val effectiveControl = controlOverrides[definition.id]
                     val effectiveAction = actionOverrides[definition.id]
+                    val shape = getGroupedShape(index, definitions.size)
 
                     RenderSettingDefinition(
                         definition = definition,
@@ -75,7 +78,8 @@ fun AutoSettingsView(
                             registry.triggerSideEffects(settings, updated)
                         },
                         controlOverride = effectiveControl,
-                        actionOverride = effectiveAction
+                        actionOverride = effectiveAction,
+                        shape = shape
                     )
                 }
             }
@@ -93,7 +97,8 @@ private fun RenderSettingDefinition(
     settings: AppSettings,
     onUpdate: (AppSettings) -> Unit,
     controlOverride: (@Composable (AppSettings, (AppSettings) -> Unit) -> Unit)? = null,
-    actionOverride: (() -> Unit)? = null
+    actionOverride: (() -> Unit)? = null,
+    shape: androidx.compose.ui.graphics.Shape
 ) {
     val isEnabled = definition.enabled(settings)
 
@@ -104,6 +109,7 @@ private fun RenderSettingDefinition(
                 subtitle = definition.subtitle?.resolve(),
                 icon = definition.icon,
                 enabled = isEnabled,
+                shape = shape,
                 control = {
                     SettingsSwitch(
                         checked = definition.getValue(settings), onCheckedChange = { checked ->
@@ -117,7 +123,8 @@ private fun RenderSettingDefinition(
                 definition = definition,
                 settings = settings,
                 onUpdate = onUpdate,
-                isEnabled = isEnabled
+                isEnabled = isEnabled,
+                shape = shape
             )
         }
 
@@ -129,6 +136,7 @@ private fun RenderSettingDefinition(
                 subtitle = dynamicSubtitle,
                 icon = definition.icon,
                 enabled = isEnabled,
+                shape = shape,
                 control = {
                     SettingsSlider(
                         value = definition.getValue(settings), onValueChange = { value ->
@@ -145,6 +153,7 @@ private fun RenderSettingDefinition(
                 subtitle = definition.subtitle?.resolve(),
                 icon = definition.icon,
                 enabled = isEnabled,
+                shape = shape,
                 control = {
                     SettingsNumericInput(
                         value = definition.getValue(settings), onValueChange = { value ->
@@ -164,6 +173,7 @@ private fun RenderSettingDefinition(
                     subtitle = definition.subtitle?.resolve(),
                     icon = definition.icon,
                     enabled = isEnabled,
+                    shape = shape,
                     onClick = actionOverride ?: definition.onClick
                 )
             }
@@ -176,6 +186,7 @@ private fun RenderSettingDefinition(
                 subtitle = definition.subtitle?.resolve(),
                 icon = definition.icon,
                 enabled = isEnabled,
+                shape = shape,
                 onClick = definition.onClick,
                 control = {
                     control(settings, onUpdate)
@@ -193,13 +204,15 @@ private fun <T> RenderDropdownSetting(
     definition: SettingDefinition.DropdownSetting<T>,
     settings: AppSettings,
     onUpdate: (AppSettings) -> Unit,
-    isEnabled: Boolean
+    isEnabled: Boolean,
+    shape: androidx.compose.ui.graphics.Shape
 ) {
     SettingsItem(
         title = definition.title.resolve(),
         subtitle = definition.subtitle?.resolve(),
         icon = definition.icon,
         enabled = isEnabled,
+        shape = shape,
         control = {
             ExpressiveMenu(
                 options = definition.options,

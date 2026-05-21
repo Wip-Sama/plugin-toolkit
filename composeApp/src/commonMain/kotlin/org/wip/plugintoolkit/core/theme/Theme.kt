@@ -64,7 +64,14 @@ data class Dimensions(
     val expressiveButtonCornerRadius: Dp = 24.dp,
     val buttonGroupGap: Dp = 2.dp,
     val buttonGroupInnerCorner: Dp = 4.dp,
-    val buttonGroupOuterCorner: Dp = 20.dp
+    val buttonGroupOuterCorner: Dp = 20.dp,
+    val settingsIconContainerSize: Dp = 40.dp,
+    val settingsIconSize: Dp = 20.dp,
+    val settingsIconCornerRadius: Dp = 10.dp,
+    val toggleButtonIconSize: Dp = 16.dp,
+    val standardButtonHeight: Dp = 40.dp,
+    val circularProgressStrokeWidth: Dp = 2.dp,
+    val circularProgressSize: Dp = 16.dp
 )
 
 data class CustomColors(
@@ -86,7 +93,10 @@ data class Opacity(
     val full: Float = 1.0f,
     val textFieldContainer: Float = 0.1f,
     val textFieldUnfocusedBorder: Float = 0.5f,
-    val buttonBackground: Float = 0.15f
+    val buttonBackground: Float = 0.15f,
+    val settingsItemDefault: Float = 0.25f,
+    val settingsItemHover: Float = 0.38f,
+    val settingsItemPressed: Float = 0.55f
 )
 
 val LocalSpacing = staticCompositionLocalOf { Spacing() }

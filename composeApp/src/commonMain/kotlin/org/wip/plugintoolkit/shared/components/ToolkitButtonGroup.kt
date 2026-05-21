@@ -10,6 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.clip
+
 @Composable
 fun ToolkitButtonGroup(
     modifier: Modifier = Modifier,
@@ -18,6 +23,7 @@ fun ToolkitButtonGroup(
     val outerCorner = ToolkitTheme.dimensions.buttonGroupOuterCorner
     val innerCorner = ToolkitTheme.dimensions.buttonGroupInnerCorner
     val gap = ToolkitTheme.dimensions.buttonGroupGap
+    val containerPadding = ToolkitTheme.spacing.extraSmall
 
     val scope = ToolkitButtonGroupScopeImpl()
     scope.content()
@@ -26,7 +32,8 @@ fun ToolkitButtonGroup(
     if (children.isEmpty()) return
 
     Row(
-        modifier = modifier,
+        modifier = modifier
+            .padding(containerPadding),
         horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -34,24 +41,27 @@ fun ToolkitButtonGroup(
             val isFirst = index == 0
             val isLast = index == children.size - 1
 
+            // Subtract padding from outer corner radius so the inner button corners run parallel to container corners
+            val buttonOuterCorner = (outerCorner - containerPadding).coerceAtLeast(ToolkitTheme.spacing.none)
+
             val shape = when {
-                children.size == 1 -> RoundedCornerShape(outerCorner)
+                children.size == 1 -> RoundedCornerShape(buttonOuterCorner)
                 isFirst -> RoundedCornerShape(
-                    topStart = outerCorner,
-                    bottomStart = outerCorner,
+                    topStart = buttonOuterCorner,
+                    bottomStart = buttonOuterCorner,
                     topEnd = innerCorner,
                     bottomEnd = innerCorner
                 )
                 isLast -> RoundedCornerShape(
                     topStart = innerCorner,
                     bottomStart = innerCorner,
-                    topEnd = outerCorner,
-                    bottomEnd = outerCorner
+                    topEnd = buttonOuterCorner,
+                    bottomEnd = buttonOuterCorner
                 )
                 else -> RoundedCornerShape(innerCorner)
             }
 
-            childContent(shape, Modifier)
+            childContent(shape, Modifier.clip(shape))
         }
     }
 }

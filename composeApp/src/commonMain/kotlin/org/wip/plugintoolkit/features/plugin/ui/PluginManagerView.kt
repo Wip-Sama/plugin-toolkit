@@ -38,7 +38,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -53,7 +53,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.PluginAction
@@ -63,8 +62,10 @@ import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.CircularProgressIndicator
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
+import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_more_actions
 import plugintoolkit.composeapp.generated.resources.action_remove
@@ -97,6 +98,7 @@ fun PluginManagerView(
     val loadedPlugins by viewModel.loadedPlugins.collectAsState()
     val isReady by viewModel.isRegistryReady.collectAsState()
     val settingsPkg by viewModel.settingsPkg.collectAsState()
+    val togglingPlugins by viewModel.togglingPlugins.collectAsState()
 
     if (settingsPkg != null) {
         PluginSettingsDialog(
@@ -140,7 +142,7 @@ fun PluginManagerView(
         ) {
             ToolkitButtonGroup {
                 item { shape, modifierSpec ->
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = { viewModel.refreshList() },
                         enabled = isReady,
                         shape = shape,
@@ -152,7 +154,7 @@ fun PluginManagerView(
                     }
                 }
                 item { shape, modifierSpec ->
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = { viewModel.rescan() },
                         enabled = isReady,
                         shape = shape,
@@ -164,7 +166,7 @@ fun PluginManagerView(
                     }
                 }
                 item { shape, modifierSpec ->
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = { viewModel.reloadAll() },
                         enabled = isReady,
                         shape = shape,
@@ -223,6 +225,7 @@ fun PluginManagerView(
                     hasUpdate = viewModel.getUpdate(plugin.pkg) != null,
                     customActions = viewModel.getActions(plugin.pkg),
                     enabled = isReady,
+                    isToggling = togglingPlugins.contains(plugin.pkg),
                     onToggle = { if (isReady) viewModel.toggleEnabled(plugin.pkg, it) },
                     onAction = { action ->
                         if (isReady) {
@@ -250,13 +253,15 @@ fun PluginManagerView(
         ) {
             val folders = viewModel.managedFolders.collectAsState().value
             val defaultFolder = viewModel.defaultPluginFolder
+            val totalItems = folders.size + 1
 
-            folders.forEach { folder ->
+            folders.forEachIndexed { index, folder ->
                 val isDefault = folder == defaultFolder
                 SettingsItem(
                     title = folder,
                     subtitle = if (isDefault) stringResource(Res.string.plugin_default_folder_label) else null,
                     icon = Icons.Default.Folder,
+                    shape = getGroupedShape(index, totalItems),
                     control = {
                         if (isDefault) {
                             Surface(
@@ -267,7 +272,7 @@ fun PluginManagerView(
                                 Text(
                                     stringResource(Res.string.plugin_default_tag),
                                     modifier = Modifier.padding(
-                                        horizontal = ToolkitTheme.spacing.extraSmall + 2.dp,
+                                        horizontal = ToolkitTheme.spacing.extraSmall + ToolkitTheme.dimensions.buttonGroupGap,
                                         vertical = ToolkitTheme.spacing.extraSmall / 2
                                     ),
                                     style = MaterialTheme.typography.labelSmall,
@@ -290,7 +295,8 @@ fun PluginManagerView(
             SettingsItem(
                 title = stringResource(Res.string.plugin_add_folder),
                 icon = Icons.Default.CreateNewFolder,
-                onClick = { viewModel.addManagedFolder() }
+                onClick = { viewModel.addManagedFolder() },
+                shape = getGroupedShape(folders.size, totalItems)
             )
         }
     }
@@ -303,6 +309,7 @@ fun PluginCard(
     hasUpdate: Boolean,
     customActions: List<PluginAction>,
     enabled: Boolean = true,
+    isToggling: Boolean = false,
     onToggle: (Boolean) -> Unit,
     onAction: (PluginStatusAction) -> Unit
 ) {
@@ -417,7 +424,7 @@ fun PluginCard(
                             Text(stringResource(Res.string.plugin_update))
                         }
                     } else {
-                        OutlinedButton(
+                        FilledTonalButton(
                             onClick = { onAction(PluginStatusAction.Update) },
                             shape = shape,
                             modifier = modifierSpec,
@@ -430,27 +437,41 @@ fun PluginCard(
 
                 item { shape, modifierSpec ->
                     val toggleColor = if (plugin.isEnabled) {
-                        ButtonDefaults.outlinedButtonColors(
+                        ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     } else {
-                        ButtonDefaults.outlinedButtonColors()
+                        ButtonDefaults.filledTonalButtonColors()
                     }
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = { onToggle(!plugin.isEnabled) },
                         colors = toggleColor,
                         shape = shape,
                         modifier = modifierSpec,
-                        enabled = enabled
+                        enabled = enabled && !isToggling
                     ) {
-                        Icon(
-                            imageVector = if (plugin.isEnabled) Icons.Default.CheckCircle else Icons.Default.Extension,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        if (isToggling) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
+                                strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
+                                color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (plugin.isEnabled) Icons.Default.CheckCircle else Icons.Default.Extension,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.toggleButtonIconSize)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(if (plugin.isEnabled) "Active" else "Disabled")
+                        Text(
+                            text = if (isToggling) {
+                                if (plugin.isEnabled) "Activating..." else "Deactivating..."
+                            } else {
+                                if (plugin.isEnabled) "Active" else "Disabled"
+                            }
+                        )
                     }
                 }
 
@@ -459,8 +480,8 @@ fun PluginCard(
                         FilledTonalIconButton(
                             onClick = { expanded = true },
                             shape = shape,
-                            modifier = modifierSpec.size(38.dp),
-                            enabled = enabled
+                            modifier = modifierSpec.size(ToolkitTheme.dimensions.standardButtonHeight),
+                            enabled = enabled && !isToggling
                         ) {
                             Icon(
                                 Icons.Default.MoreVert,
@@ -523,7 +544,7 @@ private fun StatusBadge(text: String, color: Color) {
     Surface(
         color = color.copy(alpha = 0.1f),
         shape = MaterialTheme.shapes.extraSmall,
-        modifier = Modifier.border(1.dp, color.copy(alpha = 0.2f), MaterialTheme.shapes.extraSmall)
+        modifier = Modifier.border(ToolkitTheme.dimensions.borderUnselected, color.copy(alpha = 0.2f), MaterialTheme.shapes.extraSmall)
     ) {
         Text(
             text,

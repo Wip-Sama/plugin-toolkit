@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsRegistry
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
@@ -82,10 +81,10 @@ fun SettingsGroup(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = title.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
 
                 if (collapsible) {
@@ -108,11 +107,13 @@ fun SettingsGroup(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(ToolkitTheme.spacing.medium),
+                    color = androidx.compose.ui.graphics.Color.Transparent,
                     modifier = Modifier.fillMaxWidth().animateContentSize()
                 ) {
-                    Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
+                    Column(
+                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.extraSmall),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.buttonGroupGap)
+                    ) {
                         content()
                     }
                 }
@@ -125,10 +126,10 @@ fun SettingsGroup(
 @Composable
 private fun SettingsGroupPreview() {
     MaterialTheme {
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             SettingsGroup(title = "Appearance") {
-                Text("Item 1", modifier = Modifier.padding(12.dp))
-                Text("Item 2", modifier = Modifier.padding(12.dp))
+                Text("Item 1", modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall))
+                Text("Item 2", modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall))
             }
         }
     }

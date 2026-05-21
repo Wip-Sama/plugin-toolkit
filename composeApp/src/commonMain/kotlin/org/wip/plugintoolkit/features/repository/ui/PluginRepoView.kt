@@ -430,7 +430,7 @@ fun PluginRepoView(
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                                            modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             // Plugin Icon
@@ -565,7 +565,7 @@ fun PluginRepoView(
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                                            modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             // Flow Icon

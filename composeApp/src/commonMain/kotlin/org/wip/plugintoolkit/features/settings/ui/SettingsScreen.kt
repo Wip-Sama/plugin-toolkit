@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.settings.ui
 
+import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -299,6 +300,7 @@ fun SettingsScreen(
     }
 }
 
+
 @Composable
 fun BroadSearchResultsView(
     searchQuery: String,
@@ -317,11 +319,12 @@ fun BroadSearchResultsView(
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         grouped.forEach { (sectionName, items) ->
             SettingsGroup(title = sectionName) {
-                items.forEach { definition ->
+                items.forEachIndexed { index, definition ->
                     SettingsItem(
                         title = resolvedStrings[definition.title] ?: "",
                         subtitle = definition.subtitle?.let { resolvedStrings[it] },
                         icon = definition.icon,
+                        shape = getGroupedShape(index, items.size),
                         onClick = {
                             onNavigate(definition.navKey)
                         })
