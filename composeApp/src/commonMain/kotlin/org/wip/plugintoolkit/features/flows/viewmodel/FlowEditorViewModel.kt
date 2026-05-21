@@ -349,7 +349,7 @@ class FlowEditorViewModel(
                     pluginInfo = event.pluginInfo,
                     capability = event.capability,
                     inputs = event.capability.parameters?.map { (key, meta) ->
-                        InputPort(key, key, meta.type, meta.semanticType, meta.defaultValue)
+                        InputPort(key, key, meta.type, meta.semanticType, meta.defaultValue, regex = meta.constraints?.regex)
                     } ?: emptyList(),
                     outputs = event.capability.outputs?.map { out ->
                         OutputPort(out.name, out.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }, out.type, out.semanticType)
@@ -1144,6 +1144,58 @@ class FlowEditorViewModel(
                             message = "Semantic type mismatch: '$srcSemantic' is not compatible with '$tgtSemantic'"
                         )
                     )
+                }
+            }
+        }
+        
+        // Check input ports regex validation
+        flow.nodes.forEach { node ->
+            node.inputs.forEach { input ->
+                val regexStr = input.regex
+                if (!regexStr.isNullOrEmpty()) {
+                    val rawValue = input.value ?: input.defaultValue
+                    val strValue = when (rawValue) {
+                        is kotlinx.serialization.json.JsonPrimitive -> {
+                            if (rawValue.isString) rawValue.content else rawValue.toString()
+                        }
+                        null -> null
+                        else -> rawValue.toString()
+                    }
+                    if (!strValue.isNullOrEmpty()) {
+                        try {
+                            val regex = Regex(regexStr)
+                            val isArray = input.dataType is DataType.Array
+                            val items = if (isArray) {
+                                strValue.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                            } else {
+                                listOf(strValue)
+                            }
+                            for (item in items) {
+                                if (!regex.matches(item)) {
+                                    errors.add(
+                                        ValidationError(
+                                            sourceNodeId = node.id,
+                                            sourcePortId = input.id,
+                                            targetNodeId = node.id,
+                                            targetPortId = input.id,
+                                            message = if (isArray) "Item '$item' does not match pattern '$regexStr'" else "Value does not match pattern '$regexStr'"
+                                        )
+                                    )
+                                    break
+                                }
+                            }
+                        } catch (e: Exception) {
+                            errors.add(
+                                ValidationError(
+                                    sourceNodeId = node.id,
+                                    sourcePortId = input.id,
+                                    targetNodeId = node.id,
+                                    targetPortId = input.id,
+                                    message = "Invalid regex pattern: ${e.message}"
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }

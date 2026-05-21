@@ -135,6 +135,8 @@ class JobWorker(
         val plugin = PluginLoader.getPluginById(job.pluginId)
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
+        validateCapabilityParameters(plugin.getManifest(), job.capabilityName, job.parameters)
+
         val processor = plugin.getProcessor()
         val context = pluginManager.createPluginContext(job.pluginId, job.id)
 
@@ -736,6 +738,188 @@ class JobWorker(
                                 computedValues[Pair(node.id, "output")] = merged
                                 manager.addJobLog(job.id, "Merged lists. Item count: ${merged.size}")
                             }
+                            "comparator" -> {
+                                val a = getInputValue("a", null)
+                                val b = getInputValue("b", null)
+
+                                var minorVal = false
+                                var majorVal = false
+                                var equalVal = false
+
+                                if (a != null && b != null) {
+                                    val aNum = when (a) {
+                                        is Number -> a.toDouble()
+                                        else -> a.toString().toDoubleOrNull()
+                                    }
+                                    val bNum = when (b) {
+                                        is Number -> b.toDouble()
+                                        else -> b.toString().toDoubleOrNull()
+                                    }
+
+                                    if (aNum != null && bNum != null) {
+                                        minorVal = aNum < bNum
+                                        majorVal = aNum > bNum
+                                        equalVal = aNum == bNum
+                                    } else {
+                                        val aStr = a.toString()
+                                        val bStr = b.toString()
+                                        val cmp = aStr.compareTo(bStr)
+                                        minorVal = cmp < 0
+                                        majorVal = cmp > 0
+                                        equalVal = cmp == 0
+                                    }
+                                } else {
+                                    equalVal = (a == null && b == null)
+                                    minorVal = (a == null && b != null)
+                                    majorVal = (a != null && b == null)
+                                }
+
+                                val notEqualVal = !equalVal
+                                computedValues[Pair(node.id, "minor")] = minorVal
+                                computedValues[Pair(node.id, "major")] = majorVal
+                                computedValues[Pair(node.id, "equal")] = equalVal
+                                computedValues[Pair(node.id, "not_equal")] = notEqualVal
+                                manager.addJobLog(job.id, "Comparator result: minor=$minorVal, major=$majorVal, equal=$equalVal, not_equal=$notEqualVal")
+                            }
+                            "for" -> {
+                                val subflowName = getInputValue("subflow_name", "") as String
+                                if (subflowName.isNotEmpty()) {
+                                    val subFlowFile = Path("$appDataDir/flows/${subflowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+                                    if (!SystemFileSystem.exists(subFlowFile)) {
+                                        throw Exception("Subflow file not found: $subflowName")
+                                    }
+                                    val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
+                                    val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
+
+                                    val start = (getInputValue("start", 0) as? Number)?.toInt() ?: 0
+                                    val end = (getInputValue("end", 10) as? Number)?.toInt() ?: 10
+                                    val step = (getInputValue("step", 1) as? Number)?.toInt() ?: 1
+                                    var accumulator = getInputValue("input_data", null)
+
+                                    if (step != 0) {
+                                        val range = if (step > 0) start until end step step else start downTo end + 1 step (-step)
+                                        for (i in range) {
+                                            val subParameters = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                                            subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>().forEach { inputNode ->
+                                                val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
+                                                val portId = inputNode.outputs.firstOrNull()?.id ?: ""
+                                                when {
+                                                    portName == "index" || portName == "idx" || portId == "index" || portId == "idx" -> {
+                                                        subParameters["${inputNode.id}"] = toJsonElement(i)
+                                                    }
+                                                    portName == "input_data" || portName == "input" || portName == "data" || portId == "input_data" || portId == "input" || portId == "data" -> {
+                                                        subParameters["${inputNode.id}"] = toJsonElement(accumulator)
+                                                    }
+                                                }
+                                            }
+
+                                            val subJob = BackgroundJob(
+                                                id = "${job.id}-for-${node.id}-$i",
+                                                name = "For loop index $i",
+                                                type = JobType.Flow,
+                                                pluginId = "system",
+                                                capabilityName = subflowName,
+                                                parameters = subParameters
+                                            )
+
+                                            manager.addJobLog(job.id, "Executing for loop iteration index = $i")
+                                            val subOutputs = executeSubFlowRecursively(subFlow, subJob, appDataDir)
+                                            val outVal = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"] ?: subOutputs.values.firstOrNull()
+                                            accumulator = outVal
+                                        }
+                                    }
+                                    computedValues[Pair(node.id, "output_data")] = accumulator
+                                } else {
+                                    computedValues[Pair(node.id, "output_data")] = getInputValue("input_data", null)
+                                }
+                            }
+                            "while" -> {
+                                val subflowName = getInputValue("subflow_name", "") as String
+                                if (subflowName.isNotEmpty()) {
+                                    val subFlowFile = Path("$appDataDir/flows/${subflowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+                                    if (!SystemFileSystem.exists(subFlowFile)) {
+                                        throw Exception("Subflow file not found: $subflowName")
+                                    }
+                                    val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
+                                    val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
+
+                                    var conditionVal = getInputValue("condition", true)
+                                    var condition = when (conditionVal) {
+                                        is Boolean -> conditionVal
+                                        is String -> conditionVal.toBoolean()
+                                        is Number -> conditionVal.toInt() != 0
+                                        else -> false
+                                    }
+                                    var accumulator = getInputValue("input_data", null)
+                                    var iteration = 0
+
+                                    while (condition) {
+                                        val subParameters = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                                        subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>().forEach { inputNode ->
+                                            val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
+                                            val portId = inputNode.outputs.firstOrNull()?.id ?: ""
+                                            when {
+                                                portName == "condition" || portName == "cond" || portId == "condition" || portId == "cond" -> {
+                                                    subParameters["${inputNode.id}"] = toJsonElement(condition)
+                                                }
+                                                portName == "input_data" || portName == "input" || portName == "data" || portId == "input_data" || portId == "input" || portId == "data" -> {
+                                                    subParameters["${inputNode.id}"] = toJsonElement(accumulator)
+                                                }
+                                            }
+                                        }
+
+                                        val subJob = BackgroundJob(
+                                            id = "${job.id}-while-${node.id}-$iteration",
+                                            name = "While loop iteration $iteration",
+                                            type = JobType.Flow,
+                                            pluginId = "system",
+                                            capabilityName = subflowName,
+                                            parameters = subParameters
+                                        )
+
+                                        manager.addJobLog(job.id, "Executing while loop iteration $iteration")
+                                        val subOutputs = executeSubFlowRecursively(subFlow, subJob, appDataDir)
+                                        
+                                        val newAccumulator = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"]
+                                        val newConditionVal = subOutputs["condition"] ?: subOutputs["cond"]
+                                        
+                                        if (newAccumulator != null || subOutputs.containsKey("output_data") || subOutputs.containsKey("output") || subOutputs.containsKey("data")) {
+                                            accumulator = newAccumulator
+                                        } else {
+                                            val nonConditionOutput = subOutputs.filterKeys { it != "condition" && it != "cond" }.values.firstOrNull()
+                                            if (nonConditionOutput != null) {
+                                                accumulator = nonConditionOutput
+                                            }
+                                        }
+
+                                        if (newConditionVal != null) {
+                                            condition = when (newConditionVal) {
+                                                is Boolean -> newConditionVal
+                                                is String -> newConditionVal.toBoolean()
+                                                is Number -> newConditionVal.toInt() != 0
+                                                else -> false
+                                            }
+                                        } else {
+                                            val boolOutput = subOutputs.values.filterIsInstance<Boolean>().firstOrNull()
+                                            if (boolOutput != null) {
+                                                condition = boolOutput
+                                            } else {
+                                                manager.addJobLog(job.id, "Warning: while loop did not return a condition output, exiting loop", "WARN")
+                                                break
+                                            }
+                                        }
+                                        
+                                        iteration++
+                                        if (iteration > 10000) {
+                                            throw Exception("While loop exceeded safety limit of 10000 iterations")
+                                        }
+                                    }
+
+                                    computedValues[Pair(node.id, "output_data")] = accumulator
+                                } else {
+                                    computedValues[Pair(node.id, "output_data")] = getInputValue("input_data", null)
+                                }
+                            }
                             else -> {
                                 throw Exception("Unsupported system node action: ${node.systemAction}")
                             }
@@ -751,6 +935,8 @@ class JobWorker(
                         
                         val plugin = PluginLoader.getPluginById(node.pluginInfo.id)
                             ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
+                        
+                        validateCapabilityParameters(plugin.getManifest(), node.capability.name, capabilityParameters)
                         
                         val processor = plugin.getProcessor()
                         val context = pluginManager.createPluginContext(node.pluginInfo.id, job.id)
@@ -1126,6 +1312,184 @@ class JobWorker(
                             addToList(list2)
                             computedValues[Pair(node.id, "output")] = merged
                         }
+                        "comparator" -> {
+                            val a = getInputValue("a", null)
+                            val b = getInputValue("b", null)
+
+                            var minorVal = false
+                            var majorVal = false
+                            var equalVal = false
+
+                            if (a != null && b != null) {
+                                val aNum = when (a) {
+                                    is Number -> a.toDouble()
+                                    else -> a.toString().toDoubleOrNull()
+                                }
+                                val bNum = when (b) {
+                                    is Number -> b.toDouble()
+                                    else -> b.toString().toDoubleOrNull()
+                                }
+
+                                if (aNum != null && bNum != null) {
+                                    minorVal = aNum < bNum
+                                    majorVal = aNum > bNum
+                                    equalVal = aNum == bNum
+                                } else {
+                                    val aStr = a.toString()
+                                    val bStr = b.toString()
+                                    val cmp = aStr.compareTo(bStr)
+                                    minorVal = cmp < 0
+                                    majorVal = cmp > 0
+                                    equalVal = cmp == 0
+                                }
+                            } else {
+                                equalVal = (a == null && b == null)
+                                minorVal = (a == null && b != null)
+                                majorVal = (a != null && b == null)
+                            }
+
+                            val notEqualVal = !equalVal
+                            computedValues[Pair(node.id, "minor")] = minorVal
+                            computedValues[Pair(node.id, "major")] = majorVal
+                            computedValues[Pair(node.id, "equal")] = equalVal
+                            computedValues[Pair(node.id, "not_equal")] = notEqualVal
+                        }
+                        "for" -> {
+                            val subflowName = getInputValue("subflow_name", "") as String
+                            if (subflowName.isNotEmpty()) {
+                                val subFlowFile = Path("$appDataDir/flows/${subflowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+                                if (!SystemFileSystem.exists(subFlowFile)) {
+                                    throw Exception("Subflow file not found: $subflowName")
+                                }
+                                val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
+                                val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
+
+                                val start = (getInputValue("start", 0) as? Number)?.toInt() ?: 0
+                                val end = (getInputValue("end", 10) as? Number)?.toInt() ?: 10
+                                val step = (getInputValue("step", 1) as? Number)?.toInt() ?: 1
+                                var accumulator = getInputValue("input_data", null)
+
+                                if (step != 0) {
+                                    val range = if (step > 0) start until end step step else start downTo end + 1 step (-step)
+                                    for (i in range) {
+                                        val subParameters = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                                        subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>().forEach { inputNode ->
+                                            val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
+                                            val portId = inputNode.outputs.firstOrNull()?.id ?: ""
+                                            when {
+                                                portName == "index" || portName == "idx" || portId == "index" || portId == "idx" -> {
+                                                    subParameters["${inputNode.id}"] = toJsonElement(i)
+                                                }
+                                                portName == "input_data" || portName == "input" || portName == "data" || portId == "input_data" || portId == "input" || portId == "data" -> {
+                                                    subParameters["${inputNode.id}"] = toJsonElement(accumulator)
+                                                }
+                                            }
+                                        }
+
+                                        val subJob = BackgroundJob(
+                                            id = "${job.id}-for-${node.id}-$i",
+                                            name = "For loop index $i",
+                                            type = JobType.Flow,
+                                            pluginId = "system",
+                                            capabilityName = subflowName,
+                                            parameters = subParameters
+                                        )
+
+                                        val subOutputs = executeSubFlowRecursively(subFlow, subJob, appDataDir)
+                                        val outVal = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"] ?: subOutputs.values.firstOrNull()
+                                        accumulator = outVal
+                                    }
+                                }
+                                computedValues[Pair(node.id, "output_data")] = accumulator
+                            } else {
+                                computedValues[Pair(node.id, "output_data")] = getInputValue("input_data", null)
+                            }
+                        }
+                        "while" -> {
+                            val subflowName = getInputValue("subflow_name", "") as String
+                            if (subflowName.isNotEmpty()) {
+                                val subFlowFile = Path("$appDataDir/flows/${subflowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+                                if (!SystemFileSystem.exists(subFlowFile)) {
+                                    throw Exception("Subflow file not found: $subflowName")
+                                }
+                                val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
+                                val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
+
+                                var conditionVal = getInputValue("condition", true)
+                                var condition = when (conditionVal) {
+                                    is Boolean -> conditionVal
+                                    is String -> conditionVal.toBoolean()
+                                    is Number -> conditionVal.toInt() != 0
+                                    else -> false
+                                }
+                                var accumulator = getInputValue("input_data", null)
+                                var iteration = 0
+
+                                while (condition) {
+                                    val subParameters = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                                    subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>().forEach { inputNode ->
+                                        val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
+                                        val portId = inputNode.outputs.firstOrNull()?.id ?: ""
+                                        when {
+                                            portName == "condition" || portName == "cond" || portId == "condition" || portId == "cond" -> {
+                                                subParameters["${inputNode.id}"] = toJsonElement(condition)
+                                            }
+                                            portName == "input_data" || portName == "input" || portName == "data" || portId == "input_data" || portId == "input" || portId == "data" -> {
+                                                subParameters["${inputNode.id}"] = toJsonElement(accumulator)
+                                            }
+                                        }
+                                    }
+
+                                    val subJob = BackgroundJob(
+                                        id = "${job.id}-while-${node.id}-$iteration",
+                                        name = "While loop iteration $iteration",
+                                        type = JobType.Flow,
+                                        pluginId = "system",
+                                        capabilityName = subflowName,
+                                        parameters = subParameters
+                                    )
+
+                                    val subOutputs = executeSubFlowRecursively(subFlow, subJob, appDataDir)
+                                    
+                                    val newAccumulator = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"]
+                                    val newConditionVal = subOutputs["condition"] ?: subOutputs["cond"]
+                                    
+                                    if (newAccumulator != null || subOutputs.containsKey("output_data") || subOutputs.containsKey("output") || subOutputs.containsKey("data")) {
+                                        accumulator = newAccumulator
+                                    } else {
+                                        val nonConditionOutput = subOutputs.filterKeys { it != "condition" && it != "cond" }.values.firstOrNull()
+                                        if (nonConditionOutput != null) {
+                                            accumulator = nonConditionOutput
+                                        }
+                                    }
+
+                                    if (newConditionVal != null) {
+                                        condition = when (newConditionVal) {
+                                            is Boolean -> newConditionVal
+                                            is String -> newConditionVal.toBoolean()
+                                            is Number -> newConditionVal.toInt() != 0
+                                            else -> false
+                                        }
+                                    } else {
+                                        val boolOutput = subOutputs.values.filterIsInstance<Boolean>().firstOrNull()
+                                        if (boolOutput != null) {
+                                            condition = boolOutput
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                    
+                                    iteration++
+                                    if (iteration > 10000) {
+                                        throw Exception("While loop exceeded safety limit of 10000 iterations")
+                                    }
+                                }
+
+                                computedValues[Pair(node.id, "output_data")] = accumulator
+                            } else {
+                                computedValues[Pair(node.id, "output_data")] = getInputValue("input_data", null)
+                            }
+                        }
                     }
                 }
                 is org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode -> {
@@ -1137,6 +1501,9 @@ class JobWorker(
                     
                     val plugin = PluginLoader.getPluginById(node.pluginInfo.id)
                         ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
+                    
+                    validateCapabilityParameters(plugin.getManifest(), node.capability.name, capabilityParameters)
+                    
                     val processor = plugin.getProcessor()
                     val context = pluginManager.createPluginContext(node.pluginInfo.id, job.id)
                     val request = org.wip.plugintoolkit.api.PluginRequest(
@@ -1316,11 +1683,25 @@ class JobWorker(
             }
             PrimitiveType.BOOLEAN -> {
                 if (value is Boolean) value
-                else {
+                else if (value is Number) {
+                    value.toInt() != 0
+                } else {
                     val str = value.toString().trim().lowercase()
-                    if (str == "true") true
-                    else if (str == "false") false
-                    else throw Exception("Failed to convert '$value' to Boolean")
+                    if (str == "true" || str == "1") true
+                    else if (str == "false" || str == "0") false
+                    else {
+                        val intVal = str.toIntOrNull()
+                        if (intVal != null) {
+                            intVal != 0
+                        } else {
+                            val doubleVal = str.toDoubleOrNull()
+                            if (doubleVal != null) {
+                                doubleVal.toInt() != 0
+                            } else {
+                                throw Exception("Failed to convert '$value' to Boolean")
+                            }
+                        }
+                    }
                 }
             }
             PrimitiveType.ANY -> value
@@ -1343,6 +1724,110 @@ class JobWorker(
             }
             is JsonObject -> {
                 je.entries.associate { it.key to fromJsonElement(it.value) }
+            }
+        }
+    }
+
+    private fun validateCapabilityParameters(
+        manifest: org.wip.plugintoolkit.api.PluginManifest,
+        capabilityName: String,
+        parameters: Map<String, kotlinx.serialization.json.JsonElement>
+    ) {
+        val capability = manifest.capabilities.find { it.name == capabilityName } ?: return
+        val paramMetadataMap = capability.parameters ?: return
+
+        for ((paramName, metadata) in paramMetadataMap) {
+            val valueElement = parameters[paramName]
+            
+            // Check if required
+            if (metadata.required) {
+                if (valueElement == null || valueElement is kotlinx.serialization.json.JsonNull) {
+                    throw IllegalArgumentException("Parameter '$paramName' is required but was not provided.")
+                }
+                val metaType = metadata.type
+                if (metaType is DataType.Primitive && metaType.primitiveType == PrimitiveType.STRING) {
+                    if (valueElement is JsonPrimitive && valueElement.content.isBlank()) {
+                        throw IllegalArgumentException("Parameter '$paramName' is required but was empty.")
+                    }
+                }
+            }
+
+            if (valueElement == null || valueElement is kotlinx.serialization.json.JsonNull) {
+                continue
+            }
+
+            val constraints = metadata.constraints ?: continue
+            val regex = constraints.regex
+            val minLength = constraints.minLength
+            val maxLength = constraints.maxLength
+            val minValue = constraints.minValue
+            val maxValue = constraints.maxValue
+
+            // Extract values to validate
+            val valuesToValidate = mutableListOf<String>()
+            if (metadata.type is DataType.Array) {
+                when (valueElement) {
+                    is kotlinx.serialization.json.JsonArray -> {
+                        valueElement.forEach { elem ->
+                            if (elem is JsonPrimitive) {
+                                valuesToValidate.add(elem.content)
+                            }
+                        }
+                    }
+                    is JsonPrimitive -> {
+                        val content = valueElement.content
+                        content.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach {
+                            valuesToValidate.add(it)
+                        }
+                    }
+                    else -> {}
+                }
+            } else {
+                if (valueElement is JsonPrimitive) {
+                    valuesToValidate.add(valueElement.content)
+                }
+            }
+
+            for (valStr in valuesToValidate) {
+                if (minLength != null && valStr.length < minLength) {
+                    throw IllegalArgumentException("Parameter '$paramName' value '$valStr' violates minLength constraint of $minLength.")
+                }
+                if (maxLength != null && valStr.length > maxLength) {
+                    throw IllegalArgumentException("Parameter '$paramName' value '$valStr' violates maxLength constraint of $maxLength.")
+                }
+                if (!regex.isNullOrEmpty()) {
+                    try {
+                        val pattern = Regex(regex)
+                        if (!pattern.matches(valStr)) {
+                            throw IllegalArgumentException("Parameter '$paramName' value '$valStr' does not match the required format: $regex")
+                        }
+                    } catch (e: Exception) {
+                        throw IllegalArgumentException("Parameter '$paramName' has an invalid regex constraint pattern: $regex")
+                    }
+                }
+
+                // If numeric, validate min/max values
+                val doubleVal = valStr.toDoubleOrNull()
+                if (doubleVal != null) {
+                    if (minValue != null && doubleVal < minValue) {
+                        throw IllegalArgumentException("Parameter '$paramName' value $doubleVal violates minValue constraint of $minValue.")
+                    }
+                    if (maxValue != null && doubleVal > maxValue) {
+                        throw IllegalArgumentException("Parameter '$paramName' value $doubleVal violates maxValue constraint of $maxValue.")
+                    }
+                } else if (minValue != null || maxValue != null) {
+                    val isNumericType = when (val t = metadata.type) {
+                        is DataType.Primitive -> t.primitiveType == PrimitiveType.INT || t.primitiveType == PrimitiveType.DOUBLE
+                        is DataType.Array -> {
+                            val itemType = t.items
+                            itemType is DataType.Primitive && (itemType.primitiveType == PrimitiveType.INT || itemType.primitiveType == PrimitiveType.DOUBLE)
+                        }
+                        else -> false
+                    }
+                    if (isNumericType && valStr.isNotEmpty()) {
+                        throw IllegalArgumentException("Parameter '$paramName' value '$valStr' is not a valid number.")
+                    }
+                }
             }
         }
     }

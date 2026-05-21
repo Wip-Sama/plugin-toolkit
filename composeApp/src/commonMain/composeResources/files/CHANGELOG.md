@@ -3,11 +3,14 @@ Date: 20-05-2026
 Added:
 	- Iterator node
 	- Comparator node
-	- Converter no can convert Int to Bool
+	- Converter can now convert Int to Bool (try)
 	- Ability to search/type path/folder and them be resolved by the application when working with flows and capabilities
+	- Common semantic type analysis with custom input fields based on those
+	- Optional regex support to validate string input
 Changes:
 	- Restiled the ui a bit more
 	- System dialogs are now blocking for the ui
+	- Moved managed folders to the settings
 ----------------------------------------------------------------------------------------------------
 Version: 1.5.0
 Date: 20-05-2026

@@ -75,7 +75,8 @@ data class FlowParameter(
     val label: String,
     val portId: String,
     val dataType: DataType,
-    val defaultValue: String
+    val defaultValue: String,
+    val semanticType: String? = null
 )
 
 enum class ParameterType {
@@ -150,6 +151,15 @@ fun FlowRunnerView(
                                         targetPort?.dataType ?: outPort.dataType
                                     } else outPort.dataType
 
+                                    val inferredSemanticType = if (!outPort.semanticType.isNullOrEmpty()) {
+                                        outPort.semanticType
+                                    } else {
+                                        val connection = currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
+                                        val targetNode = currentFlow.nodes.find { it.id == connection?.targetNodeId }
+                                        val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
+                                        targetPort?.semanticType
+                                    }
+
                                     listOf(
                                         FlowParameter(
                                             nodeId = node.id,
@@ -157,7 +167,8 @@ fun FlowRunnerView(
                                             label = outPort.name.replaceFirstChar { it.uppercase() },
                                             portId = outPort.id,
                                             dataType = inferredType,
-                                            defaultValue = ""
+                                            defaultValue = "",
+                                            semanticType = inferredSemanticType
                                         )
                                     )
                                 } else emptyList()
@@ -174,7 +185,8 @@ fun FlowRunnerView(
                                                     label = "${node.title} -> File Path",
                                                     portId = filePort.id,
                                                     dataType = filePort.dataType,
-                                                    defaultValue = filePort.value as? String ?: filePort.defaultValue as? String ?: "output.txt"
+                                                    defaultValue = filePort.value as? String ?: filePort.defaultValue as? String ?: "output.txt",
+                                                    semanticType = filePort.semanticType ?: "file"
                                                 )
                                             )
                                         } else emptyList()
@@ -189,7 +201,8 @@ fun FlowRunnerView(
                                                     label = "${node.title} -> File Path",
                                                     portId = filePort.id,
                                                     dataType = filePort.dataType,
-                                                    defaultValue = filePort.value as? String ?: filePort.defaultValue as? String ?: "output.txt"
+                                                    defaultValue = filePort.value as? String ?: filePort.defaultValue as? String ?: "output.txt",
+                                                    semanticType = filePort.semanticType ?: "file"
                                                 )
                                             )
                                         } else emptyList()
@@ -207,6 +220,15 @@ fun FlowRunnerView(
                                         sourcePort?.dataType ?: inPort.dataType
                                     } else inPort.dataType
 
+                                    val inferredSemanticType = if (!inPort.semanticType.isNullOrEmpty()) {
+                                        inPort.semanticType
+                                    } else {
+                                        val connection = currentFlow.connections.find { it.targetNodeId == node.id && it.targetPortId == inPort.id }
+                                        val sourceNode = currentFlow.nodes.find { it.id == connection?.sourceNodeId }
+                                        val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
+                                        sourcePort?.semanticType
+                                    }
+
                                     listOf(
                                         FlowParameter(
                                             nodeId = node.id,
@@ -214,7 +236,8 @@ fun FlowRunnerView(
                                             label = inPort.name.replaceFirstChar { it.uppercase() },
                                             portId = inPort.id,
                                             dataType = inferredType,
-                                            defaultValue = ""
+                                            defaultValue = "",
+                                            semanticType = inferredSemanticType
                                         )
                                     )
                                 } else emptyList()
@@ -287,7 +310,8 @@ fun FlowRunnerView(
                                         defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
                                         description = "",
                                         type = param.dataType,
-                                        required = true
+                                        required = true,
+                                        semanticType = param.semanticType
                                     )
                                 }
                                 var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }
@@ -323,7 +347,8 @@ fun FlowRunnerView(
                                             defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
                                             description = "Target path to save flow results",
                                             type = param.dataType,
-                                            required = true
+                                            required = true,
+                                            semanticType = param.semanticType
                                         )
                                     }
                                     var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }
@@ -366,14 +391,38 @@ fun FlowRunnerView(
                         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
                     }
                     
+                    // Validate all flow parameters
+                    val isFlowValid = remember(parameterValues.toMap(), flowParameters) {
+                        val allParams = flowParameters.filter { it.type != ParameterType.OUTPUT }
+                        allParams.all { param ->
+                            val value = parameterValues["${param.nodeId}"] ?: param.defaultValue
+                            val error = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateParameter(
+                                value = value,
+                                isRequired = true,
+                                isArray = param.dataType is DataType.Array,
+                                constraints = null
+                            )
+                            error == null
+                        }
+                    }
+
                     Button(
                         onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        enabled = isFlowValid
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                         Text(stringResource(Res.string.flow_execute_button))
+                    }
+                    if (!isFlowValid) {
+                        Text(
+                            text = "Fill in all required parameters before running",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                     }
                 }
 

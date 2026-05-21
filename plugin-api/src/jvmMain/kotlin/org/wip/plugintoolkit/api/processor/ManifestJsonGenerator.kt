@@ -78,6 +78,7 @@ object ManifestJsonGenerator {
                 val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
                 val required = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
                 val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
+                val semanticType = paramAnn?.arguments?.find { it.name?.asString() == "semanticType" }?.value as? String ?: ""
                 
                 val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
                 
@@ -100,7 +101,8 @@ object ManifestJsonGenerator {
                     type = GeneratorUtils.mapKSTypeToDataType(ksType),
                     constraints = constraints,
                     required = required,
-                    secret = secret
+                    secret = secret,
+                    semanticType = semanticType.ifEmpty { null }
                 )
             }
             

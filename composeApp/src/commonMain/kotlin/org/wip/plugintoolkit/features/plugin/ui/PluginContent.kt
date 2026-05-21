@@ -250,10 +250,19 @@ fun CapabilityTester(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        val validationErrors = remember(parameterValues.toMap(), capability.parameters) {
+            org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateAllParameters(
+                parameterValues = parameterValues,
+                parameters = capability.parameters
+            )
+        }
+        val isValid = validationErrors.isEmpty()
+
         Button(
             onClick = onExecute,
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium
+            shape = MaterialTheme.shapes.medium,
+            enabled = isValid
         ) {
             if (activeJobs.isNotEmpty()) {
                 CircularProgressIndicator(
@@ -266,6 +275,14 @@ fun CapabilityTester(
             } else {
                 Text(stringResource(Res.string.plugin_execute_capability))
             }
+        }
+        if (!isValid) {
+            Text(
+                text = "Fix parameter errors before executing",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }

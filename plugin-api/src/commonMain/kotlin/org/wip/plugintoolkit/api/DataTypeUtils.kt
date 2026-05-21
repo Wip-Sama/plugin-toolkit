@@ -85,7 +85,17 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
  */
 fun isSemanticTypeCompatible(source: String?, target: String?): Boolean {
     if (source.isNullOrBlank() || target.isNullOrBlank()) return true
-    return source.equals(target, ignoreCase = true)
+    val sourceList = source.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
+    val targetList = target.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
+    if (sourceList.isEmpty() || targetList.isEmpty()) return true
+    for (s in sourceList) {
+        for (t in targetList) {
+            if (s.equals(t, ignoreCase = true)) {
+                return true
+            }
+        }
+    }
+    return false
 }
 
 /**

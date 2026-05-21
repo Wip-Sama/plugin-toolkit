@@ -24,6 +24,13 @@ import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.gestures.detectTapGestures
+import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.colorpicker.utils.toHex
+import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -124,6 +131,8 @@ fun NodeComponent(
     var showTooltip by remember { mutableStateOf(false) }
     var tooltipJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
+    var showColorPicker by remember { mutableStateOf(false) }
+    var activeColorInputId by remember { mutableStateOf<String?>(null) }
 
     val (headerColor, onHeaderColor) = when (node) {
         is Node.CapabilityNode -> Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
@@ -299,6 +308,10 @@ fun NodeComponent(
                     // Inputs
                     node.inputs.forEach { input ->
                         val currentPortValue = input.value ?: input.defaultValue
+                        val portErrors = validationErrors.filter {
+                            (it.sourceNodeId == node.id && it.sourcePortId == input.id) ||
+                            (it.targetNodeId == node.id && it.targetPortId == input.id)
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth().height(48.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -331,10 +344,6 @@ fun NodeComponent(
                                     if (inferredSem != null) {
                                         Text(inferredSem, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    val portErrors = validationErrors.filter {
-                                        (it.sourceNodeId == node.id && it.sourcePortId == input.id) ||
-                                        (it.targetNodeId == node.id && it.targetPortId == input.id)
-                                    }
                                     if (portErrors.isNotEmpty()) {
                                         Text(
                                             text = portErrors.first().message,
@@ -348,80 +357,362 @@ fun NodeComponent(
                             }
 
                             // Default Value Editor
+                            // Default Value Editor
                             val isConnected = connectedInputPortIds.contains(input.id)
                             val valueModifier = if (isConnected) Modifier.alpha(0.5f) else Modifier
                             
                             Box(modifier = Modifier.width(120.dp).then(valueModifier)) {
-                                when (val type = input.dataType) {
-                                    is DataType.Primitive -> {
-                                        when (type.primitiveType) {
-                                            PrimitiveType.BOOLEAN -> {
-                                                val checked = getBooleanValue(currentPortValue)
-                                                Switch(
-                                                    checked = checked,
-                                                    onCheckedChange = { onUpdateValue(node.id, input.id, it) },
-                                                    enabled = !isConnected && !isReadOnly,
-                                                    modifier = Modifier.scale(0.8f)
+                                val inferredSem = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticType
+                                val category = getSemanticTypeCategory(inferredSem)
+                                when (category) {
+                                    "color" -> {
+                                        val rawValue = getPortValueString(currentPortValue)
+                                        val parsedColor = parseColorString(rawValue)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                                                .then(
+                                                    if (portErrors.isNotEmpty() && !isConnected) {
+                                                        Modifier.border(1.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small)
+                                                    } else {
+                                                        Modifier
+                                                    }
+                                                )
+                                                .padding(start = ToolkitTheme.spacing.small, end = ToolkitTheme.spacing.extraSmall)
+                                                .padding(vertical = ToolkitTheme.spacing.extraSmall)
+                                        ) {
+                                            BasicTextField(
+                                                value = rawValue,
+                                                onValueChange = { onUpdateValue(node.id, input.id, it) },
+                                                enabled = !isConnected && !isReadOnly,
+                                                textStyle = MaterialTheme.typography.bodySmall.copy(
+                                                    color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                                            else MaterialTheme.colorScheme.onSurface
+                                                ),
+                                                modifier = Modifier.weight(1f),
+                                                singleLine = true
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(20.dp)
+                                                    .clip(MaterialTheme.shapes.extraSmall)
+                                                    .background(parsedColor)
+                                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.extraSmall)
+                                                    .pointerInput(isConnected, isReadOnly) {
+                                                        if (!isConnected && !isReadOnly) {
+                                                            detectTapGestures {
+                                                                activeColorInputId = input.id
+                                                                showColorPicker = true
+                                                            }
+                                                        }
+                                                    }
+                                            )
+                                        }
+                                    }
+                                    "file" -> {
+                                        val rawValue = getPortValueString(currentPortValue)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                                                .then(
+                                                    if (portErrors.isNotEmpty() && !isConnected) {
+                                                        Modifier.border(1.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small)
+                                                    } else {
+                                                        Modifier
+                                                    }
+                                                )
+                                                .padding(start = ToolkitTheme.spacing.small, end = ToolkitTheme.spacing.extraSmall)
+                                                .padding(vertical = ToolkitTheme.spacing.extraSmall)
+                                        ) {
+                                            BasicTextField(
+                                                value = rawValue,
+                                                onValueChange = { onUpdateValue(node.id, input.id, it) },
+                                                enabled = !isConnected && !isReadOnly,
+                                                textStyle = MaterialTheme.typography.bodySmall.copy(
+                                                    color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                                            else MaterialTheme.colorScheme.onSurface
+                                                ),
+                                                modifier = Modifier.weight(1f),
+                                                singleLine = true
+                                            )
+                                            IconButton(
+                                                onClick = {
+                                                    scope.launch {
+                                                        val allowedExtensions = getAllowedExtensions(inferredSem)
+                                                        val pickedPath = PlatformUtils.pickFile("Select File", allowedExtensions)
+                                                        if (pickedPath != null) {
+                                                            val isArray = input.dataType is DataType.Array
+                                                            val newValue = appendPickedValue(rawValue, pickedPath, isArray)
+                                                            onUpdateValue(node.id, input.id, newValue)
+                                                        }
+                                                    }
+                                                },
+                                                enabled = !isConnected && !isReadOnly,
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.FolderOpen,
+                                                    contentDescription = "Pick File",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = MaterialTheme.colorScheme.primary
                                                 )
                                             }
-                                            PrimitiveType.INT -> {
-                                                 val rawValue = getPortValueString(currentPortValue)
-                                                 BasicTextField(
-                                                     value = rawValue,
-                                                     onValueChange = { newValue ->
-                                                         if (newValue.isEmpty()) {
-                                                             onUpdateValue(node.id, input.id, null)
-                                                         } else {
-                                                             val filtered = newValue.filterIndexed { index, c ->
-                                                                 c.isDigit() || (c == '-' && index == 0)
-                                                             }
-                                                             if (filtered == newValue || filtered.isNotEmpty()) {
-                                                                 val parsed = filtered.toIntOrNull()
-                                                                 onUpdateValue(node.id, input.id, parsed ?: filtered)
-                                                             }
-                                                         }
-                                                     },
-                                                     enabled = !isConnected && !isReadOnly,
-                                                     textStyle = MaterialTheme.typography.bodySmall.copy(
-                                                         color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                                                 else MaterialTheme.colorScheme.onSurface
-                                                      ),
-                                                     modifier = Modifier
-                                                         .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
-                                                         .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
-                                                         .fillMaxWidth(),
-                                                     singleLine = true
-                                                 )
-                                             }
-                                             PrimitiveType.DOUBLE -> {
-                                                 val rawValue = getPortValueString(currentPortValue)
-                                                 BasicTextField(
-                                                     value = rawValue,
-                                                     onValueChange = { newValue ->
-                                                         if (newValue.isEmpty()) {
-                                                             onUpdateValue(node.id, input.id, null)
-                                                         } else {
-                                                             val hasDot = newValue.count { it == '.' } <= 1
-                                                             val validMinus = newValue.lastIndexOf('-') <= 0
-                                                             val validChars = newValue.all { it.isDigit() || it == '.' || it == '-' }
-                                                             if (hasDot && validMinus && validChars) {
-                                                                 val parsed = newValue.toDoubleOrNull()
-                                                                 onUpdateValue(node.id, input.id, parsed ?: newValue)
-                                                             }
-                                                         }
-                                                     },
-                                                     enabled = !isConnected && !isReadOnly,
-                                                     textStyle = MaterialTheme.typography.bodySmall.copy(
-                                                         color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                                                 else MaterialTheme.colorScheme.onSurface
-                                                      ),
-                                                     modifier = Modifier
-                                                         .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
-                                                         .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
-                                                         .fillMaxWidth(),
-                                                     singleLine = true
-                                                 )
-                                             }
+                                        }
+                                    }
+                                    "path" -> {
+                                        val rawValue = getPortValueString(currentPortValue)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                                                .then(
+                                                    if (portErrors.isNotEmpty() && !isConnected) {
+                                                        Modifier.border(1.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small)
+                                                    } else {
+                                                        Modifier
+                                                    }
+                                                )
+                                                .padding(start = ToolkitTheme.spacing.small, end = ToolkitTheme.spacing.extraSmall)
+                                                .padding(vertical = ToolkitTheme.spacing.extraSmall)
+                                        ) {
+                                            BasicTextField(
+                                                value = rawValue,
+                                                onValueChange = { onUpdateValue(node.id, input.id, it) },
+                                                enabled = !isConnected && !isReadOnly,
+                                                textStyle = MaterialTheme.typography.bodySmall.copy(
+                                                    color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                                            else MaterialTheme.colorScheme.onSurface
+                                                ),
+                                                modifier = Modifier.weight(1f),
+                                                singleLine = true
+                                            )
+                                            IconButton(
+                                                onClick = {
+                                                    scope.launch {
+                                                        val pickedPath = PlatformUtils.pickFolder()
+                                                        if (pickedPath != null) {
+                                                            val isArray = input.dataType is DataType.Array
+                                                            val newValue = appendPickedValue(rawValue, pickedPath, isArray)
+                                                            onUpdateValue(node.id, input.id, newValue)
+                                                        }
+                                                    }
+                                                },
+                                                enabled = !isConnected && !isReadOnly,
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Folder,
+                                                    contentDescription = "Pick Folder",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
+                                    "image", "audio", "video" -> {
+                                        val rawValue = getPortValueString(currentPortValue)
+                                        val isArray = input.dataType is DataType.Array
+                                        val fileNames = getFileNames(rawValue, isArray)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                                                .then(
+                                                    if (portErrors.isNotEmpty() && !isConnected) {
+                                                        Modifier.border(1.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small)
+                                                    } else {
+                                                        Modifier
+                                                    }
+                                                )
+                                                .padding(start = ToolkitTheme.spacing.small, end = ToolkitTheme.spacing.extraSmall)
+                                                .padding(vertical = ToolkitTheme.spacing.extraSmall)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text(
+                                                    text = if (fileNames.isNotEmpty()) fileNames else {
+                                                        when (category) {
+                                                            "image" -> "No image"
+                                                            "audio" -> "No audio"
+                                                            else -> "No video"
+                                                        }
+                                                    },
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = if (fileNames.isNotEmpty()) MaterialTheme.colorScheme.onSurface 
+                                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            if (fileNames.isNotEmpty() && !isConnected && !isReadOnly) {
+                                                IconButton(
+                                                    onClick = { onUpdateValue(node.id, input.id, null) },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Close,
+                                                        contentDescription = "Clear",
+                                                        modifier = Modifier.size(16.dp),
+                                                        tint = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    scope.launch {
+                                                        val allowedExtensions = getAllowedExtensions(inferredSem)
+                                                        val pickedPath = PlatformUtils.pickFile("Select File", allowedExtensions)
+                                                        if (pickedPath != null) {
+                                                            val newValue = appendPickedValue(rawValue, pickedPath, isArray)
+                                                            onUpdateValue(node.id, input.id, newValue)
+                                                        }
+                                                    }
+                                                },
+                                                enabled = !isConnected && !isReadOnly,
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.FolderOpen,
+                                                    contentDescription = "Pick File",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
+                                    else -> {
+                                        when (val type = input.dataType) {
+                                            is DataType.Primitive -> {
+                                                when (type.primitiveType) {
+                                                    PrimitiveType.BOOLEAN -> {
+                                                        val checked = getBooleanValue(currentPortValue)
+                                                        Switch(
+                                                            checked = checked,
+                                                            onCheckedChange = { onUpdateValue(node.id, input.id, it) },
+                                                            enabled = !isConnected && !isReadOnly,
+                                                            modifier = Modifier.scale(0.8f)
+                                                        )
+                                                    }
+                                                    PrimitiveType.INT -> {
+                                                         val rawValue = getPortValueString(currentPortValue)
+                                                         BasicTextField(
+                                                             value = rawValue,
+                                                             onValueChange = { newValue ->
+                                                                 if (newValue.isEmpty()) {
+                                                                     onUpdateValue(node.id, input.id, null)
+                                                                 } else {
+                                                                     val filtered = newValue.filterIndexed { index, c ->
+                                                                         c.isDigit() || (c == '-' && index == 0)
+                                                                     }
+                                                                     if (filtered == newValue || filtered.isNotEmpty()) {
+                                                                         val parsed = filtered.toIntOrNull()
+                                                                         onUpdateValue(node.id, input.id, parsed ?: filtered)
+                                                                     }
+                                                                 }
+                                                             },
+                                                             enabled = !isConnected && !isReadOnly,
+                                                             textStyle = MaterialTheme.typography.bodySmall.copy(
+                                                                 color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                                                         else MaterialTheme.colorScheme.onSurface
+                                                             ),
+                                                             modifier = Modifier
+                                                                 .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                                                                 .then(
+                                                                     if (portErrors.isNotEmpty() && !isConnected) {
+                                                                         Modifier.border(1.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small)
+                                                                     } else {
+                                                                         Modifier
+                                                                     }
+                                                                 )
+                                                                 .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                                                 .fillMaxWidth(),
+                                                             singleLine = true
+                                                         )
+                                                     }
+                                                     PrimitiveType.DOUBLE -> {
+                                                         val rawValue = getPortValueString(currentPortValue)
+                                                         BasicTextField(
+                                                             value = rawValue,
+                                                             onValueChange = { newValue ->
+                                                                 if (newValue.isEmpty()) {
+                                                                     onUpdateValue(node.id, input.id, null)
+                                                                 } else {
+                                                                     val hasDot = newValue.count { it == '.' } <= 1
+                                                                     val validMinus = newValue.lastIndexOf('-') <= 0
+                                                                     val validChars = newValue.all { it.isDigit() || it == '.' || it == '-' }
+                                                                     if (hasDot && validMinus && validChars) {
+                                                                         val parsed = newValue.toDoubleOrNull()
+                                                                         onUpdateValue(node.id, input.id, parsed ?: newValue)
+                                                                     }
+                                                                 }
+                                                             },
+                                                             enabled = !isConnected && !isReadOnly,
+                                                             textStyle = MaterialTheme.typography.bodySmall.copy(
+                                                                 color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                                                         else MaterialTheme.colorScheme.onSurface
+                                                             ),
+                                                             modifier = Modifier
+                                                                 .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                                                                 .then(
+                                                                     if (portErrors.isNotEmpty() && !isConnected) {
+                                                                         Modifier.border(1.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small)
+                                                                     } else {
+                                                                         Modifier
+                                                                     }
+                                                                 )
+                                                                 .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                                                 .fillMaxWidth(),
+                                                             singleLine = true
+                                                         )
+                                                     }
+                                                    else -> {
+                                                        val rawValue = getPortValueString(currentPortValue)
+                                                        BasicTextField(
+                                                            value = rawValue,
+                                                            onValueChange = { onUpdateValue(node.id, input.id, it) },
+                                                            enabled = !isConnected && !isReadOnly,
+                                                            textStyle = MaterialTheme.typography.bodySmall.copy(
+                                                                color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                                                        else MaterialTheme.colorScheme.onSurface
+                                                            ),
+                                                            modifier = Modifier
+                                                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                                                                .then(
+                                                                    if (portErrors.isNotEmpty() && !isConnected) {
+                                                                        Modifier.border(1.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small)
+                                                                    } else {
+                                                                        Modifier
+                                                                    }
+                                                                )
+                                                                .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                                                .fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            is DataType.Enum -> {
+                                                val options = type.options
+                                                val rawValue = getPortValueString(currentPortValue)
+                                                val selected = rawValue.ifEmpty { options.firstOrNull() ?: "" }
+                                                Box(modifier = Modifier.fillMaxWidth()) {
+                                                    ExpressiveMenu(
+                                                        options = options,
+                                                        selectedOption = selected,
+                                                        onOptionSelected = { onUpdateValue(node.id, input.id, it) },
+                                                        labelProvider = { it },
+                                                        enabled = !isConnected && !isReadOnly
+                                                    )
+                                                }
+                                            }
                                             else -> {
                                                 val rawValue = getPortValueString(currentPortValue)
                                                 BasicTextField(
@@ -431,46 +722,22 @@ fun NodeComponent(
                                                     textStyle = MaterialTheme.typography.bodySmall.copy(
                                                         color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                                                 else MaterialTheme.colorScheme.onSurface
-                                                     ),
+                                                    ),
                                                     modifier = Modifier
                                                         .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                                                        .then(
+                                                            if (portErrors.isNotEmpty() && !isConnected) {
+                                                                Modifier.border(1.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small)
+                                                            } else {
+                                                                Modifier
+                                                            }
+                                                        )
                                                         .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                                                         .fillMaxWidth(),
                                                     singleLine = true
                                                 )
                                             }
                                         }
-                                    }
-                                    is DataType.Enum -> {
-                                        val options = type.options
-                                        val rawValue = getPortValueString(currentPortValue)
-                                        val selected = rawValue.ifEmpty { options.firstOrNull() ?: "" }
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            ExpressiveMenu(
-                                                options = options,
-                                                selectedOption = selected,
-                                                onOptionSelected = { onUpdateValue(node.id, input.id, it) },
-                                                labelProvider = { it },
-                                                enabled = !isConnected && !isReadOnly
-                                            )
-                                        }
-                                    }
-                                    else -> {
-                                        val rawValue = getPortValueString(currentPortValue)
-                                        BasicTextField(
-                                            value = rawValue,
-                                            onValueChange = { onUpdateValue(node.id, input.id, it) },
-                                            enabled = !isConnected && !isReadOnly,
-                                            textStyle = MaterialTheme.typography.bodySmall.copy(
-                                                color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                                        else MaterialTheme.colorScheme.onSurface
-                                            ),
-                                            modifier = Modifier
-                                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
-                                                .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
-                                                .fillMaxWidth(),
-                                            singleLine = true
-                                        )
                                     }
                                 }
                             }
@@ -717,6 +984,35 @@ fun NodeComponent(
             )
         }
     }
+
+    if (showColorPicker && activeColorInputId != null) {
+        val input = node.inputs.firstOrNull { it.id == activeColorInputId }
+        val inferredSem = input?.let { inferredSemanticTypes[Pair(node.id, it.id)] ?: it.semanticType }
+        val semLower = inferredSem?.lowercase() ?: ""
+        org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog(
+            show = showColorPicker,
+            onDismissRequest = {
+                showColorPicker = false
+                activeColorInputId = null
+            },
+            onPickedColor = { color ->
+                activeColorInputId?.let { inputId ->
+                    val hasAlpha = semLower.contains("rgba", ignoreCase = true)
+                    val formatted = if (semLower.contains("rgb", ignoreCase = true)) {
+                        color.toRGB(rgbPrefix = true, includeAlpha = hasAlpha)
+                    } else {
+                        color.toHex(hexPrefix = true, includeAlpha = hasAlpha)
+                    }
+                    val isArray = input?.dataType is DataType.Array
+                    val existingValue = getPortValueString(input?.value ?: input?.defaultValue)
+                    val newValue = appendPickedValue(existingValue, formatted, isArray)
+                    onUpdateValue(node.id, inputId, newValue)
+                }
+                showColorPicker = false
+                activeColorInputId = null
+            }
+        )
+    }
 }
 
 @Composable
@@ -832,6 +1128,9 @@ private fun getNodeDescription(node: Node): String {
                 "merger" -> "Merges two list arrays into a single combined list."
                 "conditional" -> "Routes input data to either the 'If True' or 'If False' output port based on a boolean condition."
                 "error" -> "Halts flow execution immediately with a custom error message."
+                "comparator" -> "Compares two values (numeric or string) and outputs minor (<), major (>), equal (==), and not equal (!=) boolean results."
+                "for" -> "Runs a subflow iteratively for a range of index values, accumulating data."
+                "while" -> "Runs a subflow repeatedly while a boolean condition remains true."
                 else -> "System operation: ${node.title}."
             }
         }
@@ -840,3 +1139,158 @@ private fun getNodeDescription(node: Node): String {
         is Node.SubFlowNode -> "Executes the sub-flow '${node.flowName}' and maps its inputs/outputs."
     }
 }
+
+private fun parseColorString(colorStr: String): Color {
+    val lastColor = colorStr.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim() ?: colorStr
+    val trimmed = lastColor.trim()
+    if (trimmed.isEmpty()) return Color.Transparent
+    if (trimmed.startsWith("#")) {
+        return try {
+            val hex = trimmed.substring(1)
+            when (hex.length) {
+                3 -> {
+                    val r = hex[0].toString().repeat(2).toInt(16) / 255f
+                    val g = hex[1].toString().repeat(2).toInt(16) / 255f
+                    val b = hex[2].toString().repeat(2).toInt(16) / 255f
+                    Color(r, g, b, 1f)
+                }
+                4 -> {
+                    val r = hex[0].toString().repeat(2).toInt(16) / 255f
+                    val g = hex[1].toString().repeat(2).toInt(16) / 255f
+                    val b = hex[2].toString().repeat(2).toInt(16) / 255f
+                    val a = hex[3].toString().repeat(2).toInt(16) / 255f
+                    Color(r, g, b, a)
+                }
+                6 -> {
+                    val r = hex.substring(0, 2).toInt(16) / 255f
+                    val g = hex.substring(2, 4).toInt(16) / 255f
+                    val b = hex.substring(4, 6).toInt(16) / 255f
+                    Color(r, g, b, 1f)
+                }
+                8 -> {
+                    val r = hex.substring(0, 2).toInt(16) / 255f
+                    val g = hex.substring(2, 4).toInt(16) / 255f
+                    val b = hex.substring(4, 6).toInt(16) / 255f
+                    val a = hex.substring(6, 8).toInt(16) / 255f
+                    Color(r, g, b, a)
+                }
+                else -> Color.Gray
+            }
+        } catch (e: Exception) {
+            Color.Gray
+        }
+    }
+    if (trimmed.startsWith("rgba", ignoreCase = true)) {
+        return try {
+            val parts = trimmed.substringAfter("(").substringBefore(")").split(",")
+            val r = parts[0].trim().toFloat() / 255f
+            val g = parts[1].trim().toFloat() / 255f
+            val b = parts[2].trim().toFloat() / 255f
+            val a = parts[3].trim().toFloat()
+            Color(r, g, b, a)
+        } catch (e: Exception) {
+            Color.Gray
+        }
+    }
+    if (trimmed.startsWith("rgb", ignoreCase = true)) {
+        return try {
+            val parts = trimmed.substringAfter("(").substringBefore(")").split(",")
+            val r = parts[0].trim().toFloat() / 255f
+            val g = parts[1].trim().toFloat() / 255f
+            val b = parts[2].trim().toFloat() / 255f
+            Color(r, g, b, 1f)
+        } catch (e: Exception) {
+            Color.Gray
+        }
+    }
+    return when (trimmed.lowercase()) {
+        "red" -> Color.Red
+        "green" -> Color.Green
+        "blue" -> Color.Blue
+        "yellow" -> Color.Yellow
+        "cyan" -> Color.Cyan
+        "magenta" -> Color.Magenta
+        "black" -> Color.Black
+        "white" -> Color.White
+        "gray" -> Color.Gray
+        "transparent" -> Color.Transparent
+        else -> Color.Gray
+    }
+}
+
+
+private fun getFileName(path: String): String {
+    if (path.isEmpty()) return ""
+    return path.substringAfterLast('/').substringAfterLast('\\')
+}
+
+private fun getSemanticTypeCategory(semanticType: String?): String? {
+    if (semanticType.isNullOrBlank()) return null
+    val types = semanticType.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
+    for (t in types) {
+        val tLower = t.lowercase()
+        when {
+            tLower.startsWith("color") -> return "color"
+            tLower.startsWith("file") -> return "file"
+            tLower.startsWith("path") -> return "path"
+            tLower.startsWith("image") -> return "image"
+            tLower.startsWith("audio") -> return "audio"
+            tLower.startsWith("video") -> return "video"
+        }
+    }
+    return null
+}
+
+private fun getAllowedExtensions(semanticType: String?): List<String> {
+    if (semanticType.isNullOrBlank()) return emptyList()
+    val types = semanticType.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
+    val extensions = mutableListOf<String>()
+    var hasGenericImage = false
+    var hasGenericAudio = false
+    var hasGenericVideo = false
+    
+    for (t in types) {
+        val tLower = t.lowercase()
+        if (tLower.contains("/")) {
+            val ext = tLower.substringAfter("/")
+            if (ext.isNotEmpty() && ext != "*") {
+                extensions.add(ext)
+            } else {
+                if (tLower.startsWith("image")) hasGenericImage = true
+                if (tLower.startsWith("audio")) hasGenericAudio = true
+                if (tLower.startsWith("video")) hasGenericVideo = true
+            }
+        } else {
+            if (tLower.startsWith("image")) hasGenericImage = true
+            if (tLower.startsWith("audio")) hasGenericAudio = true
+            if (tLower.startsWith("video")) hasGenericVideo = true
+        }
+    }
+    
+    if (hasGenericImage) {
+        extensions.addAll(listOf("png", "jpg", "jpeg", "gif", "webp", "bmp"))
+    }
+    if (hasGenericAudio) {
+        extensions.addAll(listOf("mp3", "wav", "ogg", "aac", "flac", "m4a"))
+    }
+    if (hasGenericVideo) {
+        extensions.addAll(listOf("mp4", "mkv", "avi", "mov", "webm", "flv"))
+    }
+    
+    return extensions.distinct()
+}
+
+private fun appendPickedValue(existingValue: String, newValue: String, isArray: Boolean): String {
+    if (!isArray) return newValue
+    if (existingValue.isBlank()) return newValue
+    val existingList = existingValue.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    if (newValue in existingList) return existingValue
+    return (existingList + newValue).joinToString(", ")
+}
+
+private fun getFileNames(path: String, isArray: Boolean): String {
+    if (path.isEmpty()) return ""
+    if (!isArray) return getFileName(path)
+    return path.split(",").map { it.trim() }.filter { it.isNotEmpty() }.map { getFileName(it) }.joinToString(", ")
+}
+

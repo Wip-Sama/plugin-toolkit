@@ -92,7 +92,8 @@ data class InputPort(
     override val dataType: DataType,
     override val semanticType: String? = null,
     @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
-    @Serializable(with = AnySerializer::class) val value: Any? = null
+    @Serializable(with = AnySerializer::class) val value: Any? = null,
+    val regex: String? = null
 ) : Port
 
 @Serializable

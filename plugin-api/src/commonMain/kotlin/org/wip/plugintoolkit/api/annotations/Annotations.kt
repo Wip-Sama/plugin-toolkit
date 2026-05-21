@@ -75,7 +75,8 @@ annotation class CapabilityParam(
     val minChoices: Int = -1,
     val maxChoices: Int = -1,
     val required: Boolean = false,
-    val secret: Boolean = false
+    val secret: Boolean = false,
+    val semanticType: String = ""
 )
 
 /**

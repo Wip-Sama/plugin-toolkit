@@ -86,7 +86,7 @@ kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 
 # Testing
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version = "kotlin" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }

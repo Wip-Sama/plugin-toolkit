@@ -65,6 +65,68 @@ Each capability can define multiple parameters using the `@CapabilityParam` anno
 The ParamType is inferred from the type and will use JSON to parse and transmit the object to the plugin.     
 While using a suspend function is good practice, it is not obligatory.
 
+#### Parameter Validation Constraints
+
+The `@CapabilityParam` annotation supports several constraints that the host application enforces automatically at two levels:
+
+1. **UI-level (real-time)**: Input fields show red outlines and error messages as the user types. The Execute/Run button is disabled while any parameter is invalid.
+2. **Runner-level (pre-execution)**: Before a capability is executed in the background, all parameters are re-validated. If any constraint fails, the job is aborted with a descriptive error message.
+
+| Constraint    | Type     | Description                                                                 |
+|:--------------|:---------|:----------------------------------------------------------------------------|
+| `required`    | Boolean  | The parameter must be non-empty. The field shows "Required" if left blank.  |
+| `regex`       | String   | A regular expression pattern that the value must match.                     |
+| `minLength`   | Int      | Minimum allowed string length.                                              |
+| `maxLength`   | Int      | Maximum allowed string length.                                              |
+| `minValue`    | Double   | Minimum numeric value (for `Int` and `Double` parameters).                  |
+| `maxValue`    | Double   | Maximum numeric value (for `Int` and `Double` parameters).                  |
+
+**Example with constraints:**
+
+```kotlin
+@Capability(name = "Validate IP", description = "Validates and processes an IP address")
+fun validateIp(
+    @CapabilityParam(
+        description = "The IP address to validate",
+        required = true,
+        regex = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+    ) ip: String,
+    @CapabilityParam(
+        description = "Port number",
+        minValue = 1.0,
+        maxValue = 65535.0
+    ) port: Int
+): String {
+    return "Validated: $ip:$port"
+}
+```
+
+**List/Array parameter validation:**
+When a parameter is a `List<T>` and has a `regex` or length constraint, the host validates **each individual item** in the list separately. For example, a `List<String>` with an IP regex will validate each comma-separated IP independently.
+
+```kotlin
+@Capability(name = "Batch Validate", description = "Validates multiple IPs")
+fun batchValidate(
+    @CapabilityParam(
+        description = "Comma-separated IP addresses",
+        regex = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+    ) ips: List<String>
+): String {
+    return "Validated ${ips.size} IPs"
+}
+```
+
+**Semantic types with constraints:**
+You can combine `semanticType` with validation constraints. For example, a `color/rgb` semantic type shows a color picker in the UI, while the regex ensures the value format is valid:
+
+```kotlin
+@CapabilityParam(
+    description = "Background color",
+    semanticType = "color/rgb",
+    regex = "^#[0-9A-Fa-f]{6}$"
+) color: String
+```
+
 #### Customizing Capability Outputs
 
 By default, any capability returning a value (except `Unit`) will expose a single output port named `"result"`. You can customize this behavior using the `@CapabilityOutput` annotation.

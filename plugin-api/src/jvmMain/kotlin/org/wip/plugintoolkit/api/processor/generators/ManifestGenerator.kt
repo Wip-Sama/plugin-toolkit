@@ -93,14 +93,33 @@ object ManifestGenerator {
                     val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
                     val required = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
                     val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
+                    val semanticType = paramAnn?.arguments?.find { it.name?.asString() == "semanticType" }?.value as? String ?: ""
                     
                     val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
                     
                     val constraintsCode = if (hasConstraints) {
-                        CodeBlock.of("%T(minValue = ${if (!minValue.isNaN()) minValue else "null"}, maxValue = ${if (!maxValue.isNaN()) maxValue else "null"}, minLength = ${if (minLength != -1) minLength else "null"}, maxLength = ${if (maxLength != -1) maxLength else "null"}, regex = ${if (regex.isNotEmpty()) "\"$regex\"" else "null"}, multiSelect = ${if (multiSelect) "true" else "null"}, minChoices = ${if (minChoices != -1) minChoices else "null"}, maxChoices = ${if (maxChoices != -1) maxChoices else "null"})", CN_PARAMETER_CONSTRAINTS)
+                        val regexCode = if (regex.isNotEmpty()) CodeBlock.of("%S", regex) else CodeBlock.of("null")
+                        CodeBlock.of(
+                            "%T(minValue = %L, maxValue = %L, minLength = %L, maxLength = %L, regex = %L, multiSelect = %L, minChoices = %L, maxChoices = %L)",
+                            CN_PARAMETER_CONSTRAINTS,
+                            if (!minValue.isNaN()) minValue else "null",
+                            if (!maxValue.isNaN()) maxValue else "null",
+                            if (minLength != -1) minLength else "null",
+                            if (maxLength != -1) maxLength else "null",
+                            regexCode,
+                            if (multiSelect) "true" else "null",
+                            if (minChoices != -1) minChoices else "null",
+                            if (maxChoices != -1) maxChoices else "null"
+                        )
                     } else "null"
                     
-                    capabilitiesCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L)", paramNameStr, CN_PARAMETER_METADATA, defaultValueCode, paramDesc, MN_GET_DATA_TYPE, paramType, constraintsCode, required, secret)
+                    val semanticTypeCode = if (semanticType.isNotEmpty()) {
+                        CodeBlock.of("%S", semanticType)
+                    } else {
+                        "null"
+                    }
+                    
+                    capabilitiesCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L, semanticType = %L)", paramNameStr, CN_PARAMETER_METADATA, defaultValueCode, paramDesc, MN_GET_DATA_TYPE, paramType, constraintsCode, required, secret, semanticTypeCode)
                     if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
                 }
             }

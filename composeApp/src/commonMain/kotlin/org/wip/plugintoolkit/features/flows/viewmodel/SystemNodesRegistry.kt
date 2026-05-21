@@ -15,7 +15,7 @@ object SystemNodesRegistry {
                 InputPort("file_path", "File Path", DataType.Primitive(PrimitiveType.STRING), defaultValue = "output.txt")
             )
             "load" -> listOf(
-                InputPort("file_path", "File Path", DataType.Primitive(PrimitiveType.STRING), defaultValue = "output.txt")
+                InputPort("file_path", "File Path", DataType.Primitive(PrimitiveType.STRING), semanticType = "file", defaultValue = "output.txt")
             )
             "log" -> listOf(
                 InputPort("level", "Log Level", DataType.Enum("LogLevel", listOf("INFO", "DEBUG", "WARN", "ERROR")), defaultValue = "INFO"),
@@ -41,6 +41,22 @@ object SystemNodesRegistry {
             "error" -> listOf(
                 InputPort("message", "Error Message", DataType.Primitive(PrimitiveType.STRING), defaultValue = "An error occurred during flow execution"),
                 InputPort("data", "Data", DataType.Primitive(PrimitiveType.ANY))
+            )
+            "comparator" -> listOf(
+                InputPort("a", "Value A", DataType.Primitive(PrimitiveType.ANY)),
+                InputPort("b", "Value B", DataType.Primitive(PrimitiveType.ANY))
+            )
+            "for" -> listOf(
+                InputPort("subflow_name", "Subflow Name", DataType.Primitive(PrimitiveType.STRING), semanticType = "flow"),
+                InputPort("start", "Start", DataType.Primitive(PrimitiveType.INT), defaultValue = 0),
+                InputPort("end", "End", DataType.Primitive(PrimitiveType.INT), defaultValue = 10),
+                InputPort("step", "Step", DataType.Primitive(PrimitiveType.INT), defaultValue = 1),
+                InputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY))
+            )
+            "while" -> listOf(
+                InputPort("subflow_name", "Subflow Name", DataType.Primitive(PrimitiveType.STRING), semanticType = "flow"),
+                InputPort("condition", "Initial Condition", DataType.Primitive(PrimitiveType.BOOLEAN), defaultValue = true),
+                InputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY))
             )
             else -> emptyList()
         }
@@ -73,6 +89,18 @@ object SystemNodesRegistry {
                 OutputPort("if_false", "If False", DataType.Primitive(PrimitiveType.ANY))
             )
             "error" -> emptyList()
+            "comparator" -> listOf(
+                OutputPort("minor", "Minor (A < B)", DataType.Primitive(PrimitiveType.BOOLEAN)),
+                OutputPort("major", "Major (A > B)", DataType.Primitive(PrimitiveType.BOOLEAN)),
+                OutputPort("equal", "Equal (A == B)", DataType.Primitive(PrimitiveType.BOOLEAN)),
+                OutputPort("not_equal", "Not Equal (A != B)", DataType.Primitive(PrimitiveType.BOOLEAN))
+            )
+            "for" -> listOf(
+                OutputPort("output_data", "Output Data", DataType.Primitive(PrimitiveType.ANY))
+            )
+            "while" -> listOf(
+                OutputPort("output_data", "Output Data", DataType.Primitive(PrimitiveType.ANY))
+            )
             else -> emptyList()
         }
     }
@@ -150,6 +178,28 @@ object SystemNodesRegistry {
                         inferred[Pair(node.id, "if_false")] = specificType
                         changed = true
                     }
+                }
+            }
+            "for" -> {
+                val inputType = inferred[Pair(node.id, "input_data")]
+                val outputType = inferred[Pair(node.id, "output_data")]
+                if (inputType != null && inputType != outputType) {
+                    inferred[Pair(node.id, "output_data")] = inputType
+                    changed = true
+                } else if (outputType != null && outputType != inputType) {
+                    inferred[Pair(node.id, "input_data")] = outputType
+                    changed = true
+                }
+            }
+            "while" -> {
+                val inputType = inferred[Pair(node.id, "input_data")]
+                val outputType = inferred[Pair(node.id, "output_data")]
+                if (inputType != null && inputType != outputType) {
+                    inferred[Pair(node.id, "output_data")] = inputType
+                    changed = true
+                } else if (outputType != null && outputType != inputType) {
+                    inferred[Pair(node.id, "input_data")] = outputType
+                    changed = true
                 }
             }
         }
@@ -241,6 +291,28 @@ object SystemNodesRegistry {
                         inferredSemantic[Pair(node.id, "if_false")] = specificSemantic
                         changed = true
                     }
+                }
+            }
+            "for" -> {
+                val inputSemantic = inferredSemantic[Pair(node.id, "input_data")]
+                val outputSemantic = inferredSemantic[Pair(node.id, "output_data")]
+                if (!inputSemantic.isNullOrBlank() && outputSemantic != inputSemantic) {
+                    inferredSemantic[Pair(node.id, "output_data")] = inputSemantic
+                    changed = true
+                } else if (!outputSemantic.isNullOrBlank() && inputSemantic != outputSemantic) {
+                    inferredSemantic[Pair(node.id, "input_data")] = outputSemantic
+                    changed = true
+                }
+            }
+            "while" -> {
+                val inputSemantic = inferredSemantic[Pair(node.id, "input_data")]
+                val outputSemantic = inferredSemantic[Pair(node.id, "output_data")]
+                if (!inputSemantic.isNullOrBlank() && outputSemantic != inputSemantic) {
+                    inferredSemantic[Pair(node.id, "output_data")] = inputSemantic
+                    changed = true
+                } else if (!outputSemantic.isNullOrBlank() && inputSemantic != outputSemantic) {
+                    inferredSemantic[Pair(node.id, "input_data")] = outputSemantic
+                    changed = true
                 }
             }
         }
