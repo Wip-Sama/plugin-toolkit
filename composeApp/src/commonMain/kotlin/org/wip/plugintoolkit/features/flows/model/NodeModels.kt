@@ -7,11 +7,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -19,6 +25,8 @@ import kotlinx.serialization.json.longOrNull
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginInfo
+import org.wip.plugintoolkit.api.SemanticType
+import org.wip.plugintoolkit.api.parseSemanticTypes
 
 object OffsetSerializer : KSerializer<Offset> {
     @Serializable
@@ -82,27 +90,134 @@ interface Port {
     val id: String
     val name: String
     val dataType: DataType
-    val semanticType: String?
+    val semanticTypes: List<SemanticType>
 }
 
-@Serializable
+@Serializable(with = InputPortSerializer::class)
 data class InputPort(
     override val id: String,
     override val name: String,
     override val dataType: DataType,
-    override val semanticType: String? = null,
+    override val semanticTypes: List<SemanticType> = emptyList(),
     @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
     @Serializable(with = AnySerializer::class) val value: Any? = null,
     val regex: String? = null
 ) : Port
 
+object InputPortSerializer : KSerializer<InputPort> {
+    override val descriptor: SerialDescriptor = InputPortSurrogate.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: InputPort) {
+        val surrogate = InputPortSurrogate(
+            id = value.id,
+            name = value.name,
+            dataType = value.dataType,
+            semanticTypes = value.semanticTypes,
+            defaultValue = value.defaultValue,
+            value = value.value,
+            regex = value.regex
+        )
+        encoder.encodeSerializableValue(InputPortSurrogate.serializer(), surrogate)
+    }
+
+    override fun deserialize(decoder: Decoder): InputPort {
+        val input = decoder as? JsonDecoder ?: throw SerializationException("This serializer only supports JSON")
+        val element = input.decodeJsonElement() as JsonObject
+        val hasSemanticTypes = "semanticTypes" in element
+        val finalElement = if (!hasSemanticTypes) {
+            val legacySemanticType = element["semanticType"]?.jsonPrimitive?.contentOrNull
+            val parsedList = parseSemanticTypes(legacySemanticType).map { type ->
+                buildJsonObject {
+                    put("namespace", type.namespace)
+                    put("name", type.name)
+                    put("variant", type.variant)
+                }
+            }
+            JsonObject(element.filterKeys { it != "semanticType" } + ("semanticTypes" to JsonArray(parsedList)))
+        } else {
+            JsonObject(element.filterKeys { it != "semanticType" })
+        }
+        val surrogate = input.json.decodeFromJsonElement(InputPortSurrogate.serializer(), finalElement)
+        return InputPort(
+            id = surrogate.id,
+            name = surrogate.name,
+            dataType = surrogate.dataType,
+            semanticTypes = surrogate.semanticTypes,
+            defaultValue = surrogate.defaultValue,
+            value = surrogate.value,
+            regex = surrogate.regex
+        )
+    }
+}
+
 @Serializable
+@SerialName("InputPort")
+private class InputPortSurrogate(
+    val id: String,
+    val name: String,
+    val dataType: DataType,
+    val semanticTypes: List<SemanticType> = emptyList(),
+    @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
+    @Serializable(with = AnySerializer::class) val value: Any? = null,
+    val regex: String? = null
+)
+
+@Serializable(with = OutputPortSerializer::class)
 data class OutputPort(
     override val id: String,
     override val name: String,
     override val dataType: DataType,
-    override val semanticType: String? = null
+    override val semanticTypes: List<SemanticType> = emptyList()
 ) : Port
+
+object OutputPortSerializer : KSerializer<OutputPort> {
+    override val descriptor: SerialDescriptor = OutputPortSurrogate.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: OutputPort) {
+        val surrogate = OutputPortSurrogate(
+            id = value.id,
+            name = value.name,
+            dataType = value.dataType,
+            semanticTypes = value.semanticTypes
+        )
+        encoder.encodeSerializableValue(OutputPortSurrogate.serializer(), surrogate)
+    }
+
+    override fun deserialize(decoder: Decoder): OutputPort {
+        val input = decoder as? JsonDecoder ?: throw SerializationException("This serializer only supports JSON")
+        val element = input.decodeJsonElement() as JsonObject
+        val hasSemanticTypes = "semanticTypes" in element
+        val finalElement = if (!hasSemanticTypes) {
+            val legacySemanticType = element["semanticType"]?.jsonPrimitive?.contentOrNull
+            val parsedList = parseSemanticTypes(legacySemanticType).map { type ->
+                buildJsonObject {
+                    put("namespace", type.namespace)
+                    put("name", type.name)
+                    put("variant", type.variant)
+                }
+            }
+            JsonObject(element.filterKeys { it != "semanticType" } + ("semanticTypes" to JsonArray(parsedList)))
+        } else {
+            JsonObject(element.filterKeys { it != "semanticType" })
+        }
+        val surrogate = input.json.decodeFromJsonElement(OutputPortSurrogate.serializer(), finalElement)
+        return OutputPort(
+            id = surrogate.id,
+            name = surrogate.name,
+            dataType = surrogate.dataType,
+            semanticTypes = surrogate.semanticTypes
+        )
+    }
+}
+
+@Serializable
+@SerialName("OutputPort")
+private class OutputPortSurrogate(
+    val id: String,
+    val name: String,
+    val dataType: DataType,
+    val semanticTypes: List<SemanticType> = emptyList()
+)
 
 @Serializable
 data class SubflowPortMapping(

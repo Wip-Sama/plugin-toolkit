@@ -32,6 +32,8 @@ import kotlinx.serialization.json.longOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.SemanticType
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginRequest
@@ -615,6 +617,18 @@ class JobWorker(
                             }
                             "load" -> {
                                 val filePath = getInputValue("file_path", "output.txt") as String
+                                val dataPort = node.outputs.find { it.id == "data" }
+                                val semanticTypes = dataPort?.semanticTypes ?: emptyList()
+                                if (semanticTypes.isNotEmpty()) {
+                                    val allowedExtensions = SemanticRegistry.getAllowedExtensions(semanticTypes)
+                                    if (allowedExtensions.isNotEmpty()) {
+                                        val filename = filePath.substringAfterLast('/').substringAfterLast('\\')
+                                        val ext = filename.substringAfterLast('.', "").lowercase()
+                                        if (ext !in allowedExtensions) {
+                                            throw Exception("File '$filePath' has unsupported extension '$ext'")
+                                        }
+                                    }
+                                }
                                 val fullPath = Path("$appDataDir/$filePath")
                                 
                                 val fileContent = if (SystemFileSystem.exists(fullPath)) {
@@ -1213,6 +1227,18 @@ class JobWorker(
                         }
                         "load" -> {
                             val filePath = getInputValue("file_path", "output.txt") as String
+                            val dataPort = node.outputs.find { it.id == "data" }
+                            val semanticTypes = dataPort?.semanticTypes ?: emptyList()
+                            if (semanticTypes.isNotEmpty()) {
+                                val allowedExtensions = SemanticRegistry.getAllowedExtensions(semanticTypes)
+                                if (allowedExtensions.isNotEmpty()) {
+                                    val filename = filePath.substringAfterLast('/').substringAfterLast('\\')
+                                    val ext = filename.substringAfterLast('.', "").lowercase()
+                                    if (ext !in allowedExtensions) {
+                                        throw Exception("File '$filePath' has unsupported extension '$ext'")
+                                    }
+                                }
+                            }
                             val fullPath = Path("$appDataDir/$filePath")
                             val fileContent = if (SystemFileSystem.exists(fullPath)) {
                                 SystemFileSystem.source(fullPath).buffered().use { it.readString() }

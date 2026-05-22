@@ -47,6 +47,8 @@ import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.core.utils.SemanticCategory
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
@@ -60,11 +62,10 @@ fun DynamicParameterInput(
     onValueChange: (String) -> Unit,
     enabled: Boolean = true
 ) {
-    val inferredSem = metadata.semanticType
-    val category = getSemanticTypeCategory(inferredSem)
+    val category = SemanticRegistry.getCategory(metadata.semanticTypes)
     val scope = rememberCoroutineScope()
 
-    if (category == "image" || category == "audio" || category == "video") {
+    if (category == SemanticCategory.IMAGE || category == SemanticCategory.AUDIO || category == SemanticCategory.VIDEO) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             val inputLabel = @Composable {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -80,20 +81,22 @@ fun DynamicParameterInput(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "(${inferredSem?.uppercase()})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+                    if (metadata.semanticTypes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "(${metadata.semanticTypes.joinToString { it.canonicalId }.uppercase()})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
 
             val isArray = metadata.type is DataType.Array
             val fileNames = getFileNames(value, isArray)
             val placeholderText = when (category) {
-                "image" -> "No image selected"
-                "audio" -> "No audio selected"
+                SemanticCategory.IMAGE -> "No image selected"
+                SemanticCategory.AUDIO -> "No audio selected"
                 else -> "No video selected"
             }
 
@@ -122,7 +125,7 @@ fun DynamicParameterInput(
                         IconButton(
                             onClick = {
                                 scope.launch {
-                                    val allowedExtensions = getAllowedExtensions(inferredSem)
+                                    val allowedExtensions = SemanticRegistry.getAllowedExtensions(metadata.semanticTypes)
                                     val picked = PlatformUtils.pickFile("Select File", allowedExtensions)
                                     if (picked != null) {
                                         val newValue = appendPickedValue(value, picked, isArray)
@@ -142,7 +145,7 @@ fun DynamicParameterInput(
                 }
             )
         }
-    } else if (category == "color") {
+    } else if (category == SemanticCategory.COLOR) {
         var showColorPicker by remember { mutableStateOf(false) }
         val parsedColor = remember(value) { parseColorString(value) }
         val isArray = metadata.type is DataType.Array
@@ -162,12 +165,14 @@ fun DynamicParameterInput(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "(${inferredSem?.uppercase()})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+                    if (metadata.semanticTypes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "(${metadata.semanticTypes.joinToString { it.canonicalId }.uppercase()})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
 
@@ -212,8 +217,8 @@ fun DynamicParameterInput(
                     show = showColorPicker,
                     onDismissRequest = { showColorPicker = false },
                     onPickedColor = { color ->
-                        val hasAlpha = inferredSem?.contains("rgba", ignoreCase = true) == true
-                        val formatted = if (inferredSem?.contains("rgb", ignoreCase = true) == true) {
+                        val hasAlpha = metadata.semanticTypes.any { it.variant?.contains("rgba", ignoreCase = true) == true }
+                        val formatted = if (metadata.semanticTypes.any { it.name.contains("rgb", ignoreCase = true) == true || it.variant?.contains("rgb", ignoreCase = true) == true }) {
                             color.toRGB(rgbPrefix = true, includeAlpha = hasAlpha)
                         } else {
                             color.toHex(hexPrefix = true, includeAlpha = hasAlpha)
@@ -225,7 +230,7 @@ fun DynamicParameterInput(
                 )
             }
         }
-    } else if (category == "file") {
+    } else if (category == SemanticCategory.FILE) {
         val isArray = metadata.type is DataType.Array
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             val inputLabel = @Composable {
@@ -242,12 +247,14 @@ fun DynamicParameterInput(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "(${inferredSem?.uppercase()})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+                    if (metadata.semanticTypes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "(${metadata.semanticTypes.joinToString { it.canonicalId }.uppercase()})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
 
@@ -266,7 +273,7 @@ fun DynamicParameterInput(
                     IconButton(
                         onClick = {
                             scope.launch {
-                                val allowedExtensions = getAllowedExtensions(inferredSem)
+                                val allowedExtensions = SemanticRegistry.getAllowedExtensions(metadata.semanticTypes)
                                 val picked = PlatformUtils.pickFile("Select File", allowedExtensions)
                                 if (picked != null) {
                                     val newValue = appendPickedValue(value, picked, isArray)
@@ -285,7 +292,7 @@ fun DynamicParameterInput(
                 }
             )
         }
-    } else if (category == "path") {
+    } else if (category == SemanticCategory.PATH) {
         val isArray = metadata.type is DataType.Array
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             val inputLabel = @Composable {
@@ -302,12 +309,14 @@ fun DynamicParameterInput(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "(${inferredSem?.uppercase()})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+                    if (metadata.semanticTypes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "(${metadata.semanticTypes.joinToString { it.canonicalId }.uppercase()})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
 
@@ -796,61 +805,7 @@ private fun getFileName(path: String): String {
     return path.substringAfterLast('/').substringAfterLast('\\')
 }
 
-private fun getSemanticTypeCategory(semanticType: String?): String? {
-    if (semanticType.isNullOrBlank()) return null
-    val types = semanticType.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
-    for (t in types) {
-        val tLower = t.lowercase()
-        when {
-            tLower.startsWith("color") -> return "color"
-            tLower.startsWith("file") -> return "file"
-            tLower.startsWith("path") -> return "path"
-            tLower.startsWith("image") -> return "image"
-            tLower.startsWith("audio") -> return "audio"
-            tLower.startsWith("video") -> return "video"
-        }
-    }
-    return null
-}
-
-private fun getAllowedExtensions(semanticType: String?): List<String> {
-    if (semanticType.isNullOrBlank()) return emptyList()
-    val types = semanticType.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
-    val extensions = mutableListOf<String>()
-    var hasGenericImage = false
-    var hasGenericAudio = false
-    var hasGenericVideo = false
-    
-    for (t in types) {
-        val tLower = t.lowercase()
-        if (tLower.contains("/")) {
-            val ext = tLower.substringAfter("/")
-            if (ext.isNotEmpty() && ext != "*") {
-                extensions.add(ext)
-            } else {
-                if (tLower.startsWith("image")) hasGenericImage = true
-                if (tLower.startsWith("audio")) hasGenericAudio = true
-                if (tLower.startsWith("video")) hasGenericVideo = true
-            }
-        } else {
-            if (tLower.startsWith("image")) hasGenericImage = true
-            if (tLower.startsWith("audio")) hasGenericAudio = true
-            if (tLower.startsWith("video")) hasGenericVideo = true
-        }
-    }
-    
-    if (hasGenericImage) {
-        extensions.addAll(listOf("png", "jpg", "jpeg", "gif", "webp", "bmp"))
-    }
-    if (hasGenericAudio) {
-        extensions.addAll(listOf("mp3", "wav", "ogg", "aac", "flac", "m4a"))
-    }
-    if (hasGenericVideo) {
-        extensions.addAll(listOf("mp4", "mkv", "avi", "mov", "webm", "flv"))
-    }
-    
-    return extensions.distinct()
-}
+// Semantic category and extension helpers removed, using SemanticRegistry.
 
 private fun appendPickedValue(existingValue: String, newValue: String, isArray: Boolean): String {
     if (!isArray) return newValue

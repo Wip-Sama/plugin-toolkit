@@ -26,6 +26,22 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANN
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object ManifestGenerator {
+    private fun generateSemanticTypesCode(types: List<org.wip.plugintoolkit.api.SemanticType>): CodeBlock {
+        if (types.isEmpty()) return CodeBlock.of("emptyList()")
+        val builder = CodeBlock.builder()
+        builder.add("listOf(\n")
+        builder.indent()
+        types.forEachIndexed { idx, type ->
+            val ns = if (type.namespace != null) "\"${type.namespace}\"" else "null"
+            val variant = if (type.variant != null) "\"${type.variant}\"" else "null"
+            builder.add("%T(%L, %S, %L)", ClassName("org.wip.plugintoolkit.api", "SemanticType"), ns, type.name, variant)
+            if (idx < types.size - 1) builder.add(",\n") else builder.add("\n")
+        }
+        builder.unindent()
+        builder.add(")")
+        return builder.build()
+    }
+
     fun generateManifestObject(
         manifestName: String,
         id: String,
@@ -93,7 +109,7 @@ object ManifestGenerator {
                     val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
                     val required = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
                     val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
-                    val semanticType = paramAnn?.arguments?.find { it.name?.asString() == "semanticType" }?.value as? String ?: ""
+                    val semTypesVal = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                     
                     val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
                     
@@ -113,13 +129,10 @@ object ManifestGenerator {
                         )
                     } else "null"
                     
-                    val semanticTypeCode = if (semanticType.isNotEmpty()) {
-                        CodeBlock.of("%S", semanticType)
-                    } else {
-                        "null"
-                    }
+                    val semanticTypesList = semTypesVal.flatMap { org.wip.plugintoolkit.api.parseSemanticTypes(it) }
+                    val semanticTypesCode = generateSemanticTypesCode(semanticTypesList)
                     
-                    capabilitiesCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L, semanticType = %L)", paramNameStr, CN_PARAMETER_METADATA, defaultValueCode, paramDesc, MN_GET_DATA_TYPE, paramType, constraintsCode, required, secret, semanticTypeCode)
+                    capabilitiesCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L, semanticTypes = %L)", paramNameStr, CN_PARAMETER_METADATA, defaultValueCode, paramDesc, MN_GET_DATA_TYPE, paramType, constraintsCode, required, secret, semanticTypesCode)
                     if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
                 }
             }
@@ -135,24 +148,24 @@ object ManifestGenerator {
             outputsCode.add("listOf(\n")
             outputsCode.indent()
             outputs.forEachIndexed { oIndex, out ->
-                val semTypeStr = if (out.semanticType != null) "\"${out.semanticType}\"" else "null"
-                outputsCode.add("%T(name = %S, description = %S, type = %L, semanticType = %L)", 
+                val semanticTypesCode = generateSemanticTypesCode(out.semanticTypes)
+                outputsCode.add("%T(name = %S, description = %S, type = %L, semanticTypes = %L)", 
                     ClassName("org.wip.plugintoolkit.api", "OutputMetadata"),
                     out.name,
                     out.description,
                     org.wip.plugintoolkit.api.processor.GeneratorUtils.generateDataTypeCode(out.type),
-                    semTypeStr
+                    semanticTypesCode
                 )
                 if (oIndex < outputs.size - 1) outputsCode.add(",\n") else outputsCode.add("\n")
             }
             outputsCode.unindent()
             outputsCode.add(")")
 
-            val semTypeVal = if (outputs.size == 1) outputs.first().semanticType else null
-            val semTypeString = if (semTypeVal != null) "\"$semTypeVal\"" else "null"
+            val semanticTypesList = if (outputs.size == 1) outputs.first().semanticTypes else emptyList()
+            val semanticTypesCode = generateSemanticTypesCode(semanticTypesList)
 
             capabilitiesCode.add("returnType = %L,\n", returnDataTypeCode)
-            capabilitiesCode.add("semanticType = %L,\n", semTypeString)
+            capabilitiesCode.add("semanticTypes = %L,\n", semanticTypesCode)
             capabilitiesCode.add("outputs = %L\n", outputsCode.build())
             capabilitiesCode.unindent()
             if (index < functions.size - 1) capabilitiesCode.add("),\n") else capabilitiesCode.add(")\n")

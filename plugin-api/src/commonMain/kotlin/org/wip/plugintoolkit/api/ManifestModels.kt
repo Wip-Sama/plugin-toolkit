@@ -6,6 +6,18 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
+
 
 /**
  * Represents the type of data exchanged between the host and the plugin.
@@ -149,7 +161,7 @@ data class Requirements(
     val targetAppVersion: String? = ApiConfig.VERSION
 )
 
-@Serializable
+@Serializable(with = ParameterMetadataSerializer::class)
 data class ParameterMetadata(
     val defaultValue: JsonElement? = null,
     val description: String,
@@ -157,27 +169,195 @@ data class ParameterMetadata(
     val constraints: ParameterConstraints? = null,
     val required: Boolean = false,
     val secret: Boolean = false,
-    val semanticType: String? = null
+    val semanticTypes: List<SemanticType> = emptyList()
 )
 
+object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
+    override val descriptor: SerialDescriptor = ParameterMetadataSurrogate.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: ParameterMetadata) {
+        val surrogate = ParameterMetadataSurrogate(
+            defaultValue = value.defaultValue,
+            description = value.description,
+            type = value.type,
+            constraints = value.constraints,
+            required = value.required,
+            secret = value.secret,
+            semanticTypes = value.semanticTypes
+        )
+        encoder.encodeSerializableValue(ParameterMetadataSurrogate.serializer(), surrogate)
+    }
+
+    override fun deserialize(decoder: Decoder): ParameterMetadata {
+        val input = decoder as? JsonDecoder ?: throw SerializationException("This serializer only supports JSON")
+        val element = input.decodeJsonElement() as JsonObject
+        val hasSemanticTypes = "semanticTypes" in element
+        val finalElement = if (!hasSemanticTypes) {
+            val legacySemanticType = element["semanticType"]?.jsonPrimitive?.contentOrNull
+            val parsedList = parseSemanticTypes(legacySemanticType).map { type ->
+                buildJsonObject {
+                    put("namespace", type.namespace)
+                    put("name", type.name)
+                    put("variant", type.variant)
+                }
+            }
+            JsonObject(element.filterKeys { it != "semanticType" } + ("semanticTypes" to JsonArray(parsedList)))
+        } else {
+            JsonObject(element.filterKeys { it != "semanticType" })
+        }
+        val surrogate = input.json.decodeFromJsonElement(ParameterMetadataSurrogate.serializer(), finalElement)
+        return ParameterMetadata(
+            defaultValue = surrogate.defaultValue,
+            description = surrogate.description,
+            type = surrogate.type,
+            constraints = surrogate.constraints,
+            required = surrogate.required,
+            secret = surrogate.secret,
+            semanticTypes = surrogate.semanticTypes
+        )
+    }
+}
+
 @Serializable
+@SerialName("ParameterMetadata")
+private class ParameterMetadataSurrogate(
+    val defaultValue: JsonElement? = null,
+    val description: String,
+    val type: DataType,
+    val constraints: ParameterConstraints? = null,
+    val required: Boolean = false,
+    val secret: Boolean = false,
+    val semanticTypes: List<SemanticType> = emptyList()
+)
+
+@Serializable(with = OutputMetadataSerializer::class)
 data class OutputMetadata(
     val name: String,
     val description: String,
     val type: DataType,
-    val semanticType: String? = null
+    val semanticTypes: List<SemanticType> = emptyList()
+)
+
+object OutputMetadataSerializer : KSerializer<OutputMetadata> {
+    override val descriptor: SerialDescriptor = OutputMetadataSurrogate.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: OutputMetadata) {
+        val surrogate = OutputMetadataSurrogate(
+            name = value.name,
+            description = value.description,
+            type = value.type,
+            semanticTypes = value.semanticTypes
+        )
+        encoder.encodeSerializableValue(OutputMetadataSurrogate.serializer(), surrogate)
+    }
+
+    override fun deserialize(decoder: Decoder): OutputMetadata {
+        val input = decoder as? JsonDecoder ?: throw SerializationException("This serializer only supports JSON")
+        val element = input.decodeJsonElement() as JsonObject
+        val hasSemanticTypes = "semanticTypes" in element
+        val finalElement = if (!hasSemanticTypes) {
+            val legacySemanticType = element["semanticType"]?.jsonPrimitive?.contentOrNull
+            val parsedList = parseSemanticTypes(legacySemanticType).map { type ->
+                buildJsonObject {
+                    put("namespace", type.namespace)
+                    put("name", type.name)
+                    put("variant", type.variant)
+                }
+            }
+            JsonObject(element.filterKeys { it != "semanticType" } + ("semanticTypes" to JsonArray(parsedList)))
+        } else {
+            JsonObject(element.filterKeys { it != "semanticType" })
+        }
+        val surrogate = input.json.decodeFromJsonElement(OutputMetadataSurrogate.serializer(), finalElement)
+        return OutputMetadata(
+            name = surrogate.name,
+            description = surrogate.description,
+            type = surrogate.type,
+            semanticTypes = surrogate.semanticTypes
+        )
+    }
+}
+
+@Serializable
+@SerialName("OutputMetadata")
+private class OutputMetadataSurrogate(
+    val name: String,
+    val description: String,
+    val type: DataType,
+    val semanticTypes: List<SemanticType> = emptyList()
 )
 
 /**
  * Metadata for a specific capability provided by the plugin.
  */
-@Serializable
+@Serializable(with = CapabilitySerializer::class)
 data class Capability(
     val name: String,
     val description: String,
     val parameters: Map<String, ParameterMetadata>? = null,
     val returnType: DataType,
-    val semanticType: String? = null,
+    val semanticTypes: List<SemanticType> = emptyList(),
+    val outputs: List<OutputMetadata>? = null,
+    val isPausable: Boolean = false,
+    val isCancellable: Boolean = true
+)
+
+object CapabilitySerializer : KSerializer<Capability> {
+    override val descriptor: SerialDescriptor = CapabilitySurrogate.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: Capability) {
+        val surrogate = CapabilitySurrogate(
+            name = value.name,
+            description = value.description,
+            parameters = value.parameters,
+            returnType = value.returnType,
+            semanticTypes = value.semanticTypes,
+            outputs = value.outputs,
+            isPausable = value.isPausable,
+            isCancellable = value.isCancellable
+        )
+        encoder.encodeSerializableValue(CapabilitySurrogate.serializer(), surrogate)
+    }
+
+    override fun deserialize(decoder: Decoder): Capability {
+        val input = decoder as? JsonDecoder ?: throw SerializationException("This serializer only supports JSON")
+        val element = input.decodeJsonElement() as JsonObject
+        val hasSemanticTypes = "semanticTypes" in element
+        val finalElement = if (!hasSemanticTypes) {
+            val legacySemanticType = element["semanticType"]?.jsonPrimitive?.contentOrNull
+            val parsedList = parseSemanticTypes(legacySemanticType).map { type ->
+                buildJsonObject {
+                    put("namespace", type.namespace)
+                    put("name", type.name)
+                    put("variant", type.variant)
+                }
+            }
+            JsonObject(element.filterKeys { it != "semanticType" } + ("semanticTypes" to JsonArray(parsedList)))
+        } else {
+            JsonObject(element.filterKeys { it != "semanticType" })
+        }
+        val surrogate = input.json.decodeFromJsonElement(CapabilitySurrogate.serializer(), finalElement)
+        return Capability(
+            name = surrogate.name,
+            description = surrogate.description,
+            parameters = surrogate.parameters,
+            returnType = surrogate.returnType,
+            semanticTypes = surrogate.semanticTypes,
+            outputs = surrogate.outputs,
+            isPausable = surrogate.isPausable,
+            isCancellable = surrogate.isCancellable
+        )
+    }
+}
+
+@Serializable
+@SerialName("Capability")
+private class CapabilitySurrogate(
+    val name: String,
+    val description: String,
+    val parameters: Map<String, ParameterMetadata>? = null,
+    val returnType: DataType,
+    val semanticTypes: List<SemanticType> = emptyList(),
     val outputs: List<OutputMetadata>? = null,
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true
@@ -192,3 +372,4 @@ data class PluginAction(
     val description: String,
     val functionName: String
 )
+

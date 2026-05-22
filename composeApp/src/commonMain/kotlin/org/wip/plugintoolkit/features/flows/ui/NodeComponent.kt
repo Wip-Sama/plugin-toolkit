@@ -75,7 +75,11 @@ import kotlinx.serialization.json.booleanOrNull
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.SemanticType
+import org.wip.plugintoolkit.api.parseSemanticTypes
+import org.wip.plugintoolkit.shared.components.TooltipArea
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
@@ -98,7 +102,7 @@ fun NodeComponent(
     node: Node,
     connectedInputPortIds: Set<String>,
     inferredTypes: Map<Pair<Long, String>, DataType> = emptyMap(),
-    inferredSemanticTypes: Map<Pair<Long, String>, String?> = emptyMap(),
+    inferredSemanticTypes: Map<Pair<Long, String>, List<SemanticType>> = emptyMap(),
     validationErrors: List<ValidationError> = emptyList(),
     onMove: (Long, Offset, Boolean, Boolean) -> Unit, // id, delta, snap, showGhost
     onEndMove: (Long) -> Unit,
@@ -110,7 +114,8 @@ fun NodeComponent(
     onDropConnection: (isShiftPressed: Boolean) -> Unit = {},
     onPortPositioned: (Long, String, Offset) -> Unit = { _, _, _ -> },
     onPress: (Long) -> Unit = {},
-    onUpdateBoundaryNode: (Long, String, DataType, String?) -> Unit = { _, _, _, _ -> },
+    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>) -> Unit = { _, _, _, _ -> },
+    onUpdateSystemNodeOutputs: (Long, String, List<SemanticType>) -> Unit = { _, _, _ -> },
     highlightedPortId: String? = null,
     highlightedPortColor: Color? = null,
     boardLayoutCoordinates: LayoutCoordinates?,
@@ -123,6 +128,7 @@ fun NodeComponent(
     val density = LocalDensity.current
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditBoundaryDialog by remember { mutableStateOf(false) }
+    var showLoadSettingsDialog by remember { mutableStateOf(false) }
     
     val currentOnMove by rememberUpdatedState(onMove)
     val currentOnEndMove by rememberUpdatedState(onEndMove)
@@ -249,6 +255,21 @@ fun NodeComponent(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (node is Node.SystemNode && node.systemAction.lowercase() == "load" && !isReadOnly) {
+                            IconButton(
+                                onClick = { showLoadSettingsDialog = true },
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Load Node Settings",
+                                    tint = onHeaderColor.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        }
+
                         if ((node is Node.FlowInputNode || node is Node.FlowOutputNode) && !isReadOnly) {
                             IconButton(
                                 onClick = { showEditBoundaryDialog = true },
@@ -340,9 +361,33 @@ fun NodeComponent(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
-                                    val inferredSem = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticType
-                                    if (inferredSem != null) {
-                                        Text(inferredSem, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    val inferredSem = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes
+                                    if (inferredSem.isNotEmpty()) {
+                                        val first = inferredSem.first().canonicalId
+                                        val semText = if (inferredSem.size > 1) {
+                                            "$first (+${inferredSem.size - 1} more)"
+                                        } else {
+                                            first
+                                        }
+                                        TooltipArea(
+                                            tooltip = {
+                                                Column(modifier = Modifier.padding(4.dp)) {
+                                                    inferredSem.forEach { sem ->
+                                                        Text(
+                                                            text = "• ${sem.canonicalId}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Text(
+                                                text = semText,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                     if (portErrors.isNotEmpty()) {
                                         Text(
@@ -362,8 +407,8 @@ fun NodeComponent(
                             val valueModifier = if (isConnected) Modifier.alpha(0.5f) else Modifier
                             
                             Box(modifier = Modifier.width(120.dp).then(valueModifier)) {
-                                val inferredSem = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticType
-                                val category = getSemanticTypeCategory(inferredSem)
+                                val inferredSem = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes
+                                val category = SemanticRegistry.getCategory(inferredSem)?.name?.lowercase()
                                 when (category) {
                                     "color" -> {
                                         val rawValue = getPortValueString(currentPortValue)
@@ -443,7 +488,7 @@ fun NodeComponent(
                                             IconButton(
                                                 onClick = {
                                                     scope.launch {
-                                                        val allowedExtensions = getAllowedExtensions(inferredSem)
+                                                        val allowedExtensions = SemanticRegistry.getAllowedExtensions(inferredSem)
                                                         val pickedPath = PlatformUtils.pickFile("Select File", allowedExtensions)
                                                         if (pickedPath != null) {
                                                             val isArray = input.dataType is DataType.Array
@@ -568,7 +613,7 @@ fun NodeComponent(
                                             IconButton(
                                                 onClick = {
                                                     scope.launch {
-                                                        val allowedExtensions = getAllowedExtensions(inferredSem)
+                                                        val allowedExtensions = SemanticRegistry.getAllowedExtensions(inferredSem)
                                                         val pickedPath = PlatformUtils.pickFile("Select File", allowedExtensions)
                                                         if (pickedPath != null) {
                                                             val newValue = appendPickedValue(rawValue, pickedPath, isArray)
@@ -769,9 +814,33 @@ fun NodeComponent(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
-                                 val inferredSem = inferredSemanticTypes[Pair(node.id, output.id)] ?: output.semanticType
-                                 if (inferredSem != null) {
-                                       Text(inferredSem, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                 val inferredSem = inferredSemanticTypes[Pair(node.id, output.id)] ?: output.semanticTypes
+                                 if (inferredSem.isNotEmpty()) {
+                                     val first = inferredSem.first().canonicalId
+                                     val semText = if (inferredSem.size > 1) {
+                                         "$first (+${inferredSem.size - 1} more)"
+                                     } else {
+                                         first
+                                     }
+                                     TooltipArea(
+                                         tooltip = {
+                                             Column(modifier = Modifier.padding(4.dp)) {
+                                                 inferredSem.forEach { sem ->
+                                                     Text(
+                                                         text = "• ${sem.canonicalId}",
+                                                         style = MaterialTheme.typography.bodySmall,
+                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                     )
+                                                 }
+                                             }
+                                         }
+                                     ) {
+                                         Text(
+                                             text = semText,
+                                             style = MaterialTheme.typography.labelSmall,
+                                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                                         )
+                                     }
                                  }
                                 val portErrors = validationErrors.filter {
                                     (it.sourceNodeId == node.id && it.sourcePortId == output.id) ||
@@ -875,7 +944,7 @@ fun NodeComponent(
                     }
                 )
             }
-            var semanticType by remember { mutableStateOf(port.semanticType ?: "") }
+            var semanticType by remember { mutableStateOf(port.semanticTypes.joinToString { it.canonicalId }) }
             
             AlertDialog(
                 onDismissRequest = { showEditBoundaryDialog = false },
@@ -968,7 +1037,7 @@ fun NodeComponent(
                                 node.id,
                                 name.ifBlank { port.name },
                                 computedDataType,
-                                semanticType.trim().ifBlank { null }
+                                parseSemanticTypes(semanticType)
                             )
                             showEditBoundaryDialog = false
                         }
@@ -986,32 +1055,83 @@ fun NodeComponent(
     }
 
     if (showColorPicker && activeColorInputId != null) {
-        val input = node.inputs.firstOrNull { it.id == activeColorInputId }
-        val inferredSem = input?.let { inferredSemanticTypes[Pair(node.id, it.id)] ?: it.semanticType }
-        val semLower = inferredSem?.lowercase() ?: ""
-        org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog(
-            show = showColorPicker,
-            onDismissRequest = {
-                showColorPicker = false
-                activeColorInputId = null
-            },
-            onPickedColor = { color ->
-                activeColorInputId?.let { inputId ->
-                    val hasAlpha = semLower.contains("rgba", ignoreCase = true)
-                    val formatted = if (semLower.contains("rgb", ignoreCase = true)) {
-                        color.toRGB(rgbPrefix = true, includeAlpha = hasAlpha)
-                    } else {
-                        color.toHex(hexPrefix = true, includeAlpha = hasAlpha)
+         val input = node.inputs.firstOrNull { it.id == activeColorInputId }
+         val inferredSem = input?.let { inferredSemanticTypes[Pair(node.id, it.id)] ?: it.semanticTypes } ?: emptyList()
+         val hasAlpha = inferredSem.any { it.variant?.contains("rgba", ignoreCase = true) == true }
+         org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog(
+             show = showColorPicker,
+             onDismissRequest = {
+                 showColorPicker = false
+                 activeColorInputId = null
+             },
+             onPickedColor = { color ->
+                 activeColorInputId?.let { inputId ->
+                     val formatted = if (inferredSem.any { it.name.contains("rgb", ignoreCase = true) || it.variant?.contains("rgb", ignoreCase = true) == true }) {
+                         color.toRGB(rgbPrefix = true, includeAlpha = hasAlpha)
+                     } else {
+                         color.toHex(hexPrefix = true, includeAlpha = hasAlpha)
+                     }
+                     val isArray = input?.dataType is DataType.Array
+                     val existingValue = getPortValueString(input?.value ?: input?.defaultValue)
+                     val newValue = appendPickedValue(existingValue, formatted, isArray)
+                     onUpdateValue(node.id, inputId, newValue)
+                 }
+                 showColorPicker = false
+                 activeColorInputId = null
+             }
+         )
+    }
+
+    if (showLoadSettingsDialog && node is Node.SystemNode && node.systemAction.lowercase() == "load") {
+        val port = node.outputs.firstOrNull { it.id == "data" }
+        if (port != null) {
+            var semanticTypesStr by remember { mutableStateOf(port.semanticTypes.joinToString { it.canonicalId }) }
+            AlertDialog(
+                onDismissRequest = { showLoadSettingsDialog = false },
+                title = {
+                    Text(
+                        text = "Configure Load Output Port",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Set the expected semantic types for the loaded file (e.g. image/png, file/txt). This will validate the loaded file extension at runtime.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        ToolkitTextField(
+                            value = semanticTypesStr,
+                            onValueChange = { semanticTypesStr = it },
+                            label = { Text("Supported Semantic Types") },
+                            placeholder = { Text("e.g. image/png, file/txt") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
-                    val isArray = input?.dataType is DataType.Array
-                    val existingValue = getPortValueString(input?.value ?: input?.defaultValue)
-                    val newValue = appendPickedValue(existingValue, formatted, isArray)
-                    onUpdateValue(node.id, inputId, newValue)
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val parsed = parseSemanticTypes(semanticTypesStr)
+                            onUpdateSystemNodeOutputs(node.id, "data", parsed)
+                            showLoadSettingsDialog = false
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLoadSettingsDialog = false }) {
+                        Text("Cancel")
+                    }
                 }
-                showColorPicker = false
-                activeColorInputId = null
-            }
-        )
+            )
+        }
     }
 }
 
@@ -1222,62 +1342,6 @@ private fun parseColorString(colorStr: String): Color {
 private fun getFileName(path: String): String {
     if (path.isEmpty()) return ""
     return path.substringAfterLast('/').substringAfterLast('\\')
-}
-
-private fun getSemanticTypeCategory(semanticType: String?): String? {
-    if (semanticType.isNullOrBlank()) return null
-    val types = semanticType.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
-    for (t in types) {
-        val tLower = t.lowercase()
-        when {
-            tLower.startsWith("color") -> return "color"
-            tLower.startsWith("file") -> return "file"
-            tLower.startsWith("path") -> return "path"
-            tLower.startsWith("image") -> return "image"
-            tLower.startsWith("audio") -> return "audio"
-            tLower.startsWith("video") -> return "video"
-        }
-    }
-    return null
-}
-
-private fun getAllowedExtensions(semanticType: String?): List<String> {
-    if (semanticType.isNullOrBlank()) return emptyList()
-    val types = semanticType.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
-    val extensions = mutableListOf<String>()
-    var hasGenericImage = false
-    var hasGenericAudio = false
-    var hasGenericVideo = false
-    
-    for (t in types) {
-        val tLower = t.lowercase()
-        if (tLower.contains("/")) {
-            val ext = tLower.substringAfter("/")
-            if (ext.isNotEmpty() && ext != "*") {
-                extensions.add(ext)
-            } else {
-                if (tLower.startsWith("image")) hasGenericImage = true
-                if (tLower.startsWith("audio")) hasGenericAudio = true
-                if (tLower.startsWith("video")) hasGenericVideo = true
-            }
-        } else {
-            if (tLower.startsWith("image")) hasGenericImage = true
-            if (tLower.startsWith("audio")) hasGenericAudio = true
-            if (tLower.startsWith("video")) hasGenericVideo = true
-        }
-    }
-    
-    if (hasGenericImage) {
-        extensions.addAll(listOf("png", "jpg", "jpeg", "gif", "webp", "bmp"))
-    }
-    if (hasGenericAudio) {
-        extensions.addAll(listOf("mp3", "wav", "ogg", "aac", "flac", "m4a"))
-    }
-    if (hasGenericVideo) {
-        extensions.addAll(listOf("mp4", "mkv", "avi", "mov", "webm", "flv"))
-    }
-    
-    return extensions.distinct()
 }
 
 private fun appendPickedValue(existingValue: String, newValue: String, isArray: Boolean): String {

@@ -42,6 +42,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -76,7 +77,7 @@ data class FlowParameter(
     val portId: String,
     val dataType: DataType,
     val defaultValue: String,
-    val semanticType: String? = null
+    val semanticTypes: List<SemanticType> = emptyList()
 )
 
 enum class ParameterType {
@@ -151,13 +152,13 @@ fun FlowRunnerView(
                                         targetPort?.dataType ?: outPort.dataType
                                     } else outPort.dataType
 
-                                    val inferredSemanticType = if (!outPort.semanticType.isNullOrEmpty()) {
-                                        outPort.semanticType
+                                    val inferredSemanticTypes = if (outPort.semanticTypes.isNotEmpty()) {
+                                        outPort.semanticTypes
                                     } else {
                                         val connection = currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
                                         val targetNode = currentFlow.nodes.find { it.id == connection?.targetNodeId }
                                         val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
-                                        targetPort?.semanticType
+                                        targetPort?.semanticTypes ?: emptyList()
                                     }
 
                                     listOf(
@@ -168,7 +169,7 @@ fun FlowRunnerView(
                                             portId = outPort.id,
                                             dataType = inferredType,
                                             defaultValue = "",
-                                            semanticType = inferredSemanticType
+                                            semanticTypes = inferredSemanticTypes
                                         )
                                     )
                                 } else emptyList()
@@ -186,7 +187,7 @@ fun FlowRunnerView(
                                                     portId = filePort.id,
                                                     dataType = filePort.dataType,
                                                     defaultValue = filePort.value as? String ?: filePort.defaultValue as? String ?: "output.txt",
-                                                    semanticType = filePort.semanticType ?: "file"
+                                                    semanticTypes = filePort.semanticTypes.ifEmpty { org.wip.plugintoolkit.api.parseSemanticTypes("file") }
                                                 )
                                             )
                                         } else emptyList()
@@ -202,7 +203,7 @@ fun FlowRunnerView(
                                                     portId = filePort.id,
                                                     dataType = filePort.dataType,
                                                     defaultValue = filePort.value as? String ?: filePort.defaultValue as? String ?: "output.txt",
-                                                    semanticType = filePort.semanticType ?: "file"
+                                                    semanticTypes = filePort.semanticTypes.ifEmpty { org.wip.plugintoolkit.api.parseSemanticTypes("file") }
                                                 )
                                             )
                                         } else emptyList()
@@ -220,13 +221,13 @@ fun FlowRunnerView(
                                         sourcePort?.dataType ?: inPort.dataType
                                     } else inPort.dataType
 
-                                    val inferredSemanticType = if (!inPort.semanticType.isNullOrEmpty()) {
-                                        inPort.semanticType
+                                    val inferredSemanticTypes = if (inPort.semanticTypes.isNotEmpty()) {
+                                        inPort.semanticTypes
                                     } else {
                                         val connection = currentFlow.connections.find { it.targetNodeId == node.id && it.targetPortId == inPort.id }
                                         val sourceNode = currentFlow.nodes.find { it.id == connection?.sourceNodeId }
                                         val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
-                                        sourcePort?.semanticType
+                                        sourcePort?.semanticTypes ?: emptyList()
                                     }
 
                                     listOf(
@@ -237,7 +238,7 @@ fun FlowRunnerView(
                                             portId = inPort.id,
                                             dataType = inferredType,
                                             defaultValue = "",
-                                            semanticType = inferredSemanticType
+                                            semanticTypes = inferredSemanticTypes
                                         )
                                     )
                                 } else emptyList()
@@ -311,7 +312,7 @@ fun FlowRunnerView(
                                         description = "",
                                         type = param.dataType,
                                         required = true,
-                                        semanticType = param.semanticType
+                                        semanticTypes = param.semanticTypes
                                     )
                                 }
                                 var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }
@@ -348,7 +349,7 @@ fun FlowRunnerView(
                                             description = "Target path to save flow results",
                                             type = param.dataType,
                                             required = true,
-                                            semanticType = param.semanticType
+                                            semanticTypes = param.semanticTypes
                                         )
                                     }
                                     var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }

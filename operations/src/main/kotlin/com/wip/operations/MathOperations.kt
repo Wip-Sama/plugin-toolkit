@@ -132,7 +132,7 @@ class MathProcessor(val settings: MathProcessorSettings) {
     }
 
     @Capability(name = "formatted_sum", description = "Returns the sum formatted as text")
-    @CapabilityOutput(name = "formattedResult", description = "The sum formatted as currency", semanticType = "text/plain")
+    @CapabilityOutput(name = "formattedResult", description = "The sum formatted as currency", semanticTypes = ["text/plain"])
     fun formattedSumCapability(
         @CapabilityParam(description = "Values to sum") values: List<Double>
     ): String {
@@ -235,7 +235,7 @@ class MathProcessor(val settings: MathProcessorSettings) {
 
     @Capability(name = "sum_from_file", description = "Reads a txt file where each row contains a number, and sums them up")
     fun sumFromFile(
-        @CapabilityParam(description = "Path to the text file", semanticType = "file/txt") filePath: String
+        @CapabilityParam(description = "Path to the text file", semanticTypes = ["file/txt"]) filePath: String
     ): Double {
         val file = java.io.File(filePath)
         if (!file.exists()) throw IllegalArgumentException("File does not exist: $filePath")
@@ -247,9 +247,9 @@ class MathProcessor(val settings: MathProcessorSettings) {
     }
 
     @Capability(name = "invert_color", description = "Inverts a color string in rgb(r, g, b) format")
-    @CapabilityOutput(name = "invertedColor", description = "The inverted color in rgb(r, g, b) format", semanticType = "color/rgb")
+    @CapabilityOutput(name = "invertedColor", description = "The inverted color in rgb(r, g, b) format", semanticTypes = ["color/rgb"])
     fun invertColor(
-        @CapabilityParam(description = "Input color in rgb(r,g,b) format", semanticType = "color/rgb") color: String
+        @CapabilityParam(description = "Input color in rgb(r,g,b) format", semanticTypes = ["color/rgb"]) color: String
     ): String {
         val regex = Regex("""rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)""")
         val match = regex.find(color) ?: throw IllegalArgumentException("Invalid color format. Expected rgb(r,g,b)")
@@ -257,6 +257,14 @@ class MathProcessor(val settings: MathProcessorSettings) {
         val g = match.groupValues[2].toInt().coerceIn(0, 255)
         val b = match.groupValues[3].toInt().coerceIn(0, 255)
         return "rgb(${255 - r}, ${255 - g}, ${255 - b})"
+    }
+
+    @Capability(name = "multi_semantic_op", description = "Test capability with multiple semantic types")
+    @CapabilityOutput(name = "output_data", description = "Multi-typed output", semanticTypes = ["color/rgb", "file/txt"])
+    fun multiSemanticOp(
+        @CapabilityParam(description = "Multi-typed parameter", semanticTypes = ["color/rgb", "file/txt"]) inputVal: String
+    ): String {
+        return inputVal
     }
 }
 

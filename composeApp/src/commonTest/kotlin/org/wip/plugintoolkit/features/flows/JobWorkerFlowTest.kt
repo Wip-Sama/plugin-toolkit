@@ -21,6 +21,7 @@ import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.InputPort
@@ -57,12 +58,12 @@ class JobWorkerFlowTest {
         override fun openLatestLog() {}
     }
 
-    private fun createInputNode(id: Long, name: String, dataType: DataType, semanticType: String? = null): Node.FlowInputNode {
+    private fun createInputNode(id: Long, name: String, dataType: DataType, semanticTypes: List<SemanticType> = emptyList()): Node.FlowInputNode {
         return Node.FlowInputNode(
             id = id,
             position = Offset.Zero,
             outputs = listOf(
-                OutputPort(id = "output_data", name = name, dataType = dataType, semanticType = semanticType)
+                OutputPort(id = "output_data", name = name, dataType = dataType, semanticTypes = semanticTypes)
             )
         )
     }

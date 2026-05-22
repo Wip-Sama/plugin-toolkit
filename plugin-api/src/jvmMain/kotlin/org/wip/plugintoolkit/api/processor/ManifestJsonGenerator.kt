@@ -78,7 +78,7 @@ object ManifestJsonGenerator {
                 val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
                 val required = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
                 val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
-                val semanticType = paramAnn?.arguments?.find { it.name?.asString() == "semanticType" }?.value as? String ?: ""
+                val semTypesVal = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                 
                 val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
                 
@@ -102,7 +102,7 @@ object ManifestJsonGenerator {
                     constraints = constraints,
                     required = required,
                     secret = secret,
-                    semanticType = semanticType.ifEmpty { null }
+                    semanticTypes = semTypesVal.flatMap { org.wip.plugintoolkit.api.parseSemanticTypes(it) }
                 )
             }
             
@@ -115,7 +115,7 @@ object ManifestJsonGenerator {
                     name = out.name,
                     description = out.description,
                     type = out.type,
-                    semanticType = out.semanticType
+                    semanticTypes = out.semanticTypes
                 )
             }
 
@@ -124,7 +124,7 @@ object ManifestJsonGenerator {
                 description = capDesc,
                 parameters = params.ifEmpty { null },
                 returnType = GeneratorUtils.mapKSTypeToDataType(func.returnType!!.resolve()),
-                semanticType = if (outputs.size == 1) outputs.first().semanticType else null,
+                semanticTypes = if (outputs.size == 1) outputs.first().semanticTypes else emptyList(),
                 outputs = outputs.ifEmpty { null },
                 isPausable = supportsPause || hasResumeState,
                 isCancellable = supportsCancel
