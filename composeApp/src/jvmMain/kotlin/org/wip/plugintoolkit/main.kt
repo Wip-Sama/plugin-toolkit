@@ -54,8 +54,11 @@ import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import org.wip.plugintoolkit.core.utils.RealFileSystem
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.ActiveFlowEditorTracker
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.logic.SystemNodeExecutorRegistry
+import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginFolderManager
@@ -181,7 +184,8 @@ fun runMain(args: Array<String>) {
             single { PluginViewModel(get(), get(), get()) }
             single { SettingsViewModel(get(), get(), get(), get()) }
             single { FlowViewModel(getOrNull(), getOrNull(), getOrNull()) }
-            factory { (flowName: String) -> FlowEditorViewModel(flowName, getOrNull(), getOrNull(), getOrNull()) }
+            single { ActiveFlowEditorTracker() }
+            factory { (flowName: String) -> FlowEditorViewModel(flowName, getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get(), get(), get()) }
@@ -189,6 +193,7 @@ fun runMain(args: Array<String>) {
             factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
             factory { JobViewModel(get()) }
             factory { AppViewModel(get(), get()) }
+            single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry() }
             single { UpdateService(get()) }
         })
     }

@@ -7,7 +7,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.SettingDefinition
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsResolvedStrings
@@ -58,6 +60,7 @@ fun AutoSettingsView(
 
     val grouped = filteredDefinitions.groupBy { it.sectionTitle }
     val settings by viewModel.settings.collectAsState()
+    val scope = rememberCoroutineScope()
 
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         grouped.forEach { (sectionTitle, definitions) ->
@@ -75,7 +78,9 @@ fun AutoSettingsView(
                         onUpdate = { updated ->
                             viewModel.updateSettings { updated }
                             // Execute side-effect if any
-                            registry.triggerSideEffects(settings, updated)
+                            scope.launch {
+                                registry.triggerSideEffects(settings, updated)
+                            }
                         },
                         controlOverride = effectiveControl,
                         actionOverride = effectiveAction,

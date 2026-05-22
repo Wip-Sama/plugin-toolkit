@@ -1,13 +1,6 @@
 package org.wip.plugintoolkit
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -15,50 +8,28 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
-import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
-import androidx.navigation3.ui.NavDisplay
 import org.koin.compose.koinInject
-import org.koin.core.parameter.parametersOf
-import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.AppTheme
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.core.ui.DialogHost
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformLocalization
-import org.wip.plugintoolkit.features.flows.ui.FlowEditorView
-import org.wip.plugintoolkit.features.flows.ui.FlowManagerView
-import org.wip.plugintoolkit.features.flows.ui.FlowRunnerView
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.ActiveFlowEditorTracker
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.ui.JobBadge
-import org.wip.plugintoolkit.features.job.ui.JobDashboard
-import org.wip.plugintoolkit.features.landingPage.ui.LandingPage
 import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.navigation.model.ScreenNavConfig
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
-import org.wip.plugintoolkit.features.plugin.ui.PluginManagerView
-import org.wip.plugintoolkit.features.plugin.ui.PluginSectionScreen
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
-import org.wip.plugintoolkit.features.repository.ui.PluginRepoView
 import org.wip.plugintoolkit.features.settings.model.AppSettings
-import org.wip.plugintoolkit.features.settings.model.UpdateState
-import org.wip.plugintoolkit.features.settings.ui.SettingsScreen
-import org.wip.plugintoolkit.features.settings.ui.UpdateConfirmationDialog
-import org.wip.plugintoolkit.features.settings.ui.UpdateDialog
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
-import org.wip.plugintoolkit.shared.components.ToastHost
-import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
-import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.app_name
+import org.wip.plugintoolkit.ui.AppNavigation
+import org.wip.plugintoolkit.ui.AppScaffold
+import org.wip.plugintoolkit.ui.AppUpdateDialogs
 
 @Composable
 fun App(
@@ -67,17 +38,26 @@ fun App(
     appViewModel: AppViewModel = koinInject(),
     notificationService: NotificationService = koinInject(),
     dialogService: DialogService = koinInject(),
-    flowViewModel: FlowViewModel = koinInject()
+    flowViewModel: FlowViewModel = koinInject(),
+    activeFlowEditorTracker: ActiveFlowEditorTracker = koinInject()
 ) {
     val settings by viewModel.settings.collectAsState()
     val languageCode by viewModel.currentLanguageCode.collectAsState()
-
 
     LaunchedEffect(languageCode) {
         PlatformLocalization.setApplicationLanguage(languageCode)
     }
 
-    AppContent(settings, viewModel, pluginViewModel, appViewModel, notificationService, dialogService, flowViewModel)
+    AppContent(
+        settings = settings,
+        viewModel = viewModel,
+        pluginViewModel = pluginViewModel,
+        appViewModel = appViewModel,
+        notificationService = notificationService,
+        dialogService = dialogService,
+        flowViewModel = flowViewModel,
+        activeFlowEditorTracker = activeFlowEditorTracker
+    )
 }
 
 @Composable
@@ -88,20 +68,20 @@ private fun AppContent(
     appViewModel: AppViewModel,
     notificationService: NotificationService,
     dialogService: DialogService,
-    flowViewModel: FlowViewModel = koinInject()
+    flowViewModel: FlowViewModel,
+    activeFlowEditorTracker: ActiveFlowEditorTracker
 ) {
     val general = settings.general
     val density = LocalDensity.current
     val customDensity = remember(density, general.scaling) {
         Density(
-            density = density.density * general.scaling, fontScale = density.fontScale * general.scaling
+            density = density.density * general.scaling,
+            fontScale = density.fontScale * general.scaling
         )
     }
 
     CompositionLocalProvider(LocalDensity provides customDensity) {
         AppTheme(appearance = settings.appearance) {
-            var isNavbarCollapsed by remember { mutableStateOf(false) }
-
             val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
             val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
 
@@ -116,174 +96,46 @@ private fun AppContent(
                 }
             }
 
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    val layoutSidebarWidth by animateDpAsState(
-                        targetValue = if (isNavbarCollapsed) ToolkitTheme.dimensions.sidebarCollapsedWidth else ToolkitTheme.dimensions.sidebarExpandedWidth,
-                        animationSpec = tween(durationMillis = 200)
-                    )
+            val hasUnsavedChanges by activeFlowEditorTracker.hasUnsavedChanges.collectAsState()
 
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        // First Sidebar Spacer
-                        Spacer(modifier = Modifier.width(layoutSidebarWidth))
-
-                        // Content Area
-                        NavDisplay(
-                            backStack = backStack,
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                            onBack = {
-                                if (currentScreen is Screen.FlowEditor && FlowEditorViewModel.hasUnsavedChanges) {
-                                    dialogService.showConfirmation(
-                                        title = "Unsaved Changes",
-                                        message = "All the unsaved data will be lost. Are you sure you want to exit?",
-                                        onConfirm = {
-                                            FlowEditorViewModel.hasUnsavedChanges = false
-                                            if (backStack.size > 1) backStack.removeLast()
-                                        }
-                                    )
-                                } else {
-                                    if (backStack.size > 1) backStack.removeLast()
-                                }
-                            }) { key ->
-                            when (key) {
-                                is Screen.Main -> NavEntry(key) {
-                                    val navigate: (Screen) -> Unit = { screen ->
-                                        if (currentScreen != screen) {
-                                            if (currentScreen is Screen.FlowEditor && FlowEditorViewModel.hasUnsavedChanges) {
-                                                dialogService.showConfirmation(
-                                                    title = "Unsaved Changes",
-                                                    message = "All the unsaved data will be lost. Are you sure you want to exit?",
-                                                    onConfirm = {
-                                                        FlowEditorViewModel.hasUnsavedChanges = false
-                                                        backStack.clear()
-                                                        backStack.add(screen)
-                                                    }
-                                                )
-                                            } else {
-                                                backStack.clear()
-                                                backStack.add(screen)
-                                            }
-                                        }
-                                    }
-                                    LandingPage(onNavigate = navigate)
-                                }
-                                is Screen.FlowManager -> NavEntry(key) {
-                                    FlowManagerView(
-                                        viewModel = flowViewModel,
-                                        onEditFlow = { flowName -> backStack.add(Screen.FlowEditor(flowName)) }
-                                    )
-                                }
-                                is Screen.FlowRunner -> NavEntry(key) {
-                                    FlowRunnerView(viewModel = flowViewModel)
-                                }
-                                is Screen.FlowEditor -> NavEntry(key) {
-                                    val editorViewModel: FlowEditorViewModel = koinInject(parameters = { parametersOf(key.flowName) })
-                                    FlowEditorView(
-                                        viewModel = editorViewModel,
-                                        notificationService = notificationService,
-                                        onExit = {
-                                            if (FlowEditorViewModel.hasUnsavedChanges) {
-                                                dialogService.showConfirmation(
-                                                    title = "Unsaved Changes",
-                                                    message = "All the unsaved data will be lost. Are you sure you want to exit?",
-                                                    onConfirm = {
-                                                        FlowEditorViewModel.hasUnsavedChanges = false
-                                                        if (backStack.size > 1) {
-                                                            backStack.removeLast()
-                                                        } else {
-                                                            backStack.clear()
-                                                            backStack.add(Screen.FlowManager)
-                                                        }
-                                                    }
-                                                )
-                                            } else {
-                                                if (backStack.size > 1) {
-                                                    backStack.removeLast()
-                                                } else {
-                                                    backStack.clear()
-                                                    backStack.add(Screen.FlowManager)
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
-                                is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = viewModel) }
-                                is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
-                                is Screen.Plugins -> NavEntry(key) { PluginSectionScreen() }
-                                is Screen.Plugin -> NavEntry(key) { PluginSectionScreen(initialPluginId = key.id) }
-                                is Screen.PluginManager -> NavEntry(key) { PluginManagerView() }
-                                is Screen.PluginRepo -> NavEntry(key) { PluginRepoView() }
-                                else -> NavEntry(key) { }
-                            }
-                        }
-                    }
-
-                    NavigationSidebar(
-                        title = Res.string.app_name.localized,
-                        bodySections = sections,
-                        bottomSections = bottomSections,
-                        currentScreen = currentScreen,
-                        onScreenSelected = { screen ->
-                            if (currentScreen != screen) {
-                                if (currentScreen is Screen.FlowEditor && FlowEditorViewModel.hasUnsavedChanges) {
-                                    dialogService.showConfirmation(
-                                        title = "Unsaved Changes",
-                                        message = "All the unsaved data will be lost. Are you sure you want to exit?",
-                                        onConfirm = {
-                                            FlowEditorViewModel.hasUnsavedChanges = false
-                                            backStack.clear()
-                                            backStack.add(screen)
-                                        }
-                                    )
-                                } else {
+            AppScaffold(
+                settings = settings,
+                sections = sections,
+                bottomSections = bottomSections,
+                currentScreen = currentScreen,
+                onScreenSelected = { screen ->
+                    if (currentScreen != screen) {
+                        if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
+                            dialogService.showConfirmation(
+                                title = "Unsaved Changes",
+                                message = "All the unsaved data will be lost. Are you sure you want to exit?",
+                                onConfirm = {
+                                    activeFlowEditorTracker.setHasUnsavedChanges(false)
                                     backStack.clear()
                                     backStack.add(screen)
                                 }
-                            }
-                        },
-                        isNavbarCollapsed = isNavbarCollapsed,
-                        onToggleNavbar = { isNavbarCollapsed = !isNavbarCollapsed },
-                        modifier = Modifier.fillMaxHeight()
-                    )
-
-
-                    ToastHost(
-                        notificationService = notificationService, settings = settings.notifications
-                    )
-                    DialogHost(dialogService)
-
-                    // Update Handling UI (Global)
-                    val availableUpdate = viewModel.availableUpdate
-                    val updateState by viewModel.updateState.collectAsState()
-                    val isDownloading = viewModel.isDownloadingUpdate
-                    val downloadProgress by viewModel.downloadProgress.collectAsState()
-
-                    if (availableUpdate != null && updateState !is UpdateState.NeedsConfirmation) {
-                        UpdateDialog(
-                            updateInfo = availableUpdate,
-                            isDownloading = isDownloading,
-                            progress = downloadProgress,
-                            onDownload = { viewModel.downloadAndInstallUpdate() },
-                            onDismiss = { viewModel.dismissUpdate() })
+                            )
+                        } else {
+                            backStack.clear()
+                            backStack.add(screen)
+                        }
                     }
-
-                    if (updateState is UpdateState.NeedsConfirmation) {
-                        val state = updateState as UpdateState.NeedsConfirmation
-                        UpdateConfirmationDialog(
-                            runningJobsCount = state.runningJobsCount,
-                            onConfirm = { force -> viewModel.confirmUpdate(force) },
-                            onDismiss = { viewModel.dismissUpdate() }
-                        )
-                    }
-                }
+                },
+                notificationService = notificationService,
+                dialogService = dialogService
+            ) {
+                AppNavigation(
+                    backStack = backStack,
+                    currentScreen = currentScreen,
+                    activeFlowEditorTracker = activeFlowEditorTracker,
+                    dialogService = dialogService,
+                    notificationService = notificationService,
+                    flowViewModel = flowViewModel,
+                    settingsViewModel = viewModel
+                )
             }
+
+            AppUpdateDialogs(viewModel = viewModel)
         }
     }
 }
-
-@Preview
-@Composable
-private fun AppPreview() {
-    App()
-}
-

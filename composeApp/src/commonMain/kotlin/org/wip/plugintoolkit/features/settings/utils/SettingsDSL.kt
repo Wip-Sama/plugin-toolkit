@@ -12,7 +12,7 @@ import kotlin.reflect.KProperty1
  */
 class SettingsRegistryBuilder {
     val definitions = mutableListOf<SettingDefinition>()
-    val sideEffects = mutableMapOf<String, (AppSettings) -> Unit>()
+    val sideEffects = mutableMapOf<String, suspend (AppSettings) -> Unit>()
 
     fun nav(key: SettingNavKey, block: NavBuilder.() -> Unit) {
         NavBuilder(key, this).apply(block)
@@ -56,7 +56,7 @@ class SectionBuilder(
         icon: ImageVector,
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
-        sideEffect: ((AppSettings) -> Unit)? = null,
+        sideEffect: (suspend (AppSettings) -> Unit)? = null,
         setValue: (AppSettings, Boolean) -> AppSettings
     ) {
         val id = generateId(p1, p2)
@@ -83,7 +83,7 @@ class SectionBuilder(
         icon: ImageVector,
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
-        sideEffect: ((AppSettings) -> Unit)? = null,
+        sideEffect: (suspend (AppSettings) -> Unit)? = null,
         setValue: (AppSettings, Boolean) -> AppSettings
     ) {
         val id = generateId(p1, p2, p3)
@@ -112,7 +112,7 @@ class SectionBuilder(
         options: List<V>,
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
-        sideEffect: ((AppSettings) -> Unit)? = null,
+        sideEffect: (suspend (AppSettings) -> Unit)? = null,
         labelProvider: @Composable (V) -> String,
         setValue: (AppSettings, V) -> AppSettings
     ) {
@@ -145,7 +145,7 @@ class SectionBuilder(
         steps: Int = 0,
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
-        sideEffect: ((AppSettings) -> Unit)? = null,
+        sideEffect: (suspend (AppSettings) -> Unit)? = null,
         subtitleProvider: ((AppSettings) -> String)? = null,
         setValue: (AppSettings, Float) -> AppSettings
     ) {
@@ -178,7 +178,7 @@ class SectionBuilder(
         valueRange: IntRange,
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
-        sideEffect: ((AppSettings) -> Unit)? = null,
+        sideEffect: (suspend (AppSettings) -> Unit)? = null,
         setValue: (AppSettings, Int) -> AppSettings
     ) {
         val id = generateId(p1, p2)
@@ -207,7 +207,7 @@ class SectionBuilder(
         valueRange: IntRange,
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
-        sideEffect: ((AppSettings) -> Unit)? = null,
+        sideEffect: (suspend (AppSettings) -> Unit)? = null,
         setValue: (AppSettings, Int) -> AppSettings
     ) {
         val id = generateId(p1, p2, p3)

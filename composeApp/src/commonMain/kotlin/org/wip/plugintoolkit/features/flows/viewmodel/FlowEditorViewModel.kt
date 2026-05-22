@@ -81,9 +81,18 @@ class FlowEditorViewModel(
     private val initialFlowName: String,
     private val settingsPersistence: SettingsPersistence? = null,
     private val notificationService: NotificationService? = null,
-    private val pluginRegistry: PluginRegistry? = null
+    private val pluginRegistry: PluginRegistry? = null,
+    private val activeFlowEditorTracker: ActiveFlowEditorTracker? = null
 ) : ViewModel() {
-    
+
+    private val resolvedActiveFlowEditorTracker: ActiveFlowEditorTracker by lazy {
+        activeFlowEditorTracker ?: try {
+            getKoin().get()
+        } catch (e: Exception) {
+            ActiveFlowEditorTracker()
+        }
+    }
+
     private val resolvedSettingsPersistence: SettingsPersistence by lazy {
         settingsPersistence ?: getKoin().get()
     }
@@ -143,11 +152,9 @@ class FlowEditorViewModel(
             redoStack.add(currentFlow.copy())
             
             _state.update { currentState ->
-                val syncFlows = currentState.flows.map { if (it.name == previousFlow.name) previousFlow else it }
                 currentState.copy(
                     flow = previousFlow,
-                    hasUnsavedChanges = true,
-                    flows = syncFlows
+                    hasUnsavedChanges = true
                 )
             }
             runTypeInference()
@@ -161,25 +168,19 @@ class FlowEditorViewModel(
             undoStack.add(currentFlow.copy())
             
             _state.update { currentState ->
-                val syncFlows = currentState.flows.map { if (it.name == nextFlow.name) nextFlow else it }
                 currentState.copy(
                     flow = nextFlow,
-                    hasUnsavedChanges = true,
-                    flows = syncFlows
+                    hasUnsavedChanges = true
                 )
             }
             runTypeInference()
         }
     }
 
-    companion object {
-        var hasUnsavedChanges: Boolean = false
-    }
-
     init {
         viewModelScope.launch {
             _state.collect { currentState ->
-                hasUnsavedChanges = currentState.hasUnsavedChanges
+                resolvedActiveFlowEditorTracker.setHasUnsavedChanges(currentState.hasUnsavedChanges)
             }
         }
         viewModelScope.launch {
@@ -506,8 +507,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 nextId = currentState.nextId + 1,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -572,8 +572,7 @@ class FlowEditorViewModel(
                 hasUnsavedChanges = true,
                 draggedNodeId = null,
                 currentDragOffset = Offset.Zero,
-                ghostPosition = null,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                ghostPosition = null
             )
         }
         runTypeInference()
@@ -589,8 +588,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 selectedNodeIds = currentState.selectedNodeIds.filter { it != id }.toSet(),
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -611,8 +609,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 selectedNodeIds = emptySet(),
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -737,8 +734,7 @@ class FlowEditorViewModel(
             val newFlow = currentState.flow.copy(connections = filteredConnections + newConnection)
             currentState.copy(
                 flow = newFlow,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -792,8 +788,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 nextId = currentState.nextId + 1,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -805,8 +800,7 @@ class FlowEditorViewModel(
             val newFlow = currentState.flow.copy(connections = currentState.flow.connections.filter { it != connection })
             currentState.copy(
                 flow = newFlow,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -855,8 +849,7 @@ class FlowEditorViewModel(
                 flow = newFlow,
                 offset = Offset.Zero,
                 scale = 1f,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
     }
@@ -877,8 +870,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = unpackedFlow,
                 nextId = nextId,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == unpackedFlow.name) unpackedFlow else it }
+                hasUnsavedChanges = true
             )
         }
     }
@@ -940,7 +932,13 @@ class FlowEditorViewModel(
                 SystemFileSystem.sink(file).buffered().use { it.writeString(content) }
 
                 withContext(Dispatchers.Main) {
-                    _state.update { it.copy(hasUnsavedChanges = false) }
+                    _state.update { currentState ->
+                        val newFlow = currentState.flow
+                        currentState.copy(
+                            hasUnsavedChanges = false,
+                            flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 Logger.e(e) { "Failed to save flow" }
@@ -966,8 +964,7 @@ class FlowEditorViewModel(
             val newFlow = currentState.flow.copy(nodes = updatedNodes)
             currentState.copy(
                 flow = newFlow,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -1006,8 +1003,7 @@ class FlowEditorViewModel(
             val newFlow = currentState.flow.copy(nodes = updatedNodes)
             currentState.copy(
                 flow = newFlow,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -1042,8 +1038,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 nextId = currentState.nextId + 1,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
