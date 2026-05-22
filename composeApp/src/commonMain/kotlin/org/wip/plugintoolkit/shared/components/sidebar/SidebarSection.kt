@@ -33,7 +33,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.model.localized
 import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.section_application
+import plugintoolkit.composeapp.generated.resources.section_general
 
 @Composable
 @Preview
@@ -41,7 +41,7 @@ private fun SidebarSectionPreview() {
     MaterialTheme {
         SidebarSection(
             section = SidebarSectionData(
-                title = Res.string.section_application.localized,
+                title = Res.string.section_general.localized,
                 elements = listOf()
             ),
             currentSelection = "main",

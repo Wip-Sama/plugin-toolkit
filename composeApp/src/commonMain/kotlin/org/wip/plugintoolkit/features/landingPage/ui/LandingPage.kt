@@ -231,7 +231,7 @@ fun DashboardHero() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .height(ToolkitTheme.dimensions.emptyStateIconSize * 2)
             .clip(MaterialTheme.shapes.extraLarge)
             .background(brush)
             .padding(ToolkitTheme.spacing.extraLarge),
@@ -247,7 +247,7 @@ fun DashboardHero() {
             Text(
                 stringResource(Res.string.landing_welcome_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.8f)
+                color = Color.White.copy(alpha = ToolkitTheme.opacity.secondaryText)
             )
         }
     }
@@ -263,14 +263,14 @@ fun StatCard(
 ) {
     GlassCard(modifier = modifier) {
         Row(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(ToolkitTheme.spacing.large),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(ToolkitTheme.dimensions.settingsIconContainerSize)
                     .clip(MaterialTheme.shapes.medium)
-                    .background(color.copy(alpha = 0.1f)),
+                    .background(color.copy(alpha = ToolkitTheme.opacity.buttonBackground)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(imageVector = icon, contentDescription = null, tint = color)
@@ -294,7 +294,7 @@ fun QuickLinkItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = ToolkitTheme.opacity.settingsItemDefault))
             .clickable(onClick = onClick)
             .padding(
                 horizontal = ToolkitTheme.spacing.medium,
@@ -305,7 +305,7 @@ fun QuickLinkItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
             tint = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))

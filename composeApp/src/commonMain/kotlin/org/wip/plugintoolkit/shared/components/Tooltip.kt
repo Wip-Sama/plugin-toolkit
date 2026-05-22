@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.composed
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
  * A reusable Composable wrapper that shows a custom tooltip when the content is hovered.
@@ -55,10 +56,10 @@ fun TooltipArea(
             ) {
                 Box(
                     modifier = Modifier
-                        .shadow(4.dp, RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .shadow(ToolkitTheme.spacing.small, RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
+                        .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
+                        .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                 ) {
                     tooltip()
                 }

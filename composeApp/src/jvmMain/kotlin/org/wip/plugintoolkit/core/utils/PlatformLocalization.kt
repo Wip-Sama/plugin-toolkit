@@ -7,5 +7,6 @@ actual object PlatformLocalization {
 
     actual fun setApplicationLanguage(languageCode: String) {
         Locale.setDefault(Locale.forLanguageTag(languageCode))
+        java.util.ResourceBundle.clearCache()
     }
 }

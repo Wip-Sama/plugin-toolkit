@@ -22,6 +22,7 @@ import org.wip.plugintoolkit.features.settings.model.AppSettings
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import org.wip.plugintoolkit.core.model.LocalizedString
 
 class JvmNotificationService(
     private val scope: CoroutineScope,
@@ -81,6 +82,15 @@ class JvmNotificationService(
         val settings = settingsProvider()
 
         // Only skip if it's a notification-toast AND toasts are disabled
+        if (isNotification && !settings.notifications.enableToasts) return
+
+        // Wrap raw String into a LocalizedString.Raw so consumers can resolve it as needed
+        _events.tryEmit(NotificationEvent.Toast(LocalizedString.Raw(message), isNotification))
+    }
+
+    override fun toast(message: LocalizedString, isNotification: Boolean) {
+        val settings = settingsProvider()
+
         if (isNotification && !settings.notifications.enableToasts) return
 
         _events.tryEmit(NotificationEvent.Toast(message, isNotification))

@@ -56,9 +56,11 @@ import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.settings.model.NotificationSettings
 import java.util.UUID
 
+import org.wip.plugintoolkit.core.model.LocalizedString
+
 data class ToastData(
     val id: String = UUID.randomUUID().toString(),
-    val message: String,
+    val message: LocalizedString,
     val isNotification: Boolean,
     val durationMillis: Long
 )
@@ -198,7 +200,7 @@ private fun ToastItem(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = toast.message,
+                    text = toast.message.resolve(),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f).padding(end = 8.dp)

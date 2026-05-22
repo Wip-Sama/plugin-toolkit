@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -17,6 +18,7 @@ import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.AppTheme
 import org.wip.plugintoolkit.core.ui.DialogService
+import org.wip.plugintoolkit.core.ui.LocalLanguage
 import org.wip.plugintoolkit.core.utils.PlatformLocalization
 import org.wip.plugintoolkit.features.flows.viewmodel.ActiveFlowEditorTracker
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
@@ -44,24 +46,29 @@ fun App(
     val settings by viewModel.settings.collectAsState()
     val languageCode by viewModel.currentLanguageCode.collectAsState()
 
-    LaunchedEffect(languageCode) {
-        PlatformLocalization.setApplicationLanguage(languageCode)
-    }
+    // Immediately set/update default locale during composition to avoid race conditions
+    // where stringResource() evaluates before LaunchedEffect runs.
+    PlatformLocalization.setApplicationLanguage(languageCode)
 
-    AppContent(
-        settings = settings,
-        viewModel = viewModel,
-        pluginViewModel = pluginViewModel,
-        appViewModel = appViewModel,
-        notificationService = notificationService,
-        dialogService = dialogService,
-        flowViewModel = flowViewModel,
-        activeFlowEditorTracker = activeFlowEditorTracker
-    )
+    // Provide the current language via CompositionLocal so all UI elements can react to language changes
+    // This preserves navigation state while allowing string resources to update
+    CompositionLocalProvider(LocalLanguage provides languageCode) {
+        AppContentImpl(
+            settings = settings,
+            viewModel = viewModel,
+            pluginViewModel = pluginViewModel,
+            appViewModel = appViewModel,
+            notificationService = notificationService,
+            dialogService = dialogService,
+            flowViewModel = flowViewModel,
+            activeFlowEditorTracker = activeFlowEditorTracker
+        )
+    }
 }
 
+
 @Composable
-private fun AppContent(
+private fun AppContentImpl(
     settings: AppSettings,
     viewModel: SettingsViewModel,
     pluginViewModel: PluginViewModel,
@@ -71,6 +78,9 @@ private fun AppContent(
     flowViewModel: FlowViewModel,
     activeFlowEditorTracker: ActiveFlowEditorTracker
 ) {
+    // Read from LocalLanguage to make this composable recompose when language changes
+    val currentLanguage = LocalLanguage.current
+
     val general = settings.general
     val density = LocalDensity.current
     val customDensity = remember(density, general.scaling) {
@@ -98,6 +108,9 @@ private fun AppContent(
 
             val hasUnsavedChanges by activeFlowEditorTracker.hasUnsavedChanges.collectAsState()
 
+            // Render UI normally without destroying the composition tree.
+            // Recomposition is triggered reactively since the screens and localized strings
+            // read from LocalLanguage / trigger recomposition.
             AppScaffold(
                 settings = settings,
                 sections = sections,

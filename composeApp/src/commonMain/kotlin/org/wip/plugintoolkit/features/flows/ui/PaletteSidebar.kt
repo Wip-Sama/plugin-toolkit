@@ -83,7 +83,7 @@ fun PaletteSidebar(
     Surface(
         modifier = modifier.width(280.dp).fillMaxHeight(),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder))
     ) {
         Column {
             PrimaryTabRow(selectedTabIndex = selectedTab) {
@@ -385,8 +385,8 @@ private fun PaletteItem(
                 lastPosition = localPos
             },
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.cardBackground),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.mediumSmall),
@@ -395,7 +395,7 @@ private fun PaletteItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(8.dp)
+                    .size(ToolkitTheme.spacing.small)
                     .background(color, CircleShape)
             )
             Text(
@@ -456,14 +456,14 @@ fun PaletteItemPreview(node: PaletteNode) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(80.dp)
+                    .height(ToolkitTheme.dimensions.emptyStateIconSize)
                     .padding(ToolkitTheme.spacing.mediumSmall),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "Drop to add node",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.secondaryText)
                 )
             }
         }

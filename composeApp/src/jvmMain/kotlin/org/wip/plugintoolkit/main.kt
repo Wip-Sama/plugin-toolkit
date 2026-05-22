@@ -3,7 +3,9 @@ package org.wip.plugintoolkit
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,6 +53,7 @@ import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.update.UpdateService
 import org.wip.plugintoolkit.core.utils.FileSystem
+import org.wip.plugintoolkit.core.utils.PlatformLocalization
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import org.wip.plugintoolkit.core.utils.RealFileSystem
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
@@ -287,6 +290,11 @@ fun runMain(args: Array<String>) {
     val startMode = if (startMinimizedOverride) WindowStartMode.Minimized else initialSettings.general.windowStartMode
 
     application {
+        val languageCode by viewModel.currentLanguageCode.collectAsState()
+
+        // Sync default JVM locale synchronously before composition
+        PlatformLocalization.setApplicationLanguage(languageCode)
+
         val trayState = rememberTrayState()
         var isVisible by remember { mutableStateOf(startMode != WindowStartMode.Minimized) }
 
@@ -300,17 +308,19 @@ fun runMain(args: Array<String>) {
             size = DpSize(1280.dp, 800.dp)
         )
 
-        Tray(
-            state = trayState,
-            icon = painterResource(Res.drawable.app_logo),
-            tooltip = stringResource(Res.string.app_name),
-            onAction = { isVisible = true },
-            menu = {
-                Item("Open", onClick = { isVisible = true })
-                Separator()
-                Item("Exit", onClick = { exitApplication() })
-            }
-        )
+        key(languageCode) {
+            Tray(
+                state = trayState,
+                icon = painterResource(Res.drawable.app_logo),
+                tooltip = stringResource(Res.string.app_name),
+                onAction = { isVisible = true },
+                menu = {
+                    Item("Open", onClick = { isVisible = true })
+                    Separator()
+                    Item("Exit", onClick = { exitApplication() })
+                }
+            )
+        }
 
         if (isVisible) {
             Window(
