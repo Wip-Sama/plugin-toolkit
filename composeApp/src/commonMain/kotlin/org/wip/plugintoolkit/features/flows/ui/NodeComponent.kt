@@ -81,6 +81,7 @@ import org.wip.plugintoolkit.shared.components.TooltipArea
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import plugintoolkit.composeapp.generated.resources.Res
@@ -114,8 +115,8 @@ fun NodeComponent(
     onDropConnection: (isShiftPressed: Boolean) -> Unit = {},
     onPortPositioned: (Long, String, Offset) -> Unit = { _, _, _ -> },
     onPress: (Long) -> Unit = {},
-    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>) -> Unit = { _, _, _, _ -> },
-    onUpdateSystemNodeOutputs: (Long, String, List<SemanticType>) -> Unit = { _, _, _ -> },
+    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit = { _, _, _, _, _ -> },
     highlightedPortId: String? = null,
     highlightedPortColor: Color? = null,
     boardLayoutCoordinates: LayoutCoordinates?,
@@ -946,6 +947,19 @@ fun NodeComponent(
             }
             var semanticType by remember { mutableStateOf(port.semanticTypes.joinToString { it.canonicalId }) }
             
+            var isList by remember {
+                mutableStateOf(if (node is Node.FlowInputNode) node.isList else false)
+            }
+            var minValStr by remember { 
+                mutableStateOf(if (node is Node.FlowInputNode) node.constraints?.min?.toString() ?: "" else "")
+            }
+            var maxValStr by remember { 
+                mutableStateOf(if (node is Node.FlowInputNode) node.constraints?.max?.toString() ?: "" else "")
+            }
+            var regexStr by remember { 
+                mutableStateOf(if (node is Node.FlowInputNode) node.constraints?.regex ?: "" else "")
+            }
+
             AlertDialog(
                 onDismissRequest = { showEditBoundaryDialog = false },
                 title = { 
@@ -1019,6 +1033,47 @@ fun NodeComponent(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        if (node is Node.FlowInputNode) {
+                            Divider()
+                            Text("Constraints & Settings", style = MaterialTheme.typography.titleSmall)
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Accept multiple items (List)")
+                                Spacer(modifier = Modifier.weight(1f))
+                                Switch(checked = isList, onCheckedChange = { isList = it })
+                            }
+
+                            if (selectedTypeOption == "String") {
+                                ToolkitTextField(
+                                    value = regexStr,
+                                    onValueChange = { regexStr = it },
+                                    label = { Text("Regex Pattern") },
+                                    placeholder = { Text("e.g. ^[a-zA-Z]+$") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+
+                            if (selectedTypeOption == "Int" || selectedTypeOption == "Double") {
+                                Row(horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
+                                    ToolkitTextField(
+                                        value = minValStr,
+                                        onValueChange = { minValStr = it },
+                                        label = { Text("Min Value") },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    ToolkitTextField(
+                                        value = maxValStr,
+                                        onValueChange = { maxValStr = it },
+                                        label = { Text("Max Value") },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
                     }
                 },
                 confirmButton = {
@@ -1033,11 +1088,22 @@ fun NodeComponent(
                                 "Object" -> DataType.Object(customClassName.ifBlank { "java.lang.Object" })
                                 else -> DataType.Primitive(PrimitiveType.ANY)
                             }
+                            
+                            val constraints = if (node is Node.FlowInputNode) {
+                                org.wip.plugintoolkit.features.flows.model.PortConstraints(
+                                    regex = regexStr.takeIf { it.isNotBlank() },
+                                    min = minValStr.toDoubleOrNull(),
+                                    max = maxValStr.toDoubleOrNull()
+                                )
+                            } else null
+                            
                             onUpdateBoundaryNode(
                                 node.id,
                                 name.ifBlank { port.name },
                                 computedDataType,
-                                parseSemanticTypes(semanticType)
+                                parseSemanticTypes(semanticType),
+                                constraints,
+                                isList
                             )
                             showEditBoundaryDialog = false
                         }
@@ -1084,13 +1150,16 @@ fun NodeComponent(
 
     if (showLoadSettingsDialog && node is Node.SystemNode && node.systemAction.lowercase() == "load") {
         val port = node.outputs.firstOrNull { it.id == "data" }
-        if (port != null) {
+        val inPort = node.inputs.firstOrNull { it.id == "file_path" }
+        if (port != null && inPort != null) {
             var semanticTypesStr by remember { mutableStateOf(port.semanticTypes.joinToString { it.canonicalId }) }
+            var extensionsStr by remember { mutableStateOf(inPort.constraints?.extensions?.joinToString(", ") ?: "") }
+            
             AlertDialog(
                 onDismissRequest = { showLoadSettingsDialog = false },
                 title = {
                     Text(
-                        text = "Configure Load Output Port",
+                        text = "Configure Load Node",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -1101,7 +1170,7 @@ fun NodeComponent(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Set the expected semantic types for the loaded file (e.g. image/png, file/txt). This will validate the loaded file extension at runtime.",
+                            text = "Set the expected semantic types for the loaded file (e.g. image/png, file/txt).",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         ToolkitTextField(
@@ -1112,13 +1181,26 @@ fun NodeComponent(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Text(
+                            text = "Add extensions constraint (!txt to allow semantics but forcefully reject txt)",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        ToolkitTextField(
+                            value = extensionsStr,
+                            onValueChange = { extensionsStr = it },
+                            label = { Text("Supported Extensions") },
+                            placeholder = { Text("e.g. txt, json, !csv") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = {
                             val parsed = parseSemanticTypes(semanticTypesStr)
-                            onUpdateSystemNodeOutputs(node.id, "data", parsed)
+                            val extensionsList = extensionsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                            onUpdateSystemNodeSettings(node.id, "data", parsed, "file_path", extensionsList.takeIf { it.isNotEmpty() })
                             showLoadSettingsDialog = false
                         }
                     ) {

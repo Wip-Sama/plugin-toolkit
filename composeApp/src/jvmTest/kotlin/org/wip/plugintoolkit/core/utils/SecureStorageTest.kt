@@ -1,6 +1,6 @@
 package org.wip.plugintoolkit.core.utils
 
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue

@@ -39,6 +39,7 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import kotlin.time.Clock
 
 enum class ConflictResolutionAction {
@@ -84,8 +85,8 @@ sealed interface FlowEvent {
     data object Save : FlowEvent
     data class SaveAs(val name: String) : FlowEvent
     data class UpdateInputPortValue(val nodeId: Long, val portId: String, val value: Any?) : FlowEvent
-    data class UpdateBoundaryNode(val nodeId: Long, val portName: String, val dataType: DataType, val semanticTypes: List<SemanticType>) : FlowEvent
-    data class UpdateSystemNodeOutputs(val nodeId: Long, val portId: String, val semanticTypes: List<SemanticType>) : FlowEvent
+    data class UpdateBoundaryNode(val nodeId: Long, val portName: String, val dataType: DataType, val semanticTypes: List<SemanticType>, val constraints: org.wip.plugintoolkit.features.flows.model.PortConstraints? = null, val isList: Boolean = false) : FlowEvent
+    data class UpdateSystemNodeSettings(val nodeId: Long, val portId: String, val semanticTypes: List<SemanticType>, val inputPortId: String? = null, val extensions: List<String>? = null) : FlowEvent
     data class BringToFront(val nodeId: Long) : FlowEvent
 
     // Selection

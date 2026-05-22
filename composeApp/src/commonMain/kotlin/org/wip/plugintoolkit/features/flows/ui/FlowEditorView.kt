@@ -54,6 +54,9 @@ import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
+import org.wip.plugintoolkit.features.flows.model.PortConstraints
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
@@ -238,9 +241,9 @@ fun FlowEditorView(
                             onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
                             onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
                             onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
-                            onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, value)) },
-                            onUpdateBoundaryNode = { id, name, dataType, semanticTypes -> viewModel.onEvent(FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticTypes)) },
-                            onUpdateSystemNodeOutputs = { id, portId, semanticTypes -> viewModel.onEvent(FlowEvent.UpdateSystemNodeOutputs(id, portId, semanticTypes)) },
+                            onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, NodeSerializationUtils.anyToJsonElement(value))) },
+                            onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList -> viewModel.onEvent(FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticTypes, constraints, isList)) },
+                            onUpdateSystemNodeSettings = { id, portId, semanticTypes, inputPortId, extensions -> viewModel.onEvent(FlowEvent.UpdateSystemNodeSettings(id, portId, semanticTypes, inputPortId, extensions)) },
                             onStartConnection = { nodeId, portId, isOutput -> 
                                 isDrawingConnection = true
                                 connectionStartNodeId = nodeId

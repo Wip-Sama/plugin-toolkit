@@ -188,25 +188,26 @@ fun DynamicParameterInput(
                 isRequired = metadata.required,
                 isArray = isArray,
                 trailingIcon = {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(24.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(parsedColor)
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
-                            .clickable(enabled = enabled) {
-                                showColorPicker = true
-                            }
+                    IconButton(
+                        onClick = { showColorPicker = true },
+                        enabled = enabled
                     ) {
-                        if (value.isEmpty() || parsedColor == Color.Transparent) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = "Choose color",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                modifier = Modifier.size(16.dp)
-                            )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(parsedColor)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
+                        ) {
+                            if (value.isEmpty() || parsedColor == Color.Transparent) {
+                                Icon(
+                                    imageVector = Icons.Default.Palette,
+                                    contentDescription = "Choose color",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                 }

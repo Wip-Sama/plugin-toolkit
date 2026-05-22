@@ -17,7 +17,16 @@ object SystemNodesRegistry {
                 InputPort("file_path", "File Path", DataType.Primitive(PrimitiveType.STRING), defaultValue = "output.txt")
             )
             "load" -> listOf(
-                InputPort("file_path", "File Path", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("file"), defaultValue = "output.txt")
+                InputPort(
+                    id = "file_path",
+                    name = "File Path",
+                    dataType = DataType.Primitive(PrimitiveType.STRING),
+                    semanticTypes = parseSemanticTypes("file"),
+                    defaultValue = "output.txt",
+                    constraints = org.wip.plugintoolkit.features.flows.model.PortConstraints(
+                        extensions = listOf("txt", "json", "csv") // Add custom supported extensions here
+                    )
+                )
             )
             "log" -> listOf(
                 InputPort("level", "Log Level", DataType.Enum("LogLevel", listOf("INFO", "DEBUG", "WARN", "ERROR")), defaultValue = "INFO"),

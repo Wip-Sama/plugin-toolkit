@@ -64,7 +64,7 @@ sealed class DataType {
      */
     @Serializable
     @SerialName("object")
-    data class Object(val className: String) : DataType() {
+    data class Object(val className: String, val namespace: String? = null) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             return value != null && value !is JsonNull
         }
@@ -75,7 +75,7 @@ sealed class DataType {
      */
     @Serializable
     @SerialName("enum")
-    data class Enum(val className: String, val options: List<String>) : DataType() {
+    data class Enum(val className: String, val options: List<String>, val namespace: String? = null) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             return value != null && value !is JsonNull
         }

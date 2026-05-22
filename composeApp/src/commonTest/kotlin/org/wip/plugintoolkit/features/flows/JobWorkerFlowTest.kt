@@ -101,7 +101,7 @@ class JobWorkerFlowTest {
         
         // Convert node with target type Int
         val convertNode = createSystemNode(2, "convert")
-            .copyWithUpdatedInput("input_data", "123")
+            .copyWithUpdatedInput("input_data", JsonPrimitive("123"))
 
         val outputNode = createOutputNode(3, "result", DataType.Primitive(PrimitiveType.INT))
 
@@ -140,7 +140,7 @@ class JobWorkerFlowTest {
         val inputNode = createInputNode(1, "source", DataType.Primitive(PrimitiveType.STRING))
         
         val convertNode = createSystemNode(2, "convert")
-            .copyWithUpdatedInput("input_data", "invalid-int")
+            .copyWithUpdatedInput("input_data", JsonPrimitive("invalid-int"))
 
         val outputNode = createOutputNode(3, "result", DataType.Primitive(PrimitiveType.INT))
 
@@ -183,14 +183,14 @@ class JobWorkerFlowTest {
         val inputNode = createInputNode(1, "data", DataType.Primitive(PrimitiveType.STRING))
         
         val condNode = createSystemNode(2, "conditional")
-            .copyWithUpdatedInput("condition", true)
-            .copyWithUpdatedInput("input_data", "hello")
+            .copyWithUpdatedInput("condition", JsonPrimitive(true))
+            .copyWithUpdatedInput("input_data", JsonPrimitive("hello"))
 
         val logNode = createSystemNode(3, "log")
-            .copyWithUpdatedInput("message", "Condition was true")
+            .copyWithUpdatedInput("message", JsonPrimitive("Condition was true"))
 
         val errorNode = createSystemNode(4, "error")
-            .copyWithUpdatedInput("message", "Error: should not be executed")
+            .copyWithUpdatedInput("message", JsonPrimitive("Error: should not be executed"))
 
         val flow = Flow(
             name = "test_conditional_true",
@@ -232,14 +232,14 @@ class JobWorkerFlowTest {
         val inputNode = createInputNode(1, "data", DataType.Primitive(PrimitiveType.STRING))
         
         val condNode = createSystemNode(2, "conditional")
-            .copyWithUpdatedInput("condition", false)
-            .copyWithUpdatedInput("input_data", "hello")
+            .copyWithUpdatedInput("condition", JsonPrimitive(false))
+            .copyWithUpdatedInput("input_data", JsonPrimitive("hello"))
 
         val errorNode = createSystemNode(3, "error")
-            .copyWithUpdatedInput("message", "Error: should not be executed")
+            .copyWithUpdatedInput("message", JsonPrimitive("Error: should not be executed"))
 
         val logNode = createSystemNode(4, "log")
-            .copyWithUpdatedInput("message", "Condition was false")
+            .copyWithUpdatedInput("message", JsonPrimitive("Condition was false"))
 
         val flow = Flow(
             name = "test_conditional_false",
@@ -277,7 +277,7 @@ class JobWorkerFlowTest {
         val inputNode = createInputNode(1, "data", DataType.Primitive(PrimitiveType.STRING))
         
         val errorNode = createSystemNode(2, "error")
-            .copyWithUpdatedInput("message", "Execution failed")
+            .copyWithUpdatedInput("message", JsonPrimitive("Execution failed"))
 
         val flow = Flow(
             name = "test_error_halt",

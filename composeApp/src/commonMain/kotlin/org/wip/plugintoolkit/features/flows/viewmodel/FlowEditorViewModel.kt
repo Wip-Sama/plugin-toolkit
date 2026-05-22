@@ -36,6 +36,7 @@ import org.wip.plugintoolkit.features.flows.model.FlowUnpacker
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.OutputPort
+import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import org.wip.plugintoolkit.features.flows.model.SubflowPortMapping
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -356,7 +357,9 @@ class FlowEditorViewModel(
                             dataType = meta.type,
                             semanticTypes = meta.semanticTypes,
                             defaultValue = meta.defaultValue,
-                            regex = meta.constraints?.regex
+                            constraints = meta.constraints?.let {
+                                PortConstraints(regex = it.regex)
+                            }
                         )
                     } ?: emptyList(),
                     outputs = event.capability.outputs?.map { out ->
@@ -463,8 +466,8 @@ class FlowEditorViewModel(
             is FlowEvent.Save -> handleSave()
             is FlowEvent.SaveAs -> handleSaveAs(event.name)
             is FlowEvent.UpdateInputPortValue -> handleUpdateInputPortValue(event.nodeId, event.portId, event.value)
-            is FlowEvent.UpdateBoundaryNode -> handleUpdateBoundaryNode(event.nodeId, event.portName, event.dataType, event.semanticTypes)
-            is FlowEvent.UpdateSystemNodeOutputs -> handleUpdateSystemNodeOutputs(event.nodeId, event.portId, event.semanticTypes)
+            is FlowEvent.UpdateBoundaryNode -> handleUpdateBoundaryNode(event.nodeId, event.portName, event.dataType, event.semanticTypes, event.constraints, event.isList)
+            is FlowEvent.UpdateSystemNodeSettings -> handleUpdateSystemNodeSettings(event.nodeId, event.portId, event.semanticTypes, event.inputPortId, event.extensions)
             is FlowEvent.BringToFront -> handleBringToFront(event.nodeId)
             is FlowEvent.SelectNodes -> {
                 _state.update { currentState ->
@@ -957,7 +960,7 @@ class FlowEditorViewModel(
         _state.update { currentState ->
             val updatedNodes = currentState.flow.nodes.map { node ->
                 if (node.id == nodeId) {
-                    node.copyWithUpdatedInput(portId, value)
+                    node.copyWithUpdatedInput(portId, org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(value))
                 } else node
             }
             val newFlow = currentState.flow.copy(nodes = updatedNodes)
@@ -970,66 +973,37 @@ class FlowEditorViewModel(
         runTypeInference()
     }
 
-    private fun handleUpdateBoundaryNode(nodeId: Long, portName: String, dataType: DataType, semanticTypes: List<SemanticType>) {
+    private fun handleUpdateBoundaryNode(nodeId: Long, portName: String, dataType: DataType, semanticTypes: List<SemanticType>, constraints: org.wip.plugintoolkit.features.flows.model.PortConstraints?, isList: Boolean) {
         saveToHistory()
         _state.update { currentState ->
-            val oldNode = currentState.flow.nodes.find { it.id == nodeId }
-            val oldPortId = when (oldNode) {
-                is Node.FlowInputNode -> oldNode.outputs.firstOrNull()?.id
-                is Node.FlowOutputNode -> oldNode.inputs.firstOrNull()?.id
-                else -> null
-            }
-            val newPortId = portName.lowercase().replace(Regex("[^a-z0-9_]"), "_").ifBlank { 
-                if (oldNode is Node.FlowInputNode) "input_data" else "output_data" 
-            }
-
             val updatedNodes = currentState.flow.nodes.map { node ->
                 if (node.id == nodeId) {
                     when (node) {
                         is Node.FlowInputNode -> {
+                            val port = node.outputs.first().copy(
+                                name = portName, 
+                                dataType = dataType, 
+                                semanticTypes = semanticTypes
+                            )
                             node.copy(
-                                outputs = listOf(
-                                    OutputPort(
-                                        id = newPortId,
-                                        name = portName,
-                                        dataType = dataType,
-                                        semanticTypes = semanticTypes
-                                    )
-                                )
+                                outputs = listOf(port),
+                                constraints = constraints,
+                                isList = isList
                             )
                         }
                         is Node.FlowOutputNode -> {
-                            node.copy(
-                                inputs = listOf(
-                                    InputPort(
-                                        id = newPortId,
-                                        name = portName,
-                                        dataType = dataType,
-                                        semanticTypes = semanticTypes
-                                    )
-                                )
+                            val port = node.inputs.first().copy(
+                                name = portName, 
+                                dataType = dataType, 
+                                semanticTypes = semanticTypes
                             )
+                            node.copy(inputs = listOf(port))
                         }
                         else -> node
                     }
                 } else node
             }
-
-            val updatedConnections = if (oldPortId != null && oldPortId != newPortId) {
-                currentState.flow.connections.map { conn ->
-                    if (conn.sourceNodeId == nodeId && conn.sourcePortId == oldPortId) {
-                        conn.copy(sourcePortId = newPortId)
-                    } else if (conn.targetNodeId == nodeId && conn.targetPortId == oldPortId) {
-                        conn.copy(targetPortId = newPortId)
-                    } else {
-                        conn
-                    }
-                }
-            } else {
-                currentState.flow.connections
-            }
-
-            val newFlow = currentState.flow.copy(nodes = updatedNodes, connections = updatedConnections)
+            val newFlow = currentState.flow.copy(nodes = updatedNodes)
             currentState.copy(
                 flow = newFlow,
                 hasUnsavedChanges = true,
@@ -1039,23 +1013,35 @@ class FlowEditorViewModel(
         runTypeInference()
     }
 
-    private fun handleUpdateSystemNodeOutputs(nodeId: Long, portId: String, semanticTypes: List<SemanticType>) {
+    private fun handleUpdateSystemNodeSettings(nodeId: Long, portId: String, semanticTypes: List<SemanticType>, inputPortId: String?, extensions: List<String>?) {
         saveToHistory()
         _state.update { currentState ->
             val updatedNodes = currentState.flow.nodes.map { node ->
                 if (node.id == nodeId && node is Node.SystemNode) {
-                    node.copy(
-                        outputs = node.outputs.map { port ->
-                            if (port.id == portId) {
-                                port.copy(semanticTypes = semanticTypes)
+                    val updatedOutputs = node.outputs.map { port ->
+                        if (port.id == portId) {
+                            port.copy(semanticTypes = semanticTypes)
+                        } else port
+                    }
+                    val updatedInputs = if (inputPortId != null) {
+                        node.inputs.map { port ->
+                            if (port.id == inputPortId) {
+                                val currentConstraints = port.constraints ?: org.wip.plugintoolkit.features.flows.model.PortConstraints()
+                                port.copy(constraints = currentConstraints.copy(extensions = extensions))
                             } else port
                         }
+                    } else node.inputs
+
+                    node.copy(
+                        outputs = updatedOutputs,
+                        inputs = updatedInputs
                     )
                 } else node
             }
             val newFlow = currentState.flow.copy(nodes = updatedNodes)
             currentState.copy(
                 flow = newFlow,
+                nextId = currentState.nextId + 1,
                 hasUnsavedChanges = true,
                 flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
             )
@@ -1196,7 +1182,7 @@ class FlowEditorViewModel(
         // Check input ports regex validation
         flow.nodes.forEach { node ->
             node.inputs.forEach { input ->
-                val regexStr = input.regex
+                val regexStr = input.constraints?.regex
                 if (!regexStr.isNullOrEmpty()) {
                     val rawValue = input.value ?: input.defaultValue
                     val strValue = when (rawValue) {
