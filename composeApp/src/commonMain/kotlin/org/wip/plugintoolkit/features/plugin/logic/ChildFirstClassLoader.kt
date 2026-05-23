@@ -23,9 +23,9 @@ class ChildFirstClassLoader(
                 val isSharedClass = name.startsWith("java.") ||
                         name.startsWith("javax.") ||
                         name.startsWith("kotlin.") ||
+                        name.startsWith("kotlinx.") ||
                         name.startsWith(apiPackagePrefix) ||
                         name.startsWith("org.koin.") // Keep Koin shared if we want types to match, though the Koin instance is isolated
-                //TODO: could add kotlinx. probably
 
                 if (isSharedClass) {
                     try {

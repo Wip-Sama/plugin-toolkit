@@ -1,5 +1,11 @@
+Version: 1.5.2
+Date: 23-05-2026
+Fixed:
+  - JOB executor not closing some job correctly
+  - Release date of version 1.5.1 in changelog
+----------------------------------------------------------------------------------------------------
 Version: 1.5.1
-Date: 20-05-2026
+Date: 23-05-2026
 Added:
 	- Iterator node
 	- Comparator node
