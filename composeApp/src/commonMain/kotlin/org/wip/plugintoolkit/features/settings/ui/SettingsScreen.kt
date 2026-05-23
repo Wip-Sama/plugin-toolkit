@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.settings.ui
 
+import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +25,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -197,7 +197,7 @@ fun SettingsScreen(
             onToggleNavbar = {},
             canCollapse = false,
             headerContent = {
-                OutlinedTextField(
+                org.wip.plugintoolkit.shared.components.ToolkitTextField(
                     value = searchQuery,
                     onValueChange = { searchViewModel.searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.medium),
@@ -208,8 +208,7 @@ fun SettingsScreen(
                             contentDescription = stringResource(Res.string.settings_search_placeholder)
                         )
                     },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.medium
+                    singleLine = true
                 )
             })
 
@@ -301,6 +300,7 @@ fun SettingsScreen(
     }
 }
 
+
 @Composable
 fun BroadSearchResultsView(
     searchQuery: String,
@@ -319,11 +319,12 @@ fun BroadSearchResultsView(
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         grouped.forEach { (sectionName, items) ->
             SettingsGroup(title = sectionName) {
-                items.forEach { definition ->
+                items.forEachIndexed { index, definition ->
                     SettingsItem(
                         title = resolvedStrings[definition.title] ?: "",
                         subtitle = definition.subtitle?.let { resolvedStrings[it] },
                         icon = definition.icon,
+                        shape = getGroupedShape(index, items.size),
                         onClick = {
                             onNavigate(definition.navKey)
                         })

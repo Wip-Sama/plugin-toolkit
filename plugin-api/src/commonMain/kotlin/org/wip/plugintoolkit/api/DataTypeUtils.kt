@@ -80,12 +80,47 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
 /**
  * Checks if two semantic types are compatible for a connection.
  *
- * If either semantic type is null or blank, they are compatible (lenient matching).
- * If both are specified, they must match (case-insensitive).
+ * If either semantic type list is empty, they are universally compatible.
+ * Otherwise, at least one semantic type in the source must satisfy one in the target.
  */
+fun isSemanticTypeCompatible(source: List<SemanticType>, target: List<SemanticType>, lenient: Boolean = true): Boolean {
+    if (source.isEmpty() || target.isEmpty()) return true
+    for (s in source) {
+        for (t in target) {
+            val nsMatches = if (s.namespace == null && t.namespace == null) {
+                true
+            } else {
+                s.namespace.equals(t.namespace, ignoreCase = true)
+            }
+            if (nsMatches) {
+                if (s.name.equals(t.name, ignoreCase = true)) {
+                    val sVar = if (s.variant == "*") null else s.variant
+                    val tVar = if (t.variant == "*") null else t.variant
+                    val variantMatches = when {
+                        sVar.equals(tVar, ignoreCase = true) -> true // Identity
+                        tVar == null -> true // Generalization
+                        sVar == null -> lenient // Specialization (lenient mode)
+                        else -> false
+                    }
+                    if (variantMatches) return true
+                }
+            }
+        }
+    }
+    return false
+}
+
+/**
+ * Checks if two semantic types are compatible for a connection.
+ *
+ * If either semantic type is null or blank, they are compatible (lenient matching).
+ * If both are specified, they must match.
+ */
+@Deprecated("Use List<SemanticType> comparison instead", ReplaceWith("isSemanticTypeCompatible(parseSemanticTypes(source), parseSemanticTypes(target))"))
 fun isSemanticTypeCompatible(source: String?, target: String?): Boolean {
-    if (source.isNullOrBlank() || target.isNullOrBlank()) return true
-    return source.equals(target, ignoreCase = true)
+    val srcList = parseSemanticTypes(source)
+    val tgtList = parseSemanticTypes(target)
+    return isSemanticTypeCompatible(srcList, tgtList, lenient = true)
 }
 
 /**

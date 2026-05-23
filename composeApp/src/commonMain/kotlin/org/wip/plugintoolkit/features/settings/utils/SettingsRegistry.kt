@@ -15,7 +15,7 @@ import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
  */
 class SettingsRegistry(
     initialDefinitions: List<SettingDefinition> = emptyList(),
-    initialSideEffects: Map<String, (AppSettings) -> Unit> = emptyMap()
+    initialSideEffects: Map<String, suspend (AppSettings) -> Unit> = emptyMap()
 ) {
     private val _definitions = MutableStateFlow<List<SettingDefinition>>(initialDefinitions)
     val definitions: StateFlow<List<SettingDefinition>> = _definitions.asStateFlow()
@@ -35,9 +35,9 @@ class SettingsRegistry(
         settingIds.forEach { sideEffects.remove(it) }
     }
 
-    fun registerWithSideEffect(
+    suspend fun registerWithSideEffect(
         definition: SettingDefinition,
-        sideEffect: (AppSettings) -> Unit
+        sideEffect: suspend (AppSettings) -> Unit
     ) {
         register(listOf(definition))
         sideEffects[definition.id] = sideEffect
@@ -46,7 +46,7 @@ class SettingsRegistry(
     /**
      * Executes any registered side effects for the given settings update.
      */
-    fun triggerSideEffects(oldSettings: AppSettings, newSettings: AppSettings) {
+    suspend fun triggerSideEffects(oldSettings: AppSettings, newSettings: AppSettings) {
         _definitions.value.forEach { def ->
             val sideEffect = sideEffects[def.id] ?: return@forEach
             

@@ -29,6 +29,7 @@ import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
+import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_cancel
 import plugintoolkit.composeapp.generated.resources.action_save
@@ -70,12 +71,13 @@ fun PluginSettingsDialog(
                 // 1. Actions Section
                 if (!manifest.actions.isNullOrEmpty()) {
                     SettingsGroup(title = "Actions") {
-                        manifest.actions.forEach { action ->
+                        manifest.actions.forEachIndexed { index, action ->
                             SettingsItem(
                                 title = action.name,
                                 subtitle = action.description,
                                 icon = Icons.Default.PlayArrow,
                                 enabled = !isBusy,
+                                shape = getGroupedShape(index, manifest.actions.size),
                                 onClick = { viewModel.runAction(action.functionName) }
                             )
                         }

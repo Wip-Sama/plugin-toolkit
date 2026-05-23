@@ -13,6 +13,7 @@ import com.google.devtools.ksp.symbol.KSClassifierReference
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSType
+import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
@@ -33,6 +34,20 @@ class ManifestProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger
 ) : SymbolProcessor {
+
+    private val grammarRegex = Regex("^(?:([a-zA-Z0-9_-]+)/)?([a-zA-Z0-9_-]+)(?::([a-zA-Z0-9_*-]+))?$")
+
+    private fun validateSemanticTypes(semanticTypes: List<String>?, symbol: com.google.devtools.ksp.symbol.KSNode) {
+        if (semanticTypes.isNullOrEmpty()) return
+        for (rawType in semanticTypes) {
+            val tokens = rawType.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
+            for (token in tokens) {
+                if (!grammarRegex.matches(token)) {
+                    logger.warn("Semantic type '$token' does not follow the standard [namespace/][name][:variant] grammar", symbol)
+                }
+            }
+        }
+    }
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver.getSymbolsWithAnnotation(PluginInfoAnnotation::class.qualifiedName!!)
@@ -84,6 +99,40 @@ class ManifestProcessor(
         val functions = classDeclaration.getAllFunctions().filter { 
             it.annotations.any { ann -> ann.hasQualifiedName(CAPABILITY_ANNOTATION) }
         }.toList()
+
+        // Validate semantic types on functions
+        functions.forEach { func ->
+            func.parameters.forEach { param ->
+                val paramAnn = param.annotations.find { it.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION) }
+                val sem = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                validateSemanticTypes(sem, param)
+            }
+            
+            // Validate outputs
+            val returnTypeKS = func.returnType?.resolve()
+            if (returnTypeKS != null && returnTypeKS.toTypeName().toString() != "kotlin.Unit") {
+                val funcOutputAnn = func.annotations.find { 
+                    it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput") 
+                }
+                if (funcOutputAnn != null) {
+                    val sem = (funcOutputAnn.arguments.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                    validateSemanticTypes(sem, func)
+                } else {
+                    val declaration = returnTypeKS.declaration
+                    val isDataClass = declaration is KSClassDeclaration && declaration.modifiers.contains(com.google.devtools.ksp.symbol.Modifier.DATA)
+                    if (isDataClass) {
+                        val classDecl = declaration as KSClassDeclaration
+                        classDecl.getAllProperties().forEach { prop ->
+                            val propAnn = prop.annotations.find { 
+                                it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput") 
+                            }
+                            val sem = (propAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                            validateSemanticTypes(sem, prop)
+                        }
+                    }
+                }
+            }
+        }
 
         val actions = classDeclaration.getAllFunctions().filter { 
             it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }

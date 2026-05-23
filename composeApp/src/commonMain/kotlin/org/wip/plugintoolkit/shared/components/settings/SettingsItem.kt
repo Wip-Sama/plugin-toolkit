@@ -37,9 +37,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
+
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 
 @Composable
 fun SettingsItem(
@@ -48,15 +49,22 @@ fun SettingsItem(
     icon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(ToolkitTheme.spacing.mediumSmall),
     extraContent: @Composable (() -> Unit)? = null,
     control: @Composable (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
 
     val backgroundColor by animateColorAsState(
-        targetValue = if (isHovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        else Color.Transparent, animationSpec = tween(200)
+        targetValue = when {
+            !enabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled * ToolkitTheme.opacity.settingsItemDefault)
+            isPressed && onClick != null -> MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.settingsItemPressed)
+            isHovered -> MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.settingsItemHover)
+            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.settingsItemDefault)
+        },
+        animationSpec = tween(200)
     )
 
     val searchQuery = LocalSettingsSearchQuery.current
@@ -74,21 +82,40 @@ fun SettingsItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(ToolkitTheme.spacing.mediumSmall))
+                .clip(shape)
                 .background(backgroundColor)
                 .hoverable(interactionSource, enabled = enabled)
-                .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
+                .then(
+                    if (onClick != null && enabled) {
+                        Modifier.clickable(
+                            interactionSource = interactionSource,
+                            indication = androidx.compose.foundation.LocalIndication.current,
+                            onClick = onClick
+                        )
+                    } else Modifier
+                )
                 .padding(ToolkitTheme.spacing.small), verticalAlignment = Alignment.CenterVertically
         ) {
             val alpha = if (enabled) 1f else 0.5f
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)) {
                 if (icon != null) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge).padding(end = ToolkitTheme.spacing.medium)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(end = ToolkitTheme.spacing.medium)
+                            .size(ToolkitTheme.dimensions.settingsIconContainerSize)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(ToolkitTheme.dimensions.settingsIconCornerRadius)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+                            modifier = Modifier.size(ToolkitTheme.dimensions.settingsIconSize)
+                        )
+                    }
                 } else {
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 }
@@ -126,12 +153,39 @@ fun SettingsItem(
 @Composable
 fun SettingsItemPreview() {
     MaterialTheme {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             SettingsItem(
                 title = "Dark Mode",
                 subtitle = "Toggle dark theme application wide",
                 icon = Icons.Default.Settings,
                 control = { Switch(checked = true, onCheckedChange = {}) })
+        }
+    }
+}
+
+@Composable
+fun getGroupedShape(
+    index: Int,
+    totalCount: Int
+): androidx.compose.ui.graphics.Shape {
+    val outer = ToolkitTheme.dimensions.buttonGroupOuterCorner
+    val inner = ToolkitTheme.dimensions.buttonGroupInnerCorner
+    return remember(index, totalCount, outer, inner) {
+        when {
+            totalCount <= 1 -> RoundedCornerShape(outer)
+            index == 0 -> RoundedCornerShape(
+                topStart = outer,
+                topEnd = outer,
+                bottomStart = inner,
+                bottomEnd = inner
+            )
+            index == totalCount - 1 -> RoundedCornerShape(
+                topStart = inner,
+                topEnd = inner,
+                bottomStart = outer,
+                bottomEnd = outer
+            )
+            else -> RoundedCornerShape(inner)
         }
     }
 }

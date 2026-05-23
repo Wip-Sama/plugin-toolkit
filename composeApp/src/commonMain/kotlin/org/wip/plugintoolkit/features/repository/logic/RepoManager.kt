@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.features.plugin.logic.PluginSecurity
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
@@ -231,11 +232,11 @@ class RepoManager(
             NotificationEvent.Toast(
                 "Repository refreshed: ${
                     index.name ?: trimmedUrl.substringAfterLast("/").substringBeforeLast(".")
-                }"
+                }".localized
             )
         } catch (e: Exception) {
             Logger.e(e) { "Failed to refresh repository: $trimmedUrl" }
-            NotificationEvent.Toast("Failed to refresh repository: $trimmedUrl")
+            NotificationEvent.Toast("Failed to refresh repository: $trimmedUrl".localized)
         }
 
     }

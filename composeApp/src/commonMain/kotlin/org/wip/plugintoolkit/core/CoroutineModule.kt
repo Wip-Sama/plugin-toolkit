@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.asCoroutineDispatcher
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.onClose
@@ -37,6 +38,7 @@ val coroutineModule = module {
 }
 
 /**
- * Platform-specific dispatcher for Virtual Threads.
+ * JVM implementation of the Virtual Thread dispatcher.
  */
-expect val loomDispatcher: CoroutineDispatcher
+val loomDispatcher: CoroutineDispatcher = 
+    java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()

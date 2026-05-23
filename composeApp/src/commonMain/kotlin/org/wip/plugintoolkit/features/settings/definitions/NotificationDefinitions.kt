@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.features.settings.definitions
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ChatBubble
@@ -13,7 +14,11 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.NotificationHistorySettings
@@ -87,30 +92,61 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                 subtitle = SettingText.Raw("Trigger test notifications to verify behavior"),
                 icon = Icons.Default.BugReport,
                 control = { _, _ ->
-                    Row {
-                        IconButton(onClick = { viewModel.testSystemNotification(NotificationType.Info) }) {
-                            Icon(
-                                Icons.Default.Info,
-                                contentDescription = "Info",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                    ToolkitButtonGroup {
+                        item { shape, modifierSpec ->
+                            FilledTonalIconButton(
+                                onClick = { viewModel.testSystemNotification(NotificationType.Info) },
+                                shape = shape,
+                                modifier = modifierSpec.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Info,
+                                    contentDescription = "Info",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                        IconButton(onClick = { viewModel.testSystemNotification(NotificationType.Warning) }) {
-                            Icon(
-                                Icons.Default.Warning,
-                                contentDescription = "Warning",
-                                tint = androidx.compose.ui.graphics.Color(0xFFFFA500)
-                            )
+                        item { shape, modifierSpec ->
+                            FilledTonalIconButton(
+                                onClick = { viewModel.testSystemNotification(NotificationType.Warning) },
+                                shape = shape,
+                                modifier = modifierSpec.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = "Warning",
+                                    tint = androidx.compose.ui.graphics.Color(0xFFFFA500),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                        IconButton(onClick = { viewModel.testSystemNotification(NotificationType.Error) }) {
-                            Icon(
-                                Icons.Default.Error,
-                                contentDescription = "Error",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                        item { shape, modifierSpec ->
+                            FilledTonalIconButton(
+                                onClick = { viewModel.testSystemNotification(NotificationType.Error) },
+                                shape = shape,
+                                modifier = modifierSpec.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Error,
+                                    contentDescription = "Error",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                        IconButton(onClick = { viewModel.testToastNotification() }) {
-                            Icon(Icons.Default.ChatBubble, contentDescription = "Toast")
+                        item { shape, modifierSpec ->
+                            FilledTonalIconButton(
+                                onClick = { viewModel.testToastNotification() },
+                                shape = shape,
+                                modifier = modifierSpec.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.ChatBubble,
+                                    contentDescription = "Toast",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }

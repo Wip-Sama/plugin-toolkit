@@ -7,7 +7,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.SettingDefinition
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsResolvedStrings
@@ -21,6 +23,8 @@ import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.SettingsNumericInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsSlider
 import org.wip.plugintoolkit.shared.components.settings.SettingsSwitch
+
+import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 
 /**
  * A fully auto-generated settings page for use in plugins and dynamic settings.
@@ -56,15 +60,17 @@ fun AutoSettingsView(
 
     val grouped = filteredDefinitions.groupBy { it.sectionTitle }
     val settings by viewModel.settings.collectAsState()
+    val scope = rememberCoroutineScope()
 
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         grouped.forEach { (sectionTitle, definitions) ->
             val sectionName = sectionTitle.resolve()
             SettingsGroup(title = sectionName) {
-                definitions.forEach { definition ->
+                definitions.forEachIndexed { index, definition ->
                     // Merge local overrides (passed to AutoSettingsView)
                     val effectiveControl = controlOverrides[definition.id]
                     val effectiveAction = actionOverrides[definition.id]
+                    val shape = getGroupedShape(index, definitions.size)
 
                     RenderSettingDefinition(
                         definition = definition,
@@ -72,10 +78,13 @@ fun AutoSettingsView(
                         onUpdate = { updated ->
                             viewModel.updateSettings { updated }
                             // Execute side-effect if any
-                            registry.triggerSideEffects(settings, updated)
+                            scope.launch {
+                                registry.triggerSideEffects(settings, updated)
+                            }
                         },
                         controlOverride = effectiveControl,
-                        actionOverride = effectiveAction
+                        actionOverride = effectiveAction,
+                        shape = shape
                     )
                 }
             }
@@ -93,7 +102,8 @@ private fun RenderSettingDefinition(
     settings: AppSettings,
     onUpdate: (AppSettings) -> Unit,
     controlOverride: (@Composable (AppSettings, (AppSettings) -> Unit) -> Unit)? = null,
-    actionOverride: (() -> Unit)? = null
+    actionOverride: (() -> Unit)? = null,
+    shape: androidx.compose.ui.graphics.Shape
 ) {
     val isEnabled = definition.enabled(settings)
 
@@ -104,6 +114,7 @@ private fun RenderSettingDefinition(
                 subtitle = definition.subtitle?.resolve(),
                 icon = definition.icon,
                 enabled = isEnabled,
+                shape = shape,
                 control = {
                     SettingsSwitch(
                         checked = definition.getValue(settings), onCheckedChange = { checked ->
@@ -117,7 +128,8 @@ private fun RenderSettingDefinition(
                 definition = definition,
                 settings = settings,
                 onUpdate = onUpdate,
-                isEnabled = isEnabled
+                isEnabled = isEnabled,
+                shape = shape
             )
         }
 
@@ -129,6 +141,7 @@ private fun RenderSettingDefinition(
                 subtitle = dynamicSubtitle,
                 icon = definition.icon,
                 enabled = isEnabled,
+                shape = shape,
                 control = {
                     SettingsSlider(
                         value = definition.getValue(settings), onValueChange = { value ->
@@ -145,6 +158,7 @@ private fun RenderSettingDefinition(
                 subtitle = definition.subtitle?.resolve(),
                 icon = definition.icon,
                 enabled = isEnabled,
+                shape = shape,
                 control = {
                     SettingsNumericInput(
                         value = definition.getValue(settings), onValueChange = { value ->
@@ -164,6 +178,7 @@ private fun RenderSettingDefinition(
                     subtitle = definition.subtitle?.resolve(),
                     icon = definition.icon,
                     enabled = isEnabled,
+                    shape = shape,
                     onClick = actionOverride ?: definition.onClick
                 )
             }
@@ -176,6 +191,7 @@ private fun RenderSettingDefinition(
                 subtitle = definition.subtitle?.resolve(),
                 icon = definition.icon,
                 enabled = isEnabled,
+                shape = shape,
                 onClick = definition.onClick,
                 control = {
                     control(settings, onUpdate)
@@ -193,13 +209,15 @@ private fun <T> RenderDropdownSetting(
     definition: SettingDefinition.DropdownSetting<T>,
     settings: AppSettings,
     onUpdate: (AppSettings) -> Unit,
-    isEnabled: Boolean
+    isEnabled: Boolean,
+    shape: androidx.compose.ui.graphics.Shape
 ) {
     SettingsItem(
         title = definition.title.resolve(),
         subtitle = definition.subtitle?.resolve(),
         icon = definition.icon,
         enabled = isEnabled,
+        shape = shape,
         control = {
             ExpressiveMenu(
                 options = definition.options,

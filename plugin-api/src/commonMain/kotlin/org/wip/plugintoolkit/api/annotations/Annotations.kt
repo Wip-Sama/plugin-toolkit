@@ -24,7 +24,7 @@ annotation class PluginInfo(
 annotation class CapabilityOutput(
     val name: String = "",
     val description: String = "",
-    val semanticType: String = ""
+    val semanticTypes: Array<String> = []
 )
 
 /**
@@ -75,7 +75,8 @@ annotation class CapabilityParam(
     val minChoices: Int = -1,
     val maxChoices: Int = -1,
     val required: Boolean = false,
-    val secret: Boolean = false
+    val secret: Boolean = false,
+    val semanticTypes: Array<String> = []
 )
 
 /**

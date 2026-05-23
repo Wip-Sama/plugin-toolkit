@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.ui.ChangelogView
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
@@ -74,24 +75,24 @@ fun DialogHost(dialogService: DialogService) {
             is DialogData.LocationPicker -> {
                 Dialog(onDismissRequest = { dialogService.dismiss() }) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(0.8f).padding(16.dp),
+                        modifier = Modifier.fillMaxWidth(0.8f).padding(ToolkitTheme.spacing.medium),
                         shape = MaterialTheme.shapes.large
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                             Text(data.title, style = MaterialTheme.typography.titleLarge)
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                             data.folders.forEach { folder ->
                                 OutlinedButton(
                                     onClick = {
                                         data.onSelected(folder)
                                         dialogService.dismiss()
                                     },
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = ToolkitTheme.spacing.extraSmall)
                                 ) {
                                     Text(folder)
                                 }
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                             TextButton(
                                 onClick = { dialogService.dismiss() },
                                 modifier = Modifier.align(androidx.compose.ui.Alignment.End)
@@ -109,9 +110,9 @@ fun DialogHost(dialogService: DialogService) {
                         modifier = Modifier
                             .fillMaxWidth(0.9f)
                             .fillMaxHeight(0.85f)
-                            .padding(vertical = 16.dp),
+                            .padding(vertical = ToolkitTheme.spacing.medium),
                         shape = MaterialTheme.shapes.extraLarge,
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                        elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.spacing.small)
                     ) {
                         ChangelogView(
                             pluginName = data.pluginName,

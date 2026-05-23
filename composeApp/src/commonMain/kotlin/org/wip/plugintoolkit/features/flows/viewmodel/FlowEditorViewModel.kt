@@ -24,6 +24,7 @@ import org.koin.mp.KoinPlatform.getKoin
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.core.KeepTrack
@@ -35,6 +36,7 @@ import org.wip.plugintoolkit.features.flows.model.FlowUnpacker
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.OutputPort
+import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import org.wip.plugintoolkit.features.flows.model.SubflowPortMapping
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -68,7 +70,7 @@ data class FlowEditorState(
     val ghostPosition: Offset? = null,
     val flows: List<Flow> = emptyList(),
     val inferredTypes: Map<Pair<Long, String>, DataType> = emptyMap(),
-    val inferredSemanticTypes: Map<Pair<Long, String>, String?> = emptyMap(),
+    val inferredSemanticTypes: Map<Pair<Long, String>, List<SemanticType>> = emptyMap(),
     val validationErrors: List<ValidationError> = emptyList(),
     val selectedNodeIds: Set<Long> = emptySet(),
     val isReadOnly: Boolean = false,
@@ -79,9 +81,18 @@ class FlowEditorViewModel(
     private val initialFlowName: String,
     private val settingsPersistence: SettingsPersistence? = null,
     private val notificationService: NotificationService? = null,
-    private val pluginRegistry: PluginRegistry? = null
+    private val pluginRegistry: PluginRegistry? = null,
+    private val activeFlowEditorTracker: ActiveFlowEditorTracker? = null
 ) : ViewModel() {
-    
+
+    private val resolvedActiveFlowEditorTracker: ActiveFlowEditorTracker by lazy {
+        activeFlowEditorTracker ?: try {
+            getKoin().get()
+        } catch (e: Exception) {
+            ActiveFlowEditorTracker()
+        }
+    }
+
     private val resolvedSettingsPersistence: SettingsPersistence by lazy {
         settingsPersistence ?: getKoin().get()
     }
@@ -141,11 +152,9 @@ class FlowEditorViewModel(
             redoStack.add(currentFlow.copy())
             
             _state.update { currentState ->
-                val syncFlows = currentState.flows.map { if (it.name == previousFlow.name) previousFlow else it }
                 currentState.copy(
                     flow = previousFlow,
-                    hasUnsavedChanges = true,
-                    flows = syncFlows
+                    hasUnsavedChanges = true
                 )
             }
             runTypeInference()
@@ -159,25 +168,19 @@ class FlowEditorViewModel(
             undoStack.add(currentFlow.copy())
             
             _state.update { currentState ->
-                val syncFlows = currentState.flows.map { if (it.name == nextFlow.name) nextFlow else it }
                 currentState.copy(
                     flow = nextFlow,
-                    hasUnsavedChanges = true,
-                    flows = syncFlows
+                    hasUnsavedChanges = true
                 )
             }
             runTypeInference()
         }
     }
 
-    companion object {
-        var hasUnsavedChanges: Boolean = false
-    }
-
     init {
         viewModelScope.launch {
             _state.collect { currentState ->
-                hasUnsavedChanges = currentState.hasUnsavedChanges
+                resolvedActiveFlowEditorTracker.setHasUnsavedChanges(currentState.hasUnsavedChanges)
             }
         }
         viewModelScope.launch {
@@ -349,11 +352,32 @@ class FlowEditorViewModel(
                     pluginInfo = event.pluginInfo,
                     capability = event.capability,
                     inputs = event.capability.parameters?.map { (key, meta) ->
-                        InputPort(key, key, meta.type, meta.semanticType, meta.defaultValue)
+                        InputPort(
+                            id = key,
+                            name = key,
+                            dataType = meta.type,
+                            semanticTypes = meta.semanticTypes,
+                            defaultValue = meta.defaultValue,
+                            constraints = meta.constraints?.let {
+                                PortConstraints(regex = it.regex)
+                            }
+                        )
                     } ?: emptyList(),
                     outputs = event.capability.outputs?.map { out ->
-                        OutputPort(out.name, out.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }, out.type, out.semanticType)
-                    } ?: listOf(OutputPort("result", "Result", event.capability.returnType, event.capability.semanticType))
+                        OutputPort(
+                            id = out.name,
+                            name = out.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                            dataType = out.type,
+                            semanticTypes = out.semanticTypes
+                        )
+                    } ?: listOf(
+                        OutputPort(
+                            id = "result",
+                            name = "Result",
+                            dataType = event.capability.returnType,
+                            semanticTypes = event.capability.semanticTypes
+                        )
+                    )
                 ),
                 density = event.density
             )
@@ -443,7 +467,8 @@ class FlowEditorViewModel(
             is FlowEvent.Save -> handleSave()
             is FlowEvent.SaveAs -> handleSaveAs(event.name)
             is FlowEvent.UpdateInputPortValue -> handleUpdateInputPortValue(event.nodeId, event.portId, event.value)
-            is FlowEvent.UpdateBoundaryNode -> handleUpdateBoundaryNode(event.nodeId, event.portName, event.dataType, event.semanticType)
+            is FlowEvent.UpdateBoundaryNode -> handleUpdateBoundaryNode(event.nodeId, event.portName, event.dataType, event.semanticTypes, event.constraints, event.isList)
+            is FlowEvent.UpdateSystemNodeSettings -> handleUpdateSystemNodeSettings(event.nodeId, event.portId, event.semanticTypes, event.inputPortId, event.extensions)
             is FlowEvent.BringToFront -> handleBringToFront(event.nodeId)
             is FlowEvent.SelectNodes -> {
                 _state.update { currentState ->
@@ -482,8 +507,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 nextId = currentState.nextId + 1,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -548,8 +572,7 @@ class FlowEditorViewModel(
                 hasUnsavedChanges = true,
                 draggedNodeId = null,
                 currentDragOffset = Offset.Zero,
-                ghostPosition = null,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                ghostPosition = null
             )
         }
         runTypeInference()
@@ -565,8 +588,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 selectedNodeIds = currentState.selectedNodeIds.filter { it != id }.toSet(),
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -587,8 +609,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 selectedNodeIds = emptySet(),
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -695,7 +716,7 @@ class FlowEditorViewModel(
             if (sourcePort == null || targetPort == null) return@update currentState
 
             if (!sourcePort.dataType.isCompatibleWith(targetPort.dataType) || 
-                !isSemanticTypeCompatible(sourcePort.semanticType, targetPort.semanticType)) {
+                !isSemanticTypeCompatible(sourcePort.semanticTypes, targetPort.semanticTypes)) {
                 return@update currentState
             }
 
@@ -713,8 +734,7 @@ class FlowEditorViewModel(
             val newFlow = currentState.flow.copy(connections = filteredConnections + newConnection)
             currentState.copy(
                 flow = newFlow,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -768,8 +788,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = newFlow,
                 nextId = currentState.nextId + 1,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -781,8 +800,7 @@ class FlowEditorViewModel(
             val newFlow = currentState.flow.copy(connections = currentState.flow.connections.filter { it != connection })
             currentState.copy(
                 flow = newFlow,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -831,8 +849,7 @@ class FlowEditorViewModel(
                 flow = newFlow,
                 offset = Offset.Zero,
                 scale = 1f,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
     }
@@ -853,8 +870,7 @@ class FlowEditorViewModel(
             currentState.copy(
                 flow = unpackedFlow,
                 nextId = nextId,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == unpackedFlow.name) unpackedFlow else it }
+                hasUnsavedChanges = true
             )
         }
     }
@@ -916,7 +932,13 @@ class FlowEditorViewModel(
                 SystemFileSystem.sink(file).buffered().use { it.writeString(content) }
 
                 withContext(Dispatchers.Main) {
-                    _state.update { it.copy(hasUnsavedChanges = false) }
+                    _state.update { currentState ->
+                        val newFlow = currentState.flow
+                        currentState.copy(
+                            hasUnsavedChanges = false,
+                            flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 Logger.e(e) { "Failed to save flow" }
@@ -936,83 +958,87 @@ class FlowEditorViewModel(
         _state.update { currentState ->
             val updatedNodes = currentState.flow.nodes.map { node ->
                 if (node.id == nodeId) {
-                    node.copyWithUpdatedInput(portId, value)
+                    node.copyWithUpdatedInput(portId, org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(value))
                 } else node
             }
             val newFlow = currentState.flow.copy(nodes = updatedNodes)
             currentState.copy(
                 flow = newFlow,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
     }
 
-    private fun handleUpdateBoundaryNode(nodeId: Long, portName: String, dataType: DataType, semanticType: String?) {
+    private fun handleUpdateBoundaryNode(nodeId: Long, portName: String, dataType: DataType, semanticTypes: List<SemanticType>, constraints: org.wip.plugintoolkit.features.flows.model.PortConstraints?, isList: Boolean) {
         saveToHistory()
         _state.update { currentState ->
-            val oldNode = currentState.flow.nodes.find { it.id == nodeId }
-            val oldPortId = when (oldNode) {
-                is Node.FlowInputNode -> oldNode.outputs.firstOrNull()?.id
-                is Node.FlowOutputNode -> oldNode.inputs.firstOrNull()?.id
-                else -> null
-            }
-            val newPortId = portName.lowercase().replace(Regex("[^a-z0-9_]"), "_").ifBlank { 
-                if (oldNode is Node.FlowInputNode) "input_data" else "output_data" 
-            }
-
             val updatedNodes = currentState.flow.nodes.map { node ->
                 if (node.id == nodeId) {
                     when (node) {
                         is Node.FlowInputNode -> {
+                            val port = node.outputs.first().copy(
+                                name = portName, 
+                                dataType = dataType, 
+                                semanticTypes = semanticTypes
+                            )
                             node.copy(
-                                outputs = listOf(
-                                    OutputPort(
-                                        id = newPortId,
-                                        name = portName,
-                                        dataType = dataType,
-                                        semanticType = semanticType
-                                    )
-                                )
+                                outputs = listOf(port),
+                                constraints = constraints,
+                                isList = isList
                             )
                         }
                         is Node.FlowOutputNode -> {
-                            node.copy(
-                                inputs = listOf(
-                                    InputPort(
-                                        id = newPortId,
-                                        name = portName,
-                                        dataType = dataType,
-                                        semanticType = semanticType
-                                    )
-                                )
+                            val port = node.inputs.first().copy(
+                                name = portName, 
+                                dataType = dataType, 
+                                semanticTypes = semanticTypes
                             )
+                            node.copy(inputs = listOf(port))
                         }
                         else -> node
                     }
                 } else node
             }
-
-            val updatedConnections = if (oldPortId != null && oldPortId != newPortId) {
-                currentState.flow.connections.map { conn ->
-                    if (conn.sourceNodeId == nodeId && conn.sourcePortId == oldPortId) {
-                        conn.copy(sourcePortId = newPortId)
-                    } else if (conn.targetNodeId == nodeId && conn.targetPortId == oldPortId) {
-                        conn.copy(targetPortId = newPortId)
-                    } else {
-                        conn
-                    }
-                }
-            } else {
-                currentState.flow.connections
-            }
-
-            val newFlow = currentState.flow.copy(nodes = updatedNodes, connections = updatedConnections)
+            val newFlow = currentState.flow.copy(nodes = updatedNodes)
             currentState.copy(
                 flow = newFlow,
-                hasUnsavedChanges = true,
-                flows = currentState.flows.map { if (it.name == newFlow.name) newFlow else it }
+                hasUnsavedChanges = true
+            )
+        }
+        runTypeInference()
+    }
+
+    private fun handleUpdateSystemNodeSettings(nodeId: Long, portId: String, semanticTypes: List<SemanticType>, inputPortId: String?, extensions: List<String>?) {
+        saveToHistory()
+        _state.update { currentState ->
+            val updatedNodes = currentState.flow.nodes.map { node ->
+                if (node.id == nodeId && node is Node.SystemNode) {
+                    val updatedOutputs = node.outputs.map { port ->
+                        if (port.id == portId) {
+                            port.copy(semanticTypes = semanticTypes)
+                        } else port
+                    }
+                    val updatedInputs = if (inputPortId != null) {
+                        node.inputs.map { port ->
+                            if (port.id == inputPortId) {
+                                val currentConstraints = port.constraints ?: org.wip.plugintoolkit.features.flows.model.PortConstraints()
+                                port.copy(constraints = currentConstraints.copy(extensions = extensions))
+                            } else port
+                        }
+                    } else node.inputs
+
+                    node.copy(
+                        outputs = updatedOutputs,
+                        inputs = updatedInputs
+                    )
+                } else node
+            }
+            val newFlow = currentState.flow.copy(nodes = updatedNodes)
+            currentState.copy(
+                flow = newFlow,
+                nextId = currentState.nextId + 1,
+                hasUnsavedChanges = true
             )
         }
         runTypeInference()
@@ -1044,17 +1070,17 @@ class FlowEditorViewModel(
     private fun runTypeInference() {
         val flow = _state.value.flow
         val inferred = mutableMapOf<Pair<Long, String>, DataType>()
-        val inferredSemantic = mutableMapOf<Pair<Long, String>, String?>()
+        val inferredSemantic = mutableMapOf<Pair<Long, String>, List<SemanticType>>()
         
         // Initialize with declared types and semantic types
         flow.nodes.forEach { node ->
             node.inputs.forEach { port ->
                 inferred[Pair(node.id, port.id)] = port.dataType
-                inferredSemantic[Pair(node.id, port.id)] = port.semanticType
+                inferredSemantic[Pair(node.id, port.id)] = port.semanticTypes
             }
             node.outputs.forEach { port ->
                 inferred[Pair(node.id, port.id)] = port.dataType
-                inferredSemantic[Pair(node.id, port.id)] = port.semanticType
+                inferredSemantic[Pair(node.id, port.id)] = port.semanticTypes
             }
         }
         
@@ -1090,12 +1116,12 @@ class FlowEditorViewModel(
                 }
 
                 // Propagate semantic types
-                val srcSemantic = inferredSemantic[srcKey]
-                val tgtSemantic = inferredSemantic[tgtKey]
-                if (!srcSemantic.isNullOrBlank() && tgtSemantic.isNullOrBlank()) {
+                val srcSemantic = inferredSemantic[srcKey].orEmpty()
+                val tgtSemantic = inferredSemantic[tgtKey].orEmpty()
+                if (srcSemantic.isNotEmpty() && tgtSemantic.isEmpty()) {
                     inferredSemantic[tgtKey] = srcSemantic
                     changed = true
-                } else if (srcSemantic.isNullOrBlank() && !tgtSemantic.isNullOrBlank()) {
+                } else if (srcSemantic.isEmpty() && tgtSemantic.isNotEmpty()) {
                     inferredSemantic[srcKey] = tgtSemantic
                     changed = true
                 }
@@ -1119,8 +1145,8 @@ class FlowEditorViewModel(
         flow.connections.forEach { conn ->
             val srcType = inferred[Pair(conn.sourceNodeId, conn.sourcePortId)]
             val tgtType = inferred[Pair(conn.targetNodeId, conn.targetPortId)]
-            val srcSemantic = inferredSemantic[Pair(conn.sourceNodeId, conn.sourcePortId)]
-            val tgtSemantic = inferredSemantic[Pair(conn.targetNodeId, conn.targetPortId)]
+            val srcSemantic = inferredSemantic[Pair(conn.sourceNodeId, conn.sourcePortId)].orEmpty()
+            val tgtSemantic = inferredSemantic[Pair(conn.targetNodeId, conn.targetPortId)].orEmpty()
             
             if (srcType != null && tgtType != null) {
                 // If they are not compatible, generate an error!
@@ -1141,9 +1167,61 @@ class FlowEditorViewModel(
                             sourcePortId = conn.sourcePortId,
                             targetNodeId = conn.targetNodeId,
                             targetPortId = conn.targetPortId,
-                            message = "Semantic type mismatch: '$srcSemantic' is not compatible with '$tgtSemantic'"
+                            message = "Semantic type mismatch: '${srcSemantic.joinToString { it.canonicalId }}' is not compatible with '${tgtSemantic.joinToString { it.canonicalId }}'"
                         )
                     )
+                }
+            }
+        }
+        
+        // Check input ports regex validation
+        flow.nodes.forEach { node ->
+            node.inputs.forEach { input ->
+                val regexStr = input.constraints?.regex
+                if (!regexStr.isNullOrEmpty()) {
+                    val rawValue = input.value ?: input.defaultValue
+                    val strValue = when (rawValue) {
+                        is kotlinx.serialization.json.JsonPrimitive -> {
+                            if (rawValue.isString) rawValue.content else rawValue.toString()
+                        }
+                        null -> null
+                        else -> rawValue.toString()
+                    }
+                    if (!strValue.isNullOrEmpty()) {
+                        try {
+                            val regex = Regex(regexStr)
+                            val isArray = input.dataType is DataType.Array
+                            val items = if (isArray) {
+                                strValue.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                            } else {
+                                listOf(strValue)
+                            }
+                            for (item in items) {
+                                if (!regex.matches(item)) {
+                                    errors.add(
+                                        ValidationError(
+                                            sourceNodeId = node.id,
+                                            sourcePortId = input.id,
+                                            targetNodeId = node.id,
+                                            targetPortId = input.id,
+                                            message = if (isArray) "Item '$item' does not match pattern '$regexStr'" else "Value does not match pattern '$regexStr'"
+                                        )
+                                    )
+                                    break
+                                }
+                            }
+                        } catch (e: Exception) {
+                            errors.add(
+                                ValidationError(
+                                    sourceNodeId = node.id,
+                                    sourcePortId = input.id,
+                                    targetNodeId = node.id,
+                                    targetPortId = input.id,
+                                    message = "Invalid regex pattern: ${e.message}"
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1159,15 +1237,15 @@ class FlowEditorViewModel(
 
     private fun getSubflowPorts(targetFlow: Flow): Pair<List<InputPort>, List<OutputPort>> {
         val inferred = mutableMapOf<Pair<Long, String>, DataType>()
-        val inferredSemantic = mutableMapOf<Pair<Long, String>, String?>()
+        val inferredSemantic = mutableMapOf<Pair<Long, String>, List<SemanticType>>()
         targetFlow.nodes.forEach { node ->
             node.inputs.forEach { port ->
                 inferred[Pair(node.id, port.id)] = port.dataType
-                inferredSemantic[Pair(node.id, port.id)] = port.semanticType
+                inferredSemantic[Pair(node.id, port.id)] = port.semanticTypes
             }
             node.outputs.forEach { port ->
                 inferred[Pair(node.id, port.id)] = port.dataType
-                inferredSemantic[Pair(node.id, port.id)] = port.semanticType
+                inferredSemantic[Pair(node.id, port.id)] = port.semanticTypes
             }
         }
         var changed = true
@@ -1193,12 +1271,12 @@ class FlowEditorViewModel(
                     }
                 }
                 
-                val srcSemantic = inferredSemantic[srcKey]
-                val tgtSemantic = inferredSemantic[tgtKey]
-                if (!srcSemantic.isNullOrBlank() && tgtSemantic.isNullOrBlank()) {
+                val srcSemantic = inferredSemantic[srcKey].orEmpty()
+                val tgtSemantic = inferredSemantic[tgtKey].orEmpty()
+                if (srcSemantic.isNotEmpty() && tgtSemantic.isEmpty()) {
                     inferredSemantic[tgtKey] = srcSemantic
                     changed = true
-                } else if (srcSemantic.isNullOrBlank() && !tgtSemantic.isNullOrBlank()) {
+                } else if (srcSemantic.isEmpty() && tgtSemantic.isNotEmpty()) {
                     inferredSemantic[srcKey] = tgtSemantic
                     changed = true
                 }
@@ -1219,24 +1297,24 @@ class FlowEditorViewModel(
         val inputs = targetFlow.nodes.filterIsInstance<Node.FlowInputNode>().map { inputNode ->
             val port = inputNode.outputs.firstOrNull()
             val inferredType = inferred[Pair(inputNode.id, port?.id ?: "")] ?: port?.dataType ?: DataType.Primitive(PrimitiveType.ANY)
-            val inferredSem = inferredSemantic[Pair(inputNode.id, port?.id ?: "")] ?: port?.semanticType
+            val inferredSem = inferredSemantic[Pair(inputNode.id, port?.id ?: "")] ?: port?.semanticTypes ?: emptyList()
             InputPort(
                 id = "input_${inputNode.id}",
                 name = port?.name ?: "Input Data",
                 dataType = inferredType,
-                semanticType = inferredSem
+                semanticTypes = inferredSem
             )
         }
         
         val outputs = targetFlow.nodes.filterIsInstance<Node.FlowOutputNode>().map { outputNode ->
             val port = outputNode.inputs.firstOrNull()
             val inferredType = inferred[Pair(outputNode.id, port?.id ?: "")] ?: port?.dataType ?: DataType.Primitive(PrimitiveType.ANY)
-            val inferredSem = inferredSemantic[Pair(outputNode.id, port?.id ?: "")] ?: port?.semanticType
+            val inferredSem = inferredSemantic[Pair(outputNode.id, port?.id ?: "")] ?: port?.semanticTypes ?: emptyList()
             OutputPort(
                 id = "output_${outputNode.id}",
                 name = port?.name ?: "Output Data",
                 dataType = inferredType,
-                semanticType = inferredSem
+                semanticTypes = inferredSem
             )
         }
         
@@ -1359,12 +1437,12 @@ class FlowEditorViewModel(
 
         val compatibleInput = node.inputs.firstOrNull { input ->
             sourcePort.dataType.isCompatibleWith(input.dataType) &&
-            isSemanticTypeCompatible(sourcePort.semanticType, input.semanticType)
+            isSemanticTypeCompatible(sourcePort.semanticTypes, input.semanticTypes)
         } ?: return null
 
         val compatibleOutput = node.outputs.firstOrNull { output ->
             output.dataType.isCompatibleWith(targetPort.dataType) &&
-            isSemanticTypeCompatible(output.semanticType, targetPort.semanticType)
+            isSemanticTypeCompatible(output.semanticTypes, targetPort.semanticTypes)
         } ?: return null
 
         return Pair(compatibleInput, compatibleOutput)

@@ -1,5 +1,7 @@
 package org.wip.plugintoolkit.core.utils
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -15,21 +17,25 @@ actual object StartupManager {
     private val appName = KeepTrack.STARTUP_APP_NAME
     private val backgroundFlag = KeepTrack.STARTUP_FLAG_BACKGROUND
 
-    actual fun setLaunchAtStartup(enabled: Boolean, minimized: Boolean) {
-        if (isWindows) {
-            setWindowsStartup(enabled, minimized)
-        } else if (isLinux) {
-            setLinuxStartup(enabled, minimized)
+    actual suspend fun setLaunchAtStartup(enabled: Boolean, minimized: Boolean) {
+        withContext(Dispatchers.IO) {
+            if (isWindows) {
+                setWindowsStartup(enabled, minimized)
+            } else if (isLinux) {
+                setLinuxStartup(enabled, minimized)
+            }
         }
     }
 
-    actual fun isLaunchAtStartupEnabled(): Boolean {
-        return if (isWindows) {
-            isWindowsStartupEnabled()
-        } else if (isLinux) {
-            isLinuxStartupEnabled()
-        } else {
-            false
+    actual suspend fun isLaunchAtStartupEnabled(): Boolean {
+        return withContext(Dispatchers.IO) {
+            if (isWindows) {
+                isWindowsStartupEnabled()
+            } else if (isLinux) {
+                isLinuxStartupEnabled()
+            } else {
+                false
+            }
         }
     }
 

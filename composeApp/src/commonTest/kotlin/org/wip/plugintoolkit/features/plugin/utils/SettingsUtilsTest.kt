@@ -44,7 +44,7 @@ class SettingsUtilsTest {
         // String
         val stringType = DataType.Primitive(PrimitiveType.STRING)
         assertEquals(JsonPrimitive("hello"), SettingsUtils.stringToJson("hello", stringType))
-        assertEquals(JsonNull, SettingsUtils.stringToJson("", stringType))
+        assertEquals(JsonPrimitive(""), SettingsUtils.stringToJson("", stringType))
     }
 
     @Test
@@ -84,5 +84,8 @@ class SettingsUtilsTest {
         val expectedIntArray = JsonArray(listOf(JsonPrimitive(1L), JsonPrimitive(2L), JsonPrimitive(3L)))
         assertEquals(expectedIntArray, SettingsUtils.stringToJson("1,2,3", listIntType))
         assertEquals(expectedIntArray, SettingsUtils.stringToJson("[1, 2, 3]", listIntType))
+        
+        // Empty array
+        assertEquals(JsonArray(emptyList()), SettingsUtils.stringToJson("", listIntType))
     }
 }

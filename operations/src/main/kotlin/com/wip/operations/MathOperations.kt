@@ -132,7 +132,7 @@ class MathProcessor(val settings: MathProcessorSettings) {
     }
 
     @Capability(name = "formatted_sum", description = "Returns the sum formatted as text")
-    @CapabilityOutput(name = "formattedResult", description = "The sum formatted as currency", semanticType = "text/plain")
+    @CapabilityOutput(name = "formattedResult", description = "The sum formatted as currency", semanticTypes = ["text/plain"])
     fun formattedSumCapability(
         @CapabilityParam(description = "Values to sum") values: List<Double>
     ): String {
@@ -224,6 +224,47 @@ class MathProcessor(val settings: MathProcessorSettings) {
 
         context.logger.info("slow_pausable_factorial completed with result $runningProduct")
         return ExecutionResult.Success(PluginResponse(result = Json.encodeToJsonElement(runningProduct)))
+    }
+
+    @Capability(name = "regex_validate_ip", description = "Checks if the provided IP address is valid using regex")
+    fun regexValidateIp(
+        @CapabilityParam(description = "IP address to validate", regex = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$") ip: String
+    ): Boolean {
+        return true
+    }
+
+    @Capability(name = "sum_from_file", description = "Reads a txt file where each row contains a number, and sums them up")
+    fun sumFromFile(
+        @CapabilityParam(description = "Path to the text file", semanticTypes = ["file/txt"]) filePath: String
+    ): Double {
+        val file = java.io.File(filePath)
+        if (!file.exists()) throw IllegalArgumentException("File does not exist: $filePath")
+        return file.readLines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .mapNotNull { it.toDoubleOrNull() }
+            .sum()
+    }
+
+    @Capability(name = "invert_color", description = "Inverts a color string in rgb(r, g, b) format")
+    @CapabilityOutput(name = "invertedColor", description = "The inverted color in rgb(r, g, b) format", semanticTypes = ["color/rgb"])
+    fun invertColor(
+        @CapabilityParam(description = "Input color in rgb(r,g,b) format", semanticTypes = ["color/rgb"]) color: String
+    ): String {
+        val regex = Regex("""rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)""")
+        val match = regex.find(color) ?: throw IllegalArgumentException("Invalid color format. Expected rgb(r,g,b)")
+        val r = match.groupValues[1].toInt().coerceIn(0, 255)
+        val g = match.groupValues[2].toInt().coerceIn(0, 255)
+        val b = match.groupValues[3].toInt().coerceIn(0, 255)
+        return "rgb(${255 - r}, ${255 - g}, ${255 - b})"
+    }
+
+    @Capability(name = "multi_semantic_op", description = "Test capability with multiple semantic types")
+    @CapabilityOutput(name = "output_data", description = "Multi-typed output", semanticTypes = ["color/rgb", "file/txt"])
+    fun multiSemanticOp(
+        @CapabilityParam(description = "Multi-typed parameter", semanticTypes = ["color/rgb", "file/txt"]) inputVal: String
+    ): String {
+        return inputVal
     }
 }
 

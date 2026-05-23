@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.KeepTrack
@@ -73,6 +74,9 @@ class PluginManagerViewModel(
                 .associate { it.pluginId to (progressMap[it.id] ?: 0f) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    private val _togglingPlugins = MutableStateFlow<Set<String>>(emptySet())
+    val togglingPlugins: StateFlow<Set<String>> = _togglingPlugins.asStateFlow()
     
     private val autoOpenedSettings = mutableSetOf<String>()
 
@@ -222,13 +226,20 @@ class PluginManagerViewModel(
 
     fun toggleEnabled(pkg: String, enabled: Boolean) {
         viewModelScope.launch {
-            val result = pluginManager.setEnabled(pkg, enabled)
-            result.onFailure { error ->
-                dialogService.showWarning(
-                    getString(Res.string.plugin_action_blocked),
-                    error.message ?: getString(Res.string.plugin_state_change_error),
-                    onConfirm = {}
-                )
+            _togglingPlugins.update { it + pkg }
+            try {
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    pluginManager.setEnabled(pkg, enabled)
+                }
+                result.onFailure { error ->
+                    dialogService.showWarning(
+                        getString(Res.string.plugin_action_blocked),
+                        error.message ?: getString(Res.string.plugin_state_change_error),
+                        onConfirm = {}
+                    )
+                }
+            } finally {
+                _togglingPlugins.update { it - pkg }
             }
         }
     }

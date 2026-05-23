@@ -17,7 +17,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.isCompatibleWith
@@ -53,6 +54,9 @@ import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
+import org.wip.plugintoolkit.features.flows.model.PortConstraints
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
@@ -212,8 +216,8 @@ fun FlowEditorView(
                         if (startPort != null && targetPort != null) {
                             val startInferredType = state.inferredTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)] ?: startPort.dataType
                             val targetInferredType = state.inferredTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.dataType
-                            val startInferredSemantic = state.inferredSemanticTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)] ?: startPort.semanticType
-                            val targetInferredSemantic = state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.semanticType
+                            val startInferredSemantic = state.inferredSemanticTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)] ?: startPort.semanticTypes
+                            val targetInferredSemantic = state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.semanticTypes
 
                             val compatible = startInferredType.isCompatibleWith(targetInferredType) &&
                                              isSemanticTypeCompatible(startInferredSemantic, targetInferredSemantic)
@@ -237,8 +241,9 @@ fun FlowEditorView(
                             onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
                             onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
                             onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
-                            onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, value)) },
-                            onUpdateBoundaryNode = { id, name, dataType, semanticType -> viewModel.onEvent(FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticType)) },
+                            onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, NodeSerializationUtils.anyToJsonElement(value))) },
+                            onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList -> viewModel.onEvent(FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticTypes, constraints, isList)) },
+                            onUpdateSystemNodeSettings = { id, portId, semanticTypes, inputPortId, extensions -> viewModel.onEvent(FlowEvent.UpdateSystemNodeSettings(id, portId, semanticTypes, inputPortId, extensions)) },
                             onStartConnection = { nodeId, portId, isOutput -> 
                                 isDrawingConnection = true
                                 connectionStartNodeId = nodeId
@@ -296,8 +301,8 @@ fun FlowEditorView(
                                         if (sourcePort != null && targetPort != null) {
                                             val sourceInferredType = state.inferredTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.dataType
                                             val targetInferredType = state.inferredTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.dataType
-                                            val sourceInferredSemantic = state.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.semanticType
-                                            val targetInferredSemantic = state.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticType
+                                            val sourceInferredSemantic = state.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.semanticTypes
+                                            val targetInferredSemantic = state.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticTypes
 
                                             val typesCompatible = sourceInferredType.isCompatibleWith(targetInferredType)
                                             val semanticsCompatible = isSemanticTypeCompatible(sourceInferredSemantic, targetInferredSemantic)
@@ -330,7 +335,10 @@ fun FlowEditorView(
                                                 val message = if (!typesCompatible) {
                                                     incompatibleTypesMsg.format(sourceInferredType.format(), targetInferredType.format())
                                                 } else {
-                                                    incompatibleSemanticsMsg.format(sourceInferredSemantic ?: "", targetInferredSemantic ?: "")
+                                                    incompatibleSemanticsMsg.format(
+                                                        sourceInferredSemantic.joinToString { it.canonicalId },
+                                                        targetInferredSemantic.joinToString { it.canonicalId }
+                                                    )
                                                 }
                                                 notificationService.toast(message)
                                             }
@@ -596,12 +604,11 @@ fun FlowEditorView(
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(bottom = ToolkitTheme.spacing.medium)
                         )
-                        OutlinedTextField(
+                        ToolkitTextField(
                             value = saveAsName,
                             onValueChange = { saveAsName = it },
                             label = { Text(stringResource(Res.string.flow_name_label)) },
                             singleLine = true,
-                            shape = MaterialTheme.shapes.medium,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

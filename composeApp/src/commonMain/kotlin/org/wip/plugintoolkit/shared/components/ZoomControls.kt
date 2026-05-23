@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun ZoomControls(
@@ -25,12 +26,12 @@ fun ZoomControls(
     Row(
         modifier = modifier
             .background(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.glassBackground),
                 shape = CircleShape
             )
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
     ) {
         IconButton(onClick = onZoomOut) {
             Text("-", style = MaterialTheme.typography.titleLarge)

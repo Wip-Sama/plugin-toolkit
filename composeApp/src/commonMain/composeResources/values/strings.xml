@@ -123,7 +123,7 @@
     <string name="update_later">Update Later</string>
     <string name="update_downloading">Downloading Update...</string>
     <string name="update_ready_to_install">Update downloaded. Launching installer...</string>
-    <string name="update_changelog_title">What\'s New</string>
+    <string name="update_changelog_title">What's New</string>
     <string name="update_check_failed">Failed to check for updates</string>
     <string name="update_no_updates">You are running the latest version</string>
     <string name="update_check_started">Checking for updates...</string>
@@ -238,7 +238,7 @@
     <string name="flow_name_label">Flow Name</string>
     <string name="flow_create_button">Create</string>
     <string name="flow_delete_title">Delete Flow</string>
-    <string name="flow_delete_confirm">Are you sure you want to delete \'%1$s\'?</string>
+    <string name="flow_delete_confirm">Are you sure you want to delete '%1$s'?</string>
     <string name="flow_delete_warning_subflow">Warning: This flow is embedded as a subflow inside other flows (Used in: %1$s). Deleting it will inline and unpack all of its nodes directly inside those parent flows.</string>
     <string name="flow_broken_tag">Broken</string>
     <string name="flow_nodes_count">%1$d nodes</string>
@@ -271,7 +271,7 @@
     <string name="flow_editor_convert_connect">Convert &amp; Connect</string>
     <string name="flow_editor_enter_name">Enter a name for your new flow:</string>
     <string name="flow_editor_save_as_title">Save Flow</string>
-    <string name="flow_editor_duplicate_error">A flow named \'%1$s\' already exists.</string>
+    <string name="flow_editor_duplicate_error">A flow named '%1$s' already exists.</string>
     <string name="flow_editor_placeholder_title">Ghost Preview</string>
     <string name="flow_editor_read_only">READ-ONLY</string>
     <string name="flow_readonly_reason_running">Running</string>
@@ -282,7 +282,7 @@
     <string name="flow_editor_save_changes">Save Changes</string>
     <string name="flow_editor_same_node_warning">Cannot connect: Ports belong to the same node.</string>
     <string name="flow_editor_incompatible_types">Cannot connect: Incompatible types. Cannot connect %1$s to %2$s.</string>
-    <string name="flow_editor_incompatible_semantics">Cannot connect: Incompatible semantic types. \'%1$s\' cannot connect to \'%2$s\'.</string>
+    <string name="flow_editor_incompatible_semantics">Cannot connect: Incompatible semantic types. '%1$s' cannot connect to '%2$s'.</string>
     <string name="flow_editor_btn_exit">Exit</string>
     
     <!-- Node Component -->
@@ -290,7 +290,7 @@
     <string name="node_edit_port">Edit Port</string>
     <string name="node_delete">Delete</string>
     <string name="node_delete_title">Delete Node</string>
-    <string name="node_delete_confirm">Are you sure you want to delete \'%1$s\'? This will also remove all connected lines.</string>
+    <string name="node_delete_confirm">Are you sure you want to delete '%1$s'? This will also remove all connected lines.</string>
     <string name="node_port_implied_type">%1$s (Implied)</string>
     <string name="node_edit_input_title">Edit Flow Input Port</string>
     <string name="node_edit_output_title">Edit Flow Output Port</string>

@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.PluginResponse
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 
@@ -25,7 +26,7 @@ import org.wip.plugintoolkit.shared.components.SectionHeader
 fun ResponseView(response: PluginResponse) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(title = "Execution Result", icon = Icons.Default.CheckCircle)
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
 
         SelectionContainer {
             Text(
@@ -38,10 +39,10 @@ fun ResponseView(response: PluginResponse) {
 
         val metadata = response.metadata
         if (!metadata.isNullOrEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
             SectionHeader(title = "Metadata", icon = Icons.Default.Info)
             metadata.forEach { (k, v) ->
-                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                Row(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.extraSmall)) {
                     Text("${k}: ", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                     Text(v, style = MaterialTheme.typography.bodySmall)
                 }

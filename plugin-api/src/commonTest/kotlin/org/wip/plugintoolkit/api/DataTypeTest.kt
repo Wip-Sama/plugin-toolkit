@@ -103,6 +103,10 @@ class DataTypeTest {
         assertTrue(isSemanticTypeCompatible("filepath", "filepath"), "Identical semantic types should be compatible")
         assertTrue(isSemanticTypeCompatible("Filepath", "filepath"), "Case-insensitive semantic types should be compatible")
         assertFalse(isSemanticTypeCompatible("filepath", "url"), "Different semantic types should not be compatible")
+        assertTrue(isSemanticTypeCompatible("color/rgb color/rgba", "color/rgb"), "Overlapping semantic types should be compatible")
+        assertTrue(isSemanticTypeCompatible("color/rgb", "color/rgb, color/rgba"), "Overlapping semantic types with comma should be compatible")
+        assertTrue(isSemanticTypeCompatible("image/png image/jpg", "image/jpg image/gif"), "Multiple overlapping semantic types should be compatible")
+        assertFalse(isSemanticTypeCompatible("file/txt file/json", "image/png"), "Non-overlapping multiple semantic types should not be compatible")
     }
 
     @Test

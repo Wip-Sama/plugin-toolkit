@@ -33,7 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -103,7 +103,7 @@ fun RemotePluginInstallDialog(
                 }
 
                 // Search Bar
-                OutlinedTextField(
+                ToolkitTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier
@@ -111,8 +111,7 @@ fun RemotePluginInstallDialog(
                         .padding(horizontal = ToolkitTheme.spacing.medium),
                     placeholder = { Text("Search plugins...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.medium
+                    singleLine = true
                 )
 
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))

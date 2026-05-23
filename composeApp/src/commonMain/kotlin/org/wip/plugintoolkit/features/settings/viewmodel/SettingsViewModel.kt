@@ -147,7 +147,8 @@ class SettingsViewModel(
                 }
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "en")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), if (PlatformLocalization.getSystemLanguage() == "it") "it" else "en")
+
 
     fun updateSettings(update: (AppSettings) -> AppSettings) {
         repository.updateSettings(update)

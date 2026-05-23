@@ -78,6 +78,7 @@ import kotlinx.serialization.modules.polymorphic
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.wip.plugintoolkit.core.model.localized
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
@@ -405,14 +406,14 @@ fun HistoryTab(viewModel: JobViewModel) {
                         else -> Icons.Default.Info
                     }
                     val color = when (entry.event) {
-                        "Completed" -> Color(0xFF4CAF50)
+                        "Completed" -> ToolkitTheme.colors.success
                         "Failed" -> MaterialTheme.colorScheme.error
                         "Started" -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
 
-                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium))
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "${entry.jobName}: ${entry.event}",
@@ -460,10 +461,10 @@ fun JobCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(ToolkitTheme.dimensions.textFieldCornerRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.dimensions.cardElevation)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onToggleExpand) {
                     Icon(
@@ -473,7 +474,7 @@ fun JobCard(
                         )
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
@@ -486,17 +487,17 @@ fun JobCard(
                 StatusBadge(job.status)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
 
             if (job.status == JobStatus.Running) {
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
+                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke).clip(MaterialTheme.shapes.small),
                     color = ProgressIndicatorDefaults.linearColor,
                     trackColor = ProgressIndicatorDefaults.linearTrackColor,
                     strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
                     // Use ticker to force update
@@ -599,11 +600,11 @@ fun TerminalLogView(logs: List<String>) {
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                     ),
                     color = when {
-                        log.contains("[ERROR]") -> Color(0xFFF44336)
-                        log.contains("[WARN]") -> Color(0xFFFFEB3B)
-                        log.contains("[VERBOSE]") -> Color(0xFF9E9E9E)
-                        log.contains("[DEBUG]") -> Color(0xFF2196F3)
-                        else -> Color(0xFFE0E0E0)
+                        log.contains("[ERROR]") -> MaterialTheme.colorScheme.error
+                        log.contains("[WARN]") -> MaterialTheme.colorScheme.primary
+                        log.contains("[VERBOSE]") -> MaterialTheme.colorScheme.onSurfaceVariant
+                        log.contains("[DEBUG]") -> ToolkitTheme.colors.info
+                        else -> MaterialTheme.colorScheme.onSurface
                     }
                 )
             }
@@ -614,23 +615,23 @@ fun TerminalLogView(logs: List<String>) {
 @Composable
 fun StatusBadge(status: JobStatus) {
     val color = when (status) {
-        JobStatus.Queued -> Color.Gray
+        JobStatus.Queued -> MaterialTheme.colorScheme.onSurfaceVariant
         JobStatus.Running -> MaterialTheme.colorScheme.primary
-        JobStatus.Paused -> Color(0xFFFFA000)
-        JobStatus.Completed -> Color(0xFF4CAF50)
+        JobStatus.Paused -> MaterialTheme.colorScheme.primary
+        JobStatus.Completed -> ToolkitTheme.colors.success
         JobStatus.Failed -> MaterialTheme.colorScheme.error
-        JobStatus.Cancelled -> Color.DarkGray
+        JobStatus.Cancelled -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Surface(
-        color = color.copy(alpha = 0.1f),
+        color = color.copy(alpha = ToolkitTheme.opacity.buttonBackground),
         contentColor = color,
-        shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.5f))
+        shape = RoundedCornerShape(ToolkitTheme.dimensions.settingsIconCornerRadius),
+        border = androidx.compose.foundation.BorderStroke(ToolkitTheme.dimensions.borderUnselected, color.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder))
     ) {
         Text(
             text = status.name,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold
         )
@@ -640,16 +641,16 @@ fun StatusBadge(status: JobStatus) {
 @Composable
 fun EmptyState(text: String, icon: ImageVector) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(48.dp),
+        modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.extraLarge),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+            modifier = Modifier.size(ToolkitTheme.dimensions.pluginIcon),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,

@@ -38,7 +38,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -53,15 +53,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
+import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.CircularProgressIndicator
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
+import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_more_actions
 import plugintoolkit.composeapp.generated.resources.action_remove
@@ -94,6 +98,7 @@ fun PluginManagerView(
     val loadedPlugins by viewModel.loadedPlugins.collectAsState()
     val isReady by viewModel.isRegistryReady.collectAsState()
     val settingsPkg by viewModel.settingsPkg.collectAsState()
+    val togglingPlugins by viewModel.togglingPlugins.collectAsState()
 
     if (settingsPkg != null) {
         PluginSettingsDialog(
@@ -132,33 +137,73 @@ fun PluginManagerView(
         // Toolbar
         Row(
             modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.small),
-            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(onClick = { viewModel.refreshList() }, enabled = isReady) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text(stringResource(Res.string.plugin_refresh_list))
+            ToolkitButtonGroup {
+                item { shape, modifierSpec ->
+                    FilledTonalButton(
+                        onClick = { viewModel.refreshList() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_refresh_list))
+                    }
+                }
+                item { shape, modifierSpec ->
+                    FilledTonalButton(
+                        onClick = { viewModel.rescan() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Folder, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_rescan))
+                    }
+                }
+                item { shape, modifierSpec ->
+                    FilledTonalButton(
+                        onClick = { viewModel.reloadAll() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Replay, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_reload_all))
+                    }
+                }
             }
-            OutlinedButton(onClick = { viewModel.rescan() }, enabled = isReady) {
-                Icon(Icons.Default.Folder, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text(stringResource(Res.string.plugin_rescan))
-            }
-            OutlinedButton(onClick = { viewModel.reloadAll() }, enabled = isReady) {
-                Icon(Icons.Default.Replay, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text(stringResource(Res.string.plugin_reload_all))
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            Button(onClick = { viewModel.openRemoteInstall() }, enabled = isReady) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text("Install Remote")
-            }
-            Button(onClick = { viewModel.installLocal() }, enabled = isReady) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                Text(stringResource(Res.string.plugin_install_local))
+
+            ToolkitButtonGroup {
+                item { shape, modifierSpec ->
+                    Button(
+                        onClick = { viewModel.openRemoteInstall() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text("Install Remote")
+                    }
+                }
+                item { shape, modifierSpec ->
+                    Button(
+                        onClick = { viewModel.installLocal() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_install_local))
+                    }
+                }
             }
         }
 
@@ -180,6 +225,7 @@ fun PluginManagerView(
                     hasUpdate = viewModel.getUpdate(plugin.pkg) != null,
                     customActions = viewModel.getActions(plugin.pkg),
                     enabled = isReady,
+                    isToggling = togglingPlugins.contains(plugin.pkg),
                     onToggle = { if (isReady) viewModel.toggleEnabled(plugin.pkg, it) },
                     onAction = { action ->
                         if (isReady) {
@@ -207,13 +253,15 @@ fun PluginManagerView(
         ) {
             val folders = viewModel.managedFolders.collectAsState().value
             val defaultFolder = viewModel.defaultPluginFolder
+            val totalItems = folders.size + 1
 
-            folders.forEach { folder ->
+            folders.forEachIndexed { index, folder ->
                 val isDefault = folder == defaultFolder
                 SettingsItem(
                     title = folder,
                     subtitle = if (isDefault) stringResource(Res.string.plugin_default_folder_label) else null,
                     icon = Icons.Default.Folder,
+                    shape = getGroupedShape(index, totalItems),
                     control = {
                         if (isDefault) {
                             Surface(
@@ -224,7 +272,7 @@ fun PluginManagerView(
                                 Text(
                                     stringResource(Res.string.plugin_default_tag),
                                     modifier = Modifier.padding(
-                                        horizontal = ToolkitTheme.spacing.extraSmall + 2.dp,
+                                        horizontal = ToolkitTheme.spacing.extraSmall + ToolkitTheme.dimensions.buttonGroupGap,
                                         vertical = ToolkitTheme.spacing.extraSmall / 2
                                     ),
                                     style = MaterialTheme.typography.labelSmall,
@@ -247,7 +295,8 @@ fun PluginManagerView(
             SettingsItem(
                 title = stringResource(Res.string.plugin_add_folder),
                 icon = Icons.Default.CreateNewFolder,
-                onClick = { viewModel.addManagedFolder() }
+                onClick = { viewModel.addManagedFolder() },
+                shape = getGroupedShape(folders.size, totalItems)
             )
         }
     }
@@ -260,6 +309,7 @@ fun PluginCard(
     hasUpdate: Boolean,
     customActions: List<PluginAction>,
     enabled: Boolean = true,
+    isToggling: Boolean = false,
     onToggle: (Boolean) -> Unit,
     onAction: (PluginStatusAction) -> Unit
 ) {
@@ -269,25 +319,11 @@ fun PluginCard(
     else if (plugin.isValidated) ToolkitTheme.colors.validated
     else MaterialTheme.colorScheme.outline
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .then(
-                if (isLoaded) Modifier.border(
-                    ToolkitTheme.dimensions.cardElevation,
-                    statusColor,
-                    MaterialTheme.shapes.medium
-                ) else Modifier
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (plugin.loadError != null) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
-            else if (isLoaded) statusColor.copy(alpha = 0.05f)
-            else MaterialTheme.colorScheme.surface
-        )
+    GlassCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon Placeholder
@@ -352,96 +388,150 @@ fun PluginCard(
             }
 
             // Actions
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            var expanded by remember { mutableStateOf(false) }
+
+            ToolkitButtonGroup {
                 if (plugin.requiredAction != null) {
                     val action = customActions.find { it.functionName == plugin.requiredAction }
-                    Button(
-                        onClick = { 
-                            if (plugin.requiredAction == "CONFIGURE_SETTINGS") {
-                                onAction(PluginStatusAction.Settings)
-                            } else {
-                                onAction(PluginStatusAction.Custom(plugin.requiredAction!!)) 
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
-                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
-                    ) {
-                        Text(if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue"))
-                    }
-                }
-
-                if (hasUpdate) {
-                    Button(
-                        onClick = { onAction(PluginStatusAction.Update) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small),
-                        enabled = enabled
-                    ) {
-                        Text(stringResource(Res.string.plugin_update))
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = { onAction(PluginStatusAction.Update) },
-                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small),
-                        enabled = enabled
-                    ) {
-                        Text(stringResource(Res.string.plugin_update_local))
-                    }
-                }
-
-                Switch(checked = plugin.isEnabled, onCheckedChange = onToggle, enabled = enabled)
-
-                var expanded by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { expanded = true }, enabled = enabled) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = stringResource(Res.string.action_more_actions)
-                        )
-                    }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.plugin_reload)) },
-                            onClick = { onAction(PluginStatusAction.Reload); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.plugin_validate)) },
-                            onClick = { onAction(PluginStatusAction.Validate); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Rerun Setup") },
-                            onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.plugin_changelog)) },
-                            onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.plugin_settings)) },
-                            onClick = { onAction(PluginStatusAction.Settings); expanded = false },
-                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
-                        )
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(Res.string.plugin_uninstall),
-                                    color = MaterialTheme.colorScheme.error
-                                )
+                    item { shape, modifierSpec ->
+                        Button(
+                            onClick = { 
+                                if (plugin.requiredAction == "CONFIGURE_SETTINGS") {
+                                    onAction(PluginStatusAction.Settings)
+                                } else {
+                                    onAction(PluginStatusAction.Custom(plugin.requiredAction!!)) 
+                                }
                             },
-                            onClick = { onAction(PluginStatusAction.Uninstall); expanded = false },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                                )
+                            colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
+                            shape = shape,
+                            modifier = modifierSpec,
+                            enabled = enabled
+                        ) {
+                            Text(if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue"))
+                        }
+                    }
+                }
+
+                item { shape, modifierSpec ->
+                    if (hasUpdate) {
+                        Button(
+                            onClick = { onAction(PluginStatusAction.Update) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                            shape = shape,
+                            modifier = modifierSpec,
+                            enabled = enabled
+                        ) {
+                            Text(stringResource(Res.string.plugin_update))
+                        }
+                    } else {
+                        FilledTonalButton(
+                            onClick = { onAction(PluginStatusAction.Update) },
+                            shape = shape,
+                            modifier = modifierSpec,
+                            enabled = enabled
+                        ) {
+                            Text(stringResource(Res.string.plugin_update_local))
+                        }
+                    }
+                }
+
+                item { shape, modifierSpec ->
+                    val toggleColor = if (plugin.isEnabled) {
+                        ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    } else {
+                        ButtonDefaults.filledTonalButtonColors()
+                    }
+                    FilledTonalButton(
+                        onClick = { onToggle(!plugin.isEnabled) },
+                        colors = toggleColor,
+                        shape = shape,
+                        modifier = modifierSpec,
+                        enabled = enabled && !isToggling
+                    ) {
+                        if (isToggling) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
+                                strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
+                                color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (plugin.isEnabled) Icons.Default.CheckCircle else Icons.Default.Extension,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.toggleButtonIconSize)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(
+                            text = if (isToggling) {
+                                if (plugin.isEnabled) "Activating..." else "Deactivating..."
+                            } else {
+                                if (plugin.isEnabled) "Active" else "Disabled"
                             }
                         )
+                    }
+                }
+
+                item { shape, modifierSpec ->
+                    Box {
+                        FilledTonalIconButton(
+                            onClick = { expanded = true },
+                            shape = shape,
+                            modifier = modifierSpec.size(ToolkitTheme.dimensions.standardButtonHeight),
+                            enabled = enabled && !isToggling
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = stringResource(Res.string.action_more_actions)
+                            )
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.plugin_reload)) },
+                                onClick = { onAction(PluginStatusAction.Reload); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.plugin_validate)) },
+                                onClick = { onAction(PluginStatusAction.Validate); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Rerun Setup") },
+                                onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.plugin_changelog)) },
+                                onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.plugin_settings)) },
+                                onClick = { onAction(PluginStatusAction.Settings); expanded = false },
+                                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(Res.string.plugin_uninstall),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = { onAction(PluginStatusAction.Uninstall); expanded = false },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -454,7 +544,7 @@ private fun StatusBadge(text: String, color: Color) {
     Surface(
         color = color.copy(alpha = 0.1f),
         shape = MaterialTheme.shapes.extraSmall,
-        modifier = Modifier.border(1.dp, color.copy(alpha = 0.2f), MaterialTheme.shapes.extraSmall)
+        modifier = Modifier.border(ToolkitTheme.dimensions.borderUnselected, color.copy(alpha = 0.2f), MaterialTheme.shapes.extraSmall)
     ) {
         Text(
             text,

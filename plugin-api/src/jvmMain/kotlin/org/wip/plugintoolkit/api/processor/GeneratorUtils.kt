@@ -10,6 +10,8 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.SemanticType
+import org.wip.plugintoolkit.api.parseSemanticTypes
 
 object GeneratorUtils {
     data class OutputInfo(
@@ -18,7 +20,7 @@ object GeneratorUtils {
         val type: DataType,
         val typeName: TypeName,
         val description: String,
-        val semanticType: String?
+        val semanticTypes: List<SemanticType>
     )
 
     fun mapKSTypeToDataType(ksType: KSType): DataType {
@@ -102,7 +104,8 @@ object GeneratorUtils {
         if (funcOutputAnn != null) {
             val name = funcOutputAnn.arguments.find { it.name?.asString() == "name" }?.value as? String ?: ""
             val desc = funcOutputAnn.arguments.find { it.name?.asString() == "description" }?.value as? String ?: ""
-            val sem = funcOutputAnn.arguments.find { it.name?.asString() == "semanticType" }?.value as? String ?: ""
+            val semTypesVal = (funcOutputAnn.arguments.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
             return listOf(
                 OutputInfo(
                     name = name.ifEmpty { "result" },
@@ -110,7 +113,7 @@ object GeneratorUtils {
                     type = mapKSTypeToDataType(returnTypeKS),
                     typeName = returnTypeName,
                     description = desc,
-                    semanticType = sem.ifEmpty { null }
+                    semanticTypes = semanticTypesList
                 )
             )
         }
@@ -132,7 +135,8 @@ object GeneratorUtils {
                     }
                     val name = propAnn?.arguments?.find { it.name?.asString() == "name" }?.value as? String ?: ""
                     val desc = propAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
-                    val sem = propAnn?.arguments?.find { it.name?.asString() == "semanticType" }?.value as? String ?: ""
+                    val semTypesVal = (propAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
                     val propTypeKS = prop.type.resolve()
                     
                     OutputInfo(
@@ -141,7 +145,7 @@ object GeneratorUtils {
                         type = mapKSTypeToDataType(propTypeKS),
                         typeName = propTypeKS.toTypeName(),
                         description = desc,
-                        semanticType = sem.ifEmpty { null }
+                        semanticTypes = semanticTypesList
                     )
                 }
             }
@@ -155,7 +159,7 @@ object GeneratorUtils {
                 type = mapKSTypeToDataType(returnTypeKS),
                 typeName = returnTypeName,
                 description = "",
-                semanticType = null
+                semanticTypes = emptyList()
             )
         )
     }
