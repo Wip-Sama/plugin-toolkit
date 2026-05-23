@@ -453,13 +453,14 @@ class JobWorker(
         // Helper to get input value
         fun getInputValue(nodeId: Long, portId: String, defaultValue: Any?): Any? {
             val conn = connectionsByTarget[Pair(nodeId, portId)]
-            return if (conn != null) {
+            val raw = if (conn != null) {
                 computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
             } else {
                 val node = nodesById[nodeId] ?: return defaultValue
                 val port = node.inputs.find { it.id == portId }
                 port?.value ?: port?.defaultValue ?: defaultValue
             }
+            return if (raw is JsonElement) fromJsonElement(raw) else raw
         }
 
         // 2. Perform Topological Sort
@@ -894,13 +895,14 @@ class JobWorker(
         // Helper to get input value
         fun getInputValue(nodeId: Long, portId: String, defaultValue: Any?): Any? {
             val conn = connectionsByTarget[Pair(nodeId, portId)]
-            return if (conn != null) {
+            val raw = if (conn != null) {
                 computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
             } else {
                 val node = nodesById[nodeId] ?: return defaultValue
                 val port = node.inputs.find { it.id == portId }
                 port?.value ?: port?.defaultValue ?: defaultValue
             }
+            return if (raw is JsonElement) fromJsonElement(raw) else raw
         }
 
         val activeNodes = mutableSetOf<Long>()

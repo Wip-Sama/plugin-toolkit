@@ -150,12 +150,11 @@ If your capability needs to return multiple output values, define a custom `@Ser
 ```kotlin
 @Serializable
 data class DivisionResult(
-    @CapabilityOutput(name = "quotient", description = "The quotient of the division")
-    val quotient: Int,
-    @CapabilityOutput(name = "remainder", description = "The remainder of the division")
-    val remainder: Int
+   @CapabilityOutput(name = "quotient", description = "The quotient of the division")
+   val quotient: Int,
+   @CapabilityOutput(name = "remainder", description = "The remainder of the division")
+   val remainder: Int
 )
-
 @Capability(name = "Integer Divide", description = "Divides two integers and returns the quotient and remainder")
 fun integerDivideCapability(
     @CapabilityParam(description = "Dividend") a: Int,
