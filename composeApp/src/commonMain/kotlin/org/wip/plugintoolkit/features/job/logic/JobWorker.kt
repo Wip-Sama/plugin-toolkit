@@ -56,7 +56,7 @@ class JobWorker(
 ) : KoinComponent {
     private val pluginManager: PluginManager by inject()
     private val lifecycleCoordinator: PluginLifecycleCoordinator by inject()
-    private var isActive = true
+    private var isWorkerActive = true
     private val workerJob = SupervisorJob(scope.coroutineContext[kotlinx.coroutines.Job])
     private val workerScope = scope + workerJob
 
@@ -70,7 +70,7 @@ class JobWorker(
 
     fun start() {
         workerScope.launch {
-            while (isActive) {
+            while (isWorkerActive && coroutineContext.isActive) {
                 try {
                     Logger.d { "Worker $workerId: Waiting for next job..." }
                     val next = manager.waitForNextJob()
@@ -100,7 +100,7 @@ class JobWorker(
 
                 } catch (e: CancellationException) {
                     Logger.i { "Worker $workerId: Loop received cancellation" }
-                    if (!isActive) {
+                    if (!isWorkerActive || !isActive) {
                         Logger.i { "Worker $workerId: Stopping loop" }
                         break
                     }
@@ -136,7 +136,7 @@ class JobWorker(
         } catch (e: CancellationException) {
             Logger.w { "Worker $workerId: Job ${job.name} was cancelled" }
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             manager.tryFailJob(job.id, e.message)
             lifecycleCoordinator.onLifecycleJobFailed(job, e.message)
             Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
@@ -1094,7 +1094,7 @@ class JobWorker(
     }
 
     fun stop() {
-        isActive = false
+        isWorkerActive = false
         workerJob.cancel()
     }
 }
