@@ -123,7 +123,19 @@ object SettingsUtils {
     }
 
     fun stringToJson(value: String, type: DataType): JsonElement {
-        if (value.isEmpty()) return JsonNull
+        if (value.isEmpty()) {
+            return when (type) {
+                is DataType.Primitive -> {
+                    if (type.primitiveType == PrimitiveType.STRING) {
+                        JsonPrimitive("")
+                    } else {
+                        JsonNull
+                    }
+                }
+                is DataType.Array -> JsonArray(emptyList())
+                else -> JsonNull
+            }
+        }
         return when (type) {
             is DataType.Primitive -> {
                 when (type.primitiveType) {
