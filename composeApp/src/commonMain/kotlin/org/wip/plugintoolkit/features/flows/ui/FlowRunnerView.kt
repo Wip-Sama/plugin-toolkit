@@ -400,7 +400,7 @@ fun FlowRunnerView(
                             val error = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateParameter(
                                 value = value,
                                 isRequired = true,
-                                isArray = param.dataType is DataType.Array,
+                                type = param.dataType,
                                 constraints = null
                             )
                             error == null

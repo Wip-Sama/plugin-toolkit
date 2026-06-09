@@ -183,29 +183,7 @@ fun validateCapabilityParameters(
         val maxValue = constraints.maxValue
 
         // Extract values to validate
-        val valuesToValidate = mutableListOf<String>()
-        if (metadata.type is DataType.Array) {
-            when (valueElement) {
-                is JsonArray -> {
-                    valueElement.forEach { elem ->
-                        if (elem is JsonPrimitive) {
-                            valuesToValidate.add(elem.content)
-                        }
-                    }
-                }
-                is JsonPrimitive -> {
-                    val content = valueElement.content
-                    content.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach {
-                        valuesToValidate.add(it)
-                    }
-                }
-                else -> {}
-            }
-        } else {
-            if (valueElement is JsonPrimitive) {
-                valuesToValidate.add(valueElement.content)
-            }
-        }
+        val valuesToValidate = getLeafPrimitives(valueElement, metadata.type)
 
         for (valStr in valuesToValidate) {
             if (minLength != null && valStr.length < minLength) {
@@ -247,6 +225,28 @@ fun validateCapabilityParameters(
                     throw IllegalArgumentException("Parameter '$paramName' value '$valStr' is not a valid number.")
                 }
             }
+        }
+    }
+}
+
+private fun getLeafPrimitives(element: JsonElement, type: DataType): List<String> {
+    return when (type) {
+        is DataType.Array -> {
+            when (element) {
+                is JsonArray -> {
+                    element.flatMap { getLeafPrimitives(it, type.items) }
+                }
+                is JsonPrimitive -> {
+                    val parts = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.splitArrayValue(element.content, type)
+                    parts.flatMap {
+                        getLeafPrimitives(JsonPrimitive(it), type.items)
+                    }
+                }
+                else -> emptyList()
+            }
+        }
+        else -> {
+            if (element is JsonPrimitive) listOf(element.content) else emptyList()
         }
     }
 }

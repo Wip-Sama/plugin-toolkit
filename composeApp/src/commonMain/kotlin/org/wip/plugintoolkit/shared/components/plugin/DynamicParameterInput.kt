@@ -2,7 +2,6 @@ package org.wip.plugintoolkit.shared.components.plugin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +44,7 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.SemanticCategory
 import org.wip.plugintoolkit.core.utils.SemanticRegistry
@@ -52,6 +52,9 @@ import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.insert_array_of_array_placeholder
+import plugintoolkit.composeapp.generated.resources.insert_array_placeholder
 
 @Composable
 fun DynamicParameterInput(
@@ -109,7 +112,7 @@ fun DynamicParameterInput(
                 constraints = metadata.constraints,
                 enabled = enabled,
                 isRequired = metadata.required,
-                isArray = isArray,
+                type = metadata.type,
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (value.isNotEmpty() && enabled) {
@@ -185,7 +188,7 @@ fun DynamicParameterInput(
                 enabled = enabled,
                 isSecret = metadata.secret,
                 isRequired = metadata.required,
-                isArray = isArray,
+                type = metadata.type,
                 trailingIcon = {
                     IconButton(
                         onClick = { showColorPicker = true },
@@ -268,7 +271,7 @@ fun DynamicParameterInput(
                 enabled = enabled,
                 isSecret = metadata.secret,
                 isRequired = metadata.required,
-                isArray = isArray,
+                type = metadata.type,
                 trailingIcon = {
                     IconButton(
                         onClick = {
@@ -330,7 +333,7 @@ fun DynamicParameterInput(
                 enabled = enabled,
                 isSecret = metadata.secret,
                 isRequired = metadata.required,
-                isArray = isArray,
+                type = metadata.type,
                 trailingIcon = {
                     IconButton(
                         onClick = {
@@ -478,24 +481,30 @@ fun DynamicParameterInput(
                                 enabled = enabled,
                                 isSecret = metadata.secret,
                                 isRequired = metadata.required,
-                                isArray = false
+                                type = type
                             )
                         }
                     }
                 }
 
                 is DataType.Array -> {
+                    val hint = getPlaceholderForArray(type)
+                    val combinedDescription = if (metadata.description.isNotEmpty()) {
+                        "${metadata.description} ($hint)"
+                    } else {
+                        hint
+                    }
                     StandardTextField(
                         value = value,
                         onValueChange = onValueChange,
-                        placeholder = "Enter values separated by comma (,,)",
+                        placeholder = hint,
                         label = inputLabel,
-                        description = metadata.description,
+                        description = combinedDescription,
                         constraints = metadata.constraints,
                         enabled = enabled,
                         isSecret = metadata.secret,
                         isRequired = metadata.required,
-                        isArray = true
+                        type = metadata.type
                     )
                 }
 
@@ -512,7 +521,7 @@ fun DynamicParameterInput(
                             enabled = enabled,
                             isSecret = metadata.secret,
                             isRequired = metadata.required,
-                            isArray = true
+                            type = metadata.type
                         )
                     } else {
                         ExpressiveMenu(
@@ -536,7 +545,7 @@ fun DynamicParameterInput(
                         enabled = enabled,
                         isSecret = metadata.secret,
                         isRequired = metadata.required,
-                        isArray = metadata.type is DataType.Array
+                        type = metadata.type
                     )
                 }
             }
@@ -564,7 +573,7 @@ private fun NumericTextField(
             org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateParameter(
                 value = value,
                 isRequired = isRequired,
-                isArray = false,
+                type = DataType.Primitive(if (allowDecimal) PrimitiveType.DOUBLE else PrimitiveType.INT),
                 constraints = constraints
             )
         }
@@ -637,14 +646,14 @@ private fun StandardTextField(
     readOnly: Boolean = false,
     isSecret: Boolean = false,
     isRequired: Boolean = false,
-    isArray: Boolean = false,
+    type: DataType = DataType.Primitive(PrimitiveType.ANY),
     trailingIcon: @Composable (() -> Unit)? = null
 ) {
-    val errorMessage = remember(value, isRequired, isArray) {
+    val errorMessage = remember(value, isRequired, type) {
         org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateParameter(
             value = value,
             isRequired = isRequired,
-            isArray = isArray,
+            type = type,
             constraints = constraints
         )
     }
@@ -819,6 +828,15 @@ private fun getFileNames(path: String, isArray: Boolean): String {
     if (path.isEmpty()) return ""
     if (!isArray) return getFileName(path)
     return path.split(",").map { it.trim() }.filter { it.isNotEmpty() }.map { getFileName(it) }.joinToString(", ")
+}
+
+private fun getPlaceholderForArray(type: DataType.Array): String {
+    val isNested = type.items is DataType.Array
+    return if (isNested) {
+        Res.string.insert_array_of_array_placeholder.localized
+    } else {
+        Res.string.insert_array_placeholder.localized
+    }.toString()
 }
 
 
