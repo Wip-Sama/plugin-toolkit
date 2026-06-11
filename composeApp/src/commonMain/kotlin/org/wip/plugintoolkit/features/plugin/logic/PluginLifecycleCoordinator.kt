@@ -56,7 +56,7 @@ class PluginLifecycleCoordinator(
     suspend fun onLifecycleJobFailed(job: BackgroundJob, error: String?) = withPluginLock(job.pluginId) {
         Logger.w { "Lifecycle job failed for ${job.pluginId}: ${job.type} - $error" }
         if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
-            markAsInvalidated(job.pluginId)
+            markAsInvalidated(job.pluginId, error)
         }
     }
 
@@ -67,7 +67,7 @@ class PluginLifecycleCoordinator(
         if (result.isSuccess) {
             markAsValidated(pkg)
         } else {
-            markAsInvalidated(pkg)
+            markAsInvalidated(pkg, result.exceptionOrNull()?.message)
         }
     }
 
@@ -298,7 +298,7 @@ class PluginLifecycleCoordinator(
         if (result.isSuccess) {
             markAsValidated(pkg)
         } else {
-            markAsInvalidated(pkg)
+            markAsInvalidated(pkg, result.exceptionOrNull()?.message)
         }
         result
     }
@@ -340,11 +340,11 @@ class PluginLifecycleCoordinator(
         lifecycleManager.loadPlugin(pkg)
     }
 
-    private suspend fun markAsInvalidated(pkg: String) {
+    private suspend fun markAsInvalidated(pkg: String, error: String? = null) {
         val plugin = registry.getPlugin(pkg) ?: return
 
-        Logger.i { "Marking plugin $pkg as invalidated" }
-        registry.updatePlugin(pkg) { it.copy(isValidated = false) }
+        Logger.i { "Marking plugin $pkg as invalidated with error: $error" }
+        registry.updatePlugin(pkg) { it.copy(isValidated = false, loadError = error) }
 
         if (lifecycleManager.loadedPlugins.value.contains(pkg)) {
             Logger.i { "Plugin $pkg is loaded but invalidated, unloading." }

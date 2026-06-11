@@ -1,7 +1,36 @@
-Version: 1.5.3
+Version: 1.6.0
 Date: 23-05-2026
 Changes:
 	- Updated dependencies
+	- Execute -> Flows / Capabilities (TODO)
+	- Flow editor is now only accessible by the flow manager (TODO)
+	- Merger and Save are now dynamic nodes (TODO)
+	- Changelog markdown strikethrough updated do double \~\~ from single (TODO)
+Removed:
+	- Dedicated sections for flows and plugins (TODO)
+Added:
+	- Better logging for plugin loading step 
+	- Dedicated section for repository and manager (TODO)
+	- System node to create a new folder with a specific name given a directory (TODO)
+	- System node to unpack dense capability output (TODO)
+	- Dynamic node Parameters (TODO) 
+	  [capabilities with allow for list can mark them as dynamic, 
+  which means it allows for multiple ordered connections  
+that are merged in a list before passing it to the capability]
+	- Capabilities locked behind plugin setting (TODO)
+	- Capabilities only available in flows (TODO)
+	- Capabilities only available in standard execution (TODO)
+	- CapabilityParameter can now be optional/required (required by default) (TODO)
+	- Autosave setting for flows (TODO)
+	- Migration logic for plugins who change capabilities (update flows where possible) (TODO)
+	- Compact CapabilityOutput (TODO)
+		[A capability output can now be defined as acompact, 
+		which means all it's fields are sent on a single connection between node,
+		when an output is dense if both side have compatible output it will be passed directly without parsing, 
+		it not it will be parsed as json and sent]
+Fixed:
+	- Capabilities with lots of input/output would not be drawn correctly (TODO)
+	- When a capability used by a flow is changes, the flow is marked as broken if not updatable / alternative available (TODO)
 ----------------------------------------------------------------------------------------------------
 Version: 1.5.2
 Date: 23-05-2026
@@ -50,7 +79,7 @@ Fixed:
   - Updater on windows not launching correctly (again)
   - Plugin-api failed to generate proper plugin if not settings were defined
 Planned:
-  - The update page now correctly displays the change description
+  - ~~The update page now correctly displays the change description~~
 ----------------------------------------------------------------------------------------------------
 Version: 1.4.0
 Date: 12-05-2026
