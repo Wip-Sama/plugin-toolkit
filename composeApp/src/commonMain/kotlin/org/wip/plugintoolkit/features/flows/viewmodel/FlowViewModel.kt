@@ -94,6 +94,14 @@ sealed interface FlowEvent {
     data object ClearSelection : FlowEvent
     data object DeleteSelectedNodes : FlowEvent
 
+    // Collapse & Order
+    data class ToggleNodeCollapse(val nodeId: Long) : FlowEvent
+    data class ToggleNodeInputsCollapse(val nodeId: Long) : FlowEvent
+    data class ToggleNodeOutputsCollapse(val nodeId: Long) : FlowEvent
+    data class UpdateConnectionOrder(val connection: Connection, val newOrderIndex: Int) : FlowEvent
+    data class MoveConnectionFirst(val connection: Connection) : FlowEvent
+    data class MoveConnectionLast(val connection: Connection) : FlowEvent
+
     // Import/Export Flow
     data object TriggerImport : FlowEvent
     data class ResolveImportConflicts(val resolutions: Map<String, ConflictResolutionAction>, val customNames: Map<String, String> = emptyMap()) : FlowEvent

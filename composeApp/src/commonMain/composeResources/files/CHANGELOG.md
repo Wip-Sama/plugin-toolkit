@@ -4,7 +4,6 @@ Changes:
 	- Updated dependencies
 	- Execute -> Flows / Capabilities (TODO)
 	- Flow editor is now only accessible by the flow manager (TODO)
-	- Merger and Save are now dynamic nodes (TODO)
 	- Changelog markdown strikethrough updated do double \~\~ from single (TODO)
 Removed:
 	- Dedicated sections for flows and plugins (TODO)
@@ -13,10 +12,7 @@ Added:
 	- Dedicated section for repository and manager (TODO)
 	- System node to create a new folder with a specific name given a directory (TODO)
 	- System node to unpack dense capability output (TODO)
-	- Dynamic node Parameters (TODO) 
-	  [capabilities with allow for list can mark them as dynamic, 
-  which means it allows for multiple ordered connections  
-that are merged in a list before passing it to the capability]
+	- Dynamic node Parameters, list and similar now allow for multiple connections in the port
 	- Capabilities locked behind plugin setting (TODO)
 	- Capabilities only available in flows (TODO)
 	- Capabilities only available in standard execution (TODO)
@@ -28,9 +24,11 @@ that are merged in a list before passing it to the capability]
 		which means all it's fields are sent on a single connection between node,
 		when an output is dense if both side have compatible output it will be passed directly without parsing, 
 		it not it will be parsed as json and sent]
+	- Nodes are not compactable in input/output to accomodate nodes with lots of input/outputs
 Fixed:
-	- Capabilities with lots of input/output would not be drawn correctly (TODO)
-	- When a capability used by a flow is changes, the flow is marked as broken if not updatable / alternative available (TODO)
+	- Moving multiple selected nodes would not animate all the connection properly until movement stopped
+	- Capabilities with lots of input/output would not be drawn correctly
+	- When a capability used by a flow is changed, the flow is marked as broken if not updatable / alternative available (TODO)
 ----------------------------------------------------------------------------------------------------
 Version: 1.5.2
 Date: 23-05-2026

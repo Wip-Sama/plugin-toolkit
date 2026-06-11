@@ -444,7 +444,7 @@ class JobWorker(
 
         // Build lookup maps
         val nodesById = flow.nodes.associateBy { it.id }
-        val connectionsByTarget = flow.connections.associateBy { Pair(it.targetNodeId, it.targetPortId) }
+        val connectionsByTarget = flow.connections.groupBy { Pair(it.targetNodeId, it.targetPortId) }
         val connectionsBySource = flow.connections.groupBy { Pair(it.sourceNodeId, it.sourcePortId) }
 
         val computedValues = mutableMapOf<Pair<Long, String>, Any?>()
@@ -452,15 +452,37 @@ class JobWorker(
 
         // Helper to get input value
         fun getInputValue(nodeId: Long, portId: String, defaultValue: Any?): Any? {
-            val conn = connectionsByTarget[Pair(nodeId, portId)]
-            val raw = if (conn != null) {
-                computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
+            val conns = connectionsByTarget[Pair(nodeId, portId)]
+            if (conns != null && conns.isNotEmpty()) {
+                val sortedConns = conns.sortedBy { it.orderIndex ?: 0 }
+                val targetNode = nodesById[nodeId]
+                val targetPort = targetNode?.inputs?.find { it.id == portId }
+                
+                if (targetPort?.dataType is DataType.Array) {
+                    val results = sortedConns.map { conn ->
+                        val raw = computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
+                        if (raw is JsonElement) fromJsonElement(raw) else raw
+                    }
+                    if (sortedConns.size == 1) {
+                        val singleParsed = results.first()
+                        if (singleParsed is List<*>) {
+                            return singleParsed
+                        } else {
+                            return listOf(singleParsed)
+                        }
+                    }
+                    return results
+                } else {
+                    val conn = sortedConns.first()
+                    val raw = computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
+                    return if (raw is JsonElement) fromJsonElement(raw) else raw
+                }
             } else {
                 val node = nodesById[nodeId] ?: return defaultValue
                 val port = node.inputs.find { it.id == portId }
-                port?.value ?: port?.defaultValue ?: defaultValue
+                val raw = port?.value ?: port?.defaultValue ?: defaultValue
+                return if (raw is JsonElement) fromJsonElement(raw) else raw
             }
-            return if (raw is JsonElement) fromJsonElement(raw) else raw
         }
 
         // 2. Perform Topological Sort
@@ -851,7 +873,7 @@ class JobWorker(
 
         // Build lookup maps
         val nodesById = flow.nodes.associateBy { it.id }
-        val connectionsByTarget = flow.connections.associateBy { Pair(it.targetNodeId, it.targetPortId) }
+        val connectionsByTarget = flow.connections.groupBy { Pair(it.targetNodeId, it.targetPortId) }
         val connectionsBySource = flow.connections.groupBy { Pair(it.sourceNodeId, it.sourcePortId) }
 
         // Build sub-DAG
@@ -894,15 +916,37 @@ class JobWorker(
 
         // Helper to get input value
         fun getInputValue(nodeId: Long, portId: String, defaultValue: Any?): Any? {
-            val conn = connectionsByTarget[Pair(nodeId, portId)]
-            val raw = if (conn != null) {
-                computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
+            val conns = connectionsByTarget[Pair(nodeId, portId)]
+            if (conns != null && conns.isNotEmpty()) {
+                val sortedConns = conns.sortedBy { it.orderIndex ?: 0 }
+                val targetNode = nodesById[nodeId]
+                val targetPort = targetNode?.inputs?.find { it.id == portId }
+                
+                if (targetPort?.dataType is DataType.Array) {
+                    val results = sortedConns.map { conn ->
+                        val raw = computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
+                        if (raw is JsonElement) fromJsonElement(raw) else raw
+                    }
+                    if (sortedConns.size == 1) {
+                        val singleParsed = results.first()
+                        if (singleParsed is List<*>) {
+                            return singleParsed
+                        } else {
+                            return listOf(singleParsed)
+                        }
+                    }
+                    return results
+                } else {
+                    val conn = sortedConns.first()
+                    val raw = computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
+                    return if (raw is JsonElement) fromJsonElement(raw) else raw
+                }
             } else {
                 val node = nodesById[nodeId] ?: return defaultValue
                 val port = node.inputs.find { it.id == portId }
-                port?.value ?: port?.defaultValue ?: defaultValue
+                val raw = port?.value ?: port?.defaultValue ?: defaultValue
+                return if (raw is JsonElement) fromJsonElement(raw) else raw
             }
-            return if (raw is JsonElement) fromJsonElement(raw) else raw
         }
 
         val activeNodes = mutableSetOf<Long>()
