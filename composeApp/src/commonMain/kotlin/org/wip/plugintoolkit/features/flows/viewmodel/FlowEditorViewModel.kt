@@ -1014,9 +1014,10 @@ class FlowEditorViewModel(
                 if (node.id == nodeId) {
                     when (node) {
                         is Node.FlowInputNode -> {
+                            val finalDataType = if (isList) DataType.Array(dataType) else dataType
                             val port = node.outputs.first().copy(
                                 name = portName, 
-                                dataType = dataType, 
+                                dataType = finalDataType, 
                                 semanticTypes = semanticTypes
                             )
                             node.copy(
@@ -1026,9 +1027,10 @@ class FlowEditorViewModel(
                             )
                         }
                         is Node.FlowOutputNode -> {
+                            val finalDataType = if (isList) DataType.Array(dataType) else dataType
                             val port = node.inputs.first().copy(
                                 name = portName, 
-                                dataType = dataType, 
+                                dataType = finalDataType, 
                                 semanticTypes = semanticTypes
                             )
                             node.copy(inputs = listOf(port))

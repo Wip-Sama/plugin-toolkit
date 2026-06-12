@@ -264,6 +264,9 @@ interface PluginContext {
  *
  * This interface is typically implemented by the class annotated with `@PluginInfo`.
  * It handles the execution of capabilities.
+ * 
+ * Execution is inherently asynchronous. The host application will wrap the `process`
+ * invocation in a managed coroutine to provide cancellation and handle generation.
  */
 interface DataProcessor {
     /**
@@ -283,15 +286,6 @@ interface DataProcessor {
      * Observe processing progress (0.0 to 1.0).
      */
     fun observeProgress(): Flow<Float>? = null
-
-    /**
-     * Process data asynchronously, returning a handle to control the task.
-     * @param request Native request object.
-     * @param context The execution context.
-     */
-    fun processAsync(request: PluginRequest, context: PluginContext): JobHandle {
-        throw NotImplementedError("processAsync not implemented")
-    }
 
     /**
      * Run a custom action.

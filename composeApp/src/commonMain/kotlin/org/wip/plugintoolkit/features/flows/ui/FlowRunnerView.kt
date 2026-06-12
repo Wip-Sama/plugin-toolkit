@@ -146,12 +146,7 @@ fun FlowRunnerView(
                             is Node.FlowInputNode -> {
                                 val outPort = node.outputs.firstOrNull()
                                 if (outPort != null) {
-                                    val inferredType = if (outPort.dataType is DataType.Primitive && outPort.dataType.primitiveType == PrimitiveType.ANY) {
-                                        val connection = currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
-                                        val targetNode = currentFlow.nodes.find { it.id == connection?.targetNodeId }
-                                        val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
-                                        targetPort?.dataType ?: outPort.dataType
-                                    } else outPort.dataType
+                                    val inferredType = currentFlow.getInferredDataTypeForOutput(node.id, outPort.id, outPort.dataType)
 
                                     val inferredSemanticTypes = if (outPort.semanticTypes.isNotEmpty()) {
                                         outPort.semanticTypes
@@ -215,12 +210,7 @@ fun FlowRunnerView(
                             is Node.FlowOutputNode -> {
                                 val inPort = node.inputs.firstOrNull()
                                 if (inPort != null) {
-                                    val inferredType = if (inPort.dataType is DataType.Primitive && inPort.dataType.primitiveType == PrimitiveType.ANY) {
-                                        val connection = currentFlow.connections.find { it.targetNodeId == node.id && it.targetPortId == inPort.id }
-                                        val sourceNode = currentFlow.nodes.find { it.id == connection?.sourceNodeId }
-                                        val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
-                                        sourcePort?.dataType ?: inPort.dataType
-                                    } else inPort.dataType
+                                    val inferredType = currentFlow.getInferredDataTypeForInput(node.id, inPort.id, inPort.dataType)
 
                                     val inferredSemanticTypes = if (inPort.semanticTypes.isNotEmpty()) {
                                         inPort.semanticTypes

@@ -241,7 +241,13 @@ class PluginLifecycleManager(
         val decryptedSettings = store.settings.mapValues { (key, value) ->
             val isSecret = manifest?.settings?.get(key)?.secret == true
             if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
-                kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.decrypt(value.content))
+                val content = value.content
+                if (content.startsWith("ENC[") && content.endsWith("]")) {
+                    val encryptedPart = content.substring(4, content.length - 1)
+                    kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.decrypt(encryptedPart))
+                } else {
+                    value
+                }
             } else {
                 value
             }
@@ -260,7 +266,8 @@ class PluginLifecycleManager(
         val encryptedSettings = store.settings.mapValues { (key, value) ->
             val isSecret = manifest?.settings?.get(key)?.secret == true
             if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
-                kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.encrypt(value.content))
+                val encrypted = org.wip.plugintoolkit.core.utils.SecureStorage.encrypt(value.content)
+                kotlinx.serialization.json.JsonPrimitive("ENC[$encrypted]")
             } else {
                 value
             }

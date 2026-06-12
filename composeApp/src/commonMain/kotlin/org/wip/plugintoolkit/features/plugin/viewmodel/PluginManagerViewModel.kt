@@ -276,15 +276,32 @@ class PluginManagerViewModel(
 
     fun updatePlugin(pkg: String) {
         viewModelScope.launch {
-            if (pluginManager.getUpdate(pkg) != null) {
-                pluginManager.updateRemote(pkg)
-            } else {
-                val newPath = PlatformUtils.pickFile()
-                if (newPath != null) {
-                    pluginManager.updateLocal(pkg, newPath)
+            val manifest = pluginManager.getManifest(pkg)
+            val proceedWithUpdate = suspend {
+                if (pluginManager.getUpdate(pkg) != null) {
+                    pluginManager.updateRemote(pkg)
+                } else {
+                    val newPath = PlatformUtils.pickFile()
+                    if (newPath != null) {
+                        pluginManager.updateLocal(pkg, newPath)
+                    }
                 }
+                flowViewModel.triggerMigrationsForUpdatedPlugin(pkg)
             }
-            flowViewModel.triggerMigrationsForUpdatedPlugin(pkg)
+
+            if (manifest != null && manifest.hasSetupHandler && !manifest.hasUpdateHandler) {
+                dialogService.showConfirmation(
+                    title = "Update Warning",
+                    message = "This plugin requires setup but does not support migrations. Updating will wipe all current configuration and data for this plugin. Continue?",
+                    onConfirm = {
+                        viewModelScope.launch {
+                            proceedWithUpdate()
+                        }
+                    }
+                )
+            } else {
+                proceedWithUpdate()
+            }
         }
     }
 

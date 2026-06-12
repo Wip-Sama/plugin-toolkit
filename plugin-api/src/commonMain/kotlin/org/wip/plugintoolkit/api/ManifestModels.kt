@@ -67,10 +67,18 @@ sealed class DataType {
     data class Object(
         val className: String, 
         val namespace: String? = null,
-        val properties: Map<String, DataType> = emptyMap()
+        val properties: Map<String, DataType> = emptyMap(),
+        val requiredProperties: List<String> = emptyList()
     ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
-            return value != null && value !is JsonNull
+            if (value == null || value is JsonNull) return false
+            if (requiredProperties.isEmpty()) return true
+            
+            val jsonObj = value as? JsonObject ?: return false
+            return requiredProperties.all { prop ->
+                val propValue = jsonObj[prop]
+                propValue != null && propValue !is JsonNull
+            }
         }
     }
 

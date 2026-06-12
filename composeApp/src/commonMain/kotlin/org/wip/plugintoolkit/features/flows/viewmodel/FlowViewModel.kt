@@ -751,7 +751,26 @@ class FlowViewModel(
                 
                 val params = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
                 parameterValues.forEach { (key, value) ->
-                    params[key] = kotlinx.serialization.json.JsonPrimitive(value)
+                    val nodeId = key.toLongOrNull()
+                    val node = flow.nodes.find { it.id == nodeId }
+                    
+                    val dataType = when (node) {
+                        is Node.FlowInputNode -> {
+                            val outPort = node.outputs.firstOrNull()
+                            if (outPort != null) {
+                                flow.getInferredDataTypeForOutput(node.id, outPort.id, outPort.dataType)
+                            } else {
+                                DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.ANY)
+                            }
+                        }
+                        is Node.SystemNode -> {
+                            // Find the first input port
+                            node.inputs.firstOrNull()?.dataType ?: DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.ANY)
+                        }
+                        else -> DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.ANY)
+                    }
+                    
+                    params[key] = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(value, dataType)
                 }
 
                 val job = BackgroundJob(

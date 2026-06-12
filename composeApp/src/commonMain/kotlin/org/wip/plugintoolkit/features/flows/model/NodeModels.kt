@@ -383,7 +383,47 @@ data class Flow(
     val connections: List<Connection> = emptyList(),
     val version: String = "1.0.0",
     val description: String? = null
-)
+) {
+    fun getInferredDataTypeForOutput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
+        val baseType = fallbackType
+        val baseArray = baseType as? DataType.Array
+        val baseItems = baseArray?.items
+        
+        if (baseType is DataType.Primitive && baseType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+            val connection = connections.find { it.sourceNodeId == nodeId && it.sourcePortId == portId }
+            val targetNode = nodes.find { it.id == connection?.targetNodeId }
+            val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
+            return targetPort?.dataType ?: fallbackType
+        } else if (baseArray != null && baseItems is DataType.Primitive && baseItems.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+            val connection = connections.find { it.sourceNodeId == nodeId && it.sourcePortId == portId }
+            val targetNode = nodes.find { it.id == connection?.targetNodeId }
+            val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
+            val targetType = targetPort?.dataType
+            if (targetType is DataType.Array) return targetType else return fallbackType
+        }
+        return fallbackType
+    }
+
+    fun getInferredDataTypeForInput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
+        val baseType = fallbackType
+        val baseArray = baseType as? DataType.Array
+        val baseItems = baseArray?.items
+        
+        if (baseType is DataType.Primitive && baseType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+            val connection = connections.find { it.targetNodeId == nodeId && it.targetPortId == portId }
+            val sourceNode = nodes.find { it.id == connection?.sourceNodeId }
+            val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
+            return sourcePort?.dataType ?: fallbackType
+        } else if (baseArray != null && baseItems is DataType.Primitive && baseItems.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+            val connection = connections.find { it.targetNodeId == nodeId && it.targetPortId == portId }
+            val sourceNode = nodes.find { it.id == connection?.sourceNodeId }
+            val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
+            val sourceType = sourcePort?.dataType
+            if (sourceType is DataType.Array) return sourceType else return fallbackType
+        }
+        return fallbackType
+    }
+}
 
 @Serializable
 data class PortConstraints(

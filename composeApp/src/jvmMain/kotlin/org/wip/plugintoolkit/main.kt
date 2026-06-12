@@ -178,7 +178,7 @@ fun runMain(args: Array<String>) {
             single { PluginLockProvider() }
             single { PluginRegistry(get(), get(named("AppScope")), get(named("LoomDispatcher"))) }
             single { PluginLifecycleManager(get(), get(), get(), get()) }
-            single { PluginLifecycleCoordinator(get(), get(), get(), get(), get(named("AppScope"))) }
+            single { PluginLifecycleCoordinator(get(), get(), get(), get(named("AppScope"))) }
             single { PluginFolderManager(get(), get(), get()) }
             single { PluginInstaller(get(), get(), get(), get(), get(), get(), get()) }
             single { PluginScanner(get()) }

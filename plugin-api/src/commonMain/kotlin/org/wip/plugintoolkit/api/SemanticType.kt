@@ -38,58 +38,40 @@ class SemanticType {
     override fun toString(): String = canonicalId
 }
 
+private val semanticTypeRegex = Regex("""^(?:([^/]+)/)?([^:]+)(?::(.+))?$""")
+
 fun parseSemanticType(token: String): SemanticType? {
     val trimmed = token.trim()
     if (trimmed.isEmpty()) return null
 
-    val colonIndex = trimmed.indexOf(':')
-    val hasColon = colonIndex != -1
-    val left = if (hasColon) trimmed.substring(0, colonIndex) else trimmed
-    val variantPart = if (hasColon) trimmed.substring(colonIndex + 1) else null
+    val match = semanticTypeRegex.matchEntire(trimmed) ?: return null
+    val g1 = match.groupValues[1].takeIf { it.isNotEmpty() }
+    val g2 = match.groupValues[2]
+    val g3 = match.groupValues[3].takeIf { it.isNotEmpty() }
 
-    val slashIndex = left.indexOf('/')
-    val hasSlash = slashIndex != -1
+    if (g2.isBlank()) return null
 
-    val namespace: String?
-    val name: String
-    val variant: String?
+    var namespace = g1
+    var name = g2
+    var variant = g3
 
-    if (hasSlash) {
-        val part1 = left.substring(0, slashIndex)
-        val part2 = left.substring(slashIndex + 1)
-
-        if (hasColon) {
-            namespace = part1
-            name = part2
-            variant = variantPart
-        } else {
-            val isMimeCategory = part1.lowercase() in setOf(
-                "image", "audio", "video", "text", "application", "font", "file", "color", "path"
-            )
-            if (isMimeCategory) {
-                namespace = null
-                name = part1
-                variant = part2
-            } else {
-                namespace = part1
-                name = part2
-                variant = null
-            }
+    if (namespace != null && variant == null) {
+        val isMimeCategory = namespace.lowercase() in setOf(
+            "image", "audio", "video", "text", "application", "font", "file", "color", "path"
+        )
+        if (isMimeCategory) {
+            variant = name
+            name = namespace
+            namespace = null
         }
-    } else {
-        namespace = null
-        name = left
-        variant = variantPart
     }
-
-    if (name.isBlank()) return null
 
     return SemanticType(namespace, name, variant)
 }
 
 fun parseSemanticTypes(value: String?): List<SemanticType> {
     if (value.isNullOrBlank()) return emptyList()
-    return value.split(Regex("[\\s,]+"))
+    return value.split(',', ' ', '\n', '\r', '\t')
         .filter { it.isNotBlank() }
         .mapNotNull { parseSemanticType(it) }
 }

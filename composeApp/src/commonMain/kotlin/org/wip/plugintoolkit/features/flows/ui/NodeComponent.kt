@@ -1075,9 +1075,9 @@ fun NodeComponent(
         val port = if (node is Node.FlowInputNode) node.outputs.firstOrNull() else node.inputs.firstOrNull()
         if (port != null) {
             var name by remember { mutableStateOf(port.name) }
-            var selectedTypeOption by remember {
+            var selectedTypeOption by remember { 
                 mutableStateOf(
-                    when (val dt = port.dataType) {
+                    when (val dt = if (port.dataType is DataType.Array) (port.dataType as DataType.Array).items else port.dataType) {
                         is DataType.Primitive -> {
                             if (dt.primitiveType == PrimitiveType.ANY) "Any"
                             else dt.primitiveType.name.lowercase().replaceFirstChar { it.uppercase() }
@@ -1091,7 +1091,7 @@ fun NodeComponent(
             }
             var customClassName by remember {
                 mutableStateOf(
-                    when (val dt = port.dataType) {
+                    when (val dt = if (port.dataType is DataType.Array) (port.dataType as DataType.Array).items else port.dataType) {
                         is DataType.Object -> dt.className
                         is DataType.Enum -> dt.className
                         else -> ""

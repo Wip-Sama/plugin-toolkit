@@ -19,6 +19,7 @@ Added:
 	- Dense CapabilityOutput
 	- Nodes are not compactable in input/output to accomodate nodes with lots of input/outputs
 	- Migration logic for plugins who change capabilities (update flows where possible)
+	- Tooltip for node ports
 Fixed:
 	- Moving multiple selected nodes would not animate all the connection properly until movement stopped
 	- Capabilities with lots of input/output would not be drawn correctly

@@ -40,11 +40,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PrimitiveType
-import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.SemanticCategory
 import org.wip.plugintoolkit.core.utils.SemanticRegistry
@@ -488,7 +488,8 @@ fun DynamicParameterInput(
                 }
 
                 is DataType.Array -> {
-                    val hint = getPlaceholderForArray(type)
+                    val hintRes = getPlaceholderForArray(type)
+                    val hint = stringResource(hintRes)
                     val combinedDescription = if (metadata.description.isNotEmpty()) {
                         "${metadata.description} ($hint)"
                     } else {
@@ -831,13 +832,13 @@ private fun getFileNames(path: String, isArray: Boolean): String {
     return path.split(",").map { it.trim() }.filter { it.isNotEmpty() }.map { getFileName(it) }.joinToString(", ")
 }
 
-private fun getPlaceholderForArray(type: DataType.Array): String {
+private fun getPlaceholderForArray(type: DataType.Array): org.jetbrains.compose.resources.StringResource {
     val isNested = type.items is DataType.Array
     return if (isNested) {
-        Res.string.insert_array_of_array_placeholder.localized
+        Res.string.insert_array_of_array_placeholder
     } else {
-        Res.string.insert_array_placeholder.localized
-    }.toString()
+        Res.string.insert_array_placeholder
+    }
 }
 
 
