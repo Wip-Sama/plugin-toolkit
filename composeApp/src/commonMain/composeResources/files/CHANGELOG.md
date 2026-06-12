@@ -1,10 +1,11 @@
 Version: 1.6.0
-Date: 23-06-2026
+Date: 12-06-2026
 Changes:
 	- Updated dependencies
 	- Execute -> Flows / Capabilities
 	- Flow editor is now only accessible by the flow manager
 	- Changelog markdown strikethrough updated do double \~\~ from single
+	- Various minor internal improvements
 Removed:
 	- Dedicated sections for flows and plugins
 Added:
@@ -25,6 +26,7 @@ Fixed:
 	- Capabilities with lots of input/output would not be drawn correctly
 	- When a capability used by a flow is changed, the flow is marked as broken if not updatable / alternative available
 	- When a flow is installed the install button would not change to installed until reentering the tab/page
+	- Parsing of list elements in flows runner
 ----------------------------------------------------------------------------------------------------
 Version: 1.5.2
 Date: 23-05-2026
