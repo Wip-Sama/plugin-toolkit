@@ -85,9 +85,9 @@ object PluginLoader {
 
                 Logger.i { "Successfully loaded plugin $pluginId from $normalizedPath (Total tracked: ${loadedPlugins.size})" }
                 return Result.success(pluginEntry)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Logger.e(e) { "Failed to load plugin from $normalizedPath" }
-                return Result.failure(e)
+                return Result.failure(Exception(e.message, e))
             }
         }
     }

@@ -57,6 +57,13 @@ class PluginLifecycleManager(
             return Result.success(Unit)
         }
 
+        if (!plugin.isCompatible) {
+            val errorMsg = plugin.compatibilityError ?: "Plugin is incompatible with the current app version"
+            Logger.w { "Cannot load plugin $pkg: $errorMsg" }
+            updateLoadError(pkg, errorMsg)
+            return Result.failure(Exception(errorMsg))
+        }
+
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"
 
@@ -81,7 +88,11 @@ class PluginLifecycleManager(
 
         Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
         val settings = loadPluginSettings(pkg)
-        val result = PluginLoader.loadPlugin(jarFile, settings.settings)
+        val result = try {
+            PluginLoader.loadPlugin(jarFile, settings.settings)
+        } catch (t: Throwable) {
+            Result.failure(Exception("Fatal error loading plugin classes", t))
+        }
         
         return if (result.isSuccess) {
             val entry = result.getOrThrow()

@@ -327,7 +327,12 @@ class PluginLifecycleCoordinator(
     }
 
     suspend fun validatePlugin(pkg: String): Result<Unit> = withPluginLock(pkg) {
-        val plugin = PluginLoader.getPluginById(pkg) ?: return@withPluginLock Result.failure(Exception("Plugin not loaded"))
+        val plugin = PluginLoader.getPluginById(pkg) 
+        if (plugin == null) {
+            val error = "Plugin not loaded"
+            markAsInvalidated(pkg, error)
+            return@withPluginLock Result.failure(Exception(error))
+        }
         val result = plugin.validate(lifecycleManager.createPluginContext(pkg))
         if (result.isSuccess) {
             markAsValidated(pkg)
