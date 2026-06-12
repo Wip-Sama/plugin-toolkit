@@ -39,9 +39,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -101,6 +102,7 @@ import plugintoolkit.composeapp.generated.resources.node_edit_output_title
 import plugintoolkit.composeapp.generated.resources.node_port_name_label
 import plugintoolkit.composeapp.generated.resources.node_semantic_type_label
 import plugintoolkit.composeapp.generated.resources.node_semantic_type_placeholder
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun NodeComponent(
@@ -199,7 +201,7 @@ fun NodeComponent(
                                     if (event.type == PointerEventType.Enter) {
                                         tooltipJob?.cancel()
                                         tooltipJob = scope.launch {
-                                            delay(2000)
+                                            delay(2000.milliseconds)
                                             showTooltip = true
                                         }
                                     } else if (event.type == PointerEventType.Exit) {
@@ -425,7 +427,22 @@ fun NodeComponent(
                                 )
                                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(input.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                    if (!input.description.isNullOrBlank()) {
+                                        TooltipArea(
+                                            delayMillis = 3000,
+                                            tooltip = {
+                                                Text(
+                                                    text = input.description,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        ) {
+                                            Text(input.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    } else {
+                                        Text(input.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                    }
                                     val inferredType = inferredTypes[Pair(node.id, input.id)] ?: input.dataType
                                     val typeLabel = if (input.dataType is DataType.Primitive && input.dataType.primitiveType == PrimitiveType.ANY &&
                                                        !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)) {
@@ -868,7 +885,11 @@ fun NodeComponent(
                     }
 
                     if (node.inputs.isNotEmpty() && node.outputs.isNotEmpty() && !node.isInputsCollapsed && !node.isOutputsCollapsed) {
-                        Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                        HorizontalDivider(
+                            Modifier,
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                     }
 
                     // Outputs Section
@@ -912,7 +933,22 @@ fun NodeComponent(
                             horizontalArrangement = Arrangement.End
                         ) {
                             Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
-                                Text(output.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                if (!output.description.isNullOrBlank()) {
+                                    TooltipArea(
+                                        delayMillis = 3000,
+                                        tooltip = {
+                                            Text(
+                                                text = output.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    ) {
+                                        Text(output.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                    }
+                                } else {
+                                    Text(output.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                }
                                 val inferredType = inferredTypes[Pair(node.id, output.id)] ?: output.dataType
                                 val typeLabel = if (output.dataType is DataType.Primitive && output.dataType.primitiveType == PrimitiveType.ANY &&
                                                    !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)) {
@@ -1152,7 +1188,7 @@ fun NodeComponent(
                         )
 
                         if (node is Node.FlowInputNode) {
-                            Divider()
+                            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
                             Text("Constraints & Settings", style = MaterialTheme.typography.titleSmall)
                             
                             Row(verticalAlignment = Alignment.CenterVertically) {

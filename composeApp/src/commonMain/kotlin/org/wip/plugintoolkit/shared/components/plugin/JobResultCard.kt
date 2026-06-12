@@ -21,7 +21,8 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Divider
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -175,7 +176,7 @@ fun JobResultCard(
             // Expanded Details Section
             if (expanded) {
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                HorizontalDivider(Modifier, DividerDefaults.Thickness, color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
                 when (job.status) {

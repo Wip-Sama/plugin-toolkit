@@ -364,6 +364,7 @@ class FlowEditorViewModel(
                         InputPort(
                             id = key,
                             name = key,
+                            description = meta.description,
                             dataType = meta.type,
                             semanticTypes = meta.semanticTypes,
                             defaultValue = meta.defaultValue,
@@ -376,6 +377,7 @@ class FlowEditorViewModel(
                         OutputPort(
                             id = out.name,
                             name = out.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                            description = out.description,
                             dataType = out.type,
                             semanticTypes = out.semanticTypes
                         )
@@ -383,6 +385,7 @@ class FlowEditorViewModel(
                         OutputPort(
                             id = "result",
                             name = "Result",
+                            description = "Capability Result",
                             dataType = event.capability.returnType,
                             semanticTypes = event.capability.semanticTypes
                         )

@@ -91,6 +91,7 @@ interface Port {
     val name: String
     val dataType: DataType
     val semanticTypes: List<SemanticType>
+    val description: String?
 }
 
 @Serializable(with = InputPortSerializer::class)
@@ -101,7 +102,8 @@ data class InputPort(
     override val semanticTypes: List<SemanticType> = emptyList(),
     @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
     @Serializable(with = AnySerializer::class) val value: Any? = null,
-    val constraints: PortConstraints? = null
+    val constraints: PortConstraints? = null,
+    override val description: String? = null
 ) : Port
 
 object InputPortSerializer : KSerializer<InputPort> {
@@ -111,6 +113,7 @@ object InputPortSerializer : KSerializer<InputPort> {
         val surrogate = InputPortSurrogate(
             id = value.id,
             name = value.name,
+            description = value.description,
             dataType = value.dataType,
             semanticTypes = value.semanticTypes,
             defaultValue = value.defaultValue,
@@ -127,6 +130,7 @@ object InputPortSerializer : KSerializer<InputPort> {
         return InputPort(
             id = surrogate.id,
             name = surrogate.name,
+            description = surrogate.description,
             dataType = surrogate.dataType,
             semanticTypes = surrogate.semanticTypes ?: emptyList(),
             defaultValue = surrogate.defaultValue,
@@ -147,7 +151,8 @@ private data class InputPortSurrogate(
     @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
     @Serializable(with = AnySerializer::class) val value: Any? = null,
     val regex: String? = null,
-    val constraints: PortConstraints? = null
+    val constraints: PortConstraints? = null,
+    val description: String? = null
 )
 
 @Serializable(with = OutputPortSerializer::class)
@@ -155,7 +160,8 @@ data class OutputPort(
     override val id: String,
     override val name: String,
     override val dataType: DataType,
-    override val semanticTypes: List<SemanticType> = emptyList()
+    override val semanticTypes: List<SemanticType> = emptyList(),
+    override val description: String? = null
 ) : Port
 
 object OutputPortSerializer : KSerializer<OutputPort> {
@@ -165,6 +171,7 @@ object OutputPortSerializer : KSerializer<OutputPort> {
         val surrogate = OutputPortSurrogate(
             id = value.id,
             name = value.name,
+            description = value.description,
             dataType = value.dataType,
             semanticTypes = value.semanticTypes
         )
@@ -192,6 +199,7 @@ object OutputPortSerializer : KSerializer<OutputPort> {
         return OutputPort(
             id = surrogate.id,
             name = surrogate.name,
+            description = surrogate.description,
             dataType = surrogate.dataType,
             semanticTypes = surrogate.semanticTypes
         )
@@ -204,7 +212,8 @@ private class OutputPortSurrogate(
     val id: String,
     val name: String,
     val dataType: DataType,
-    val semanticTypes: List<SemanticType> = emptyList()
+    val semanticTypes: List<SemanticType> = emptyList(),
+    val description: String? = null
 )
 
 @Serializable
