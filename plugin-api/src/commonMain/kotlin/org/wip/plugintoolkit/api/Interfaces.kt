@@ -50,6 +50,13 @@ interface PluginEntry {
     
     /**
      * Optional update step called by the host application during plugin update.
+     * 
+     * NOTE: This function must be implemented in a **version-agnostic** way. Users may skip versions
+     * during an upgrade (e.g., from 1.0.0 directly to 1.3.0). This function is meant for updating internal
+     * plugin state, such as files or local databases, and should query the current state defensively rather
+     * than assuming a specific previous version. Flow node config migrations are handled separately
+     * by the Host Application using `migrations.json`.
+     *
      * @param context The execution context providing logger, progress, and file system access.
      */
     suspend fun performUpdate(context: PluginContext): Result<Unit> = Result.success(Unit)

@@ -1,5 +1,5 @@
 Version: 1.6.0
-Date: 23-05-2026
+Date: 23-06-2026
 Changes:
 	- Updated dependencies
 	- Execute -> Flows / Capabilities
@@ -11,7 +11,6 @@ Added:
 	- Better logging for plugin loading step 
 	- Dedicated section for repository and manager
 	- System node to create a new folder with a specific name given a directory
-	- System node to unpack dense capability output (TODO)
 	- Dynamic node Parameters, list and similar now allow for multiple connections in the port
 	- Capabilities locked behind required plugin setting/s
 	- Capabilities only available in flows 
@@ -19,12 +18,12 @@ Added:
 	- Autosave setting for flows
 	- Dense CapabilityOutput
 	- Nodes are not compactable in input/output to accomodate nodes with lots of input/outputs
-	- Migration logic for plugins who change capabilities (update flows where possible) (TODO)
+	- Migration logic for plugins who change capabilities (update flows where possible)
 Fixed:
 	- Moving multiple selected nodes would not animate all the connection properly until movement stopped
 	- Capabilities with lots of input/output would not be drawn correctly
-	- When a capability used by a flow is changed, the flow is marked as broken if not updatable / alternative available (TODO)
-	- When a flow is installed the install button would not change to installed until reentering the tab/page (TODO)
+	- When a capability used by a flow is changed, the flow is marked as broken if not updatable / alternative available
+	- When a flow is installed the install button would not change to installed until reentering the tab/page
 ----------------------------------------------------------------------------------------------------
 Version: 1.5.2
 Date: 23-05-2026

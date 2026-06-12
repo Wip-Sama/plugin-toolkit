@@ -129,7 +129,9 @@ class PluginLifecycleCoordinator(
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for setup: ${loadResult.exceptionOrNull()?.message}" }
+            val errorMsg = loadResult.exceptionOrNull()?.message
+            Logger.e { "Failed to load plugin $pkg for setup: $errorMsg" }
+            markAsInvalidated(pkg, errorMsg)
             return
         }
 
@@ -173,7 +175,9 @@ class PluginLifecycleCoordinator(
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for update: ${loadResult.exceptionOrNull()?.message}" }
+            val errorMsg = loadResult.exceptionOrNull()?.message
+            Logger.e { "Failed to load plugin $pkg for update: $errorMsg" }
+            markAsInvalidated(pkg, errorMsg)
             return
         }
 
@@ -221,7 +225,11 @@ class PluginLifecycleCoordinator(
         }
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
-        if (loadResult.isFailure) return Result.failure(loadResult.exceptionOrNull()!!)
+        if (loadResult.isFailure) {
+            val errorMsg = loadResult.exceptionOrNull()?.message
+            markAsInvalidated(pkg, errorMsg)
+            return Result.failure(loadResult.exceptionOrNull()!!)
+        }
 
         val job = BackgroundJob(
             id = "val_$pkg",
@@ -237,7 +245,19 @@ class PluginLifecycleCoordinator(
 
     suspend fun checkAndResumeSetup(pkg: String) = withPluginLock(pkg) {
         val plugin = registry.getPlugin(pkg) ?: return@withPluginLock
-        if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !hasMissingRequiredSettings(pkg)) {
+        val missing = hasMissingRequiredSettings(pkg)
+
+        if (missing) {
+            Logger.w { "Plugin $pkg is missing required settings, marking as broken." }
+            registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
+            if (lifecycleManager.loadedPlugins.value.contains(pkg)) {
+                try {
+                    lifecycleManager.unloadPlugin(pkg)
+                } catch (e: Exception) {
+                    Logger.e(e) { "Failed to unload plugin $pkg after settings were removed" }
+                }
+            }
+        } else if (plugin.requiredAction == "CONFIGURE_SETTINGS") {
             Logger.i { "Required settings provided for $pkg. Resuming setup/update." }
             clearRequiredAction(pkg)
             val manifest = lifecycleManager.getManifest(pkg)
@@ -246,7 +266,16 @@ class PluginLifecycleCoordinator(
             } else if (manifest?.hasSetupHandler == true) {
                 enqueueSetupJobInternal(pkg)
             } else {
-                triggerValidationInternal(pkg)
+                if (plugin.isValidated) {
+                    if (plugin.isEnabled && !lifecycleManager.loadedPlugins.value.contains(pkg)) {
+                        val loadResult = lifecycleManager.loadPlugin(pkg)
+                        if (loadResult.isFailure) {
+                            markAsInvalidated(pkg, loadResult.exceptionOrNull()?.message)
+                        }
+                    }
+                } else {
+                    triggerValidationInternal(pkg)
+                }
             }
         }
     }
@@ -276,8 +305,13 @@ class PluginLifecycleCoordinator(
         if (enabled) {
             val plugin = registry.getPlugin(pkg)
             if (plugin != null) {
-                if (plugin.isValidated) {
-                    lifecycleManager.loadPlugin(pkg)
+                if (plugin.requiredAction != null) {
+                    Logger.w { "Cannot load plugin $pkg because it requires action: ${plugin.requiredAction}" }
+                } else if (plugin.isValidated) {
+                    val loadResult = lifecycleManager.loadPlugin(pkg)
+                    if (loadResult.isFailure) {
+                        markAsInvalidated(pkg, loadResult.exceptionOrNull()?.message)
+                    }
                 } else {
                     // Try to get manifest to check for setup handler
                     val manifest = lifecycleManager.getManifest(pkg)
@@ -309,7 +343,9 @@ class PluginLifecycleCoordinator(
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for action ${action.name}" }
+            val errorMsg = loadResult.exceptionOrNull()?.message
+            Logger.e { "Failed to load plugin $pkg for action ${action.name}: $errorMsg" }
+            markAsInvalidated(pkg, errorMsg)
             return@withPluginLock
         }
 

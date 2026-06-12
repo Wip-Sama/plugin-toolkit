@@ -146,7 +146,50 @@ data class PluginManifest(
     val settings: Map<String, SettingMetadata>? = null,
     val changelog: Changelog? = null,
     val hasUpdateHandler: Boolean = false,
-    val hasSetupHandler: Boolean = false
+    val hasSetupHandler: Boolean = false,
+    val hasMigrations: Boolean = false
+)
+
+@Serializable
+data class PluginMigration(
+    val fromVersion: String,
+    val toVersion: String,
+    val capabilityMigrations: List<CapabilityMigration> = emptyList(),
+    val settingMigrations: List<SettingMigration> = emptyList(),
+    val objectMigrations: List<ObjectMigration> = emptyList()
+)
+
+@Serializable
+data class CapabilityMigration(
+    val oldName: String,
+    val newName: String?, // null means capability is removed/unsupported
+    val isDropInReplacement: Boolean = false,
+    val portMigrations: List<PortMigration> = emptyList()
+)
+
+@Serializable
+data class PortMigration(
+    val oldName: String,
+    val newName: String? // null means port is removed
+)
+
+@Serializable
+data class SettingMigration(
+    val oldName: String,
+    val newName: String? // null means setting is removed
+)
+
+@Serializable
+data class ObjectMigration(
+    val oldClassName: String,
+    val newClassName: String?, // null means custom object is removed
+    val propertyMigrations: List<PropertyMigration> = emptyList()
+)
+
+@Serializable
+data class PropertyMigration(
+    val oldName: String,
+    val newName: String?
 )
 
 @Serializable

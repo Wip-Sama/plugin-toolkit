@@ -50,6 +50,8 @@ class PluginRepoViewModel(
     val plugins = repoManager.plugins
     val flows = repoManager.flows
 
+    val installedPlugins = pluginManager.installedPlugins
+    val flowState = flowViewModel.state
 
     var repoUrlInput by mutableStateOf("")
 

@@ -149,7 +149,13 @@ fun NodeComponent(
     var activeColorInputId by remember { mutableStateOf<String?>(null) }
 
     val (headerColor, onHeaderColor) = when (node) {
-        is Node.CapabilityNode -> Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+        is Node.CapabilityNode -> {
+            if (node.isBroken) {
+                Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
+            } else {
+                Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+            }
+        }
         is Node.SystemNode -> {
             if (node.systemAction.lowercase() == "error") {
                 Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
@@ -245,6 +251,17 @@ fun NodeComponent(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        
+                        if (node is Node.CapabilityNode && node.isBroken) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Box(
+                                modifier = Modifier
+                                    .background(onHeaderColor, MaterialTheme.shapes.extraSmall)
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Text("BROKEN", color = headerColor, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
                         
                         if (node is Node.SubFlowNode && !isReadOnly) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))

@@ -243,7 +243,8 @@ sealed class Node {
         override val outputs: List<OutputPort>,
         override val isCollapsed: Boolean = false,
         override val isInputsCollapsed: Boolean = false,
-        override val isOutputsCollapsed: Boolean = false
+        override val isOutputsCollapsed: Boolean = false,
+        val isBroken: Boolean = false
     ) : Node() {
         override val title: String get() = capability.name
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)

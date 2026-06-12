@@ -42,6 +42,9 @@ fun PluginRepoView(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val pluginsMap by viewModel.plugins.collectAsState()
     val flowsMap by viewModel.flows.collectAsState()
+    
+    val installedPlugins by viewModel.installedPlugins.collectAsState()
+    val flowState by viewModel.flowState.collectAsState()
 
     var selectedRepo by remember { mutableStateOf<ExtensionRepo?>(null) }
     var selectedTab by remember { mutableStateOf(0) } // 0: Plugins, 1: Flows
@@ -420,8 +423,9 @@ fun PluginRepoView(
                                 contentPadding = PaddingValues(bottom = ToolkitTheme.spacing.large)
                             ) {
                                 items(filteredPlugins) { plugin ->
-                                    val installedVersion = viewModel.getInstalledVersion(plugin.pkg)
-                                    val isInstalled = viewModel.isInstalled(plugin.pkg)
+                                    val installedPlugin = installedPlugins.find { it.pkg == plugin.pkg }
+                                    val installedVersion = installedPlugin?.version
+                                    val isInstalled = installedPlugin != null
                                     val activeJobs by viewModel.activePluginInstallationJobs.collectAsState()
                                     val progress = activeJobs[plugin.pkg]
                                     val hasUpdate = installedVersion != null && org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion) > 0
@@ -557,9 +561,10 @@ fun PluginRepoView(
                                 contentPadding = PaddingValues(bottom = ToolkitTheme.spacing.large)
                             ) {
                                 items(filteredFlows) { flow ->
-                                    val isInstalled = viewModel.isFlowInstalled(flow.name)
-                                    val installedVersion = viewModel.getInstalledFlowVersion(flow.name)
-                                    val hasUpdate = viewModel.getFlowUpdate(flow)
+                                    val installedFlow = flowState.flows.find { it.name == flow.name }
+                                    val isInstalled = installedFlow != null
+                                    val installedVersion = installedFlow?.version
+                                    val hasUpdate = installedVersion != null && org.wip.plugintoolkit.core.utils.VersionUtils.compare(flow.version, installedVersion) > 0
 
                                     GlassCard(
                                         modifier = Modifier.fillMaxWidth()

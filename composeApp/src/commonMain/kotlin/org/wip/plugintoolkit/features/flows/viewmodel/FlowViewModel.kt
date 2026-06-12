@@ -40,17 +40,27 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.flows.model.PortConstraints
+import org.wip.plugintoolkit.features.flows.model.MigrationEngine
+import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import kotlin.time.Clock
 
 enum class ConflictResolutionAction {
     RENAME, KEEP_LOCAL, KEEP_IMPORTED
 }
 
+data class MigrationPrompt(
+    val originalFlow: Flow,
+    val migratedFlow: Flow,
+    val requiresConsentNodes: List<Node.CapabilityNode>,
+    val brokenNodes: List<Node.CapabilityNode>
+)
+
 data class FlowState(
     val flows: List<Flow> = emptyList(),
     val selectedFlowId: String? = null,
     val importConflicts: List<String> = emptyList(),
-    val pendingImportedFlows: List<Flow> = emptyList()
+    val pendingImportedFlows: List<Flow> = emptyList(),
+    val pendingMigrations: List<MigrationPrompt> = emptyList()
 ) {
     val currentFlow: Flow? get() = flows.find { it.name == selectedFlowId } ?: flows.firstOrNull()
 }
@@ -106,6 +116,9 @@ sealed interface FlowEvent {
     data object TriggerImport : FlowEvent
     data class ResolveImportConflicts(val resolutions: Map<String, ConflictResolutionAction>, val customNames: Map<String, String> = emptyMap()) : FlowEvent
     data object CancelImport : FlowEvent
+    // Migration
+    data class AcceptMigration(val flowName: String) : FlowEvent
+    data class RejectMigration(val flowName: String) : FlowEvent
     data class ExportFlow(val flowName: String) : FlowEvent
 }
 
@@ -191,12 +204,33 @@ class FlowViewModel(
 
                 // List flows in directory
                 val loadedFlows = mutableListOf<Flow>()
+                val pendingMigs = _state.value.pendingMigrations.toMutableList()
+                
+                val pluginManager = try { getKoin().get<PluginManager>() } catch (e: Exception) { null }
+                val manifests = pluginManager?.installedPlugins?.value?.filter { it.isEnabled }?.associate { it.pkg to pluginManager.getManifest(it.pkg) }
+                    ?.filterValues { it != null }?.mapValues { it.value!! } ?: emptyMap()
+
                 SystemFileSystem.list(flowsDir).forEach { file ->
                     if (file.name.endsWith(".json")) {
                         try {
                             val content = SystemFileSystem.source(file).buffered().use { it.readString() }
                             val flow = json.decodeFromString<Flow>(content)
-                            loadedFlows.add(flow)
+                            
+                            // Check for broken nodes based on current plugins
+                            val updatedNodes = flow.nodes.map { node ->
+                                if (node is Node.CapabilityNode) {
+                                    val currentManifest = manifests[node.pluginInfo.id]
+                                    val hasCapability = currentManifest?.capabilities?.any { it.name == node.capability.name } == true
+                                    if (currentManifest == null || !hasCapability) {
+                                        node.copy(isBroken = true)
+                                    } else {
+                                        node.copy(isBroken = false)
+                                    }
+                                } else {
+                                    node
+                                }
+                            }
+                            loadedFlows.add(flow.copy(nodes = updatedNodes))
                         } catch (e: Exception) {
                             Logger.e(e) { "Failed to parse flow file: ${file.name}" }
                         }
@@ -207,12 +241,60 @@ class FlowViewModel(
                     _state.update { currentState ->
                         currentState.copy(
                             flows = loadedFlows,
-                            selectedFlowId = currentState.selectedFlowId ?: loadedFlows.firstOrNull()?.name
+                            selectedFlowId = currentState.selectedFlowId ?: loadedFlows.firstOrNull()?.name,
+                            pendingMigrations = pendingMigs
                         )
                     }
                 }
             } catch (e: Exception) {
                 Logger.e(e) { "Failed to reload flows" }
+            }
+        }
+    }
+
+    fun triggerMigrationsForUpdatedPlugin(pluginId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val appDataDir = resolvedSettingsPersistence.getSettingsDir()
+            val pluginManager = try { getKoin().get<PluginManager>() } catch (e: Exception) { null } ?: return@launch
+            val manifests = pluginManager.installedPlugins.value.associate { it.pkg to pluginManager.getManifest(it.pkg) }
+                .filterValues { it != null }.mapValues { it.value!! }
+                
+            val pendingMigs = mutableListOf<MigrationPrompt>()
+            
+            _state.value.flows.forEach { flow ->
+                // Check if flow uses the updated plugin
+                val usesPlugin = flow.nodes.any { it is Node.CapabilityNode && it.pluginInfo.id == pluginId }
+                if (usesPlugin) {
+                    val migResult = MigrationEngine.migrateFlow(
+                        flow = flow,
+                        currentManifests = manifests,
+                        getMigrations = { pluginManager.getMigrations(it) }
+                    )
+                    
+                    if (migResult.requiresConsentNodes.isNotEmpty() || migResult.brokenNodes.isNotEmpty()) {
+                        pendingMigs.add(MigrationPrompt(flow, migResult.migratedFlow, migResult.requiresConsentNodes, migResult.brokenNodes))
+                    } else if (migResult.migratedFlow != flow) {
+                        // Silent drop-in replacement
+                        val file = getFlowPath(appDataDir, flow.name)
+                        val flowContent = json.encodeToString(Flow.serializer(), migResult.migratedFlow)
+                        SystemFileSystem.sink(file).buffered().use { it.writeString(flowContent) }
+                        
+                        withContext(Dispatchers.Main) {
+                            _state.update { currentState ->
+                                currentState.copy(flows = currentState.flows.map { if (it.name == flow.name) migResult.migratedFlow else it })
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (pendingMigs.isNotEmpty()) {
+                withContext(Dispatchers.Main) {
+                    _state.update { currentState ->
+                        val existing = currentState.pendingMigrations.filter { p -> pendingMigs.none { it.originalFlow.name == p.originalFlow.name } }
+                        currentState.copy(pendingMigrations = existing + pendingMigs)
+                    }
+                }
             }
         }
     }
@@ -227,7 +309,43 @@ class FlowViewModel(
             is FlowEvent.ResolveImportConflicts -> handleResolveImportConflicts(event.resolutions, event.customNames)
             is FlowEvent.CancelImport -> handleCancelImport()
             is FlowEvent.ExportFlow -> handleExportFlow(event.flowName)
+            is FlowEvent.AcceptMigration -> handleAcceptMigration(event.flowName)
+            is FlowEvent.RejectMigration -> handleRejectMigration(event.flowName)
             else -> {}
+        }
+    }
+
+    private fun handleAcceptMigration(flowName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val prompt = _state.value.pendingMigrations.find { it.originalFlow.name == flowName } ?: return@launch
+            val appDataDir = resolvedSettingsPersistence.getSettingsDir()
+            val file = getFlowPath(appDataDir, flowName)
+            
+            try {
+                val flowContent = json.encodeToString(Flow.serializer(), prompt.migratedFlow)
+                SystemFileSystem.sink(file).buffered().use { it.writeString(flowContent) }
+                
+                withContext(Dispatchers.Main) {
+                    _state.update { currentState ->
+                        val updatedFlows = currentState.flows.map { if (it.name == flowName) prompt.migratedFlow else it }
+                        currentState.copy(
+                            flows = updatedFlows,
+                            pendingMigrations = currentState.pendingMigrations.filter { it.originalFlow.name != flowName }
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to save migrated flow" }
+            }
+        }
+    }
+
+    private fun handleRejectMigration(flowName: String) {
+        // Just dismiss the prompt, flow remains as-is (with old versions).
+        _state.update { currentState ->
+            currentState.copy(
+                pendingMigrations = currentState.pendingMigrations.filter { it.originalFlow.name != flowName }
+            )
         }
     }
 

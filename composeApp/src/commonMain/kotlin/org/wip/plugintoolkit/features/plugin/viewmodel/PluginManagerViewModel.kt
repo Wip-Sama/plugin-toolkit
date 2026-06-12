@@ -18,6 +18,7 @@ import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
@@ -43,7 +44,8 @@ class PluginManagerViewModel(
     private val dialogService: DialogService,
     private val settingsRepository: SettingsRepository,
     private val repoManager: RepoManager,
-    private val jobManager: JobManager
+    private val jobManager: JobManager,
+    private val flowViewModel: FlowViewModel
 ) : ViewModel() {
 
     val installedPlugins = pluginManager.installedPlugins
@@ -78,7 +80,7 @@ class PluginManagerViewModel(
     private val _togglingPlugins = MutableStateFlow<Set<String>>(emptySet())
     val togglingPlugins: StateFlow<Set<String>> = _togglingPlugins.asStateFlow()
     
-    private val autoOpenedSettings = mutableSetOf<String>()
+    // Persistence flags handled via InstalledPlugin now
 
     init {
         PlatformUtils.mkdirs(defaultPluginFolder)
@@ -86,15 +88,19 @@ class PluginManagerViewModel(
         viewModelScope.launch {
             installedPlugins.collect { plugins ->
                 plugins.forEach { plugin ->
-                    if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !autoOpenedSettings.contains(plugin.pkg)) {
-                        autoOpenedSettings.add(plugin.pkg)
+                    if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !plugin.configurationPrompted) {
+                        viewModelScope.launch {
+                            pluginManager.updatePlugin(plugin.pkg) { it.copy(configurationPrompted = true) }
+                        }
                         dialogService.showConfirmation(
                             title = "Configuration Required",
                             message = "Plugin ${plugin.name} requires configuration. Would you like to configure it now?",
                             onConfirm = { openSettings(plugin.pkg) }
                         )
-                    } else if (plugin.requiredAction == "CONFIRM_SIGNATURE" && !autoOpenedSettings.contains(plugin.pkg + "_sig")) {
-                        autoOpenedSettings.add(plugin.pkg + "_sig")
+                    } else if (plugin.requiredAction == "CONFIRM_SIGNATURE" && !plugin.signaturePrompted) {
+                        viewModelScope.launch {
+                            pluginManager.updatePlugin(plugin.pkg) { it.copy(signaturePrompted = true) }
+                        }
                         dialogService.showConfirmation(
                             title = "Invalid Signature",
                             message = "Plugin ${plugin.name} has an invalid signature. Do you want to load it anyway? If you ignore, the plugin will remain locked and unloaded.",
@@ -107,9 +113,6 @@ class PluginManagerViewModel(
                                 }
                             }
                         )
-                    } else if (plugin.requiredAction != "CONFIGURE_SETTINGS" && plugin.requiredAction != "CONFIRM_SIGNATURE") {
-                        autoOpenedSettings.remove(plugin.pkg)
-                        autoOpenedSettings.remove(plugin.pkg + "_sig")
                     }
                 }
             }
@@ -281,6 +284,7 @@ class PluginManagerViewModel(
                     pluginManager.updateLocal(pkg, newPath)
                 }
             }
+            flowViewModel.triggerMigrationsForUpdatedPlugin(pkg)
         }
     }
 
@@ -355,7 +359,6 @@ class PluginManagerViewModel(
     }
 
     fun closeSettings() {
-        _settingsPkg.value?.let { autoOpenedSettings.remove(it) }
         _settingsPkg.value = null
     }
 

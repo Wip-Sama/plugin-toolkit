@@ -44,7 +44,8 @@ object ManifestJsonGenerator {
         functions: List<KSFunctionDeclaration>,
         settingsProperties: List<KSPropertyDeclaration>,
         actions: List<KSFunctionDeclaration>,
-        changelogObj: Changelog?
+        changelogObj: Changelog?,
+        hasMigrations: Boolean = false
     ): String {
         val manifestCapabilities = functions.map { func ->
             val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
@@ -195,7 +196,8 @@ object ManifestJsonGenerator {
             settings = manifestSettings.ifEmpty { null },
             changelog = changelogObj,
             hasUpdateHandler = updateFunction != null,
-            hasSetupHandler = setupFunction != null
+            hasSetupHandler = setupFunction != null,
+            hasMigrations = hasMigrations
         )
         
         val json = Json { prettyPrint = true }

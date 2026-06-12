@@ -11,6 +11,7 @@ import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PluginMigration
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PluginSignalManager
 import org.wip.plugintoolkit.api.ProgressReporter
@@ -318,6 +319,24 @@ class PluginLifecycleManager(
                 null
             }
         }
+    }
+
+    fun getMigrations(pkg: String): List<PluginMigration> {
+        val plugin = registry.getPlugin(pkg) ?: return emptyList()
+        val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
+        val jarFile = "${plugin.installPath}/$jarFileName"
+        
+        val content = fileSystem.readFileFromZip(jarFile, "migrations.json")
+            ?: fileSystem.readFileFromZip(jarFile, "META-INF/migrations.json")
+            
+        return content?.let {
+            try {
+                json.decodeFromString<List<PluginMigration>>(it)
+            } catch (e: Exception) {
+                Logger.w { "Failed to parse migrations for $pkg: ${e.message}" }
+                emptyList()
+            }
+        } ?: emptyList()
     }
 
 }

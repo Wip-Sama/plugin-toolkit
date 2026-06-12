@@ -172,11 +172,19 @@ class ManifestProcessor(
         val providerName = baseClassName + "ModuleProvider"
         writeFile(sourceFile, "", "META-INF/services/${org.wip.plugintoolkit.api.PluginModuleProvider::class.qualifiedName}", "", "$packageName.$providerName")
 
-        // 4. Generate manifest.json
+        // 4. Check for migrations.json
+        val migrationsFile = sourceFile?.let { findMigrationsFile(it) }
+        var hasMigrations = false
+        if (migrationsFile != null && migrationsFile.exists()) {
+            hasMigrations = true
+            writeFile(sourceFile, "", "META-INF/migrations", "json", migrationsFile.readText())
+        }
+
+        // 5. Generate manifest.json
         val allSettingsProperties = settingsClasses.flatMap { it.getAllProperties().filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } } }.toList()
         val manifestJson = ManifestJsonGenerator.generate(
             classDeclaration, id, name, version, description,
-            minMemoryMb, minExecutionTimeMs, supportedOs, functions, allSettingsProperties, actions, changelogObj
+            minMemoryMb, minExecutionTimeMs, supportedOs, functions, allSettingsProperties, actions, changelogObj, hasMigrations
         )
         writeFile(sourceFile, "", "META-INF/manifest", "json", manifestJson)
     }
@@ -204,6 +212,25 @@ class ManifestProcessor(
                 val modResourcesMd = File(currentDir, "src/main/resources/changelog.md")
                 if (modResourcesMd.exists()) return modResourcesMd
                 return if (changelogMd.exists()) changelogMd else null
+            }
+            currentDir = currentDir.parentFile
+        }
+        return null
+    }
+
+    private fun findMigrationsFile(sourceFile: KSFile): File? {
+        var currentDir = File(sourceFile.filePath).parentFile
+        while (currentDir != null) {
+            val migrationsJson = File(currentDir, "migrations.json")
+            if (migrationsJson.exists()) return migrationsJson
+
+            val resourcesMigrationsJson = File(currentDir, "src/main/resources/migrations.json")
+            if (resourcesMigrationsJson.exists()) return resourcesMigrationsJson
+
+            if (File(currentDir, "build.gradle.kts").exists() || File(currentDir, "build.gradle").exists()) {
+                val modResourcesJson = File(currentDir, "src/main/resources/migrations.json")
+                if (modResourcesJson.exists()) return modResourcesJson
+                return if (migrationsJson.exists()) migrationsJson else null
             }
             currentDir = currentDir.parentFile
         }
