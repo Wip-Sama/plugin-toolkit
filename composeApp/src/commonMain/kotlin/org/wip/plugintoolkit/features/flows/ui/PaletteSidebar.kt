@@ -287,7 +287,7 @@ private fun SystemPalette(
                 modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
             )
             
-            listOf("Save", "Load", "Log", "Delay", "Convert", "Merger", "Conditional", "Comparator", "For", "While").forEach { action ->
+            listOf("Save", "Load", "Log", "Delay", "Convert", "Merger", "Conditional", "Comparator", "For", "While", "create_folder").forEach { action ->
                 val systemNode = PaletteNode.System(action)
                 PaletteItem(
                     text = action,

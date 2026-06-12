@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
@@ -308,7 +309,7 @@ fun FlowRunnerView(
                             inputs.forEach { param ->
                                 val metadata = remember(param) {
                                     org.wip.plugintoolkit.api.ParameterMetadata(
-                                        defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
+                                        defaultValue = JsonPrimitive(param.defaultValue),
                                         description = "",
                                         type = param.dataType,
                                         required = true,
@@ -345,7 +346,7 @@ fun FlowRunnerView(
                                 if (param.type == ParameterType.SAVE) {
                                     val metadata = remember(param) {
                                         org.wip.plugintoolkit.api.ParameterMetadata(
-                                            defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
+                                            defaultValue = JsonPrimitive(param.defaultValue),
                                             description = "Target path to save flow results",
                                             type = param.dataType,
                                             required = true,

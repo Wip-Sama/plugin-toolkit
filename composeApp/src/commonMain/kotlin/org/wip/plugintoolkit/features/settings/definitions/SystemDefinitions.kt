@@ -7,9 +7,11 @@ import androidx.compose.material.icons.filled.Minimize
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Window
+import androidx.compose.material.icons.filled.Save
 import org.wip.plugintoolkit.core.utils.StartupManager
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.AutoUpdateSettings
+import org.wip.plugintoolkit.features.settings.model.FlowSettings
 import org.wip.plugintoolkit.features.settings.model.GeneralSettings
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
@@ -71,6 +73,18 @@ fun SettingsRegistryBuilder.systemDefinitions(viewModel: SettingsViewModel) {
                 subtitle = SettingText.Raw("Closing the main window will minimize it to the system tray"),
                 icon = Icons.Default.Close,
                 setValue = { s, v -> s.copy(general = s.general.copy(closeToTray = v)) }
+            )
+        }
+
+        // ── Flows ────────────────────────────────────────────────────
+        section(SettingText.Raw("Flows")) {
+            SettingSwitch(
+                p1 = AppSettings::flows,
+                p2 = FlowSettings::autosave,
+                title = SettingText.Raw("Autosave"),
+                subtitle = SettingText.Raw("Automatically save changes when editing flows"),
+                icon = Icons.Default.Save,
+                setValue = { s, v -> s.copy(flows = s.flows.copy(autosave = v)) }
             )
         }
 

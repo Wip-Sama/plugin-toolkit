@@ -82,8 +82,17 @@ class FlowEditorViewModel(
     private val settingsPersistence: SettingsPersistence? = null,
     private val notificationService: NotificationService? = null,
     private val pluginRegistry: PluginRegistry? = null,
-    private val activeFlowEditorTracker: ActiveFlowEditorTracker? = null
+    private val activeFlowEditorTracker: ActiveFlowEditorTracker? = null,
+    private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository? = null
 ) : ViewModel() {
+
+    private val resolvedSettingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository? by lazy {
+        settingsRepository ?: try {
+            getKoin().get()
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private val resolvedActiveFlowEditorTracker: ActiveFlowEditorTracker by lazy {
         activeFlowEditorTracker ?: try {
@@ -488,6 +497,12 @@ class FlowEditorViewModel(
             is FlowEvent.MoveConnectionFirst -> handleMoveConnectionFirst(event.connection)
             is FlowEvent.MoveConnectionLast -> handleMoveConnectionLast(event.connection)
             else -> {}
+        }
+
+        if (_state.value.hasUnsavedChanges && event !is FlowEvent.Save && event !is FlowEvent.SaveAs) {
+            if (resolvedSettingsRepository?.settings?.value?.flows?.autosave == true) {
+                handleSave()
+            }
         }
     }
 

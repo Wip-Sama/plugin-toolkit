@@ -69,6 +69,10 @@ object SystemNodesRegistry {
                 InputPort("condition", "Initial Condition", DataType.Primitive(PrimitiveType.BOOLEAN), defaultValue = true),
                 InputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY))
             )
+            "create_folder" -> listOf(
+                InputPort("path", "Path", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("sys/path")),
+                InputPort("folder_name", "Folder Name", DataType.Primitive(PrimitiveType.STRING))
+            )
             else -> emptyList()
         }
     }
@@ -111,6 +115,10 @@ object SystemNodesRegistry {
             )
             "while" -> listOf(
                 OutputPort("output_data", "Output Data", DataType.Primitive(PrimitiveType.ANY))
+            )
+            "create_folder" -> listOf(
+                OutputPort("path", "Path", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("sys/path")),
+                OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
             )
             else -> emptyList()
         }

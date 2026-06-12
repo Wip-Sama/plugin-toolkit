@@ -80,16 +80,16 @@ private fun parseMarkdown(text: String): AnnotatedString {
                         i += 1
                     }
                 }
-                c == '~' -> {
-                    val end = findClosing(text, i + 1, "~")
+                text.startsWith("~~", i) -> {
+                    val end = findClosing(text, i + 2, "~~")
                     if (end != -1) {
                         val start = length
-                        append(parseMarkdown(text.substring(i + 1, end)))
+                        append(parseMarkdown(text.substring(i + 2, end)))
                         addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), start, length)
-                        i = end + 1
+                        i = end + 2
                     } else {
-                        append("~")
-                        i += 1
+                        append("~~")
+                        i += 2
                     }
                 }
                 c == '`' -> {

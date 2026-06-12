@@ -8,7 +8,11 @@ import org.wip.plugintoolkit.core.ui.LocalLanguage
 
 sealed interface LocalizedString {
     data class Resource(val res: StringResource) : LocalizedString
-    data class Raw(val text: String) : LocalizedString
+    data class Raw(val text: String) : LocalizedString {
+        init {
+            println("WARN: String '$text' should be localized")
+        }
+    }
 
     @Composable
     fun resolve(): String = when (this) {
@@ -31,4 +35,6 @@ sealed interface LocalizedString {
 
 // Extensions for easy creation
 val StringResource.localized get() = LocalizedString.Resource(this)
-val String.localized get() = LocalizedString.Raw(this)
+val String.localized get() = LocalizedString.Raw(this).also {
+    println("WARN: .localized used on String '$this' - should be localized")
+}

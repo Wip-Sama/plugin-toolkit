@@ -2,25 +2,25 @@ Version: 1.6.0
 Date: 23-05-2026
 Changes:
 	- Updated dependencies
-	- Execute -> Flows / Capabilities (TODO)
-	- Flow editor is now only accessible by the flow manager (TODO)
-	- Changelog markdown strikethrough updated do double \~\~ from single (TODO)
+	- Execute -> Flows / Capabilities
+	- Flow editor is now only accessible by the flow manager
+	- Changelog markdown strikethrough updated do double \~\~ from single
 Removed:
 	- Dedicated sections for flows and plugins (TODO)
 Added:
 	- Better logging for plugin loading step 
-	- Dedicated section for repository and manager (TODO)
+	- Dedicated section for repository and manager
 	- System node to create a new folder with a specific name given a directory (TODO)
 	- System node to unpack dense capability output (TODO)
 	- Dynamic node Parameters, list and similar now allow for multiple connections in the port
 	- Capabilities locked behind plugin setting (TODO)
 	- Capabilities only available in flows (TODO)
 	- Capabilities only available in standard execution (TODO)
-	- CapabilityParameter can now be optional/required (required by default) (TODO)
-	- Autosave setting for flows (TODO)
+	- CapabilityParameter can now be OPTIONAL/required (required by default) (TODO)
+	- Autosave setting for flows
 	- Migration logic for plugins who change capabilities (update flows where possible) (TODO)
 	- Compact CapabilityOutput (TODO)
-		[A capability output can now be defined as acompact, 
+		[A capability output can now be defined as a compact, 
 		which means all it's fields are sent on a single connection between node,
 		when an output is dense if both side have compatible output it will be passed directly without parsing, 
 		it not it will be parsed as json and sent]

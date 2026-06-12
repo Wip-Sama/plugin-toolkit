@@ -193,7 +193,7 @@ fun runMain(args: Array<String>) {
             single { SettingsViewModel(get(), get(), get(), get()) }
             single { FlowViewModel(getOrNull(), getOrNull(), getOrNull()) }
             single { ActiveFlowEditorTracker() }
-            factory { (flowName: String) -> FlowEditorViewModel(flowName, getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
+            factory { (flowName: String) -> FlowEditorViewModel(flowName, getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get(), get(), get()) }

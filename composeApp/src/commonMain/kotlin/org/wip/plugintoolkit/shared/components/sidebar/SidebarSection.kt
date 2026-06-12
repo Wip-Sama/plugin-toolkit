@@ -93,7 +93,7 @@ fun <T> SidebarSection(
         section.elements.forEachIndexed { index, element ->
             val isSelected = element.id == currentSelection
 
-            val isVisible = !isSectionCollapsed || isSelected
+            val isVisible = (!isSectionCollapsed || isSelected) && element.isVisible
 
             val position = if (section.elements.size == 1 || (isSectionCollapsed && isSelected)) {
                 SidebarItemPosition.StandAlone
