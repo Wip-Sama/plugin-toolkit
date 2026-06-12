@@ -6,6 +6,7 @@ import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.ksp.toTypeName
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.Capability
+import org.wip.plugintoolkit.api.CapabilityContext
 import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.OutputMetadata
@@ -20,6 +21,7 @@ import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.Requirements
 import org.wip.plugintoolkit.api.SettingMetadata
+import org.wip.plugintoolkit.api.parseSemanticTypes
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
@@ -50,6 +52,11 @@ object ManifestJsonGenerator {
             val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
             val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
             val supportsCancel = capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
+            
+            val contextEnumKS = capAnn.arguments.find { it.name?.asString() == "context" }?.value as? com.google.devtools.ksp.symbol.KSType
+            val contextName = contextEnumKS?.declaration?.simpleName?.asString() ?: "ANY"
+            val context = CapabilityContext.valueOf(contextName)
+            val requiresSettingsList = (capAnn.arguments.find { it.name?.asString() == "requiresSettings" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
             
             val params = func.parameters.filter { param ->
                 val paramType = param.type.resolve().toTypeName().toString()
@@ -102,7 +109,7 @@ object ManifestJsonGenerator {
                     constraints = constraints,
                     required = required,
                     secret = secret,
-                    semanticTypes = semTypesVal.flatMap { org.wip.plugintoolkit.api.parseSemanticTypes(it) }
+                    semanticTypes = semTypesVal.flatMap { parseSemanticTypes(it) }
                 )
             }
             
@@ -127,7 +134,9 @@ object ManifestJsonGenerator {
                 semanticTypes = if (outputs.size == 1) outputs.first().semanticTypes else emptyList(),
                 outputs = outputs.ifEmpty { null },
                 isPausable = supportsPause || hasResumeState,
-                isCancellable = supportsCancel
+                isCancellable = supportsCancel,
+                context = context,
+                requiresSettings = requiresSettingsList
             )
         }
 

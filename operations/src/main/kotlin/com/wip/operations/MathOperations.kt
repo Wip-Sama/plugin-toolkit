@@ -13,41 +13,51 @@ import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.annotations.Capability
+import org.wip.plugintoolkit.api.annotations.CapabilityContext
 import org.wip.plugintoolkit.api.annotations.CapabilityOutput
 import org.wip.plugintoolkit.api.annotations.CapabilityParam
 import org.wip.plugintoolkit.api.annotations.PluginAction
 import org.wip.plugintoolkit.api.annotations.PluginInfo
 import org.wip.plugintoolkit.api.annotations.PluginSetting
 import org.wip.plugintoolkit.api.annotations.PluginValidate
+import org.wip.plugintoolkit.api.annotations.RequiresSetting
 import org.wip.plugintoolkit.api.annotations.ResumeState
 
 data class MathProcessorSettings(
     @PluginSetting(
         description = "API Key for Google services",
         defaultValue = "null",
-    )
-    val googleApiKey: String = "null",
+    ) val googleApiKey: String = "null",
 
     @PluginSetting(
         description = "Secure token for the operations server",
         required = true,
         secret = true
-    )
-    val serverToken: String = "",
+    ) val serverToken: String = "",
 
     @PluginSetting(
         description = "Name of the person performing the operations",
         required = true
-    )
-    val operatorName: String = ""
+    ) val operatorName: String = ""
 )
 
 @Serializable
 data class DivisionResult(
-    @CapabilityOutput(name = "quotient", description = "The quotient of the division")
-    val quotient: Int,
-    @CapabilityOutput(name = "remainder", description = "The remainder of the division")
-    val remainder: Int
+    @CapabilityOutput(name = "quotient", description = "The quotient of the division") val quotient: Int,
+    @CapabilityOutput(name = "remainder", description = "The remainder of the division") val remainder: Int
+)
+
+enum class VoiceOption {
+    @RequiresSetting(["googleApiKey"])
+    GOOGLE,
+
+    @RequiresSetting(["serverToken"])
+    SERVER, LOCAL
+}
+
+@Serializable
+data class ComplexObject(
+    val id: String, val properties: Map<String, String>, val metadata: Map<String, Int>
 )
 
 @PluginInfo(
@@ -58,12 +68,9 @@ data class DivisionResult(
     supportedOs = [OS.WINDOWS, OS.LINUX, OS.MACOS]
 )
 class MathProcessor(val settings: MathProcessorSettings) {
-
-
     @PluginValidate()
     fun validate(
-        logger: PluginLogger,
-        pluginContext: PluginContext
+        logger: PluginLogger, pluginContext: PluginContext
     ): Result<Unit> {
         if (settings.googleApiKey != "null") return Result.success(Unit)
         return Result.failure(Exception("Validation failed"))
@@ -124,22 +131,29 @@ class MathProcessor(val settings: MathProcessorSettings) {
 
     @Capability(name = "integer_divide", description = "Divides two integers and returns the quotient and remainder")
     fun integerDivideCapability(
-        @CapabilityParam(description = "Dividend") a: Int,
-        @CapabilityParam(description = "Divisor") b: Int
+        @CapabilityParam(description = "Dividend") a: Int, @CapabilityParam(description = "Divisor") b: Int
     ): DivisionResult {
         if (b == 0) throw ArithmeticException("Division by zero")
         return DivisionResult(a / b, a % b)
     }
 
     @Capability(name = "formatted_sum", description = "Returns the sum formatted as text")
-    @CapabilityOutput(name = "formattedResult", description = "The sum formatted as currency", semanticTypes = ["text/plain"])
+    @CapabilityOutput(
+        name = "formattedResult",
+        description = "The sum formatted as currency",
+        semanticTypes = ["text/plain"]
+    )
     fun formattedSumCapability(
         @CapabilityParam(description = "Values to sum") values: List<Double>
     ): String {
         return "$${values.sum()}"
     }
 
-    @Capability(name = "slow_pausable_sum", description = "Calculates the sum of a list of numbers slowly with pause support", supportsPause = true)
+    @Capability(
+        name = "slow_pausable_sum",
+        description = "Calculates the sum of a list of numbers slowly with pause support",
+        supportsPause = true
+    )
     suspend fun slowPausableSum(
         @CapabilityParam(description = "List of numbers to add") values: List<Double>,
         @CapabilityParam(description = "Delay in milliseconds between steps", defaultValue = "500") stepDelay: Long,
@@ -155,14 +169,12 @@ class MathProcessor(val settings: MathProcessorSettings) {
         }
         var currentIndex = state?.currentIndex ?: 0
         var runningSum = state?.runningSum ?: 0.0
-
         var isPaused = false
         context.onSignal { signal ->
             if (signal == PluginSignal.PAUSE) {
                 isPaused = true
             }
         }
-
         while (currentIndex < values.size) {
             if (isPaused) {
                 context.logger.info("slow_pausable_sum paused at index $currentIndex with running sum $runningSum")
@@ -175,12 +187,15 @@ class MathProcessor(val settings: MathProcessorSettings) {
             currentIndex++
             delay(stepDelay)
         }
-
         context.logger.info("slow_pausable_sum completed with result $runningSum")
         return ExecutionResult.Success(PluginResponse(result = Json.encodeToJsonElement(runningSum)))
     }
 
-    @Capability(name = "slow_pausable_factorial", description = "Calculates the factorial of a number slowly with pause support", supportsPause = true)
+    @Capability(
+        name = "slow_pausable_factorial",
+        description = "Calculates the factorial of a number slowly with pause support",
+        supportsPause = true
+    )
     suspend fun slowPausableFactorial(
         @CapabilityParam(description = "Number to compute factorial for") n: Int,
         @CapabilityParam(description = "Delay in milliseconds between steps", defaultValue = "500") stepDelay: Long,
@@ -199,21 +214,23 @@ class MathProcessor(val settings: MathProcessorSettings) {
         }
         var currentN = state?.currentN ?: 2
         var runningProduct = state?.runningProduct ?: 1L
-
         var isPaused = false
         context.onSignal { signal ->
             if (signal == PluginSignal.PAUSE) {
                 isPaused = true
             }
         }
-
         val target = n.coerceAtLeast(1)
-
         while (currentN <= target) {
             if (isPaused) {
                 context.logger.info("slow_pausable_factorial paused at multiplier $currentN with running product $runningProduct")
                 val pausedState = FactorialProgressState(currentN, runningProduct)
-                return ExecutionResult.Paused(Json.encodeToJsonElement(FactorialProgressState.serializer(), pausedState))
+                return ExecutionResult.Paused(
+                    Json.encodeToJsonElement(
+                        FactorialProgressState.serializer(),
+                        pausedState
+                    )
+                )
             }
             runningProduct *= currentN
             context.progress.report((currentN - 1).toFloat() / (target - 1).coerceAtLeast(1))
@@ -221,33 +238,38 @@ class MathProcessor(val settings: MathProcessorSettings) {
             currentN++
             delay(stepDelay)
         }
-
         context.logger.info("slow_pausable_factorial completed with result $runningProduct")
         return ExecutionResult.Success(PluginResponse(result = Json.encodeToJsonElement(runningProduct)))
     }
 
     @Capability(name = "regex_validate_ip", description = "Checks if the provided IP address is valid using regex")
     fun regexValidateIp(
-        @CapabilityParam(description = "IP address to validate", regex = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$") ip: String
+        @CapabilityParam(
+            description = "IP address to validate",
+            regex = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+        ) ip: String
     ): Boolean {
         return true
     }
 
-    @Capability(name = "sum_from_file", description = "Reads a txt file where each row contains a number, and sums them up")
+    @Capability(
+        name = "sum_from_file",
+        description = "Reads a txt file where each row contains a number, and sums them up"
+    )
     fun sumFromFile(
         @CapabilityParam(description = "Path to the text file", semanticTypes = ["file/txt"]) filePath: String
     ): Double {
         val file = java.io.File(filePath)
         if (!file.exists()) throw IllegalArgumentException("File does not exist: $filePath")
-        return file.readLines()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .mapNotNull { it.toDoubleOrNull() }
-            .sum()
+        return file.readLines().map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { it.toDoubleOrNull() }.sum()
     }
 
     @Capability(name = "invert_color", description = "Inverts a color string in rgb(r, g, b) format")
-    @CapabilityOutput(name = "invertedColor", description = "The inverted color in rgb(r, g, b) format", semanticTypes = ["color/rgb"])
+    @CapabilityOutput(
+        name = "invertedColor",
+        description = "The inverted color in rgb(r, g, b) format",
+        semanticTypes = ["color/rgb"]
+    )
     fun invertColor(
         @CapabilityParam(description = "Input color in rgb(r,g,b) format", semanticTypes = ["color/rgb"]) color: String
     ): String {
@@ -260,22 +282,43 @@ class MathProcessor(val settings: MathProcessorSettings) {
     }
 
     @Capability(name = "multi_semantic_op", description = "Test capability with multiple semantic types")
-    @CapabilityOutput(name = "output_data", description = "Multi-typed output", semanticTypes = ["color/rgb", "file/txt"])
+    @CapabilityOutput(
+        name = "output_data",
+        description = "Multi-typed output",
+        semanticTypes = ["color/rgb", "file/txt"]
+    )
     fun multiSemanticOp(
-        @CapabilityParam(description = "Multi-typed parameter", semanticTypes = ["color/rgb", "file/txt"]) inputVal: String
+        @CapabilityParam(
+            description = "Multi-typed parameter",
+            semanticTypes = ["color/rgb", "file/txt"]
+        ) inputVal: String
     ): String {
         return inputVal
+    }
+
+    @Capability(
+        name = "advanced_generation",
+        description = "Test capability for advanced features",
+        context = CapabilityContext.FLOW_ONLY,
+        requiresSettings = ["operatorName"]
+    )
+    fun advancedGeneration(
+        @CapabilityParam(description = "Voice to use") voice: VoiceOption,
+        @CapabilityParam(description = "Configuration map") config: Map<String, Double>
+    ): ComplexObject {
+        return ComplexObject(
+            id = "test-123",
+            properties = mapOf("voice" to voice.name),
+            metadata = config.mapValues { it.value.toInt() })
     }
 }
 
 @Serializable
 data class SumProgressState(
-    val currentIndex: Int,
-    val runningSum: Double
+    val currentIndex: Int, val runningSum: Double
 )
 
 @Serializable
 data class FactorialProgressState(
-    val currentN: Int,
-    val runningProduct: Long
+    val currentN: Int, val runningProduct: Long
 )

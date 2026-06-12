@@ -64,7 +64,11 @@ sealed class DataType {
      */
     @Serializable
     @SerialName("object")
-    data class Object(val className: String, val namespace: String? = null) : DataType() {
+    data class Object(
+        val className: String, 
+        val namespace: String? = null,
+        val properties: Map<String, DataType> = emptyMap()
+    ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             return value != null && value !is JsonNull
         }
@@ -75,9 +79,26 @@ sealed class DataType {
      */
     @Serializable
     @SerialName("enum")
-    data class Enum(val className: String, val options: List<String>, val namespace: String? = null) : DataType() {
+    data class Enum(
+        val className: String, 
+        val options: List<String>, 
+        val namespace: String? = null,
+        val optionRequirements: Map<String, List<String>> = emptyMap()
+    ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             return value != null && value !is JsonNull
+        }
+    }
+
+    /**
+     * A map of strings to a specific value type.
+     */
+    @Serializable
+    @SerialName("map")
+    data class MapType(val valueType: DataType) : DataType() {
+        override fun isProvided(value: JsonElement?): Boolean {
+            if (value == null || value is JsonNull) return false
+            return (value as? JsonObject)?.isNotEmpty() ?: true
         }
     }
 }
@@ -287,6 +308,11 @@ private class OutputMetadataSurrogate(
     val semanticTypes: List<SemanticType> = emptyList()
 )
 
+@Serializable
+enum class CapabilityContext {
+    ANY, FLOW_ONLY, STANDALONE_ONLY
+}
+
 /**
  * Metadata for a specific capability provided by the plugin.
  */
@@ -299,7 +325,9 @@ data class Capability(
     val semanticTypes: List<SemanticType> = emptyList(),
     val outputs: List<OutputMetadata>? = null,
     val isPausable: Boolean = false,
-    val isCancellable: Boolean = true
+    val isCancellable: Boolean = true,
+    val context: CapabilityContext = CapabilityContext.ANY,
+    val requiresSettings: List<String> = emptyList()
 )
 
 object CapabilitySerializer : KSerializer<Capability> {
@@ -314,7 +342,9 @@ object CapabilitySerializer : KSerializer<Capability> {
             semanticTypes = value.semanticTypes,
             outputs = value.outputs,
             isPausable = value.isPausable,
-            isCancellable = value.isCancellable
+            isCancellable = value.isCancellable,
+            context = value.context,
+            requiresSettings = value.requiresSettings
         )
         encoder.encodeSerializableValue(CapabilitySurrogate.serializer(), surrogate)
     }
@@ -345,7 +375,9 @@ object CapabilitySerializer : KSerializer<Capability> {
             semanticTypes = surrogate.semanticTypes,
             outputs = surrogate.outputs,
             isPausable = surrogate.isPausable,
-            isCancellable = surrogate.isCancellable
+            isCancellable = surrogate.isCancellable,
+            context = surrogate.context,
+            requiresSettings = surrogate.requiresSettings
         )
     }
 }
@@ -360,7 +392,9 @@ private class CapabilitySurrogate(
     val semanticTypes: List<SemanticType> = emptyList(),
     val outputs: List<OutputMetadata>? = null,
     val isPausable: Boolean = false,
-    val isCancellable: Boolean = true
+    val isCancellable: Boolean = true,
+    val context: CapabilityContext = CapabilityContext.ANY,
+    val requiresSettings: List<String> = emptyList()
 )
 
 /**

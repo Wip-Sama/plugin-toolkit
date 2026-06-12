@@ -1359,6 +1359,7 @@ class FlowEditorViewModel(
         return when (this) {
             is DataType.Primitive -> this.primitiveType.name.lowercase().replaceFirstChar { it.uppercase() }
             is DataType.Array -> "List<${this.items.format()}>"
+            is DataType.MapType -> "Map<String, ${this.valueType.format()}>"
             is DataType.Enum -> this.className.substringAfterLast('.')
             is DataType.Object -> this.className.substringAfterLast('.')
         }

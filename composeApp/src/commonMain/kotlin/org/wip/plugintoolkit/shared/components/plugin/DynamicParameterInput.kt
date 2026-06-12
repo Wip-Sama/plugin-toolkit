@@ -699,6 +699,7 @@ private fun formatDataType(type: DataType): String {
     return when (type) {
         is DataType.Primitive -> type.primitiveType.name.lowercase()
         is DataType.Array -> "list<${formatDataType(type.items)}>"
+        is DataType.MapType -> "map<string, ${formatDataType(type.valueType)}>"
         is DataType.Enum -> type.className.substringAfterLast('.')
         is DataType.Object -> type.className.substringAfterLast('.')
     }

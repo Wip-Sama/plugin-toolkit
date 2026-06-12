@@ -165,4 +165,19 @@ class MathOperationsTest {
         val response = result2.response
         assertEquals(24L, response.result.jsonPrimitive.long)
     }
+
+    @Test
+    fun testAdvancedGeneration() = runTest {
+        val processor = MathProcessor(MathProcessorSettings())
+        
+        val voice = VoiceOption.SERVER
+        val config = mapOf("speed" to 1.5, "pitch" to 0.8)
+        
+        val result = processor.advancedGeneration(voice, config)
+        
+        assertEquals("test-123", result.id)
+        assertEquals("SERVER", result.properties["voice"])
+        assertEquals(1, result.metadata["speed"])
+        assertEquals(0, result.metadata["pitch"])
+    }
 }

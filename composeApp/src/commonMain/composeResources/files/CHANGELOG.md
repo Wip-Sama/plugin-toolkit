@@ -6,29 +6,25 @@ Changes:
 	- Flow editor is now only accessible by the flow manager
 	- Changelog markdown strikethrough updated do double \~\~ from single
 Removed:
-	- Dedicated sections for flows and plugins (TODO)
+	- Dedicated sections for flows and plugins
 Added:
 	- Better logging for plugin loading step 
 	- Dedicated section for repository and manager
-	- System node to create a new folder with a specific name given a directory (TODO)
+	- System node to create a new folder with a specific name given a directory
 	- System node to unpack dense capability output (TODO)
 	- Dynamic node Parameters, list and similar now allow for multiple connections in the port
-	- Capabilities locked behind plugin setting (TODO)
-	- Capabilities only available in flows (TODO)
-	- Capabilities only available in standard execution (TODO)
-	- CapabilityParameter can now be OPTIONAL/required (required by default) (TODO)
+	- Capabilities locked behind required plugin setting/s
+	- Capabilities only available in flows 
+	- Capabilities only available in standard execution 
 	- Autosave setting for flows
-	- Migration logic for plugins who change capabilities (update flows where possible) (TODO)
-	- Compact CapabilityOutput (TODO)
-		[A capability output can now be defined as a compact, 
-		which means all it's fields are sent on a single connection between node,
-		when an output is dense if both side have compatible output it will be passed directly without parsing, 
-		it not it will be parsed as json and sent]
+	- Dense CapabilityOutput
 	- Nodes are not compactable in input/output to accomodate nodes with lots of input/outputs
+	- Migration logic for plugins who change capabilities (update flows where possible) (TODO)
 Fixed:
 	- Moving multiple selected nodes would not animate all the connection properly until movement stopped
 	- Capabilities with lots of input/output would not be drawn correctly
 	- When a capability used by a flow is changed, the flow is marked as broken if not updatable / alternative available (TODO)
+	- When a flow is installed the install button would not change to installed until reentering the tab/page (TODO)
 ----------------------------------------------------------------------------------------------------
 Version: 1.5.2
 Date: 23-05-2026
@@ -46,7 +42,7 @@ Added:
 	- Common semantic type analysis with custom input fields based on those
 	- Optional regex support to validate string input
 Changes:
-	- Restiled the ui a bit more
+	- Restyled the ui a bit more
 	- System dialogs are now blocking for the ui
 	- Moved managed folders to the settings
 ----------------------------------------------------------------------------------------------------

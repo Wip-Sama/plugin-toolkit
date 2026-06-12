@@ -68,6 +68,9 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
         is DataType.Array -> {
             other is DataType.Array && this.items.isCompatibleWith(other.items)
         }
+        is DataType.MapType -> {
+            other is DataType.MapType && this.valueType.isCompatibleWith(other.valueType)
+        }
         is DataType.Object -> {
             other is DataType.Object && this.className == other.className
         }
@@ -130,6 +133,7 @@ fun DataType.format(): String {
     return when (this) {
         is DataType.Primitive -> this.primitiveType.name
         is DataType.Array -> "Array<${this.items.format()}>"
+        is DataType.MapType -> "Map<String, ${this.valueType.format()}>"
         is DataType.Object -> this.className.substringAfterLast('.')
         is DataType.Enum -> this.className.substringAfterLast('.')
     }

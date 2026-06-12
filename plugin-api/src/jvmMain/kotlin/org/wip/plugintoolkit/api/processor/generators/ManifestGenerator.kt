@@ -69,6 +69,10 @@ object ManifestGenerator {
             val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
             val supportsCancel = capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
 
+            val contextEnumKS = capAnn.arguments.find { it.name?.asString() == "context" }?.value as? com.google.devtools.ksp.symbol.KSType
+            val contextName = contextEnumKS?.declaration?.simpleName?.asString() ?: "ANY"
+            val requiresSettingsList = (capAnn.arguments.find { it.name?.asString() == "requiresSettings" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+
             val hasResumeState = func.parameters.any { param -> 
                 param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }
             }
@@ -79,6 +83,12 @@ object ManifestGenerator {
             capabilitiesCode.add("description = %S,\n", capDesc)
             capabilitiesCode.add("isPausable = %L,\n", supportsPause || hasResumeState)
             capabilitiesCode.add("isCancellable = %L,\n", supportsCancel)
+            capabilitiesCode.add("context = %T.%L,\n", ClassName("org.wip.plugintoolkit.api", "CapabilityContext"), contextName)
+            if (requiresSettingsList.isEmpty()) {
+                capabilitiesCode.add("requiresSettings = emptyList(),\n")
+            } else {
+                capabilitiesCode.add("requiresSettings = listOf(%L),\n", requiresSettingsList.joinToString { "\"$it\"" })
+            }
             capabilitiesCode.add("parameters = mapOf(\n")
             capabilitiesCode.indent()
             

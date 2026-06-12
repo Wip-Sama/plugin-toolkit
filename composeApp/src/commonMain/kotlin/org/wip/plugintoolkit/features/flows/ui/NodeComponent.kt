@@ -1032,6 +1032,7 @@ fun NodeComponent(
                         is DataType.Object -> "Object"
                         is DataType.Array -> "Array"
                         is DataType.Enum -> "Enum"
+                        is DataType.MapType -> "Map"
                     }
                 )
             }
@@ -1394,6 +1395,7 @@ private fun formatDataType(type: DataType): String {
     return when (type) {
         is DataType.Primitive -> type.primitiveType.name.lowercase().replaceFirstChar { it.uppercase() }
         is DataType.Array -> "List<${formatDataType(type.items)}>"
+        is DataType.MapType -> "Map<String, ${formatDataType(type.valueType)}>"
         is DataType.Enum -> type.className.substringAfterLast('.')
         is DataType.Object -> type.className.substringAfterLast('.')
     }
