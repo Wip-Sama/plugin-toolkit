@@ -2,6 +2,8 @@ package org.wip.plugintoolkit
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,6 +24,9 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.rememberWindowState
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.platformLogWriter
@@ -173,7 +178,7 @@ fun runMain(args: Array<String>) {
             single { PluginLockProvider() }
             single { PluginRegistry(get(), get(named("AppScope")), get(named("LoomDispatcher"))) }
             single { PluginLifecycleManager(get(), get(), get(), get()) }
-            single { PluginLifecycleCoordinator(get(), get(), get(), get(), get(named("AppScope"))) }
+            single { PluginLifecycleCoordinator(get(), get(), get(), get(named("AppScope"))) }
             single { PluginFolderManager(get(), get(), get()) }
             single { PluginInstaller(get(), get(), get(), get(), get(), get(), get()) }
             single { PluginScanner(get()) }
@@ -188,11 +193,11 @@ fun runMain(args: Array<String>) {
             single { SettingsViewModel(get(), get(), get(), get()) }
             single { FlowViewModel(getOrNull(), getOrNull(), getOrNull()) }
             single { ActiveFlowEditorTracker() }
-            factory { (flowName: String) -> FlowEditorViewModel(flowName, getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
+            factory { (flowName: String) -> FlowEditorViewModel(flowName, getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get(), get(), get()) }
-            factory { PluginManagerViewModel(get(), get(), get(), get(), get()) }
+            factory { PluginManagerViewModel(get(), get(), get(), get(), get(), get()) }
             factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
             factory { JobViewModel(get()) }
             factory { AppViewModel(get(), get()) }
@@ -295,6 +300,20 @@ fun runMain(args: Array<String>) {
         // Sync default JVM locale synchronously before composition
         PlatformLocalization.setApplicationLanguage(languageCode)
 
+        // Provide a root ViewModelStoreOwner for the application to prevent StackOverflow in LocalViewModelStoreOwner
+        // on some Compose Multiplatform versions where the default lookup loops.
+        val viewModelStoreOwner = remember {
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
+        }
+
+        DisposableEffect(Unit) {
+            onDispose {
+                viewModelStoreOwner.viewModelStore.clear()
+            }
+        }
+
         val trayState = rememberTrayState()
         var isVisible by remember { mutableStateOf(startMode != WindowStartMode.Minimized) }
 
@@ -360,7 +379,9 @@ fun runMain(args: Array<String>) {
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    App(viewModel = viewModel)
+                    CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
+                        App(viewModel = viewModel)
+                    }
                 }
             }
         }

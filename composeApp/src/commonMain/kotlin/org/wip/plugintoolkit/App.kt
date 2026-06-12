@@ -1,19 +1,18 @@
 package org.wip.plugintoolkit
 
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import org.wip.plugintoolkit.core.model.localized
+import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
+import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.AppTheme
@@ -95,7 +94,30 @@ private fun AppContentImpl(
             val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
             val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
 
-            val sections = appViewModel.sections
+            val baseSections = appViewModel.sections
+            val sections = remember(baseSections, currentScreen) {
+                val isEditingFlow = currentScreen is Screen.FlowEditor
+                val newSections = baseSections.toMutableList()
+                val mgtIndex = newSections.indexOfFirst { it.title == "Management".localized }
+                if (mgtIndex != -1) {
+                    val mgtSection = newSections[mgtIndex]
+                    val newElements = mgtSection.elements.toMutableList()
+                    val flowManagerIndex = newElements.indexOfFirst { it.id == Screen.FlowManager }
+                    val insertIndex = if (flowManagerIndex >= 0) flowManagerIndex + 1 else newElements.size
+                    
+                    val editorId = if (currentScreen is Screen.FlowEditor) currentScreen else Screen.FlowEditor("")
+                    
+                    val editorElement = SidebarElement(
+                        id = editorId as Screen,
+                        icon = Icons.Default.Edit,
+                        title = "Editor".localized,
+                        isVisible = isEditingFlow
+                    )
+                    newElements.add(insertIndex, editorElement)
+                    newSections[mgtIndex] = mgtSection.copy(elements = newElements)
+                }
+                newSections
+            }
             val bottomSections = remember(appViewModel.bottomSections) {
                 appViewModel.bottomSections.map { section ->
                     section.copy(elements = section.elements.map { element ->

@@ -75,7 +75,39 @@ class PluginLifecycleManagerTest {
         println("Asserting value is correct")
         assertEquals("new-value", (loaded3.settings["key"] as JsonPrimitive).content)
         println("Asserting newStore === loaded3")
+        println("Asserting newStore === loaded3")
         assertSame(newStore, loaded3, "Should return the same instance that was saved")
         println("Test completed successfully")
+    }
+
+    @Test
+    fun testLoadPluginCatchesError() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+
+        val pkg = "test.error.plugin"
+        registry.addOrUpdatePlugin(InstalledPlugin(pkg = pkg, name = "Test", version = "1.0.0", installPath = "/tmp/test.plugin", isEnabled = true))
+
+        io.mockk.mockkObject(PluginLoader)
+        try {
+            io.mockk.every { PluginLoader.loadPlugin(any(), any()) } throws Error("Incompatible plugin")
+
+            val result = lifecycleManager.loadPlugin(pkg)
+            
+            kotlin.test.assertTrue(result.isFailure, "Result should be failure when an Error is thrown")
+            val exception = result.exceptionOrNull()
+            kotlin.test.assertNotNull(exception, "Exception should not be null")
+            kotlin.test.assertTrue(exception.message?.contains("Fatal error loading plugin classes") == true, "Exception message should indicate fatal error")
+            
+            // Check if loadError was updated
+            val updatedPlugin = registry.getPlugin(pkg)
+            kotlin.test.assertEquals("Fatal error loading plugin classes", updatedPlugin?.loadError, "Load error should be set on the plugin")
+        } finally {
+            io.mockk.unmockkAll()
+        }
     }
 }

@@ -3,6 +3,7 @@ package org.wip.plugintoolkit.features.flows.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.drag
@@ -12,7 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +27,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.gestures.detectTapGestures
 import org.wip.plugintoolkit.core.utils.PlatformUtils
@@ -36,9 +39,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +68,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -97,6 +102,7 @@ import plugintoolkit.composeapp.generated.resources.node_edit_output_title
 import plugintoolkit.composeapp.generated.resources.node_port_name_label
 import plugintoolkit.composeapp.generated.resources.node_semantic_type_label
 import plugintoolkit.composeapp.generated.resources.node_semantic_type_placeholder
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun NodeComponent(
@@ -117,6 +123,9 @@ fun NodeComponent(
     onPress: (Long) -> Unit = {},
     onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit = { _, _, _, _, _ -> },
+    onToggleCollapse: (Long) -> Unit = {},
+    onToggleInputsCollapse: (Long) -> Unit = {},
+    onToggleOutputsCollapse: (Long) -> Unit = {},
     highlightedPortId: String? = null,
     highlightedPortColor: Color? = null,
     boardLayoutCoordinates: LayoutCoordinates?,
@@ -142,7 +151,13 @@ fun NodeComponent(
     var activeColorInputId by remember { mutableStateOf<String?>(null) }
 
     val (headerColor, onHeaderColor) = when (node) {
-        is Node.CapabilityNode -> Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+        is Node.CapabilityNode -> {
+            if (node.isBroken) {
+                Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
+            } else {
+                Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+            }
+        }
         is Node.SystemNode -> {
             if (node.systemAction.lowercase() == "error") {
                 Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
@@ -186,7 +201,7 @@ fun NodeComponent(
                                     if (event.type == PointerEventType.Enter) {
                                         tooltipJob?.cancel()
                                         tooltipJob = scope.launch {
-                                            delay(2000)
+                                            delay(2000.milliseconds)
                                             showTooltip = true
                                         }
                                     } else if (event.type == PointerEventType.Exit) {
@@ -239,6 +254,17 @@ fun NodeComponent(
                             overflow = TextOverflow.Ellipsis
                         )
                         
+                        if (node is Node.CapabilityNode && node.isBroken) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Box(
+                                modifier = Modifier
+                                    .background(onHeaderColor, MaterialTheme.shapes.extraSmall)
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Text("BROKEN", color = headerColor, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        
                         if (node is Node.SubFlowNode && !isReadOnly) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             IconButton(
@@ -252,6 +278,19 @@ fun NodeComponent(
                                     modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                 )
                             }
+                        }
+                        
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        IconButton(
+                            onClick = { onToggleCollapse(node.id) },
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                        ) {
+                            Icon(
+                                imageVector = if (node.isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                contentDescription = "Toggle Collapse",
+                                tint = onHeaderColor.copy(alpha = 0.8f),
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
                         }
                     }
 
@@ -321,21 +360,54 @@ fun NodeComponent(
                 }
 
                 // Body
+                // Body
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(ToolkitTheme.spacing.mediumSmall),
                     verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
                 ) {
-                    // Inputs
-                    node.inputs.forEach { input ->
+                    // Inputs Section
+                    if (node.inputs.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onToggleInputsCollapse(node.id) },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (node.isInputsCollapsed) {
+                                    PortCircle(
+                                        color = headerColor,
+                                        isHighlighted = false,
+                                        onDragStart = {}, onDrag = {}, onDragEnd = {},
+                                        modifier = Modifier.onGloballyPositioned { coords ->
+                                            if (boardLayoutCoordinates != null) {
+                                                val center = boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
+                                                node.inputs.forEach { input ->
+                                                    onPortPositioned(node.id, input.id, center)
+                                                }
+                                            }
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                }
+                                Text("Inputs", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            }
+                            Icon(
+                                imageVector = if (node.isInputsCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                contentDescription = "Toggle Inputs"
+                            )
+                        }
+                    }
+                        if (!node.isInputsCollapsed) {
+                            node.inputs.forEach { input ->
                         val currentPortValue = input.value ?: input.defaultValue
                         val portErrors = validationErrors.filter {
                             (it.sourceNodeId == node.id && it.sourcePortId == input.id) ||
                             (it.targetNodeId == node.id && it.targetPortId == input.id)
                         }
                         Row(
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -345,11 +417,32 @@ fun NodeComponent(
                                     isHighlighted = highlightedPortId == input.id,
                                     onDragStart = { if (!isReadOnly) onStartConnection(node.id, input.id, false) },
                                     onDrag = { if (!isReadOnly) onDragConnection(it) },
-                                    onDragEnd = { if (!isReadOnly) onDropConnection(it) }
+                                    onDragEnd = { if (!isReadOnly) onDropConnection(it) },
+                                    modifier = Modifier.onGloballyPositioned { coords ->
+                                        if (boardLayoutCoordinates != null) {
+                                            val center = boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
+                                            onPortPositioned(node.id, input.id, center)
+                                        }
+                                    }
                                 )
                                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(input.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                    if (!input.description.isNullOrBlank()) {
+                                        TooltipArea(
+                                            delayMillis = 3000,
+                                            tooltip = {
+                                                Text(
+                                                    text = input.description,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        ) {
+                                            Text(input.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    } else {
+                                        Text(input.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                    }
                                     val inferredType = inferredTypes[Pair(node.id, input.id)] ?: input.dataType
                                     val typeLabel = if (input.dataType is DataType.Primitive && input.dataType.primitiveType == PrimitiveType.ANY &&
                                                        !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)) {
@@ -787,22 +880,75 @@ fun NodeComponent(
                                     }
                                 }
                             }
+                            }
                         }
                     }
 
-                    if (node.inputs.isNotEmpty() && node.outputs.isNotEmpty()) {
-                        Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    if (node.inputs.isNotEmpty() && node.outputs.isNotEmpty() && !node.isInputsCollapsed && !node.isOutputsCollapsed) {
+                        HorizontalDivider(
+                            Modifier,
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                     }
 
-                    // Outputs
-                    node.outputs.forEach { output ->
+                    // Outputs Section
+                    // Outputs Section
+                    if (node.outputs.isNotEmpty()) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            modifier = Modifier.fillMaxWidth().clickable { onToggleOutputsCollapse(node.id) },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Outputs", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (node.isOutputsCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Toggle Outputs"
+                                )
+                                if (node.isOutputsCollapsed) {
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                    PortCircle(
+                                        color = headerColor,
+                                        isHighlighted = false,
+                                        onDragStart = {}, onDrag = {}, onDragEnd = {},
+                                        modifier = Modifier.onGloballyPositioned { coords ->
+                                            if (boardLayoutCoordinates != null) {
+                                                val center = boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
+                                                node.outputs.forEach { output ->
+                                                    onPortPositioned(node.id, output.id, center)
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (!node.isOutputsCollapsed) {
+                        node.outputs.forEach { output ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.End
                         ) {
                             Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
-                                Text(output.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                if (!output.description.isNullOrBlank()) {
+                                    TooltipArea(
+                                        delayMillis = 3000,
+                                        tooltip = {
+                                            Text(
+                                                text = output.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    ) {
+                                        Text(output.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                    }
+                                } else {
+                                    Text(output.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                }
                                 val inferredType = inferredTypes[Pair(node.id, output.id)] ?: output.dataType
                                 val typeLabel = if (output.dataType is DataType.Primitive && output.dataType.primitiveType == PrimitiveType.ANY &&
                                                    !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)) {
@@ -857,15 +1003,21 @@ fun NodeComponent(
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                             PortCircle(
                                 color = if (highlightedPortId == output.id) (highlightedPortColor ?: headerColor) else headerColor,
                                 isHighlighted = highlightedPortId == output.id,
                                 onDragStart = { if (!isReadOnly) onStartConnection(node.id, output.id, true) },
                                 onDrag = { if (!isReadOnly) onDragConnection(it) },
-                                onDragEnd = { if (!isReadOnly) onDropConnection(it) }
+                                onDragEnd = { if (!isReadOnly) onDropConnection(it) },
+                                modifier = Modifier.onGloballyPositioned { coords ->
+                                    if (boardLayoutCoordinates != null) {
+                                        val center = boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
+                                        onPortPositioned(node.id, output.id, center)
+                                    }
+                                }
                             )
                         }
+                    }
                     }
                 }
             }
@@ -923,9 +1075,9 @@ fun NodeComponent(
         val port = if (node is Node.FlowInputNode) node.outputs.firstOrNull() else node.inputs.firstOrNull()
         if (port != null) {
             var name by remember { mutableStateOf(port.name) }
-            var selectedTypeOption by remember {
+            var selectedTypeOption by remember { 
                 mutableStateOf(
-                    when (val dt = port.dataType) {
+                    when (val dt = if (port.dataType is DataType.Array) (port.dataType as DataType.Array).items else port.dataType) {
                         is DataType.Primitive -> {
                             if (dt.primitiveType == PrimitiveType.ANY) "Any"
                             else dt.primitiveType.name.lowercase().replaceFirstChar { it.uppercase() }
@@ -933,12 +1085,13 @@ fun NodeComponent(
                         is DataType.Object -> "Object"
                         is DataType.Array -> "Array"
                         is DataType.Enum -> "Enum"
+                        is DataType.MapType -> "Map"
                     }
                 )
             }
             var customClassName by remember {
                 mutableStateOf(
-                    when (val dt = port.dataType) {
+                    when (val dt = if (port.dataType is DataType.Array) (port.dataType as DataType.Array).items else port.dataType) {
                         is DataType.Object -> dt.className
                         is DataType.Enum -> dt.className
                         else -> ""
@@ -1035,7 +1188,7 @@ fun NodeComponent(
                         )
 
                         if (node is Node.FlowInputNode) {
-                            Divider()
+                            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
                             Text("Constraints & Settings", style = MaterialTheme.typography.titleSmall)
                             
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1295,6 +1448,7 @@ private fun formatDataType(type: DataType): String {
     return when (type) {
         is DataType.Primitive -> type.primitiveType.name.lowercase().replaceFirstChar { it.uppercase() }
         is DataType.Array -> "List<${formatDataType(type.items)}>"
+        is DataType.MapType -> "Map<String, ${formatDataType(type.valueType)}>"
         is DataType.Enum -> type.className.substringAfterLast('.')
         is DataType.Object -> type.className.substringAfterLast('.')
     }

@@ -118,15 +118,11 @@ fun FlowEditorView(
     var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
 
     // State for port position tracking
+    val portPositions = remember { mutableStateMapOf<Pair<Long, String>, Offset>() }
     val getPortBoardPosition = { nodeId: Long, portId: String ->
-        val node = flow.nodes.find { it.id == nodeId }
-        if (node != null) {
-            val dragOffset = if (state.draggedNodeId == nodeId) state.currentDragOffset else Offset.Zero
-            node.position + dragOffset + getPortRelativeOffset(node, portId, density)
-        } else {
-            null
-        }
+        portPositions[Pair(nodeId, portId)]
     }
+    
     val nodeSizes = remember { mutableStateMapOf<Long, IntSize>() }
     var highlightedPortId by remember { mutableStateOf<String?>(null) }
     var highlightedNodeId by remember { mutableStateOf<Long?>(null) }
@@ -179,6 +175,8 @@ fun FlowEditorView(
             onBoardLayoutCoordinatesChanged = { boardLayoutCoordinates = it },
             onBoardSizeChanged = { boardSize = it },
             onDeleteConnection = { viewModel.onEvent(FlowEvent.DeleteConnection(it)) },
+            onMoveConnectionFirst = { viewModel.onEvent(FlowEvent.MoveConnectionFirst(it)) },
+            onMoveConnectionLast = { viewModel.onEvent(FlowEvent.MoveConnectionLast(it)) },
             selectedNodeIds = state.selectedNodeIds,
             onSelectNodes = { viewModel.onEvent(FlowEvent.SelectNodes(it)) },
             onClearSelection = { viewModel.onEvent(FlowEvent.ClearSelection) },
@@ -244,6 +242,12 @@ fun FlowEditorView(
                             onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, NodeSerializationUtils.anyToJsonElement(value))) },
                             onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList -> viewModel.onEvent(FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticTypes, constraints, isList)) },
                             onUpdateSystemNodeSettings = { id, portId, semanticTypes, inputPortId, extensions -> viewModel.onEvent(FlowEvent.UpdateSystemNodeSettings(id, portId, semanticTypes, inputPortId, extensions)) },
+                            onToggleCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeCollapse(id)) },
+                            onToggleInputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeInputsCollapse(id)) },
+                            onToggleOutputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeOutputsCollapse(id)) },
+                            onPortPositioned = { nodeId, portId, pos -> 
+                                portPositions[Pair(nodeId, portId)] = (pos - state.offset) / state.scale
+                            },
                             onStartConnection = { nodeId, portId, isOutput -> 
                                 isDrawingConnection = true
                                 connectionStartNodeId = nodeId

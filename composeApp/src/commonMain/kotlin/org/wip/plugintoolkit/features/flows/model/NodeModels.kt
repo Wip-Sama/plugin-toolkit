@@ -91,6 +91,7 @@ interface Port {
     val name: String
     val dataType: DataType
     val semanticTypes: List<SemanticType>
+    val description: String?
 }
 
 @Serializable(with = InputPortSerializer::class)
@@ -101,7 +102,8 @@ data class InputPort(
     override val semanticTypes: List<SemanticType> = emptyList(),
     @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
     @Serializable(with = AnySerializer::class) val value: Any? = null,
-    val constraints: PortConstraints? = null
+    val constraints: PortConstraints? = null,
+    override val description: String? = null
 ) : Port
 
 object InputPortSerializer : KSerializer<InputPort> {
@@ -111,6 +113,7 @@ object InputPortSerializer : KSerializer<InputPort> {
         val surrogate = InputPortSurrogate(
             id = value.id,
             name = value.name,
+            description = value.description,
             dataType = value.dataType,
             semanticTypes = value.semanticTypes,
             defaultValue = value.defaultValue,
@@ -127,6 +130,7 @@ object InputPortSerializer : KSerializer<InputPort> {
         return InputPort(
             id = surrogate.id,
             name = surrogate.name,
+            description = surrogate.description,
             dataType = surrogate.dataType,
             semanticTypes = surrogate.semanticTypes ?: emptyList(),
             defaultValue = surrogate.defaultValue,
@@ -147,7 +151,8 @@ private data class InputPortSurrogate(
     @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
     @Serializable(with = AnySerializer::class) val value: Any? = null,
     val regex: String? = null,
-    val constraints: PortConstraints? = null
+    val constraints: PortConstraints? = null,
+    val description: String? = null
 )
 
 @Serializable(with = OutputPortSerializer::class)
@@ -155,7 +160,8 @@ data class OutputPort(
     override val id: String,
     override val name: String,
     override val dataType: DataType,
-    override val semanticTypes: List<SemanticType> = emptyList()
+    override val semanticTypes: List<SemanticType> = emptyList(),
+    override val description: String? = null
 ) : Port
 
 object OutputPortSerializer : KSerializer<OutputPort> {
@@ -165,6 +171,7 @@ object OutputPortSerializer : KSerializer<OutputPort> {
         val surrogate = OutputPortSurrogate(
             id = value.id,
             name = value.name,
+            description = value.description,
             dataType = value.dataType,
             semanticTypes = value.semanticTypes
         )
@@ -192,6 +199,7 @@ object OutputPortSerializer : KSerializer<OutputPort> {
         return OutputPort(
             id = surrogate.id,
             name = surrogate.name,
+            description = surrogate.description,
             dataType = surrogate.dataType,
             semanticTypes = surrogate.semanticTypes
         )
@@ -204,7 +212,8 @@ private class OutputPortSurrogate(
     val id: String,
     val name: String,
     val dataType: DataType,
-    val semanticTypes: List<SemanticType> = emptyList()
+    val semanticTypes: List<SemanticType> = emptyList(),
+    val description: String? = null
 )
 
 @Serializable
@@ -221,10 +230,16 @@ sealed class Node {
     abstract val title: String
     abstract val inputs: List<InputPort>
     abstract val outputs: List<OutputPort>
+    abstract val isCollapsed: Boolean
+    abstract val isInputsCollapsed: Boolean
+    abstract val isOutputsCollapsed: Boolean
     
     abstract fun copyWithPosition(newPosition: Offset): Node
     abstract fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node
     abstract fun copyWithId(newId: Long): Node
+    abstract fun copyWithCollapsedState(isCollapsed: Boolean): Node
+    abstract fun copyWithInputsCollapsedState(isCollapsed: Boolean): Node
+    abstract fun copyWithOutputsCollapsedState(isCollapsed: Boolean): Node
 
     @Serializable
     @SerialName("capability")
@@ -234,11 +249,18 @@ sealed class Node {
         val pluginInfo: PluginInfo,
         val capability: Capability,
         override val inputs: List<InputPort>,
-        override val outputs: List<OutputPort>
+        override val outputs: List<OutputPort>,
+        override val isCollapsed: Boolean = false,
+        override val isInputsCollapsed: Boolean = false,
+        override val isOutputsCollapsed: Boolean = false,
+        val isBroken: Boolean = false
     ) : Node() {
         override val title: String get() = capability.name
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
         override fun copyWithId(newId: Long) = copy(id = newId)
+        override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
+        override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
+        override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -254,10 +276,16 @@ sealed class Node {
         override val title: String,
         val systemAction: String, // e.g., "save", "load"
         override val inputs: List<InputPort>,
-        override val outputs: List<OutputPort>
+        override val outputs: List<OutputPort>,
+        override val isCollapsed: Boolean = false,
+        override val isInputsCollapsed: Boolean = false,
+        override val isOutputsCollapsed: Boolean = false
     ) : Node() {
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
         override fun copyWithId(newId: Long) = copy(id = newId)
+        override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
+        override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
+        override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -272,12 +300,18 @@ sealed class Node {
         @Serializable(with = OffsetSerializer::class) override val position: Offset,
         override val outputs: List<OutputPort>,
         val constraints: PortConstraints? = null,
-        val isList: Boolean = false
+        val isList: Boolean = false,
+        override val isCollapsed: Boolean = false,
+        override val isInputsCollapsed: Boolean = false,
+        override val isOutputsCollapsed: Boolean = false
     ) : Node() {
         override val title: String get() = "Flow Input (${outputs.firstOrNull()?.name ?: "input_data"})"
         override val inputs: List<InputPort> = emptyList() // Uses outputs to provide data into the flow
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
         override fun copyWithId(newId: Long) = copy(id = newId)
+        override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
+        override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
+        override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node = this
     }
 
@@ -286,12 +320,18 @@ sealed class Node {
     data class FlowOutputNode(
         override val id: Long,
         @Serializable(with = OffsetSerializer::class) override val position: Offset,
-        override val inputs: List<InputPort>
+        override val inputs: List<InputPort>,
+        override val isCollapsed: Boolean = false,
+        override val isInputsCollapsed: Boolean = false,
+        override val isOutputsCollapsed: Boolean = false
     ) : Node() {
         override val title: String get() = "Flow Output (${inputs.firstOrNull()?.name ?: "output_data"})"
         override val outputs: List<OutputPort> = emptyList() // Uses inputs to collect data from the flow
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
         override fun copyWithId(newId: Long) = copy(id = newId)
+        override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
+        override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
+        override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -308,11 +348,17 @@ sealed class Node {
         override val inputs: List<InputPort>,
         override val outputs: List<OutputPort>,
         val inputMappings: List<SubflowPortMapping> = emptyList(),
-        val outputMappings: List<SubflowPortMapping> = emptyList()
+        val outputMappings: List<SubflowPortMapping> = emptyList(),
+        override val isCollapsed: Boolean = false,
+        override val isInputsCollapsed: Boolean = false,
+        override val isOutputsCollapsed: Boolean = false
     ) : Node() {
         override val title: String get() = flowName
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
         override fun copyWithId(newId: Long) = copy(id = newId)
+        override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
+        override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
+        override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -326,7 +372,8 @@ data class Connection(
     val sourceNodeId: Long,
     val sourcePortId: String,
     val targetNodeId: Long,
-    val targetPortId: String
+    val targetPortId: String,
+    val orderIndex: Int? = null
 )
 
 @Serializable
@@ -336,7 +383,47 @@ data class Flow(
     val connections: List<Connection> = emptyList(),
     val version: String = "1.0.0",
     val description: String? = null
-)
+) {
+    fun getInferredDataTypeForOutput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
+        val baseType = fallbackType
+        val baseArray = baseType as? DataType.Array
+        val baseItems = baseArray?.items
+        
+        if (baseType is DataType.Primitive && baseType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+            val connection = connections.find { it.sourceNodeId == nodeId && it.sourcePortId == portId }
+            val targetNode = nodes.find { it.id == connection?.targetNodeId }
+            val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
+            return targetPort?.dataType ?: fallbackType
+        } else if (baseArray != null && baseItems is DataType.Primitive && baseItems.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+            val connection = connections.find { it.sourceNodeId == nodeId && it.sourcePortId == portId }
+            val targetNode = nodes.find { it.id == connection?.targetNodeId }
+            val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
+            val targetType = targetPort?.dataType
+            if (targetType is DataType.Array) return targetType else return fallbackType
+        }
+        return fallbackType
+    }
+
+    fun getInferredDataTypeForInput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
+        val baseType = fallbackType
+        val baseArray = baseType as? DataType.Array
+        val baseItems = baseArray?.items
+        
+        if (baseType is DataType.Primitive && baseType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+            val connection = connections.find { it.targetNodeId == nodeId && it.targetPortId == portId }
+            val sourceNode = nodes.find { it.id == connection?.sourceNodeId }
+            val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
+            return sourcePort?.dataType ?: fallbackType
+        } else if (baseArray != null && baseItems is DataType.Primitive && baseItems.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+            val connection = connections.find { it.targetNodeId == nodeId && it.targetPortId == portId }
+            val sourceNode = nodes.find { it.id == connection?.sourceNodeId }
+            val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
+            val sourceType = sourcePort?.dataType
+            if (sourceType is DataType.Array) return sourceType else return fallbackType
+        }
+        return fallbackType
+    }
+}
 
 @Serializable
 data class PortConstraints(

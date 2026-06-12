@@ -2,6 +2,8 @@ package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -45,6 +47,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -72,6 +75,8 @@ fun BoardCanvas(
     onBoardLayoutCoordinatesChanged: (LayoutCoordinates) -> Unit,
     onBoardSizeChanged: (IntSize) -> Unit,
     onDeleteConnection: (org.wip.plugintoolkit.features.flows.model.Connection) -> Unit,
+    onMoveConnectionFirst: (org.wip.plugintoolkit.features.flows.model.Connection) -> Unit,
+    onMoveConnectionLast: (org.wip.plugintoolkit.features.flows.model.Connection) -> Unit,
     selectedNodeIds: Set<Long>,
     onSelectNodes: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
@@ -372,6 +377,65 @@ fun BoardCanvas(
                     size = androidx.compose.ui.geometry.Size(rectRight - rectLeft, rectBottom - rectTop),
                     style = Stroke(width = 2.dp.toPx())
                 )
+            }
+        }
+
+        // Order Badges
+        flow.connections.forEach { conn ->
+            if (conn.orderIndex != null) {
+                androidx.compose.runtime.key(conn.sourceNodeId, conn.sourcePortId, conn.targetNodeId, conn.targetPortId) {
+                    val sourcePortBoardPos = getPortBoardPosition(conn.sourceNodeId, conn.sourcePortId)
+                    val targetPortBoardPos = getPortBoardPosition(conn.targetNodeId, conn.targetPortId)
+                    if (sourcePortBoardPos != null && targetPortBoardPos != null) {
+                        val startPos = (sourcePortBoardPos * state.scale) + state.offset
+                        val endPos = (targetPortBoardPos * state.scale) + state.offset
+                        val midPoint = getBezierMidpoint(startPos, endPos)
+                        
+                        var showMenu by remember { mutableStateOf(false) }
+                        
+                        Box(
+                            modifier = Modifier
+                                .offset {
+                                    IntOffset(
+                                        (midPoint.x - 12.dp.toPx()).roundToInt(),
+                                        (midPoint.y - 12.dp.toPx()).roundToInt()
+                                    )
+                                }
+                                .size(24.dp)
+                                .background(MaterialTheme.colorScheme.background, CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                .clickable { showMenu = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.material3.Text(
+                                text = conn.orderIndex.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { androidx.compose.material3.Text("Move First") },
+                                    onClick = {
+                                        onMoveConnectionFirst(conn)
+                                        showMenu = false
+                                    }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { androidx.compose.material3.Text("Move Last") },
+                                    onClick = {
+                                        onMoveConnectionLast(conn)
+                                        showMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 

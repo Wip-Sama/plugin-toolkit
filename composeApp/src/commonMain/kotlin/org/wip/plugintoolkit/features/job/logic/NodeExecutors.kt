@@ -1,8 +1,11 @@
 package org.wip.plugintoolkit.features.job.logic
 
 import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
@@ -10,8 +13,10 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Context provided to [NodeExecutor] during execution.
@@ -91,7 +96,8 @@ class DefaultSystemNodeExecutorRegistry : SystemNodeExecutorRegistry {
         "merger" to MergerNodeExecutor(),
         "comparator" to ComparatorNodeExecutor(),
         "for" to ForNodeExecutor(),
-        "while" to WhileNodeExecutor()
+        "while" to WhileNodeExecutor(),
+        "create_folder" to CreateFolderNodeExecutor()
     )
 
     override fun getExecutor(action: String): NodeExecutor {
@@ -112,7 +118,7 @@ class SaveNodeExecutor : NodeExecutor {
             else -> data?.toString() ?: ""
         }
         
-        val path = kotlinx.io.files.Path(filePath)
+        val path = Path(filePath)
         val fullPath = if (path.isAbsolute) {
             path
         } else {
@@ -120,10 +126,10 @@ class SaveNodeExecutor : NodeExecutor {
         }
         
         val parent = fullPath.parent
-        if (parent != null && !kotlinx.io.files.SystemFileSystem.exists(parent)) {
-            kotlinx.io.files.SystemFileSystem.createDirectories(parent)
+        if (parent != null && !SystemFileSystem.exists(parent)) {
+            SystemFileSystem.createDirectories(parent)
         }
-        kotlinx.io.files.SystemFileSystem.sink(fullPath).buffered().use { it.writeString(dataString) }
+        SystemFileSystem.sink(fullPath).buffered().use { it.writeString(dataString) }
         
         context.setOutputValue("success", true)
         context.addLog("Saved data to file: $filePath")
@@ -141,7 +147,7 @@ class LoadNodeExecutor : NodeExecutor {
         val dataPort = context.node.outputs.find { it.id == "data" }
         val semanticTypes = dataPort?.semanticTypes ?: emptyList()
         if (semanticTypes.isNotEmpty()) {
-            val allowedExtensions = org.wip.plugintoolkit.core.utils.SemanticRegistry.getAllowedExtensions(semanticTypes)
+            val allowedExtensions = SemanticRegistry.getAllowedExtensions(semanticTypes)
             if (allowedExtensions.isNotEmpty()) {
                 val filename = filePath.substringAfterLast('/').substringAfterLast('\\')
                 val ext = filename.substringAfterLast('.', "").lowercase()
@@ -151,15 +157,15 @@ class LoadNodeExecutor : NodeExecutor {
             }
         }
         
-        val path = kotlinx.io.files.Path(filePath)
+        val path = Path(filePath)
         val fullPath = if (path.isAbsolute) {
             path
         } else {
-            kotlinx.io.files.Path(context.appDataDir, filePath)
+            Path(context.appDataDir, filePath)
         }
         
-        val fileContent = if (kotlinx.io.files.SystemFileSystem.exists(fullPath)) {
-            kotlinx.io.files.SystemFileSystem.source(fullPath).buffered().use { it.readString() }
+        val fileContent = if (SystemFileSystem.exists(fullPath)) {
+            SystemFileSystem.source(fullPath).buffered().use { it.readString() }
         } else {
             context.addLog("Warning: file to load not found at $fullPath, returning empty: $filePath", "WARN")
             ""
@@ -198,7 +204,7 @@ class DelayNodeExecutor : NodeExecutor {
         val inputData = context.getInputValue("input_data", null)
         
         context.addLog("Sleeping for $duration ms...")
-        kotlinx.coroutines.delay(duration)
+        kotlinx.coroutines.delay(duration.milliseconds)
         
         context.setOutputValue("output_data", inputData)
     }
@@ -275,7 +281,7 @@ class MergerNodeExecutor : NodeExecutor {
             when (item) {
                 is List<*> -> merged.addAll(item)
                 is Array<*> -> merged.addAll(item)
-                is kotlinx.serialization.json.JsonArray -> {
+                is JsonArray -> {
                     item.forEach { je ->
                         val unwrapped = when (je) {
                             is kotlinx.serialization.json.JsonPrimitive -> {
@@ -351,10 +357,10 @@ class ForNodeExecutor : NodeExecutor {
         val subflowName = context.getInputValue("subflow_name", "") as String
         if (subflowName.isNotEmpty()) {
             val subFlowFile = kotlinx.io.files.Path("${context.appDataDir}/flows/${subflowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
-            if (!kotlinx.io.files.SystemFileSystem.exists(subFlowFile)) {
+            if (!SystemFileSystem.exists(subFlowFile)) {
                 throw Exception("Subflow file not found: $subflowName")
             }
-            val subFlowContent = kotlinx.io.files.SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
+            val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
             val subFlow = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
                 .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
 
@@ -398,10 +404,10 @@ class WhileNodeExecutor : NodeExecutor {
         val subflowName = context.getInputValue("subflow_name", "") as String
         if (subflowName.isNotEmpty()) {
             val subFlowFile = kotlinx.io.files.Path("${context.appDataDir}/flows/${subflowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
-            if (!kotlinx.io.files.SystemFileSystem.exists(subFlowFile)) {
+            if (!SystemFileSystem.exists(subFlowFile)) {
                 throw Exception("Subflow file not found: $subflowName")
             }
-            val subFlowContent = kotlinx.io.files.SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
+            val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
             val subFlow = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
                 .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
 
@@ -471,6 +477,38 @@ class WhileNodeExecutor : NodeExecutor {
             context.setOutputValue("output_data", accumulator)
         } else {
             context.setOutputValue("output_data", context.getInputValue("input_data", null))
+        }
+    }
+}
+
+class CreateFolderNodeExecutor : NodeExecutor {
+    override suspend fun execute(context: NodeExecutionContext) {
+        try {
+            val basePath = context.getInputValue("path", "") as String
+            val folderName = context.getInputValue("folder_name", "") as String
+            
+            val path = kotlinx.io.files.Path(basePath)
+            val fullBasePath = if (path.isAbsolute) {
+                path
+            } else {
+                kotlinx.io.files.Path(context.appDataDir, basePath)
+            }
+            
+            val newFolderPath = kotlinx.io.files.Path(fullBasePath, folderName)
+            
+            if (!kotlinx.io.files.SystemFileSystem.exists(newFolderPath)) {
+                kotlinx.io.files.SystemFileSystem.createDirectories(newFolderPath)
+                context.addLog("Created folder: $newFolderPath")
+            } else {
+                context.addLog("Folder already exists: $newFolderPath")
+            }
+            
+            context.setOutputValue("path", newFolderPath.toString())
+            context.setOutputValue("success", true)
+        } catch (e: Exception) {
+            context.addLog("Failed to create folder: ${e.message}", "ERROR")
+            context.setOutputValue("path", null)
+            context.setOutputValue("success", false)
         }
     }
 }

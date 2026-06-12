@@ -64,9 +64,21 @@ sealed class DataType {
      */
     @Serializable
     @SerialName("object")
-    data class Object(val className: String, val namespace: String? = null) : DataType() {
+    data class Object(
+        val className: String, 
+        val namespace: String? = null,
+        val properties: Map<String, DataType> = emptyMap(),
+        val requiredProperties: List<String> = emptyList()
+    ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
-            return value != null && value !is JsonNull
+            if (value == null || value is JsonNull) return false
+            if (requiredProperties.isEmpty()) return true
+            
+            val jsonObj = value as? JsonObject ?: return false
+            return requiredProperties.all { prop ->
+                val propValue = jsonObj[prop]
+                propValue != null && propValue !is JsonNull
+            }
         }
     }
 
@@ -75,9 +87,26 @@ sealed class DataType {
      */
     @Serializable
     @SerialName("enum")
-    data class Enum(val className: String, val options: List<String>, val namespace: String? = null) : DataType() {
+    data class Enum(
+        val className: String, 
+        val options: List<String>, 
+        val namespace: String? = null,
+        val optionRequirements: Map<String, List<String>> = emptyMap()
+    ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             return value != null && value !is JsonNull
+        }
+    }
+
+    /**
+     * A map of strings to a specific value type.
+     */
+    @Serializable
+    @SerialName("map")
+    data class MapType(val valueType: DataType) : DataType() {
+        override fun isProvided(value: JsonElement?): Boolean {
+            if (value == null || value is JsonNull) return false
+            return (value as? JsonObject)?.isNotEmpty() ?: true
         }
     }
 }
@@ -125,7 +154,50 @@ data class PluginManifest(
     val settings: Map<String, SettingMetadata>? = null,
     val changelog: Changelog? = null,
     val hasUpdateHandler: Boolean = false,
-    val hasSetupHandler: Boolean = false
+    val hasSetupHandler: Boolean = false,
+    val hasMigrations: Boolean = false
+)
+
+@Serializable
+data class PluginMigration(
+    val fromVersion: String,
+    val toVersion: String,
+    val capabilityMigrations: List<CapabilityMigration> = emptyList(),
+    val settingMigrations: List<SettingMigration> = emptyList(),
+    val objectMigrations: List<ObjectMigration> = emptyList()
+)
+
+@Serializable
+data class CapabilityMigration(
+    val oldName: String,
+    val newName: String?, // null means capability is removed/unsupported
+    val isDropInReplacement: Boolean = false,
+    val portMigrations: List<PortMigration> = emptyList()
+)
+
+@Serializable
+data class PortMigration(
+    val oldName: String,
+    val newName: String? // null means port is removed
+)
+
+@Serializable
+data class SettingMigration(
+    val oldName: String,
+    val newName: String? // null means setting is removed
+)
+
+@Serializable
+data class ObjectMigration(
+    val oldClassName: String,
+    val newClassName: String?, // null means custom object is removed
+    val propertyMigrations: List<PropertyMigration> = emptyList()
+)
+
+@Serializable
+data class PropertyMigration(
+    val oldName: String,
+    val newName: String?
 )
 
 @Serializable
@@ -287,6 +359,11 @@ private class OutputMetadataSurrogate(
     val semanticTypes: List<SemanticType> = emptyList()
 )
 
+@Serializable
+enum class CapabilityContext {
+    ANY, FLOW_ONLY, STANDALONE_ONLY
+}
+
 /**
  * Metadata for a specific capability provided by the plugin.
  */
@@ -299,7 +376,9 @@ data class Capability(
     val semanticTypes: List<SemanticType> = emptyList(),
     val outputs: List<OutputMetadata>? = null,
     val isPausable: Boolean = false,
-    val isCancellable: Boolean = true
+    val isCancellable: Boolean = true,
+    val context: CapabilityContext = CapabilityContext.ANY,
+    val requiresSettings: List<String> = emptyList()
 )
 
 object CapabilitySerializer : KSerializer<Capability> {
@@ -314,7 +393,9 @@ object CapabilitySerializer : KSerializer<Capability> {
             semanticTypes = value.semanticTypes,
             outputs = value.outputs,
             isPausable = value.isPausable,
-            isCancellable = value.isCancellable
+            isCancellable = value.isCancellable,
+            context = value.context,
+            requiresSettings = value.requiresSettings
         )
         encoder.encodeSerializableValue(CapabilitySurrogate.serializer(), surrogate)
     }
@@ -345,7 +426,9 @@ object CapabilitySerializer : KSerializer<Capability> {
             semanticTypes = surrogate.semanticTypes,
             outputs = surrogate.outputs,
             isPausable = surrogate.isPausable,
-            isCancellable = surrogate.isCancellable
+            isCancellable = surrogate.isCancellable,
+            context = surrogate.context,
+            requiresSettings = surrogate.requiresSettings
         )
     }
 }
@@ -360,7 +443,9 @@ private class CapabilitySurrogate(
     val semanticTypes: List<SemanticType> = emptyList(),
     val outputs: List<OutputMetadata>? = null,
     val isPausable: Boolean = false,
-    val isCancellable: Boolean = true
+    val isCancellable: Boolean = true,
+    val context: CapabilityContext = CapabilityContext.ANY,
+    val requiresSettings: List<String> = emptyList()
 )
 
 /**

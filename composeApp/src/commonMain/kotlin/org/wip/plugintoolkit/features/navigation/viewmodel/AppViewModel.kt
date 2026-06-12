@@ -19,8 +19,6 @@ import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.nav_jobs
 import plugintoolkit.composeapp.generated.resources.nav_main
-import plugintoolkit.composeapp.generated.resources.section_flows
-import plugintoolkit.composeapp.generated.resources.section_plugins
 import plugintoolkit.composeapp.generated.resources.settings
 
 class AppViewModel(
@@ -45,21 +43,21 @@ class AppViewModel(
                 )
             )
         ), SidebarSectionData(
-            title = Res.string.section_plugins.localized, elements = listOf(
+            title = "Runner".localized, elements = listOf(
                 SidebarElement(
-                    id = Screen.Plugins, icon = Icons.Default.PlayCircle, title = "Execute".localized
+                    id = Screen.Plugins, icon = Icons.Default.PlayCircle, title = "Capabilities".localized
                 ), SidebarElement(
-                    id = Screen.PluginManager, icon = Icons.Default.Inventory, title = "Manager".localized
+                    id = Screen.FlowRunner, icon = Icons.Default.PlayCircle, title = "Flows".localized
                 )
             )
         ), SidebarSectionData(
-            title = Res.string.section_flows.localized, elements = listOf(
+            title = "Management".localized, elements = listOf(
                 SidebarElement(
-                    id = Screen.FlowRunner, icon = Icons.Default.PlayCircle, title = "Execute".localized
+                    id = Screen.PluginManager, icon = Icons.Default.Inventory, title = "Plugin Manager".localized
                 ), SidebarElement(
-                    id = Screen.FlowEditor(""), icon = Icons.Default.Edit, title = "Editor".localized
+                    id = Screen.FlowManager, icon = Icons.Default.Dashboard, title = "Flow Manager".localized
                 ), SidebarElement(
-                    id = Screen.FlowManager, icon = Icons.Default.Dashboard, title = "Manager".localized
+                    id = Screen.PluginRepo, icon = Icons.Default.CloudDownload, title = "Repositories".localized
                 )
             )
         )
@@ -70,8 +68,6 @@ class AppViewModel(
             title = null, elements = listOf(
                 SidebarElement(
                     id = Screen.JobDashboard, icon = Icons.Default.PendingActions, title = Res.string.nav_jobs.localized
-                ), SidebarElement(
-                    id = Screen.PluginRepo, icon = Icons.Default.CloudDownload, title = "Repositories".localized
                 ), SidebarElement(
                     id = Screen.Settings, icon = Icons.Default.Settings, title = Res.string.settings.localized
                 )

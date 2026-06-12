@@ -17,6 +17,11 @@ kotlin {
     }
 }
 
+sourceSets.main {
+    kotlin.srcDir("build/generated/ksp/main/kotlin")
+    resources.srcDir("build/generated/ksp/main/resources")
+}
+
 dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)

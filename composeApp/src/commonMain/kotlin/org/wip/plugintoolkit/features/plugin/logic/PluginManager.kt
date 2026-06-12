@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PluginMigration
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
@@ -93,8 +94,8 @@ class PluginManager(
     fun rescanManagedFolders() {
         scope.launch {
             scanner.rescanManagedFolders()
-            // Post-scan: load plugins that are enabled and validated but not yet loaded
-            installedPlugins.value.filter { it.isEnabled && it.isValidated && !loadedPlugins.value.contains(it.pkg) }
+            // Post-scan: load plugins that are enabled, validated, and don't require setup/action
+            installedPlugins.value.filter { it.isEnabled && it.isValidated && it.requiredAction == null && !loadedPlugins.value.contains(it.pkg) }
                 .forEach { launch { loadPlugin(it.pkg) } }
         }
     }
@@ -112,6 +113,8 @@ class PluginManager(
     fun savePluginSettings(pkg: String, store: PluginSettingsStore) = lifecycleManager.savePluginSettings(pkg, store)
 
     fun getManifest(pkg: String): PluginManifest? = lifecycleManager.getManifest(pkg)
+
+    fun getMigrations(pkg: String): List<PluginMigration> = lifecycleManager.getMigrations(pkg)
 
     suspend fun setEnabled(pkg: String, enabled: Boolean) = coordinator.setEnabled(pkg, enabled)
 

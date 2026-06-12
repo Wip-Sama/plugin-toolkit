@@ -12,7 +12,8 @@ data class AppSettings(
     val notifications: NotificationSettings = NotificationSettings(),
     val extensions: ExtensionSettings = ExtensionSettings(),
     val jobs: JobSettings = JobSettings(),
-    val autoUpdate: AutoUpdateSettings = AutoUpdateSettings()
+    val autoUpdate: AutoUpdateSettings = AutoUpdateSettings(),
+    val flows: FlowSettings = FlowSettings()
 )
 
 @Serializable
@@ -126,4 +127,9 @@ data class AutoUpdateSettings(
     val checkOnStartup: Boolean = true,
     val lastCheckTimestamp: Long = 0,
     val pendingUpdateVersion: String? = null
+)
+
+@Serializable
+data class FlowSettings(
+    val autosave: Boolean = true
 )

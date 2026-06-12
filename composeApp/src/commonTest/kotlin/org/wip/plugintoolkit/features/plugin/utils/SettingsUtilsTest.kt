@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.ParameterConstraints
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -87,5 +88,30 @@ class SettingsUtilsTest {
         
         // Empty array
         assertEquals(JsonArray(emptyList()), SettingsUtils.stringToJson("", listIntType))
+    }
+
+    @Test
+    fun testNestedArrays() {
+        val listListDouble = DataType.Array(DataType.Array(DataType.Primitive(PrimitiveType.DOUBLE)))
+
+        // Test jsonToString
+        val doubleArray = JsonArray(listOf(
+            JsonArray(listOf(JsonPrimitive(100.0), JsonPrimitive(100.0))),
+            JsonArray(listOf(JsonPrimitive(200.0), JsonPrimitive(200.0)))
+        ))
+        assertEquals("(100.0,100.0), (200.0,200.0)", SettingsUtils.jsonToString(doubleArray, listListDouble))
+
+        // Test stringToJson with matching parentheses
+        assertEquals(doubleArray, SettingsUtils.stringToJson("(100.0,100.0), (200.0,200.0)", listListDouble))
+        assertEquals(doubleArray, SettingsUtils.stringToJson("(100.0, 100.0) (200.0, 200.0)", listListDouble))
+        assertEquals(doubleArray, SettingsUtils.stringToJson("[(100.0, 100.0), (200.0, 200.0)]", listListDouble))
+
+        // Test validateParameter
+        val constraints = ParameterConstraints(minValue = 50.0, maxValue = 350.0)
+        assertEquals(null, SettingsUtils.validateParameter("(100,100), (200,200)", isRequired = true, type = listListDouble, constraints = constraints))
+
+        // Out of range check
+        val errorMsg = SettingsUtils.validateParameter("(100,400), (200,200)", isRequired = true, type = listListDouble, constraints = constraints)
+        assertEquals("Value must be <= 350.0", errorMsg)
     }
 }

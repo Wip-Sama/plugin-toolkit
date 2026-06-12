@@ -12,6 +12,8 @@ import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
@@ -773,5 +775,114 @@ class JobWorkerFlowTest {
 
         val finalJob = jobManager.endedJobs.value.first { it.id == job.id }
         assertEquals(org.wip.plugintoolkit.features.job.model.JobStatus.Completed, finalJob.status)
+    }
+
+    @Test
+    fun testDynamicListParameters() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val jobWorker = JobWorker(1, jobManager, backgroundScope)
+
+        // Flow:
+        // Input Node 1 (String "A")
+        // Input Node 2 (String "B")
+        // Merge Node (Capability node expecting a List of String, returning String)
+        // Output Node
+        
+        val inputNode1 = createInputNode(1, "source1", DataType.Primitive(PrimitiveType.STRING))
+        val inputNode2 = createInputNode(2, "source2", DataType.Primitive(PrimitiveType.STRING))
+        
+        val listInputPort = InputPort(
+            id = "list_input",
+            name = "List Input",
+            dataType = DataType.Array(DataType.Primitive(PrimitiveType.STRING))
+        )
+        val mergeNode = Node.CapabilityNode(
+            id = 3,
+            position = Offset.Zero,
+            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
+            capability = org.wip.plugintoolkit.api.Capability(name = "merge", description = "test merge", returnType = DataType.Primitive(PrimitiveType.STRING)),
+            inputs = listOf(listInputPort),
+            outputs = listOf(OutputPort(id = "result", name = "result", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        
+        val outputNode = createOutputNode(4, "result", DataType.Primitive(PrimitiveType.STRING))
+
+        val flow = Flow(
+            name = "test_dynamic_list",
+            nodes = listOf(inputNode1, inputNode2, mergeNode, outputNode),
+            connections = listOf(
+                // Connection 1: source1 -> mergeNode, orderIndex = 1
+                Connection(1, "output_data", 3, "list_input", orderIndex = 1),
+                // Connection 2: source2 -> mergeNode, orderIndex = 0
+                Connection(2, "output_data", 3, "list_input", orderIndex = 0),
+                Connection(3, "result", 4, "input_data")
+            )
+        )
+
+        // We need to mock the PluginLoader and DataProcessor to verify the parameters
+        mockkObject(PluginLoader)
+        val mockPluginEntry = mockk<PluginEntry>(relaxed = true)
+        val mockProcessor = mockk<DataProcessor>(relaxed = true)
+        val mockPluginManager = mockk<PluginManager>(relaxed = true)
+        val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
+        
+        startKoin {
+            modules(module {
+                single<SettingsPersistence> { persistence }
+                single { mockPluginManager }
+                single { mockLifecycleCoordinator }
+            })
+        }
+
+        every { PluginLoader.getPluginById("test-plugin") } returns mockPluginEntry
+        every { mockPluginEntry.getProcessor() } returns mockProcessor
+        every { mockPluginEntry.getManifest() } returns org.wip.plugintoolkit.api.PluginManifest(
+            manifestVersion = "1.0",
+            plugin = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
+            requirements = org.wip.plugintoolkit.api.Requirements(minMemoryMb = 128, minExecutionTimeMs = 100),
+            capabilities = listOf(org.wip.plugintoolkit.api.Capability(name = "merge", description = "test merge", returnType = DataType.Primitive(PrimitiveType.STRING), parameters = mapOf("list_input" to org.wip.plugintoolkit.api.ParameterMetadata(description = "list_input", type = DataType.Array(DataType.Primitive(PrimitiveType.STRING))))))
+        )
+        
+        var capturedParameters: Map<String, kotlinx.serialization.json.JsonElement>? = null
+        every { mockProcessor.processAsync(any(), any()) } answers {
+            val req = firstArg<org.wip.plugintoolkit.api.PluginRequest>()
+            capturedParameters = req.parameters
+            
+            val deferred = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
+            deferred.complete(org.wip.plugintoolkit.api.ExecutionResult.Success(
+                org.wip.plugintoolkit.api.PluginResponse(
+                    result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("merged-result")))
+                )
+            ))
+            object : JobHandle {
+                override val result = deferred
+                override fun pause() {}
+                override fun cancel(force: Boolean) {}
+            }
+        }
+
+        val job = BackgroundJob(
+            id = "test-job-dynamic-list",
+            name = "Dynamic List Job",
+            type = JobType.Flow,
+            pluginId = "system",
+            capabilityName = "test_dynamic_list",
+            parameters = mapOf("1" to JsonPrimitive("A"), "2" to JsonPrimitive("B"))
+        )
+
+        val outputs = jobWorker.executeSubFlowRecursively(flow, job, "/tmp")
+
+        // The expected order based on orderIndex is source2 (B) then source1 (A)
+        assertNotNull(capturedParameters)
+        val listInputParam = capturedParameters!!["list_input"]!!
+        
+        val jsonArray = listInputParam.jsonArray
+        assertEquals(2, jsonArray.size)
+        assertEquals("B", jsonArray[0].jsonPrimitive.content)
+        assertEquals("A", jsonArray[1].jsonPrimitive.content)
+
+        assertEquals("merged-result", outputs["result"])
     }
 }

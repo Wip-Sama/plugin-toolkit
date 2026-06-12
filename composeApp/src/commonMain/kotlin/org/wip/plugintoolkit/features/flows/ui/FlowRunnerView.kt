@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
@@ -145,12 +146,7 @@ fun FlowRunnerView(
                             is Node.FlowInputNode -> {
                                 val outPort = node.outputs.firstOrNull()
                                 if (outPort != null) {
-                                    val inferredType = if (outPort.dataType is DataType.Primitive && outPort.dataType.primitiveType == PrimitiveType.ANY) {
-                                        val connection = currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
-                                        val targetNode = currentFlow.nodes.find { it.id == connection?.targetNodeId }
-                                        val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
-                                        targetPort?.dataType ?: outPort.dataType
-                                    } else outPort.dataType
+                                    val inferredType = currentFlow.getInferredDataTypeForOutput(node.id, outPort.id, outPort.dataType)
 
                                     val inferredSemanticTypes = if (outPort.semanticTypes.isNotEmpty()) {
                                         outPort.semanticTypes
@@ -214,12 +210,7 @@ fun FlowRunnerView(
                             is Node.FlowOutputNode -> {
                                 val inPort = node.inputs.firstOrNull()
                                 if (inPort != null) {
-                                    val inferredType = if (inPort.dataType is DataType.Primitive && inPort.dataType.primitiveType == PrimitiveType.ANY) {
-                                        val connection = currentFlow.connections.find { it.targetNodeId == node.id && it.targetPortId == inPort.id }
-                                        val sourceNode = currentFlow.nodes.find { it.id == connection?.sourceNodeId }
-                                        val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
-                                        sourcePort?.dataType ?: inPort.dataType
-                                    } else inPort.dataType
+                                    val inferredType = currentFlow.getInferredDataTypeForInput(node.id, inPort.id, inPort.dataType)
 
                                     val inferredSemanticTypes = if (inPort.semanticTypes.isNotEmpty()) {
                                         inPort.semanticTypes
@@ -308,7 +299,7 @@ fun FlowRunnerView(
                             inputs.forEach { param ->
                                 val metadata = remember(param) {
                                     org.wip.plugintoolkit.api.ParameterMetadata(
-                                        defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
+                                        defaultValue = JsonPrimitive(param.defaultValue),
                                         description = "",
                                         type = param.dataType,
                                         required = true,
@@ -345,7 +336,7 @@ fun FlowRunnerView(
                                 if (param.type == ParameterType.SAVE) {
                                     val metadata = remember(param) {
                                         org.wip.plugintoolkit.api.ParameterMetadata(
-                                            defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
+                                            defaultValue = JsonPrimitive(param.defaultValue),
                                             description = "Target path to save flow results",
                                             type = param.dataType,
                                             required = true,
@@ -400,7 +391,7 @@ fun FlowRunnerView(
                             val error = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateParameter(
                                 value = value,
                                 isRequired = true,
-                                isArray = param.dataType is DataType.Array,
+                                type = param.dataType,
                                 constraints = null
                             )
                             error == null

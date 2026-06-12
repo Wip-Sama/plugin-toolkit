@@ -46,7 +46,7 @@ fun PluginSettingsDialog(
     val manifest = viewModel.manifest ?: return
 
     AlertDialog(
-        onDismissRequest = if (isBusy) ({}) else onDismiss,
+        onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text(
@@ -150,9 +150,9 @@ fun PluginSettingsDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isBusy
+                enabled = true
             ) {
-                Text(stringResource(Res.string.action_cancel))
+                Text(if (isBusy) "Close" else stringResource(Res.string.action_cancel))
             }
         }
     )

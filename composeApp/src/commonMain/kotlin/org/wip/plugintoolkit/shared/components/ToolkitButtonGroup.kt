@@ -7,12 +7,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.Dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.draw.clip
 
 @Composable
@@ -33,7 +31,8 @@ fun ToolkitButtonGroup(
 
     Row(
         modifier = modifier
-            .padding(containerPadding),
+            .padding(containerPadding)
+            .animateContentSize(),
         horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.CenterVertically
     ) {

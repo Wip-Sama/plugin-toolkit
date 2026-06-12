@@ -1,3 +1,33 @@
+Version: 1.6.0
+Date: 12-06-2026
+Changes:
+	- Updated dependencies
+	- Execute -> Flows / Capabilities
+	- Flow editor is now only accessible by the flow manager
+	- Changelog markdown strikethrough updated do double \~\~ from single
+	- Various minor internal improvements
+Removed:
+	- Dedicated sections for flows and plugins
+Added:
+	- Better logging for plugin loading step 
+	- Dedicated section for repository and manager
+	- System node to create a new folder with a specific name given a directory
+	- Dynamic node Parameters, list and similar now allow for multiple connections in the port
+	- Capabilities locked behind required plugin setting/s
+	- Capabilities only available in flows 
+	- Capabilities only available in standard execution 
+	- Autosave setting for flows
+	- Dense CapabilityOutput
+	- Nodes are not compactable in input/output to accomodate nodes with lots of input/outputs
+	- Migration logic for plugins who change capabilities (update flows where possible)
+	- Tooltip for node ports
+Fixed:
+	- Moving multiple selected nodes would not animate all the connection properly until movement stopped
+	- Capabilities with lots of input/output would not be drawn correctly
+	- When a capability used by a flow is changed, the flow is marked as broken if not updatable / alternative available
+	- When a flow is installed the install button would not change to installed until reentering the tab/page
+	- Parsing of list elements in flows runner
+----------------------------------------------------------------------------------------------------
 Version: 1.5.2
 Date: 23-05-2026
 Fixed:
@@ -14,7 +44,7 @@ Added:
 	- Common semantic type analysis with custom input fields based on those
 	- Optional regex support to validate string input
 Changes:
-	- Restiled the ui a bit more
+	- Restyled the ui a bit more
 	- System dialogs are now blocking for the ui
 	- Moved managed folders to the settings
 ----------------------------------------------------------------------------------------------------
@@ -45,7 +75,7 @@ Fixed:
   - Updater on windows not launching correctly (again)
   - Plugin-api failed to generate proper plugin if not settings were defined
 Planned:
-  - The update page now correctly displays the change description
+  - ~~The update page now correctly displays the change description~~
 ----------------------------------------------------------------------------------------------------
 Version: 1.4.0
 Date: 12-05-2026

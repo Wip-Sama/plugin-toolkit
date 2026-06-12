@@ -37,6 +37,8 @@ annotation class CapabilityOutput(
  * @property description A description of what the capability does.
  * @property supportsPause Whether the capability supports being paused and resumed.
  * @property supportsCancel Whether the capability supports being cancelled.
+ * @property context Specifies whether the capability runs only in flows, alone, or both.
+ * @property requiresSettings Settings required for this capability to be enabled.
  */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.SOURCE)
@@ -44,7 +46,26 @@ annotation class Capability(
     val name: String,
     val description: String,
     val supportsPause: Boolean = false,
-    val supportsCancel: Boolean = true
+    val supportsCancel: Boolean = true,
+    val context: CapabilityContext = CapabilityContext.ANY,
+    val requiresSettings: Array<String> = []
+)
+
+/**
+ * Specifies the context in which a capability can be executed.
+ */
+enum class CapabilityContext {
+    ANY, FLOW_ONLY, STANDALONE_ONLY
+}
+
+/**
+ * Indicates that the annotated element requires specific plugin settings to be provided.
+ * Can be applied to enum entries or properties.
+ */
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+@Retention(AnnotationRetention.SOURCE)
+annotation class RequiresSetting(
+    val settings: Array<String>
 )
 
 /**

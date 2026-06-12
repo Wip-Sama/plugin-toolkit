@@ -1,140 +1,371 @@
-package org.wip.plugintoolkit.features.plugin.logic
+﻿package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
 import kotlin.time.Clock
 
+sealed interface LifecycleAction {
+    data class OnJobCompleted(val job: BackgroundJob, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class OnJobFailed(val job: BackgroundJob, val error: String?, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class OnManualValidation(val pkg: String, val result: Result<Unit>, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class LoadPlugin(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
+    data class UnloadPlugin(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class ReloadPlugin(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class HandlePostInstall(val pkg: String, val manifest: org.wip.plugintoolkit.api.PluginManifest, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class HandlePostUpdate(val pkg: String, val manifest: org.wip.plugintoolkit.api.PluginManifest, val installer: PluginInstaller, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class EnqueueSetupJob(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class EnqueueUpdateJob(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class TriggerValidation(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
+    data class CheckAndResumeSetup(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class RerunSetup(val pkg: String, val installer: PluginInstaller, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class SetEnabled(val pkg: String, val enabled: Boolean, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
+    data class ValidatePlugin(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
+    data class RunAction(val pkg: String, val action: PluginAction, val response: CompletableDeferred<Unit>) : LifecycleAction
+}
+
 /**
  * Coordinates the lifecycle state transitions for plugins.
  * Ensures plugins move through Setup -> Update -> Validation -> Loaded sequentially
- * without relying on global reactive job observation.
+ * using the Actor pattern to avoid concurrent modifications.
  */
 class PluginLifecycleCoordinator(
     private val registry: PluginRegistry,
     private val jobManager: JobManager,
     private val lifecycleManager: PluginLifecycleManager,
-    private val lockProvider: PluginLockProvider,
     /** Injected [AppScope] for non-blocking logic and state transitions. */
     private val scope: CoroutineScope
 ) {
 
-    private fun getMutex(pkg: String) = lockProvider.getMutex(pkg)
+    private val actorChannel = Channel<LifecycleAction>(Channel.UNLIMITED)
 
-    private suspend inline fun <T> withPluginLock(pkg: String, crossinline block: suspend () -> T): T {
-        return getMutex(pkg).withLock { block() }
-    }
-
-    /**
-     * Called by JobWorker when a lifecycle job completes successfully.
-     */
-    suspend fun onLifecycleJobCompleted(job: BackgroundJob) = withPluginLock(job.pluginId) {
-        Logger.d { "Lifecycle job completed for ${job.pluginId}: ${job.type}" }
-        when (job.type) {
-            JobType.Validation -> {
-                markAsValidated(job.pluginId)
-            }
-            JobType.Setup, JobType.Update -> {
-                triggerValidationInternal(job.pluginId)
-            }
-            JobType.PluginAction -> {
-                clearRequiredAction(job.pluginId)
-            }
-            else -> {
-                // Not a lifecycle job we manage state for directly here
+    init {
+        scope.launch {
+            for (action in actorChannel) {
+                try {
+                    processAction(action)
+                } catch (e: Exception) {
+                    Logger.e(e) { "Error processing LifecycleAction: $action" }
+                }
             }
         }
     }
 
-    /**
-     * Called by JobWorker when a lifecycle job fails.
-     */
-    suspend fun onLifecycleJobFailed(job: BackgroundJob, error: String?) = withPluginLock(job.pluginId) {
-        Logger.w { "Lifecycle job failed for ${job.pluginId}: ${job.type} - $error" }
-        if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
-            markAsInvalidated(job.pluginId)
+    private suspend fun processAction(action: LifecycleAction) {
+        when (action) {
+            is LifecycleAction.OnJobCompleted -> {
+                val job = action.job
+                Logger.d { "Lifecycle job completed for ${job.pluginId}: ${job.type}" }
+                when (job.type) {
+                    JobType.Validation -> markAsValidated(job.pluginId)
+                    JobType.Setup, JobType.Update -> triggerValidationInternal(job.pluginId)
+                    JobType.PluginAction -> clearRequiredAction(job.pluginId)
+                    else -> {}
+                }
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.OnJobFailed -> {
+                val job = action.job
+                Logger.w { "Lifecycle job failed for ${job.pluginId}: ${job.type} - ${action.error}" }
+                if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
+                    markAsInvalidated(job.pluginId, action.error)
+                }
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.OnManualValidation -> {
+                if (action.result.isSuccess) {
+                    markAsValidated(action.pkg)
+                } else {
+                    markAsInvalidated(action.pkg, action.result.exceptionOrNull()?.message)
+                }
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.LoadPlugin -> {
+                action.response.complete(lifecycleManager.loadPlugin(action.pkg))
+            }
+            is LifecycleAction.UnloadPlugin -> {
+                lifecycleManager.unloadPlugin(action.pkg)
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.ReloadPlugin -> {
+                lifecycleManager.reloadPlugin(action.pkg)
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.HandlePostInstall -> {
+                if (action.manifest.hasSetupHandler) {
+                    enqueueSetupJobInternal(action.pkg)
+                } else {
+                    triggerValidationInternal(action.pkg)
+                }
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.HandlePostUpdate -> {
+                if (action.manifest.hasUpdateHandler) {
+                    enqueueUpdateJobInternal(action.pkg)
+                } else if (action.manifest.hasSetupHandler) {
+                    action.installer.clearFiles(action.pkg)
+                    enqueueSetupJobInternal(action.pkg)
+                } else {
+                    triggerValidationInternal(action.pkg)
+                }
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.EnqueueSetupJob -> {
+                enqueueSetupJobInternal(action.pkg)
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.EnqueueUpdateJob -> {
+                enqueueUpdateJobInternal(action.pkg)
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.TriggerValidation -> {
+                action.response.complete(triggerValidationInternal(action.pkg))
+            }
+            is LifecycleAction.CheckAndResumeSetup -> {
+                val plugin = registry.getPlugin(action.pkg)
+                if (plugin != null) {
+                    if (hasMissingRequiredSettings(action.pkg)) {
+                        Logger.w { "Plugin ${action.pkg} is missing required settings, marking as broken." }
+                        registry.updatePlugin(action.pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
+                        if (lifecycleManager.loadedPlugins.value.contains(action.pkg)) {
+                            try {
+                                lifecycleManager.unloadPlugin(action.pkg)
+                            } catch (e: Exception) {
+                                Logger.e(e) { "Failed to unload plugin ${action.pkg} after settings were removed" }
+                            }
+                        }
+                    } else if (plugin.requiredAction == "CONFIGURE_SETTINGS") {
+                        Logger.i { "Required settings provided for ${action.pkg}. Resuming setup/update." }
+                        clearRequiredAction(action.pkg)
+                        val manifest = lifecycleManager.getManifest(action.pkg)
+                        if (manifest?.hasUpdateHandler == true) {
+                            enqueueUpdateJobInternal(action.pkg)
+                        } else if (manifest?.hasSetupHandler == true) {
+                            enqueueSetupJobInternal(action.pkg)
+                        } else {
+                            if (plugin.isValidated) {
+                                if (plugin.isEnabled && !lifecycleManager.loadedPlugins.value.contains(action.pkg)) {
+                                    val loadResult = lifecycleManager.loadPlugin(action.pkg)
+                                    if (loadResult.isFailure) {
+                                        markAsInvalidated(action.pkg, loadResult.exceptionOrNull()?.message)
+                                    }
+                                }
+                            } else {
+                                triggerValidationInternal(action.pkg)
+                            }
+                        }
+                    }
+                }
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.RerunSetup -> {
+                Logger.i { "Rerunning setup for plugin: ${action.pkg}" }
+                lifecycleManager.unloadPlugin(action.pkg)
+                action.installer.clearFiles(action.pkg)
+                registry.updatePlugin(action.pkg) { it.copy(isValidated = false, loadError = null) }
+                enqueueSetupJobInternal(action.pkg)
+                action.response.complete(Unit)
+            }
+            is LifecycleAction.SetEnabled -> {
+                Logger.i { "Setting plugin ${action.pkg} enabled: ${action.enabled}" }
+                if (!action.enabled) {
+                    val safeRes = lifecycleManager.ensureSafeToUnload(listOf(action.pkg))
+                    if (safeRes.isFailure) {
+                        action.response.complete(Result.failure(safeRes.exceptionOrNull()!!))
+                        return
+                    }
+                    lifecycleManager.unloadPlugin(action.pkg)
+                }
+
+                registry.updatePlugin(action.pkg) { it.copy(isEnabled = action.enabled) }
+
+                if (action.enabled) {
+                    val plugin = registry.getPlugin(action.pkg)
+                    if (plugin != null) {
+                        if (plugin.requiredAction != null) {
+                            Logger.w { "Cannot load plugin ${action.pkg} because it requires action: ${plugin.requiredAction}" }
+                        } else if (plugin.isValidated) {
+                            val loadResult = lifecycleManager.loadPlugin(action.pkg)
+                            if (loadResult.isFailure) {
+                                markAsInvalidated(action.pkg, loadResult.exceptionOrNull()?.message)
+                            }
+                        } else {
+                            val manifest = lifecycleManager.getManifest(action.pkg)
+                            if (manifest?.hasSetupHandler == true) {
+                                enqueueSetupJobInternal(action.pkg)
+                            } else {
+                                triggerValidationInternal(action.pkg)
+                            }
+                        }
+                    }
+                }
+                action.response.complete(Result.success(Unit))
+            }
+            is LifecycleAction.ValidatePlugin -> {
+                val plugin = PluginLoader.getPluginById(action.pkg) 
+                if (plugin == null) {
+                    val error = "Plugin not loaded"
+                    markAsInvalidated(action.pkg, error)
+                    action.response.complete(Result.failure(Exception(error)))
+                } else {
+                    val result = plugin.validate(lifecycleManager.createPluginContext(action.pkg))
+                    if (result.isSuccess) {
+                        markAsValidated(action.pkg)
+                    } else {
+                        markAsInvalidated(action.pkg, result.exceptionOrNull()?.message)
+                    }
+                    action.response.complete(result)
+                }
+            }
+            is LifecycleAction.RunAction -> {
+                val plugin = registry.getPlugin(action.pkg)
+                if (plugin != null) {
+                    Logger.i { "Enqueuing custom action: ${action.action.name} for plugin: ${action.pkg}" }
+                    val loadResult = lifecycleManager.loadPlugin(action.pkg)
+                    if (loadResult.isFailure) {
+                        val errorMsg = loadResult.exceptionOrNull()?.message
+                        Logger.e { "Failed to load plugin ${action.pkg} for action ${action.action.name}: $errorMsg" }
+                        markAsInvalidated(action.pkg, errorMsg)
+                    } else {
+                        val job = BackgroundJob(
+                            id = "action_${action.pkg}_${action.action.functionName}_${Clock.System.now().toEpochMilliseconds()}",
+                            name = "Action: ${action.action.name} (${plugin.name})",
+                            type = JobType.PluginAction,
+                            pluginId = action.pkg,
+                            capabilityName = action.action.functionName,
+                            keepResult = false
+                        )
+                        jobManager.enqueueJob(job)
+                    }
+                }
+                action.response.complete(Unit)
+            }
         }
     }
 
-    /**
-     * Called by PluginManager when a manual (synchronous) validation completes.
-     */
-    suspend fun onManualValidationCompleted(pkg: String, result: Result<Unit>) = withPluginLock(pkg) {
-        if (result.isSuccess) {
-            markAsValidated(pkg)
-        } else {
-            markAsInvalidated(pkg)
-        }
+    // --- Public API ---
+
+    suspend fun onLifecycleJobCompleted(job: BackgroundJob) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.OnJobCompleted(job, deferred))
+        deferred.await()
     }
 
-    // --- Lifecycle Wrappers ---
-
-    suspend fun loadPlugin(pkg: String): Result<Unit> = withPluginLock(pkg) {
-        lifecycleManager.loadPlugin(pkg)
+    suspend fun onLifecycleJobFailed(job: BackgroundJob, error: String?) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.OnJobFailed(job, error, deferred))
+        deferred.await()
     }
 
-    suspend fun unloadPlugin(pkg: String) = withPluginLock(pkg) {
-        lifecycleManager.unloadPlugin(pkg)
+    suspend fun onManualValidationCompleted(pkg: String, result: Result<Unit>) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.OnManualValidation(pkg, result, deferred))
+        deferred.await()
     }
 
-    suspend fun reloadPlugin(pkg: String) = withPluginLock(pkg) {
-        lifecycleManager.reloadPlugin(pkg)
+    suspend fun loadPlugin(pkg: String): Result<Unit> {
+        val deferred = CompletableDeferred<Result<Unit>>()
+        actorChannel.send(LifecycleAction.LoadPlugin(pkg, deferred))
+        return deferred.await()
     }
 
-    // --- State Transitions ---
-
-    suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) = withPluginLock(pkg) {
-        if (manifest.hasSetupHandler) {
-            enqueueSetupJobInternal(pkg)
-        } else {
-            triggerValidationInternal(pkg)
-        }
+    suspend fun unloadPlugin(pkg: String) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.UnloadPlugin(pkg, deferred))
+        deferred.await()
     }
 
-    suspend fun handlePostUpdate(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest, installer: PluginInstaller) = withPluginLock(pkg) {
-        if (manifest.hasUpdateHandler) {
-            enqueueUpdateJobInternal(pkg)
-        } else if (manifest.hasSetupHandler) {
-            installer.clearFiles(pkg)
-            enqueueSetupJobInternal(pkg)
-        } else {
-            triggerValidationInternal(pkg)
-        }
+    suspend fun reloadPlugin(pkg: String) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.ReloadPlugin(pkg, deferred))
+        deferred.await()
     }
 
-    suspend fun enqueueSetupJob(pkg: String) = withPluginLock(pkg) {
-        enqueueSetupJobInternal(pkg)
+    suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.HandlePostInstall(pkg, manifest, deferred))
+        deferred.await()
     }
+
+    suspend fun handlePostUpdate(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest, installer: PluginInstaller) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.HandlePostUpdate(pkg, manifest, installer, deferred))
+        deferred.await()
+    }
+
+    suspend fun enqueueSetupJob(pkg: String) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.EnqueueSetupJob(pkg, deferred))
+        deferred.await()
+    }
+
+    suspend fun enqueueUpdateJob(pkg: String) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.EnqueueUpdateJob(pkg, deferred))
+        deferred.await()
+    }
+
+    suspend fun triggerValidation(pkg: String): Result<Unit> {
+        val deferred = CompletableDeferred<Result<Unit>>()
+        actorChannel.send(LifecycleAction.TriggerValidation(pkg, deferred))
+        return deferred.await()
+    }
+
+    suspend fun checkAndResumeSetup(pkg: String) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.CheckAndResumeSetup(pkg, deferred))
+        deferred.await()
+    }
+    
+    suspend fun rerunSetup(pkg: String, installer: PluginInstaller) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.RerunSetup(pkg, installer, deferred))
+        deferred.await()
+    }
+
+    suspend fun setEnabled(pkg: String, enabled: Boolean): Result<Unit> {
+        val deferred = CompletableDeferred<Result<Unit>>()
+        actorChannel.send(LifecycleAction.SetEnabled(pkg, enabled, deferred))
+        return deferred.await()
+    }
+
+    suspend fun validatePlugin(pkg: String): Result<Unit> {
+        val deferred = CompletableDeferred<Result<Unit>>()
+        actorChannel.send(LifecycleAction.ValidatePlugin(pkg, deferred))
+        return deferred.await()
+    }
+
+    suspend fun runAction(pkg: String, action: PluginAction) {
+        val deferred = CompletableDeferred<Unit>()
+        actorChannel.send(LifecycleAction.RunAction(pkg, action, deferred))
+        deferred.await()
+    }
+
+    // --- Internal Helpers (Actor Thread Only) ---
 
     private suspend fun enqueueSetupJobInternal(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
-        
-        // Prevent redundant setup jobs
-        if (isJobPendingOrRunning("setup_$pkg")) {
-            Logger.d { "Setup job for $pkg is already pending or running, skipping enqueue." }
-            return
-        }
+        if (isJobPendingOrRunning("setup_$pkg")) return
 
         val manifest = lifecycleManager.getManifest(pkg)
-
         if (hasMissingRequiredSettings(pkg, manifest)) {
-            Logger.w { "Plugin $pkg has missing required settings, blocking setup." }
             registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
             return
         }
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for setup: ${loadResult.exceptionOrNull()?.message}" }
+            markAsInvalidated(pkg, loadResult.exceptionOrNull()?.message)
             return
         }
 
         if (manifest?.hasSetupHandler != true) {
-            Logger.i { "Plugin $pkg has no setup handler, skipping setup job and triggering validation." }
             triggerValidationInternal(pkg)
             return
         }
@@ -150,35 +381,23 @@ class PluginLifecycleCoordinator(
         jobManager.enqueueJob(job)
     }
 
-    suspend fun enqueueUpdateJob(pkg: String) = withPluginLock(pkg) {
-        enqueueUpdateJobInternal(pkg)
-    }
-
     private suspend fun enqueueUpdateJobInternal(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
-
-        // Prevent redundant update jobs
-        if (isJobPendingOrRunning("update_$pkg")) {
-            Logger.d { "Update job for $pkg is already pending or running, skipping enqueue." }
-            return
-        }
+        if (isJobPendingOrRunning("update_$pkg")) return
 
         val manifest = lifecycleManager.getManifest(pkg)
-
         if (hasMissingRequiredSettings(pkg, manifest)) {
-            Logger.w { "Plugin $pkg has missing required settings, blocking update." }
             registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
             return
         }
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for update: ${loadResult.exceptionOrNull()?.message}" }
+            markAsInvalidated(pkg, loadResult.exceptionOrNull()?.message)
             return
         }
 
         if (manifest?.hasUpdateHandler != true) {
-            Logger.i { "Plugin $pkg has no update handler, skipping update job and triggering validation." }
             triggerValidationInternal(pkg)
             return
         }
@@ -194,34 +413,22 @@ class PluginLifecycleCoordinator(
         jobManager.enqueueJob(job)
     }
 
-    suspend fun triggerValidation(pkg: String): Result<Unit> = withPluginLock(pkg) {
-        triggerValidationInternal(pkg)
-    }
-
     private suspend fun triggerValidationInternal(pkg: String): Result<Unit> {
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin not found"))
-
-        if (plugin.isValidated) {
-            Logger.d { "Plugin $pkg is already validated, skipping trigger." }
-            return Result.success(Unit)
-        }
-
-        // Prevent redundant validation jobs
-        if (isJobPendingOrRunning("val_$pkg")) {
-            Logger.d { "Validation job for $pkg is already pending or running." }
-            return Result.success(Unit)
-        }
+        if (plugin.isValidated) return Result.success(Unit)
+        if (isJobPendingOrRunning("val_$pkg")) return Result.success(Unit)
 
         val manifest = lifecycleManager.getManifest(pkg)
-
         if (hasMissingRequiredSettings(pkg, manifest)) {
-            Logger.w { "Plugin $pkg has missing required settings, blocking validation." }
             registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
             return Result.failure(Exception("Missing required settings"))
         }
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
-        if (loadResult.isFailure) return Result.failure(loadResult.exceptionOrNull()!!)
+        if (loadResult.isFailure) {
+            markAsInvalidated(pkg, loadResult.exceptionOrNull()?.message)
+            return Result.failure(loadResult.exceptionOrNull()!!)
+        }
 
         val job = BackgroundJob(
             id = "val_$pkg",
@@ -235,119 +442,21 @@ class PluginLifecycleCoordinator(
         return Result.success(Unit)
     }
 
-    suspend fun checkAndResumeSetup(pkg: String) = withPluginLock(pkg) {
-        val plugin = registry.getPlugin(pkg) ?: return@withPluginLock
-        if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !hasMissingRequiredSettings(pkg)) {
-            Logger.i { "Required settings provided for $pkg. Resuming setup/update." }
-            clearRequiredAction(pkg)
-            val manifest = lifecycleManager.getManifest(pkg)
-            if (manifest?.hasUpdateHandler == true) {
-                enqueueUpdateJobInternal(pkg)
-            } else if (manifest?.hasSetupHandler == true) {
-                enqueueSetupJobInternal(pkg)
-            } else {
-                triggerValidationInternal(pkg)
-            }
-        }
-    }
-    
-    suspend fun rerunSetup(pkg: String, installer: PluginInstaller) = withPluginLock(pkg) {
-        Logger.i { "Rerunning setup for plugin: $pkg" }
-        // 1. Unload
-        lifecycleManager.unloadPlugin(pkg)
-        // 2. Clear files
-        installer.clearFiles(pkg)
-        // 3. Mark as not validated and clear errors
-        registry.updatePlugin(pkg) { it.copy(isValidated = false, loadError = null) }
-        // 4. Enqueue setup job
-        enqueueSetupJobInternal(pkg)
-    }
-
-    suspend fun setEnabled(pkg: String, enabled: Boolean): Result<Unit> = withPluginLock(pkg) {
-        Logger.i { "Setting plugin $pkg enabled: $enabled" }
-
-        if (!enabled) {
-            lifecycleManager.ensureSafeToUnload(listOf(pkg)).onFailure { return@withPluginLock Result.failure(it) }
-            lifecycleManager.unloadPlugin(pkg)
-        }
-
-        registry.updatePlugin(pkg) { it.copy(isEnabled = enabled) }
-
-        if (enabled) {
-            val plugin = registry.getPlugin(pkg)
-            if (plugin != null) {
-                if (plugin.isValidated) {
-                    lifecycleManager.loadPlugin(pkg)
-                } else {
-                    // Try to get manifest to check for setup handler
-                    val manifest = lifecycleManager.getManifest(pkg)
-                    if (manifest?.hasSetupHandler == true) {
-                        enqueueSetupJobInternal(pkg)
-                    } else {
-                        triggerValidationInternal(pkg)
-                    }
-                }
-            }
-        }
-        Result.success(Unit)
-    }
-
-    suspend fun validatePlugin(pkg: String): Result<Unit> = withPluginLock(pkg) {
-        val plugin = PluginLoader.getPluginById(pkg) ?: return@withPluginLock Result.failure(Exception("Plugin not loaded"))
-        val result = plugin.validate(lifecycleManager.createPluginContext(pkg))
-        if (result.isSuccess) {
-            markAsValidated(pkg)
-        } else {
-            markAsInvalidated(pkg)
-        }
-        result
-    }
-
-    suspend fun runAction(pkg: String, action: PluginAction) = withPluginLock(pkg) {
-        val plugin = registry.getPlugin(pkg) ?: return@withPluginLock
-        Logger.i { "Enqueuing custom action: ${action.name} for plugin: $pkg" }
-
-        val loadResult = lifecycleManager.loadPlugin(pkg)
-        if (loadResult.isFailure) {
-            Logger.e { "Failed to load plugin $pkg for action ${action.name}" }
-            return@withPluginLock
-        }
-
-        val job = BackgroundJob(
-            id = "action_${pkg}_${action.functionName}_${Clock.System.now().toEpochMilliseconds()}",
-            name = "Action: ${action.name} (${plugin.name})",
-            type = JobType.PluginAction,
-            pluginId = pkg,
-            capabilityName = action.functionName,
-            keepResult = false
-        )
-        jobManager.enqueueJob(job)
-    }
-
     private fun isJobPendingOrRunning(jobId: String): Boolean {
         return jobManager.activeJobIds.value.contains(jobId)
     }
 
-
-    // --- Internal Helpers ---
-
     private suspend fun markAsValidated(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
         if (plugin.isValidated) return
-
-        Logger.i { "Marking plugin $pkg as validated and activating" }
         registry.updatePlugin(pkg) { it.copy(isValidated = true) }
         lifecycleManager.loadPlugin(pkg)
     }
 
-    private suspend fun markAsInvalidated(pkg: String) {
+    private suspend fun markAsInvalidated(pkg: String, error: String? = null) {
         val plugin = registry.getPlugin(pkg) ?: return
-
-        Logger.i { "Marking plugin $pkg as invalidated" }
-        registry.updatePlugin(pkg) { it.copy(isValidated = false) }
-
+        registry.updatePlugin(pkg) { it.copy(isValidated = false, loadError = error) }
         if (lifecycleManager.loadedPlugins.value.contains(pkg)) {
-            Logger.i { "Plugin $pkg is loaded but invalidated, unloading." }
             lifecycleManager.unloadPlugin(pkg)
         }
     }
@@ -361,15 +470,11 @@ class PluginLifecycleCoordinator(
         if (actualManifest.settings.isNullOrEmpty()) return false
 
         val store = lifecycleManager.loadPluginSettings(pkg)
-        val missing = actualManifest.settings!!.any { (key, meta) ->
+        return actualManifest.settings!!.any { (key, meta) ->
             if (!meta.required) return@any false
-
             val value = store.settings[key] ?: return@any true
-
             if (!meta.type.isProvided(value)) return@any true
-
             false
         }
-        return missing
     }
 }

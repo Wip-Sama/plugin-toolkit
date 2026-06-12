@@ -8,6 +8,7 @@ data class SidebarElement<out T>(
     val id: T,
     val icon: ImageVector,
     val title: LocalizedString,
+    val isVisible: Boolean = true,
     val trailingContent: @Composable (isExpanded: Boolean) -> Unit = {}
 )
 

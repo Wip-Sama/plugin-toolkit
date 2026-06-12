@@ -11,6 +11,7 @@ import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PluginMigration
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PluginSignalManager
 import org.wip.plugintoolkit.api.ProgressReporter
@@ -56,6 +57,13 @@ class PluginLifecycleManager(
             return Result.success(Unit)
         }
 
+        if (!plugin.isCompatible) {
+            val errorMsg = plugin.compatibilityError ?: "Plugin is incompatible with the current app version"
+            Logger.w { "Cannot load plugin $pkg: $errorMsg" }
+            updateLoadError(pkg, errorMsg)
+            return Result.failure(Exception(errorMsg))
+        }
+
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"
 
@@ -80,7 +88,11 @@ class PluginLifecycleManager(
 
         Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
         val settings = loadPluginSettings(pkg)
-        val result = PluginLoader.loadPlugin(jarFile, settings.settings)
+        val result = try {
+            PluginLoader.loadPlugin(jarFile, settings.settings)
+        } catch (t: Throwable) {
+            Result.failure(Exception("Fatal error loading plugin classes", t))
+        }
         
         return if (result.isSuccess) {
             val entry = result.getOrThrow()
@@ -229,7 +241,13 @@ class PluginLifecycleManager(
         val decryptedSettings = store.settings.mapValues { (key, value) ->
             val isSecret = manifest?.settings?.get(key)?.secret == true
             if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
-                kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.decrypt(value.content))
+                val content = value.content
+                if (content.startsWith("ENC[") && content.endsWith("]")) {
+                    val encryptedPart = content.substring(4, content.length - 1)
+                    kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.decrypt(encryptedPart))
+                } else {
+                    value
+                }
             } else {
                 value
             }
@@ -248,7 +266,8 @@ class PluginLifecycleManager(
         val encryptedSettings = store.settings.mapValues { (key, value) ->
             val isSecret = manifest?.settings?.get(key)?.secret == true
             if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
-                kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.encrypt(value.content))
+                val encrypted = org.wip.plugintoolkit.core.utils.SecureStorage.encrypt(value.content)
+                kotlinx.serialization.json.JsonPrimitive("ENC[$encrypted]")
             } else {
                 value
             }
@@ -318,6 +337,24 @@ class PluginLifecycleManager(
                 null
             }
         }
+    }
+
+    fun getMigrations(pkg: String): List<PluginMigration> {
+        val plugin = registry.getPlugin(pkg) ?: return emptyList()
+        val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
+        val jarFile = "${plugin.installPath}/$jarFileName"
+        
+        val content = fileSystem.readFileFromZip(jarFile, "migrations.json")
+            ?: fileSystem.readFileFromZip(jarFile, "META-INF/migrations.json")
+            
+        return content?.let {
+            try {
+                json.decodeFromString<List<PluginMigration>>(it)
+            } catch (e: Exception) {
+                Logger.w { "Failed to parse migrations for $pkg: ${e.message}" }
+                emptyList()
+            }
+        } ?: emptyList()
     }
 
 }

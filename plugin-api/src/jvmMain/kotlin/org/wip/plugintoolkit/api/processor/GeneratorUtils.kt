@@ -23,7 +23,7 @@ object GeneratorUtils {
         val semanticTypes: List<SemanticType>
     )
 
-    fun mapKSTypeToDataType(ksType: KSType): DataType {
+    fun mapKSTypeToDataType(ksType: KSType, visited: Set<String> = emptySet()): DataType {
         val declaration = ksType.declaration
         val qualifiedName = declaration.qualifiedName?.asString() ?: ""
         
@@ -34,24 +34,47 @@ object GeneratorUtils {
             "kotlin.Boolean" -> DataType.Primitive(PrimitiveType.BOOLEAN)
             "kotlin.Unit" -> DataType.Primitive(PrimitiveType.UNIT)
             "kotlinx.serialization.json.JsonElement", "kotlin.Any" -> DataType.Primitive(PrimitiveType.ANY)
-            "kotlin.collections.List", "kotlin.collections.MutableList" -> {
+            "kotlin.collections.List", "kotlin.collections.MutableList", "kotlin.collections.Set", "kotlin.collections.MutableSet" -> {
                 val elementType = ksType.arguments.firstOrNull()?.type?.resolve()
                 if (elementType != null) {
-                    DataType.Array(mapKSTypeToDataType(elementType))
+                    DataType.Array(mapKSTypeToDataType(elementType, visited))
                 } else {
                     DataType.Primitive(PrimitiveType.ANY)
                 }
             }
+            "kotlin.collections.Map", "kotlin.collections.MutableMap" -> {
+                val valueType = ksType.arguments.getOrNull(1)?.type?.resolve()
+                if (valueType != null) {
+                    DataType.MapType(mapKSTypeToDataType(valueType, visited))
+                } else {
+                    DataType.MapType(DataType.Primitive(PrimitiveType.ANY))
+                }
+            }
             else -> {
                 if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
-                    val options = declaration.declarations
+                    val enumEntries = declaration.declarations
                         .filterIsInstance<KSClassDeclaration>()
                         .filter { it.classKind == ClassKind.ENUM_ENTRY }
-                        .map { it.simpleName.asString() }
                         .toList()
-                    DataType.Enum(qualifiedName, options)
+                    val options = enumEntries.map { it.simpleName.asString() }
+                    val optionRequirements = enumEntries.associate { entry ->
+                        val reqAnn = entry.annotations.find { it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.RequiresSetting") }
+                        val settings = (reqAnn?.arguments?.find { it.name?.asString() == "settings" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                        entry.simpleName.asString() to settings
+                    }.filter { it.value.isNotEmpty() }
+                    DataType.Enum(qualifiedName, options, null, optionRequirements)
                 } else {
-                    DataType.Object(qualifiedName)
+                    if (visited.contains(qualifiedName)) {
+                        DataType.Object(qualifiedName)
+                    } else {
+                        val newVisited = visited + qualifiedName
+                        val properties = if (declaration is KSClassDeclaration) {
+                            declaration.getAllProperties().associate { prop ->
+                                prop.simpleName.asString() to mapKSTypeToDataType(prop.type.resolve(), newVisited)
+                            }
+                        } else emptyMap()
+                        DataType.Object(qualifiedName, null, properties)
+                    }
                 }
             }
         }
@@ -74,18 +97,54 @@ object GeneratorUtils {
                 cnDataType.nestedClass("Array"),
                 generateDataTypeCode(dataType.items)
             )
+            is DataType.MapType -> com.squareup.kotlinpoet.CodeBlock.of("%T(%L)",
+                cnDataType.nestedClass("MapType"),
+                generateDataTypeCode(dataType.valueType)
+            )
             is DataType.Enum -> {
                 val optionsList = dataType.options.joinToString { "\"$it\"" }
-                com.squareup.kotlinpoet.CodeBlock.of("%T(%S, listOf(%L))",
-                    cnDataType.nestedClass("Enum"),
-                    dataType.className,
-                    optionsList
-                )
+                if (dataType.optionRequirements.isEmpty()) {
+                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, listOf(%L))",
+                        cnDataType.nestedClass("Enum"),
+                        dataType.className,
+                        optionsList
+                    )
+                } else {
+                    val reqMapStr = dataType.optionRequirements.entries.joinToString(", ") { entry ->
+                        "\"${entry.key}\" to listOf(${entry.value.joinToString { "\"$it\"" }})"
+                    }
+                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, listOf(%L), null, mapOf(%L))",
+                        cnDataType.nestedClass("Enum"),
+                        dataType.className,
+                        optionsList,
+                        reqMapStr
+                    )
+                }
             }
-            is DataType.Object -> com.squareup.kotlinpoet.CodeBlock.of("%T(%S)",
-                cnDataType.nestedClass("Object"),
-                dataType.className
-            )
+            is DataType.Object -> {
+                if (dataType.properties.isEmpty()) {
+                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S)",
+                        cnDataType.nestedClass("Object"),
+                        dataType.className
+                    )
+                } else {
+                    val propsCode = com.squareup.kotlinpoet.CodeBlock.builder()
+                    propsCode.add("mapOf(\n")
+                    propsCode.indent()
+                    val entries = dataType.properties.entries.toList()
+                    entries.forEachIndexed { index, entry ->
+                        propsCode.add("%S to %L", entry.key, generateDataTypeCode(entry.value))
+                        if (index < entries.size - 1) propsCode.add(",\n") else propsCode.add("\n")
+                    }
+                    propsCode.unindent()
+                    propsCode.add(")")
+                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, null, %L)",
+                        cnDataType.nestedClass("Object"),
+                        dataType.className,
+                        propsCode.build()
+                    )
+                }
+            }
         }
     }
 

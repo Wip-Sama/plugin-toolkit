@@ -192,39 +192,6 @@ object DispatcherGenerator {
         
         dispatcherType.addFunction(processFunc.build())
 
-        val processAsyncFunc = FunSpec.builder("processAsync")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("request", CN_PLUGIN_REQUEST)
-            .addParameter("context", CN_PLUGIN_CONTEXT)
-            .returns(CN_JOB_HANDLE)
-            .addCode(CodeBlock.builder()
-                .addStatement("val handler = handlers[request.method.lowercase()] ?: throw %T(%S)", CN_ILLEGAL_ARGUMENT_EXCEPTION, "Unknown method: \${request.method}")
-                .addStatement("val scope = %T(%T.Default + %M())", CN_COROUTINE_SCOPE, CN_DISPATCHERS, MN_SUPERVISOR_JOB)
-                .beginControlFlow("val deferred = scope.%M", MN_ASYNC)
-                .beginControlFlow("try")
-                .addStatement("handler(request, context)")
-                .nextControlFlow("catch (e: Exception)")
-                .addStatement("%T.Error(e.message ?: \"Unknown error\", e)", CN_EXECUTION_RESULT)
-                .endControlFlow()
-                .endControlFlow()
-                .add("\n")
-                .beginControlFlow("return object : %T", CN_JOB_HANDLE)
-                .addStatement("override val result = deferred")
-                .beginControlFlow("override fun pause()")
-                .addStatement("scope.%M { context.signals.sendSignal(%T.%M) }", MN_LAUNCH, CN_PLUGIN_SIGNAL, MN_SIGNAL_PAUSE)
-                .endControlFlow()
-                .beginControlFlow("override fun cancel(force: Boolean)")
-                .addStatement("scope.%M { context.signals.sendSignal(%T.%M) }", MN_LAUNCH, CN_PLUGIN_SIGNAL, MN_SIGNAL_CANCEL)
-                .addStatement("deferred.cancel()")
-                .beginControlFlow("if (force)")
-                .addStatement("scope.%M()", MN_CANCEL)
-                .endControlFlow()
-                .endControlFlow()
-                .endControlFlow()
-                .build())
-        
-        dispatcherType.addFunction(processAsyncFunc.build())
-
         // RunAction
         val actionMapType = CN_MAP.parameterizedBy(
             String::class.asClassName(),

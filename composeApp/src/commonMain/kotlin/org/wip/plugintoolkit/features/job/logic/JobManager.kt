@@ -28,12 +28,14 @@ import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.time.Clock
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 class JobManager(
     /** Injected [AppScope] for managing job lifecycles and worker coordination. */
     private val scope: CoroutineScope,
     private val settingsRepository: SettingsRepository
-) {
+) : KoinComponent {
     private val maxConcurrentJobs get() = settingsRepository.settings.value.jobs.maxConcurrentJobs
     private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
     private val maxHistoryLength get() = settingsRepository.settings.value.jobs.maxHistoryLength
@@ -67,9 +69,36 @@ class JobManager(
     private val handlesMutex = Mutex()
     private val activeJobHandles = mutableMapOf<String, JobHandle>()
 
+    private val settingsPersistence: org.wip.plugintoolkit.features.settings.logic.SettingsPersistence by inject()
+    private val jobRepository = JobRepository(settingsPersistence)
 
     init {
-        startWorkers()
+        scope.launch {
+            try {
+                val savedJobs = jobRepository.loadJobs()
+                _jobs.update { currentJobs ->
+                    val newJobIds = currentJobs.map { it.id }.toSet()
+                    savedJobs.filterNot { it.id in newJobIds } + currentJobs
+                }
+                
+                // Wake up workers in case we loaded queued jobs
+                if (_jobs.value.any { it.status == JobStatus.Queued }) {
+                    jobSignal.trySend(Unit)
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Error loading jobs from repository" }
+            }
+
+            // Start workers after initial load
+            startWorkers()
+
+            // Observe and save job state changes
+            launch {
+                _jobs.collect { currentJobs ->
+                    jobRepository.saveJobs(currentJobs)
+                }
+            }
+        }
     }
 
     private fun startWorkers() {

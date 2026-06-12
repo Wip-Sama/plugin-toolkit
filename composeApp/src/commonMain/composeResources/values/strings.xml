@@ -129,6 +129,8 @@
     <string name="update_check_started">Checking for updates...</string>
     <string name="update_new_version_found">New version available: %1$s</string>
     <string name="action_check_for_updates">Check for Updates</string>
+    <string name="insert_array_of_array_placeholder">Enter nested lists enclosed in parentheses, e.g. (1,2), (3,4)</string>
+    <string name="insert_array_placeholder">Enter nested lists enclosed in parentheses, e.g. (1,2), (3,4)</string>
 
     <!-- General / Common -->
     <string name="dialog_confirm">Confirm</string>

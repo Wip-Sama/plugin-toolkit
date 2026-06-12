@@ -82,8 +82,17 @@ class FlowEditorViewModel(
     private val settingsPersistence: SettingsPersistence? = null,
     private val notificationService: NotificationService? = null,
     private val pluginRegistry: PluginRegistry? = null,
-    private val activeFlowEditorTracker: ActiveFlowEditorTracker? = null
+    private val activeFlowEditorTracker: ActiveFlowEditorTracker? = null,
+    private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository? = null
 ) : ViewModel() {
+
+    private val resolvedSettingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository? by lazy {
+        settingsRepository ?: try {
+            getKoin().get()
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private val resolvedActiveFlowEditorTracker: ActiveFlowEditorTracker by lazy {
         activeFlowEditorTracker ?: try {
@@ -355,6 +364,7 @@ class FlowEditorViewModel(
                         InputPort(
                             id = key,
                             name = key,
+                            description = meta.description,
                             dataType = meta.type,
                             semanticTypes = meta.semanticTypes,
                             defaultValue = meta.defaultValue,
@@ -367,6 +377,7 @@ class FlowEditorViewModel(
                         OutputPort(
                             id = out.name,
                             name = out.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                            description = out.description,
                             dataType = out.type,
                             semanticTypes = out.semanticTypes
                         )
@@ -374,6 +385,7 @@ class FlowEditorViewModel(
                         OutputPort(
                             id = "result",
                             name = "Result",
+                            description = "Capability Result",
                             dataType = event.capability.returnType,
                             semanticTypes = event.capability.semanticTypes
                         )
@@ -481,7 +493,19 @@ class FlowEditorViewModel(
                 }
             }
             is FlowEvent.DeleteSelectedNodes -> handleDeleteSelectedNodes()
+            is FlowEvent.ToggleNodeCollapse -> handleToggleNodeCollapse(event.nodeId)
+            is FlowEvent.ToggleNodeInputsCollapse -> handleToggleNodeInputsCollapse(event.nodeId)
+            is FlowEvent.ToggleNodeOutputsCollapse -> handleToggleNodeOutputsCollapse(event.nodeId)
+            is FlowEvent.UpdateConnectionOrder -> handleUpdateConnectionOrder(event.connection, event.newOrderIndex)
+            is FlowEvent.MoveConnectionFirst -> handleMoveConnectionFirst(event.connection)
+            is FlowEvent.MoveConnectionLast -> handleMoveConnectionLast(event.connection)
             else -> {}
+        }
+
+        if (_state.value.hasUnsavedChanges && event !is FlowEvent.Save && event !is FlowEvent.SaveAs) {
+            if (resolvedSettingsRepository?.settings?.value?.flows?.autosave == true) {
+                handleSave()
+            }
         }
     }
 
@@ -720,8 +744,17 @@ class FlowEditorViewModel(
                 return@update currentState
             }
 
-            val filteredConnections = currentState.flow.connections.filterNot { 
-                it.targetNodeId == targetNodeId && it.targetPortId == targetPortId 
+            val isList = targetPort.dataType is DataType.Array
+            val filteredConnections = if (isList) {
+                currentState.flow.connections
+            } else {
+                currentState.flow.connections.filterNot { 
+                    it.targetNodeId == targetNodeId && it.targetPortId == targetPortId 
+                }
+            }
+
+            if (filteredConnections.any { it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId && it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }) {
+                return@update currentState // Already connected exactly
             }
 
             if (wouldCreateCycle(sourceNodeId, targetNodeId, filteredConnections)) {
@@ -729,7 +762,11 @@ class FlowEditorViewModel(
                 return@update currentState
             }
 
-            val newConnection = Connection(sourceNodeId, sourcePortId, targetNodeId, targetPortId)
+            val orderIndex = if (isList) {
+                filteredConnections.count { it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }
+            } else null
+
+            val newConnection = Connection(sourceNodeId, sourcePortId, targetNodeId, targetPortId, orderIndex)
             
             val newFlow = currentState.flow.copy(connections = filteredConnections + newConnection)
             currentState.copy(
@@ -977,9 +1014,10 @@ class FlowEditorViewModel(
                 if (node.id == nodeId) {
                     when (node) {
                         is Node.FlowInputNode -> {
+                            val finalDataType = if (isList) DataType.Array(dataType) else dataType
                             val port = node.outputs.first().copy(
                                 name = portName, 
-                                dataType = dataType, 
+                                dataType = finalDataType, 
                                 semanticTypes = semanticTypes
                             )
                             node.copy(
@@ -989,9 +1027,10 @@ class FlowEditorViewModel(
                             )
                         }
                         is Node.FlowOutputNode -> {
+                            val finalDataType = if (isList) DataType.Array(dataType) else dataType
                             val port = node.inputs.first().copy(
                                 name = portName, 
-                                dataType = dataType, 
+                                dataType = finalDataType, 
                                 semanticTypes = semanticTypes
                             )
                             node.copy(inputs = listOf(port))
@@ -1325,6 +1364,7 @@ class FlowEditorViewModel(
         return when (this) {
             is DataType.Primitive -> this.primitiveType.name.lowercase().replaceFirstChar { it.uppercase() }
             is DataType.Array -> "List<${this.items.format()}>"
+            is DataType.MapType -> "Map<String, ${this.valueType.format()}>"
             is DataType.Enum -> this.className.substringAfterLast('.')
             is DataType.Object -> this.className.substringAfterLast('.')
         }
@@ -1486,5 +1526,73 @@ class FlowEditorViewModel(
             return Pair(conn, pts)
         }
         return null
+    }
+
+    private fun handleToggleNodeCollapse(nodeId: Long) {
+        saveToHistory()
+        _state.update { currentState ->
+            val updatedNodes = currentState.flow.nodes.map { node ->
+                if (node.id == nodeId) {
+                    val newState = !node.isCollapsed
+                    node.copyWithCollapsedState(newState)
+                        .copyWithInputsCollapsedState(newState)
+                        .copyWithOutputsCollapsedState(newState)
+                } else node
+            }
+            currentState.copy(flow = currentState.flow.copy(nodes = updatedNodes), hasUnsavedChanges = true)
+        }
+    }
+
+    private fun handleToggleNodeInputsCollapse(nodeId: Long) {
+        saveToHistory()
+        _state.update { currentState ->
+            val updatedNodes = currentState.flow.nodes.map { node ->
+                if (node.id == nodeId) node.copyWithInputsCollapsedState(!node.isInputsCollapsed) else node
+            }
+            currentState.copy(flow = currentState.flow.copy(nodes = updatedNodes), hasUnsavedChanges = true)
+        }
+    }
+
+    private fun handleToggleNodeOutputsCollapse(nodeId: Long) {
+        saveToHistory()
+        _state.update { currentState ->
+            val updatedNodes = currentState.flow.nodes.map { node ->
+                if (node.id == nodeId) node.copyWithOutputsCollapsedState(!node.isOutputsCollapsed) else node
+            }
+            currentState.copy(flow = currentState.flow.copy(nodes = updatedNodes), hasUnsavedChanges = true)
+        }
+    }
+
+    private fun handleUpdateConnectionOrder(connection: Connection, newOrderIndex: Int) {
+        saveToHistory()
+        _state.update { currentState ->
+            val targetConnections = currentState.flow.connections.filter { 
+                it.targetNodeId == connection.targetNodeId && it.targetPortId == connection.targetPortId 
+            }.sortedBy { it.orderIndex ?: 0 }.toMutableList()
+            
+            val currentIdx = targetConnections.indexOfFirst { it == connection }
+            if (currentIdx == -1 || currentIdx == newOrderIndex || newOrderIndex < 0 || newOrderIndex >= targetConnections.size) return@update currentState
+
+            val conn = targetConnections.removeAt(currentIdx)
+            targetConnections.add(newOrderIndex, conn)
+
+            // Reassign indices
+            val remapped = targetConnections.mapIndexed { index, c -> c.copy(orderIndex = index) }
+            
+            val newConnections = currentState.flow.connections.map { existing ->
+                remapped.find { it.sourceNodeId == existing.sourceNodeId && it.sourcePortId == existing.sourcePortId && it.targetNodeId == existing.targetNodeId && it.targetPortId == existing.targetPortId } ?: existing
+            }
+
+            currentState.copy(flow = currentState.flow.copy(connections = newConnections), hasUnsavedChanges = true)
+        }
+    }
+
+    private fun handleMoveConnectionFirst(connection: Connection) {
+        handleUpdateConnectionOrder(connection, 0)
+    }
+
+    private fun handleMoveConnectionLast(connection: Connection) {
+        val targetCount = _state.value.flow.connections.count { it.targetNodeId == connection.targetNodeId && it.targetPortId == connection.targetPortId }
+        handleUpdateConnectionOrder(connection, targetCount - 1)
     }
 }

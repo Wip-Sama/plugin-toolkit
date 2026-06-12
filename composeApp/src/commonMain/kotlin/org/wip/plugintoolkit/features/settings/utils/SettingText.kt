@@ -10,7 +10,11 @@ import org.jetbrains.compose.resources.stringResource
  */
 sealed interface SettingText {
     data class Resource(val res: StringResource) : SettingText
-    data class Raw(val text: String) : SettingText
+    data class Raw(val text: String) : SettingText {
+        init {
+            println("WARN: String '$text' should be localized")
+        }
+    }
 }
 
 @Composable

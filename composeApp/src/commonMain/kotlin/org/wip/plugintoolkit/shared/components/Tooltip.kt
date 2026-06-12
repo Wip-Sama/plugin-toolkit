@@ -24,6 +24,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * A reusable Composable wrapper that shows a custom tooltip when the content is hovered.
@@ -33,9 +34,22 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 fun TooltipArea(
     tooltip: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    delayMillis: Int = 0,
     content: @Composable () -> Unit
 ) {
     var isHovered by remember { mutableStateOf(false) }
+    var isTooltipVisible by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(isHovered) {
+        if (isHovered) {
+            if (delayMillis > 0) {
+                kotlinx.coroutines.delay(delayMillis.toLong().milliseconds)
+            }
+            isTooltipVisible = true
+        } else {
+            isTooltipVisible = false
+        }
+    }
 
     Box(
         modifier = modifier
@@ -44,7 +58,7 @@ fun TooltipArea(
     ) {
         content()
 
-        if (isHovered) {
+        if (isTooltipVisible) {
             Popup(
                 alignment = Alignment.TopCenter,
                 offset = IntOffset(0, -60), // Position slightly above the hovered component

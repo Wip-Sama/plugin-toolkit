@@ -16,7 +16,9 @@ data class InstalledPlugin(
     val jarFileName: String? = null,
     val description: String? = null,
     val loadError: String? = null,
-    val requiredAction: String? = null
+    val requiredAction: String? = null,
+    val configurationPrompted: Boolean = false,
+    val signaturePrompted: Boolean = false
 )
 
 sealed class InstallationSource {

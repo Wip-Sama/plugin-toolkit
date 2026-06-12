@@ -61,6 +61,7 @@ import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.ConflictResolutionAction
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.MigrationPrompt
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
@@ -303,6 +304,59 @@ fun FlowManagerView(
             onCancel = { viewModel.onEvent(FlowEvent.CancelImport) }
         )
     }
+
+    if (state.pendingMigrations.isNotEmpty()) {
+        val prompt = state.pendingMigrations.first()
+        MigrationPromptDialog(
+            prompt = prompt,
+            onAccept = { viewModel.onEvent(FlowEvent.AcceptMigration(prompt.originalFlow.name)) },
+            onReject = { viewModel.onEvent(FlowEvent.RejectMigration(prompt.originalFlow.name)) }
+        )
+    }
+}
+
+@Composable
+private fun MigrationPromptDialog(
+    prompt: MigrationPrompt,
+    onAccept: () -> Unit,
+    onReject: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onReject,
+        title = { Text("Migration Required for ${prompt.originalFlow.name}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (prompt.requiresConsentNodes.isNotEmpty()) {
+                    Text(
+                        text = "The following nodes have new capabilities that require your review:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    prompt.requiresConsentNodes.forEach { node ->
+                        Text("• ${node.title}", color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                if (prompt.brokenNodes.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "The following nodes have incompatible changes and will be marked as broken:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    prompt.brokenNodes.forEach { node ->
+                        Text("• ${node.title}", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Do you want to apply these migrations now?")
+            }
+        },
+        confirmButton = {
+            Button(onClick = onAccept) { Text("Apply Migration") }
+        },
+        dismissButton = {
+            TextButton(onClick = onReject) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
