@@ -7,9 +7,12 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
@@ -31,6 +34,9 @@ interface NodeExecutionContext {
     val appDataDir: String
     /** Runtime inferred types for ports. */
     val runtimeInferredTypes: Map<Pair<Long, String>, DataType>
+    
+    /** Resume state if the node was paused mid-execution. */
+    val resumeState: JsonElement?
     
     /**
      * Retrieves the value of an input port.
@@ -368,9 +374,16 @@ class ForNodeExecutor : NodeExecutor {
             val end = (context.getInputValue("end", 10) as? Number)?.toInt() ?: 10
             val step = (context.getInputValue("step", 1) as? Number)?.toInt() ?: 1
             var accumulator = context.getInputValue("input_data", null)
+            var currentIndex = start
+
+            val rs = context.resumeState as? JsonObject
+            if (rs != null) {
+                currentIndex = rs["index"]?.jsonPrimitive?.intOrNull ?: start
+                accumulator = rs["accumulator"]?.let { fromJsonElement(it) } ?: accumulator
+            }
 
             if (step != 0) {
-                val range = if (step > 0) start until end step step else start downTo end + 1 step (-step)
+                val range = if (step > 0) currentIndex until end step step else currentIndex downTo end + 1 step (-step)
                 for (i in range) {
                     val subParameters = mutableMapOf<String, JsonElement>()
                     subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>().forEach { inputNode ->
@@ -387,7 +400,16 @@ class ForNodeExecutor : NodeExecutor {
                     }
 
                     context.addLog("Executing for loop iteration index = $i")
-                    val subOutputs = context.executeSubFlow(subflowName, subParameters)
+                    val subOutputs = try {
+                        context.executeSubFlow(subflowName, subParameters)
+                    } catch (e: PauseFlowException) {
+                        val state = JsonObject(mapOf(
+                            "index" to JsonPrimitive(i),
+                            "accumulator" to toJsonElement(accumulator),
+                            "subflowResumeState" to e.resumeState
+                        ))
+                        throw PauseFlowException(state)
+                    }
                     val outVal = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"] ?: subOutputs.values.firstOrNull()
                     accumulator = outVal
                 }
@@ -421,6 +443,13 @@ class WhileNodeExecutor : NodeExecutor {
             var accumulator = context.getInputValue("input_data", null)
             var iteration = 0
 
+            val rs = context.resumeState as? JsonObject
+            if (rs != null) {
+                iteration = rs["iteration"]?.jsonPrimitive?.intOrNull ?: 0
+                condition = rs["condition"]?.jsonPrimitive?.booleanOrNull ?: condition
+                accumulator = rs["accumulator"]?.let { fromJsonElement(it) } ?: accumulator
+            }
+
             while (condition) {
                 val subParameters = mutableMapOf<String, JsonElement>()
                 subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>().forEach { inputNode ->
@@ -437,7 +466,17 @@ class WhileNodeExecutor : NodeExecutor {
                 }
 
                 context.addLog("Executing while loop iteration $iteration")
-                val subOutputs = context.executeSubFlow(subflowName, subParameters)
+                val subOutputs = try {
+                    context.executeSubFlow(subflowName, subParameters)
+                } catch (e: PauseFlowException) {
+                    val state = JsonObject(mapOf(
+                        "iteration" to JsonPrimitive(iteration),
+                        "condition" to JsonPrimitive(condition),
+                        "accumulator" to toJsonElement(accumulator),
+                        "subflowResumeState" to e.resumeState
+                    ))
+                    throw PauseFlowException(state)
+                }
                 
                 val newAccumulator = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"]
                 val newConditionVal = subOutputs["condition"] ?: subOutputs["cond"]
@@ -459,19 +498,11 @@ class WhileNodeExecutor : NodeExecutor {
                         else -> false
                     }
                 } else {
-                    val boolOutput = subOutputs.values.filterIsInstance<Boolean>().firstOrNull()
-                    if (boolOutput != null) {
-                        condition = boolOutput
-                    } else {
-                        context.addLog("Warning: while loop did not return a condition output, exiting loop", "WARN")
-                        break
-                    }
+                    context.addLog("Warning: while loop subflow did not return 'condition' or 'cond' output, exiting loop", "WARN")
+                    break
                 }
                 
                 iteration++
-                if (iteration > 10000) {
-                    throw Exception("While loop exceeded safety limit of 10000 iterations")
-                }
             }
 
             context.setOutputValue("output_data", accumulator)
@@ -503,11 +534,11 @@ class CreateFolderNodeExecutor : NodeExecutor {
                 context.addLog("Folder already exists: $newFolderPath")
             }
             
-            context.setOutputValue("path", newFolderPath.toString())
+            context.setOutputValue("created_path", newFolderPath.toString())
             context.setOutputValue("success", true)
         } catch (e: Exception) {
             context.addLog("Failed to create folder: ${e.message}", "ERROR")
-            context.setOutputValue("path", null)
+            context.setOutputValue("created_path", null)
             context.setOutputValue("success", false)
         }
     }
