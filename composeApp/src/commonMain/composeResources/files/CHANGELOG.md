@@ -5,7 +5,8 @@ Changes:
 Fixed:
 	- Parsing of null / empty values in flows
 	- Create folder system node not accepting connection in the path port
-  - Create folder would return an error if the folder already existed (TODO)
+Planned:
+  - Create folder would return an error if the folder already existed
 ----------------------------------------------------------------------------------------------------
 Version: 1.6.0
 Date: 12-06-2026
