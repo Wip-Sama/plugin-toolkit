@@ -1,4 +1,4 @@
-﻿package org.wip.plugintoolkit.features.job.logic
+package org.wip.plugintoolkit.features.job.logic
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CancellationException
@@ -209,7 +209,7 @@ class JobWorker(
             throw e
         } catch (e: Exception) {
             Logger.e(e) { "Worker $workerId: Capability job ${job.id} failed with exception" }
-            ExecutionResult.Error(e.message ?: "Unknown error", e)
+            ExecutionResult.Error("Capability invocation failed (Plugin: '${job.pluginId}', Capability: '${job.capabilityName}'): ${e.message ?: "Unknown error"}", e)
         } finally {
             progressJob?.cancel()
         }
@@ -224,8 +224,9 @@ class JobWorker(
                 manager.tryPauseJob(job.id, result.resumeState)
             }
             is ExecutionResult.Error -> {
-                manager.tryFailJob(job.id, result.message)
-                lifecycleCoordinator.onLifecycleJobFailed(job, result.message)
+                val enhancedMessage = "Capability invocation failed (Plugin: '${job.pluginId}', Capability: '${job.capabilityName}'): ${result.message}"
+                manager.tryFailJob(job.id, enhancedMessage)
+                lifecycleCoordinator.onLifecycleJobFailed(job, enhancedMessage)
             }
         }
     }
