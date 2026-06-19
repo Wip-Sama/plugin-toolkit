@@ -179,3 +179,21 @@ annotation class PluginUpdate
 @Target(AnnotationTarget.VALUE_PARAMETER)
 @Retention(AnnotationRetention.SOURCE)
 annotation class ResumeState
+
+/**
+ * Provides metadata for a complex object parameter or return type.
+ *
+ * This annotation allows for better identification and versioning of complex objects,
+ * especially when multiple plugins might define objects with the same name.
+ *
+ * @property id An optional identifier for the complex object. Defaults to the class name if empty.
+ * @property description A description of the complex object.
+ * @property version The version of the complex object structure.
+ */
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.SOURCE)
+annotation class ComplexObject(
+    val id: String = "",
+    val description: String = "",
+    val version: Int = 1
+)

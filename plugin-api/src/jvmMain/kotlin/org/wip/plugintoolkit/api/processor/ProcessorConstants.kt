@@ -42,6 +42,7 @@ object ProcessorConstants {
     const val PLUGIN_VALIDATE_ANNOTATION = "$ANNOTATION_PACKAGE.PluginValidate"
     const val PLUGIN_LOAD_ANNOTATION = "$ANNOTATION_PACKAGE.PluginLoad"
     const val PLUGIN_UPDATE_ANNOTATION = "$ANNOTATION_PACKAGE.PluginUpdate"
+    const val COMPLEX_OBJECT_ANNOTATION = "$ANNOTATION_PACKAGE.ComplexObject"
 
     // API Classes
     val CN_PLUGIN_MANIFEST = PluginManifest::class.asClassName()

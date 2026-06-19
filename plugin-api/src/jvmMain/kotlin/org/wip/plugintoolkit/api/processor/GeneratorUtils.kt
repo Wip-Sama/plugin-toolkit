@@ -68,12 +68,21 @@ object GeneratorUtils {
                         DataType.Object(qualifiedName)
                     } else {
                         val newVisited = visited + qualifiedName
+                        val complexObjAnn = declaration.annotations.find { it.hasQualifiedName(ProcessorConstants.COMPLEX_OBJECT_ANNOTATION) }
+                        val annId = complexObjAnn?.arguments?.find { it.name?.asString() == "id" }?.value as? String
+                        val annDesc = complexObjAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String
+                        val annVersion = complexObjAnn?.arguments?.find { it.name?.asString() == "version" }?.value as? Int
+                        
+                        val id = if (annId.isNullOrEmpty()) null else annId
+                        val description = if (annDesc.isNullOrEmpty()) null else annDesc
+                        val version = if (complexObjAnn != null) (annVersion ?: 1) else null
+                        
                         val properties = if (declaration is KSClassDeclaration) {
                             declaration.getAllProperties().associate { prop ->
                                 prop.simpleName.asString() to mapKSTypeToDataType(prop.type.resolve(), newVisited)
                             }
                         } else emptyMap()
-                        DataType.Object(qualifiedName, null, properties)
+                        DataType.Object(qualifiedName, id, description, version, null, properties)
                     }
                 }
             }
@@ -122,10 +131,15 @@ object GeneratorUtils {
                 }
             }
             is DataType.Object -> {
+                val idStr = dataType.id?.let { "\"$it\"" } ?: "null"
+                val descStr = dataType.description?.let { "\"$it\"" } ?: "null"
+                val verStr = dataType.version?.toString() ?: "null"
+                
                 if (dataType.properties.isEmpty()) {
-                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S)",
+                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, %L, %L, %L)",
                         cnDataType.nestedClass("Object"),
-                        dataType.className
+                        dataType.className,
+                        idStr, descStr, verStr
                     )
                 } else {
                     val propsCode = com.squareup.kotlinpoet.CodeBlock.builder()
@@ -138,9 +152,10 @@ object GeneratorUtils {
                     }
                     propsCode.unindent()
                     propsCode.add(")")
-                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, null, %L)",
+                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, %L, %L, %L, null, %L)",
                         cnDataType.nestedClass("Object"),
                         dataType.className,
+                        idStr, descStr, verStr,
                         propsCode.build()
                     )
                 }

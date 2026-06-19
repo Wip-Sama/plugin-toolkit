@@ -47,6 +47,29 @@ The following types are supported for parameters annotated with `@CapabilityPara
 | **Object**  | `@Serializable class MyData`     | Complex objects (serialized as JSON).              |
 | **Any**     | `JsonElement`                    | Raw JSON input for maximum flexibility.            |
 
+#### Complex Objects
+
+When using complex objects (custom `@Serializable` data classes) as parameters or return types, keep the following in mind:
+
+1. **Lenient Serialization (Ignoring Extra Fields)**: When a plugin receives a complex object from the host (or another plugin in a flow), the deserialization process is inherently lenient. This means that **if the provided JSON object contains more fields than the receiving data class expects, the unused fields are simply ignored and dropped**. It will not throw an error. This is particularly useful for building robust flows where an upstream capability might output a rich object, but your capability only needs a few specific properties from it.
+2. **The `@ComplexObject` Annotation**: Multiple plugins might define complex objects with the same class name (e.g., `Config` or `UserData`). To help the host application differentiate these and to provide better metadata, you should annotate your data classes with `@ComplexObject` alongside `@Serializable`. 
+   - `id`: An optional identifier (defaults to the class name if not provided). You might want to prefix this with your plugin ID (e.g., `my-plugin/Config`).
+   - `description`: A helpful description of the object.
+   - `version`: The version of the object structure (defaults to `1`).
+3. **Nesting**: Complex objects fully support nesting. A `@Serializable` data class can contain properties that are themselves `@Serializable` data classes.
+   ```kotlin
+   @Serializable
+   @ComplexObject(id = "geometry/BoundingBox", description = "A bounding box")
+   data class BoundingBox(val x: Int, val y: Int, val width: Int, val height: Int)
+
+   @Serializable
+   @ComplexObject(id = "geometry/Shape", description = "A geometric shape with a bounding box")
+   data class GeometricShape(
+       val name: String,
+       val boundingBox: BoundingBox
+   )
+   ```
+
 ```kotlin
 @Capability(
     name = "Process Data",

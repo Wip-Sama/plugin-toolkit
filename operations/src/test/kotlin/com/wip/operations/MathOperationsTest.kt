@@ -180,4 +180,44 @@ class MathOperationsTest {
         assertEquals(1, result.metadata["speed"])
         assertEquals(0, result.metadata["pitch"])
     }
+    @Test
+    fun testProcessComplexObject() = runTest {
+        val processor = MathProcessor(MathProcessorSettings())
+        val initialObj = ComplexObject("id1", mapOf("key" to "value"), mapOf("meta" to 1))
+        
+        val result = processor.processComplexObject(initialObj)
+        
+        assertEquals("id1-processed", result.id)
+        assertEquals("value", result.properties["key"])
+        assertEquals("true", result.properties["processed"])
+        assertEquals(1, result.metadata["meta"])
+    }
+
+    @Test
+    fun testMergeComplexObjects() = runTest {
+        val processor = MathProcessor(MathProcessorSettings())
+        val obj1 = ComplexObject("id1", mapOf("k1" to "v1"), mapOf("m1" to 1))
+        val obj2 = ComplexObject("id2", mapOf("k2" to "v2"), mapOf("m2" to 2))
+        
+        val result = processor.mergeComplexObjects(listOf(obj1, obj2))
+        
+        assertEquals("id1-id2", result.id)
+        assertEquals("v1", result.properties["k1"])
+        assertEquals("v2", result.properties["k2"])
+        assertEquals(1, result.metadata["m1"])
+        assertEquals(2, result.metadata["m2"])
+    }
+
+    @Test
+    fun testProcessDataPoints() = runTest {
+        val processor = MathProcessor(MathProcessorSettings())
+        val p1 = DataPoint(1.0, 2.0, "p1")
+        val p2 = DataPoint(3.0, 4.0, "p2")
+        
+        val result = processor.processDataPoints(listOf(p1, p2))
+        
+        assertEquals(4.0, result.x)
+        assertEquals(6.0, result.y)
+        assertEquals("centroid", result.label)
+    }
 }

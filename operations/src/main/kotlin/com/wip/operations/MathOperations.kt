@@ -60,6 +60,11 @@ data class ComplexObject(
     val id: String, val properties: Map<String, String>, val metadata: Map<String, Int>
 )
 
+@Serializable
+data class DataPoint(
+    val x: Double, val y: Double, val label: String
+)
+
 @PluginInfo(
     id = "com.wip.operations.math",
     name = "Math Operations",
@@ -310,6 +315,40 @@ class MathProcessor(val settings: MathProcessorSettings) {
             id = "test-123",
             properties = mapOf("voice" to voice.name),
             metadata = config.mapValues { it.value.toInt() })
+    }
+
+    @Capability(name = "process_complex_object", description = "Processes a complex object by appending a suffix to its ID")
+    fun processComplexObject(
+        @CapabilityParam(description = "The complex object to process") obj: ComplexObject
+    ): ComplexObject {
+        return obj.copy(
+            id = obj.id + "-processed",
+            properties = obj.properties + ("processed" to "true")
+        )
+    }
+
+    @Capability(name = "merge_complex_objects", description = "Merges a list of complex objects into one")
+    fun mergeComplexObjects(
+        @CapabilityParam(description = "List of complex objects to merge") objects: List<ComplexObject>
+    ): ComplexObject {
+        if (objects.isEmpty()) return ComplexObject("empty", emptyMap(), emptyMap())
+        val mergedProperties = objects.flatMap { it.properties.entries }.associate { it.key to it.value }
+        val mergedMetadata = objects.flatMap { it.metadata.entries }.associate { it.key to it.value }
+        return ComplexObject(
+            id = objects.joinToString("-") { it.id },
+            properties = mergedProperties,
+            metadata = mergedMetadata
+        )
+    }
+
+    @Capability(name = "process_data_points", description = "Calculates the centroid of data points")
+    fun processDataPoints(
+        @CapabilityParam(description = "List of data points") points: List<DataPoint>
+    ): DataPoint {
+        if (points.isEmpty()) return DataPoint(0.0, 0.0, "empty")
+        val sumX = points.sumOf { it.x }
+        val sumY = points.sumOf { it.y }
+        return DataPoint(sumX, sumY, "centroid")
     }
 }
 

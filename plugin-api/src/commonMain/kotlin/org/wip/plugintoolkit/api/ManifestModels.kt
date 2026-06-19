@@ -66,6 +66,9 @@ sealed class DataType {
     @SerialName("object")
     data class Object(
         val className: String, 
+        val id: String? = null,
+        val description: String? = null,
+        val version: Int? = null,
         val namespace: String? = null,
         val properties: Map<String, DataType> = emptyMap(),
         val requiredProperties: List<String> = emptyList()
