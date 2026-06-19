@@ -28,16 +28,19 @@ import kotlin.time.Duration.Companion.milliseconds
 interface NodeExecutionContext {
     /** The system node being executed. */
     val node: Node.SystemNode
+
     /** The background job containing this node execution. */
     val job: BackgroundJob
+
     /** The base directory for application data. */
     val appDataDir: String
+
     /** Runtime inferred types for ports. */
     val runtimeInferredTypes: Map<Pair<Long, String>, DataType>
-    
+
     /** Resume state if the node was paused mid-execution. */
     val resumeState: JsonElement?
-    
+
     /**
      * Retrieves the value of an input port.
      * @param portId The ID of the port.
@@ -58,7 +61,7 @@ interface NodeExecutionContext {
      * @param level The log level (e.g., "INFO", "WARN", "ERROR").
      */
     fun addLog(message: String, level: String = "INFO")
-    
+
     /**
      * Executes a sub-flow.
      * @param flowName The name of the flow to execute.
@@ -123,20 +126,20 @@ class SaveNodeExecutor : NodeExecutor {
             is JsonElement -> data.toString()
             else -> data?.toString() ?: ""
         }
-        
+
         val path = Path(filePath)
         val fullPath = if (path.isAbsolute) {
             path
         } else {
             kotlinx.io.files.Path(context.appDataDir, filePath)
         }
-        
+
         val parent = fullPath.parent
         if (parent != null && !SystemFileSystem.exists(parent)) {
             SystemFileSystem.createDirectories(parent)
         }
         SystemFileSystem.sink(fullPath).buffered().use { it.writeString(dataString) }
-        
+
         context.setOutputValue("success", true)
         context.addLog("Saved data to file: $filePath")
     }
@@ -162,21 +165,21 @@ class LoadNodeExecutor : NodeExecutor {
                 }
             }
         }
-        
+
         val path = Path(filePath)
         val fullPath = if (path.isAbsolute) {
             path
         } else {
             Path(context.appDataDir, filePath)
         }
-        
+
         val fileContent = if (SystemFileSystem.exists(fullPath)) {
             SystemFileSystem.source(fullPath).buffered().use { it.readString() }
         } else {
             context.addLog("Warning: file to load not found at $fullPath, returning empty: $filePath", "WARN")
             ""
         }
-        
+
         context.setOutputValue("data", fileContent)
         context.addLog("Loaded content from file: $filePath (Size: ${fileContent.length} chars)")
     }
@@ -187,7 +190,7 @@ class LogNodeExecutor : NodeExecutor {
         val level = context.getInputValue("level", "INFO") as String
         val message = context.getInputValue("message", "") as String
         val data = context.getInputValue("data", null)
-        
+
         val logMessage = buildString {
             append(message)
             if (data != null) {
@@ -208,10 +211,10 @@ class DelayNodeExecutor : NodeExecutor {
             else -> 1000L
         }
         val inputData = context.getInputValue("input_data", null)
-        
+
         context.addLog("Sleeping for $duration ms...")
         kotlinx.coroutines.delay(duration.milliseconds)
-        
+
         context.setOutputValue("output_data", inputData)
     }
 }
@@ -219,7 +222,7 @@ class DelayNodeExecutor : NodeExecutor {
 class ConvertNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val inputData = context.getInputValue("input_data", null)
-        val targetType = context.runtimeInferredTypes[Pair(context.node.id, "output_data")] 
+        val targetType = context.runtimeInferredTypes[Pair(context.node.id, "output_data")]
             ?: DataType.Primitive(PrimitiveType.ANY)
         try {
             val converted = convertValue(inputData, targetType)
@@ -262,6 +265,7 @@ class ErrorNodeExecutor : NodeExecutor {
                 is kotlinx.serialization.json.JsonPrimitive -> {
                     if (data.isString) data.content else data.toString()
                 }
+
                 else -> data.toString()
             }
             if (message.endsWith(": ") || message.endsWith(":") || message.endsWith(" ")) {
@@ -280,9 +284,9 @@ class MergerNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val list1 = context.getInputValue("list1", null)
         val list2 = context.getInputValue("list2", null)
-        
+
         val merged = mutableListOf<Any?>()
-        
+
         fun addToList(item: Any?) {
             when (item) {
                 is List<*> -> merged.addAll(item)
@@ -294,19 +298,21 @@ class MergerNodeExecutor : NodeExecutor {
                                 if (je.isString) je.content
                                 else je.booleanOrNull ?: je.intOrNull ?: je.longOrNull ?: je.doubleOrNull ?: je.content
                             }
+
                             else -> je
                         }
                         merged.add(unwrapped)
                     }
                 }
+
                 null -> {}
                 else -> merged.add(item)
             }
         }
-        
+
         addToList(list1)
         addToList(list2)
-        
+
         context.setOutputValue("output", merged)
         context.addLog("Merged lists. Item count: ${merged.size}")
     }
@@ -362,7 +368,14 @@ class ForNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val subflowName = context.getInputValue("subflow_name", "") as String
         if (subflowName.isNotEmpty()) {
-            val subFlowFile = kotlinx.io.files.Path("${context.appDataDir}/flows/${subflowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+            val subFlowFile = kotlinx.io.files.Path(
+                "${context.appDataDir}/flows/${
+                    subflowName.replace(
+                        Regex("[\\\\/:*?\"<>|]"),
+                        "_"
+                    )
+                }.json"
+            )
             if (!SystemFileSystem.exists(subFlowFile)) {
                 throw Exception("Subflow file not found: $subflowName")
             }
@@ -386,31 +399,36 @@ class ForNodeExecutor : NodeExecutor {
                 val range = if (step > 0) currentIndex until end step step else currentIndex downTo end + 1 step (-step)
                 for (i in range) {
                     val subParameters = mutableMapOf<String, JsonElement>()
-                    subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>().forEach { inputNode ->
-                        val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
-                        val portId = inputNode.outputs.firstOrNull()?.id ?: ""
-                        when {
-                            portName == "index" || portName == "idx" || portId == "index" || portId == "idx" -> {
-                                subParameters["${inputNode.id}"] = toJsonElement(i)
-                            }
-                            portName == "input_data" || portName == "input" || portName == "data" || portId == "input_data" || portId == "input" || portId == "data" -> {
-                                subParameters["${inputNode.id}"] = toJsonElement(accumulator)
+                    subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>()
+                        .forEach { inputNode ->
+                            val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
+                            val portId = inputNode.outputs.firstOrNull()?.id ?: ""
+                            when {
+                                portName == "index" || portName == "idx" || portId == "index" || portId == "idx" -> {
+                                    subParameters["${inputNode.id}"] = toJsonElement(i)
+                                }
+
+                                portName == "input_data" || portName == "input" || portName == "data" || portId == "input_data" || portId == "input" || portId == "data" -> {
+                                    subParameters["${inputNode.id}"] = toJsonElement(accumulator)
+                                }
                             }
                         }
-                    }
 
                     context.addLog("Executing for loop iteration index = $i")
                     val subOutputs = try {
                         context.executeSubFlow(subflowName, subParameters)
                     } catch (e: PauseFlowException) {
-                        val state = JsonObject(mapOf(
-                            "index" to JsonPrimitive(i),
-                            "accumulator" to toJsonElement(accumulator),
-                            "subflowResumeState" to e.resumeState
-                        ))
+                        val state = JsonObject(
+                            mapOf(
+                                "index" to JsonPrimitive(i),
+                                "accumulator" to toJsonElement(accumulator),
+                                "subflowResumeState" to e.resumeState
+                            )
+                        )
                         throw PauseFlowException(state)
                     }
-                    val outVal = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"] ?: subOutputs.values.firstOrNull()
+                    val outVal = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"]
+                    ?: subOutputs.values.firstOrNull()
                     accumulator = outVal
                 }
             }
@@ -425,7 +443,14 @@ class WhileNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val subflowName = context.getInputValue("subflow_name", "") as String
         if (subflowName.isNotEmpty()) {
-            val subFlowFile = kotlinx.io.files.Path("${context.appDataDir}/flows/${subflowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+            val subFlowFile = kotlinx.io.files.Path(
+                "${context.appDataDir}/flows/${
+                    subflowName.replace(
+                        Regex("[\\\\/:*?\"<>|]"),
+                        "_"
+                    )
+                }.json"
+            )
             if (!SystemFileSystem.exists(subFlowFile)) {
                 throw Exception("Subflow file not found: $subflowName")
             }
@@ -452,39 +477,47 @@ class WhileNodeExecutor : NodeExecutor {
 
             while (condition) {
                 val subParameters = mutableMapOf<String, JsonElement>()
-                subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>().forEach { inputNode ->
-                    val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
-                    val portId = inputNode.outputs.firstOrNull()?.id ?: ""
-                    when {
-                        portName == "condition" || portName == "cond" || portId == "condition" || portId == "cond" -> {
-                            subParameters["${inputNode.id}"] = toJsonElement(condition)
-                        }
-                        portName == "input_data" || portName == "input" || portName == "data" || portId == "input_data" || portId == "input" || portId == "data" -> {
-                            subParameters["${inputNode.id}"] = toJsonElement(accumulator)
+                subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>()
+                    .forEach { inputNode ->
+                        val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
+                        val portId = inputNode.outputs.firstOrNull()?.id ?: ""
+                        when {
+                            portName == "condition" || portName == "cond" || portId == "condition" || portId == "cond" -> {
+                                subParameters["${inputNode.id}"] = toJsonElement(condition)
+                            }
+
+                            portName == "input_data" || portName == "input" || portName == "data" || portId == "input_data" || portId == "input" || portId == "data" -> {
+                                subParameters["${inputNode.id}"] = toJsonElement(accumulator)
+                            }
                         }
                     }
-                }
 
                 context.addLog("Executing while loop iteration $iteration")
                 val subOutputs = try {
                     context.executeSubFlow(subflowName, subParameters)
                 } catch (e: PauseFlowException) {
-                    val state = JsonObject(mapOf(
-                        "iteration" to JsonPrimitive(iteration),
-                        "condition" to JsonPrimitive(condition),
-                        "accumulator" to toJsonElement(accumulator),
-                        "subflowResumeState" to e.resumeState
-                    ))
+                    val state = JsonObject(
+                        mapOf(
+                            "iteration" to JsonPrimitive(iteration),
+                            "condition" to JsonPrimitive(condition),
+                            "accumulator" to toJsonElement(accumulator),
+                            "subflowResumeState" to e.resumeState
+                        )
+                    )
                     throw PauseFlowException(state)
                 }
-                
+
                 val newAccumulator = subOutputs["output_data"] ?: subOutputs["output"] ?: subOutputs["data"]
                 val newConditionVal = subOutputs["condition"] ?: subOutputs["cond"]
-                
-                if (newAccumulator != null || subOutputs.containsKey("output_data") || subOutputs.containsKey("output") || subOutputs.containsKey("data")) {
+
+                if (newAccumulator != null || subOutputs.containsKey("output_data") || subOutputs.containsKey("output") || subOutputs.containsKey(
+                        "data"
+                    )
+                ) {
                     accumulator = newAccumulator
                 } else {
-                    val nonConditionOutput = subOutputs.filterKeys { it != "condition" && it != "cond" }.values.firstOrNull()
+                    val nonConditionOutput =
+                        subOutputs.filterKeys { it != "condition" && it != "cond" }.values.firstOrNull()
                     if (nonConditionOutput != null) {
                         accumulator = nonConditionOutput
                     }
@@ -498,10 +531,13 @@ class WhileNodeExecutor : NodeExecutor {
                         else -> false
                     }
                 } else {
-                    context.addLog("Warning: while loop subflow did not return 'condition' or 'cond' output, exiting loop", "WARN")
+                    context.addLog(
+                        "Warning: while loop subflow did not return 'condition' or 'cond' output, exiting loop",
+                        "WARN"
+                    )
                     break
                 }
-                
+
                 iteration++
             }
 
@@ -517,23 +553,23 @@ class CreateFolderNodeExecutor : NodeExecutor {
         try {
             val basePath = context.getInputValue("path", "") as String
             val folderName = context.getInputValue("folder_name", "") as String
-            
+
             val path = kotlinx.io.files.Path(basePath)
             val fullBasePath = if (path.isAbsolute) {
                 path
             } else {
                 kotlinx.io.files.Path(context.appDataDir, basePath)
             }
-            
+
             val newFolderPath = kotlinx.io.files.Path(fullBasePath, folderName)
-            
+
             if (!kotlinx.io.files.SystemFileSystem.exists(newFolderPath)) {
                 kotlinx.io.files.SystemFileSystem.createDirectories(newFolderPath)
                 context.addLog("Created folder: $newFolderPath")
             } else {
                 context.addLog("Folder already exists: $newFolderPath")
             }
-            
+
             context.setOutputValue("created_path", newFolderPath.toString())
             context.setOutputValue("success", true)
         } catch (e: Exception) {

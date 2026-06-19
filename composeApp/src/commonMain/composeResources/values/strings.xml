@@ -248,7 +248,7 @@
     <string name="flow_used_in_parents">Used in %1$d parents</string>
     <string name="flow_used_in_chip">Used in: %1$s</string>
     <string name="flow_missing_chip">Missing: %1$s</string>
-    
+
     <!-- Flow Runner -->
     <string name="flow_select_title">Select Flow</string>
     <string name="flow_select_hint">Select a flow to see options</string>
@@ -286,7 +286,7 @@
     <string name="flow_editor_incompatible_types">Cannot connect: Incompatible types. Cannot connect %1$s to %2$s.</string>
     <string name="flow_editor_incompatible_semantics">Cannot connect: Incompatible semantic types. '%1$s' cannot connect to '%2$s'.</string>
     <string name="flow_editor_btn_exit">Exit</string>
-    
+
     <!-- Node Component -->
     <string name="node_expand">Expand</string>
     <string name="node_edit_port">Edit Port</string>
@@ -302,7 +302,7 @@
     <string name="node_class_name_label">Class Name (e.g. org.wip.MyData)</string>
     <string name="node_semantic_type_label">Semantic Type / Mimetype (optional)</string>
     <string name="node_semantic_type_placeholder">e.g. image/png</string>
-    
+
     <!-- Palette Sidebar -->
     <string name="palette_search_placeholder">Search nodes...</string>
     <string name="palette_tab_plugins">Plugins</string>
@@ -324,4 +324,8 @@
     <string name="repo_flow_filename_version_format">FileName: %1$s • Version: %2$s</string>
     <string name="repo_action_update_version">Update to v%1$s</string>
     <string name="repo_plugin_installed_version_format">Installed (v%1$s)</string>
+    <string name="repo_action_updating">Updating...</string>
+    <string name="repo_action_cancel_update">Cancel</string>
+    <string name="cancel_update_title">Cancel Update</string>
+    <string name="cancel_update_desc">Are you sure you want to cancel the plugin update?</string>
 </resources>

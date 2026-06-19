@@ -322,4 +322,8 @@
     <string name="repo_flow_filename_version_format">NomeFile: %1$s • Versione: %2$s</string>
     <string name="repo_action_update_version">Aggiorna a v%1$s</string>
     <string name="repo_plugin_installed_version_format">Installato (v%1$s)</string>
+    <string name="repo_action_updating">In aggiornamento...</string>
+    <string name="repo_action_cancel_update">Annulla</string>
+    <string name="cancel_update_title">Annulla Aggiornamento</string>
+    <string name="cancel_update_desc">Sei sicuro di voler annullare l\'aggiornamento del plugin?</string>
 </resources>

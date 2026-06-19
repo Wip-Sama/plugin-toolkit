@@ -1,18 +1,18 @@
 package org.wip.plugintoolkit.features.flows
 
 import androidx.compose.ui.geometry.Offset
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.buffered
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
@@ -20,7 +20,9 @@ import org.koin.dsl.module
 import org.wip.plugintoolkit.api.DataProcessor
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.JobHandle
+import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginEntry
+import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
@@ -53,14 +55,22 @@ class JobWorkerFlowTest {
     private class FakeSettingsPersistence : SettingsPersistence {
         var settings = AppSettings()
         override fun load(): AppSettings = settings
-        override fun save(settings: AppSettings) { this.settings = settings }
+        override fun save(settings: AppSettings) {
+            this.settings = settings
+        }
+
         override fun getSettingsDir(): String = "/tmp"
         override fun getJobsDir(): String = "/tmp/jobs"
         override fun openLogFolder() {}
         override fun openLatestLog() {}
     }
 
-    private fun createInputNode(id: Long, name: String, dataType: DataType, semanticTypes: List<SemanticType> = emptyList()): Node.FlowInputNode {
+    private fun createInputNode(
+        id: Long,
+        name: String,
+        dataType: DataType,
+        semanticTypes: List<SemanticType> = emptyList()
+    ): Node.FlowInputNode {
         return Node.FlowInputNode(
             id = id,
             position = Offset.Zero,
@@ -100,7 +110,7 @@ class JobWorkerFlowTest {
 
         // Flow: Input node (String: "123") -> Convert Node (to Int) -> Output Node
         val inputNode = createInputNode(1, "source", DataType.Primitive(PrimitiveType.STRING))
-        
+
         // Convert node with target type Int
         val convertNode = createSystemNode(2, "convert")
             .copyWithUpdatedInput("input_data", JsonPrimitive("123"))
@@ -125,7 +135,13 @@ class JobWorkerFlowTest {
             parameters = mapOf("1" to JsonPrimitive("123"))
         )
 
-        val outputs = jobWorker.executeSubFlowRecursively(flow, job, "/tmp")
+        val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+            jobManager,
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+            backgroundScope
+        ).executeSubFlowRecursively(flow, job, "/tmp")
 
         // Output of convert should be successfully cast to Int
         assertEquals(123, outputs["result"])
@@ -140,7 +156,7 @@ class JobWorkerFlowTest {
 
         // Flow: Input node (String: "invalid-int") -> Convert Node (to Int) -> Output Node
         val inputNode = createInputNode(1, "source", DataType.Primitive(PrimitiveType.STRING))
-        
+
         val convertNode = createSystemNode(2, "convert")
             .copyWithUpdatedInput("input_data", JsonPrimitive("invalid-int"))
 
@@ -165,7 +181,13 @@ class JobWorkerFlowTest {
         )
 
         // Should complete without throwing exception (soft failure)
-        val outputs = jobWorker.executeSubFlowRecursively(flow, job, "/tmp")
+        val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+            jobManager,
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+            backgroundScope
+        ).executeSubFlowRecursively(flow, job, "/tmp")
 
         // The target output should be null since conversion failed
         assertNull(outputs["result"])
@@ -183,7 +205,7 @@ class JobWorkerFlowTest {
         // Conditional if_true -> Log Node (success path)
         // Conditional if_false -> Error Node (should NOT be fired/executed)
         val inputNode = createInputNode(1, "data", DataType.Primitive(PrimitiveType.STRING))
-        
+
         val condNode = createSystemNode(2, "conditional")
             .copyWithUpdatedInput("condition", JsonPrimitive(true))
             .copyWithUpdatedInput("input_data", JsonPrimitive("hello"))
@@ -214,8 +236,14 @@ class JobWorkerFlowTest {
 
         // If both branches were executed, the errorNode would throw an Exception, failing the flow.
         // If only the true branch is executed, this runs successfully.
-        val outputs = jobWorker.executeSubFlowRecursively(flow, job, "/tmp")
-        
+        val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+            jobManager,
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+            backgroundScope
+        ).executeSubFlowRecursively(flow, job, "/tmp")
+
         // Flow should have completed without errors
         assertNotNull(outputs)
     }
@@ -232,7 +260,7 @@ class JobWorkerFlowTest {
         // Conditional if_true -> Error Node (should NOT be executed)
         // Conditional if_false -> Log Node (success path)
         val inputNode = createInputNode(1, "data", DataType.Primitive(PrimitiveType.STRING))
-        
+
         val condNode = createSystemNode(2, "conditional")
             .copyWithUpdatedInput("condition", JsonPrimitive(false))
             .copyWithUpdatedInput("input_data", JsonPrimitive("hello"))
@@ -263,8 +291,14 @@ class JobWorkerFlowTest {
 
         // If the true branch runs, it throws an exception.
         // Otherwise, it runs successfully.
-        val outputs = jobWorker.executeSubFlowRecursively(flow, job, "/tmp")
-        
+        val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+            jobManager,
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+            backgroundScope
+        ).executeSubFlowRecursively(flow, job, "/tmp")
+
         assertNotNull(outputs)
     }
 
@@ -277,7 +311,7 @@ class JobWorkerFlowTest {
 
         // Flow: Input node (String: "debug_info") -> Error Node (message = "Execution failed")
         val inputNode = createInputNode(1, "data", DataType.Primitive(PrimitiveType.STRING))
-        
+
         val errorNode = createSystemNode(2, "error")
             .copyWithUpdatedInput("message", JsonPrimitive("Execution failed"))
 
@@ -299,7 +333,13 @@ class JobWorkerFlowTest {
         )
 
         try {
-            jobWorker.executeSubFlowRecursively(flow, job, "/tmp")
+            org.wip.plugintoolkit.features.job.logic.FlowEngine(
+                jobManager,
+                org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+                mockk(relaxed = true),
+                mockk(relaxed = true),
+                backgroundScope
+            ).executeSubFlowRecursively(flow, job, "/tmp")
             fail("Flow should have failed due to Error Node execution")
         } catch (e: Exception) {
             assertEquals("Execution failed: debug_info", e.message)
@@ -342,15 +382,26 @@ class JobWorkerFlowTest {
         // First call to processAsync (Node 2)
         val deferred1 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
         every { mockHandle1.result } returns deferred1
-        
+
         // Second call to processAsync (Node 3)
         val deferred2 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
         every { mockHandle2.result } returns deferred2
 
         var callCount = 0
-        every { mockProcessor.processAsync(any(), any()) } answers {
+        coEvery { mockProcessor.process(any(), any()) } coAnswers {
             callCount++
-            if (callCount == 1) mockHandle1 else mockHandle2
+            if (callCount == 1) {
+                val req = firstArg<PluginRequest>()
+                val ctx = secondArg<PluginContext>()
+                ctx.onSignal { signal ->
+                    if (signal == PluginSignal.PAUSE) {
+                        deferred1.complete(org.wip.plugintoolkit.api.ExecutionResult.Paused(JsonPrimitive("saved-node-1")))
+                    }
+                }
+                deferred1.await()
+            } else {
+                deferred2.await()
+            }
         }
 
         // Flow: Input node (1) -> Capability Node A (2) -> Capability Node B (3) -> Output Node (4)
@@ -358,18 +409,60 @@ class JobWorkerFlowTest {
         val capNodeA = Node.CapabilityNode(
             id = 2,
             position = Offset.Zero,
-            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
-            capability = org.wip.plugintoolkit.api.Capability(name = "capA", description = "test A", returnType = DataType.Primitive(PrimitiveType.STRING)),
-            inputs = listOf(InputPort(id = "input", name = "input", dataType = DataType.Primitive(PrimitiveType.STRING))),
-            outputs = listOf(OutputPort(id = "result", name = "result", dataType = DataType.Primitive(PrimitiveType.STRING)))
+            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(
+                id = "test-plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                description = "Test"
+            ),
+            capability = org.wip.plugintoolkit.api.Capability(
+                name = "capA",
+                description = "test A",
+                returnType = DataType.Primitive(PrimitiveType.STRING)
+            ),
+            inputs = listOf(
+                InputPort(
+                    id = "input",
+                    name = "input",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            ),
+            outputs = listOf(
+                OutputPort(
+                    id = "result",
+                    name = "result",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            )
         )
         val capNodeB = Node.CapabilityNode(
             id = 3,
             position = Offset.Zero,
-            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
-            capability = org.wip.plugintoolkit.api.Capability(name = "capB", description = "test B", returnType = DataType.Primitive(PrimitiveType.STRING)),
-            inputs = listOf(InputPort(id = "input", name = "input", dataType = DataType.Primitive(PrimitiveType.STRING))),
-            outputs = listOf(OutputPort(id = "result", name = "result", dataType = DataType.Primitive(PrimitiveType.STRING)))
+            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(
+                id = "test-plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                description = "Test"
+            ),
+            capability = org.wip.plugintoolkit.api.Capability(
+                name = "capB",
+                description = "test B",
+                returnType = DataType.Primitive(PrimitiveType.STRING)
+            ),
+            inputs = listOf(
+                InputPort(
+                    id = "input",
+                    name = "input",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            ),
+            outputs = listOf(
+                OutputPort(
+                    id = "result",
+                    name = "result",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            )
         )
         val outputNode = createOutputNode(4, "result", DataType.Primitive(PrimitiveType.STRING))
 
@@ -410,26 +503,36 @@ class JobWorkerFlowTest {
         jobWorker.start()
 
         // Wait for job to start running
-        kotlinx.coroutines.withTimeout(2000) {
-            while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
-                kotlinx.coroutines.delay(10)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.withTimeout(5000) {
+                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
             }
         }
 
         // Complete first capability successfully
-        deferred1.complete(org.wip.plugintoolkit.api.ExecutionResult.Success(
-            org.wip.plugintoolkit.api.PluginResponse(
-                result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("res-A")))
+        deferred1.complete(
+            org.wip.plugintoolkit.api.ExecutionResult.Success(
+                org.wip.plugintoolkit.api.PluginResponse(
+                    result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("res-A")))
+                )
             )
-        ))
+        )
 
         // Request flow pause
         jobManager.pauseJob(job.id)
 
         // Wait for job to transition to Paused status and save resumeState
-        kotlinx.coroutines.withTimeout(2000) {
-            while (jobManager.jobs.value.first().resumeState == null) {
-                kotlinx.coroutines.delay(10)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.withTimeout(5000) {
+                    while (jobManager.jobs.value.first().resumeState == null) {
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
             }
         }
 
@@ -437,23 +540,29 @@ class JobWorkerFlowTest {
         val pausedJob = jobManager.jobs.value.first()
         val resumeState = pausedJob.resumeState as? kotlinx.serialization.json.JsonObject
         assertNotNull(resumeState)
-        
+
         // Resume the job
         jobManager.resumeJob(job.id)
 
         // Wait for job to transition back to Running
-        kotlinx.coroutines.withTimeout(2000) {
-            while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
-                kotlinx.coroutines.delay(10)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.withTimeout(5000) {
+                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
             }
         }
 
         // Complete the second capability
-        deferred2.complete(org.wip.plugintoolkit.api.ExecutionResult.Success(
-            org.wip.plugintoolkit.api.PluginResponse(
-                result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("res-B")))
+        deferred2.complete(
+            org.wip.plugintoolkit.api.ExecutionResult.Success(
+                org.wip.plugintoolkit.api.PluginResponse(
+                    result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("res-B")))
+                )
             )
-        ))
+        )
 
         // Wait for job to complete
         kotlinx.coroutines.withTimeout(2000) {
@@ -503,18 +612,17 @@ class JobWorkerFlowTest {
         every { mockHandle1.result } returns deferred1
         every { mockHandle2.result } returns deferred2
 
-        every { mockProcessor.processAsync(any(), any()) } answers {
-            val req = firstArg<org.wip.plugintoolkit.api.PluginRequest>()
+        coEvery { mockProcessor.process(any(), any()) } coAnswers {
+            val req = firstArg<PluginRequest>()
             if (isSecondCall) {
                 capabilityResumedWithState = req.resumeState
-                deferred2.complete(org.wip.plugintoolkit.api.ExecutionResult.Success(
+                org.wip.plugintoolkit.api.ExecutionResult.Success(
                     org.wip.plugintoolkit.api.PluginResponse(
                         result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("finished")))
                     )
-                ))
-                mockHandle2
+                )
             } else {
-                mockHandle1
+                deferred1.await()
             }
         }
 
@@ -523,10 +631,31 @@ class JobWorkerFlowTest {
         val capNode = Node.CapabilityNode(
             id = 2,
             position = Offset.Zero,
-            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
-            capability = org.wip.plugintoolkit.api.Capability(name = "cap", description = "test cap", returnType = DataType.Primitive(PrimitiveType.STRING)),
-            inputs = listOf(InputPort(id = "input", name = "input", dataType = DataType.Primitive(PrimitiveType.STRING))),
-            outputs = listOf(OutputPort(id = "result", name = "result", dataType = DataType.Primitive(PrimitiveType.STRING)))
+            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(
+                id = "test-plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                description = "Test"
+            ),
+            capability = org.wip.plugintoolkit.api.Capability(
+                name = "cap",
+                description = "test cap",
+                returnType = DataType.Primitive(PrimitiveType.STRING)
+            ),
+            inputs = listOf(
+                InputPort(
+                    id = "input",
+                    name = "input",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            ),
+            outputs = listOf(
+                OutputPort(
+                    id = "result",
+                    name = "result",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            )
         )
         val outputNode = createOutputNode(3, "result", DataType.Primitive(PrimitiveType.STRING))
 
@@ -566,21 +695,31 @@ class JobWorkerFlowTest {
         jobWorker.start()
 
         // Wait for job to start running
-        kotlinx.coroutines.withTimeout(2000) {
-            while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
-                kotlinx.coroutines.delay(10)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.withTimeout(5000) {
+                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
             }
         }
 
         // Simulate capability returning Paused result
-        deferred1.complete(org.wip.plugintoolkit.api.ExecutionResult.Paused(
-            JsonPrimitive("saved-mid-state")
-        ))
+        deferred1.complete(
+            org.wip.plugintoolkit.api.ExecutionResult.Paused(
+                JsonPrimitive("saved-mid-state")
+            )
+        )
 
         // Wait for flow job to transition to Paused status
-        kotlinx.coroutines.withTimeout(2000) {
-            while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Paused) {
-                kotlinx.coroutines.delay(10)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.withTimeout(5000) {
+                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Paused) {
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
             }
         }
 
@@ -622,7 +761,7 @@ class JobWorkerFlowTest {
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
         val signalManager = org.wip.plugintoolkit.features.plugin.logic.DefaultPluginSignalManager()
-        val mockContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
+        val mockContext = mockk<PluginContext>(relaxed = true)
         every { mockContext.signals } returns signalManager
         every { mockContext.onSignal(any()) } answers {
             signalManager.onSignal(firstArg())
@@ -650,38 +789,27 @@ class JobWorkerFlowTest {
         val deferred1 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
         val deferred2 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
 
-        every { mockProcessor.processAsync(any(), any()) } answers {
-            val req = firstArg<org.wip.plugintoolkit.api.PluginRequest>()
-            val ctx = secondArg<org.wip.plugintoolkit.api.PluginContext>()
+        coEvery { mockProcessor.process(any(), any()) } coAnswers {
+            val req = firstArg<PluginRequest>()
+            val ctx = secondArg<PluginContext>()
             if (isSecondCall) {
                 capabilityResumedWithState = req.resumeState
-                deferred2.complete(org.wip.plugintoolkit.api.ExecutionResult.Success(
+                org.wip.plugintoolkit.api.ExecutionResult.Success(
                     org.wip.plugintoolkit.api.PluginResponse(
                         result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("finished")))
                     )
-                ))
-                object : JobHandle {
-                    override val result = deferred2
-                    override fun pause() {}
-                    override fun cancel(force: Boolean) {}
-                }
+                )
             } else {
                 ctx.onSignal { signal ->
-                    if (signal == PluginSignal.PAUSE) {
-                        deferred1.complete(org.wip.plugintoolkit.api.ExecutionResult.Paused(
-                            JsonPrimitive("saved-mid-state")
-                        ))
+                    if (signal == org.wip.plugintoolkit.api.PluginSignal.PAUSE) {
+                        deferred1.complete(
+                            org.wip.plugintoolkit.api.ExecutionResult.Paused(
+                                JsonPrimitive("saved-mid-state")
+                            )
+                        )
                     }
                 }
-                object : JobHandle {
-                    override val result = deferred1
-                    override fun pause() {
-                        backgroundScope.launch {
-                            ctx.signals.sendSignal(PluginSignal.PAUSE)
-                        }
-                    }
-                    override fun cancel(force: Boolean) {}
-                }
+                deferred1.await()
             }
         }
 
@@ -690,10 +818,31 @@ class JobWorkerFlowTest {
         val capNode = Node.CapabilityNode(
             id = 2,
             position = Offset.Zero,
-            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
-            capability = org.wip.plugintoolkit.api.Capability(name = "cap", description = "test cap", returnType = DataType.Primitive(PrimitiveType.STRING)),
-            inputs = listOf(InputPort(id = "input", name = "input", dataType = DataType.Primitive(PrimitiveType.STRING))),
-            outputs = listOf(OutputPort(id = "result", name = "result", dataType = DataType.Primitive(PrimitiveType.STRING)))
+            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(
+                id = "test-plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                description = "Test"
+            ),
+            capability = org.wip.plugintoolkit.api.Capability(
+                name = "cap",
+                description = "test cap",
+                returnType = DataType.Primitive(PrimitiveType.STRING)
+            ),
+            inputs = listOf(
+                InputPort(
+                    id = "input",
+                    name = "input",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            ),
+            outputs = listOf(
+                OutputPort(
+                    id = "result",
+                    name = "result",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            )
         )
         val outputNode = createOutputNode(3, "result", DataType.Primitive(PrimitiveType.STRING))
 
@@ -733,9 +882,13 @@ class JobWorkerFlowTest {
         jobWorker.start()
 
         // Wait for job to start running
-        kotlinx.coroutines.withTimeout(2000) {
-            while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
-                kotlinx.coroutines.delay(10)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.withTimeout(5000) {
+                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
             }
         }
 
@@ -743,9 +896,13 @@ class JobWorkerFlowTest {
         jobManager.pauseJob(job.id)
 
         // Wait for flow job to transition to Paused status and save resumeState
-        kotlinx.coroutines.withTimeout(2000) {
-            while (jobManager.jobs.value.first().resumeState == null) {
-                kotlinx.coroutines.delay(10)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.withTimeout(5000) {
+                    while (jobManager.jobs.value.first().resumeState == null) {
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
             }
         }
 
@@ -789,10 +946,10 @@ class JobWorkerFlowTest {
         // Input Node 2 (String "B")
         // Merge Node (Capability node expecting a List of String, returning String)
         // Output Node
-        
+
         val inputNode1 = createInputNode(1, "source1", DataType.Primitive(PrimitiveType.STRING))
         val inputNode2 = createInputNode(2, "source2", DataType.Primitive(PrimitiveType.STRING))
-        
+
         val listInputPort = InputPort(
             id = "list_input",
             name = "List Input",
@@ -801,12 +958,27 @@ class JobWorkerFlowTest {
         val mergeNode = Node.CapabilityNode(
             id = 3,
             position = Offset.Zero,
-            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
-            capability = org.wip.plugintoolkit.api.Capability(name = "merge", description = "test merge", returnType = DataType.Primitive(PrimitiveType.STRING)),
+            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(
+                id = "test-plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                description = "Test"
+            ),
+            capability = org.wip.plugintoolkit.api.Capability(
+                name = "merge",
+                description = "test merge",
+                returnType = DataType.Primitive(PrimitiveType.STRING)
+            ),
             inputs = listOf(listInputPort),
-            outputs = listOf(OutputPort(id = "result", name = "result", dataType = DataType.Primitive(PrimitiveType.STRING)))
+            outputs = listOf(
+                OutputPort(
+                    id = "result",
+                    name = "result",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            )
         )
-        
+
         val outputNode = createOutputNode(4, "result", DataType.Primitive(PrimitiveType.STRING))
 
         val flow = Flow(
@@ -827,7 +999,7 @@ class JobWorkerFlowTest {
         val mockProcessor = mockk<DataProcessor>(relaxed = true)
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
-        
+
         startKoin {
             modules(module {
                 single<SettingsPersistence> { persistence }
@@ -840,27 +1012,37 @@ class JobWorkerFlowTest {
         every { mockPluginEntry.getProcessor() } returns mockProcessor
         every { mockPluginEntry.getManifest() } returns org.wip.plugintoolkit.api.PluginManifest(
             manifestVersion = "1.0",
-            plugin = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
+            plugin = org.wip.plugintoolkit.api.PluginInfo(
+                id = "test-plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                description = "Test"
+            ),
             requirements = org.wip.plugintoolkit.api.Requirements(minMemoryMb = 128, minExecutionTimeMs = 100),
-            capabilities = listOf(org.wip.plugintoolkit.api.Capability(name = "merge", description = "test merge", returnType = DataType.Primitive(PrimitiveType.STRING), parameters = mapOf("list_input" to org.wip.plugintoolkit.api.ParameterMetadata(description = "list_input", type = DataType.Array(DataType.Primitive(PrimitiveType.STRING))))))
+            capabilities = listOf(
+                org.wip.plugintoolkit.api.Capability(
+                    name = "merge",
+                    description = "test merge",
+                    returnType = DataType.Primitive(PrimitiveType.STRING),
+                    parameters = mapOf(
+                        "list_input" to org.wip.plugintoolkit.api.ParameterMetadata(
+                            description = "list_input",
+                            type = DataType.Array(DataType.Primitive(PrimitiveType.STRING))
+                        )
+                    )
+                )
+            )
         )
-        
+
         var capturedParameters: Map<String, kotlinx.serialization.json.JsonElement>? = null
-        every { mockProcessor.processAsync(any(), any()) } answers {
-            val req = firstArg<org.wip.plugintoolkit.api.PluginRequest>()
+        coEvery { mockProcessor.process(any(), any()) } coAnswers {
+            val req = firstArg<PluginRequest>()
             capturedParameters = req.parameters
-            
-            val deferred = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
-            deferred.complete(org.wip.plugintoolkit.api.ExecutionResult.Success(
+            org.wip.plugintoolkit.api.ExecutionResult.Success(
                 org.wip.plugintoolkit.api.PluginResponse(
                     result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("merged-result")))
                 )
-            ))
-            object : JobHandle {
-                override val result = deferred
-                override fun pause() {}
-                override fun cancel(force: Boolean) {}
-            }
+            )
         }
 
         val job = BackgroundJob(
@@ -872,12 +1054,18 @@ class JobWorkerFlowTest {
             parameters = mapOf("1" to JsonPrimitive("A"), "2" to JsonPrimitive("B"))
         )
 
-        val outputs = jobWorker.executeSubFlowRecursively(flow, job, "/tmp")
+        val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+            jobManager,
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+            backgroundScope
+        ).executeSubFlowRecursively(flow, job, "/tmp")
 
         // The expected order based on orderIndex is source2 (B) then source1 (A)
         assertNotNull(capturedParameters)
         val listInputParam = capturedParameters!!["list_input"]!!
-        
+
         val jsonArray = listInputParam.jsonArray
         assertEquals(2, jsonArray.size)
         assertEquals("B", jsonArray[0].jsonPrimitive.content)
@@ -895,7 +1083,7 @@ class JobWorkerFlowTest {
 
         val inputNode1 = createInputNode(1, "source1", DataType.Array(DataType.Primitive(PrimitiveType.STRING)))
         val inputNode2 = createInputNode(2, "source2", DataType.Array(DataType.Primitive(PrimitiveType.STRING)))
-        
+
         val listInputPort = InputPort(
             id = "list_input",
             name = "List Input",
@@ -904,12 +1092,27 @@ class JobWorkerFlowTest {
         val mergeNode = Node.CapabilityNode(
             id = 3,
             position = Offset.Zero,
-            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
-            capability = org.wip.plugintoolkit.api.Capability(name = "merge", description = "test merge", returnType = DataType.Primitive(PrimitiveType.STRING)),
+            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(
+                id = "test-plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                description = "Test"
+            ),
+            capability = org.wip.plugintoolkit.api.Capability(
+                name = "merge",
+                description = "test merge",
+                returnType = DataType.Primitive(PrimitiveType.STRING)
+            ),
             inputs = listOf(listInputPort),
-            outputs = listOf(OutputPort(id = "result", name = "result", dataType = DataType.Primitive(PrimitiveType.STRING)))
+            outputs = listOf(
+                OutputPort(
+                    id = "result",
+                    name = "result",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            )
         )
-        
+
         val outputNode = createOutputNode(4, "result", DataType.Primitive(PrimitiveType.STRING))
 
         val flow = Flow(
@@ -927,7 +1130,7 @@ class JobWorkerFlowTest {
         val mockProcessor = mockk<DataProcessor>(relaxed = true)
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
-        
+
         startKoin {
             modules(module {
                 single<SettingsPersistence> { persistence }
@@ -940,27 +1143,37 @@ class JobWorkerFlowTest {
         every { mockPluginEntry.getProcessor() } returns mockProcessor
         every { mockPluginEntry.getManifest() } returns org.wip.plugintoolkit.api.PluginManifest(
             manifestVersion = "1.0",
-            plugin = org.wip.plugintoolkit.api.PluginInfo(id = "test-plugin", name = "Test Plugin", version = "1.0.0", description = "Test"),
+            plugin = org.wip.plugintoolkit.api.PluginInfo(
+                id = "test-plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                description = "Test"
+            ),
             requirements = org.wip.plugintoolkit.api.Requirements(minMemoryMb = 128, minExecutionTimeMs = 100),
-            capabilities = listOf(org.wip.plugintoolkit.api.Capability(name = "merge", description = "test merge", returnType = DataType.Primitive(PrimitiveType.STRING), parameters = mapOf("list_input" to org.wip.plugintoolkit.api.ParameterMetadata(description = "list_input", type = DataType.Array(DataType.Primitive(PrimitiveType.STRING))))))
+            capabilities = listOf(
+                org.wip.plugintoolkit.api.Capability(
+                    name = "merge",
+                    description = "test merge",
+                    returnType = DataType.Primitive(PrimitiveType.STRING),
+                    parameters = mapOf(
+                        "list_input" to org.wip.plugintoolkit.api.ParameterMetadata(
+                            description = "list_input",
+                            type = DataType.Array(DataType.Primitive(PrimitiveType.STRING))
+                        )
+                    )
+                )
+            )
         )
-        
+
         var capturedParameters: Map<String, kotlinx.serialization.json.JsonElement>? = null
-        every { mockProcessor.processAsync(any(), any()) } answers {
-            val req = firstArg<org.wip.plugintoolkit.api.PluginRequest>()
+        coEvery { mockProcessor.process(any(), any()) } coAnswers {
+            val req = firstArg<PluginRequest>()
             capturedParameters = req.parameters
-            
-            val deferred = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
-            deferred.complete(org.wip.plugintoolkit.api.ExecutionResult.Success(
+            org.wip.plugintoolkit.api.ExecutionResult.Success(
                 org.wip.plugintoolkit.api.PluginResponse(
                     result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("merged-result")))
                 )
-            ))
-            object : JobHandle {
-                override val result = deferred
-                override fun pause() {}
-                override fun cancel(force: Boolean) {}
-            }
+            )
         }
 
         val job = BackgroundJob(
@@ -970,17 +1183,23 @@ class JobWorkerFlowTest {
             pluginId = "system",
             capabilityName = "test_dynamic_list_flattening",
             parameters = mapOf(
-                "1" to kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive("A"), JsonPrimitive("B"))), 
+                "1" to kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive("A"), JsonPrimitive("B"))),
                 "2" to kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive("C"), JsonPrimitive("D")))
             )
         )
 
-        val engine = org.wip.plugintoolkit.features.job.logic.FlowEngine(jobManager, org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(), mockPluginManager, mockLifecycleCoordinator, backgroundScope)
+        val engine = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+            jobManager,
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            mockPluginManager,
+            mockLifecycleCoordinator,
+            backgroundScope
+        )
         val outputs = engine.executeSubFlowRecursively(flow, job, "/tmp")
 
         assertNotNull(capturedParameters)
         val listInputParam = capturedParameters!!["list_input"]!!
-        
+
         val jsonArray = listInputParam.jsonArray
         assertEquals(4, jsonArray.size)
         assertEquals("A", jsonArray[0].jsonPrimitive.content)

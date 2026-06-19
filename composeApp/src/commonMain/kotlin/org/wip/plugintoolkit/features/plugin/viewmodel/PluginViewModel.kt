@@ -153,7 +153,7 @@ class PluginViewModel(
             } ?: emptyMap()
 
             val jobId = jobCounterMutex.withLock { ++jobCounter }.toString()
-            
+
             val manifest = try {
                 plugin.getManifest()
             } catch (t: Throwable) {

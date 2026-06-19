@@ -28,14 +28,12 @@ import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.time.Clock
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 
 class JobManager(
     /** Injected [AppScope] for managing job lifecycles and worker coordination. */
     private val scope: CoroutineScope,
     private val settingsRepository: SettingsRepository
-) : KoinComponent {
+) {
     private val maxConcurrentJobs get() = settingsRepository.settings.value.jobs.maxConcurrentJobs
     private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
     private val maxHistoryLength get() = settingsRepository.settings.value.jobs.maxHistoryLength
@@ -69,7 +67,8 @@ class JobManager(
     private val handlesMutex = Mutex()
     private val activeJobHandles = mutableMapOf<String, JobHandle>()
 
-    private val settingsPersistence: org.wip.plugintoolkit.features.settings.logic.SettingsPersistence by inject()
+    private val settingsPersistence: org.wip.plugintoolkit.features.settings.logic.SettingsPersistence =
+        settingsRepository.persistence
     private val jobRepository = JobRepository(settingsPersistence)
 
     init {
@@ -80,12 +79,13 @@ class JobManager(
                     val newJobIds = currentJobs.map { it.id }.toSet()
                     savedJobs.filterNot { it.id in newJobIds } + currentJobs
                 }
-                
+
                 // Wake up workers in case we loaded queued jobs
                 if (_jobs.value.any { it.status == JobStatus.Queued }) {
                     jobSignal.trySend(Unit)
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Logger.e(e) { "Error loading jobs from repository" }
             }
 
@@ -272,12 +272,12 @@ class JobManager(
 
             // Wait for signal if no jobs are queued
             Logger.v { "No queued jobs, worker waiting for signal..." }
-            
+
             // Before receiving, do one more quick check to avoid unnecessary suspension
             if (_jobs.value.any { it.status == JobStatus.Queued }) {
                 continue
             }
-            
+
             jobSignal.receive()
         }
     }

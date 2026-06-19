@@ -41,6 +41,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -75,6 +76,7 @@ fun BoardCanvas(
     onBoardLayoutCoordinatesChanged: (LayoutCoordinates) -> Unit,
     onBoardSizeChanged: (IntSize) -> Unit,
     onDeleteConnection: (org.wip.plugintoolkit.features.flows.model.Connection) -> Unit,
+    onDetachConnection: (org.wip.plugintoolkit.features.flows.model.Connection, Boolean, Offset) -> Unit,
     onMoveConnectionFirst: (org.wip.plugintoolkit.features.flows.model.Connection) -> Unit,
     onMoveConnectionLast: (org.wip.plugintoolkit.features.flows.model.Connection) -> Unit,
     selectedNodeIds: Set<Long>,
@@ -90,17 +92,20 @@ fun BoardCanvas(
     val gridSize = 50f
     val density = LocalDensity.current
     val focusRequester = remember { FocusRequester() }
-    
+
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     var selectedConnection by remember { mutableStateOf<org.wip.plugintoolkit.features.flows.model.Connection?>(null) }
     var hoveredConnection by remember { mutableStateOf<org.wip.plugintoolkit.features.flows.model.Connection?>(null) }
-    
+    var hoveredConnectionIsSource by remember { mutableStateOf<Boolean?>(null) }
+    var isCtrlModifierPressed by remember { mutableStateOf(false) }
+
     var selectionStart by remember { mutableStateOf<Offset?>(null) }
     var selectionEnd by remember { mutableStateOf<Offset?>(null) }
 
     LaunchedEffect(flow.connections) {
         if (hoveredConnection != null && !flow.connections.contains(hoveredConnection)) {
             hoveredConnection = null
+            hoveredConnectionIsSource = null
         }
     }
 
@@ -115,7 +120,7 @@ fun BoardCanvas(
         modifier = modifier
             .fillMaxSize()
             .onGloballyPositioned { onBoardLayoutCoordinatesChanged(it) }
-            .onSizeChanged { 
+            .onSizeChanged {
                 boardSize = it
                 onBoardSizeChanged(it)
             }
@@ -129,14 +134,17 @@ fun BoardCanvas(
                             onDeleteSelectedNodes()
                             true
                         }
+
                         keyEvent.isCtrlPressed && keyEvent.key == Key.Z -> {
                             onUndo()
                             true
                         }
+
                         keyEvent.isCtrlPressed && keyEvent.key == Key.Y -> {
                             onRedo()
                             true
                         }
+
                         else -> false
                     }
                 } else {
@@ -156,7 +164,7 @@ fun BoardCanvas(
                     var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
                     var minDistance = 20f * state.scale
                     if (minDistance < 15f) minDistance = 15f
-                    
+
                     flow.connections.forEach { connection ->
                         val sourcePortBoardPos = getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
                         val targetPortBoardPos = getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
@@ -174,6 +182,10 @@ fun BoardCanvas(
                     if (bestConnection == null) {
                         onClearSelection()
                     }
+                    if (bestConnection != null && isCtrlModifierPressed) {
+                        val isSrc = hoveredConnectionIsSource ?: false
+                        onDetachConnection(bestConnection!!, isSrc, tapOffset)
+                    }
                 }
             }
             .pointerInput(state.scale, state.offset, flow.nodes, nodeSizes) {
@@ -185,33 +197,35 @@ fun BoardCanvas(
                             val startPoint = event.changes.first().position
                             selectionStart = startPoint
                             selectionEnd = startPoint
-                            
+
                             event.changes.forEach { it.consume() }
-                            
+
                             while (true) {
                                 val dragEvent = awaitPointerEvent()
                                 if (dragEvent.type == PointerEventType.Move) {
                                     selectionEnd = dragEvent.changes.first().position
                                     dragEvent.changes.forEach { it.consume() }
-                                    
+
                                     val modelStart = (selectionStart!! - state.offset) / state.scale
                                     val modelEnd = (selectionEnd!! - state.offset) / state.scale
                                     val selectLeft = minOf(modelStart.x, modelEnd.x)
                                     val selectRight = maxOf(modelStart.x, modelEnd.x)
                                     val selectTop = minOf(modelStart.y, modelEnd.y)
                                     val selectBottom = maxOf(modelStart.y, modelEnd.y)
-                                    
+
                                     val selectedIds = mutableSetOf<Long>()
                                     flow.nodes.forEach { node ->
                                         val nodeLeft = node.position.x
                                         val nodeTop = node.position.y
                                         val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: (300f * density.density)
-                                        val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
+                                        val nodeHeight =
+                                            nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
                                         val nodeRight = nodeLeft + nodeWidth
                                         val nodeBottom = nodeTop + nodeHeight
-                                        
+
                                         if (selectLeft < nodeRight && selectRight > nodeLeft &&
-                                            selectTop < nodeBottom && selectBottom > nodeTop) {
+                                            selectTop < nodeBottom && selectBottom > nodeTop
+                                        ) {
                                             selectedIds.add(node.id)
                                         }
                                     }
@@ -241,10 +255,12 @@ fun BoardCanvas(
                             var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
                             var minDistance = 20f * state.scale
                             if (minDistance < 15f) minDistance = 15f
-                            
+
                             flow.connections.forEach { connection ->
-                                val sourcePortBoardPos = getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
-                                val targetPortBoardPos = getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
+                                val sourcePortBoardPos =
+                                    getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
+                                val targetPortBoardPos =
+                                    getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
                                 if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                                     val startPos = (sourcePortBoardPos * state.scale) + state.offset
                                     val endPos = (targetPortBoardPos * state.scale) + state.offset
@@ -255,14 +271,34 @@ fun BoardCanvas(
                                     }
                                 }
                             }
+                            isCtrlModifierPressed = event.keyboardModifiers.isCtrlPressed
+                            if (bestConnection != null && isCtrlModifierPressed) {
+                                val sourcePortBoardPos =
+                                    getPortBoardPosition(bestConnection.sourceNodeId, bestConnection.sourcePortId)
+                                val targetPortBoardPos =
+                                    getPortBoardPosition(bestConnection.targetNodeId, bestConnection.targetPortId)
+                                if (sourcePortBoardPos != null && targetPortBoardPos != null) {
+                                    val startPos = (sourcePortBoardPos * state.scale) + state.offset
+                                    val endPos = (targetPortBoardPos * state.scale) + state.offset
+                                    val distToSource = (position - startPos).getDistance()
+                                    val distToTarget = (position - endPos).getDistance()
+                                    hoveredConnectionIsSource = distToSource < distToTarget
+                                } else {
+                                    hoveredConnectionIsSource = null
+                                }
+                            } else {
+                                hoveredConnectionIsSource = null
+                            }
                             hoveredConnection = bestConnection
                         } else if (event.type == PointerEventType.Exit) {
                             hoveredConnection = null
+                            hoveredConnectionIsSource = null
                         } else if (event.type == PointerEventType.Press) {
                             if (event.buttons.isSecondaryPressed) {
                                 hoveredConnection?.let { conn ->
                                     onDeleteConnection(conn)
                                     hoveredConnection = null
+                                    hoveredConnectionIsSource = null
                                     if (selectedConnection == conn) {
                                         selectedConnection = null
                                     }
@@ -298,35 +334,96 @@ fun BoardCanvas(
             flow.connections.forEach { connection ->
                 val sourcePortBoardPos = getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
                 val targetPortBoardPos = getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
-                
+
                 if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                     val startPos = (sourcePortBoardPos * state.scale) + state.offset
                     val endPos = (targetPortBoardPos * state.scale) + state.offset
-                    
                     val isInvalid = state.validationErrors.any {
                         it.sourceNodeId == connection.sourceNodeId &&
-                        it.sourcePortId == connection.sourcePortId &&
-                        it.targetNodeId == connection.targetNodeId &&
-                        it.targetPortId == connection.targetPortId
+                                it.sourcePortId == connection.sourcePortId &&
+                                it.targetNodeId == connection.targetNodeId &&
+                                it.targetPortId == connection.targetPortId
                     }
                     val isSelected = selectedConnection == connection
                     val isHovered = hoveredConnection == connection
                     val color = if (isSelected) {
                         Color(0xFFFF9800)
-                    } else if (isHovered) {
+                    } else if (isHovered && hoveredConnectionIsSource == null) {
                         Color(0xFFFF2D55)
                     } else if (isInvalid) {
                         Color.Red
                     } else {
                         connectionColor
                     }
-                    
-                    if (isHovered) {
+
+                    if (isHovered && hoveredConnectionIsSource == null) {
                         drawBezierCurve(startPos, endPos, color.copy(alpha = 0.25f), strokeWidth = 9.dp.toPx())
                     }
-                    
-                    val strokeWidth = if (isSelected || isHovered) 5.dp.toPx() else 3.dp.toPx()
-                    drawBezierCurve(startPos, endPos, color, strokeWidth)
+
+                    if (isHovered && hoveredConnectionIsSource != null) {
+                        // Custom drawing for split bezier
+                        val midPoint = Offset((startPos.x + endPos.x) / 2, (startPos.y + endPos.y) / 2)
+                        val cp1 = Offset(startPos.x + (endPos.x - startPos.x) / 2, startPos.y)
+                        val cp2 = Offset(endPos.x - (endPos.x - startPos.x) / 2, endPos.y)
+
+                        val pathSource = Path().apply {
+                            moveTo(startPos.x, startPos.y)
+                            cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, midPoint.x, midPoint.y)
+                        }
+                        val pathTarget = Path().apply {
+                            moveTo(midPoint.x, midPoint.y)
+                            cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, endPos.x, endPos.y)
+                        }
+
+                        val highlightColor = Color(0xFFFF2D55)
+                        val sourceColor =
+                            if (hoveredConnectionIsSource == true) highlightColor else connectionColor.copy(alpha = 0.4f)
+                        val sourceStroke = if (hoveredConnectionIsSource == true) 5.dp.toPx() else 3.dp.toPx()
+
+                        val targetColor =
+                            if (hoveredConnectionIsSource == false) highlightColor else connectionColor.copy(alpha = 0.4f)
+                        val targetStroke = if (hoveredConnectionIsSource == false) 5.dp.toPx() else 3.dp.toPx()
+
+                        if (hoveredConnectionIsSource == true) {
+                            drawPath(
+                                pathSource,
+                                sourceColor.copy(alpha = 0.25f),
+                                style = Stroke(
+                                    width = 9.dp.toPx(),
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                )
+                            )
+                        } else {
+                            drawPath(
+                                pathTarget,
+                                targetColor.copy(alpha = 0.25f),
+                                style = Stroke(
+                                    width = 9.dp.toPx(),
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                )
+                            )
+                        }
+
+                        drawPath(
+                            pathSource,
+                            sourceColor,
+                            style = Stroke(
+                                width = sourceStroke,
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                        )
+                        drawPath(
+                            pathTarget,
+                            targetColor,
+                            style = Stroke(
+                                width = targetStroke,
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                        )
+                    } else {
+                        val strokeWidth = if (isSelected || isHovered) 5.dp.toPx() else 3.dp.toPx()
+                        drawBezierCurve(startPos, endPos, color, strokeWidth)
+                    }
                 }
             }
 
@@ -365,7 +462,7 @@ fun BoardCanvas(
                 val rectRight = maxOf(selectionStart!!.x, selectionEnd!!.x)
                 val rectTop = minOf(selectionStart!!.y, selectionEnd!!.y)
                 val rectBottom = maxOf(selectionStart!!.y, selectionEnd!!.y)
-                
+
                 drawRect(
                     color = connectionColor.copy(alpha = 0.15f),
                     topLeft = Offset(rectLeft, rectTop),
@@ -383,16 +480,21 @@ fun BoardCanvas(
         // Order Badges
         flow.connections.forEach { conn ->
             if (conn.orderIndex != null) {
-                androidx.compose.runtime.key(conn.sourceNodeId, conn.sourcePortId, conn.targetNodeId, conn.targetPortId) {
+                androidx.compose.runtime.key(
+                    conn.sourceNodeId,
+                    conn.sourcePortId,
+                    conn.targetNodeId,
+                    conn.targetPortId
+                ) {
                     val sourcePortBoardPos = getPortBoardPosition(conn.sourceNodeId, conn.sourcePortId)
                     val targetPortBoardPos = getPortBoardPosition(conn.targetNodeId, conn.targetPortId)
                     if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                         val startPos = (sourcePortBoardPos * state.scale) + state.offset
                         val endPos = (targetPortBoardPos * state.scale) + state.offset
                         val midPoint = getBezierMidpoint(startPos, endPos)
-                        
+
                         var showMenu by remember { mutableStateOf(false) }
-                        
+
                         Box(
                             modifier = Modifier
                                 .offset {
@@ -413,7 +515,7 @@ fun BoardCanvas(
                                 color = MaterialTheme.colorScheme.onBackground,
                                 fontWeight = FontWeight.Bold
                             )
-                            
+
                             androidx.compose.material3.DropdownMenu(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false }
@@ -447,7 +549,7 @@ fun BoardCanvas(
                 val startPos = (sourcePortBoardPos * state.scale) + state.offset
                 val endPos = (targetPortBoardPos * state.scale) + state.offset
                 val midPoint = getBezierMidpoint(startPos, endPos)
-                
+
                 Surface(
                     onClick = {
                         onDeleteConnection(conn)
@@ -495,16 +597,16 @@ private fun getDistanceToBezier(p: Offset, start: Offset, end: Offset): Float {
     val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
     val c1 = Offset(start.x + controlPointOffset, start.y)
     val c2 = Offset(end.x - controlPointOffset, end.y)
-    
+
     var minDistance = Float.MAX_VALUE
     val steps = 30
     for (i in 0..steps) {
         val t = i.toFloat() / steps
         val mt = 1f - t
-        val bt = start * (mt * mt * mt) + 
-                 c1 * (3f * mt * mt * t) + 
-                 c2 * (3f * mt * t * t) + 
-                 end * (t * t * t)
+        val bt = start * (mt * mt * mt) +
+                c1 * (3f * mt * mt * t) +
+                c2 * (3f * mt * t * t) +
+                end * (t * t * t)
         val dist = (p - bt).getDistance()
         if (dist < minDistance) {
             minDistance = dist
@@ -519,10 +621,10 @@ private fun getBezierMidpoint(start: Offset, end: Offset): Offset {
     val c2 = Offset(end.x - controlPointOffset, end.y)
     val t = 0.5f
     val mt = 0.5f
-    return start * (mt * mt * mt) + 
-           c1 * (3f * mt * mt * t) + 
-           c2 * (3f * mt * t * t) + 
-           end * (t * t * t)
+    return start * (mt * mt * mt) +
+            c1 * (3f * mt * mt * t) +
+            c2 * (3f * mt * t * t) +
+            end * (t * t * t)
 }
 
 private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color, strokeWidth: Float = 3.dp.toPx()) {

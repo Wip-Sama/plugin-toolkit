@@ -23,8 +23,8 @@ class PluginFolderManager(
         }
 
         val normalizedFolder = folderPath.replace('\\', '/').removeSuffix("/")
-        val pluginsInFolder = registry.installedPlugins.value.filter { 
-            it.installPath.replace('\\', '/').removeSuffix("/").startsWith(normalizedFolder) 
+        val pluginsInFolder = registry.installedPlugins.value.filter {
+            it.installPath.replace('\\', '/').removeSuffix("/").startsWith(normalizedFolder)
         }
         val pkgs = pluginsInFolder.map { it.pkg }
 
@@ -34,8 +34,8 @@ class PluginFolderManager(
 
         // Remove from settings
         settingsRepository.updateSettings { settings ->
-            val updatedFolders = settings.extensions.pluginFolders.filter { 
-                it.replace('\\', '/').removeSuffix("/") != normalizedFolder 
+            val updatedFolders = settings.extensions.pluginFolders.filter {
+                it.replace('\\', '/').removeSuffix("/") != normalizedFolder
             }
             settings.copy(extensions = settings.extensions.copy(pluginFolders = updatedFolders))
         }

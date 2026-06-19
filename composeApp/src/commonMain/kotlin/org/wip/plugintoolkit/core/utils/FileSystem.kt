@@ -21,9 +21,11 @@ class RealFileSystem : FileSystem {
     override fun mkdirs(path: String): Boolean = PlatformUtils.mkdirs(path)
     override fun copyFile(source: String, destination: String) = PlatformUtils.copyFile(source, destination)
     override fun deleteDirectory(path: String): Boolean = PlatformUtils.deleteDirectory(path)
-    override fun readFileFromZip(zipPath: String, fileName: String): String? = PlatformUtils.readFileFromZip(zipPath, fileName)
+    override fun readFileFromZip(zipPath: String, fileName: String): String? =
+        PlatformUtils.readFileFromZip(zipPath, fileName)
+
     override fun listFiles(path: String): List<String> = PlatformUtils.listFiles(path)
-    
+
     override fun saveFile(path: String, content: ByteArray) {
         val p = Path(path)
         p.parent?.let { SystemFileSystem.createDirectories(it) }

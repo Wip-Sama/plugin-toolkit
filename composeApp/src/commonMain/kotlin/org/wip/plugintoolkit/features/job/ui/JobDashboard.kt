@@ -412,7 +412,12 @@ fun HistoryTab(viewModel: JobViewModel) {
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
 
-                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium))
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                    )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -492,7 +497,8 @@ fun JobCard(
             if (job.status == JobStatus.Running) {
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke).clip(MaterialTheme.shapes.small),
+                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke)
+                        .clip(MaterialTheme.shapes.small),
                     color = ProgressIndicatorDefaults.linearColor,
                     trackColor = ProgressIndicatorDefaults.linearTrackColor,
                     strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
@@ -627,11 +633,17 @@ fun StatusBadge(status: JobStatus) {
         color = color.copy(alpha = ToolkitTheme.opacity.buttonBackground),
         contentColor = color,
         shape = RoundedCornerShape(ToolkitTheme.dimensions.settingsIconCornerRadius),
-        border = androidx.compose.foundation.BorderStroke(ToolkitTheme.dimensions.borderUnselected, color.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder))
+        border = androidx.compose.foundation.BorderStroke(
+            ToolkitTheme.dimensions.borderUnselected,
+            color.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder)
+        )
     ) {
         Text(
             text = status.name,
-            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
+            modifier = Modifier.padding(
+                horizontal = ToolkitTheme.spacing.small,
+                vertical = ToolkitTheme.spacing.extraSmall
+            ),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold
         )

@@ -61,10 +61,13 @@ object PluginSecurity {
             while (entries.hasMoreElements()) {
                 val entry = entries.nextElement()
                 if (entry.isDirectory) continue
-                
+
                 // Exclude the signature files themselves from needing to be signed
-                if (entry.name.startsWith("META-INF/") && 
-                    (entry.name.endsWith(".SF") || entry.name.endsWith(".RSA") || entry.name.endsWith(".DSA") || entry.name.endsWith(".EC"))) {
+                if (entry.name.startsWith("META-INF/") &&
+                    (entry.name.endsWith(".SF") || entry.name.endsWith(".RSA") || entry.name.endsWith(".DSA") || entry.name.endsWith(
+                        ".EC"
+                    ))
+                ) {
                     continue
                 }
 
@@ -98,7 +101,7 @@ object PluginSecurity {
                     return false
                 }
             }
-            
+
             if (!hasSignedEntries) {
                 Logger.w { "JAR file contains no signed entries: ${file.name}" }
                 return false

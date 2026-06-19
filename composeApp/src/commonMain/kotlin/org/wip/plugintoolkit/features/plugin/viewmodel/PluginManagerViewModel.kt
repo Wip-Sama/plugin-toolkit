@@ -15,10 +15,10 @@ import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.KeepTrack
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
@@ -79,7 +79,7 @@ class PluginManagerViewModel(
 
     private val _togglingPlugins = MutableStateFlow<Set<String>>(emptySet())
     val togglingPlugins: StateFlow<Set<String>> = _togglingPlugins.asStateFlow()
-    
+
     // Persistence flags handled via InstalledPlugin now
 
     init {
@@ -104,10 +104,15 @@ class PluginManagerViewModel(
                         dialogService.showConfirmation(
                             title = "Invalid Signature",
                             message = "Plugin ${plugin.name} has an invalid signature. Do you want to load it anyway? If you ignore, the plugin will remain locked and unloaded.",
-                            onConfirm = { 
+                            onConfirm = {
                                 viewModelScope.launch {
                                     pluginManager.updatePlugin(plugin.pkg) { p ->
-                                        p.copy(requiredAction = null, isEnabled = true, loadError = null, isValidated = true) 
+                                        p.copy(
+                                            requiredAction = null,
+                                            isEnabled = true,
+                                            loadError = null,
+                                            isValidated = true
+                                        )
                                     }
                                     pluginManager.reloadPlugin(plugin.pkg)
                                 }
@@ -380,7 +385,7 @@ class PluginManagerViewModel(
     }
 
     fun getUpdate(pkg: String) = pluginManager.getUpdate(pkg)
-    
+
     fun fixIssue(pkg: String) {
         openSettings(pkg)
     }

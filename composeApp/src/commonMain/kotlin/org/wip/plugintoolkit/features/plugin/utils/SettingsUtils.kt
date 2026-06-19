@@ -56,7 +56,9 @@ object SettingsUtils {
             if ((cleaned.startsWith("(") && cleaned.endsWith(")")) || (cleaned.startsWith("[") && cleaned.endsWith("]"))) {
                 val blocks = extractMatchingParentheses(cleaned)
                 if (blocks.isNotEmpty()) {
-                    return blocks.flatMap { it.split(",").map { item -> item.trim() }.filter { item -> item.isNotEmpty() } }
+                    return blocks.flatMap {
+                        it.split(",").map { item -> item.trim() }.filter { item -> item.isNotEmpty() }
+                    }
                 }
             }
             cleaned.split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -167,7 +169,10 @@ object SettingsUtils {
      * @param constraints The parameter constraints (regex, minLength, etc.).
      * @return null if the value is valid, or an error message string if validation fails.
      */
-    @Deprecated("Use overload that takes DataType instead of Boolean isArray", ReplaceWith("validateParameter(value, isRequired, type, constraints)"))
+    @Deprecated(
+        "Use overload that takes DataType instead of Boolean isArray",
+        ReplaceWith("validateParameter(value, isRequired, type, constraints)")
+    )
     fun validateParameter(
         value: String,
         isRequired: Boolean,
@@ -201,6 +206,7 @@ object SettingsUtils {
         }
         return errors
     }
+
     fun jsonToString(element: JsonElement?, type: DataType): String {
         if (element == null || element is JsonNull) return ""
         return when (type) {
@@ -211,6 +217,7 @@ object SettingsUtils {
                     element.toString()
                 }
             }
+
             is DataType.Enum -> {
                 if (element is JsonPrimitive) {
                     element.content
@@ -218,6 +225,7 @@ object SettingsUtils {
                     element.toString()
                 }
             }
+
             is DataType.Array -> {
                 if (element is JsonArray) {
                     val isNested = type.items is DataType.Array
@@ -230,6 +238,7 @@ object SettingsUtils {
                     element.toString()
                 }
             }
+
             else -> element.toString()
         }
     }
@@ -244,6 +253,7 @@ object SettingsUtils {
                         JsonNull
                     }
                 }
+
                 is DataType.Array -> JsonArray(emptyList())
                 else -> JsonNull
             }
@@ -257,29 +267,35 @@ object SettingsUtils {
                     else -> JsonPrimitive(value)
                 }
             }
+
             is DataType.Enum -> JsonPrimitive(value)
             is DataType.Array -> {
                 val cleanedValue = value.trim()
-                val elements = if (cleanedValue.startsWith("[") && cleanedValue.endsWith("]") && !cleanedValue.contains("(") && !cleanedValue.contains(")")) {
-                    try {
-                        val parsed = Json.decodeFromString<JsonArray>(cleanedValue)
-                        parsed.map { stringToJson(jsonToString(it, type.items), type.items) }
-                    } catch (e: Exception) {
-                        val innerValue = cleanedValue.removePrefix("[").removeSuffix("]").trim()
+                val elements =
+                    if (cleanedValue.startsWith("[") && cleanedValue.endsWith("]") && !cleanedValue.contains("(") && !cleanedValue.contains(
+                            ")"
+                        )
+                    ) {
+                        try {
+                            val parsed = Json.decodeFromString<JsonArray>(cleanedValue)
+                            parsed.map { stringToJson(jsonToString(it, type.items), type.items) }
+                        } catch (e: Exception) {
+                            val innerValue = cleanedValue.removePrefix("[").removeSuffix("]").trim()
+                            val parts = splitArrayValue(innerValue, type)
+                            parts.map { stringToJson(it.trim(), type.items) }
+                        }
+                    } else {
+                        val innerValue = if (cleanedValue.startsWith("[") && cleanedValue.endsWith("]")) {
+                            cleanedValue.removePrefix("[").removeSuffix("]").trim()
+                        } else {
+                            cleanedValue
+                        }
                         val parts = splitArrayValue(innerValue, type)
                         parts.map { stringToJson(it.trim(), type.items) }
                     }
-                } else {
-                    val innerValue = if (cleanedValue.startsWith("[") && cleanedValue.endsWith("]")) {
-                        cleanedValue.removePrefix("[").removeSuffix("]").trim()
-                    } else {
-                        cleanedValue
-                    }
-                    val parts = splitArrayValue(innerValue, type)
-                    parts.map { stringToJson(it.trim(), type.items) }
-                }
                 JsonArray(elements)
             }
+
             else -> JsonPrimitive(value)
         }
     }

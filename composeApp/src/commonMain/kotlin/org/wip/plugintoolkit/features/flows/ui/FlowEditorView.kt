@@ -17,7 +17,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,7 +45,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.isCompatibleWith
@@ -55,11 +53,10 @@ import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
-import org.wip.plugintoolkit.features.flows.model.PortConstraints
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_save
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
@@ -93,7 +90,7 @@ fun FlowEditorView(
     val state by viewModel.state.collectAsState()
     val flow = state.flow
     val density = androidx.compose.ui.platform.LocalDensity.current
-    
+
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     var boardLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var rootLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -122,7 +119,7 @@ fun FlowEditorView(
     val getPortBoardPosition = { nodeId: Long, portId: String ->
         portPositions[Pair(nodeId, portId)]
     }
-    
+
     val nodeSizes = remember { mutableStateMapOf<Long, IntSize>() }
     var highlightedPortId by remember { mutableStateOf<String?>(null) }
     var highlightedNodeId by remember { mutableStateOf<Long?>(null) }
@@ -138,7 +135,15 @@ fun FlowEditorView(
         val dropPos = (Offset(boardSize.width / 2f, boardSize.height / 2f) - state.offset) / state.scale
         val d = density.density
         when (paletteNode) {
-            is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos, d))
+            is PaletteNode.Capability -> viewModel.onEvent(
+                FlowEvent.AddCapabilityNode(
+                    paletteNode.pluginInfo,
+                    paletteNode.capability,
+                    dropPos,
+                    d
+                )
+            )
+
             is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos, d))
             is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos, d))
             is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos, d))
@@ -175,6 +180,20 @@ fun FlowEditorView(
             onBoardLayoutCoordinatesChanged = { boardLayoutCoordinates = it },
             onBoardSizeChanged = { boardSize = it },
             onDeleteConnection = { viewModel.onEvent(FlowEvent.DeleteConnection(it)) },
+            onDetachConnection = { connection, isSource, offset ->
+                viewModel.onEvent(FlowEvent.DeleteConnection(connection))
+                if (isSource) {
+                    connectionStartNodeId = connection.targetNodeId
+                    connectionStartPortId = connection.targetPortId
+                    connectionStartIsOutput = false
+                } else {
+                    connectionStartNodeId = connection.sourceNodeId
+                    connectionStartPortId = connection.sourcePortId
+                    connectionStartIsOutput = true
+                }
+                connectionCurrentPos = offset
+                isDrawingConnection = true
+            },
             onMoveConnectionFirst = { viewModel.onEvent(FlowEvent.MoveConnectionFirst(it)) },
             onMoveConnectionLast = { viewModel.onEvent(FlowEvent.MoveConnectionLast(it)) },
             selectedNodeIds = state.selectedNodeIds,
@@ -192,37 +211,46 @@ fun FlowEditorView(
                     val isPartofSelectedGroupDrag = state.draggedNodeId != null &&
                             state.selectedNodeIds.contains(state.draggedNodeId) &&
                             state.selectedNodeIds.contains(node.id)
-                    val dragOffset = if (isDragged || isPartofSelectedGroupDrag) state.currentDragOffset else Offset.Zero
-                    
+                    val dragOffset =
+                        if (isDragged || isPartofSelectedGroupDrag) state.currentDragOffset else Offset.Zero
+
                     val isNodeHighlighted = highlightedNodeId == node.id
                     val nodeHighlightedPortId = if (isNodeHighlighted) highlightedPortId else null
-                    
-                    val nodeHighlightedPortColor = if (isNodeHighlighted && highlightedPortId != null && connectionStartNodeId != null && connectionStartPortId != null) {
-                        val startNode = flow.nodes.find { it.id == connectionStartNodeId }
-                        val startPort = if (connectionStartIsOutput) {
-                            startNode?.outputs?.find { it.id == connectionStartPortId }
-                        } else {
-                            startNode?.inputs?.find { it.id == connectionStartPortId }
-                        }
-                        
-                        val targetPort = if (connectionStartIsOutput) {
-                            node.inputs.find { it.id == highlightedPortId }
-                        } else {
-                            node.outputs.find { it.id == highlightedPortId }
-                        }
-                        
-                        if (startPort != null && targetPort != null) {
-                            val startInferredType = state.inferredTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)] ?: startPort.dataType
-                            val targetInferredType = state.inferredTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.dataType
-                            val startInferredSemantic = state.inferredSemanticTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)] ?: startPort.semanticTypes
-                            val targetInferredSemantic = state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.semanticTypes
 
-                            val compatible = startInferredType.isCompatibleWith(targetInferredType) &&
-                                             isSemanticTypeCompatible(startInferredSemantic, targetInferredSemantic)
-                            if (compatible) null else Color.Red
+                    val nodeHighlightedPortColor =
+                        if (isNodeHighlighted && highlightedPortId != null && connectionStartNodeId != null && connectionStartPortId != null) {
+                            val startNode = flow.nodes.find { it.id == connectionStartNodeId }
+                            val startPort = if (connectionStartIsOutput) {
+                                startNode?.outputs?.find { it.id == connectionStartPortId }
+                            } else {
+                                startNode?.inputs?.find { it.id == connectionStartPortId }
+                            }
+
+                            val targetPort = if (connectionStartIsOutput) {
+                                node.inputs.find { it.id == highlightedPortId }
+                            } else {
+                                node.outputs.find { it.id == highlightedPortId }
+                            }
+
+                            if (startPort != null && targetPort != null) {
+                                val startInferredType =
+                                    state.inferredTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)]
+                                        ?: startPort.dataType
+                                val targetInferredType =
+                                    state.inferredTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.dataType
+                                val startInferredSemantic =
+                                    state.inferredSemanticTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)]
+                                        ?: startPort.semanticTypes
+                                val targetInferredSemantic =
+                                    state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)]
+                                        ?: targetPort.semanticTypes
+
+                                val compatible = startInferredType.isCompatibleWith(targetInferredType) &&
+                                        isSemanticTypeCompatible(startInferredSemantic, targetInferredSemantic)
+                                if (compatible) null else Color.Red
+                            } else null
                         } else null
-                    } else null
-                
+
                     NodeCardContainer(
                         nodePosition = node.position,
                         dragOffset = dragOffset,
@@ -231,24 +259,56 @@ fun FlowEditorView(
                     ) {
                         NodeComponent(
                             node = node,
-                            connectedInputPortIds = flow.connections.filter { it.targetNodeId == node.id }.map { it.targetPortId }.toSet(),
+                            connectedInputPortIds = flow.connections.filter { it.targetNodeId == node.id }
+                                .map { it.targetPortId }.toSet(),
                             inferredTypes = state.inferredTypes,
                             inferredSemanticTypes = state.inferredSemanticTypes,
                             validationErrors = state.validationErrors,
-                            onMove = { id, delta, snap, showGhost -> viewModel.onEvent(FlowEvent.MoveNode(id, delta, snap, showGhost)) },
+                            onMove = { id, delta, snap, showGhost ->
+                                viewModel.onEvent(
+                                    FlowEvent.MoveNode(
+                                        id,
+                                        delta,
+                                        snap,
+                                        showGhost
+                                    )
+                                )
+                            },
                             onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
                             onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
                             onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
-                            onUpdateValue = { id, portId, value -> viewModel.onEvent(FlowEvent.UpdateInputPortValue(id, portId, NodeSerializationUtils.anyToJsonElement(value))) },
-                            onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList -> viewModel.onEvent(FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticTypes, constraints, isList)) },
-                            onUpdateSystemNodeSettings = { id, portId, semanticTypes, inputPortId, extensions -> viewModel.onEvent(FlowEvent.UpdateSystemNodeSettings(id, portId, semanticTypes, inputPortId, extensions)) },
+                            onUpdateValue = { id, portId, value ->
+                                viewModel.onEvent(
+                                    FlowEvent.UpdateInputPortValue(
+                                        id,
+                                        portId,
+                                        NodeSerializationUtils.anyToJsonElement(value)
+                                    )
+                                )
+                            },
+                            onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList ->
+                                viewModel.onEvent(
+                                    FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticTypes, constraints, isList)
+                                )
+                            },
+                            onUpdateSystemNodeSettings = { id, portId, semanticTypes, inputPortId, extensions ->
+                                viewModel.onEvent(
+                                    FlowEvent.UpdateSystemNodeSettings(
+                                        id,
+                                        portId,
+                                        semanticTypes,
+                                        inputPortId,
+                                        extensions
+                                    )
+                                )
+                            },
                             onToggleCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeCollapse(id)) },
                             onToggleInputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeInputsCollapse(id)) },
                             onToggleOutputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeOutputsCollapse(id)) },
-                            onPortPositioned = { nodeId, portId, pos -> 
+                            onPortPositioned = { nodeId, portId, pos ->
                                 portPositions[Pair(nodeId, portId)] = (pos - state.offset) / state.scale
                             },
-                            onStartConnection = { nodeId, portId, isOutput -> 
+                            onStartConnection = { nodeId, portId, isOutput ->
                                 isDrawingConnection = true
                                 connectionStartNodeId = nodeId
                                 connectionStartPortId = portId
@@ -259,7 +319,8 @@ fun FlowEditorView(
                             },
                             onDragConnection = { cumulativeDragOffset ->
                                 if (connectionStartNodeId != null && connectionStartPortId != null) {
-                                    val startBoardPos = getPortBoardPosition(connectionStartNodeId!!, connectionStartPortId!!)
+                                    val startBoardPos =
+                                        getPortBoardPosition(connectionStartNodeId!!, connectionStartPortId!!)
                                     if (startBoardPos != null) {
                                         val boardPosition = startBoardPos + cumulativeDragOffset
                                         connectionCurrentPos = boardPosition
@@ -281,7 +342,7 @@ fun FlowEditorView(
                                                 }
                                             }
                                         }
-                                        
+
                                         highlightedPortId = closestPortId
                                         highlightedNodeId = closestNodeId
                                     }
@@ -289,10 +350,14 @@ fun FlowEditorView(
                             },
                             onDropConnection = { isShiftPressed ->
                                 if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
-                                    val sourceNodeId = if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
-                                    val sourcePortId = if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
-                                    val targetNodeId = if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
-                                    val targetPortId = if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
+                                    val sourceNodeId =
+                                        if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
+                                    val sourcePortId =
+                                        if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
+                                    val targetNodeId =
+                                        if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
+                                    val targetPortId =
+                                        if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
 
                                     if (sourceNodeId == targetNodeId) {
                                         notificationService.toast(sameNodeWarning)
@@ -303,29 +368,46 @@ fun FlowEditorView(
                                         val targetPort = targetNode?.inputs?.find { it.id == targetPortId }
 
                                         if (sourcePort != null && targetPort != null) {
-                                            val sourceInferredType = state.inferredTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.dataType
-                                            val targetInferredType = state.inferredTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.dataType
-                                            val sourceInferredSemantic = state.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.semanticTypes
-                                            val targetInferredSemantic = state.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticTypes
+                                            val sourceInferredType =
+                                                state.inferredTypes[Pair(sourceNodeId, sourcePortId)]
+                                                    ?: sourcePort.dataType
+                                            val targetInferredType =
+                                                state.inferredTypes[Pair(targetNodeId, targetPortId)]
+                                                    ?: targetPort.dataType
+                                            val sourceInferredSemantic =
+                                                state.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)]
+                                                    ?: sourcePort.semanticTypes
+                                            val targetInferredSemantic =
+                                                state.inferredSemanticTypes[Pair(targetNodeId, targetPortId)]
+                                                    ?: targetPort.semanticTypes
 
-                                            val typesCompatible = sourceInferredType.isCompatibleWith(targetInferredType)
-                                            val semanticsCompatible = isSemanticTypeCompatible(sourceInferredSemantic, targetInferredSemantic)
+                                            val typesCompatible =
+                                                sourceInferredType.isCompatibleWith(targetInferredType)
+                                            val semanticsCompatible =
+                                                isSemanticTypeCompatible(sourceInferredSemantic, targetInferredSemantic)
 
                                             if (typesCompatible && semanticsCompatible) {
-                                                viewModel.onEvent(FlowEvent.ConnectPorts(
-                                                    sourceNodeId, 
-                                                    sourcePortId, 
-                                                    targetNodeId, 
-                                                    targetPortId
-                                                ))
-                                            } else if (semanticsCompatible && sourceInferredType.canConvert(targetInferredType)) {
-                                                if (isShiftPressed) {
-                                                    viewModel.onEvent(FlowEvent.AutoConvertAndConnect(
+                                                viewModel.onEvent(
+                                                    FlowEvent.ConnectPorts(
                                                         sourceNodeId,
                                                         sourcePortId,
                                                         targetNodeId,
                                                         targetPortId
-                                                    ))
+                                                    )
+                                                )
+                                            } else if (semanticsCompatible && sourceInferredType.canConvert(
+                                                    targetInferredType
+                                                )
+                                            ) {
+                                                if (isShiftPressed) {
+                                                    viewModel.onEvent(
+                                                        FlowEvent.AutoConvertAndConnect(
+                                                            sourceNodeId,
+                                                            sourcePortId,
+                                                            targetNodeId,
+                                                            targetPortId
+                                                        )
+                                                    )
                                                 } else {
                                                     pendingConnectionSourceNodeId = sourceNodeId
                                                     pendingConnectionSourcePortId = sourcePortId
@@ -337,7 +419,10 @@ fun FlowEditorView(
                                                 }
                                             } else {
                                                 val message = if (!typesCompatible) {
-                                                    incompatibleTypesMsg.format(sourceInferredType.format(), targetInferredType.format())
+                                                    incompatibleTypesMsg.format(
+                                                        sourceInferredType.format(),
+                                                        targetInferredType.format()
+                                                    )
                                                 } else {
                                                     incompatibleSemanticsMsg.format(
                                                         sourceInferredSemantic.joinToString { it.canonicalId },
@@ -422,18 +507,40 @@ fun FlowEditorView(
                     val position = draggingNodePos
                     val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
                     val relativeToBoard = position - boardOffset
-                    val isOverBoard = relativeToBoard.x >= 0 && relativeToBoard.y >= 0 && relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
-                    
+                    val isOverBoard =
+                        relativeToBoard.x >= 0 && relativeToBoard.y >= 0 && relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+
                     if (isOverBoard) {
                         val dropPos = (relativeToBoard - state.offset) / state.scale
                         draggingNodeFromPalette?.let { paletteNode ->
                             val d = density.density
                             when (paletteNode) {
-                                is PaletteNode.Capability -> viewModel.onEvent(FlowEvent.AddCapabilityNode(paletteNode.pluginInfo, paletteNode.capability, dropPos, d))
-                                is PaletteNode.System -> viewModel.onEvent(FlowEvent.AddSystemNode(paletteNode.action, dropPos, d))
+                                is PaletteNode.Capability -> viewModel.onEvent(
+                                    FlowEvent.AddCapabilityNode(
+                                        paletteNode.pluginInfo,
+                                        paletteNode.capability,
+                                        dropPos,
+                                        d
+                                    )
+                                )
+
+                                is PaletteNode.System -> viewModel.onEvent(
+                                    FlowEvent.AddSystemNode(
+                                        paletteNode.action,
+                                        dropPos,
+                                        d
+                                    )
+                                )
+
                                 is PaletteNode.FlowInput -> viewModel.onEvent(FlowEvent.AddFlowInputNode(dropPos, d))
                                 is PaletteNode.FlowOutput -> viewModel.onEvent(FlowEvent.AddFlowOutputNode(dropPos, d))
-                                is PaletteNode.SubFlow -> viewModel.onEvent(FlowEvent.AddSubFlowNode(paletteNode.name, dropPos, d))
+                                is PaletteNode.SubFlow -> viewModel.onEvent(
+                                    FlowEvent.AddSubFlowNode(
+                                        paletteNode.name,
+                                        dropPos,
+                                        d
+                                    )
+                                )
                             }
                         }
                     }
@@ -454,7 +561,10 @@ fun FlowEditorView(
             shadowElevation = ToolkitTheme.spacing.extraSmall
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small),
+                modifier = Modifier.padding(
+                    horizontal = ToolkitTheme.spacing.medium,
+                    vertical = ToolkitTheme.spacing.small
+                ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
@@ -506,7 +616,10 @@ fun FlowEditorView(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                        modifier = Modifier.padding(
+                                            horizontal = ToolkitTheme.spacing.small,
+                                            vertical = ToolkitTheme.spacing.extraSmall
+                                        )
                                     )
                                 }
                             }
@@ -524,14 +637,20 @@ fun FlowEditorView(
                         }
                     },
                     enabled = state.hasUnsavedChanges && !state.isReadOnly,
-                    contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
+                    contentPadding = PaddingValues(
+                        horizontal = ToolkitTheme.spacing.medium,
+                        vertical = ToolkitTheme.spacing.small
+                    )
                 ) {
                     Text(stringResource(Res.string.flow_editor_save_changes))
                 }
 
                 OutlinedButton(
                     onClick = onExit,
-                    contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small)
+                    contentPadding = PaddingValues(
+                        horizontal = ToolkitTheme.spacing.medium,
+                        vertical = ToolkitTheme.spacing.small
+                    )
                 ) {
                     Text(stringResource(Res.string.flow_editor_btn_exit))
                 }
@@ -554,7 +673,7 @@ fun FlowEditorView(
             }
         }
 
-        if (showConversionDialog && 
+        if (showConversionDialog &&
             pendingConnectionSourceNodeId != null && pendingConnectionSourcePortId != null &&
             pendingConnectionTargetNodeId != null && pendingConnectionTargetPortId != null
         ) {
@@ -562,11 +681,13 @@ fun FlowEditorView(
                 onDismissRequest = { showConversionDialog = false },
                 title = { Text(stringResource(Res.string.flow_editor_incompatible_title)) },
                 text = {
-                    Text(stringResource(
-                        Res.string.flow_editor_incompatible_message,
-                        pendingConnectionSourceType?.format() ?: "",
-                        pendingConnectionTargetType?.format() ?: ""
-                    ))
+                    Text(
+                        stringResource(
+                            Res.string.flow_editor_incompatible_message,
+                            pendingConnectionSourceType?.format() ?: "",
+                            pendingConnectionTargetType?.format() ?: ""
+                        )
+                    )
                 },
                 confirmButton = {
                     Button(

@@ -159,6 +159,6 @@ class PluginRegistry(
     fun getPlugin(pkg: String): InstalledPlugin? {
         return _installedPlugins.value.find { it.pkg == pkg }
     }
-    
+
     fun getDefaultPluginFolder(): String = defaultPluginFolder
 }

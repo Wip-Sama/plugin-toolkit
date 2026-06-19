@@ -65,7 +65,8 @@ object PluginLoader {
                 // Use ServiceLoader to find the PluginModuleProvider implementation
                 val loader = ServiceLoader.load(PluginModuleProvider::class.java, newClassLoader)
                 val moduleProvider =
-                    loader.firstOrNull() ?: throw Exception("No PluginModuleProvider implementation found in $normalizedPath")
+                    loader.firstOrNull()
+                        ?: throw Exception("No PluginModuleProvider implementation found in $normalizedPath")
 
                 // Create an isolated Koin application for this plugin
                 val koinApp = koinApplication {

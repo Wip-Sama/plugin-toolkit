@@ -16,15 +16,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import org.wip.plugintoolkit.core.model.localized
+import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.DialogHost
 import org.wip.plugintoolkit.core.ui.DialogService
-import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.shared.components.ToastHost
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
-import org.wip.plugintoolkit.core.model.localized
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_name
 

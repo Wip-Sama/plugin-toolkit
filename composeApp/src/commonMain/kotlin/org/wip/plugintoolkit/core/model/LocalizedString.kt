@@ -3,7 +3,6 @@ package org.wip.plugintoolkit.core.model
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.ui.LocalLanguage
 
 sealed interface LocalizedString {
@@ -20,6 +19,7 @@ sealed interface LocalizedString {
             LocalLanguage.current // Register dependency to trigger recomposition when language changes
             stringResource(res)
         }
+
         is Raw -> text
     }
 
@@ -35,6 +35,7 @@ sealed interface LocalizedString {
 
 // Extensions for easy creation
 val StringResource.localized get() = LocalizedString.Resource(this)
-val String.localized get() = LocalizedString.Raw(this).also {
-    println("WARN: .localized used on String '$this' - should be localized")
-}
+val String.localized
+    get() = LocalizedString.Raw(this).also {
+        println("WARN: .localized used on String '$this' - should be localized")
+    }

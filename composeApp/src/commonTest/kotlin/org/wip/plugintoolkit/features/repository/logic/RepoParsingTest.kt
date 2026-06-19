@@ -29,7 +29,10 @@ class RepoParsingTest {
     private class FakeSettingsPersistence : SettingsPersistence {
         var settings = AppSettings()
         override fun load(): AppSettings = settings
-        override fun save(settings: AppSettings) { this.settings = settings }
+        override fun save(settings: AppSettings) {
+            this.settings = settings
+        }
+
         override fun getSettingsDir(): String = ""
         override fun getJobsDir(): String = ""
         override fun openLogFolder() {}
@@ -61,6 +64,7 @@ class RepoParsingTest {
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
                 }
+
                 "https://example.com/repo/custom-plugins/org.test.plugin/manifest.json" -> {
                     respond(
                         content = """
@@ -82,6 +86,7 @@ class RepoParsingTest {
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
                 }
+
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
@@ -97,9 +102,9 @@ class RepoParsingTest {
         val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
 
         val result = repoManager.addRepository("https://example.com/repo/index.json")
-        
+
         assertEquals(AddRepoResult.Success, result)
-        
+
         val repos = repoManager.repositories.value
         assertEquals(1, repos.size)
         assertEquals("Test Repo", repos[0].name)
@@ -137,6 +142,7 @@ class RepoParsingTest {
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
                 }
+
                 "https://example.com/repo/plugins/org.broken.plugin/manifest.json" -> {
                     respond(
                         content = "{ \"invalid\": \"json\" }", // Missing required fields for PluginManifest
@@ -144,6 +150,7 @@ class RepoParsingTest {
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
                 }
+
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
@@ -184,6 +191,7 @@ class RepoParsingTest {
                         headers = headersOf(HttpHeaders.ContentType, "text/plain")
                     )
                 }
+
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
@@ -199,7 +207,7 @@ class RepoParsingTest {
         val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
 
         val result = repoManager.addRepository("https://example.com/repo/index.json")
-        
+
         assertEquals(AddRepoResult.Success, result)
         assertEquals("Text Repo", repoManager.repositories.value[0].name)
     }
@@ -230,6 +238,7 @@ class RepoParsingTest {
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
                 }
+
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }

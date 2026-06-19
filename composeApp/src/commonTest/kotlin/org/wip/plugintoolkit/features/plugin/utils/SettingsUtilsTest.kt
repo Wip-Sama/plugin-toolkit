@@ -4,8 +4,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.ParameterConstraints
+import org.wip.plugintoolkit.api.PrimitiveType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -71,11 +71,11 @@ class SettingsUtilsTest {
         // List<Bool>
         val listBoolType = DataType.Array(DataType.Primitive(PrimitiveType.BOOLEAN))
         val expectedBoolArray = JsonArray(listOf(JsonPrimitive(true), JsonPrimitive(false)))
-        
+
         // Comma-separated list
         assertEquals(expectedBoolArray, SettingsUtils.stringToJson("true,false", listBoolType))
         assertEquals(expectedBoolArray, SettingsUtils.stringToJson("true, false", listBoolType))
-        
+
         // JSON array format (backward compatibility)
         assertEquals(expectedBoolArray, SettingsUtils.stringToJson("[true, false]", listBoolType))
         assertEquals(expectedBoolArray, SettingsUtils.stringToJson("[\"true\", \"false\"]", listBoolType))
@@ -85,7 +85,7 @@ class SettingsUtilsTest {
         val expectedIntArray = JsonArray(listOf(JsonPrimitive(1L), JsonPrimitive(2L), JsonPrimitive(3L)))
         assertEquals(expectedIntArray, SettingsUtils.stringToJson("1,2,3", listIntType))
         assertEquals(expectedIntArray, SettingsUtils.stringToJson("[1, 2, 3]", listIntType))
-        
+
         // Empty array
         assertEquals(JsonArray(emptyList()), SettingsUtils.stringToJson("", listIntType))
     }
@@ -95,10 +95,12 @@ class SettingsUtilsTest {
         val listListDouble = DataType.Array(DataType.Array(DataType.Primitive(PrimitiveType.DOUBLE)))
 
         // Test jsonToString
-        val doubleArray = JsonArray(listOf(
-            JsonArray(listOf(JsonPrimitive(100.0), JsonPrimitive(100.0))),
-            JsonArray(listOf(JsonPrimitive(200.0), JsonPrimitive(200.0)))
-        ))
+        val doubleArray = JsonArray(
+            listOf(
+                JsonArray(listOf(JsonPrimitive(100.0), JsonPrimitive(100.0))),
+                JsonArray(listOf(JsonPrimitive(200.0), JsonPrimitive(200.0)))
+            )
+        )
         assertEquals("(100.0,100.0), (200.0,200.0)", SettingsUtils.jsonToString(doubleArray, listListDouble))
 
         // Test stringToJson with matching parentheses
@@ -108,10 +110,23 @@ class SettingsUtilsTest {
 
         // Test validateParameter
         val constraints = ParameterConstraints(minValue = 50.0, maxValue = 350.0)
-        assertEquals(null, SettingsUtils.validateParameter("(100,100), (200,200)", isRequired = true, type = listListDouble, constraints = constraints))
+        assertEquals(
+            null,
+            SettingsUtils.validateParameter(
+                "(100,100), (200,200)",
+                isRequired = true,
+                type = listListDouble,
+                constraints = constraints
+            )
+        )
 
         // Out of range check
-        val errorMsg = SettingsUtils.validateParameter("(100,400), (200,200)", isRequired = true, type = listListDouble, constraints = constraints)
+        val errorMsg = SettingsUtils.validateParameter(
+            "(100,400), (200,200)",
+            isRequired = true,
+            type = listListDouble,
+            constraints = constraints
+        )
         assertEquals("Value must be <= 350.0", errorMsg)
     }
 }

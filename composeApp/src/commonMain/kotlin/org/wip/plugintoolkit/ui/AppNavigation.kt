@@ -27,7 +27,7 @@ import org.wip.plugintoolkit.features.plugin.ui.PluginSectionScreen
 import org.wip.plugintoolkit.features.repository.ui.PluginRepoView
 import org.wip.plugintoolkit.features.settings.ui.SettingsScreen
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
- 
+
 @Composable
 fun AppNavigation(
     backStack: NavBackStack<NavKey>,
@@ -81,15 +81,18 @@ fun AppNavigation(
                 }
                 LandingPage(onNavigate = navigate)
             }
+
             is Screen.FlowManager -> NavEntry(key) {
                 FlowManagerView(
                     viewModel = flowViewModel,
                     onEditFlow = { flowName -> backStack.add(Screen.FlowEditor(flowName)) }
                 )
             }
+
             is Screen.FlowRunner -> NavEntry(key) {
                 FlowRunnerView(viewModel = flowViewModel)
             }
+
             is Screen.FlowEditor -> NavEntry(key) {
                 val editorViewModel: FlowEditorViewModel = koinInject(parameters = { parametersOf(key.flowName) })
                 FlowEditorView(
@@ -121,6 +124,7 @@ fun AppNavigation(
                     }
                 )
             }
+
             is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = settingsViewModel) }
             is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
             is Screen.Plugins -> NavEntry(key) { PluginSectionScreen() }

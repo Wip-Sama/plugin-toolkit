@@ -4,24 +4,24 @@ import androidx.compose.ui.geometry.Offset
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.JsonDecoder
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.put
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginInfo
@@ -68,9 +68,11 @@ object AnySerializer : KSerializer<Any?> {
                 if (element.isString) {
                     element.content
                 } else {
-                    element.booleanOrNull ?: element.intOrNull ?: element.longOrNull ?: element.doubleOrNull ?: element.content
+                    element.booleanOrNull ?: element.intOrNull ?: element.longOrNull ?: element.doubleOrNull
+                    ?: element.content
                 }
             }
+
             is JsonObject -> element.entries.associate { it.key to toPrimitiveOrElement(it.value) }
             is JsonArray -> element.map { toPrimitiveOrElement(it) }
         }
@@ -225,6 +227,7 @@ data class SubflowPortMapping(
 @Serializable
 sealed class Node {
     abstract val id: Long
+
     @Serializable(with = OffsetSerializer::class)
     abstract val position: Offset
     abstract val title: String
@@ -233,7 +236,7 @@ sealed class Node {
     abstract val isCollapsed: Boolean
     abstract val isInputsCollapsed: Boolean
     abstract val isOutputsCollapsed: Boolean
-    
+
     abstract fun copyWithPosition(newPosition: Offset): Node
     abstract fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node
     abstract fun copyWithId(newId: Long): Node
@@ -338,7 +341,7 @@ sealed class Node {
             })
         }
     }
-    
+
     @Serializable
     @SerialName("sub_flow")
     data class SubFlowNode(
@@ -388,7 +391,7 @@ data class Flow(
         val baseType = fallbackType
         val baseArray = baseType as? DataType.Array
         val baseItems = baseArray?.items
-        
+
         if (baseType is DataType.Primitive && baseType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
             val connection = connections.find { it.sourceNodeId == nodeId && it.sourcePortId == portId }
             val targetNode = nodes.find { it.id == connection?.targetNodeId }
@@ -408,7 +411,7 @@ data class Flow(
         val baseType = fallbackType
         val baseArray = baseType as? DataType.Array
         val baseItems = baseArray?.items
-        
+
         if (baseType is DataType.Primitive && baseType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
             val connection = connections.find { it.targetNodeId == nodeId && it.targetPortId == portId }
             val sourceNode = nodes.find { it.id == connection?.sourceNodeId }

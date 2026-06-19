@@ -130,7 +130,7 @@ fun PluginContent(
                                 job = job,
                                 progress = jobProgressMap[job.id] ?: 0f,
                                 logs = emptyList(),
-                                onDelete = { 
+                                onDelete = {
                                     if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
                                         viewModel.removeEndedJob(job.id)
                                     } else {

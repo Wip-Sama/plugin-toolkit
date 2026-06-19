@@ -4,8 +4,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.onClose
@@ -15,10 +15,10 @@ val coroutineModule = module {
      * AppScope is tied to Dispatchers.Default.
      * Use this for CPU-intensive background tasks (e.g., parsing, logic, calculations).
      */
-    single(named("AppScope")) { 
-        CoroutineScope(SupervisorJob() + Dispatchers.Default) 
-    } onClose { 
-        it?.cancel() 
+    single(named("AppScope")) {
+        CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    } onClose {
+        it?.cancel()
     }
 
     /**
@@ -40,5 +40,5 @@ val coroutineModule = module {
 /**
  * JVM implementation of the Virtual Thread dispatcher.
  */
-val loomDispatcher: CoroutineDispatcher = 
+val loomDispatcher: CoroutineDispatcher =
     java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()

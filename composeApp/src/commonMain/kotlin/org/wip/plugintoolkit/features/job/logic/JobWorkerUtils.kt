@@ -1,19 +1,30 @@
 package org.wip.plugintoolkit.features.job.logic
 
-import kotlinx.serialization.json.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry
-import org.wip.plugintoolkit.api.PluginManifest
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 object FlowTypeInferenceCache {
     private val mutex = Mutex()
     private val cache = mutableMapOf<Int, Map<Pair<Long, String>, DataType>>()
 
-    suspend fun getOrCreate(flow: Flow, compute: suspend () -> Map<Pair<Long, String>, DataType>): Map<Pair<Long, String>, DataType> {
+    suspend fun getOrCreate(
+        flow: Flow,
+        compute: suspend () -> Map<Pair<Long, String>, DataType>
+    ): Map<Pair<Long, String>, DataType> {
         val key = flow.hashCode()
         mutex.withLock {
             val cached = cache[key]
@@ -49,9 +60,11 @@ fun fromJsonElement(je: JsonElement): Any? {
                 je.booleanOrNull ?: je.intOrNull ?: je.longOrNull ?: je.doubleOrNull ?: je.content
             }
         }
+
         is JsonArray -> {
             je.map { fromJsonElement(it) }
         }
+
         is JsonObject -> {
             je.entries.associate { it.key to fromJsonElement(it.value) }
         }
@@ -76,12 +89,14 @@ fun runRuntimeTypeInference(flow: Flow): Map<Pair<Long, String>, DataType> {
             val tgtType = inferred[tgtKey]
             if (srcType != null && tgtType != null) {
                 if (srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY &&
-                    !(tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY)) {
+                    !(tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY)
+                ) {
                     inferred[srcKey] = tgtType
                     changed = true
                 }
                 if (tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY &&
-                    !(srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY)) {
+                    !(srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY)
+                ) {
                     inferred[tgtKey] = srcType
                     changed = true
                 }
@@ -112,6 +127,7 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
                 str.toIntOrNull() ?: throw Exception("Failed to convert '$value' to Int")
             }
         }
+
         PrimitiveType.DOUBLE -> {
             if (value is Number) value.toDouble()
             else {
@@ -119,6 +135,7 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
                 str.toDoubleOrNull() ?: throw Exception("Failed to convert '$value' to Double")
             }
         }
+
         PrimitiveType.BOOLEAN -> {
             if (value is Boolean) value
             else if (value is Number) {
@@ -142,6 +159,7 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
                 }
             }
         }
+
         PrimitiveType.ANY -> value
         PrimitiveType.UNIT -> Unit
     }
@@ -157,7 +175,7 @@ fun validateCapabilityParameters(
 
     for ((paramName, metadata) in paramMetadataMap) {
         val valueElement = parameters[paramName]
-        
+
         // Check if required
         if (metadata.required) {
             if (valueElement == null || valueElement is JsonNull) {
@@ -219,6 +237,7 @@ fun validateCapabilityParameters(
                         val itemType = t.items
                         itemType is DataType.Primitive && (itemType.primitiveType == PrimitiveType.INT || itemType.primitiveType == PrimitiveType.DOUBLE)
                     }
+
                     else -> false
                 }
                 if (isNumericType && valStr.isNotEmpty()) {
@@ -236,15 +255,19 @@ private fun getLeafPrimitives(element: JsonElement, type: DataType): List<String
                 is JsonArray -> {
                     element.flatMap { getLeafPrimitives(it, type.items) }
                 }
+
                 is JsonPrimitive -> {
-                    val parts = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.splitArrayValue(element.content, type)
+                    val parts =
+                        org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.splitArrayValue(element.content, type)
                     parts.flatMap {
                         getLeafPrimitives(JsonPrimitive(it), type.items)
                     }
                 }
+
                 else -> emptyList()
             }
         }
+
         else -> {
             if (element is JsonPrimitive) listOf(element.content) else emptyList()
         }

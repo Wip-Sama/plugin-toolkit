@@ -13,21 +13,41 @@ import kotlin.time.Clock
 
 sealed interface LifecycleAction {
     data class OnJobCompleted(val job: BackgroundJob, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class OnJobFailed(val job: BackgroundJob, val error: String?, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class OnManualValidation(val pkg: String, val result: Result<Unit>, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class OnJobFailed(val job: BackgroundJob, val error: String?, val response: CompletableDeferred<Unit>) :
+        LifecycleAction
+
+    data class OnManualValidation(val pkg: String, val result: Result<Unit>, val response: CompletableDeferred<Unit>) :
+        LifecycleAction
+
     data class LoadPlugin(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
     data class UnloadPlugin(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
     data class ReloadPlugin(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class HandlePostInstall(val pkg: String, val manifest: org.wip.plugintoolkit.api.PluginManifest, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class HandlePostUpdate(val pkg: String, val manifest: org.wip.plugintoolkit.api.PluginManifest, val installer: PluginInstaller, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class HandlePostInstall(
+        val pkg: String,
+        val manifest: org.wip.plugintoolkit.api.PluginManifest,
+        val response: CompletableDeferred<Unit>
+    ) : LifecycleAction
+
+    data class HandlePostUpdate(
+        val pkg: String,
+        val manifest: org.wip.plugintoolkit.api.PluginManifest,
+        val installer: PluginInstaller,
+        val response: CompletableDeferred<Unit>
+    ) : LifecycleAction
+
     data class EnqueueSetupJob(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
     data class EnqueueUpdateJob(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
     data class TriggerValidation(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
     data class CheckAndResumeSetup(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class RerunSetup(val pkg: String, val installer: PluginInstaller, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class SetEnabled(val pkg: String, val enabled: Boolean, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
+    data class RerunSetup(val pkg: String, val installer: PluginInstaller, val response: CompletableDeferred<Unit>) :
+        LifecycleAction
+
+    data class SetEnabled(val pkg: String, val enabled: Boolean, val response: CompletableDeferred<Result<Unit>>) :
+        LifecycleAction
+
     data class ValidatePlugin(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
-    data class RunAction(val pkg: String, val action: PluginAction, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class RunAction(val pkg: String, val action: PluginAction, val response: CompletableDeferred<Unit>) :
+        LifecycleAction
 }
 
 /**
@@ -70,6 +90,7 @@ class PluginLifecycleCoordinator(
                 }
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.OnJobFailed -> {
                 val job = action.job
                 Logger.w { "Lifecycle job failed for ${job.pluginId}: ${job.type} - ${action.error}" }
@@ -78,6 +99,7 @@ class PluginLifecycleCoordinator(
                 }
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.OnManualValidation -> {
                 if (action.result.isSuccess) {
                     markAsValidated(action.pkg)
@@ -86,17 +108,21 @@ class PluginLifecycleCoordinator(
                 }
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.LoadPlugin -> {
                 action.response.complete(lifecycleManager.loadPlugin(action.pkg))
             }
+
             is LifecycleAction.UnloadPlugin -> {
                 lifecycleManager.unloadPlugin(action.pkg)
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.ReloadPlugin -> {
                 lifecycleManager.reloadPlugin(action.pkg)
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.HandlePostInstall -> {
                 if (action.manifest.hasSetupHandler) {
                     enqueueSetupJobInternal(action.pkg)
@@ -105,6 +131,7 @@ class PluginLifecycleCoordinator(
                 }
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.HandlePostUpdate -> {
                 if (action.manifest.hasUpdateHandler) {
                     enqueueUpdateJobInternal(action.pkg)
@@ -116,17 +143,21 @@ class PluginLifecycleCoordinator(
                 }
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.EnqueueSetupJob -> {
                 enqueueSetupJobInternal(action.pkg)
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.EnqueueUpdateJob -> {
                 enqueueUpdateJobInternal(action.pkg)
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.TriggerValidation -> {
                 action.response.complete(triggerValidationInternal(action.pkg))
             }
+
             is LifecycleAction.CheckAndResumeSetup -> {
                 val plugin = registry.getPlugin(action.pkg)
                 if (plugin != null) {
@@ -164,6 +195,7 @@ class PluginLifecycleCoordinator(
                 }
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.RerunSetup -> {
                 Logger.i { "Rerunning setup for plugin: ${action.pkg}" }
                 lifecycleManager.unloadPlugin(action.pkg)
@@ -172,6 +204,7 @@ class PluginLifecycleCoordinator(
                 enqueueSetupJobInternal(action.pkg)
                 action.response.complete(Unit)
             }
+
             is LifecycleAction.SetEnabled -> {
                 Logger.i { "Setting plugin ${action.pkg} enabled: ${action.enabled}" }
                 if (!action.enabled) {
@@ -207,8 +240,9 @@ class PluginLifecycleCoordinator(
                 }
                 action.response.complete(Result.success(Unit))
             }
+
             is LifecycleAction.ValidatePlugin -> {
-                val plugin = PluginLoader.getPluginById(action.pkg) 
+                val plugin = PluginLoader.getPluginById(action.pkg)
                 if (plugin == null) {
                     val error = "Plugin not loaded"
                     markAsInvalidated(action.pkg, error)
@@ -223,6 +257,7 @@ class PluginLifecycleCoordinator(
                     action.response.complete(result)
                 }
             }
+
             is LifecycleAction.RunAction -> {
                 val plugin = registry.getPlugin(action.pkg)
                 if (plugin != null) {
@@ -234,7 +269,9 @@ class PluginLifecycleCoordinator(
                         markAsInvalidated(action.pkg, errorMsg)
                     } else {
                         val job = BackgroundJob(
-                            id = "action_${action.pkg}_${action.action.functionName}_${Clock.System.now().toEpochMilliseconds()}",
+                            id = "action_${action.pkg}_${action.action.functionName}_${
+                                Clock.System.now().toEpochMilliseconds()
+                            }",
                             name = "Action: ${action.action.name} (${plugin.name})",
                             type = JobType.PluginAction,
                             pluginId = action.pkg,
@@ -293,7 +330,11 @@ class PluginLifecycleCoordinator(
         deferred.await()
     }
 
-    suspend fun handlePostUpdate(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest, installer: PluginInstaller) {
+    suspend fun handlePostUpdate(
+        pkg: String,
+        manifest: org.wip.plugintoolkit.api.PluginManifest,
+        installer: PluginInstaller
+    ) {
         val deferred = CompletableDeferred<Unit>()
         actorChannel.send(LifecycleAction.HandlePostUpdate(pkg, manifest, installer, deferred))
         deferred.await()
@@ -322,7 +363,7 @@ class PluginLifecycleCoordinator(
         actorChannel.send(LifecycleAction.CheckAndResumeSetup(pkg, deferred))
         deferred.await()
     }
-    
+
     suspend fun rerunSetup(pkg: String, installer: PluginInstaller) {
         val deferred = CompletableDeferred<Unit>()
         actorChannel.send(LifecycleAction.RerunSetup(pkg, installer, deferred))
@@ -465,7 +506,10 @@ class PluginLifecycleCoordinator(
         registry.updatePlugin(pkg) { it.copy(requiredAction = null) }
     }
 
-    private fun hasMissingRequiredSettings(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest? = null): Boolean {
+    private fun hasMissingRequiredSettings(
+        pkg: String,
+        manifest: org.wip.plugintoolkit.api.PluginManifest? = null
+    ): Boolean {
         val actualManifest = manifest ?: lifecycleManager.getManifest(pkg) ?: return false
         if (actualManifest.settings.isNullOrEmpty()) return false
 

@@ -35,22 +35,30 @@ class PluginSettingsSecurityTest {
         override fun deleteDirectory(path: String): Boolean = true
         override fun readFileFromZip(zipPath: String, fileName: String): String? = manifestJson
         override fun listFiles(path: String): List<String> = emptyList()
-        override fun saveFile(path: String, content: ByteArray) { files[path] = content.decodeToString() }
+        override fun saveFile(path: String, content: ByteArray) {
+            files[path] = content.decodeToString()
+        }
+
         override fun readFile(path: String): String? = files[path]
-        override fun writeFile(path: String, content: String) { files[path] = content }
+        override fun writeFile(path: String, content: String) {
+            files[path] = content
+        }
     }
 
     private class FakeSettingsPersistence : SettingsPersistence {
         var settings = AppSettings()
         override fun load(): AppSettings = settings
-        override fun save(settings: AppSettings) { this.settings = settings }
+        override fun save(settings: AppSettings) {
+            this.settings = settings
+        }
+
         override fun getSettingsDir(): String = "/tmp"
         override fun getJobsDir(): String = "/tmp/jobs"
         override fun openLogFolder() {}
         override fun openLatestLog() {}
     }
 
-    private val json = Json { 
+    private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
     }
@@ -67,7 +75,7 @@ class PluginSettingsSecurityTest {
         val pkg = "test.plugin.secret"
         val tempDir = System.getProperty("java.io.tmpdir").replace("\\", "/")
         val installPath = "$tempDir/test.plugin.secret"
-        
+
         // Setup manifest with a secret setting
         val manifest = PluginManifest(
             manifestVersion = "1.0",
@@ -90,7 +98,14 @@ class PluginSettingsSecurityTest {
 
         // registry.initialize() is skipped because it uses real IO via PlatformUtils
         // We manually add the plugin to the registry for the test
-        registry.addOrUpdatePlugin(InstalledPlugin(pkg = pkg, name = "Secret Plugin", version = "1.0.0", installPath = installPath))
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(
+                pkg = pkg,
+                name = "Secret Plugin",
+                version = "1.0.0",
+                installPath = installPath
+            )
+        )
 
         // Save settings
         val clearApiKey = "sk-1234567890abcdef"
@@ -101,19 +116,22 @@ class PluginSettingsSecurityTest {
                 "publicSetting" to JsonPrimitive(publicVal)
             )
         )
-        
+
         lifecycleManager.savePluginSettings(pkg, store)
 
         // Verify that the file on disk is encrypted
         val savedContent = fileSystem.readFile("$installPath/settings.json")
         assertNotNull(savedContent, "Settings file should exist")
-        
+
         val savedStore = json.decodeFromString<PluginSettingsStore>(savedContent)
         val savedApiKey = (savedStore.settings["apiKey"] as JsonPrimitive).content
         val savedPublic = (savedStore.settings["publicSetting"] as JsonPrimitive).content
 
         assertNotEquals(clearApiKey, savedApiKey, "API Key should be encrypted on disk")
-        assertTrue(savedApiKey.startsWith("dpapi:") || savedApiKey.startsWith("aes:"), "API Key should have encryption prefix: $savedApiKey")
+        assertTrue(
+            savedApiKey.startsWith("ENC[dpapi:") || savedApiKey.startsWith("ENC[aes:"),
+            "API Key should have encryption prefix: $savedApiKey"
+        )
         assertEquals(publicVal, savedPublic, "Public setting should NOT be encrypted")
 
         // Load settings back
@@ -138,7 +156,7 @@ class PluginSettingsSecurityTest {
         val pkg = "test.plugin.secret.nonstring"
         val tempDir = System.getProperty("java.io.tmpdir").replace("\\", "/")
         val installPath = "$tempDir/test.plugin.secret.nonstring"
-        
+
         val manifest = PluginManifest(
             manifestVersion = "1.0",
             plugin = PluginInfo(id = pkg, name = "Secret Plugin", version = "1.0.0", description = "Test"),
@@ -153,20 +171,27 @@ class PluginSettingsSecurityTest {
         )
         fileSystem.manifestJson = json.encodeToString(manifest)
 
-        registry.addOrUpdatePlugin(InstalledPlugin(pkg = pkg, name = "Secret Plugin", version = "1.0.0", installPath = installPath))
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(
+                pkg = pkg,
+                name = "Secret Plugin",
+                version = "1.0.0",
+                installPath = installPath
+            )
+        )
 
         val store = PluginSettingsStore(
             settings = mapOf("secretNumber" to JsonPrimitive(42))
         )
-        
+
         lifecycleManager.savePluginSettings(pkg, store)
 
         val savedContent = fileSystem.readFile("$installPath/settings.json")
         assertNotNull(savedContent)
-        
+
         val savedStore = json.decodeFromString<PluginSettingsStore>(savedContent)
         val savedNumber = (savedStore.settings["secretNumber"] as JsonPrimitive).content
-        
+
         assertEquals("42", savedNumber, "Non-string settings are currently not encrypted even if marked secret")
     }
 }

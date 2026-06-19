@@ -1,11 +1,11 @@
 package org.wip.plugintoolkit.features.job.logic
 
-import co.touchlab.kermit.Logger
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -16,29 +16,23 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
-import kotlinx.serialization.json.longOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
-import kotlinx.coroutines.CoroutineScope
-import org.wip.plugintoolkit.api.PrimitiveType
-import kotlinx.coroutines.CancellationException
 
 class FlowEngine(
     private val manager: JobManager,
@@ -56,16 +50,19 @@ class FlowEngine(
         val appDataDir = settingsPersistence.getSettingsDir()
         val safeName = job.capabilityName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
         val file = Path("$appDataDir/flows/$safeName.json")
-        
+
         if (!SystemFileSystem.exists(file)) {
             throw Exception("Flow definition file not found: ${file.name}")
         }
-        
+
         val flowContent = SystemFileSystem.source(file).buffered().use { it.readString() }
         val flow = Json { ignoreUnknownKeys = true; encodeDefaults = true }
             .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(flowContent)
 
-        manager.addJobLog(job.id, "Loaded flow '${flow.name}' with ${flow.nodes.size} nodes and ${flow.connections.size} connections.")
+        manager.addJobLog(
+            job.id,
+            "Loaded flow '${flow.name}' with ${flow.nodes.size} nodes and ${flow.connections.size} connections."
+        )
 
         try {
             val jsonOutputs = executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject)
@@ -114,13 +111,13 @@ class FlowEngine(
                 val sortedConns = conns.sortedBy { it.orderIndex ?: 0 }
                 val targetNode = nodesById[nodeId]
                 val targetPort = targetNode?.inputs?.find { it.id == portId }
-                
+
                 if (targetPort?.dataType is DataType.Array) {
                     val results = sortedConns.map { conn ->
                         val raw = computedValues[Pair(conn.sourceNodeId, conn.sourcePortId)]
                         if (raw is JsonElement) fromJsonElement(raw) else raw
                     }
-                    return results.flatMap { 
+                    return results.flatMap {
                         if (it is List<*>) it else listOf(it)
                     }
                 } else {
@@ -133,10 +130,13 @@ class FlowEngine(
                 val port = node.inputs.find { it.id == portId }
                 val rawValue = port?.value
                 val rawDefault = port?.defaultValue
-                
-                val isStringPort = port?.dataType is DataType.Primitive && port.dataType.primitiveType == PrimitiveType.STRING
-                val isRawValueEmptyString = (rawValue is JsonPrimitive && rawValue.isString && rawValue.content.isEmpty()) || (rawValue is String && rawValue.isEmpty())
-                val isRawDefaultEmptyString = (rawDefault is JsonPrimitive && rawDefault.isString && rawDefault.content.isEmpty()) || (rawDefault is String && rawDefault.isEmpty())
+
+                val isStringPort =
+                    port?.dataType is DataType.Primitive && port.dataType.primitiveType == PrimitiveType.STRING
+                val isRawValueEmptyString =
+                    (rawValue is JsonPrimitive && rawValue.isString && rawValue.content.isEmpty()) || (rawValue is String && rawValue.isEmpty())
+                val isRawDefaultEmptyString =
+                    (rawDefault is JsonPrimitive && rawDefault.isString && rawDefault.content.isEmpty()) || (rawDefault is String && rawDefault.isEmpty())
 
                 val raw = if (rawValue != null && rawValue !is JsonNull && (isStringPort || !isRawValueEmptyString)) {
                     rawValue
@@ -145,7 +145,7 @@ class FlowEngine(
                 } else {
                     defaultValue
                 }
-                
+
                 return if (raw is JsonElement) fromJsonElement(raw) else raw
             }
         }
@@ -196,6 +196,7 @@ class FlowEngine(
                     pauseRequested = true
                     activeCapabilityHandle?.pause()
                 }
+
                 override fun cancel(force: Boolean) {
                     activeCapabilityHandle?.cancel(force)
                     jobExecution.cancel()
@@ -205,7 +206,8 @@ class FlowEngine(
         }
 
         if (resumeStateOverride != null) {
-            resumeStateOverride["executedNodeIds"]?.jsonArray?.map { it.jsonPrimitive.long }?.let { executedNodeIds.addAll(it) }
+            resumeStateOverride["executedNodeIds"]?.jsonArray?.map { it.jsonPrimitive.long }
+                ?.let { executedNodeIds.addAll(it) }
             resumeStateOverride["activeNodes"]?.jsonArray?.map { it.jsonPrimitive.long }?.let { activeNodes.addAll(it) }
             resumeStateOverride["computedValues"]?.jsonArray?.forEach { entry ->
                 val obj = entry.jsonObject
@@ -221,7 +223,10 @@ class FlowEngine(
                     capabilityResumeStates[nodeId] = resumeStateJson
                 }
             }
-            if (isRoot) manager.addJobLog(job.id, "Resuming flow execution from saved state. Executed nodes: ${executedNodeIds.size}")
+            if (isRoot) manager.addJobLog(
+                job.id,
+                "Resuming flow execution from saved state. Executed nodes: ${executedNodeIds.size}"
+            )
         } else {
             val nodesWithIncoming = flow.connections.map { it.targetNodeId }.toSet()
             flow.nodes.forEach { n ->
@@ -230,18 +235,22 @@ class FlowEngine(
         }
 
         fun buildCurrentState(): JsonObject {
-            return JsonObject(mapOf(
-                "executedNodeIds" to JsonArray(executedNodeIds.map { JsonPrimitive(it) }),
-                "activeNodes" to JsonArray(activeNodes.map { JsonPrimitive(it) }),
-                "computedValues" to JsonArray(computedValues.map { (key, value) ->
-                    JsonObject(mapOf(
-                        "nodeId" to JsonPrimitive(key.first),
-                        "portId" to JsonPrimitive(key.second),
-                        "value" to toJsonElement(value)
-                    ))
-                }),
-                "capabilityResumeStates" to JsonObject(capabilityResumeStates.mapKeys { it.key.toString() })
-            ))
+            return JsonObject(
+                mapOf(
+                    "executedNodeIds" to JsonArray(executedNodeIds.map { JsonPrimitive(it) }),
+                    "activeNodes" to JsonArray(activeNodes.map { JsonPrimitive(it) }),
+                    "computedValues" to JsonArray(computedValues.map { (key, value) ->
+                        JsonObject(
+                            mapOf(
+                                "nodeId" to JsonPrimitive(key.first),
+                                "portId" to JsonPrimitive(key.second),
+                                "value" to toJsonElement(value)
+                            )
+                        )
+                    }),
+                    "capabilityResumeStates" to JsonObject(capabilityResumeStates.mapKeys { it.key.toString() })
+                )
+            )
         }
 
         executionOrder.forEachIndexed { index, nodeId ->
@@ -271,6 +280,7 @@ class FlowEngine(
                         computedValues[Pair(node.id, outputPort.id)] = rawValue
                     }
                 }
+
                 is org.wip.plugintoolkit.features.flows.model.Node.SystemNode -> {
                     val executor = executorRegistry.getExecutor(node.systemAction)
                     val sysResumeState = capabilityResumeStates[node.id]
@@ -280,24 +290,39 @@ class FlowEngine(
                         override val appDataDir = appDataDir
                         override val runtimeInferredTypes = runtimeInferred
                         override val resumeState = sysResumeState
-                        override fun getInputValue(portId: String, defaultValue: Any?) = getInputValue(node.id, portId, defaultValue)
-                        override fun setOutputValue(portId: String, value: Any?) { computedValues[Pair(node.id, portId)] = value }
-                        override fun addLog(message: String, level: String) { manager.addJobLog(job.id, message, level) }
-                        override suspend fun executeSubFlow(flowName: String, parameters: Map<String, JsonElement>): Map<String, Any?> {
-                            val subFlowFile = Path("$appDataDir/flows/${flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+                        override fun getInputValue(portId: String, defaultValue: Any?) =
+                            getInputValue(node.id, portId, defaultValue)
+
+                        override fun setOutputValue(portId: String, value: Any?) {
+                            computedValues[Pair(node.id, portId)] = value
+                        }
+
+                        override fun addLog(message: String, level: String) {
+                            manager.addJobLog(job.id, message, level)
+                        }
+
+                        override suspend fun executeSubFlow(
+                            flowName: String,
+                            parameters: Map<String, JsonElement>
+                        ): Map<String, Any?> {
+                            val subFlowFile =
+                                Path("$appDataDir/flows/${flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
                             if (!SystemFileSystem.exists(subFlowFile)) throw Exception("Subflow file not found: $flowName")
                             val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
-                            val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
+                            val subFlow = Json {
+                                ignoreUnknownKeys = true; encodeDefaults = true
+                            }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
                             val subJob = BackgroundJob(
-                                id = "${job.id}-sub-${node.id}", 
-                                name = "Subflow: $flowName", 
-                                type = JobType.Flow, 
-                                pluginId = "system", 
-                                capabilityName = flowName, 
+                                id = "${job.id}-sub-${node.id}",
+                                name = "Subflow: $flowName",
+                                type = JobType.Flow,
+                                pluginId = "system",
+                                capabilityName = flowName,
                                 parameters = parameters
                             )
-                            
-                            val nestedResumeState = (sysResumeState as? JsonObject)?.get("subflowResumeState") as? JsonObject
+
+                            val nestedResumeState =
+                                (sysResumeState as? JsonObject)?.get("subflowResumeState") as? JsonObject
                             return executeSubFlowRecursively(subFlow, subJob, appDataDir, nestedResumeState)
                         }
                     }
@@ -309,6 +334,7 @@ class FlowEngine(
                         throw PauseFlowException(buildCurrentState())
                     }
                 }
+
                 is org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode -> {
                     val capabilityParameters = mutableMapOf<String, JsonElement>()
                     node.inputs.forEach { port ->
@@ -316,30 +342,39 @@ class FlowEngine(
                         val jsonVal = toJsonElement(resolvedVal)
                         if (jsonVal !is JsonNull) capabilityParameters[port.id] = jsonVal
                     }
-                    
-                    val plugin = PluginLoader.getPluginById(node.pluginInfo.id) ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
+
+                    val plugin = PluginLoader.getPluginById(node.pluginInfo.id)
+                        ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
                     validateCapabilityParameters(plugin.getManifest(), node.capability.name, capabilityParameters)
-                    
+
                     val processor = plugin.getProcessor()
                     val context = pluginManager.createPluginContext(node.pluginInfo.id, job.id)
                     val savedCapResumeState = capabilityResumeStates[node.id]
                     val request = PluginRequest(node.capability.name, capabilityParameters, savedCapResumeState)
-                    
-                    manager.addJobLog(job.id, "Invoking plugin capability: ${node.pluginInfo.name} -> ${node.capability.name}...")
-                    
-                    val deferredResult = workerScope.async { 
+
+                    manager.addJobLog(
+                        job.id,
+                        "Invoking plugin capability: ${node.pluginInfo.name} -> ${node.capability.name}..."
+                    )
+
+                    val deferredResult = workerScope.async {
                         kotlinx.coroutines.withTimeout(600_000L) {
-                            processor.process(request, context) 
+                            processor.process(request, context)
                         }
                     }
-                    
+
                     val handle = object : JobHandle {
                         override val result = deferredResult
-                        override fun pause() { workerScope.launch { context.signals.sendSignal(org.wip.plugintoolkit.api.PluginSignal.PAUSE) } }
-                        override fun cancel(force: Boolean) { workerScope.launch { context.signals.sendSignal(org.wip.plugintoolkit.api.PluginSignal.CANCEL) }; deferredResult.cancel() }
+                        override fun pause() {
+                            workerScope.launch { context.signals.sendSignal(org.wip.plugintoolkit.api.PluginSignal.PAUSE) }
+                        }
+
+                        override fun cancel(force: Boolean) {
+                            workerScope.launch { context.signals.sendSignal(org.wip.plugintoolkit.api.PluginSignal.CANCEL) }; deferredResult.cancel()
+                        }
                     }
                     activeCapabilityHandle = handle
-                    
+
                     val result = try {
                         handle.result.await()
                     } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -347,11 +382,14 @@ class FlowEngine(
                     } catch (e: CancellationException) {
                         if (pauseRequested) ExecutionResult.Paused(JsonNull) else throw e
                     } catch (e: Exception) {
-                        throw Exception("Capability invocation failed for node '${node.title.ifEmpty { node.id.toString() }}' (Plugin: '${node.pluginInfo.name}', Capability: '${node.capability.name}'): ${e.message}", e)
+                        throw Exception(
+                            "Capability invocation failed for node '${node.title.ifEmpty { node.id.toString() }}' (Plugin: '${node.pluginInfo.name}', Capability: '${node.capability.name}'): ${e.message}",
+                            e
+                        )
                     } finally {
                         activeCapabilityHandle = null
                     }
-                    
+
                     when (result) {
                         is ExecutionResult.Success -> {
                             capabilityResumeStates.remove(node.id)
@@ -361,10 +399,12 @@ class FlowEngine(
                                 for ((key, value) in outputVal) computedValues[Pair(node.id, key)] = value
                             }
                         }
+
                         is ExecutionResult.Error -> {
                             capabilityResumeStates.remove(node.id)
                             throw Exception("Capability invocation failed for node '${node.title.ifEmpty { node.id.toString() }}' (Plugin: '${node.pluginInfo.name}', Capability: '${node.capability.name}'): ${result.message}")
                         }
+
                         is ExecutionResult.Paused -> {
                             capabilityResumeStates[node.id] = result.resumeState
                             manager.addJobLog(job.id, "Capability requested pause mid-work.")
@@ -372,6 +412,7 @@ class FlowEngine(
                         }
                     }
                 }
+
                 is org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode -> {
                     val inputPort = node.inputs.firstOrNull()
                     if (inputPort != null) {
@@ -380,12 +421,16 @@ class FlowEngine(
                         computedValues[Pair(node.id, inputPort.id)] = finalVal
                     }
                 }
+
                 is org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode -> {
-                    val subFlowFile = Path("$appDataDir/flows/${node.flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
+                    val subFlowFile =
+                        Path("$appDataDir/flows/${node.flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")}.json")
                     if (SystemFileSystem.exists(subFlowFile)) {
                         val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
-                        val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
-                        
+                        val subFlow = Json {
+                            ignoreUnknownKeys = true; encodeDefaults = true
+                        }.decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
+
                         val subParameters = mutableMapOf<String, JsonElement>()
                         node.inputs.forEach { port ->
                             val mapping = node.inputMappings.find { it.portId == port.id }
@@ -395,14 +440,14 @@ class FlowEngine(
                             }
                         }
                         val subJob = BackgroundJob(
-                            id = "${job.id}-sub-${node.id}", 
-                            name = "Subflow: ${node.flowName}", 
-                            type = JobType.Flow, 
-                            pluginId = "system", 
-                            capabilityName = node.flowName, 
+                            id = "${job.id}-sub-${node.id}",
+                            name = "Subflow: ${node.flowName}",
+                            type = JobType.Flow,
+                            pluginId = "system",
+                            capabilityName = node.flowName,
                             parameters = subParameters
                         )
-                        
+
                         val subResumeState = capabilityResumeStates[node.id] as? JsonObject
                         val subOutputs = try {
                             executeSubFlowRecursively(subFlow, subJob, appDataDir, subResumeState)
@@ -410,14 +455,15 @@ class FlowEngine(
                             capabilityResumeStates[node.id] = e.resumeState
                             throw PauseFlowException(buildCurrentState())
                         }
-                        
+
                         capabilityResumeStates.remove(node.id)
-                        
+
                         val subNodesById = subFlow.nodes.associateBy { it.id }
                         node.outputs.forEach { port ->
                             val mapping = node.outputMappings.find { it.portId == port.id }
                             if (mapping != null) {
-                                val boundaryOutputNode = subNodesById[mapping.boundaryNodeId] as? org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode
+                                val boundaryOutputNode =
+                                    subNodesById[mapping.boundaryNodeId] as? org.wip.plugintoolkit.features.flows.model.Node.FlowOutputNode
                                 val boundaryPortName = boundaryOutputNode?.inputs?.firstOrNull()?.name ?: "output_data"
                                 computedValues[Pair(node.id, port.id)] = subOutputs[boundaryPortName]
                             }

@@ -56,6 +56,7 @@ private fun parseMarkdown(text: String): AnnotatedString {
                     append(text[i + 1])
                     i += 2
                 }
+
                 text.startsWith("**", i) -> {
                     val end = findClosing(text, i + 2, "**")
                     if (end != -1) {
@@ -68,6 +69,7 @@ private fun parseMarkdown(text: String): AnnotatedString {
                         i += 2
                     }
                 }
+
                 c == '_' -> {
                     val end = findClosing(text, i + 1, "_")
                     if (end != -1) {
@@ -80,6 +82,7 @@ private fun parseMarkdown(text: String): AnnotatedString {
                         i += 1
                     }
                 }
+
                 text.startsWith("~~", i) -> {
                     val end = findClosing(text, i + 2, "~~")
                     if (end != -1) {
@@ -92,6 +95,7 @@ private fun parseMarkdown(text: String): AnnotatedString {
                         i += 2
                     }
                 }
+
                 c == '`' -> {
                     val end = findClosing(text, i + 1, "`")
                     if (end != -1) {
@@ -109,6 +113,7 @@ private fun parseMarkdown(text: String): AnnotatedString {
                         i += 1
                     }
                 }
+
                 c == '[' -> {
                     val linkEnd = findClosing(text, i + 1, "]")
                     if (linkEnd != -1 && linkEnd + 1 < text.length && text[linkEnd + 1] == '(') {
@@ -135,6 +140,7 @@ private fun parseMarkdown(text: String): AnnotatedString {
                         i += 1
                     }
                 }
+
                 else -> {
                     append(c)
                     i++

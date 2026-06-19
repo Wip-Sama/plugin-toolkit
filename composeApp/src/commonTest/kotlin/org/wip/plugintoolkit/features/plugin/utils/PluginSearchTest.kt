@@ -8,10 +8,34 @@ import kotlin.test.assertTrue
 class PluginSearchTest {
 
     private val plugins = listOf(
-        ExtensionPlugin(name = "Weather Widget", pkg = "org.weather.widget", version = "1.0.0", description = "Shows weather info", fileName = "w.jar"),
-        ExtensionPlugin(name = "Calculator", pkg = "org.calc.app", version = "2.1.0", description = "Advanced math tool", fileName = "c.jar"),
-        ExtensionPlugin(name = "Notes Pro", pkg = "com.notes.pro", version = "0.9.0", description = "Take notes easily", fileName = "n.jar"),
-        ExtensionPlugin(name = "System Monitor", pkg = "org.sys.mon", version = "1.5.0", description = "Monitor CPU and RAM", fileName = "s.jar")
+        ExtensionPlugin(
+            name = "Weather Widget",
+            pkg = "org.weather.widget",
+            version = "1.0.0",
+            description = "Shows weather info",
+            fileName = "w.jar"
+        ),
+        ExtensionPlugin(
+            name = "Calculator",
+            pkg = "org.calc.app",
+            version = "2.1.0",
+            description = "Advanced math tool",
+            fileName = "c.jar"
+        ),
+        ExtensionPlugin(
+            name = "Notes Pro",
+            pkg = "com.notes.pro",
+            version = "0.9.0",
+            description = "Take notes easily",
+            fileName = "n.jar"
+        ),
+        ExtensionPlugin(
+            name = "System Monitor",
+            pkg = "org.sys.mon",
+            version = "1.5.0",
+            description = "Monitor CPU and RAM",
+            fileName = "s.jar"
+        )
     )
 
     @Test
@@ -52,7 +76,7 @@ class PluginSearchTest {
     fun testSortingInstalledToBottom() {
         val installed = setOf("org.weather.widget", "org.calc.app")
         val results = PluginSearchUtils.filterPlugins(plugins, "", installed)
-        
+
         assertEquals(4, results.size)
         // Non-installed should be at the top
         assertTrue(results[0].pkg == "com.notes.pro" || results[0].pkg == "org.sys.mon")
@@ -65,7 +89,7 @@ class PluginSearchTest {
     @Test
     fun testAlphabeticalSortingWithinGroups() {
         val results = PluginSearchUtils.filterPlugins(plugins, "", emptySet())
-        
+
         assertEquals(4, results.size)
         assertEquals("Calculator", results[0].name)
         assertEquals("Notes Pro", results[1].name)

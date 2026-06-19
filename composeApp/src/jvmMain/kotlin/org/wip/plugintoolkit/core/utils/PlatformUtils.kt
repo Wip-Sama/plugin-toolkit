@@ -246,7 +246,8 @@ actual object PlatformUtils {
     actual fun readFileFromZip(zipPath: String, fileName: String): String? {
         return try {
             java.util.zip.ZipFile(zipPath).use { zip ->
-                val entry = zip.getEntry(fileName) ?: zip.entries().asSequence().find { it.name.equals(fileName, ignoreCase = true) }
+                val entry = zip.getEntry(fileName) ?: zip.entries().asSequence()
+                    .find { it.name.equals(fileName, ignoreCase = true) }
                 ?: return null
                 zip.getInputStream(entry).use { it.bufferedReader().readText() }
             }
@@ -289,10 +290,12 @@ actual object PlatformUtils {
                         val base = "/i \"$normalizedPath\""
                         if (currentInstallDir != null) "$base INSTALLDIR=\"$currentInstallDir\"" else base
                     }
+
                     normalizedPath.endsWith(".exe") -> {
                         print(currentInstallDir)
                         if (currentInstallDir != null) "INSTALLDIR=\"$currentInstallDir\"" else ""
                     }
+
                     else -> ""
                 }
 

@@ -142,7 +142,7 @@ class UpdateService(
                     val channel = response.bodyAsChannel()
                     val file = java.io.File(destinationPath)
                     file.parentFile?.mkdirs()
-                    
+
                     file.outputStream().use { output ->
                         val buffer = ByteArray(8192)
                         var totalRead = 0L

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -28,21 +30,14 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,18 +50,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.ConflictResolutionAction
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
-import org.wip.plugintoolkit.features.flows.viewmodel.MigrationPrompt
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.shared.components.GlassCard
-import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
-import androidx.compose.material3.FilledTonalIconButton
 import org.wip.plugintoolkit.shared.components.SectionHeader
+import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_delete
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
@@ -103,7 +101,7 @@ fun FlowManagerView(
     var flowToDelete by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        viewModel.reloadFlows()
+        // flows are reloaded automatically via flowRepository
     }
 
     val activeCapabilities = remember(state.flows) {
@@ -163,9 +161,20 @@ fun FlowManagerView(
         ToolkitTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text(stringResource(Res.string.flow_search_placeholder), style = MaterialTheme.typography.bodyMedium) },
+            placeholder = {
+                Text(
+                    stringResource(Res.string.flow_search_placeholder),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+            leadingIcon = {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
             singleLine = true
         )
 
@@ -176,9 +185,14 @@ fun FlowManagerView(
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
         ) {
             if (filteredFlows.isEmpty()) {
-                Box(Modifier.fillMaxSize().padding(vertical = ToolkitTheme.spacing.extraLarge), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.fillMaxSize().padding(vertical = ToolkitTheme.spacing.extraLarge),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = if (searchQuery.isEmpty()) stringResource(Res.string.flow_no_flows) else stringResource(Res.string.flow_no_search_results),
+                        text = if (searchQuery.isEmpty()) stringResource(Res.string.flow_no_flows) else stringResource(
+                            Res.string.flow_no_search_results
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -211,7 +225,7 @@ fun FlowManagerView(
                         isRunning = isRunning,
                         isSelected = state.selectedFlowId == flow.name,
                         onSelect = { viewModel.onEvent(FlowEvent.SelectFlow(flow.name)) },
-                        onEdit = { 
+                        onEdit = {
                             viewModel.onEvent(FlowEvent.SelectFlow(flow.name))
                             onEditFlow(flow.name)
                         },
@@ -265,7 +279,10 @@ fun FlowManagerView(
                     Text(stringResource(Res.string.flow_delete_confirm, nameOfFlow))
                     if (parentFlows.isNotEmpty()) {
                         Text(
-                            text = stringResource(Res.string.flow_delete_warning_subflow, parentFlows.joinToString(", ")),
+                            text = stringResource(
+                                Res.string.flow_delete_warning_subflow,
+                                parentFlows.joinToString(", ")
+                            ),
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium
@@ -305,58 +322,6 @@ fun FlowManagerView(
         )
     }
 
-    if (state.pendingMigrations.isNotEmpty()) {
-        val prompt = state.pendingMigrations.first()
-        MigrationPromptDialog(
-            prompt = prompt,
-            onAccept = { viewModel.onEvent(FlowEvent.AcceptMigration(prompt.originalFlow.name)) },
-            onReject = { viewModel.onEvent(FlowEvent.RejectMigration(prompt.originalFlow.name)) }
-        )
-    }
-}
-
-@Composable
-private fun MigrationPromptDialog(
-    prompt: MigrationPrompt,
-    onAccept: () -> Unit,
-    onReject: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onReject,
-        title = { Text("Migration Required for ${prompt.originalFlow.name}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (prompt.requiresConsentNodes.isNotEmpty()) {
-                    Text(
-                        text = "The following nodes have new capabilities that require your review:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    prompt.requiresConsentNodes.forEach { node ->
-                        Text("• ${node.title}", color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                if (prompt.brokenNodes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "The following nodes have incompatible changes and will be marked as broken:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    prompt.brokenNodes.forEach { node ->
-                        Text("• ${node.title}", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Do you want to apply these migrations now?")
-            }
-        },
-        confirmButton = {
-            Button(onClick = onAccept) { Text("Apply Migration") }
-        },
-        dismissButton = {
-            TextButton(onClick = onReject) { Text("Cancel") }
-        }
-    )
 }
 
 @Composable
@@ -488,7 +453,7 @@ private fun FlowItem(
     onExport: () -> Unit
 ) {
     val isBroken = missingCapabilities.isNotEmpty()
-    
+
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onSelect
@@ -511,14 +476,17 @@ private fun FlowItem(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    
+
                     if (isBroken) {
                         Surface(
                             color = MaterialTheme.colorScheme.errorContainer,
                             shape = CircleShape
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.extraSmall
+                                ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
                             ) {
@@ -544,7 +512,10 @@ private fun FlowItem(
                             shape = CircleShape
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.extraSmall
+                                ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
                             ) {
@@ -567,7 +538,7 @@ private fun FlowItem(
                         val reasons = mutableListOf<String>()
                         if (isRunning) reasons.add(stringResource(Res.string.flow_readonly_reason_running))
                         if (parentFlows.isNotEmpty()) reasons.add(stringResource(Res.string.flow_readonly_reason_used_in_other))
-                        
+
                         val displayText = if (reasons.isNotEmpty()) {
                             stringResource(Res.string.flow_editor_read_only_reason, reasons.joinToString(", "))
                         } else {
@@ -583,12 +554,15 @@ private fun FlowItem(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.extraSmall
+                                )
                             )
                         }
                     }
                 }
-                
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
@@ -598,7 +572,7 @@ private fun FlowItem(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    
+
                     if (parentFlows.isNotEmpty()) {
                         Text(
                             text = "•",
@@ -612,7 +586,7 @@ private fun FlowItem(
                         )
                     }
                 }
-                
+
                 // Chips Flow Row (parent flows and missing capabilities)
                 if (parentFlows.isNotEmpty() || missingCapabilities.isNotEmpty()) {
                     Row(
@@ -633,11 +607,14 @@ private fun FlowItem(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                    modifier = Modifier.padding(
+                                        horizontal = ToolkitTheme.spacing.small,
+                                        vertical = ToolkitTheme.spacing.extraSmall
+                                    )
                                 )
                             }
                         }
-                        
+
                         missingCapabilities.forEach { capName ->
                             Surface(
                                 color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
@@ -649,7 +626,10 @@ private fun FlowItem(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                    modifier = Modifier.padding(
+                                        horizontal = ToolkitTheme.spacing.small,
+                                        vertical = ToolkitTheme.spacing.extraSmall
+                                    )
                                 )
                             }
                         }
@@ -726,19 +706,19 @@ private fun SegmentedButtonGroup(
         ) {
             options.forEachIndexed { index, option ->
                 val isSelected = option == selectedOption
-                
+
                 val containerColor = if (isSelected) {
                     MaterialTheme.colorScheme.secondaryContainer
                 } else {
                     Color.Transparent
                 }
-                
+
                 val contentColor = if (isSelected) {
                     MaterialTheme.colorScheme.onSecondaryContainer
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 }
-                
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -774,7 +754,7 @@ private fun SegmentedButtonGroup(
                         )
                     }
                 }
-                
+
                 // Add vertical divider if not the last item
                 if (index < options.size - 1) {
                     Spacer(

@@ -1,14 +1,13 @@
 package org.wip.plugintoolkit.features.navigation.viewmodel
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.CloudDownload
 import androidx.lifecycle.ViewModel
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.update.UpdateService

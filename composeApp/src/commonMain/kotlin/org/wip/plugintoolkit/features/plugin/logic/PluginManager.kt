@@ -32,7 +32,7 @@ class PluginManager(
 
     // --- Installation & Updates ---
 
-    suspend fun installLocal(filePath: String, targetFolderPath: String) = 
+    suspend fun installLocal(filePath: String, targetFolderPath: String) =
         installer.installLocal(filePath, targetFolderPath).onSuccess { manifest ->
             if (manifest != null) {
                 coordinator.handlePostInstall(manifest.plugin.id, manifest)
@@ -54,14 +54,14 @@ class PluginManager(
 
     suspend fun uninstall(pkg: String) = installer.uninstall(pkg)
 
-    suspend fun updateLocal(pkg: String, newJarPath: String) = 
+    suspend fun updateLocal(pkg: String, newJarPath: String) =
         installer.updateLocal(pkg, newJarPath).onSuccess { manifest ->
             if (manifest != null) {
                 coordinator.handlePostUpdate(pkg, manifest, installer)
             }
         }.map { Unit }
 
-    suspend fun updateRemote(pkg: String) = 
+    suspend fun updateRemote(pkg: String) =
         installer.updateRemote(pkg).onSuccess { manifest ->
             if (manifest != null) {
                 coordinator.handlePostUpdate(pkg, manifest, installer)
@@ -70,7 +70,7 @@ class PluginManager(
 
     fun getUpdate(pkg: String) = installer.getUpdate(pkg)
 
-    suspend fun fetchRemoteChangelog(pkg: String): String? = 
+    suspend fun fetchRemoteChangelog(pkg: String): String? =
         repoManager.fetchRemoteChangelog(pkg)
 
     // --- Lifecycle Management ---
@@ -95,7 +95,11 @@ class PluginManager(
         scope.launch {
             scanner.rescanManagedFolders()
             // Post-scan: load plugins that are enabled, validated, and don't require setup/action
-            installedPlugins.value.filter { it.isEnabled && it.isValidated && it.requiredAction == null && !loadedPlugins.value.contains(it.pkg) }
+            installedPlugins.value.filter {
+                it.isEnabled && it.isValidated && it.requiredAction == null && !loadedPlugins.value.contains(
+                    it.pkg
+                )
+            }
                 .forEach { launch { loadPlugin(it.pkg) } }
         }
     }
@@ -118,12 +122,12 @@ class PluginManager(
 
     suspend fun setEnabled(pkg: String, enabled: Boolean) = coordinator.setEnabled(pkg, enabled)
 
-    suspend fun updatePlugin(pkg: String, transform: (InstalledPlugin) -> InstalledPlugin) = 
+    suspend fun updatePlugin(pkg: String, transform: (InstalledPlugin) -> InstalledPlugin) =
         registry.updatePlugin(pkg, transform)
 
     // --- Context & Jobs ---
 
-    fun createPluginContext(pkg: String, jobId: String? = null) = 
+    fun createPluginContext(pkg: String, jobId: String? = null) =
         lifecycleManager.createPluginContext(pkg, jobId)
 
     suspend fun validatePluginInJob(pkg: String) = coordinator.triggerValidation(pkg)

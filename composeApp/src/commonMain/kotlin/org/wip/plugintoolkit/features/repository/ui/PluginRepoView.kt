@@ -3,35 +3,107 @@ package org.wip.plugintoolkit.features.repository.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.platform.LocalClipboard
-import org.wip.plugintoolkit.core.utils.PlatformUtils
-import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
-import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
-import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
+import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
-import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_install
+import plugintoolkit.composeapp.generated.resources.action_refresh
+import plugintoolkit.composeapp.generated.resources.action_remove
+import plugintoolkit.composeapp.generated.resources.cancel_update_desc
+import plugintoolkit.composeapp.generated.resources.cancel_update_title
+import plugintoolkit.composeapp.generated.resources.dialog_cancel
+import plugintoolkit.composeapp.generated.resources.dialog_confirm
+import plugintoolkit.composeapp.generated.resources.repo_action_cancel_update
+import plugintoolkit.composeapp.generated.resources.repo_action_update_version
+import plugintoolkit.composeapp.generated.resources.repo_action_updating
+import plugintoolkit.composeapp.generated.resources.repo_add_button
+import plugintoolkit.composeapp.generated.resources.repo_conflicts_title
+import plugintoolkit.composeapp.generated.resources.repo_flow_filename_version_format
+import plugintoolkit.composeapp.generated.resources.repo_managed_title
+import plugintoolkit.composeapp.generated.resources.repo_no_flows_found
+import plugintoolkit.composeapp.generated.resources.repo_no_plugins_found
+import plugintoolkit.composeapp.generated.resources.repo_no_repo_selected
+import plugintoolkit.composeapp.generated.resources.repo_no_repo_selected_desc
+import plugintoolkit.composeapp.generated.resources.repo_plugin_installed_version_format
+import plugintoolkit.composeapp.generated.resources.repo_plugin_pkg_version_format
+import plugintoolkit.composeapp.generated.resources.repo_refresh_all
+import plugintoolkit.composeapp.generated.resources.repo_search_flows_placeholder
+import plugintoolkit.composeapp.generated.resources.repo_search_plugins_placeholder
+import plugintoolkit.composeapp.generated.resources.repo_share_link_desc
+import plugintoolkit.composeapp.generated.resources.repo_tab_flows
+import plugintoolkit.composeapp.generated.resources.repo_tab_plugins
+import plugintoolkit.composeapp.generated.resources.repo_url_placeholder
+import plugintoolkit.composeapp.generated.resources.repo_wrong_signature
 
 @Composable
 fun PluginRepoView(
@@ -42,7 +114,7 @@ fun PluginRepoView(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val pluginsMap by viewModel.plugins.collectAsState()
     val flowsMap by viewModel.flows.collectAsState()
-    
+
     val installedPlugins by viewModel.installedPlugins.collectAsState()
     val flowState by viewModel.flowState.collectAsState()
 
@@ -88,7 +160,12 @@ fun PluginRepoView(
                     value = viewModel.repoUrlInput,
                     onValueChange = { viewModel.repoUrlInput = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(Res.string.repo_url_placeholder), style = MaterialTheme.typography.bodyMedium) },
+                    placeholder = {
+                        Text(
+                            stringResource(Res.string.repo_url_placeholder),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium
                 )
@@ -125,14 +202,19 @@ fun PluginRepoView(
                         ),
                         border = BorderStroke(
                             width = if (isSelected) ToolkitTheme.dimensions.borderSelected else ToolkitTheme.dimensions.borderUnselected,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.sidebarBackground)
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(
+                                alpha = ToolkitTheme.opacity.sidebarBackground
+                            )
                         ),
                         shape = MaterialTheme.shapes.medium
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small),
+                                .padding(
+                                    horizontal = ToolkitTheme.spacing.medium,
+                                    vertical = ToolkitTheme.spacing.small
+                                ),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(
@@ -145,7 +227,7 @@ fun PluginRepoView(
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
-                               )
+                                )
                                 Text(
                                     text = repo.url,
                                     style = MaterialTheme.typography.bodySmall,
@@ -154,7 +236,7 @@ fun PluginRepoView(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            
+
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
 
                             Row(
@@ -219,7 +301,11 @@ fun PluginRepoView(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall))
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                    )
                 }
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 Text(stringResource(Res.string.repo_refresh_all))
@@ -256,7 +342,8 @@ fun PluginRepoView(
                             Icon(
                                 Icons.Default.CloudDownload,
                                 contentDescription = null,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.emptyStateIconSize).padding(ToolkitTheme.spacing.medium),
+                                modifier = Modifier.size(ToolkitTheme.dimensions.emptyStateIconSize)
+                                    .padding(ToolkitTheme.spacing.medium),
                                 tint = MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.disabled)
                             )
                         }
@@ -330,7 +417,8 @@ fun PluginRepoView(
                                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                                 activeConflicts.forEach { (pkg, repos) ->
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = ToolkitTheme.spacing.extraSmall),
+                                        modifier = Modifier.fillMaxWidth()
+                                            .padding(vertical = ToolkitTheme.spacing.extraSmall),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -393,7 +481,9 @@ fun PluginRepoView(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
                             Text(
-                                if (selectedTab == 0) stringResource(Res.string.repo_search_plugins_placeholder) else stringResource(Res.string.repo_search_flows_placeholder),
+                                if (selectedTab == 0) stringResource(Res.string.repo_search_plugins_placeholder) else stringResource(
+                                    Res.string.repo_search_flows_placeholder
+                                ),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         },
@@ -414,7 +504,11 @@ fun PluginRepoView(
 
                         if (filteredPlugins.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(stringResource(Res.string.repo_no_plugins_found), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                                Text(
+                                    stringResource(Res.string.repo_no_plugins_found),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
                             }
                         } else {
                             LazyColumn(
@@ -428,7 +522,11 @@ fun PluginRepoView(
                                     val isInstalled = installedPlugin != null
                                     val activeJobs by viewModel.activePluginInstallationJobs.collectAsState()
                                     val progress = activeJobs[plugin.pkg]
-                                    val hasUpdate = installedVersion != null && org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion) > 0
+                                    val hasUpdate =
+                                        installedVersion != null && org.wip.plugintoolkit.core.utils.VersionUtils.compare(
+                                            plugin.version,
+                                            installedVersion
+                                        ) > 0
 
                                     GlassCard(
                                         modifier = Modifier.fillMaxWidth()
@@ -471,7 +569,10 @@ fun PluginRepoView(
                                                         ) {
                                                             Text(
                                                                 stringResource(Res.string.repo_wrong_signature),
-                                                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = ToolkitTheme.spacing.badgeVertical),
+                                                                modifier = Modifier.padding(
+                                                                    horizontal = ToolkitTheme.spacing.badgeHorizontal,
+                                                                    vertical = ToolkitTheme.spacing.badgeVertical
+                                                                ),
                                                                 style = MaterialTheme.typography.labelSmall,
                                                                 color = MaterialTheme.colorScheme.onErrorContainer
                                                             )
@@ -479,7 +580,11 @@ fun PluginRepoView(
                                                     }
                                                 }
                                                 Text(
-                                                    text = stringResource(Res.string.repo_plugin_pkg_version_format, plugin.pkg, plugin.version),
+                                                    text = stringResource(
+                                                        Res.string.repo_plugin_pkg_version_format,
+                                                        plugin.pkg,
+                                                        plugin.version
+                                                    ),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.outline
                                                 )
@@ -499,12 +604,61 @@ fun PluginRepoView(
 
                                             // Control
                                             if (progress != null) {
-                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(ToolkitTheme.dimensions.progressBoxSize)) {
-                                                    CircularProgressIndicator(
-                                                        progress = { progress },
-                                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
-                                                        strokeWidth = ToolkitTheme.dimensions.progressIndicatorStrokeMedium
+                                                var isHovered by remember { mutableStateOf(false) }
+                                                var showCancelDialog by remember { mutableStateOf(false) }
+
+                                                if (showCancelDialog) {
+                                                    AlertDialog(
+                                                        onDismissRequest = { showCancelDialog = false },
+                                                        title = { Text(stringResource(Res.string.cancel_update_title)) },
+                                                        text = { Text(stringResource(Res.string.cancel_update_desc)) },
+                                                        confirmButton = {
+                                                            TextButton(onClick = {
+                                                                showCancelDialog = false
+                                                                viewModel.cancelPluginInstall(plugin.pkg)
+                                                            }) { Text(stringResource(Res.string.dialog_confirm)) }
+                                                        },
+                                                        dismissButton = {
+                                                            TextButton(onClick = { showCancelDialog = false }) {
+                                                                Text(
+                                                                    stringResource(Res.string.dialog_cancel)
+                                                                )
+                                                            }
+                                                        }
                                                     )
+                                                }
+
+                                                @OptIn(ExperimentalComposeUiApi::class)
+                                                Button(
+                                                    onClick = { showCancelDialog = true },
+                                                    shape = MaterialTheme.shapes.medium,
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = if (isHovered) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
+                                                        contentColor = if (isHovered) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurfaceVariant
+                                                    ),
+                                                    modifier = Modifier.onPointerEvent(PointerEventType.Enter) {
+                                                        isHovered = true
+                                                    }
+                                                        .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+                                                ) {
+                                                    if (isHovered) {
+                                                        Icon(
+                                                            Icons.Default.Cancel,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                                        Text(stringResource(Res.string.repo_action_cancel_update))
+                                                    } else {
+                                                        CircularProgressIndicator(
+                                                            progress = { progress },
+                                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                                        Text(stringResource(Res.string.repo_action_updating))
+                                                    }
                                                 }
                                             } else if (isInstalled) {
                                                 if (hasUpdate) {
@@ -512,9 +666,18 @@ fun PluginRepoView(
                                                         onClick = { viewModel.installPlugin(plugin) },
                                                         shape = MaterialTheme.shapes.medium
                                                     ) {
-                                                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall))
+                                                        Icon(
+                                                            Icons.Default.CloudDownload,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                                        )
                                                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                                        Text(stringResource(Res.string.repo_action_update_version, plugin.version))
+                                                        Text(
+                                                            stringResource(
+                                                                Res.string.repo_action_update_version,
+                                                                plugin.version
+                                                            )
+                                                        )
                                                     }
                                                 } else {
                                                     Surface(
@@ -522,8 +685,14 @@ fun PluginRepoView(
                                                         shape = MaterialTheme.shapes.medium
                                                     ) {
                                                         Text(
-                                                            stringResource(Res.string.repo_plugin_installed_version_format, installedVersion ?: ""),
-                                                            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.badgeHorizontal),
+                                                            stringResource(
+                                                                Res.string.repo_plugin_installed_version_format,
+                                                                installedVersion ?: ""
+                                                            ),
+                                                            modifier = Modifier.padding(
+                                                                horizontal = ToolkitTheme.spacing.mediumSmall,
+                                                                vertical = ToolkitTheme.spacing.badgeHorizontal
+                                                            ),
                                                             style = MaterialTheme.typography.labelMedium,
                                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                             fontWeight = FontWeight.Bold
@@ -552,7 +721,11 @@ fun PluginRepoView(
 
                         if (filteredFlows.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(stringResource(Res.string.repo_no_flows_found), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                                Text(
+                                    stringResource(Res.string.repo_no_flows_found),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
                             }
                         } else {
                             LazyColumn(
@@ -564,7 +737,11 @@ fun PluginRepoView(
                                     val installedFlow = flowState.flows.find { it.name == flow.name }
                                     val isInstalled = installedFlow != null
                                     val installedVersion = installedFlow?.version
-                                    val hasUpdate = installedVersion != null && org.wip.plugintoolkit.core.utils.VersionUtils.compare(flow.version, installedVersion) > 0
+                                    val hasUpdate =
+                                        installedVersion != null && org.wip.plugintoolkit.core.utils.VersionUtils.compare(
+                                            flow.version,
+                                            installedVersion
+                                        ) > 0
 
                                     GlassCard(
                                         modifier = Modifier.fillMaxWidth()
@@ -607,7 +784,10 @@ fun PluginRepoView(
                                                         ) {
                                                             Text(
                                                                 stringResource(Res.string.repo_wrong_signature),
-                                                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = ToolkitTheme.spacing.badgeVertical),
+                                                                modifier = Modifier.padding(
+                                                                    horizontal = ToolkitTheme.spacing.badgeHorizontal,
+                                                                    vertical = ToolkitTheme.spacing.badgeVertical
+                                                                ),
                                                                 style = MaterialTheme.typography.labelSmall,
                                                                 color = MaterialTheme.colorScheme.onErrorContainer
                                                             )
@@ -615,7 +795,11 @@ fun PluginRepoView(
                                                     }
                                                 }
                                                 Text(
-                                                    text = stringResource(Res.string.repo_flow_filename_version_format, flow.fileName, flow.version),
+                                                    text = stringResource(
+                                                        Res.string.repo_flow_filename_version_format,
+                                                        flow.fileName,
+                                                        flow.version
+                                                    ),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.outline
                                                 )
@@ -640,9 +824,18 @@ fun PluginRepoView(
                                                         onClick = { viewModel.installFlow(flow) },
                                                         shape = MaterialTheme.shapes.medium
                                                     ) {
-                                                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall))
+                                                        Icon(
+                                                            Icons.Default.CloudDownload,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                                        )
                                                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                                        Text(stringResource(Res.string.repo_action_update_version, flow.version))
+                                                        Text(
+                                                            stringResource(
+                                                                Res.string.repo_action_update_version,
+                                                                flow.version
+                                                            )
+                                                        )
                                                     }
                                                 } else {
                                                     Surface(
@@ -650,8 +843,14 @@ fun PluginRepoView(
                                                         shape = MaterialTheme.shapes.medium
                                                     ) {
                                                         Text(
-                                                            stringResource(Res.string.repo_plugin_installed_version_format, installedVersion ?: ""),
-                                                            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.badgeHorizontal),
+                                                            stringResource(
+                                                                Res.string.repo_plugin_installed_version_format,
+                                                                installedVersion ?: ""
+                                                            ),
+                                                            modifier = Modifier.padding(
+                                                                horizontal = ToolkitTheme.spacing.mediumSmall,
+                                                                vertical = ToolkitTheme.spacing.badgeHorizontal
+                                                            ),
                                                             style = MaterialTheme.typography.labelMedium,
                                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                             fontWeight = FontWeight.Bold

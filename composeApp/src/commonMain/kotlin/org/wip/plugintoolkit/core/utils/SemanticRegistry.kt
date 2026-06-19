@@ -61,6 +61,7 @@ object SemanticRegistry {
                         extensions.add(variant)
                     }
                 }
+
                 "audio" -> {
                     if (variant == null || variant == "*") {
                         hasGenericAudio = true
@@ -68,6 +69,7 @@ object SemanticRegistry {
                         extensions.add(variant)
                     }
                 }
+
                 "video" -> {
                     if (variant == null || variant == "*") {
                         hasGenericVideo = true
@@ -75,6 +77,7 @@ object SemanticRegistry {
                         extensions.add(variant)
                     }
                 }
+
                 "file" -> {
                     if (variant != null && variant != "*") {
                         extensions.add(variant)

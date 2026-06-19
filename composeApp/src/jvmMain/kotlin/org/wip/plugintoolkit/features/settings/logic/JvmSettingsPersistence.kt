@@ -81,7 +81,8 @@ class JvmSettingsPersistence : SettingsPersistence {
     override fun openLatestLog() {
         try {
             val logDirPath = "$settingsDirPath/${KeepTrack.LOGS_DIR_NAME}"
-            val dateString = java.text.SimpleDateFormat("yyyy_MM_dd", java.util.Locale.getDefault()).format(java.util.Date())
+            val dateString =
+                java.text.SimpleDateFormat("yyyy_MM_dd", java.util.Locale.getDefault()).format(java.util.Date())
             val logFilePath = "$logDirPath/$dateString.log"
             val logFile = java.io.File(logFilePath)
 

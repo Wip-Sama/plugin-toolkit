@@ -48,24 +48,41 @@ class PluginPluginInstallationTest {
         val zips = mutableMapOf<String, Map<String, String>>() // zipPath -> { fileName -> content }
 
         override fun exists(path: String): Boolean = files.containsKey(path) || dirs.contains(path)
-        override fun mkdirs(path: String): Boolean { dirs.add(path); return true }
-        override fun copyFile(source: String, destination: String) { files[destination] = files[source] ?: byteArrayOf() }
-        override fun deleteDirectory(path: String): Boolean { 
+        override fun mkdirs(path: String): Boolean {
+            dirs.add(path); return true
+        }
+
+        override fun copyFile(source: String, destination: String) {
+            files[destination] = files[source] ?: byteArrayOf()
+        }
+
+        override fun deleteDirectory(path: String): Boolean {
             files.keys.removeIf { it.startsWith(path) }
             dirs.removeIf { it.startsWith(path) }
-            return true 
+            return true
         }
+
         override fun readFileFromZip(zipPath: String, fileName: String): String? = zips[zipPath]?.get(fileName)
-        override fun listFiles(path: String): List<String> = files.keys.filter { it.startsWith(path) }.map { it.substringAfterLast("/") }
-        override fun saveFile(path: String, content: ByteArray) { files[path] = content }
+        override fun listFiles(path: String): List<String> =
+            files.keys.filter { it.startsWith(path) }.map { it.substringAfterLast("/") }
+
+        override fun saveFile(path: String, content: ByteArray) {
+            files[path] = content
+        }
+
         override fun readFile(path: String): String? = files[path]?.decodeToString()
-        override fun writeFile(path: String, content: String) { files[path] = content.encodeToByteArray() }
+        override fun writeFile(path: String, content: String) {
+            files[path] = content.encodeToByteArray()
+        }
     }
 
     private class FakeSettingsPersistence : SettingsPersistence {
         var settings = AppSettings()
         override fun load(): AppSettings = settings
-        override fun save(settings: AppSettings) { this.settings = settings }
+        override fun save(settings: AppSettings) {
+            this.settings = settings
+        }
+
         override fun getSettingsDir(): String = ""
         override fun getJobsDir(): String = ""
         override fun openLogFolder() {}
@@ -99,6 +116,7 @@ class PluginPluginInstallationTest {
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
                 }
+
                 url.endsWith("manifest.json") -> {
                     respond(
                         content = """
@@ -112,6 +130,7 @@ class PluginPluginInstallationTest {
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
                 }
+
                 url.endsWith(".jar") -> {
                     respond(
                         content = if (url.contains("test_v2")) byteArrayOf(4, 5, 6) else byteArrayOf(1, 2, 3),
@@ -119,6 +138,7 @@ class PluginPluginInstallationTest {
                         headers = headersOf(HttpHeaders.ContentType, "application/java-archive")
                     )
                 }
+
                 else -> respond("")
             }
         }
@@ -134,12 +154,13 @@ class PluginPluginInstallationTest {
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
-        val installer = PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, jobManager, client, fileSystem)
+        val installer =
+            PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, jobManager, client, fileSystem)
 
         // 1. Initial Installation
         repoManager.addRepository("https://example.com/repo/index.json")
         val extensionPlugin = repoManager.plugins.value["https://example.com/repo/index.json"]!![0]
-        
+
         fileSystem.zips["target/org.test.plugin/test.jar"] = mapOf(
             "manifest.json" to """{ "manifestVersion": "1.0", "plugin": { "id": "org.test.plugin", "name": "Test Plugin", "version": "1.0.0", "description": "" }, "requirements": { "minMemoryMb": 0, "minExecutionTimeMs": 0 } }"""
         )
@@ -151,10 +172,10 @@ class PluginPluginInstallationTest {
         // 2. Simulate Remote Update
         remoteVersion = "1.1.0"
         remoteJarName = "test_v2.jar"
-        
+
         // Refresh repository to see the new version
         repoManager.refreshRepository("https://example.com/repo/index.json")
-        
+
         val update = installer.getUpdate("org.test.plugin")
         assertTrue(update != null, "Update should be available")
         assertEquals("1.1.0", update.version)
@@ -177,18 +198,21 @@ class PluginPluginInstallationTest {
 
         val persistence = FakeSettingsPersistence()
         persistence.settings = AppSettings(extensions = ExtensionSettings(strictSignatureChecking = true))
-        
+
         val (installer, repoManager, registry, fileSystem) = createTestInstaller(persistence)
 
         val repoUrl = "https://example.com/repo/index.json"
         repoManager.addRepository(repoUrl)
-        
+
         val plugin = repoManager.plugins.value[repoUrl]!![0]
 
         val result = installer.installRemote(plugin, "target")
-        
+
         assertTrue(result.isFailure)
-        assertEquals("Plugin signature verification failed (strict checking enabled)", result.exceptionOrNull()?.message)
+        assertEquals(
+            "Plugin signature verification failed (strict checking enabled)",
+            result.exceptionOrNull()?.message
+        )
         assertFalse(fileSystem.exists("target/org.test"))
         unmockkObject(PluginSecurity)
     }
@@ -200,16 +224,16 @@ class PluginPluginInstallationTest {
 
         val persistence = FakeSettingsPersistence()
         persistence.settings = AppSettings(extensions = ExtensionSettings(strictSignatureChecking = false))
-        
+
         val (installer, repoManager, registry, fileSystem) = createTestInstaller(persistence)
 
         val repoUrl = "https://example.com/repo/index.json"
         repoManager.addRepository(repoUrl)
-        
+
         val plugin = repoManager.plugins.value[repoUrl]!![0]
 
         val result = installer.installRemote(plugin, "target")
-        
+
         assertTrue(result.isSuccess)
         val installed = registry.getPlugin("org.test")
         assertNotNull(installed)
@@ -231,6 +255,7 @@ class PluginPluginInstallationTest {
                     status = HttpStatusCode.OK,
                     headers = headersOf(HttpHeaders.ContentType, "application/json")
                 )
+
                 else -> respond(byteArrayOf(1, 2, 3))
             }
         }
@@ -240,7 +265,8 @@ class PluginPluginInstallationTest {
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
-        val installer = PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, jobManager, client, fileSystem)
+        val installer =
+            PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, jobManager, client, fileSystem)
         return TestInstallerComponents(installer, repoManager, registry, fileSystem)
     }
 

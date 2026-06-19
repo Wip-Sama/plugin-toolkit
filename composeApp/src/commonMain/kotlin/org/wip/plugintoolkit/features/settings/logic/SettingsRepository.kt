@@ -11,10 +11,10 @@ import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 
 class SettingsRepository(
-    private val persistence: SettingsPersistence,
+    val persistence: SettingsPersistence,
     private val scope: CoroutineScope
 ) {
-    
+
     private val _settings = MutableStateFlow(persistence.load())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
@@ -24,7 +24,7 @@ class SettingsRepository(
         scope.launch {
             saveChannel.receiveAsFlow()
                 .debounce(500)
-                .collect { 
+                .collect {
                     persistence.save(it)
                 }
         }
@@ -39,11 +39,11 @@ class SettingsRepository(
     }
 
     fun getSettingsDir(): String = persistence.getSettingsDir()
-    
+
     fun getJobsDir(): String = persistence.getJobsDir()
-    
+
     fun openLogFolder() = persistence.openLogFolder()
-    
+
     fun openLatestLog() = persistence.openLatestLog()
 
     /**

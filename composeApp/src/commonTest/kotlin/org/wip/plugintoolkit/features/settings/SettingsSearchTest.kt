@@ -12,7 +12,12 @@ import kotlin.test.assertEquals
 
 class SettingsSearchTest {
 
-    private fun createDefinition(id: String, title: String, subtitle: String? = null, section: String = "Section"): SettingDefinition {
+    private fun createDefinition(
+        id: String,
+        title: String,
+        subtitle: String? = null,
+        section: String = "Section"
+    ): SettingDefinition {
         return SettingDefinition.SwitchSetting(
             id = id,
             title = SettingText.Raw(title),

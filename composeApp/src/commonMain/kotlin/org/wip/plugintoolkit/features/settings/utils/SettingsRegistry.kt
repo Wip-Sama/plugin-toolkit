@@ -49,10 +49,13 @@ class SettingsRegistry(
     suspend fun triggerSideEffects(oldSettings: AppSettings, newSettings: AppSettings) {
         _definitions.value.forEach { def ->
             val sideEffect = sideEffects[def.id] ?: return@forEach
-            
+
             val changed = when (def) {
                 is SettingDefinition.SwitchSetting -> def.getValue(oldSettings) != def.getValue(newSettings)
-                is SettingDefinition.DropdownSetting<*> -> (def as SettingDefinition.DropdownSetting<Any>).getValue(oldSettings) != (def as SettingDefinition.DropdownSetting<Any>).getValue(newSettings)
+                is SettingDefinition.DropdownSetting<*> -> (def as SettingDefinition.DropdownSetting<Any>).getValue(
+                    oldSettings
+                ) != (def as SettingDefinition.DropdownSetting<Any>).getValue(newSettings)
+
                 is SettingDefinition.SliderSetting -> def.getValue(oldSettings) != def.getValue(newSettings)
                 is SettingDefinition.NumericSetting -> def.getValue(oldSettings) != def.getValue(newSettings)
                 else -> false

@@ -137,8 +137,14 @@ class FlowUnpackerTest {
         assertFalse(unpackedFlow.nodes.any { it.id == 2L }, "Subflow node 2 should be removed")
 
         // Input and Output boundary nodes from Subflow (100L, 102L) should NOT be added
-        assertFalse(unpackedFlow.nodes.any { it is Node.FlowInputNode }, "Boundary Input node should not be in final unpacked flow")
-        assertFalse(unpackedFlow.nodes.any { it is Node.FlowOutputNode }, "Boundary Output node should not be in final unpacked flow")
+        assertFalse(
+            unpackedFlow.nodes.any { it is Node.FlowInputNode },
+            "Boundary Input node should not be in final unpacked flow"
+        )
+        assertFalse(
+            unpackedFlow.nodes.any { it is Node.FlowOutputNode },
+            "Boundary Output node should not be in final unpacked flow"
+        )
 
         // Source node (1L) and Target node (3L) should remain
         assertTrue(unpackedFlow.nodes.any { it.id == 1L }, "Source node 1 should remain")
@@ -149,7 +155,11 @@ class FlowUnpackerTest {
         val copiedWorkNode = unpackedFlow.nodes.find { it.title == "Work" }
         assertNotNull(copiedWorkNode, "Copied work node should exist")
         assertEquals(5L, copiedWorkNode!!.id, "Copied work node should be assigned ID 5")
-        assertEquals(Offset(300f, 50f), copiedWorkNode.position, "Position of copied node should be shifted by subflowNode position Offset(200,0)")
+        assertEquals(
+            Offset(300f, 50f),
+            copiedWorkNode.position,
+            "Position of copied node should be shifted by subflowNode position Offset(200,0)"
+        )
 
         // Verify Connections
         // The two connections of parentFlow and two connections of subflow should resolve to:

@@ -58,10 +58,10 @@ class SettingsViewModel(
             if (isManual) {
                 _events.emit(SettingsEvent.ShowToast(SettingsToast.UpdateCheckStarted))
             }
-            
+
             val update = updateService.checkForUpdates()
             availableUpdate = update
-            
+
             if (update != null) {
                 _updateState.value = UpdateState.UpdateAvailable(update)
                 if (isManual) {
@@ -83,7 +83,7 @@ class SettingsViewModel(
 
     fun downloadAndInstallUpdate() {
         val update = availableUpdate ?: return
-        
+
         // Check for running jobs first
         val runningJobs = jobManager.jobs.value.filter { it.status == JobStatus.Running }
         if (runningJobs.isNotEmpty()) {
@@ -110,7 +110,7 @@ class SettingsViewModel(
             isDownloadingUpdate = true
             val dest = "${repository.getSettingsDir()}/${update.fileName}"
             val file = java.io.File(dest)
-            
+
             // Caching check: If file exists and size matches, skip download
             if (file.exists() && file.length() == update.size) {
                 Logger.i { "Update already downloaded: $dest" }
@@ -147,7 +147,11 @@ class SettingsViewModel(
                 }
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), if (PlatformLocalization.getSystemLanguage() == "it") "it" else "en")
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            if (PlatformLocalization.getSystemLanguage() == "it") "it" else "en"
+        )
 
 
     fun updateSettings(update: (AppSettings) -> AppSettings) {

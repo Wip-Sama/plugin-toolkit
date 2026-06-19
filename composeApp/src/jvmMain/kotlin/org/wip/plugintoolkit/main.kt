@@ -61,12 +61,13 @@ import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.PlatformLocalization
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import org.wip.plugintoolkit.core.utils.RealFileSystem
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
+import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.viewmodel.ActiveFlowEditorTracker
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.logic.SystemNodeExecutorRegistry
-import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginFolderManager
@@ -137,14 +138,14 @@ fun runMain(args: Array<String>) {
             single { SettingsRepository(get(), get(named("LoomScope"))) }
             single<NotificationService> {
                 val repository = get<SettingsRepository>()
-                JvmNotificationService(get(named("LoomScope"))) { 
-                    viewModelProvider()?.settings?.value ?: repository.settings.value 
+                JvmNotificationService(get(named("LoomScope"))) {
+                    viewModelProvider()?.settings?.value ?: repository.settings.value
                 }
             }
             single<SettingsRegistry> {
                 val settingsViewModel: SettingsViewModel = get()
                 val notificationViewModel: NotificationViewModel = get()
-                
+
                 SettingsRegistry.build {
                     appearanceDefinitions()
                     systemDefinitions(settingsViewModel)
@@ -191,9 +192,20 @@ fun runMain(args: Array<String>) {
             }
             single { PluginViewModel(get(), get(), get()) }
             single { SettingsViewModel(get(), get(), get(), get()) }
-            single { FlowViewModel(getOrNull(), getOrNull(), getOrNull()) }
+            single { FlowRepository(get(), get(), get(named("LoomScope"))) }
+            single { FlowViewModel(get(), getOrNull(), getOrNull()) }
             single { ActiveFlowEditorTracker() }
-            factory { (flowName: String) -> FlowEditorViewModel(flowName, getOrNull(), getOrNull(), getOrNull(), getOrNull(), getOrNull()) }
+            factory { (flowName: String) ->
+                FlowEditorViewModel(
+                    flowName,
+                    get(),
+                    getOrNull(),
+                    getOrNull(),
+                    getOrNull(),
+                    getOrNull(),
+                    getOrNull()
+                )
+            }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
             factory { PluginRepoViewModel(get(), get(), get(), get(), get(), get(), get()) }
@@ -224,7 +236,7 @@ fun runMain(args: Array<String>) {
         } catch (e: Throwable) {
             Logger.e(e) { "Startup: Failed to initialize PluginRegistry" }
         }
-        
+
         val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
         Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
 
@@ -269,7 +281,7 @@ fun runMain(args: Array<String>) {
     val logDir = Path(logDirPath)
 
     Logger.setLogWriters(
-        platformLogWriter(), 
+        platformLogWriter(),
         FileLogWriter(logDir, getKoin().get(named("LoomScope"))) { viewModel.settings.value.logging }
     )
 
@@ -287,7 +299,6 @@ fun runMain(args: Array<String>) {
     }.launchIn(getKoin().get(named("AppScope")))
 
     Logger.i { "Application started. Logging initialized at: $logDir" }
-
 
 
     // Determine initial window state based on settings and flags

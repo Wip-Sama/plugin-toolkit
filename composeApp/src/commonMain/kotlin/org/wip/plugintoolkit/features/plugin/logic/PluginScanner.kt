@@ -64,7 +64,7 @@ class PluginScanner(
         folders.forEach { folderPath ->
             val normalizedFolder = normalizePath(folderPath)
             val trackingFile = "$normalizedFolder/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
-            
+
             val existingContent = PlatformUtils.readFile(trackingFile)
             val existingPlugins = try {
                 if (existingContent != null) json.decodeFromString<List<InstalledPlugin>>(existingContent) else emptyList()

@@ -42,7 +42,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.core.model.localized
@@ -93,12 +92,12 @@ fun FlowRunnerView(
 ) {
     val state by viewModel.state.collectAsState()
     val jobViewModel: JobViewModel = koinInject()
-    
+
     // Using a simple selection for flows to run
     var selectedFlowToRun by remember { mutableStateOf(state.flows.firstOrNull()) }
 
     LaunchedEffect(Unit) {
-        viewModel.reloadFlows()
+        // flows are reloaded automatically via flowRepository
     }
 
     LaunchedEffect(state.flows) {
@@ -108,7 +107,7 @@ fun FlowRunnerView(
             selectedFlowToRun = state.flows.find { it.name == selectedFlowToRun?.name }
         }
     }
-    
+
     Row(modifier = modifier.fillMaxSize()) {
         // Sidebar: Select Flow to Run (Standard NavigationSidebar)
         val flowElements = state.flows.map { flow ->
@@ -131,12 +130,16 @@ fun FlowRunnerView(
 
         // Main Area: Run and History
         Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(ToolkitTheme.spacing.extraLarge)
+            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())
+                .padding(ToolkitTheme.spacing.extraLarge)
         ) {
             val currentFlow = selectedFlowToRun
             if (currentFlow == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(Res.string.flow_select_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        stringResource(Res.string.flow_select_hint),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             } else {
                 // Parse parameters
@@ -146,12 +149,14 @@ fun FlowRunnerView(
                             is Node.FlowInputNode -> {
                                 val outPort = node.outputs.firstOrNull()
                                 if (outPort != null) {
-                                    val inferredType = currentFlow.getInferredDataTypeForOutput(node.id, outPort.id, outPort.dataType)
+                                    val inferredType =
+                                        currentFlow.getInferredDataTypeForOutput(node.id, outPort.id, outPort.dataType)
 
                                     val inferredSemanticTypes = if (outPort.semanticTypes.isNotEmpty()) {
                                         outPort.semanticTypes
                                     } else {
-                                        val connection = currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
+                                        val connection =
+                                            currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
                                         val targetNode = currentFlow.nodes.find { it.id == connection?.targetNodeId }
                                         val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
                                         targetPort?.semanticTypes ?: emptyList()
@@ -170,6 +175,7 @@ fun FlowRunnerView(
                                     )
                                 } else emptyList()
                             }
+
                             is Node.SystemNode -> {
                                 when (node.systemAction.lowercase()) {
                                     "load" -> {
@@ -182,12 +188,18 @@ fun FlowRunnerView(
                                                     label = "${node.title} -> File Path",
                                                     portId = filePort.id,
                                                     dataType = filePort.dataType,
-                                                    defaultValue = filePort.value as? String ?: filePort.defaultValue as? String ?: "output.txt",
-                                                    semanticTypes = filePort.semanticTypes.ifEmpty { org.wip.plugintoolkit.api.parseSemanticTypes("file") }
+                                                    defaultValue = filePort.value as? String
+                                                        ?: filePort.defaultValue as? String ?: "output.txt",
+                                                    semanticTypes = filePort.semanticTypes.ifEmpty {
+                                                        org.wip.plugintoolkit.api.parseSemanticTypes(
+                                                            "file"
+                                                        )
+                                                    }
                                                 )
                                             )
                                         } else emptyList()
                                     }
+
                                     "save" -> {
                                         val filePort = node.inputs.find { it.id == "file_path" }
                                         if (filePort != null) {
@@ -198,24 +210,33 @@ fun FlowRunnerView(
                                                     label = "${node.title} -> File Path",
                                                     portId = filePort.id,
                                                     dataType = filePort.dataType,
-                                                    defaultValue = filePort.value as? String ?: filePort.defaultValue as? String ?: "output.txt",
-                                                    semanticTypes = filePort.semanticTypes.ifEmpty { org.wip.plugintoolkit.api.parseSemanticTypes("file") }
+                                                    defaultValue = filePort.value as? String
+                                                        ?: filePort.defaultValue as? String ?: "output.txt",
+                                                    semanticTypes = filePort.semanticTypes.ifEmpty {
+                                                        org.wip.plugintoolkit.api.parseSemanticTypes(
+                                                            "file"
+                                                        )
+                                                    }
                                                 )
                                             )
                                         } else emptyList()
                                     }
+
                                     else -> emptyList()
                                 }
                             }
+
                             is Node.FlowOutputNode -> {
                                 val inPort = node.inputs.firstOrNull()
                                 if (inPort != null) {
-                                    val inferredType = currentFlow.getInferredDataTypeForInput(node.id, inPort.id, inPort.dataType)
+                                    val inferredType =
+                                        currentFlow.getInferredDataTypeForInput(node.id, inPort.id, inPort.dataType)
 
                                     val inferredSemanticTypes = if (inPort.semanticTypes.isNotEmpty()) {
                                         inPort.semanticTypes
                                     } else {
-                                        val connection = currentFlow.connections.find { it.targetNodeId == node.id && it.targetPortId == inPort.id }
+                                        val connection =
+                                            currentFlow.connections.find { it.targetNodeId == node.id && it.targetPortId == inPort.id }
                                         val sourceNode = currentFlow.nodes.find { it.id == connection?.sourceNodeId }
                                         val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
                                         sourcePort?.semanticTypes ?: emptyList()
@@ -234,6 +255,7 @@ fun FlowRunnerView(
                                     )
                                 } else emptyList()
                             }
+
                             else -> emptyList()
                         }
                     }
@@ -283,7 +305,11 @@ fun FlowRunnerView(
                     }
 
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-                    Text(stringResource(Res.string.flow_run_description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        stringResource(Res.string.flow_run_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
 
                     // Parameter Inputs (DynamicParameterInput sharing)
@@ -306,8 +332,12 @@ fun FlowRunnerView(
                                         semanticTypes = param.semanticTypes
                                     )
                                 }
-                                var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }
-                                
+                                var value by remember(param) {
+                                    mutableStateOf(
+                                        parameterValues["${param.nodeId}"] ?: param.defaultValue
+                                    )
+                                }
+
                                 org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
                                     name = param.label,
                                     metadata = metadata,
@@ -343,8 +373,12 @@ fun FlowRunnerView(
                                             semanticTypes = param.semanticTypes
                                         )
                                     }
-                                    var value by remember(param) { mutableStateOf(parameterValues["${param.nodeId}"] ?: param.defaultValue) }
-                                    
+                                    var value by remember(param) {
+                                        mutableStateOf(
+                                            parameterValues["${param.nodeId}"] ?: param.defaultValue
+                                        )
+                                    }
+
                                     org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
                                         name = param.label,
                                         metadata = metadata,
@@ -382,7 +416,7 @@ fun FlowRunnerView(
                         }
                         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
                     }
-                    
+
                     // Validate all flow parameters
                     val isFlowValid = remember(parameterValues.toMap(), flowParameters) {
                         val allParams = flowParameters.filter { it.type != ParameterType.OUTPUT }
@@ -423,7 +457,7 @@ fun FlowRunnerView(
                 // Real Execution History
                 val allJobs by jobViewModel.jobs.collectAsState(emptyList())
                 val endedJobs by jobViewModel.endedJobs.collectAsState(emptyList())
-                
+
                 val flowJobs = remember(allJobs, endedJobs, currentFlow) {
                     (allJobs + endedJobs)
                         .filter { it.type == JobType.Flow && it.capabilityName == currentFlow.name }

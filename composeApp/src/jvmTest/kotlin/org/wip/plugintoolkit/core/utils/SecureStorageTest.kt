@@ -10,17 +10,17 @@ class SecureStorageTest {
     @Test
     fun testEncryptDecrypt() {
         val clearText = "superSecretPassword123!"
-        
+
         val encrypted = SecureStorage.encrypt(clearText)
-        
+
         // It shouldn't be the same
         assertNotEquals(clearText, encrypted)
-        
+
         // It should start with a known prefix
         assertTrue(encrypted.startsWith("dpapi:") || encrypted.startsWith("aes:"))
-        
+
         val decrypted = SecureStorage.decrypt(encrypted)
-        
+
         // Should decrypt back to the original
         assertEquals(clearText, decrypted)
     }
@@ -30,7 +30,7 @@ class SecureStorageTest {
         val clearText = ""
         val encrypted = SecureStorage.encrypt(clearText)
         assertEquals("", encrypted)
-        
+
         val decrypted = SecureStorage.decrypt(encrypted)
         assertEquals("", decrypted)
     }

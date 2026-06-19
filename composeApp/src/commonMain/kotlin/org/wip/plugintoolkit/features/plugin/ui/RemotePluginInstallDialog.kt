@@ -33,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +51,7 @@ import androidx.compose.ui.window.DialogProperties
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.utils.PluginSearchUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 
 @Composable
 fun RemotePluginInstallDialog(
@@ -62,7 +62,7 @@ fun RemotePluginInstallDialog(
     onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    
+
     val filteredPlugins = remember(availablePlugins, searchQuery, installedPackageNames) {
         PluginSearchUtils.filterPlugins(
             availablePlugins,
@@ -125,7 +125,7 @@ fun RemotePluginInstallDialog(
                     items(filteredPlugins) { plugin ->
                         val isInstalled = installedPackageNames.contains(plugin.pkg)
                         val progress = activeJobs[plugin.pkg]
-                        
+
                         RemotePluginCard(
                             plugin = plugin,
                             isInstalled = isInstalled,
@@ -213,16 +213,17 @@ fun RemotePluginCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { showInfo = !showInfo }) {
                         Icon(
-                            Icons.Default.Info, 
-                            contentDescription = "Info", 
+                            Icons.Default.Info,
+                            contentDescription = "Info",
                             tint = if (showInfo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    
+
                     if (progress != null) {
                         CircularProgressIndicator(
                             progress = { progress },
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge).padding(ToolkitTheme.spacing.extraSmall),
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
+                                .padding(ToolkitTheme.spacing.extraSmall),
                             strokeWidth = 3.dp
                         )
                     } else if (!isInstalled) {
@@ -234,8 +235,8 @@ fun RemotePluginCard(
                             )
                         ) {
                             Icon(
-                                Icons.Default.CloudDownload, 
-                                contentDescription = null, 
+                                Icons.Default.CloudDownload,
+                                contentDescription = null,
                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall + 2.dp)
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))

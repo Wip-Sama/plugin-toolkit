@@ -51,12 +51,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import org.wip.plugintoolkit.core.model.LocalizedString
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.settings.model.NotificationSettings
 import java.util.UUID
-
-import org.wip.plugintoolkit.core.model.LocalizedString
 
 data class ToastData(
     val id: String = UUID.randomUUID().toString(),

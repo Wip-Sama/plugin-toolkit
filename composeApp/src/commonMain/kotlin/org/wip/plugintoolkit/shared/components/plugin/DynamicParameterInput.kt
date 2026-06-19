@@ -50,8 +50,8 @@ import org.wip.plugintoolkit.core.utils.SemanticCategory
 import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
-import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.insert_array_of_array_placeholder
 import plugintoolkit.composeapp.generated.resources.insert_array_placeholder
@@ -127,7 +127,8 @@ fun DynamicParameterInput(
                         IconButton(
                             onClick = {
                                 scope.launch {
-                                    val allowedExtensions = SemanticRegistry.getAllowedExtensions(metadata.semanticTypes)
+                                    val allowedExtensions =
+                                        SemanticRegistry.getAllowedExtensions(metadata.semanticTypes)
                                     val picked = PlatformUtils.pickFile("Select File", allowedExtensions)
                                     if (picked != null) {
                                         val newValue = appendPickedValue(value, picked, isArray)
@@ -220,8 +221,14 @@ fun DynamicParameterInput(
                     show = showColorPicker,
                     onDismissRequest = { showColorPicker = false },
                     onPickedColor = { color ->
-                        val hasAlpha = metadata.semanticTypes.any { it.variant?.contains("rgba", ignoreCase = true) == true }
-                        val formatted = if (metadata.semanticTypes.any { it.name.contains("rgb", ignoreCase = true) == true || it.variant?.contains("rgb", ignoreCase = true) == true }) {
+                        val hasAlpha =
+                            metadata.semanticTypes.any { it.variant?.contains("rgba", ignoreCase = true) == true }
+                        val formatted = if (metadata.semanticTypes.any {
+                                it.name.contains(
+                                    "rgb",
+                                    ignoreCase = true
+                                ) == true || it.variant?.contains("rgb", ignoreCase = true) == true
+                            }) {
                             color.toRGB(rgbPrefix = true, includeAlpha = hasAlpha)
                         } else {
                             color.toHex(hexPrefix = true, includeAlpha = hasAlpha)
@@ -747,6 +754,7 @@ private fun parseColorString(colorStr: String): Color {
                     val b = hex[2].toString().repeat(2).toInt(16) / 255f
                     Color(r, g, b, 1f)
                 }
+
                 4 -> {
                     val r = hex[0].toString().repeat(2).toInt(16) / 255f
                     val g = hex[1].toString().repeat(2).toInt(16) / 255f
@@ -754,12 +762,14 @@ private fun parseColorString(colorStr: String): Color {
                     val a = hex[3].toString().repeat(2).toInt(16) / 255f
                     Color(r, g, b, a)
                 }
+
                 6 -> {
                     val r = hex.substring(0, 2).toInt(16) / 255f
                     val g = hex.substring(2, 4).toInt(16) / 255f
                     val b = hex.substring(4, 6).toInt(16) / 255f
                     Color(r, g, b, 1f)
                 }
+
                 8 -> {
                     val r = hex.substring(0, 2).toInt(16) / 255f
                     val g = hex.substring(2, 4).toInt(16) / 255f
@@ -767,6 +777,7 @@ private fun parseColorString(colorStr: String): Color {
                     val a = hex.substring(6, 8).toInt(16) / 255f
                     Color(r, g, b, a)
                 }
+
                 else -> Color.Gray
             }
         } catch (e: Exception) {

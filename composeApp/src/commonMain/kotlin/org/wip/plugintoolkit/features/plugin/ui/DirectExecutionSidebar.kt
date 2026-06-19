@@ -77,7 +77,7 @@ fun DirectExecutionSidebar(
                         title = manifest.plugin.name.localized
                     )
                 }
-                
+
                 NavigationSidebar(
                     title = Res.string.section_loaded_plugins.localized,
                     bodySections = listOf(SidebarSectionData(title = null, elements = pluginsElements)),
@@ -119,9 +119,16 @@ fun DirectExecutionSidebar(
                             ) {
                                 TextButton(
                                     onClick = onBackToPlugins,
-                                    contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                    contentPadding = PaddingValues(
+                                        horizontal = ToolkitTheme.spacing.small,
+                                        vertical = ToolkitTheme.spacing.extraSmall
+                                    )
                                 ) {
-                                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        Icons.Default.ArrowBack,
+                                        contentDescription = "Back",
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                                     Text("Back", style = MaterialTheme.typography.labelMedium)
                                 }
@@ -135,7 +142,7 @@ fun DirectExecutionSidebar(
                                         style = MaterialTheme.typography.labelSmall,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
-                                     )
+                                    )
                                 }
                             }
                         }

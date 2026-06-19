@@ -15,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.core.theme.ToolkitTheme

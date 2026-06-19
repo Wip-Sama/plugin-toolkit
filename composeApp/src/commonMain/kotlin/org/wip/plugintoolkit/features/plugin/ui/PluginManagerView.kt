@@ -34,17 +34,15 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,7 +52,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.stringResource
@@ -65,8 +62,6 @@ import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.CircularProgressIndicator
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
@@ -116,7 +111,7 @@ fun PluginManagerView(
         val availablePlugins by viewModel.availableRemotePlugins.collectAsState()
         val installedPlugins by viewModel.installedPlugins.collectAsState()
         val activeJobs by viewModel.activePluginInstallationJobs.collectAsState()
-        
+
         RemotePluginInstallDialog(
             availablePlugins = availablePlugins,
             installedPackageNames = installedPlugins.map { it.pkg }.toSet(),
@@ -359,10 +354,11 @@ fun PluginCard(
 
                     if (plugin.requiredAction != null) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        val badgeText = if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Setup Required" else "Action Required"
+                        val badgeText =
+                            if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Setup Required" else "Action Required"
                         StatusBadge(badgeText, ToolkitTheme.colors.warning)
                     }
-                    
+
                     if (plugin.loadError == null) {
                         if (plugin.isValidated) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
@@ -404,11 +400,11 @@ fun PluginCard(
                         val action = customActions.find { it.functionName == reqAction }
                         item { shape, modifierSpec ->
                             Button(
-                                onClick = { 
+                                onClick = {
                                     if (reqAction == "CONFIGURE_SETTINGS") {
                                         onAction(PluginStatusAction.Settings)
                                     } else {
-                                        onAction(PluginStatusAction.Custom(reqAction)) 
+                                        onAction(PluginStatusAction.Custom(reqAction))
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
@@ -416,7 +412,10 @@ fun PluginCard(
                                 modifier = modifierSpec,
                                 enabled = readyStatus
                             ) {
-                                Text(if (reqAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue"))
+                                Text(
+                                    if (reqAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name
+                                        ?: "Fix Issue")
+                                )
                             }
                         }
                     }
@@ -554,7 +553,11 @@ private fun StatusBadge(text: String, color: Color) {
     Surface(
         color = color.copy(alpha = 0.1f),
         shape = MaterialTheme.shapes.extraSmall,
-        modifier = Modifier.border(ToolkitTheme.dimensions.borderUnselected, color.copy(alpha = 0.2f), MaterialTheme.shapes.extraSmall)
+        modifier = Modifier.border(
+            ToolkitTheme.dimensions.borderUnselected,
+            color.copy(alpha = 0.2f),
+            MaterialTheme.shapes.extraSmall
+        )
     ) {
         Text(
             text,
