@@ -252,7 +252,8 @@ data class ParameterMetadata(
     val constraints: ParameterConstraints? = null,
     val required: Boolean = false,
     val secret: Boolean = false,
-    val semanticTypes: List<SemanticType> = emptyList()
+    val semanticTypes: List<SemanticType> = emptyList(),
+    val pathTemplate: String? = null
 )
 
 object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
@@ -266,7 +267,8 @@ object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
             constraints = value.constraints,
             required = value.required,
             secret = value.secret,
-            semanticTypes = value.semanticTypes
+            semanticTypes = value.semanticTypes,
+            pathTemplate = value.pathTemplate
         )
         encoder.encodeSerializableValue(ParameterMetadataSurrogate.serializer(), surrogate)
     }
@@ -296,7 +298,8 @@ object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
             constraints = surrogate.constraints,
             required = surrogate.required,
             secret = surrogate.secret,
-            semanticTypes = surrogate.semanticTypes
+            semanticTypes = surrogate.semanticTypes,
+            pathTemplate = surrogate.pathTemplate
         )
     }
 }
@@ -310,7 +313,8 @@ private class ParameterMetadataSurrogate(
     val constraints: ParameterConstraints? = null,
     val required: Boolean = false,
     val secret: Boolean = false,
-    val semanticTypes: List<SemanticType> = emptyList()
+    val semanticTypes: List<SemanticType> = emptyList(),
+    val pathTemplate: String? = null
 )
 
 @Serializable(with = OutputMetadataSerializer::class)
@@ -375,6 +379,13 @@ enum class CapabilityContext {
     ANY, FLOW_ONLY, STANDALONE_ONLY
 }
 
+@Serializable
+data class FileAccess(
+    val readsFiles: Boolean = false,
+    val writesFiles: Boolean = false,
+    val isDestructive: Boolean = false
+)
+
 /**
  * Metadata for a specific capability provided by the plugin.
  */
@@ -389,7 +400,8 @@ data class Capability(
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true,
     val context: CapabilityContext = CapabilityContext.ANY,
-    val requiresSettings: List<String> = emptyList()
+    val requiresSettings: List<String> = emptyList(),
+    val fileAccess: FileAccess? = null
 )
 
 object CapabilitySerializer : KSerializer<Capability> {
@@ -406,7 +418,8 @@ object CapabilitySerializer : KSerializer<Capability> {
             isPausable = value.isPausable,
             isCancellable = value.isCancellable,
             context = value.context,
-            requiresSettings = value.requiresSettings
+            requiresSettings = value.requiresSettings,
+            fileAccess = value.fileAccess
         )
         encoder.encodeSerializableValue(CapabilitySurrogate.serializer(), surrogate)
     }
@@ -439,7 +452,8 @@ object CapabilitySerializer : KSerializer<Capability> {
             isPausable = surrogate.isPausable,
             isCancellable = surrogate.isCancellable,
             context = surrogate.context,
-            requiresSettings = surrogate.requiresSettings
+            requiresSettings = surrogate.requiresSettings,
+            fileAccess = surrogate.fileAccess
         )
     }
 }
@@ -456,7 +470,8 @@ private class CapabilitySurrogate(
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true,
     val context: CapabilityContext = CapabilityContext.ANY,
-    val requiresSettings: List<String> = emptyList()
+    val requiresSettings: List<String> = emptyList(),
+    val fileAccess: FileAccess? = null
 )
 
 /**

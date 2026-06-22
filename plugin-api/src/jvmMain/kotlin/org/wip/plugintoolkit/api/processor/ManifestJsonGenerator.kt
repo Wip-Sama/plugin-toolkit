@@ -15,6 +15,7 @@ import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginFileSystem
+import org.wip.plugintoolkit.api.HostFileSystem
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginManifest
@@ -22,9 +23,11 @@ import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.Requirements
 import org.wip.plugintoolkit.api.SettingMetadata
 import org.wip.plugintoolkit.api.parseSemanticTypes
+import org.wip.plugintoolkit.api.FileAccess
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_FILE_ACCESS_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
@@ -64,6 +67,7 @@ object ManifestJsonGenerator {
                 paramType != PluginLogger::class.qualifiedName && 
                 paramType != ProgressReporter::class.qualifiedName && 
                 paramType != PluginFileSystem::class.qualifiedName && 
+                paramType != HostFileSystem::class.qualifiedName && 
                 paramType != PluginContext::class.qualifiedName
             }.associate { param ->
                 val paramAnn = param.annotations.find { it.hasQualifiedName(CAPABILITY_PARAM_ANNOTATION) }
@@ -90,6 +94,7 @@ object ManifestJsonGenerator {
                 val required = explicitRequired || (!isNullable && !hasDefault)
                 val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
                 val semTypesVal = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                val pathTemplate = paramAnn?.arguments?.find { it.name?.asString() == "pathTemplate" }?.value as? String ?: ""
                 
                 val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
                 
@@ -113,9 +118,39 @@ object ManifestJsonGenerator {
                     constraints = constraints,
                     required = required,
                     secret = secret,
-                    semanticTypes = semTypesVal.flatMap { parseSemanticTypes(it) }
+                    semanticTypes = semTypesVal.flatMap { parseSemanticTypes(it) },
+                    pathTemplate = pathTemplate.ifEmpty { null }
                 )
             }
+            
+            var inferredReadsFiles = false
+            var inferredWritesFiles = false
+            params.values.forEach { pMeta ->
+                pMeta.semanticTypes.forEach { st ->
+                    val fullType = "${st.namespace}/${st.name}"
+                    if (fullType == "file/path" || fullType == "folder/path") {
+                        inferredReadsFiles = true
+                    }
+                    if (fullType == "file/output" || fullType == "folder/output") {
+                        inferredWritesFiles = true
+                    }
+                }
+            }
+
+            val fileAccessAnn = func.annotations.find { it.hasQualifiedName(CAPABILITY_FILE_ACCESS_ANNOTATION) }
+            val fileAccess = if (fileAccessAnn != null) {
+                FileAccess(
+                    readsFiles = fileAccessAnn.arguments.find { it.name?.asString() == "readsFiles" }?.value as? Boolean ?: false,
+                    writesFiles = fileAccessAnn.arguments.find { it.name?.asString() == "writesFiles" }?.value as? Boolean ?: false,
+                    isDestructive = fileAccessAnn.arguments.find { it.name?.asString() == "isDestructive" }?.value as? Boolean ?: false
+                )
+            } else if (inferredReadsFiles || inferredWritesFiles) {
+                FileAccess(
+                    readsFiles = inferredReadsFiles,
+                    writesFiles = inferredWritesFiles,
+                    isDestructive = false
+                )
+            } else null
             
             val hasResumeState = func.parameters.any { param -> 
                 param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }
@@ -140,7 +175,8 @@ object ManifestJsonGenerator {
                 isPausable = supportsPause || hasResumeState,
                 isCancellable = supportsCancel,
                 context = context,
-                requiresSettings = requiresSettingsList
+                requiresSettings = requiresSettingsList,
+                fileAccess = fileAccess
             )
         }
 

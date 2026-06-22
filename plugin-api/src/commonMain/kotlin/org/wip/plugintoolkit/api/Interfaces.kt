@@ -116,6 +116,23 @@ interface PluginFileSystem {
 }
 
 /**
+ * File system interface for interacting with the host machine's external file system.
+ * 
+ * Operations are strictly limited by the File Access rules declared in the plugin's capabilities.
+ * If a capability attempts to perform unauthorized operations, a SecurityException will be thrown.
+ */
+interface HostFileSystem {
+    suspend fun readFile(absolutePath: String): ByteArray?
+    suspend fun readTextFile(absolutePath: String): String?
+    suspend fun writeFile(absolutePath: String, data: ByteArray): Result<Unit>
+    suspend fun writeTextFile(absolutePath: String, text: String): Result<Unit>
+    suspend fun exists(absolutePath: String): Boolean
+    suspend fun listFiles(absolutePath: String): List<String>
+    suspend fun deleteFile(absolutePath: String): Result<Unit>
+    suspend fun createDirectory(absolutePath: String): Result<Unit>
+}
+
+/**
  * Logger interface for plugins to send logs to the host application.
  *
  * Logs are routed through the host's logging system, allowing for centralized
@@ -220,6 +237,7 @@ interface PluginContext {
     val progress: ProgressReporter
     val fileSystem: PluginFileSystem
     val cacheFileSystem: PluginFileSystem
+    val hostFileSystem: HostFileSystem
     val settings: Map<String, JsonElement>
     val signals: PluginSignalManager
 

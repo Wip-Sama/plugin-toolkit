@@ -453,6 +453,12 @@ data class Flow(
         val hasNotReadyNode = this.nodes.any { !it.isReady(connections) }
         return hasBrokenNode || hasMissingCapability || hasNotReadyNode
     }
+
+    fun isDestructive(): Boolean {
+        return nodes.filterIsInstance<Node.CapabilityNode>().any {
+            it.capability.fileAccess?.isDestructive == true
+        }
+    }
 }
 
 @Serializable

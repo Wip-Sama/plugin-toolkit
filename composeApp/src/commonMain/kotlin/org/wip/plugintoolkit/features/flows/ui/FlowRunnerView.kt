@@ -324,6 +324,23 @@ fun FlowRunnerView(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    
+                    if (currentFlow.isDestructive()) {
+                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                "Warning: This flow performs destructive file operations (like overriding or deleting files).",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
 
                     // Parameter Inputs (DynamicParameterInput sharing)

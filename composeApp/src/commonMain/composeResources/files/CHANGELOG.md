@@ -10,6 +10,7 @@ Changes:
   - now updating a plugin will make the button reflect what's happening to avoid confusion
   - shift is not used to fast delete a node connection
   - BIG refactor to the plugin-api so 1.7.x is not compatible with 1.6.x
+  - PluginFileSystem is completely revamped with new features and pipelines to follow to be compliant with best practices for plugins
 Fixed:
   - Broken flow would appear as running
   - plugin-api would improperly identify the required capability param

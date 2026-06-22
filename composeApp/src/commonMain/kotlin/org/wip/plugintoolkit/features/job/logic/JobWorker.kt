@@ -124,14 +124,18 @@ class JobWorker(
         val plugin = PluginLoader.getPluginById(job.pluginId)
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
-        validateCapabilityParameters(plugin.getManifest().getOrThrow(), job.capabilityName, job.parameters)
+        val manifest = plugin.getManifest().getOrThrow()
+        val mutableParams = job.parameters.toMutableMap()
+        val (allowedPaths, isDestructive) = resolveFileAccess(manifest, job.capabilityName, mutableParams)
+
+        validateCapabilityParameters(manifest, job.capabilityName, mutableParams)
 
         val processor = plugin.getProcessor().getOrThrow()
-        val context = pluginManager.createPluginContext(job.pluginId, job.id)
+        val context = pluginManager.createPluginContext(job.pluginId, job.id, allowedPaths = allowedPaths, isDestructiveAllowed = isDestructive)
 
         val request = PluginRequest(
             method = job.capabilityName,
-            parameters = job.parameters,
+            parameters = mutableParams,
             resumeState = job.resumeState
         )
 

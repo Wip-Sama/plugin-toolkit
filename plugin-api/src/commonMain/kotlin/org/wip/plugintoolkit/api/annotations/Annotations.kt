@@ -59,6 +59,21 @@ enum class CapabilityContext {
 }
 
 /**
+ * Marks a capability's explicit file access requirements to the HostFileSystem.
+ * 
+ * @property readsFiles True if the capability requires read access outside the sandbox.
+ * @property writesFiles True if the capability requires write access outside the sandbox.
+ * @property isDestructive True if the capability performs destructive operations like delete/rename outside the sandbox.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class CapabilityFileAccess(
+    val readsFiles: Boolean = false,
+    val writesFiles: Boolean = false,
+    val isDestructive: Boolean = false
+)
+
+/**
  * Indicates that the annotated element requires specific plugin settings to be provided.
  * Can be applied to enum entries or properties.
  */
@@ -97,7 +112,8 @@ annotation class CapabilityParam(
     val maxChoices: Int = -1,
     val required: Boolean = false,
     val secret: Boolean = false,
-    val semanticTypes: Array<String> = []
+    val semanticTypes: Array<String> = [],
+    val pathTemplate: String = ""
 )
 
 /**

@@ -273,3 +273,56 @@ private fun getLeafPrimitives(element: JsonElement, type: DataType): List<String
         }
     }
 }
+
+fun resolveFileAccess(
+    manifest: PluginManifest,
+    capabilityName: String,
+    parameters: MutableMap<String, JsonElement>
+): Pair<List<String>, Boolean> {
+    val capability = manifest.capabilities.find { it.name == capabilityName } ?: return Pair(emptyList(), false)
+    val paramMetadataMap = capability.parameters ?: return Pair(emptyList(), false)
+
+    val allowedPaths = mutableListOf<String>()
+
+    // First pass: Resolve pathTemplate for parameters that are empty or missing
+    for ((paramName, metadata) in paramMetadataMap) {
+        val template = metadata.pathTemplate
+        if (!template.isNullOrEmpty()) {
+            val currentValue = parameters[paramName]?.let { if (it is JsonPrimitive) it.content else null }
+            if (currentValue.isNullOrBlank()) {
+                var resolvedPath = template
+                val regex = Regex("""\{([^}]+)\}""")
+                resolvedPath = regex.replace(resolvedPath) { matchResult ->
+                    val key = matchResult.groupValues[1]
+                    val value = parameters[key]?.let { if (it is JsonPrimitive) it.content else null } ?: ""
+                    value
+                }
+                parameters[paramName] = JsonPrimitive(resolvedPath)
+            }
+        }
+    }
+
+    // Second pass: Collect allowed paths
+    for ((paramName, metadata) in paramMetadataMap) {
+        val isFileOrFolder = metadata.semanticTypes.any { st ->
+            val fullType = "${st.namespace}/${st.name}"
+            fullType.startsWith("file/") || fullType.startsWith("folder/")
+        }
+        if (isFileOrFolder) {
+            val valueElement = parameters[paramName]
+            if (valueElement != null && valueElement !is JsonNull) {
+                val valuesToValidate = getLeafPrimitives(valueElement, metadata.type)
+                for (valStr in valuesToValidate) {
+                    if (valStr.isNotBlank()) {
+                        allowedPaths.add(valStr)
+                    }
+                }
+            }
+        }
+    }
+
+    val isDestructive = capability.fileAccess?.isDestructive == true
+
+    return Pair(allowedPaths, isDestructive)
+}
+

@@ -16,6 +16,7 @@ import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginFileSystem
+import org.wip.plugintoolkit.api.HostFileSystem
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginManifest
@@ -35,6 +36,7 @@ object ProcessorConstants {
     const val PLUGIN_INFO_ANNOTATION = "$ANNOTATION_PACKAGE.PluginInfo"
     const val CAPABILITY_ANNOTATION = "$ANNOTATION_PACKAGE.Capability"
     const val CAPABILITY_PARAM_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityParam"
+    const val CAPABILITY_FILE_ACCESS_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityFileAccess"
     const val PLUGIN_SETTING_ANNOTATION = "$ANNOTATION_PACKAGE.PluginSetting"
     const val PLUGIN_ACTION_ANNOTATION = "$ANNOTATION_PACKAGE.PluginAction"
     const val RESUME_STATE_ANNOTATION = "$ANNOTATION_PACKAGE.ResumeState"
@@ -63,6 +65,7 @@ object ProcessorConstants {
     val CN_PLUGIN_MODULE_PROVIDER = PluginModuleProvider::class.asClassName()
     val CN_PLUGIN_LOGGER = PluginLogger::class.asClassName()
     val CN_PLUGIN_FILESYSTEM = PluginFileSystem::class.asClassName()
+    val CN_HOST_FILESYSTEM = HostFileSystem::class.asClassName()
     val CN_PROGRESS_REPORTER = ProgressReporter::class.asClassName()
     val CN_EXECUTION_RESULT = ExecutionResult::class.asClassName()
     val CN_EXECUTION_RESULT_SUCCESS = ExecutionResult.Success::class.asClassName()
@@ -97,6 +100,7 @@ object ProcessorConstants {
         CN_PLUGIN_LOGGER,
         CN_PROGRESS_REPORTER,
         CN_PLUGIN_FILESYSTEM,
+        CN_HOST_FILESYSTEM,
         CN_PLUGIN_CONTEXT
     )
 }

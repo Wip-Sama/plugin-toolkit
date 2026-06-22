@@ -782,7 +782,7 @@ class JobWorkerFlowTest {
         every { mockContext.onSignal(any()) } answers {
             signalManager.onSignal(firstArg())
         }
-        every { mockPluginManager.createPluginContext(any(), any()) } returns mockContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any()) } returns mockContext
 
         startKoin {
             modules(module {
