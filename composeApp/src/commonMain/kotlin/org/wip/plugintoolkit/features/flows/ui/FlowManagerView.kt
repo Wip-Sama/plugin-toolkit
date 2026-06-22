@@ -213,6 +213,10 @@ fun FlowManagerView(
                             .distinct()
                     }
 
+                    val notReadyNodes = remember(flow, state.flows) {
+                        flow.nodes.filter { !it.isReady(flow.connections) }
+                    }
+
                     val isRunning = remember(flow.name, state.flows) {
                         viewModel.isFlowRunning(flow.name)
                     }
@@ -222,6 +226,7 @@ fun FlowManagerView(
                         nodeCount = flow.nodes.size,
                         parentFlows = parentFlows,
                         missingCapabilities = missingCapabilities,
+                        notReadyNodes = notReadyNodes,
                         isRunning = isRunning,
                         isSelected = state.selectedFlowId == flow.name,
                         onSelect = { viewModel.onEvent(FlowEvent.SelectFlow(flow.name)) },
@@ -445,6 +450,7 @@ private fun FlowItem(
     nodeCount: Int,
     parentFlows: List<String>,
     missingCapabilities: List<String>,
+    notReadyNodes: List<Node>,
     isRunning: Boolean,
     isSelected: Boolean,
     onSelect: () -> Unit,
@@ -452,7 +458,7 @@ private fun FlowItem(
     onDelete: () -> Unit,
     onExport: () -> Unit
 ) {
-    val isBroken = missingCapabilities.isNotEmpty()
+    val isBroken = missingCapabilities.isNotEmpty() || notReadyNodes.isNotEmpty()
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -588,7 +594,7 @@ private fun FlowItem(
                 }
 
                 // Chips Flow Row (parent flows and missing capabilities)
-                if (parentFlows.isNotEmpty() || missingCapabilities.isNotEmpty()) {
+                if (parentFlows.isNotEmpty() || missingCapabilities.isNotEmpty() || notReadyNodes.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -623,6 +629,25 @@ private fun FlowItem(
                             ) {
                                 Text(
                                     text = stringResource(Res.string.flow_missing_chip, capName),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(
+                                        horizontal = ToolkitTheme.spacing.small,
+                                        vertical = ToolkitTheme.spacing.extraSmall
+                                    )
+                                )
+                            }
+                        }
+
+                        notReadyNodes.forEach { node ->
+                            Surface(
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                                shape = CircleShape
+                            ) {
+                                Text(
+                                    text = "Not Ready: ${node.title}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.SemiBold,

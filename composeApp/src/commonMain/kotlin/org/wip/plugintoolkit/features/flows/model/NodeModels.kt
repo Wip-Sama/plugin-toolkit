@@ -47,7 +47,7 @@ object OffsetSerializer : KSerializer<Offset> {
 object AnySerializer : KSerializer<Any?> {
     override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
 
-    private fun toJsonElement(value: Any?): JsonElement {
+    fun toJsonElement(value: Any?): JsonElement {
         return when (value) {
             null -> JsonNull
             is JsonElement -> value
@@ -243,6 +243,7 @@ sealed class Node {
     abstract fun copyWithCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithInputsCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithOutputsCollapsedState(isCollapsed: Boolean): Node
+    abstract fun isReady(connections: List<Connection>): Boolean
 
     @Serializable
     @SerialName("capability")
@@ -269,6 +270,21 @@ sealed class Node {
                 if (input.id == portId) input.copy(value = value) else input
             })
         }
+        override fun isReady(connections: List<Connection>): Boolean {
+            if (isBroken) return false
+            val parameters = capability.parameters ?: return true
+            for ((portId, metadata) in parameters) {
+                if (metadata.required) {
+                    val inputPort = inputs.find { it.id == portId }
+                    val providedByValue = inputPort?.dataType?.isProvided(AnySerializer.toJsonElement(inputPort.value)) == true
+                    val providedByConnection = connections.any { it.targetNodeId == id && it.targetPortId == portId }
+                    if (!providedByValue && !providedByConnection) {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
     }
 
     @Serializable
@@ -294,6 +310,7 @@ sealed class Node {
                 if (input.id == portId) input.copy(value = value) else input
             })
         }
+        override fun isReady(connections: List<Connection>): Boolean = true
     }
 
     @Serializable
@@ -316,6 +333,7 @@ sealed class Node {
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node = this
+        override fun isReady(connections: List<Connection>): Boolean = true
     }
 
     @Serializable
@@ -340,6 +358,7 @@ sealed class Node {
                 if (input.id == portId) input.copy(value = value) else input
             })
         }
+        override fun isReady(connections: List<Connection>): Boolean = true
     }
 
     @Serializable
@@ -367,6 +386,7 @@ sealed class Node {
                 if (input.id == portId) input.copy(value = value) else input
             })
         }
+        override fun isReady(connections: List<Connection>): Boolean = true
     }
 }
 
@@ -430,7 +450,8 @@ data class Flow(
     fun isBroken(activeCapabilities: Set<String>): Boolean {
         val hasBrokenNode = this.nodes.any { it is Node.CapabilityNode && it.isBroken }
         val hasMissingCapability = this.nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.name !in activeCapabilities }
-        return hasBrokenNode || hasMissingCapability
+        val hasNotReadyNode = this.nodes.any { !it.isReady(connections) }
+        return hasBrokenNode || hasMissingCapability || hasNotReadyNode
     }
 }
 

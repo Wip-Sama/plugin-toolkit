@@ -1,14 +1,16 @@
 Version: 1.7.0
-Date: 13-06-2026
+Date: xx-06-2026
 Added:
-	- It's not possible to change a connection destination/origin after it's creation
+	- It's not possible to change a connection destination/origin after its creation
 	- Tooltip names for the capability/flows with long names
+	- Flows and Nodes now are in a not-ready state if a required parameter is not connected or has a default
 Changes:
   - now updating a plugin will make the button reflect what's happening to avoid confusion
   - shift is not used to fast delete a node connection
   - BIG refactor to the plugin-api so 1.7.x is not compatible with 1.6.x
 Fixed:
   - Broken flow would appear as running
+  - plugin-api would improperly identify the required capability param
 ----------------------------------------------------------------------------------------------------
 Version: 1.6.1
 Date: 13-06-2026

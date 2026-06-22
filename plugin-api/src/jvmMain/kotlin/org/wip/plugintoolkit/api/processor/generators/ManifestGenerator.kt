@@ -117,7 +117,10 @@ object ManifestGenerator {
                     val multiSelect = paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
                     val minChoices = paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
                     val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
-                    val required = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+                    val isNullable = param.type.resolve().isMarkedNullable
+                    val hasDefault = param.hasDefault
+                    val explicitRequired = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+                    val required = explicitRequired || (!isNullable && !hasDefault)
                     val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
                     val semTypesVal = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                     
@@ -190,7 +193,9 @@ object ManifestGenerator {
             val ann = prop.annotations.first { it.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
             val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
-            val required = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+            val explicitRequired = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+            val isNullable = prop.type.resolve().isMarkedNullable
+            val required = explicitRequired || !isNullable
             val secret = ann.arguments.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
             val propName = prop.simpleName.asString()
             val propType = prop.type.resolve().toTypeName()

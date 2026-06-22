@@ -150,10 +150,23 @@ fun NodeComponent(
     var showColorPicker by remember { mutableStateOf(false) }
     var activeColorInputId by remember { mutableStateOf<String?>(null) }
 
+    val isNotReady = remember(node, connectedInputPortIds) {
+        node is Node.CapabilityNode && node.capability.parameters?.any { (portId, metadata) ->
+            if (metadata.required) {
+                val isConnected = connectedInputPortIds.contains(portId)
+                val inputPort = node.inputs.find { it.id == portId }
+                val isProvided = inputPort?.dataType?.isProvided(org.wip.plugintoolkit.features.flows.model.AnySerializer.toJsonElement(inputPort.value)) == true
+                !isConnected && !isProvided
+            } else false
+        } == true
+    }
+
     val (headerColor, onHeaderColor) = when (node) {
         is Node.CapabilityNode -> {
             if (node.isBroken) {
                 Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
+            } else if (isNotReady) {
+                Pair(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary)
             } else {
                 Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
             }
@@ -265,6 +278,20 @@ fun NodeComponent(
                             ) {
                                 Text(
                                     "BROKEN",
+                                    color = headerColor,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else if (isNotReady) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Box(
+                                modifier = Modifier
+                                    .background(onHeaderColor, MaterialTheme.shapes.extraSmall)
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    "NOT READY",
                                     color = headerColor,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold
@@ -441,6 +468,8 @@ fun NodeComponent(
                                     )
                                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                                     Column(modifier = Modifier.weight(1f)) {
+                                        val isRequired = (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)?.required == true
+                                        val displayName = if (isRequired) "${input.name} *" else input.name
                                         if (!input.description.isNullOrBlank()) {
                                             TooltipArea(
                                                 delayMillis = 3000,
@@ -453,14 +482,14 @@ fun NodeComponent(
                                                 }
                                             ) {
                                                 Text(
-                                                    input.name,
+                                                    text = displayName,
                                                     style = MaterialTheme.typography.labelMedium,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
                                             }
                                         } else {
                                             Text(
-                                                input.name,
+                                                text = displayName,
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.SemiBold
                                             )

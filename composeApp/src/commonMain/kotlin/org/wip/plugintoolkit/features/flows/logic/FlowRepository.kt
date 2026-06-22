@@ -37,6 +37,11 @@ class FlowRepository(
 
     init {
         reloadFlows()
+        scope.launch {
+            pluginManager.installedPlugins.collect {
+                reloadFlows()
+            }
+        }
     }
 
     private fun getFlowPath(appDataDir: String, flowName: String): Path {
@@ -100,12 +105,15 @@ class FlowRepository(
                             val updatedNodes = flow.nodes.map { node ->
                                 if (node is Node.CapabilityNode) {
                                     val currentManifest = manifests[node.pluginInfo.id]
-                                    val hasCapability =
-                                        currentManifest?.capabilities?.any { it.name == node.capability.name } == true
-                                    if (currentManifest == null || !hasCapability) {
+                                    val actualCapability = currentManifest?.capabilities?.find { it.name == node.capability.name }
+                                    if (currentManifest == null || actualCapability == null) {
                                         node.copy(isBroken = true)
                                     } else {
-                                        node.copy(isBroken = false)
+                                        node.copy(
+                                            isBroken = false,
+                                            capability = actualCapability,
+                                            pluginInfo = currentManifest.plugin
+                                        )
                                     }
                                 } else {
                                     node

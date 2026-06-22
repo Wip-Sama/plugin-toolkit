@@ -8,6 +8,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginFileSystem
@@ -219,5 +221,31 @@ class MathOperationsTest {
         assertEquals(4.0, result.x)
         assertEquals(6.0, result.y)
         assertEquals("centroid", result.label)
+    }
+
+    @Test
+    fun testManifestGeneration() {
+        val manifestStream = javaClass.classLoader.getResourceAsStream("META-INF/manifest.json")
+        kotlin.test.assertNotNull(manifestStream, "Manifest file should exist")
+        val manifestContent = manifestStream.bufferedReader().readText()
+        val manifestJson = Json.parseToJsonElement(manifestContent)
+        
+        // Find multiply capability and check if 'values' is required
+        val capabilities = manifestJson.jsonObject["capabilities"]?.jsonArray
+        kotlin.test.assertNotNull(capabilities)
+        
+        val multiplyCap = capabilities.find { 
+            it.jsonObject["name"]?.jsonPrimitive?.content == "multiply" 
+        }?.jsonObject
+        
+        kotlin.test.assertNotNull(multiplyCap, "multiply capability not found in manifest")
+        
+        val valuesParam = multiplyCap["parameters"]?.jsonObject?.get("values")?.jsonObject
+        kotlin.test.assertNotNull(valuesParam, "values parameter not found in multiply capability")
+        
+        val isRequired = valuesParam["required"]?.jsonPrimitive?.content?.toBoolean() ?: false
+        println("valuesParam: $valuesParam")
+        println("isRequired: $isRequired")
+        kotlin.test.assertTrue(isRequired, "values parameter should be required")
     }
 }
