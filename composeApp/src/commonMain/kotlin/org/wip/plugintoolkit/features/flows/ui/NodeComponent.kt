@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -133,6 +134,8 @@ fun NodeComponent(
     stateOffset: Offset,
     selectedNodeIds: Set<Long> = emptySet(),
     isReadOnly: Boolean = false,
+    isReady: Boolean = true,
+    onFocusLost: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -150,22 +153,13 @@ fun NodeComponent(
     var showColorPicker by remember { mutableStateOf(false) }
     var activeColorInputId by remember { mutableStateOf<String?>(null) }
 
-    val isNotReady = remember(node, connectedInputPortIds) {
-        node is Node.CapabilityNode && node.capability.parameters?.any { (portId, metadata) ->
-            if (metadata.required) {
-                val isConnected = connectedInputPortIds.contains(portId)
-                val inputPort = node.inputs.find { it.id == portId }
-                val isProvided = inputPort?.dataType?.isProvided(org.wip.plugintoolkit.features.flows.model.AnySerializer.toJsonElement(inputPort.value)) == true
-                !isConnected && !isProvided
-            } else false
-        } == true
-    }
+
 
     val (headerColor, onHeaderColor) = when (node) {
         is Node.CapabilityNode -> {
             if (node.isBroken) {
                 Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
-            } else if (isNotReady) {
+            } else if (!isReady) {
                 Pair(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary)
             } else {
                 Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
@@ -283,7 +277,7 @@ fun NodeComponent(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                        } else if (isNotReady) {
+                        } else if (!isReady) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Box(
                                 modifier = Modifier
@@ -560,7 +554,7 @@ fun NodeComponent(
                                     val category = SemanticRegistry.getCategory(inferredSem)?.name?.lowercase()
                                     when (category) {
                                         "color" -> {
-                                            val rawValue = getPortValueString(currentPortValue)
+                                            val rawValue = getPortValueString(currentPortValue, input.dataType)
                                             val parsedColor = parseColorString(rawValue)
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
@@ -589,7 +583,7 @@ fun NodeComponent(
                                             ) {
                                                 BasicTextField(
                                                     value = rawValue,
-                                                    onValueChange = { onUpdateValue(node.id, input.id, it) },
+                                                    onValueChange = { onUpdateValue(node.id, input.id, org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(it, input.dataType)) },
                                                     enabled = !isConnected && !isReadOnly,
                                                     textStyle = MaterialTheme.typography.bodySmall.copy(
                                                         color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(
@@ -597,7 +591,7 @@ fun NodeComponent(
                                                         )
                                                         else MaterialTheme.colorScheme.onSurface
                                                     ),
-                                                    modifier = Modifier.weight(1f),
+                                                    modifier = Modifier.onFocusChanged { if (!it.isFocused) onFocusLost() }.weight(1f),
                                                     singleLine = true
                                                 )
                                                 Spacer(modifier = Modifier.width(4.dp))
@@ -624,7 +618,7 @@ fun NodeComponent(
                                         }
 
                                         "file" -> {
-                                            val rawValue = getPortValueString(currentPortValue)
+                                            val rawValue = getPortValueString(currentPortValue, input.dataType)
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 modifier = Modifier
@@ -652,7 +646,7 @@ fun NodeComponent(
                                             ) {
                                                 BasicTextField(
                                                     value = rawValue,
-                                                    onValueChange = { onUpdateValue(node.id, input.id, it) },
+                                                    onValueChange = { onUpdateValue(node.id, input.id, org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(it, input.dataType)) },
                                                     enabled = !isConnected && !isReadOnly,
                                                     textStyle = MaterialTheme.typography.bodySmall.copy(
                                                         color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(
@@ -660,7 +654,7 @@ fun NodeComponent(
                                                         )
                                                         else MaterialTheme.colorScheme.onSurface
                                                     ),
-                                                    modifier = Modifier.weight(1f),
+                                                    modifier = Modifier.onFocusChanged { if (!it.isFocused) onFocusLost() }.weight(1f),
                                                     singleLine = true
                                                 )
                                                 IconButton(
@@ -692,7 +686,7 @@ fun NodeComponent(
                                         }
 
                                         "path" -> {
-                                            val rawValue = getPortValueString(currentPortValue)
+                                            val rawValue = getPortValueString(currentPortValue, input.dataType)
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 modifier = Modifier
@@ -720,7 +714,7 @@ fun NodeComponent(
                                             ) {
                                                 BasicTextField(
                                                     value = rawValue,
-                                                    onValueChange = { onUpdateValue(node.id, input.id, it) },
+                                                    onValueChange = { onUpdateValue(node.id, input.id, org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(it, input.dataType)) },
                                                     enabled = !isConnected && !isReadOnly,
                                                     textStyle = MaterialTheme.typography.bodySmall.copy(
                                                         color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(
@@ -728,7 +722,7 @@ fun NodeComponent(
                                                         )
                                                         else MaterialTheme.colorScheme.onSurface
                                                     ),
-                                                    modifier = Modifier.weight(1f),
+                                                    modifier = Modifier.onFocusChanged { if (!it.isFocused) onFocusLost() }.weight(1f),
                                                     singleLine = true
                                                 )
                                                 IconButton(
@@ -757,7 +751,7 @@ fun NodeComponent(
                                         }
 
                                         "image", "audio", "video" -> {
-                                            val rawValue = getPortValueString(currentPortValue)
+                                            val rawValue = getPortValueString(currentPortValue, input.dataType)
                                             val isArray = input.dataType is DataType.Array
                                             val fileNames = getFileNames(rawValue, isArray)
                                             Row(
@@ -864,7 +858,7 @@ fun NodeComponent(
                                                         }
 
                                                         PrimitiveType.INT -> {
-                                                            val rawValue = getPortValueString(currentPortValue)
+                                                            val rawValue = getPortValueString(currentPortValue, input.dataType)
                                                             BasicTextField(
                                                                 value = rawValue,
                                                                 onValueChange = { newValue ->
@@ -892,7 +886,7 @@ fun NodeComponent(
                                                                     )
                                                                     else MaterialTheme.colorScheme.onSurface
                                                                 ),
-                                                                modifier = Modifier
+                                                                modifier = Modifier.onFocusChanged { if (!it.isFocused) onFocusLost() }
                                                                     .background(
                                                                         MaterialTheme.colorScheme.surfaceVariant,
                                                                         MaterialTheme.shapes.small
@@ -918,7 +912,7 @@ fun NodeComponent(
                                                         }
 
                                                         PrimitiveType.DOUBLE -> {
-                                                            val rawValue = getPortValueString(currentPortValue)
+                                                            val rawValue = getPortValueString(currentPortValue, input.dataType)
                                                             BasicTextField(
                                                                 value = rawValue,
                                                                 onValueChange = { newValue ->
@@ -946,7 +940,7 @@ fun NodeComponent(
                                                                     )
                                                                     else MaterialTheme.colorScheme.onSurface
                                                                 ),
-                                                                modifier = Modifier
+                                                                modifier = Modifier.onFocusChanged { if (!it.isFocused) onFocusLost() }
                                                                     .background(
                                                                         MaterialTheme.colorScheme.surfaceVariant,
                                                                         MaterialTheme.shapes.small
@@ -972,7 +966,7 @@ fun NodeComponent(
                                                         }
 
                                                         else -> {
-                                                            val rawValue = getPortValueString(currentPortValue)
+                                                            val rawValue = getPortValueString(currentPortValue, input.dataType)
                                                             BasicTextField(
                                                                 value = rawValue,
                                                                 onValueChange = {
@@ -989,7 +983,7 @@ fun NodeComponent(
                                                                     )
                                                                     else MaterialTheme.colorScheme.onSurface
                                                                 ),
-                                                                modifier = Modifier
+                                                                modifier = Modifier.onFocusChanged { if (!it.isFocused) onFocusLost() }
                                                                     .background(
                                                                         MaterialTheme.colorScheme.surfaceVariant,
                                                                         MaterialTheme.shapes.small
@@ -1018,7 +1012,7 @@ fun NodeComponent(
 
                                                 is DataType.Enum -> {
                                                     val options = type.options
-                                                    val rawValue = getPortValueString(currentPortValue)
+                                                    val rawValue = getPortValueString(currentPortValue, input.dataType)
                                                     val selected = rawValue.ifEmpty { options.firstOrNull() ?: "" }
                                                     Box(modifier = Modifier.fillMaxWidth()) {
                                                         ExpressiveMenu(
@@ -1032,10 +1026,10 @@ fun NodeComponent(
                                                 }
 
                                                 else -> {
-                                                    val rawValue = getPortValueString(currentPortValue)
+                                                    val rawValue = getPortValueString(currentPortValue, input.dataType)
                                                     BasicTextField(
                                                         value = rawValue,
-                                                        onValueChange = { onUpdateValue(node.id, input.id, it) },
+                                                        onValueChange = { onUpdateValue(node.id, input.id, org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(it, input.dataType)) },
                                                         enabled = !isConnected && !isReadOnly,
                                                         textStyle = MaterialTheme.typography.bodySmall.copy(
                                                             color = if (isConnected) MaterialTheme.colorScheme.onSurface.copy(
@@ -1043,7 +1037,7 @@ fun NodeComponent(
                                                             )
                                                             else MaterialTheme.colorScheme.onSurface
                                                         ),
-                                                        modifier = Modifier
+                                                        modifier = Modifier.onFocusChanged { if (!it.isFocused) onFocusLost() }
                                                             .background(
                                                                 MaterialTheme.colorScheme.surfaceVariant,
                                                                 MaterialTheme.shapes.small
@@ -1505,7 +1499,7 @@ fun NodeComponent(
                         color.toHex(hexPrefix = true, includeAlpha = hasAlpha)
                     }
                     val isArray = input?.dataType is DataType.Array
-                    val existingValue = getPortValueString(input?.value ?: input?.defaultValue)
+                    val existingValue = input?.let { getPortValueString(it.value ?: it.defaultValue, it.dataType) } ?: ""
                     val newValue = appendPickedValue(existingValue, formatted, isArray)
                     onUpdateValue(node.id, inputId, newValue)
                 }
@@ -1673,12 +1667,10 @@ private fun formatDataType(type: DataType): String {
     }
 }
 
-private fun getPortValueString(value: Any?): String {
+private fun getPortValueString(value: Any?, type: DataType): String {
     if (value == null) return ""
-    if (value is kotlinx.serialization.json.JsonPrimitive) {
-        return if (value.isString) value.content else value.toString()
-    }
-    return value.toString()
+    val jsonElement = org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(value)
+    return org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.jsonToString(jsonElement, type)
 }
 
 private fun getBooleanValue(value: Any?): Boolean {

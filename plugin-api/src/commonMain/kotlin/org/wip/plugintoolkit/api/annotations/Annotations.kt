@@ -117,7 +117,15 @@ annotation class PluginSetting(
     val description: String,
     val defaultValue: String = "",
     val required: Boolean = false,
-    val secret: Boolean = false
+    val secret: Boolean = false,
+    val minValue: Double = Double.NaN,
+    val maxValue: Double = Double.NaN,
+    val minLength: Int = -1,
+    val maxLength: Int = -1,
+    val regex: String = "",
+    val multiSelect: Boolean = false,
+    val minChoices: Int = -1,
+    val maxChoices: Int = -1
 )
 
 /**

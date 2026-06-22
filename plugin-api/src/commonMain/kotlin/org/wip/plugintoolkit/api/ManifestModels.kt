@@ -145,7 +145,8 @@ data class SettingMetadata(
     val description: String,
     val type: DataType,
     val required: Boolean = false,
-    val secret: Boolean = false
+    val secret: Boolean = false,
+    val constraints: ParameterConstraints? = null
 )
 
 /**

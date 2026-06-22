@@ -29,6 +29,25 @@ data class MyPluginSettings(
 )
 ```
 
+#### Plugin Settings Validation
+
+The `@PluginSetting` annotation supports identical validation constraints to those used for capabilities (see below). When users configure your plugin's settings via the host application, these rules are actively enforced. 
+
+```kotlin
+data class MyAdvancedSettings(
+    @PluginSetting(
+        description = "Service Endpoint",
+        regex = "^https?://.*"
+    ) val endpoint: String,
+    
+    @PluginSetting(
+        description = "Timeout in seconds",
+        minValue = 1.0,
+        maxValue = 120.0
+    ) val timeoutSeconds: Int
+)
+```
+
 ### 2. Capabilities
 
 A plugin provides one or more **Capabilities**. These are functions annotated with `@Capability`. Each capability becomes a task that the host application can execute.

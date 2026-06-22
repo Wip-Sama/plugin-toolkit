@@ -283,6 +283,8 @@ fun FlowEditorView(
                             inferredTypes = state.inferredTypes,
                             inferredSemanticTypes = state.inferredSemanticTypes,
                             validationErrors = state.validationErrors,
+                            isReady = node.isReady(flow.connections),
+                            onFocusLost = { viewModel.onEvent(FlowEvent.Save) },
                             onMove = { id, delta, snap, showGhost ->
                                 viewModel.onEvent(
                                     FlowEvent.MoveNode(

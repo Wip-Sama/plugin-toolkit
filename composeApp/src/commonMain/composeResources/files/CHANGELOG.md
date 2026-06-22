@@ -4,6 +4,8 @@ Added:
 	- It's not possible to change a connection destination/origin after its creation
 	- Tooltip names for the capability/flows with long names
 	- Flows and Nodes now are in a not-ready state if a required parameter is not connected or has a default
+	- Components in nodes no longer default to violet/purple color for accents in some elements
+	- PluginsSetting can now define constraints like the CapabilityParameter
 Changes:
   - now updating a plugin will make the button reflect what's happening to avoid confusion
   - shift is not used to fast delete a node connection

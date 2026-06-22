@@ -159,12 +159,37 @@ object ManifestJsonGenerator {
                 try { Json.parseToJsonElement(defaultVal) } catch(e: Exception) { null }
             } else null
             
+            val minValue = ann.arguments.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
+            val maxValue = ann.arguments.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
+            val minLength = ann.arguments.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
+            val maxLength = ann.arguments.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
+            val regex = ann.arguments.find { it.name?.asString() == "regex" }?.value as? String ?: ""
+            val multiSelect = ann.arguments.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
+            val minChoices = ann.arguments.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
+            val maxChoices = ann.arguments.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
+            
+            val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
+            
+            val constraints = if (hasConstraints) {
+                ParameterConstraints(
+                    minValue = if (!minValue.isNaN()) minValue else null,
+                    maxValue = if (!maxValue.isNaN()) maxValue else null,
+                    minLength = if (minLength != -1) minLength else null,
+                    maxLength = if (maxLength != -1) maxLength else null,
+                    regex = regex.ifEmpty { null },
+                    multiSelect = if (multiSelect) true else null,
+                    minChoices = if (minChoices != -1) minChoices else null,
+                    maxChoices = if (maxChoices != -1) maxChoices else null
+                )
+            } else null
+            
             propName to SettingMetadata(
                 defaultValue = defaultJson,
                 description = desc,
                 type = GeneratorUtils.mapKSTypeToDataType(ksType),
                 required = required,
-                secret = secret
+                secret = secret,
+                constraints = constraints
             )
         }
 
