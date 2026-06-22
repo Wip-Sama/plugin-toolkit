@@ -426,6 +426,12 @@ data class Flow(
         }
         return fallbackType
     }
+
+    fun isBroken(activeCapabilities: Set<String>): Boolean {
+        val hasBrokenNode = this.nodes.any { it is Node.CapabilityNode && it.isBroken }
+        val hasMissingCapability = this.nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.name !in activeCapabilities }
+        return hasBrokenNode || hasMissingCapability
+    }
 }
 
 @Serializable

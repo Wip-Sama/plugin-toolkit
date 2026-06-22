@@ -93,24 +93,38 @@ fun FlowRunnerView(
     val state by viewModel.state.collectAsState()
     val jobViewModel: JobViewModel = koinInject()
 
+    val activeCapabilities = remember(state.flows) {
+        org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
+            .mapNotNull { it.getManifest().getOrNull() }
+            .flatMap { it.capabilities }
+            .map { it.name }
+            .toSet()
+    }
+
+    val executableFlows = remember(state.flows, activeCapabilities) {
+        state.flows.filter { flow ->
+            !flow.isBroken(activeCapabilities)
+        }
+    }
+
     // Using a simple selection for flows to run
-    var selectedFlowToRun by remember { mutableStateOf(state.flows.firstOrNull()) }
+    var selectedFlowToRun by remember { mutableStateOf(executableFlows.firstOrNull()) }
 
     LaunchedEffect(Unit) {
         // flows are reloaded automatically via flowRepository
     }
 
-    LaunchedEffect(state.flows) {
-        if (selectedFlowToRun == null || !state.flows.any { it.name == selectedFlowToRun?.name }) {
-            selectedFlowToRun = state.flows.firstOrNull()
+    LaunchedEffect(executableFlows) {
+        if (selectedFlowToRun == null || !executableFlows.any { it.name == selectedFlowToRun?.name }) {
+            selectedFlowToRun = executableFlows.firstOrNull()
         } else {
-            selectedFlowToRun = state.flows.find { it.name == selectedFlowToRun?.name }
+            selectedFlowToRun = executableFlows.find { it.name == selectedFlowToRun?.name }
         }
     }
 
     Row(modifier = modifier.fillMaxSize()) {
         // Sidebar: Select Flow to Run (Standard NavigationSidebar)
-        val flowElements = state.flows.map { flow ->
+        val flowElements = executableFlows.map { flow ->
             SidebarElement(
                 id = flow,
                 icon = Icons.Default.PlayArrow,
