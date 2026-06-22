@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.shared.components.ZoomControls
 import kotlin.math.roundToInt
@@ -180,7 +181,7 @@ fun BoardCanvas(
                         if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                             val startPos = (sourcePortBoardPos * state.scale) + state.offset
                             val endPos = (targetPortBoardPos * state.scale) + state.offset
-                            val dist = getDistanceToBezier(tapOffset, startPos, endPos)
+                            val dist = BoardMathUtils.getDistanceToBezier(tapOffset, startPos, endPos)
                             if (dist < minDistance) {
                                 minDistance = dist
                                 bestConnection = connection
@@ -284,7 +285,7 @@ fun BoardCanvas(
                                     if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                                         val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                                         val endPos = (targetPortBoardPos * currentScale) + currentOffset
-                                        val dist = getDistanceToBezier(position, startPos, endPos)
+                                        val dist = BoardMathUtils.getDistanceToBezier(position, startPos, endPos)
                                         if (dist < minDistance) {
                                             minDistance = dist
                                             bestConnection = connection
@@ -404,26 +405,15 @@ fun BoardCanvas(
 
                     if (isHovered && hoveredConnectionIsSource != null) {
                         // Custom drawing for split bezier
-                        val controlPointOffset = kotlin.math.abs(endPos.x - startPos.x) / 2f
-                        val p0 = startPos
-                        val p1 = Offset(startPos.x + controlPointOffset, startPos.y)
-                        val p2 = Offset(endPos.x - controlPointOffset, endPos.y)
-                        val p3 = endPos
-
-                        val p01 = (p0 + p1) / 2f
-                        val p12 = (p1 + p2) / 2f
-                        val p23 = (p2 + p3) / 2f
-                        val p012 = (p01 + p12) / 2f
-                        val p123 = (p12 + p23) / 2f
-                        val p0123 = (p012 + p123) / 2f
+                        val (sourceHalf, targetHalf) = BoardMathUtils.splitCubicBezierInHalf(startPos, endPos)
 
                         val pathSource = Path().apply {
-                            moveTo(p0.x, p0.y)
-                            cubicTo(p01.x, p01.y, p012.x, p012.y, p0123.x, p0123.y)
+                            moveTo(sourceHalf.p0.x, sourceHalf.p0.y)
+                            cubicTo(sourceHalf.p1.x, sourceHalf.p1.y, sourceHalf.p2.x, sourceHalf.p2.y, sourceHalf.p3.x, sourceHalf.p3.y)
                         }
                         val pathTarget = Path().apply {
-                            moveTo(p0123.x, p0123.y)
-                            cubicTo(p123.x, p123.y, p23.x, p23.y, p3.x, p3.y)
+                            moveTo(targetHalf.p0.x, targetHalf.p0.y)
+                            cubicTo(targetHalf.p1.x, targetHalf.p1.y, targetHalf.p2.x, targetHalf.p2.y, targetHalf.p3.x, targetHalf.p3.y)
                         }
 
                         val highlightColor = Color(0xFFFF2D55)
@@ -542,7 +532,7 @@ fun BoardCanvas(
                     if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                         val startPos = (sourcePortBoardPos * state.scale) + state.offset
                         val endPos = (targetPortBoardPos * state.scale) + state.offset
-                        val midPoint = getBezierMidpoint(startPos, endPos)
+                        val midPoint = BoardMathUtils.getBezierMidpoint(startPos, endPos)
 
                         var showMenu by remember { mutableStateOf(false) }
 
@@ -599,7 +589,7 @@ fun BoardCanvas(
             if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                 val startPos = (sourcePortBoardPos * state.scale) + state.offset
                 val endPos = (targetPortBoardPos * state.scale) + state.offset
-                val midPoint = getBezierMidpoint(startPos, endPos)
+                val midPoint = BoardMathUtils.getBezierMidpoint(startPos, endPos)
 
                 Surface(
                     onClick = {
@@ -642,40 +632,6 @@ fun BoardCanvas(
                 .padding(ToolkitTheme.spacing.medium)
         )
     }
-}
-
-private fun getDistanceToBezier(p: Offset, start: Offset, end: Offset): Float {
-    val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
-    val c1 = Offset(start.x + controlPointOffset, start.y)
-    val c2 = Offset(end.x - controlPointOffset, end.y)
-
-    var minDistance = Float.MAX_VALUE
-    val steps = 30
-    for (i in 0..steps) {
-        val t = i.toFloat() / steps
-        val mt = 1f - t
-        val bt = start * (mt * mt * mt) +
-                c1 * (3f * mt * mt * t) +
-                c2 * (3f * mt * t * t) +
-                end * (t * t * t)
-        val dist = (p - bt).getDistance()
-        if (dist < minDistance) {
-            minDistance = dist
-        }
-    }
-    return minDistance
-}
-
-private fun getBezierMidpoint(start: Offset, end: Offset): Offset {
-    val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
-    val c1 = Offset(start.x + controlPointOffset, start.y)
-    val c2 = Offset(end.x - controlPointOffset, end.y)
-    val t = 0.5f
-    val mt = 0.5f
-    return start * (mt * mt * mt) +
-            c1 * (3f * mt * mt * t) +
-            c2 * (3f * mt * t * t) +
-            end * (t * t * t)
 }
 
 private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color, strokeWidth: Float = 3.dp.toPx()) {
