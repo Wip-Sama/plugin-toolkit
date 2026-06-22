@@ -18,6 +18,7 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
+import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.core.notification.NotificationService
@@ -35,6 +36,11 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_semantics
+import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_types
+import plugintoolkit.composeapp.generated.resources.flow_editor_same_node_warning
+import org.jetbrains.compose.resources.getString
 import kotlin.math.roundToInt
 
 data class ValidationError(
@@ -43,6 +49,15 @@ data class ValidationError(
     val targetNodeId: Long,
     val targetPortId: String,
     val message: String
+)
+
+data class PendingConnection(
+    val sourceNodeId: Long,
+    val sourcePortId: String,
+    val targetNodeId: Long,
+    val targetPortId: String,
+    val sourceType: DataType,
+    val targetType: DataType
 )
 
 enum class ReadOnlyReason {
@@ -65,7 +80,8 @@ data class FlowEditorState(
     val validationErrors: List<ValidationError> = emptyList(),
     val selectedNodeIds: Set<Long> = emptySet(),
     val isReadOnly: Boolean = false,
-    val readOnlyReasons: List<ReadOnlyReason> = emptyList()
+    val readOnlyReasons: List<ReadOnlyReason> = emptyList(),
+    val pendingConnection: PendingConnection? = null
 )
 
 class FlowEditorViewModel(
@@ -385,6 +401,20 @@ class FlowEditorViewModel(
                 event.targetNodeId,
                 event.targetPortId
             )
+
+            is FlowEvent.TryConnectPorts -> handleTryConnectPorts(
+                event.sourceNodeId,
+                event.sourcePortId,
+                event.targetNodeId,
+                event.targetPortId,
+                event.isShiftPressed
+            )
+
+            is FlowEvent.CancelPendingConnection -> {
+                _state.update { currentState ->
+                    currentState.copy(pendingConnection = null)
+                }
+            }
 
             is FlowEvent.AutoConvertAndConnect -> handleAutoConvertAndConnect(
                 event.sourceNodeId,
@@ -722,6 +752,69 @@ class FlowEditorViewModel(
             )
         }
         runTypeInference()
+    }
+
+    private fun handleTryConnectPorts(
+        sourceNodeId: Long,
+        sourcePortId: String,
+        targetNodeId: Long,
+        targetPortId: String,
+        isShiftPressed: Boolean
+    ) {
+        if (sourceNodeId == targetNodeId) {
+            viewModelScope.launch {
+                val message = getString(Res.string.flow_editor_same_node_warning)
+                resolvedNotificationService?.toast(message)
+            }
+            return
+        }
+
+        val currentState = _state.value
+        val sourceNode = currentState.flow.nodes.find { it.id == sourceNodeId }
+        val targetNode = currentState.flow.nodes.find { it.id == targetNodeId }
+
+        if (sourceNode == null || targetNode == null) return
+
+        val sourcePort = sourceNode.outputs.find { it.id == sourcePortId }
+        val targetPort = targetNode.inputs.find { it.id == targetPortId }
+
+        if (sourcePort == null || targetPort == null) return
+
+        val sourceInferredType = currentState.inferredTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.dataType
+        val targetInferredType = currentState.inferredTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.dataType
+        val sourceInferredSemantic = currentState.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.semanticTypes
+        val targetInferredSemantic = currentState.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticTypes
+
+        val typesCompatible = sourceInferredType.isCompatibleWith(targetInferredType)
+        val semanticsCompatible = isSemanticTypeCompatible(sourceInferredSemantic, targetInferredSemantic)
+
+        if (typesCompatible && semanticsCompatible) {
+            onEvent(FlowEvent.ConnectPorts(sourceNodeId, sourcePortId, targetNodeId, targetPortId))
+        } else if (semanticsCompatible && sourceInferredType.canConvert(targetInferredType)) {
+            if (isShiftPressed) {
+                onEvent(FlowEvent.AutoConvertAndConnect(sourceNodeId, sourcePortId, targetNodeId, targetPortId))
+            } else {
+                _state.update { it.copy(
+                    pendingConnection = PendingConnection(
+                        sourceNodeId = sourceNodeId,
+                        sourcePortId = sourcePortId,
+                        targetNodeId = targetNodeId,
+                        targetPortId = targetPortId,
+                        sourceType = sourceInferredType,
+                        targetType = targetInferredType
+                    )
+                )}
+            }
+        } else {
+            viewModelScope.launch {
+                val message = if (!typesCompatible) {
+                    getString(Res.string.flow_editor_incompatible_types, sourceInferredType.format(), targetInferredType.format())
+                } else {
+                    getString(Res.string.flow_editor_incompatible_semantics, sourceInferredSemantic.joinToString { it.canonicalId }, targetInferredSemantic.joinToString { it.canonicalId })
+                }
+                resolvedNotificationService?.toast(message)
+            }
+        }
     }
 
     private fun handleAutoConvertAndConnect(

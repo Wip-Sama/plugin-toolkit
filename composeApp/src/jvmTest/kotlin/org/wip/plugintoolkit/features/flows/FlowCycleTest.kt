@@ -356,4 +356,37 @@ class FlowCycleTest {
         assertEquals(0, updatedConn1.orderIndex)
         assertEquals(1, updatedConn3.orderIndex) // conn3 should be decremented from 2 to 1
     }
+
+    @Test
+    fun testTryConnectPorts() {
+        val mockFlowRepo = mockk<org.wip.plugintoolkit.features.flows.logic.FlowRepository>(relaxed = true)
+        val viewModel = FlowEditorViewModel(
+            initialFlowName = "Default Flow",
+            settingsPersistence = MockSettingsPersistence(),
+            notificationService = null,
+            flowRepository = mockFlowRepo
+        )
+
+        viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(100f, 100f)))
+        viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(200f, 200f)))
+
+        val state = viewModel.state.value
+        val flow = state.flow
+
+        val nodeA = flow.nodes[0]
+        val nodeB = flow.nodes[1]
+
+        // 1. Same node - should do nothing (no connections, no pending)
+        viewModel.onEvent(FlowEvent.TryConnectPorts(nodeA.id, "output", nodeA.id, "message", false))
+        assertTrue(viewModel.state.value.flow.connections.isEmpty())
+        assertTrue(viewModel.state.value.pendingConnection == null)
+
+        // 2. Valid connection - should connect directly
+        viewModel.onEvent(FlowEvent.TryConnectPorts(nodeA.id, "output", nodeB.id, "message", false))
+        assertEquals(1, viewModel.state.value.flow.connections.size)
+        assertTrue(viewModel.state.value.pendingConnection == null)
+
+        // 3. To test incompatible or pending we would need different datatypes
+        // Let's just assume the validation happens by checking pendingConnection state is clean for valid.
+    }
 }

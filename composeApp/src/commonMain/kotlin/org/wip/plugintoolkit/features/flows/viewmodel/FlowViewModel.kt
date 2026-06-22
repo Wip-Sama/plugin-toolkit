@@ -73,6 +73,16 @@ sealed interface FlowEvent {
         val targetPortId: String
     ) : FlowEvent
 
+    data class TryConnectPorts(
+        val sourceNodeId: Long,
+        val sourcePortId: String,
+        val targetNodeId: Long,
+        val targetPortId: String,
+        val isShiftPressed: Boolean
+    ) : FlowEvent
+
+    data object CancelPendingConnection : FlowEvent
+
     data class AutoConvertAndConnect(
         val sourceNodeId: Long,
         val sourcePortId: String,
