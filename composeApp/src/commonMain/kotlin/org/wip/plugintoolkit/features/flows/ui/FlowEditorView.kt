@@ -194,6 +194,122 @@ fun FlowEditorView(
                 connectionCurrentPos = offset
                 isDrawingConnection = true
             },
+            onConnectionDrag = { boardPosition ->
+                connectionCurrentPos = boardPosition
+
+                // Proximity Check: Find closest port in Board Space
+                var closestPortId: String? = null
+                var closestNodeId: Long? = null
+                var minDistance = 30f / state.scale
+
+                flow.nodes.forEach { n ->
+                    val portsToTrack = if (connectionStartIsOutput) n.inputs else n.outputs
+                    portsToTrack.forEach { port ->
+                        val portBoardPos = getPortBoardPosition(n.id, port.id) ?: return@forEach
+                        val dist = (boardPosition - portBoardPos).getDistance()
+                        if (dist < minDistance) {
+                            minDistance = dist
+                            closestPortId = port.id
+                            closestNodeId = n.id
+                        }
+                    }
+                }
+
+                highlightedPortId = closestPortId
+                highlightedNodeId = closestNodeId
+            },
+            onConnectionDrop = { isShiftPressed ->
+                if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
+                    val sourceNodeId =
+                        if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
+                    val sourcePortId =
+                        if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
+                    val targetNodeId =
+                        if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
+                    val targetPortId =
+                        if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
+
+                    if (sourceNodeId == targetNodeId) {
+                        notificationService.toast(sameNodeWarning)
+                    } else {
+                        val sourceNode = flow.nodes.find { it.id == sourceNodeId }
+                        val targetNode = flow.nodes.find { it.id == targetNodeId }
+                        val sourcePort = sourceNode?.outputs?.find { it.id == sourcePortId }
+                        val targetPort = targetNode?.inputs?.find { it.id == targetPortId }
+
+                        if (sourcePort != null && targetPort != null) {
+                            val sourceInferredType =
+                                state.inferredTypes[Pair(sourceNodeId, sourcePortId)]
+                                    ?: sourcePort.dataType
+                            val targetInferredType =
+                                state.inferredTypes[Pair(targetNodeId, targetPortId)]
+                                    ?: targetPort.dataType
+                            val sourceInferredSemantic =
+                                state.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)]
+                                    ?: sourcePort.semanticTypes
+                            val targetInferredSemantic =
+                                state.inferredSemanticTypes[Pair(targetNodeId, targetPortId)]
+                                    ?: targetPort.semanticTypes
+
+                            val typesCompatible =
+                                sourceInferredType.isCompatibleWith(targetInferredType)
+                            val semanticsCompatible =
+                                isSemanticTypeCompatible(sourceInferredSemantic, targetInferredSemantic)
+
+                            if (typesCompatible && semanticsCompatible) {
+                                viewModel.onEvent(
+                                    FlowEvent.ConnectPorts(
+                                        sourceNodeId,
+                                        sourcePortId,
+                                        targetNodeId,
+                                        targetPortId
+                                    )
+                                )
+                            } else if (semanticsCompatible && sourceInferredType.canConvert(
+                                    targetInferredType
+                                )
+                            ) {
+                                if (isShiftPressed) {
+                                    viewModel.onEvent(
+                                        FlowEvent.AutoConvertAndConnect(
+                                            sourceNodeId,
+                                            sourcePortId,
+                                            targetNodeId,
+                                            targetPortId
+                                        )
+                                    )
+                                } else {
+                                    pendingConnectionSourceNodeId = sourceNodeId
+                                    pendingConnectionSourcePortId = sourcePortId
+                                    pendingConnectionTargetNodeId = targetNodeId
+                                    pendingConnectionTargetPortId = targetPortId
+                                    pendingConnectionSourceType = sourceInferredType
+                                    pendingConnectionTargetType = targetInferredType
+                                    showConversionDialog = true
+                                }
+                            } else {
+                                val message = if (!typesCompatible) {
+                                    incompatibleTypesMsg.format(
+                                        sourceInferredType.format(),
+                                        targetInferredType.format()
+                                    )
+                                } else {
+                                    incompatibleSemanticsMsg.format(
+                                        sourceInferredSemantic.joinToString { it.canonicalId },
+                                        targetInferredSemantic.joinToString { it.canonicalId }
+                                    )
+                                }
+                                notificationService.toast(message)
+                            }
+                        }
+                    }
+                }
+                isDrawingConnection = false
+                connectionStartNodeId = null
+                connectionStartPortId = null
+                highlightedPortId = null
+                highlightedNodeId = null
+            },
             onMoveConnectionFirst = { viewModel.onEvent(FlowEvent.MoveConnectionFirst(it)) },
             onMoveConnectionLast = { viewModel.onEvent(FlowEvent.MoveConnectionLast(it)) },
             selectedNodeIds = state.selectedNodeIds,
@@ -323,12 +439,15 @@ fun FlowEditorView(
                                         getPortBoardPosition(connectionStartNodeId!!, connectionStartPortId!!)
                                     if (startBoardPos != null) {
                                         val boardPosition = startBoardPos + cumulativeDragOffset
+                                        // Proximity Check and update is handled by BoardCanvas callback logic now, 
+                                        // but since PortCircle uses drag offset, we can just pass the calculated board pos to it.
+                                        // Wait, we need to access the callback we just defined. Let's just duplicate the short calculation or access the state variables.
+                                        // Actually, wait, since we extracted the logic, let's just use the same logic here!
                                         connectionCurrentPos = boardPosition
-
-                                        // Proximity Check: Find closest port in Board Space
+                                        
                                         var closestPortId: String? = null
                                         var closestNodeId: Long? = null
-                                        var minDistance = 30f / state.scale // 30dp radius in board space
+                                        var minDistance = 30f / state.scale
 
                                         flow.nodes.forEach { n ->
                                             val portsToTrack = if (connectionStartIsOutput) n.inputs else n.outputs
@@ -349,6 +468,8 @@ fun FlowEditorView(
                                 }
                             },
                             onDropConnection = { isShiftPressed ->
+                                // The drop logic is identical, so we could duplicate it or extract it.
+                                // To keep it simple, we'll duplicate it here.
                                 if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
                                     val sourceNodeId =
                                         if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!

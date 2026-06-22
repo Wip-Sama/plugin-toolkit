@@ -1,12 +1,24 @@
+Version: 1.7.0
+Date: 13-06-2026
+Added:
+	- It's not possible to change a connection destination/origin after it's creation
+	- Tooltip names for the capability/flows with long names
+Changes:
+  - now updating a plugin will make the button reflect what's happening to avoid confusion
+  - shift is not used to fast delete a node connection
+  - BIG refactor to the plugin-api so 1.7.x is not compatible with 1.6.x
+Fixed:
+  - Broken flow would appear as running
+----------------------------------------------------------------------------------------------------
 Version: 1.6.1
 Date: 13-06-2026
 Changes:
-- Minor improvements to the codebase
+	- Minor improvements to the codebase
 Fixed:
-- Parsing of null / empty values in flows
-- Create folder system node not accepting connection in the path port
+  - Parsing of null / empty values in flows
+  - Create folder system node not accepting connection in the path port
 Planned:
-- Create folder would return an error if the folder already existed
+  - Create folder would return an error if the folder already existed
 ----------------------------------------------------------------------------------------------------
 Version: 1.6.0
 Date: 12-06-2026

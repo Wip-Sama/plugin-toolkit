@@ -945,7 +945,7 @@ class FlowEditorViewModel(
         portName: String,
         dataType: DataType,
         semanticTypes: List<SemanticType>,
-        constraints: org.wip.plugintoolkit.features.flows.model.PortConstraints?,
+        constraints: PortConstraints?,
         isList: Boolean
     ) {
         saveToHistory()
