@@ -61,15 +61,15 @@ object EntryGenerator {
             .addFunction(
                 FunSpec.builder("getProcessor")
                     .addModifiers(KModifier.OVERRIDE)
-                    .returns(CN_DATA_PROCESSOR)
-                    .addStatement("return dispatcher")
+                    .returns(CN_RESULT.parameterizedBy(CN_DATA_PROCESSOR))
+                    .addStatement("return Result.success(dispatcher)")
                     .build()
             )
             .addFunction(
                 FunSpec.builder("getManifest")
                     .addModifiers(KModifier.OVERRIDE)
-                    .returns(CN_PLUGIN_MANIFEST)
-                    .addStatement("return %L.manifest", manifestName)
+                    .returns(CN_RESULT.parameterizedBy(CN_PLUGIN_MANIFEST))
+                    .addStatement("return Result.success(%L.manifest)", manifestName)
                     .build()
             )
             .addFunction(

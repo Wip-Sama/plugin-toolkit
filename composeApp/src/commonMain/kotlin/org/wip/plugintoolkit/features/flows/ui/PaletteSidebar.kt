@@ -203,7 +203,7 @@ private fun CapabilitiesPalette(
 ) {
     val groupedCaps = remember(searchQuery, plugins) {
         plugins.map { p ->
-            val manifest = p.getManifest()
+            val manifest = p.getManifest().getOrThrow()
             manifest.plugin to manifest.capabilities.filter { it.name.contains(searchQuery, ignoreCase = true) }
         }.filter { it.second.isNotEmpty() }
     }

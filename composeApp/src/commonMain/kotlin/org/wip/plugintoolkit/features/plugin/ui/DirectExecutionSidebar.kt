@@ -70,7 +70,7 @@ fun DirectExecutionSidebar(
         ) { pluginId ->
             if (pluginId == null) {
                 val pluginsElements = loadedPlugins.map { plugin ->
-                    val manifest = plugin.getManifest()
+                    val manifest = plugin.getManifest().getOrThrow()
                     SidebarElement(
                         id = manifest.plugin.id,
                         icon = Icons.Default.Extension,
@@ -88,9 +88,9 @@ fun DirectExecutionSidebar(
                     canCollapse = false
                 )
             } else {
-                val plugin = loadedPlugins.find { it.getManifest().plugin.id == pluginId }
+                val plugin = loadedPlugins.find { it.getManifest().getOrThrow().plugin.id == pluginId }
                 if (plugin != null) {
-                    val manifest = plugin.getManifest()
+                    val manifest = plugin.getManifest().getOrThrow()
                     val capabilityElements = manifest.capabilities.map { capability ->
                         SidebarElement(
                             id = capability,

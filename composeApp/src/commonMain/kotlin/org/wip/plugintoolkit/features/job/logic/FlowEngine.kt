@@ -345,9 +345,9 @@ class FlowEngine(
 
                     val plugin = PluginLoader.getPluginById(node.pluginInfo.id)
                         ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
-                    validateCapabilityParameters(plugin.getManifest(), node.capability.name, capabilityParameters)
+                    validateCapabilityParameters(plugin.getManifest().getOrThrow(), node.capability.name, capabilityParameters)
 
-                    val processor = plugin.getProcessor()
+                    val processor = plugin.getProcessor().getOrThrow()
                     val context = pluginManager.createPluginContext(node.pluginInfo.id, job.id)
                     val savedCapResumeState = capabilityResumeStates[node.id]
                     val request = PluginRequest(node.capability.name, capabilityParameters, savedCapResumeState)

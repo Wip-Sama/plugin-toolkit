@@ -55,7 +55,9 @@ sealed class DataType {
     data class Array(val items: DataType) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             if (value == null || value is JsonNull) return false
-            return (value as? JsonArray)?.isNotEmpty() ?: true
+            val array = value as? JsonArray ?: return false
+            if (array.isEmpty()) return false
+            return array.all { items.isProvided(it) }
         }
     }
 
@@ -79,8 +81,13 @@ sealed class DataType {
             
             val jsonObj = value as? JsonObject ?: return false
             return requiredProperties.all { prop ->
+                val propType = properties[prop]
                 val propValue = jsonObj[prop]
-                propValue != null && propValue !is JsonNull
+                if (propType != null) {
+                    propType.isProvided(propValue)
+                } else {
+                    propValue != null && propValue !is JsonNull
+                }
             }
         }
     }

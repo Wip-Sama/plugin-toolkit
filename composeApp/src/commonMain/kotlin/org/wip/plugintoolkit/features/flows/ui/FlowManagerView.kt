@@ -105,7 +105,7 @@ fun FlowManagerView(
     }
 
     val activeCapabilities = remember(state.flows) {
-        PluginLoader.getPlugins().flatMap { it.getManifest().capabilities.map { cap -> cap.name } }.toSet()
+        PluginLoader.getPlugins().flatMap { it.getManifest().getOrThrow().capabilities.map { cap -> cap.name } }.toSet()
     }
 
     val filteredFlows = remember(state.flows, searchQuery) {

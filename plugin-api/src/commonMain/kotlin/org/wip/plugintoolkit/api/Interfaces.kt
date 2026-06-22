@@ -22,12 +22,12 @@ interface PluginEntry {
     /**
      * Get the plugin manifest information.
      */
-    fun getManifest(): PluginManifest
+    fun getManifest(): Result<PluginManifest>
 
     /**
      * Provide the worker instance.
      */
-    fun getProcessor(): DataProcessor
+    fun getProcessor(): Result<DataProcessor>
 
 
     /**
@@ -89,6 +89,9 @@ interface PluginModuleProvider {
  *
  * All paths provided to these methods are relative to the plugin's base directory.
  * This ensures that plugins cannot interfere with each other or the host application's files.
+ * 
+ * **SECURITY WARNING:** Implementations of this interface must rigidly validate all relative paths
+ * to prevent Path Traversal attacks (e.g., verifying paths do not contain "../" or start with "/").
  */
 interface PluginFileSystem {
     suspend fun readFile(relativePath: String): ByteArray?
@@ -230,27 +233,45 @@ interface PluginContext {
      * Typed helpers for settings access.
      */
     fun getStringSetting(key: String, defaultValue: String = ""): String {
-        return settings[key]?.let {
-            if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString()
-        } ?: defaultValue
+        return try {
+            settings[key]?.let {
+                if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString()
+            } ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
     }
 
     fun getIntSetting(key: String, defaultValue: Int = 0): Int {
-        return settings[key]?.let {
-            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toIntOrNull() else null
-        } ?: defaultValue
+        return try {
+            settings[key]?.let {
+                if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toIntOrNull() else null
+            } ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
     }
 
     fun getBooleanSetting(key: String, defaultValue: Boolean = false): Boolean {
-        return settings[key]?.let {
-            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toBooleanStrictOrNull() else null
-        } ?: defaultValue
+        return try {
+            settings[key]?.let {
+                if (it is kotlinx.serialization.json.JsonPrimitive) {
+                    it.content.toBooleanStrictOrNull()
+                } else null
+            } ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
     }
 
     fun getDoubleSetting(key: String, defaultValue: Double = 0.0): Double {
-        return settings[key]?.let {
-            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toDoubleOrNull() else null
-        } ?: defaultValue
+        return try {
+            settings[key]?.let {
+                if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toDoubleOrNull() else null
+            } ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
     }
 
     /**
@@ -285,7 +306,7 @@ interface DataProcessor {
     /**
      * Observe processing progress (0.0 to 1.0).
      */
-    fun observeProgress(): Flow<Float>? = null
+    fun observeProgress(): kotlinx.coroutines.flow.StateFlow<Float>? = null
 
     /**
      * Run a custom action.

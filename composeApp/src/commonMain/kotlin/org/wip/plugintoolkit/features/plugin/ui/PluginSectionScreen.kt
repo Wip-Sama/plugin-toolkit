@@ -101,7 +101,7 @@ fun PluginSectionScreen(
                     }
 
                     is PluginNavKey.PluginDetail -> NavEntry(key) {
-                        val plugin = loadedPlugins.find { it.getManifest().plugin.id == key.id }
+                        val plugin = loadedPlugins.find { it.getManifest().getOrThrow().plugin.id == key.id }
                         if (plugin != null) {
                             LaunchedEffect(key.id) {
                                 viewModel.selectPlugin(plugin)

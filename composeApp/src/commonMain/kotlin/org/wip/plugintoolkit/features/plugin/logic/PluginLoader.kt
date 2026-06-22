@@ -77,7 +77,7 @@ object PluginLoader {
                 val pluginEntry = koinApp.koin.get<PluginEntry>()
 
                 // Cache the ID for O(1) lookups
-                val manifest = pluginEntry.getManifest()
+                val manifest = pluginEntry.getManifest().getOrThrow()
                 val pluginId = manifest.plugin.id
 
                 val loadedPlugin = LoadedPlugin(pluginId, normalizedPath, pluginEntry, newClassLoader, koinApp)

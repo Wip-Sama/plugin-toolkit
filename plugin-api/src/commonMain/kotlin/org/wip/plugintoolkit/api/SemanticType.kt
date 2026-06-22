@@ -55,17 +55,6 @@ fun parseSemanticType(token: String): SemanticType? {
     var name = g2
     var variant = g3
 
-    if (namespace != null && variant == null) {
-        val isMimeCategory = namespace.lowercase() in setOf(
-            "image", "audio", "video", "text", "application", "font", "file", "color", "path"
-        )
-        if (isMimeCategory) {
-            variant = name
-            name = namespace
-            namespace = null
-        }
-    }
-
     return SemanticType(namespace, name, variant)
 }
 

@@ -124,9 +124,9 @@ class JobWorker(
         val plugin = PluginLoader.getPluginById(job.pluginId)
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
-        validateCapabilityParameters(plugin.getManifest(), job.capabilityName, job.parameters)
+        validateCapabilityParameters(plugin.getManifest().getOrThrow(), job.capabilityName, job.parameters)
 
-        val processor = plugin.getProcessor()
+        val processor = plugin.getProcessor().getOrThrow()
         val context = pluginManager.createPluginContext(job.pluginId, job.id)
 
         val request = PluginRequest(
@@ -232,9 +232,9 @@ class JobWorker(
         })
 
         manager.updateJobProgress(job.id, 0.1f)
-        manager.addJobLog(job.id, "Performing setup for ${plugin.getManifest().plugin.name}...")
+        manager.addJobLog(job.id, "Performing setup for ${plugin.getManifest().getOrThrow().plugin.name}...")
 
-        if (!plugin.getManifest().hasSetupHandler) {
+        if (!plugin.getManifest().getOrThrow().hasSetupHandler) {
             manager.addJobLog(job.id, "No setup handler found, skipping setup phase.")
         } else {
             val setupResult = plugin.performSetup(context)
@@ -273,9 +273,9 @@ class JobWorker(
         })
 
         manager.updateJobProgress(job.id, 0.2f)
-        manager.addJobLog(job.id, "Running update handler for ${plugin.getManifest().plugin.name}...")
+        manager.addJobLog(job.id, "Running update handler for ${plugin.getManifest().getOrThrow().plugin.name}...")
 
-        if (!plugin.getManifest().hasUpdateHandler) {
+        if (!plugin.getManifest().getOrThrow().hasUpdateHandler) {
             manager.addJobLog(job.id, "No update handler found, skipping update phase.")
         } else {
             val updateResult = plugin.performUpdate(context)
@@ -314,7 +314,7 @@ class JobWorker(
         })
 
         manager.updateJobProgress(job.id, 0.2f)
-        manager.addJobLog(job.id, "Running validation for ${plugin.getManifest().plugin.name}...")
+        manager.addJobLog(job.id, "Running validation for ${plugin.getManifest().getOrThrow().plugin.name}...")
 
         val validationResult = plugin.validate(context)
         if (validationResult.isFailure) {
@@ -333,7 +333,7 @@ class JobWorker(
         val plugin = PluginLoader.getPluginById(job.pluginId)
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
-        val processor = plugin.getProcessor()
+        val processor = plugin.getProcessor().getOrThrow()
         val context = pluginManager.createPluginContext(job.pluginId, job.id)
 
         // Register a simple handle for cancellation
@@ -353,7 +353,7 @@ class JobWorker(
         manager.updateJobProgress(job.id, 0.1f)
         manager.addJobLog(job.id, "Executing action: ${job.capabilityName}")
 
-        val manifest = plugin.getManifest()
+        val manifest = plugin.getManifest().getOrThrow()
         val action = manifest.actions.find { it.functionName == job.capabilityName }
             ?: throw Exception("Action ${job.capabilityName} not found in manifest")
 

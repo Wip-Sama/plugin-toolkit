@@ -98,7 +98,7 @@ class PluginLifecycleManager(
             val entry = result.getOrThrow()
             try {
                 // Initialize with context
-                val manifest = entry.getManifest()
+                val manifest = entry.getManifest().getOrThrow()
                 val initResult = entry.initialize(createPluginContext(pkg, manifest = manifest))
                 if (initResult.isFailure) {
                     val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")

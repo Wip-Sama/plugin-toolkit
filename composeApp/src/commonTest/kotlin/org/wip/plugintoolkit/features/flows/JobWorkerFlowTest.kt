@@ -377,7 +377,8 @@ class JobWorkerFlowTest {
         val mockHandle2 = mockk<JobHandle>(relaxed = true)
 
         every { PluginLoader.getPluginById("test-plugin") } returns mockPluginEntry
-        every { mockPluginEntry.getProcessor() } returns mockProcessor
+        every { mockPluginEntry.getProcessor() } answers { Result.success(mockProcessor) }
+        every { mockPluginEntry.getManifest() } answers { Result.success(org.wip.plugintoolkit.api.PluginManifest(manifestVersion = "1.0", plugin = org.wip.plugintoolkit.api.PluginInfo("test-plugin", "Test Plugin", "1.0.0", "Test"), requirements = org.wip.plugintoolkit.api.Requirements(128, 1000))) }
 
         // First call to processAsync (Node 2)
         val deferred1 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
@@ -506,7 +507,10 @@ class JobWorkerFlowTest {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 kotlinx.coroutines.withTimeout(5000) {
-                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
+                    while (true) {
+                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                        val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
+                        if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
                         kotlinx.coroutines.delay(10)
                     }
                 }
@@ -529,7 +533,9 @@ class JobWorkerFlowTest {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 kotlinx.coroutines.withTimeout(5000) {
-                    while (jobManager.jobs.value.first().resumeState == null) {
+                    while (true) {
+                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                        if (activeJob?.resumeState != null) break
                         kotlinx.coroutines.delay(10)
                     }
                 }
@@ -537,7 +543,7 @@ class JobWorkerFlowTest {
         }
 
         // Verify state is saved
-        val pausedJob = jobManager.jobs.value.first()
+        val pausedJob = jobManager.jobs.value.find { it.id == job.id } ?: jobManager.endedJobs.value.first { it.id == job.id }
         val resumeState = pausedJob.resumeState as? kotlinx.serialization.json.JsonObject
         assertNotNull(resumeState)
 
@@ -548,7 +554,10 @@ class JobWorkerFlowTest {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 kotlinx.coroutines.withTimeout(5000) {
-                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
+                    while (true) {
+                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                        val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
+                        if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
                         kotlinx.coroutines.delay(10)
                     }
                 }
@@ -602,7 +611,8 @@ class JobWorkerFlowTest {
         val mockHandle2 = mockk<JobHandle>(relaxed = true)
 
         every { PluginLoader.getPluginById("test-plugin") } returns mockPluginEntry
-        every { mockPluginEntry.getProcessor() } returns mockProcessor
+        every { mockPluginEntry.getProcessor() } answers { Result.success(mockProcessor) }
+        every { mockPluginEntry.getManifest() } answers { Result.success(org.wip.plugintoolkit.api.PluginManifest(manifestVersion = "1.0", plugin = org.wip.plugintoolkit.api.PluginInfo("test-plugin", "Test Plugin", "1.0.0", "Test"), requirements = org.wip.plugintoolkit.api.Requirements(128, 1000))) }
 
         var capabilityResumedWithState: kotlinx.serialization.json.JsonElement? = null
         var isSecondCall = false
@@ -698,7 +708,10 @@ class JobWorkerFlowTest {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 kotlinx.coroutines.withTimeout(5000) {
-                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
+                    while (true) {
+                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                        val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
+                        if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
                         kotlinx.coroutines.delay(10)
                     }
                 }
@@ -716,7 +729,10 @@ class JobWorkerFlowTest {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 kotlinx.coroutines.withTimeout(5000) {
-                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Paused) {
+                    while (true) {
+                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                        val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
+                        if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Paused || endedJob != null) break
                         kotlinx.coroutines.delay(10)
                     }
                 }
@@ -724,7 +740,7 @@ class JobWorkerFlowTest {
         }
 
         // Verify capability resume state is serialized
-        val pausedJob = jobManager.jobs.value.first()
+        val pausedJob = jobManager.jobs.value.find { it.id == job.id } ?: jobManager.endedJobs.value.first { it.id == job.id }
         val resumeState = pausedJob.resumeState as? kotlinx.serialization.json.JsonObject
         assertNotNull(resumeState)
         val capResumeStates = resumeState["capabilityResumeStates"]?.jsonObject
@@ -782,7 +798,8 @@ class JobWorkerFlowTest {
         val mockProcessor = mockk<DataProcessor>(relaxed = true)
 
         every { PluginLoader.getPluginById("test-plugin") } returns mockPluginEntry
-        every { mockPluginEntry.getProcessor() } returns mockProcessor
+        every { mockPluginEntry.getProcessor() } answers { Result.success(mockProcessor) }
+        every { mockPluginEntry.getManifest() } answers { Result.success(org.wip.plugintoolkit.api.PluginManifest(manifestVersion = "1.0", plugin = org.wip.plugintoolkit.api.PluginInfo("test-plugin", "Test Plugin", "1.0.0", "Test"), requirements = org.wip.plugintoolkit.api.Requirements(128, 1000))) }
 
         var capabilityResumedWithState: kotlinx.serialization.json.JsonElement? = null
         var isSecondCall = false
@@ -885,7 +902,10 @@ class JobWorkerFlowTest {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 kotlinx.coroutines.withTimeout(5000) {
-                    while (jobManager.jobs.value.first().status != org.wip.plugintoolkit.features.job.model.JobStatus.Running) {
+                    while (true) {
+                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                        val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
+                        if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
                         kotlinx.coroutines.delay(10)
                     }
                 }
@@ -899,7 +919,9 @@ class JobWorkerFlowTest {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 kotlinx.coroutines.withTimeout(5000) {
-                    while (jobManager.jobs.value.first().resumeState == null) {
+                    while (true) {
+                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                        if (activeJob?.resumeState != null) break
                         kotlinx.coroutines.delay(10)
                     }
                 }
@@ -907,7 +929,7 @@ class JobWorkerFlowTest {
         }
 
         // Verify capability resume state is serialized
-        val pausedJob = jobManager.jobs.value.first()
+        val pausedJob = jobManager.jobs.value.find { it.id == job.id } ?: jobManager.endedJobs.value.first { it.id == job.id }
         val resumeState = pausedJob.resumeState as? kotlinx.serialization.json.JsonObject
         assertNotNull(resumeState)
         val capResumeStates = resumeState["capabilityResumeStates"]?.jsonObject
@@ -1009,8 +1031,8 @@ class JobWorkerFlowTest {
         }
 
         every { PluginLoader.getPluginById("test-plugin") } returns mockPluginEntry
-        every { mockPluginEntry.getProcessor() } returns mockProcessor
-        every { mockPluginEntry.getManifest() } returns org.wip.plugintoolkit.api.PluginManifest(
+        every { mockPluginEntry.getProcessor() } answers { Result.success(mockProcessor) }
+        every { mockPluginEntry.getManifest() } answers { Result.success(org.wip.plugintoolkit.api.PluginManifest(
             manifestVersion = "1.0",
             plugin = org.wip.plugintoolkit.api.PluginInfo(
                 id = "test-plugin",
@@ -1032,7 +1054,7 @@ class JobWorkerFlowTest {
                     )
                 )
             )
-        )
+        )) }
 
         var capturedParameters: Map<String, kotlinx.serialization.json.JsonElement>? = null
         coEvery { mockProcessor.process(any(), any()) } coAnswers {
@@ -1140,8 +1162,8 @@ class JobWorkerFlowTest {
         }
 
         every { PluginLoader.getPluginById("test-plugin") } returns mockPluginEntry
-        every { mockPluginEntry.getProcessor() } returns mockProcessor
-        every { mockPluginEntry.getManifest() } returns org.wip.plugintoolkit.api.PluginManifest(
+        every { mockPluginEntry.getProcessor() } answers { Result.success(mockProcessor) }
+        every { mockPluginEntry.getManifest() } answers { Result.success(org.wip.plugintoolkit.api.PluginManifest(
             manifestVersion = "1.0",
             plugin = org.wip.plugintoolkit.api.PluginInfo(
                 id = "test-plugin",
@@ -1163,7 +1185,7 @@ class JobWorkerFlowTest {
                     )
                 )
             )
-        )
+        )) }
 
         var capturedParameters: Map<String, kotlinx.serialization.json.JsonElement>? = null
         coEvery { mockProcessor.process(any(), any()) } coAnswers {

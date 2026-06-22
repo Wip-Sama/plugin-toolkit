@@ -55,14 +55,14 @@ class PluginViewModel(
             .onEach { activeIds ->
                 loadedPlugins = PluginLoader.getPlugins().filter {
                     try {
-                        activeIds.contains(it.getManifest().plugin.id)
+                        activeIds.contains(it.getManifest().getOrThrow().plugin.id)
                     } catch (t: Throwable) {
                         Logger.e(t) { "Failed to get manifest during VM sync" }
                         false
                     }
                 }
                 val selectedId = try {
-                    selectedPlugin?.getManifest()?.plugin?.id
+                    selectedPlugin?.let { it.getManifest().getOrThrow().plugin.id }
                 } catch (t: Throwable) {
                     //TODO: maybe do something
                     null
@@ -85,7 +85,7 @@ class PluginViewModel(
         parameterValues.clear()
 
         val pkg = try {
-            selectedPlugin?.getManifest()?.plugin?.id ?: ""
+            selectedPlugin?.let { it.getManifest().getOrThrow().plugin.id } ?: ""
         } catch (t: Throwable) {
             ""
         }
@@ -113,7 +113,7 @@ class PluginViewModel(
             if (result.isSuccess) {
                 val plugin = result.getOrThrow()
                 try {
-                    val pkg = plugin.getManifest().plugin.id
+                    val pkg = plugin.getManifest().getOrThrow().plugin.id
                     plugin.initialize(pluginManager.createPluginContext(pkg))
                     loadedPlugins = PluginLoader.getPlugins()
                     selectPlugin(plugin)
@@ -155,7 +155,7 @@ class PluginViewModel(
             val jobId = jobCounterMutex.withLock { ++jobCounter }.toString()
 
             val manifest = try {
-                plugin.getManifest()
+                plugin.getManifest().getOrThrow()
             } catch (t: Throwable) {
                 Logger.e(t) { "Failed to get manifest for job creation" }
                 null
@@ -190,7 +190,7 @@ class PluginViewModel(
 
     fun clearCapabilityHistory() {
         val pluginId = try {
-            selectedPlugin?.getManifest()?.plugin?.id
+            selectedPlugin?.let { it.getManifest().getOrThrow().plugin.id }
         } catch (t: Throwable) {
             null
         }

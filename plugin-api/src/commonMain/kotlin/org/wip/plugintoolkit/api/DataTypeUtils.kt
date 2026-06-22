@@ -96,7 +96,16 @@ fun isSemanticTypeCompatible(source: List<SemanticType>, target: List<SemanticTy
                 s.namespace.equals(t.namespace, ignoreCase = true)
             }
             if (nsMatches) {
-                if (s.name.equals(t.name, ignoreCase = true)) {
+                val sName = if (s.name == "*") null else s.name
+                val tName = if (t.name == "*") null else t.name
+                val nameMatches = when {
+                    sName.equals(tName, ignoreCase = true) -> true
+                    tName == null -> true // Target accepts anything
+                    sName == null -> lenient // Source provides anything
+                    else -> false
+                }
+                
+                if (nameMatches) {
                     val sVar = if (s.variant == "*") null else s.variant
                     val tVar = if (t.variant == "*") null else t.variant
                     val variantMatches = when {
@@ -139,28 +148,38 @@ fun DataType.format(): String {
     }
 }
 
+private fun isIterable(type: DataType): Boolean {
+    if (type is DataType.Array) return true
+    if (type is DataType.Object) {
+        val name = type.className.substringAfterLast('.').lowercase()
+        return name.contains("list") || name.contains("array") || name.contains("tuple") || 
+               name.contains("pair") || name.contains("triple") || name.contains("set") || 
+               name.contains("collection") || name.contains("iterable")
+    }
+    return false
+}
+
 /**
  * Checks if a value of this [DataType] can be automatically converted to another [DataType].
  *
  * Conversion rules:
  * 1. Convert between numeric primitives (INT and DOUBLE).
- * 2. Convert between list/array and tuple/pair/triple.
+ * 2. Convert between iterables (list, set, tuple, etc.).
+ * 3. Wrap a single element into an iterable.
  */
 fun DataType.canConvert(other: DataType): Boolean {
     if (this == other) return false
 
-    // Rule 2: List / Tuple conversions & Rule 3: Single element (Any / Primitive / Object) to List / Tuple
-    val thisStr = this.format().lowercase()
-    val otherStr = other.format().lowercase()
+    val isThisIterable = isIterable(this)
+    val isOtherIterable = isIterable(other)
 
-    val isThisListOrTuple = thisStr.contains("list") || thisStr.contains("array") || thisStr.contains("tuple") || thisStr.contains("pair") || thisStr.contains("triple")
-    val isOtherListOrTuple = otherStr.contains("list") || otherStr.contains("array") || otherStr.contains("tuple") || otherStr.contains("pair") || otherStr.contains("triple")
-
-    if (isThisListOrTuple && isOtherListOrTuple) {
+    // Rule 2: Iterable to Iterable
+    if (isThisIterable && isOtherIterable) {
         return true
     }
 
-    if (isOtherListOrTuple && !isThisListOrTuple) {
+    // Rule 3: Single element to Iterable
+    if (isOtherIterable && !isThisIterable) {
         return true
     }
 
