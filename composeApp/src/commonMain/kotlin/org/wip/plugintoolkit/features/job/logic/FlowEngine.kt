@@ -346,11 +346,13 @@ class FlowEngine(
                     val plugin = PluginLoader.getPluginById(node.pluginInfo.id)
                         ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
                     val manifest = plugin.getManifest().getOrThrow()
-                    val (allowedPaths, isDestructive) = resolveFileAccess(manifest, node.capability.name, capabilityParameters)
+                    val nodeSandbox = "$appDataDir/jobs/${job.id}/sandbox/node_${node.id}"
+                    val (allowedPaths, isDestructive) = resolveFileAccess(manifest, node.capability.name, capabilityParameters, nodeSandbox)
                     validateCapabilityParameters(manifest, node.capability.name, capabilityParameters)
 
                     val processor = plugin.getProcessor().getOrThrow()
-                    val context = pluginManager.createPluginContext(node.pluginInfo.id, job.id, allowedPaths = allowedPaths, isDestructiveAllowed = isDestructive)
+                    val execFs = org.wip.plugintoolkit.features.plugin.logic.DefaultExecutionFileSystem(nodeSandbox)
+                    val context = pluginManager.createPluginContext(node.pluginInfo.id, job.id, allowedPaths = allowedPaths, isDestructiveAllowed = isDestructive, executionFileSystem = execFs)
                     val savedCapResumeState = capabilityResumeStates[node.id]
                     val request = PluginRequest(node.capability.name, capabilityParameters, savedCapResumeState)
 

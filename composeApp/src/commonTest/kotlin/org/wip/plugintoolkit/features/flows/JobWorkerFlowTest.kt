@@ -791,6 +791,8 @@ class JobWorkerFlowTest {
                 single { mockLifecycleCoordinator }
             })
         }
+        
+        try {
 
         // Mock PluginLoader and the PluginEntry / DataProcessor
         mockkObject(PluginLoader)
@@ -954,6 +956,9 @@ class JobWorkerFlowTest {
 
         val finalJob = jobManager.endedJobs.value.first { it.id == job.id }
         assertEquals(org.wip.plugintoolkit.features.job.model.JobStatus.Completed, finalJob.status)
+        } finally {
+            org.koin.core.context.stopKoin()
+        }
     }
 
     @Test

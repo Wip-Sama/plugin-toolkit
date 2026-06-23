@@ -12,6 +12,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.ExecutionFileSystem
+import org.wip.plugintoolkit.api.HostFileSystem
 import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginSignal
@@ -31,6 +33,8 @@ class MathOperationsTest {
     ) : PluginContext {
         override val fileSystem: PluginFileSystem get() = throw UnsupportedOperationException()
         override val cacheFileSystem: PluginFileSystem get() = throw UnsupportedOperationException()
+        override val executionFileSystem: ExecutionFileSystem get() = throw UnsupportedOperationException()
+        override val hostFileSystem: HostFileSystem get() = throw UnsupportedOperationException()
         override val settings: Map<String, JsonElement> get() = emptyMap()
         override fun setRequiredAction(actionName: String?) {}
     }

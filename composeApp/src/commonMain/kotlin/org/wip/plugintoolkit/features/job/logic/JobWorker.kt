@@ -24,6 +24,7 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import kotlin.time.Duration.Companion.minutes
 
 class JobWorker(
@@ -117,6 +118,11 @@ class JobWorker(
             manager.tryFailJob(job.id, e.message)
             lifecycleCoordinator.onLifecycleJobFailed(job, e.message)
             Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
+        } finally {
+            val settingsPersistence: SettingsPersistence = get()
+            val appDataDir = settingsPersistence.getSettingsDir()
+            val sandboxDir = kotlinx.io.files.Path("$appDataDir/jobs/${job.id}/sandbox")
+            deleteRecursively(sandboxDir)
         }
     }
 
@@ -126,12 +132,15 @@ class JobWorker(
 
         val manifest = plugin.getManifest().getOrThrow()
         val mutableParams = job.parameters.toMutableMap()
-        val (allowedPaths, isDestructive) = resolveFileAccess(manifest, job.capabilityName, mutableParams)
+        val settingsPersistence: SettingsPersistence = get()
+        val sandboxDir = "${settingsPersistence.getSettingsDir()}/jobs/${job.id}/sandbox/node_0"
+        val (allowedPaths, isDestructive) = resolveFileAccess(manifest, job.capabilityName, mutableParams, sandboxDir)
 
         validateCapabilityParameters(manifest, job.capabilityName, mutableParams)
 
         val processor = plugin.getProcessor().getOrThrow()
-        val context = pluginManager.createPluginContext(job.pluginId, job.id, allowedPaths = allowedPaths, isDestructiveAllowed = isDestructive)
+        val execFs = org.wip.plugintoolkit.features.plugin.logic.DefaultExecutionFileSystem(sandboxDir)
+        val context = pluginManager.createPluginContext(job.pluginId, job.id, allowedPaths = allowedPaths, isDestructiveAllowed = isDestructive, executionFileSystem = execFs)
 
         val request = PluginRequest(
             method = job.capabilityName,

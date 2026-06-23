@@ -277,27 +277,46 @@ private fun getLeafPrimitives(element: JsonElement, type: DataType): List<String
 fun resolveFileAccess(
     manifest: PluginManifest,
     capabilityName: String,
-    parameters: MutableMap<String, JsonElement>
+    parameters: MutableMap<String, JsonElement>,
+    sandboxPath: String? = null
 ): Pair<List<String>, Boolean> {
     val capability = manifest.capabilities.find { it.name == capabilityName } ?: return Pair(emptyList(), false)
     val paramMetadataMap = capability.parameters ?: return Pair(emptyList(), false)
 
     val allowedPaths = mutableListOf<String>()
 
-    // First pass: Resolve pathTemplate for parameters that are empty or missing
+    // First pass: Resolve pathTemplate or auto-route to sandbox for parameters that are empty or missing
     for ((paramName, metadata) in paramMetadataMap) {
+        val isFileOutput = metadata.semanticTypes.any { st ->
+            val fullType = "${st.namespace}/${st.name}"
+            fullType == "file/output" || fullType == "folder/output"
+        }
+        val isFileOrFolder = metadata.semanticTypes.any { st ->
+            val fullType = "${st.namespace}/${st.name}"
+            fullType.startsWith("file/") || fullType.startsWith("folder/")
+        }
+        
+        val currentValue = parameters[paramName]?.let { if (it is JsonPrimitive) it.content else null }
         val template = metadata.pathTemplate
-        if (!template.isNullOrEmpty()) {
-            val currentValue = parameters[paramName]?.let { if (it is JsonPrimitive) it.content else null }
-            if (currentValue.isNullOrBlank()) {
+        
+        if (currentValue.isNullOrBlank()) {
+            if (!template.isNullOrEmpty()) {
                 var resolvedPath = template
                 val regex = Regex("""\{([^}]+)\}""")
                 resolvedPath = regex.replace(resolvedPath) { matchResult ->
                     val key = matchResult.groupValues[1]
-                    val value = parameters[key]?.let { if (it is JsonPrimitive) it.content else null } ?: ""
-                    value
+                    if (sandboxPath != null && key == "output_folder") {
+                        sandboxPath
+                    } else {
+                        val value = parameters[key]?.let { if (it is JsonPrimitive) it.content else null } ?: ""
+                        value
+                    }
                 }
                 parameters[paramName] = JsonPrimitive(resolvedPath)
+            } else if (sandboxPath != null && isFileOutput) {
+                // Auto route unmapped outputs to sandbox
+                val generatedPath = kotlinx.io.files.Path(sandboxPath, "${capabilityName}_${paramName}_${kotlin.random.Random.nextInt(10000)}.tmp").toString()
+                parameters[paramName] = JsonPrimitive(generatedPath)
             }
         }
     }
@@ -324,5 +343,21 @@ fun resolveFileAccess(
     val isDestructive = capability.fileAccess?.isDestructive == true
 
     return Pair(allowedPaths, isDestructive)
+}
+
+fun deleteRecursively(path: kotlinx.io.files.Path) {
+    if (kotlinx.io.files.SystemFileSystem.exists(path)) {
+        val metadata = kotlinx.io.files.SystemFileSystem.metadataOrNull(path)
+        if (metadata?.isDirectory == true) {
+            kotlinx.io.files.SystemFileSystem.list(path).forEach { child ->
+                deleteRecursively(child)
+            }
+        }
+        try {
+            kotlinx.io.files.SystemFileSystem.delete(path)
+        } catch (e: Exception) {
+            // Ignore errors during cleanup
+        }
+    }
 }
 

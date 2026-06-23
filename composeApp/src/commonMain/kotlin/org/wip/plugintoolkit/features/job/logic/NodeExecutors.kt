@@ -4,6 +4,7 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
+import kotlinx.io.readByteArray
 import kotlinx.io.writeString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -122,9 +123,12 @@ class SaveNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val data = context.getInputValue("data", "")
         val filePath = context.getInputValue("file_path", "output.txt") as String
-        val dataString = when (data) {
-            is JsonElement -> data.toString()
-            else -> data?.toString() ?: ""
+        val isDestructiveVal = context.getInputValue("is_destructive", false)
+        val isDestructive = when (isDestructiveVal) {
+            is Boolean -> isDestructiveVal
+            is String -> isDestructiveVal.toBoolean()
+            is Number -> isDestructiveVal.toInt() != 0
+            else -> false
         }
 
         val path = Path(filePath)
@@ -138,10 +142,37 @@ class SaveNodeExecutor : NodeExecutor {
         if (parent != null && !SystemFileSystem.exists(parent)) {
             SystemFileSystem.createDirectories(parent)
         }
-        SystemFileSystem.sink(fullPath).buffered().use { it.writeString(dataString) }
+
+        val dataString = when (data) {
+            is JsonElement -> {
+                if (data is kotlinx.serialization.json.JsonPrimitive && data.isString) data.content else data.toString()
+            }
+            else -> data?.toString() ?: ""
+        }
+
+        val possibleSourcePath = Path(dataString)
+        if (possibleSourcePath.isAbsolute && SystemFileSystem.exists(possibleSourcePath) && !SystemFileSystem.metadataOrNull(possibleSourcePath)!!.isDirectory) {
+            // It's a file, perform copy
+            val sourceBytes = SystemFileSystem.source(possibleSourcePath).buffered().use { it.readByteArray() }
+            SystemFileSystem.sink(fullPath).buffered().use { it.write(sourceBytes) }
+            context.addLog("Copied file from $possibleSourcePath to $fullPath")
+            
+            if (isDestructive) {
+                try {
+                    SystemFileSystem.delete(possibleSourcePath)
+                    context.addLog("Deleted source file $possibleSourcePath (is_destructive=true)")
+                } catch (e: Exception) {
+                    context.addLog("Warning: failed to delete source file $possibleSourcePath: ${e.message}", "WARN")
+                }
+            }
+        } else {
+            // It's plain text data
+            SystemFileSystem.sink(fullPath).buffered().use { it.writeString(dataString) }
+            context.addLog("Saved data to file: $filePath")
+        }
 
         context.setOutputValue("success", true)
-        context.addLog("Saved data to file: $filePath")
+        context.setOutputValue("saved_path", fullPath.toString())
     }
 }
 

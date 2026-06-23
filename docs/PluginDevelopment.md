@@ -307,11 +307,37 @@ While you can set a plugin to "not support cancellation" the host app can force-
 
 ### Working with the Host
 
-The `PluginContext` (and focused interfaces like `PluginLogger`, `PluginFileSystem`) provide access to host services:
+The `PluginContext` (and focused interfaces like `PluginLogger`, `PluginFileSystem`, `ExecutionFileSystem`, `HostFileSystem`) provide access to host services:
 - **Logger**: `PluginLogger` (e.g. `logger.info("Message")`)
-- **File System**: `PluginFileSystem` (e.g. `fileSystem.getBasePath()`)
+- **Plugin File System**: `PluginFileSystem` (Persistent, isolated storage for the plugin. Preserved across executions. e.g. `fileSystem.getBasePath()`)
+- **Execution File System**: `ExecutionFileSystem` (Temporary, isolated sandbox storage for the current execution. Cleared automatically after the flow finishes.)
+- **Host File System**: `HostFileSystem` (External file access. Restricted to paths explicitly granted by the user via file input/output ports. Requires `@CapabilityFileAccess` annotation.)
 - **Progress**: `ProgressReporter` (e.g. `progress.report(0.5f)`)
 - **Signals**: `PluginSignalManager` (e.g. `context.signals.onSignal { ... }`)
+
+#### File Systems & Sandboxing
+
+Plugins operate within strict file system sandboxes to ensure user privacy and prevent conflicts.
+
+1. **Internal Operations (PluginFileSystem & ExecutionFileSystem)**: When your plugin needs to save internal data, temporary processing files, or downloaded models, use `PluginFileSystem` (for persistent data) or `ExecutionFileSystem` (for temporary, per-job data). These operate within an isolated folder.
+2. **External File Access (HostFileSystem)**: If your capability needs to read or write files outside its sandbox (e.g., reading a user's document, saving a final exported file to their Desktop), you MUST use `HostFileSystem`. Access is strictly limited to files/folders explicitly passed into the capability's parameters by the user.
+
+To declare that a capability will use the `HostFileSystem`, annotate the capability function with `@CapabilityFileAccess`:
+
+```kotlin
+@Capability(name = "Process External File")
+@CapabilityFileAccess(readsFiles = true, writesFiles = true, isDestructive = false)
+fun processFile(
+    @CapabilityParam(description = "Input File", semanticType = "file/input") inFile: String,
+    @CapabilityParam(description = "Output File", semanticType = "file/output") outFile: String,
+    hostFs: HostFileSystem
+) {
+    // Operations on hostFs are allowed ONLY for `inFile` and `outFile` paths
+}
+```
+
+> [!WARNING]
+> Unmapped Output Auto-Routing: If a flow contains a capability with a `file/output` parameter, but the user leaves the parameter empty (unmapped) in the flow editor, the host application will **automatically route that output into the Execution Sandbox** by generating a temporary `.tmp` path. This ensures intermediate files between flow nodes are cleanly sandboxed and deleted after execution.
 
 You can inject either the full `PluginContext` or just the specific interfaces your function needs:
 

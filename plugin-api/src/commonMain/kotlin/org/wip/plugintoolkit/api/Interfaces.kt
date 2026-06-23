@@ -85,15 +85,15 @@ interface PluginModuleProvider {
 }
 
 /**
- * File system interface for plugins, restricting operations to the plugin's managed folder.
+ * Base interface for isolated file systems, restricting operations to a specific managed folder.
  *
- * All paths provided to these methods are relative to the plugin's base directory.
- * This ensures that plugins cannot interfere with each other or the host application's files.
+ * All paths provided to these methods are relative to the base directory.
+ * This ensures that operations cannot interfere with files outside the managed scope.
  * 
  * **SECURITY WARNING:** Implementations of this interface must rigidly validate all relative paths
  * to prevent Path Traversal attacks (e.g., verifying paths do not contain "../" or start with "/").
  */
-interface PluginFileSystem {
+interface ScopedFileSystem {
     suspend fun readFile(relativePath: String): ByteArray?
     suspend fun readTextFile(relativePath: String): String?
     suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit>
@@ -103,17 +103,27 @@ interface PluginFileSystem {
     suspend fun deleteFile(relativePath: String): Result<Unit>
 
     /**
+     * Get the absolute base path of the managed file area.
+     */
+    fun getBasePath(): String
+}
+
+/**
+ * File system interface for persistent plugin storage (e.g. settings, downloaded models).
+ */
+interface PluginFileSystem : ScopedFileSystem {
+    /**
      * Extract a resource bundled inside the plugin JAR to the plugin's managed file area.
      * @param resourcePath Path to the resource inside the JAR (e.g. "scripts/install.bat").
      * @param targetRelativePath Relative path within the plugin's managed folder to write to.
      */
     suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit>
-
-    /**
-     * Get the absolute base path of the plugin's managed file area.
-     */
-    fun getBasePath(): String
 }
+
+/**
+ * File system interface for temporary execution storage (e.g. job sandboxes).
+ */
+interface ExecutionFileSystem : ScopedFileSystem
 
 /**
  * File system interface for interacting with the host machine's external file system.
@@ -237,6 +247,7 @@ interface PluginContext {
     val progress: ProgressReporter
     val fileSystem: PluginFileSystem
     val cacheFileSystem: PluginFileSystem
+    val executionFileSystem: ExecutionFileSystem
     val hostFileSystem: HostFileSystem
     val settings: Map<String, JsonElement>
     val signals: PluginSignalManager

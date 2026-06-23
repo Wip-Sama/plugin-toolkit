@@ -288,7 +288,7 @@ class PluginLifecycleManager(
         }
     }
 
-    fun createPluginContext(pkg: String, jobId: String? = null, manifest: PluginManifest? = null, allowedPaths: List<String> = emptyList(), isDestructiveAllowed: Boolean = false): PluginContext {
+    fun createPluginContext(pkg: String, jobId: String? = null, manifest: PluginManifest? = null, allowedPaths: List<String> = emptyList(), isDestructiveAllowed: Boolean = false, executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null): PluginContext {
         val plugin = registry.getPlugin(pkg)
         val installPath = plugin?.installPath ?: ""
         val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }
@@ -317,6 +317,7 @@ class PluginLifecycleManager(
             progress = progressReporter,
             fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
             cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath),
+            executionFileSystem = executionFileSystem ?: DefaultExecutionFileSystem("${installPath}/temp_execution"),
             hostFileSystem = HostFileSystemImpl(allowedPaths, isDestructiveAllowed),
             settings = mergedSettings,
             onRequiredActionChange = { actionName ->
@@ -388,6 +389,7 @@ class DefaultPluginContext(
     override val progress: ProgressReporter,
     override val fileSystem: PluginFileSystem,
     override val cacheFileSystem: PluginFileSystem,
+    override val executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem,
     override val hostFileSystem: org.wip.plugintoolkit.api.HostFileSystem,
     override val settings: Map<String, JsonElement>,
     override val signals: PluginSignalManager = DefaultPluginSignalManager(),

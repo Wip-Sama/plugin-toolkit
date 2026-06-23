@@ -54,6 +54,7 @@ object ModuleGenerator {
                     Int::class.asClassName() -> CodeBlock.of("0")
                     Boolean::class.asClassName() -> CodeBlock.of("false")
                     Double::class.asClassName() -> CodeBlock.of("0.0")
+                    Float::class.asClassName() -> CodeBlock.of("0f")
                     else -> CodeBlock.of("%T()", type)
                 }
 
