@@ -149,7 +149,7 @@ class ManifestProcessor(
             
             // Bundle changelog into resources
             val extension = changelogFile.extension
-            writeFile(sourceFile, "", "META-INF/changelog", extension, content)
+            writeFile(sourceFile, "", "resources/changelog", extension, content)
         }
 
         // 2. Generate Kotlin Classes

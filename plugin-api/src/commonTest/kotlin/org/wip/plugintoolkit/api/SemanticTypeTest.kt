@@ -158,4 +158,20 @@ class SemanticTypeTest {
         assertTrue(isSemanticTypeCompatible(multiSource, multiTargetStrict, lenient = true))
         assertFalse(isSemanticTypeCompatible(multiSource, multiTargetStrict, lenient = false))
     }
+
+    @Test
+    fun testCommonSemanticTypes() {
+        assertEquals("path", CommonSemanticTypes.PATH.canonicalId)
+        assertEquals("path/file", CommonSemanticTypes.PATH_FILE.canonicalId)
+        assertEquals("path/folder", CommonSemanticTypes.PATH_FOLDER.canonicalId)
+        assertEquals("image", CommonSemanticTypes.IMAGE.canonicalId)
+        assertEquals("image/png", CommonSemanticTypes.IMAGE_PNG.canonicalId)
+        assertEquals("image/jpeg", CommonSemanticTypes.IMAGE_JPEG.canonicalId)
+        assertEquals("text", CommonSemanticTypes.TEXT.canonicalId)
+        assertEquals("text/plain", CommonSemanticTypes.TEXT_PLAIN.canonicalId)
+        assertEquals("text/markdown", CommonSemanticTypes.TEXT_MARKDOWN.canonicalId)
+        assertEquals("text/html", CommonSemanticTypes.TEXT_HTML.canonicalId)
+        assertEquals("json", CommonSemanticTypes.JSON.canonicalId)
+        assertEquals("xml", CommonSemanticTypes.XML.canonicalId)
+    }
 }
