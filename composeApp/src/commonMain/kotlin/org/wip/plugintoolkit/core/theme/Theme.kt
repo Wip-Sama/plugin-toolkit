@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -182,9 +183,13 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
             else -> LightColorScheme
         }
 
+    val isLightPrimary = seedColor.luminance() > 0.5f
+    val onPrimaryColor = if (isLightPrimary) Color.Black else Color.White
+
     val colorScheme =
         baseScheme.copy(
             primary = seedColor,
+            onPrimary = onPrimaryColor,
             primaryContainer = seedColor.copy(alpha = 0.2f),
             onPrimaryContainer = seedColor,
             error = Color(0xFFB00020),

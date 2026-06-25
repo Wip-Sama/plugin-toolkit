@@ -1,10 +1,10 @@
 Version: 1.7.0
-Date: xx-06-2026
+Date: 24-06-2026
 Added:
 	- It's not possible to change a connection destination/origin after its creation
 	- Tooltip names for the capability/flows with long names
 	- Flows and Nodes now are in a not-ready state if a required parameter is not connected or has a default
-	- Components in nodes no longer default to violet/purple color for accents in some elements
+	- Components no longer default to the color purple for accents
 	- PluginsSetting can now define constraints like the CapabilityParameter
 Changes:
   - now updating a plugin will make the button reflect what's happening to avoid confusion
