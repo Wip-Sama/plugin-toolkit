@@ -142,10 +142,19 @@ object ManifestGenerator {
                         )
                     } else "null"
                     
+                    val isInputLoc = param.annotations.any { it.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) }
+                    val isOutputLoc = param.annotations.any { it.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION) }
+                    val roleStr = when {
+                        isInputLoc -> "INPUT_LOCATION"
+                        isOutputLoc -> "OUTPUT_LOCATION"
+                        else -> "STANDARD"
+                    }
+                    val roleCode = CodeBlock.of("%T.%L", org.wip.plugintoolkit.api.ParameterRole::class, roleStr)
+                    
                     val semanticTypesList = semTypesVal.flatMap { org.wip.plugintoolkit.api.parseSemanticTypes(it) }
                     val semanticTypesCode = generateSemanticTypesCode(semanticTypesList)
                     
-                    capabilitiesCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L, semanticTypes = %L)", paramNameStr, CN_PARAMETER_METADATA, defaultValueCode, paramDesc, MN_GET_DATA_TYPE, paramType, constraintsCode, required, secret, semanticTypesCode)
+                    capabilitiesCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L, semanticTypes = %L, role = %L)", paramNameStr, CN_PARAMETER_METADATA, defaultValueCode, paramDesc, MN_GET_DATA_TYPE, paramType, constraintsCode, required, secret, semanticTypesCode, roleCode)
                     if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
                 }
             }
