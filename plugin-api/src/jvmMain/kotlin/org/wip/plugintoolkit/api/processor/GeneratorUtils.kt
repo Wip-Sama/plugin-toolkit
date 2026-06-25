@@ -172,7 +172,7 @@ object GeneratorUtils {
         }
 
         val funcOutputAnn = func.annotations.find { 
-            it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput") 
+            it.hasQualifiedName(ProcessorConstants.CAPABILITY_RESULT_ANNOTATION) 
         }
 
         if (funcOutputAnn != null) {
@@ -199,13 +199,13 @@ object GeneratorUtils {
             val classDecl = declaration as KSClassDeclaration
             val properties = classDecl.getAllProperties().toList()
             val hasAnnotatedProperties = properties.any { prop ->
-                prop.annotations.any { it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput") }
+                prop.annotations.any { it.hasQualifiedName(ProcessorConstants.CAPABILITY_RESULT_ANNOTATION) }
             }
 
             if (hasAnnotatedProperties) {
                 return properties.map { prop ->
                     val propAnn = prop.annotations.find { 
-                        it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput") 
+                        it.hasQualifiedName(ProcessorConstants.CAPABILITY_RESULT_ANNOTATION) 
                     }
                     val name = propAnn?.arguments?.find { it.name?.asString() == "name" }?.value as? String ?: ""
                     val desc = propAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""

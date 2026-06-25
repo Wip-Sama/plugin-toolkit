@@ -26,6 +26,8 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.io.buffered
+import kotlinx.io.writeString
 
 class JobWorker(
     val workerId: Int,
@@ -208,6 +210,21 @@ class JobWorker(
             is ExecutionResult.Success -> {
                 val response = result.response
                 manager.tryCompleteJob(job.id, response.result?.toString())
+                
+                val outputFile = job.parameters["_outputFile"]?.let { 
+                    if (it is kotlinx.serialization.json.JsonPrimitive) it.content else null 
+                }
+                if (!outputFile.isNullOrBlank() && response.result != null) {
+                    try {
+                        val path = kotlinx.io.files.Path(outputFile)
+                        kotlinx.io.files.SystemFileSystem.sink(path).buffered().use { sink ->
+                            sink.writeString(response.result.toString())
+                        }
+                    } catch (e: Exception) {
+                        Logger.e(e) { "Failed to save capability result to $outputFile" }
+                    }
+                }
+
                 lifecycleCoordinator.onLifecycleJobCompleted(job)
             }
 

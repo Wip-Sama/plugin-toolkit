@@ -276,7 +276,8 @@ sealed class Node {
             for ((portId, metadata) in parameters) {
                 if (metadata.required) {
                     val inputPort = inputs.find { it.id == portId }
-                    val providedByValue = inputPort?.dataType?.isProvided(AnySerializer.toJsonElement(inputPort.value)) == true
+                    val effectiveValue = inputPort?.value ?: inputPort?.defaultValue
+                    val providedByValue = inputPort?.dataType?.isProvided(AnySerializer.toJsonElement(effectiveValue)) == true
                     val providedByConnection = connections.any { it.targetNodeId == id && it.targetPortId == portId }
                     if (!providedByValue && !providedByConnection) {
                         return false
@@ -458,6 +459,14 @@ data class Flow(
         return nodes.filterIsInstance<Node.CapabilityNode>().any {
             it.capability.fileAccess?.isDestructive == true
         }
+    }
+
+    fun getFileAccess(): org.wip.plugintoolkit.api.FileAccess? {
+        val reads = nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.fileAccess?.readsFiles == true }
+        val writes = nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.fileAccess?.writesFiles == true }
+        val destructive = isDestructive()
+        if (!reads && !writes && !destructive) return null
+        return org.wip.plugintoolkit.api.FileAccess(readsFiles = reads, writesFiles = writes, isDestructive = destructive)
     }
 }
 

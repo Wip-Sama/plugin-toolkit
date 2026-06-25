@@ -10,6 +10,8 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
+import kotlinx.io.buffered
+import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -67,6 +69,24 @@ class FlowEngine(
         try {
             val jsonOutputs = executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject)
             val finalJson = toJsonElement(jsonOutputs).toString()
+            val outputFileStr = job.parameters["-1"]?.let { param ->
+                try {
+                    val primitive = param as? kotlinx.serialization.json.JsonPrimitive
+                    if (primitive != null && primitive.isString) primitive.content else null
+                } catch (e: Exception) { null }
+            }
+            if (!outputFileStr.isNullOrBlank() && job.keepResult) {
+                try {
+                    val path = kotlinx.io.files.Path(outputFileStr)
+                    kotlinx.io.files.SystemFileSystem.sink(path).buffered().use { sink ->
+                        sink.writeString(finalJson)
+                    }
+                    manager.addJobLog(job.id, "Flow result saved to: $outputFileStr")
+                } catch (e: Exception) {
+                    manager.addJobLog(job.id, "Warning: Failed to save flow result to $outputFileStr: ${e.message}")
+                }
+            }
+
             manager.addJobLog(job.id, "Flow executed successfully. Final output results: $finalJson")
             manager.tryCompleteJob(job.id, finalJson)
             lifecycleCoordinator.onLifecycleJobCompleted(job)

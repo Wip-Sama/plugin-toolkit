@@ -18,7 +18,8 @@ object SemanticRegistry {
      */
     fun getCategory(types: List<SemanticType>): SemanticCategory? {
         val mappedCategories = types.mapNotNull { type ->
-            when (type.name.lowercase()) {
+            val primary = (type.namespace ?: type.name).lowercase()
+            when (primary) {
                 "color" -> SemanticCategory.COLOR
                 "image" -> SemanticCategory.IMAGE
                 "audio" -> SemanticCategory.AUDIO
@@ -50,37 +51,41 @@ object SemanticRegistry {
         var hasGenericVideo = false
 
         for (type in types) {
-            val nameLower = type.name.lowercase()
+            val primary = (type.namespace ?: type.name).lowercase()
             val variant = type.variant
 
-            when (nameLower) {
+            when (primary) {
                 "image" -> {
-                    if (variant == null || variant == "*") {
+                    val ext = if (type.namespace != null) type.name else type.variant
+                    if (ext == null || ext == "*") {
                         hasGenericImage = true
                     } else {
-                        extensions.add(variant)
+                        extensions.add(ext)
                     }
                 }
 
                 "audio" -> {
-                    if (variant == null || variant == "*") {
+                    val ext = if (type.namespace != null) type.name else type.variant
+                    if (ext == null || ext == "*") {
                         hasGenericAudio = true
                     } else {
-                        extensions.add(variant)
+                        extensions.add(ext)
                     }
                 }
 
                 "video" -> {
-                    if (variant == null || variant == "*") {
+                    val ext = if (type.namespace != null) type.name else type.variant
+                    if (ext == null || ext == "*") {
                         hasGenericVideo = true
                     } else {
-                        extensions.add(variant)
+                        extensions.add(ext)
                     }
                 }
 
                 "file" -> {
-                    if (variant != null && variant != "*") {
-                        extensions.add(variant)
+                    val ext = if (type.namespace != null) type.name else type.variant
+                    if (ext != null && ext != "*") {
+                        extensions.add(ext)
                     }
                 }
             }

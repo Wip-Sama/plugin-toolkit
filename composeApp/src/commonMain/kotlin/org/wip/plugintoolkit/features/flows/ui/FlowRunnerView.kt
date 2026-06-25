@@ -57,6 +57,7 @@ import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
+import org.wip.plugintoolkit.shared.components.plugin.FileAccessChips
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_collected_automatically
 import plugintoolkit.composeapp.generated.resources.flow_execute_button
@@ -77,7 +78,8 @@ data class FlowParameter(
     val portId: String,
     val dataType: DataType,
     val defaultValue: String,
-    val semanticTypes: List<SemanticType> = emptyList()
+    val semanticTypes: List<SemanticType> = emptyList(),
+    val role: org.wip.plugintoolkit.api.ParameterRole = org.wip.plugintoolkit.api.ParameterRole.STANDARD
 )
 
 enum class ParameterType {
@@ -208,7 +210,8 @@ fun FlowRunnerView(
                                                         org.wip.plugintoolkit.api.parseSemanticTypes(
                                                             "file"
                                                         )
-                                                    }
+                                                    },
+                                                    role = org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION
                                                 )
                                             )
                                         } else emptyList()
@@ -230,7 +233,8 @@ fun FlowRunnerView(
                                                         org.wip.plugintoolkit.api.parseSemanticTypes(
                                                             "file"
                                                         )
-                                                    }
+                                                    },
+                                                    role = org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
                                                 )
                                             )
                                         } else emptyList()
@@ -287,101 +291,56 @@ fun FlowRunnerView(
                 }
 
                 // Filter parameters: SAVE nodes are classified as outputs!
-                val inputs = flowParameters.filter { it.type != ParameterType.OUTPUT && it.type != ParameterType.SAVE }
-                val outputs = flowParameters.filter { it.type == ParameterType.OUTPUT || it.type == ParameterType.SAVE }
+                val baseInputs = flowParameters.filter { it.type != ParameterType.OUTPUT }
+                val outputs = flowParameters.filter { it.type == ParameterType.OUTPUT }.toMutableList()
 
-                // Runner Card (Standard GlassCard)
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SectionHeader(
-                            title = stringResource(Res.string.flow_run_title, currentFlow.name),
-                            icon = Icons.Default.PlayArrow,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                stringResource(Res.string.plugin_save_results),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Switch(
-                                checked = viewModel.saveResults,
-                                onCheckedChange = { viewModel.saveResults = it },
-                                modifier = Modifier.scale(0.8f)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-                    Text(
-                        stringResource(Res.string.flow_run_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                val inputs = baseInputs.toMutableList()
+                if (viewModel.saveResults && outputs.isNotEmpty()) {
+                    val outputFileParam = FlowParameter(
+                        nodeId = -1L,
+                        type = ParameterType.SAVE,
+                        label = "_outputFile",
+                        portId = "flow_output_file",
+                        dataType = org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.STRING),
+                        defaultValue = "",
+                        semanticTypes = org.wip.plugintoolkit.api.parseSemanticTypes("file"),
+                        role = org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
                     )
-                    
-                    if (currentFlow.isDestructive()) {
-                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Text(
-                                "Warning: This flow performs destructive file operations (like overriding or deleting files).",
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(ToolkitTheme.spacing.medium),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
+                    inputs.add(outputFileParam)
+                }
 
-                    // Parameter Inputs (DynamicParameterInput sharing)
-                    if (inputs.isNotEmpty()) {
-                        Text(
-                            stringResource(Res.string.flow_inputs_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small)
+                // Runner Card (Unified Component)
+                val executionParameters = inputs.map { param ->
+                    val metadata = remember(param) {
+                        org.wip.plugintoolkit.api.ParameterMetadata(
+                            defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
+                            description = "",
+                            type = param.dataType,
+                            required = param.nodeId != -1L,
+                            semanticTypes = param.semanticTypes,
+                            role = param.role
                         )
-                        Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)) {
-                            inputs.forEach { param ->
-                                val metadata = remember(param) {
-                                    org.wip.plugintoolkit.api.ParameterMetadata(
-                                        defaultValue = JsonPrimitive(param.defaultValue),
-                                        description = "",
-                                        type = param.dataType,
-                                        required = true,
-                                        semanticTypes = param.semanticTypes
-                                    )
-                                }
-                                var value by remember(param) {
-                                    mutableStateOf(
-                                        parameterValues["${param.nodeId}"] ?: param.defaultValue
-                                    )
-                                }
-
-                                org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
-                                    name = param.label,
-                                    metadata = metadata,
-                                    value = value,
-                                    onValueChange = { newValue ->
-                                        value = newValue
-                                        parameterValues["${param.nodeId}"] = newValue
-                                    }
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
                     }
+                    org.wip.plugintoolkit.shared.components.plugin.ExecutionParameter(
+                        name = param.label,
+                        value = parameterValues["${param.nodeId}"] ?: param.defaultValue,
+                        metadata = metadata,
+                        onValueChange = { newValue ->
+                            parameterValues["${param.nodeId}"] = newValue
+                        }
+                    )
+                }
+
+                org.wip.plugintoolkit.shared.components.plugin.ExecutionParametersCard(
+                    title = stringResource(Res.string.flow_run_title, currentFlow.name),
+                    icon = Icons.Default.PlayArrow,
+                    description = stringResource(Res.string.flow_run_description),
+                    fileAccess = currentFlow.getFileAccess(),
+                    isDestructive = currentFlow.isDestructive(),
+                    saveResults = viewModel.saveResults,
+                    onSaveResultsChange = { viewModel.saveResults = it },
+                    parameters = executionParameters
+                )
 
                     // Expected Outputs (including SAVE node outputs)
                     if (outputs.isNotEmpty()) {
@@ -481,7 +440,6 @@ fun FlowRunnerView(
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
-                }
 
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraLarge))
 
