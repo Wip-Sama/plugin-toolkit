@@ -67,7 +67,7 @@ fun DynamicParameterInput(
     val category = SemanticRegistry.getCategory(metadata.semanticTypes)
     val scope = rememberCoroutineScope()
 
-    if (category == SemanticCategory.IMAGE || category == SemanticCategory.AUDIO || category == SemanticCategory.VIDEO) {
+    if (category == SemanticCategory.IMAGE || category == SemanticCategory.AUDIO || category == SemanticCategory.VIDEO || category == SemanticCategory.FILE || category == SemanticCategory.PATH) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             val inputLabel = @Composable {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -99,7 +99,9 @@ fun DynamicParameterInput(
             val placeholderText = when (category) {
                 SemanticCategory.IMAGE -> "No image selected"
                 SemanticCategory.AUDIO -> "No audio selected"
-                else -> "No video selected"
+                SemanticCategory.VIDEO -> "No video selected"
+                SemanticCategory.PATH -> "No folder selected"
+                else -> "No file selected"
             }
 
             StandardTextField(
@@ -119,7 +121,7 @@ fun DynamicParameterInput(
                             IconButton(onClick = { onValueChange("") }) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Clear file selection",
+                                    contentDescription = "Clear selection",
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -127,20 +129,28 @@ fun DynamicParameterInput(
                         IconButton(
                             onClick = {
                                 scope.launch {
-                                    val allowedExtensions =
-                                        SemanticRegistry.getAllowedExtensions(metadata.semanticTypes)
-                                    val picked = PlatformUtils.pickFile("Select File", allowedExtensions)
-                                    if (picked != null) {
-                                        val newValue = appendPickedValue(value, picked, isArray)
-                                        onValueChange(newValue)
+                                    if (category == SemanticCategory.PATH) {
+                                        val picked = PlatformUtils.pickFolder()
+                                        if (picked != null) {
+                                            val newValue = appendPickedValue(value, picked, isArray)
+                                            onValueChange(newValue)
+                                        }
+                                    } else {
+                                        val allowedExtensions =
+                                            SemanticRegistry.getAllowedExtensions(metadata.semanticTypes)
+                                        val picked = PlatformUtils.pickFile("Select File", allowedExtensions)
+                                        if (picked != null) {
+                                            val newValue = appendPickedValue(value, picked, isArray)
+                                            onValueChange(newValue)
+                                        }
                                     }
                                 }
                             },
                             enabled = enabled
                         ) {
                             Icon(
-                                imageVector = Icons.Default.FolderOpen,
-                                contentDescription = "Browse file",
+                                imageVector = if (category == SemanticCategory.PATH) Icons.Default.Folder else Icons.Default.FolderOpen,
+                                contentDescription = if (category == SemanticCategory.PATH) "Browse folder" else "Browse file",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
