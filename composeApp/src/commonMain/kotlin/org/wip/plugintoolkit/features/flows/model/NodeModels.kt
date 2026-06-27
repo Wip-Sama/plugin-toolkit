@@ -462,8 +462,10 @@ data class Flow(
     }
 
     fun getFileAccess(): org.wip.plugintoolkit.api.FileAccess? {
-        val reads = nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.fileAccess?.readsFiles == true }
-        val writes = nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.fileAccess?.writesFiles == true }
+        val reads = nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.fileAccess?.readsFiles == true } ||
+                    nodes.filterIsInstance<Node.SystemNode>().any { it.systemAction.lowercase() == "load" }
+        val writes = nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.fileAccess?.writesFiles == true } ||
+                     nodes.filterIsInstance<Node.SystemNode>().any { it.systemAction.lowercase() == "save" }
         val destructive = isDestructive()
         if (!reads && !writes && !destructive) return null
         return org.wip.plugintoolkit.api.FileAccess(readsFiles = reads, writesFiles = writes, isDestructive = destructive)

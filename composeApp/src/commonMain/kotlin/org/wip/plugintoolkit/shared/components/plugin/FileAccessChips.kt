@@ -3,20 +3,25 @@ package org.wip.plugintoolkit.shared.components.plugin
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.api.FileAccess
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 
 @Composable
 fun FileAccessChips(
@@ -29,55 +34,58 @@ fun FileAccessChips(
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (fileAccess.readsFiles) {
-            AssistChip(
-                onClick = {},
-                label = { Text("Read") },
-                leadingIcon = {
+            ToolkitChip(
+                text = "Read", //TODO: localize
+                icon = {
                     Icon(
                         imageVector = Icons.Default.Visibility,
-                        contentDescription = "Read Files",
-                        modifier = Modifier.size(AssistChipDefaults.IconSize)
+                        contentDescription = "Read Files", //TODO: localize
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                )
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                style = ToolkitChipStyle.Filled,
+                fontWeight = FontWeight.Medium
             )
         }
         if (fileAccess.writesFiles) {
-            AssistChip(
-                onClick = {},
-                label = { Text("Write") },
-                leadingIcon = {
+            ToolkitChip(
+                text = "Write", //TODO: localize
+                icon = {
                     Icon(
                         imageVector = Icons.Default.Edit,
-                        contentDescription = "Write Files",
-                        modifier = Modifier.size(AssistChipDefaults.IconSize)
+                        contentDescription = "Write Files", //TODO: localize
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                )
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                style = ToolkitChipStyle.Filled,
+                fontWeight = FontWeight.Medium
             )
         }
         if (fileAccess.isDestructive) {
-            AssistChip(
-                onClick = {},
-                label = { Text("Delete") },
-                leadingIcon = {
+            ToolkitChip(
+                text = "Delete", //TODO: localize
+                icon = {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Destructive",
-                        modifier = Modifier.size(AssistChipDefaults.IconSize)
+                        contentDescription = "Delete Files", //TODO: localize
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                        tint = MaterialTheme.colorScheme.onErrorContainer
                     )
                 },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                )
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                style = ToolkitChipStyle.Filled,
+                fontWeight = FontWeight.Medium
             )
         }
     }

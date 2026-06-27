@@ -62,6 +62,8 @@ import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
+import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
@@ -550,26 +552,14 @@ fun PluginCard(
 
 @Composable
 private fun StatusBadge(text: String, color: Color) {
-    Surface(
-        color = color.copy(alpha = 0.1f),
+    ToolkitChip(
+        text = text,
+        containerColor = color,
+        contentColor = color,
+        style = ToolkitChipStyle.Outlined,
         shape = MaterialTheme.shapes.extraSmall,
-        modifier = Modifier.border(
-            ToolkitTheme.dimensions.borderUnselected,
-            color.copy(alpha = 0.2f),
-            MaterialTheme.shapes.extraSmall
-        )
-    ) {
-        Text(
-            text,
-            modifier = Modifier.padding(
-                horizontal = ToolkitTheme.spacing.extraSmall,
-                vertical = ToolkitTheme.spacing.extraSmall / 2
-            ),
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            fontWeight = FontWeight.Bold
-        )
-    }
+        fontWeight = FontWeight.Bold
+    )
 }
 
 sealed class PluginStatusAction {

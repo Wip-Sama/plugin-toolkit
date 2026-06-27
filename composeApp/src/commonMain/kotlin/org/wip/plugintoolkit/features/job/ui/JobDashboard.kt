@@ -83,6 +83,8 @@ import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.shared.components.SectionHeader
+import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
@@ -629,25 +631,13 @@ fun StatusBadge(status: JobStatus) {
         JobStatus.Cancelled -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Surface(
-        color = color.copy(alpha = ToolkitTheme.opacity.buttonBackground),
+    ToolkitChip(
+        text = status.name,
+        containerColor = color,
         contentColor = color,
-        shape = RoundedCornerShape(ToolkitTheme.dimensions.settingsIconCornerRadius),
-        border = androidx.compose.foundation.BorderStroke(
-            ToolkitTheme.dimensions.borderUnselected,
-            color.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder)
-        )
-    ) {
-        Text(
-            text = status.name,
-            modifier = Modifier.padding(
-                horizontal = ToolkitTheme.spacing.small,
-                vertical = ToolkitTheme.spacing.extraSmall
-            ),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold
-        )
-    }
+        style = ToolkitChipStyle.Outlined,
+        shape = RoundedCornerShape(ToolkitTheme.dimensions.settingsIconCornerRadius)
+    )
 }
 
 @Composable

@@ -51,25 +51,22 @@ import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
-import org.wip.plugintoolkit.shared.components.GlassCard
-import org.wip.plugintoolkit.shared.components.SectionHeader
+import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
+import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
-import org.wip.plugintoolkit.shared.components.plugin.FileAccessChips
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_collected_automatically
 import plugintoolkit.composeapp.generated.resources.flow_execute_button
 import plugintoolkit.composeapp.generated.resources.flow_history_title
-import plugintoolkit.composeapp.generated.resources.flow_inputs_title
 import plugintoolkit.composeapp.generated.resources.flow_no_history
 import plugintoolkit.composeapp.generated.resources.flow_outputs_title
 import plugintoolkit.composeapp.generated.resources.flow_run_description
 import plugintoolkit.composeapp.generated.resources.flow_run_title
 import plugintoolkit.composeapp.generated.resources.flow_select_hint
 import plugintoolkit.composeapp.generated.resources.flow_select_title
-import plugintoolkit.composeapp.generated.resources.plugin_save_results
 
 data class FlowParameter(
     val nodeId: Long,
@@ -369,7 +366,7 @@ fun FlowRunnerView(
                                         )
                                     }
 
-                                    org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
+                                    DynamicParameterInput(
                                         name = param.label,
                                         metadata = metadata,
                                         value = value,
@@ -412,7 +409,7 @@ fun FlowRunnerView(
                         val allParams = flowParameters.filter { it.type != ParameterType.OUTPUT }
                         allParams.all { param ->
                             val value = parameterValues["${param.nodeId}"] ?: param.defaultValue
-                            val error = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateParameter(
+                            val error = SettingsUtils.validateParameter(
                                 value = value,
                                 isRequired = true,
                                 type = param.dataType,

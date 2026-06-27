@@ -87,6 +87,8 @@ import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
+import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.TooltipArea
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
@@ -265,32 +267,22 @@ fun NodeComponent(
 
                         if (node is Node.CapabilityNode && node.isBroken) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Box(
-                                modifier = Modifier
-                                    .background(onHeaderColor, MaterialTheme.shapes.extraSmall)
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    "BROKEN",
-                                    color = headerColor,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            ToolkitChip(
+                                text = "BROKEN",
+                                containerColor = onHeaderColor,
+                                contentColor = headerColor,
+                                style = ToolkitChipStyle.Filled,
+                                shape = MaterialTheme.shapes.extraSmall
+                            )
                         } else if (!isReady) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Box(
-                                modifier = Modifier
-                                    .background(onHeaderColor, MaterialTheme.shapes.extraSmall)
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    "NOT READY",
-                                    color = headerColor,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            ToolkitChip(
+                                text = "NOT READY",
+                                containerColor = onHeaderColor,
+                                contentColor = headerColor,
+                                style = ToolkitChipStyle.Filled,
+                                shape = MaterialTheme.shapes.extraSmall
+                            )
                         }
 
                         if (node is Node.SubFlowNode && !isReadOnly) {

@@ -162,11 +162,8 @@ object ManifestJsonGenerator {
                 // legacy support for semantic types
                 pMeta.semanticTypes.forEach { st ->
                     val fullType = "${st.namespace}/${st.name}"
-                    if (fullType == "file/path" || fullType == "folder/path") {
+                    if (fullType == "path/file" || fullType == "path/folder") {
                         inferredReadsFiles = true
-                    }
-                    if (fullType == "file/output" || fullType == "folder/output") {
-                        inferredWritesFiles = true
                     }
                 }
             }

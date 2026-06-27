@@ -64,6 +64,8 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
+import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_delete
@@ -100,9 +102,9 @@ fun FlowManagerView(
     var searchQuery by remember { mutableStateOf("") }
     var flowToDelete by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
-        // flows are reloaded automatically via flowRepository
-    }
+//    LaunchedEffect(Unit) {
+//        // flows are reloaded automatically via flowRepository
+//    }
 
     val activeCapabilities = remember(state.flows) {
         PluginLoader.getPlugins().flatMap { it.getManifest().getOrThrow().capabilities.map { cap -> cap.name } }.toSet()
@@ -355,7 +357,7 @@ private fun ConflictResolutionDialog(
         onDismissRequest = onCancel,
         title = {
             Text(
-                text = "Resolve Import Conflicts",
+                text = "Resolve Import Conflicts", //TODO: localize
                 style = MaterialTheme.typography.titleMedium
             )
         },
@@ -365,7 +367,7 @@ private fun ConflictResolutionDialog(
                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
                 Text(
-                    text = "The following imported flows already exist. Choose an action for each flow:",
+                    text = "The following imported flows already exist. Choose an action for each flow:", //TODO: localize
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -412,8 +414,8 @@ private fun ConflictResolutionDialog(
                                     ToolkitTextField(
                                         value = customNames[clashingName] ?: "",
                                         onValueChange = { customNames[clashingName] = it },
-                                        label = { Text("New flow name (optional)") },
-                                        placeholder = { Text("Auto-unique fallback") },
+                                        label = { Text("New flow name (optional)") }, //TODO: localize
+                                        placeholder = { Text("Auto-unique fallback") }, //TODO: localize
                                         singleLine = true,
                                         modifier = Modifier.fillMaxWidth(),
                                         textStyle = MaterialTheme.typography.bodyMedium
@@ -431,14 +433,14 @@ private fun ConflictResolutionDialog(
                     onResolve(resolutions.toMap(), customNames.toMap())
                 }
             ) {
-                Text("Import")
+                Text("Import") //TODO: localize
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onCancel
             ) {
-                Text("Cancel")
+                Text("Cancel") //TODO: localize
             }
         }
     )
@@ -484,60 +486,38 @@ private fun FlowItem(
                     )
 
                     if (isBroken) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = CircleShape
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(
-                                    horizontal = ToolkitTheme.spacing.small,
-                                    vertical = ToolkitTheme.spacing.extraSmall
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
-                            ) {
+                        ToolkitChip(
+                            text = stringResource(Res.string.flow_broken_tag),
+                            icon = {
                                 Icon(
                                     imageVector = Icons.Default.Warning,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(12.dp)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                 )
-                                Text(
-                                    text = stringResource(Res.string.flow_broken_tag),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                            },
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            style = ToolkitChipStyle.Filled,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (isRunning) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = CircleShape
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(
-                                    horizontal = ToolkitTheme.spacing.small,
-                                    vertical = ToolkitTheme.spacing.extraSmall
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
-                            ) {
+                        ToolkitChip(
+                            text = stringResource(Res.string.flow_readonly_reason_running),
+                            icon = {
                                 Box(
                                     modifier = Modifier
-                                        .size(6.dp)
+                                        .size(ToolkitTheme.spacing.badgeHorizontal)
                                         .background(MaterialTheme.colorScheme.primary, CircleShape)
                                 )
-                                Text(
-                                    text = stringResource(Res.string.flow_readonly_reason_running),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                            },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            style = ToolkitChipStyle.Filled,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (isRunning || parentFlows.isNotEmpty()) {
@@ -551,21 +531,13 @@ private fun FlowItem(
                             stringResource(Res.string.flow_editor_read_only)
                         }
 
-                        Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            shape = CircleShape
-                        ) {
-                            Text(
-                                text = displayText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(
-                                    horizontal = ToolkitTheme.spacing.small,
-                                    vertical = ToolkitTheme.spacing.extraSmall
-                                )
-                            )
-                        }
+                        ToolkitChip(
+                            text = displayText,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                            style = ToolkitChipStyle.Filled,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
@@ -604,59 +576,33 @@ private fun FlowItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         parentFlows.forEach { parentName ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                                shape = CircleShape
-                            ) {
-                                Text(
-                                    text = stringResource(Res.string.flow_used_in_chip, parentName),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(
-                                        horizontal = ToolkitTheme.spacing.small,
-                                        vertical = ToolkitTheme.spacing.extraSmall
-                                    )
-                                )
-                            }
+                            ToolkitChip(
+                                text = stringResource(Res.string.flow_used_in_chip, parentName),
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = ToolkitChipStyle.Tinted,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
 
                         missingCapabilities.forEach { capName ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
-                                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                                shape = CircleShape
-                            ) {
-                                Text(
-                                    text = stringResource(Res.string.flow_missing_chip, capName),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(
-                                        horizontal = ToolkitTheme.spacing.small,
-                                        vertical = ToolkitTheme.spacing.extraSmall
-                                    )
-                                )
-                            }
+                            ToolkitChip(
+                                text = stringResource(Res.string.flow_missing_chip, capName),
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.error,
+                                style = ToolkitChipStyle.Outlined,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
 
                         notReadyNodes.forEach { node ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
-                                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                                shape = CircleShape
-                            ) {
-                                Text(
-                                    text = "Not Ready: ${node.title}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(
-                                        horizontal = ToolkitTheme.spacing.small,
-                                        vertical = ToolkitTheme.spacing.extraSmall
-                                    )
-                                )
-                            }
+                            ToolkitChip(
+                                text = "Not Ready: ${node.title}",
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.error,
+                                style = ToolkitChipStyle.Outlined,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
