@@ -131,6 +131,17 @@
     <string name="action_check_for_updates">Check for Updates</string>
     <string name="insert_array_of_array_placeholder">Enter nested lists enclosed in parentheses, e.g. (1,2), (3,4)</string>
     <string name="insert_array_placeholder">Enter nested lists enclosed in parentheses, e.g. (1,2), (3,4)</string>
+    <string name="updater_title">Software Update</string>
+    <string name="updater_checking">Checking for updates...</string>
+    <string name="updater_available_title">Update Available</string>
+    <string name="updater_available_message">A new version (%1$s) is available. Would you like to download and install it?</string>
+    <string name="updater_no_update_title">Up to Date</string>
+    <string name="updater_no_update_message">You are running the latest version.</string>
+    <string name="updater_error_title">Update Error</string>
+    <string name="updater_error_message">An error occurred while checking for updates: %1$s</string>
+    <string name="node_parameters_section">Parameters</string>
+    <string name="node_results_section">Results</string>
+    <string name="auto_generated_path_format">%1$s (Auto-generated)</string>
 
     <!-- General / Common -->
     <string name="dialog_confirm">Confirm</string>

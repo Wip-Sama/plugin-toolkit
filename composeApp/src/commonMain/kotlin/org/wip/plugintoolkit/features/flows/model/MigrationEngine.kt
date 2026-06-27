@@ -170,9 +170,22 @@ object MigrationEngine {
                     brokenNodes.add(brokenNode)
                 } else {
                     // Just a version bump or unaffected capability, capability intact.
+                    val missingOutputs = newCapability.parameters?.filter { it.value.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }?.mapNotNull { (key, meta) ->
+                        if (node.outputs.none { it.id == key }) {
+                            OutputPort(
+                                id = key,
+                                name = key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                                description = meta.description,
+                                dataType = meta.type,
+                                semanticTypes = meta.semanticTypes
+                            )
+                        } else null
+                    } ?: emptyList()
+
                     val updatedNode = node.copy(
                         pluginInfo = currentManifest.plugin,
-                        capability = newCapability
+                        capability = newCapability,
+                        outputs = node.outputs + missingOutputs
                     )
                     newNodes.add(updatedNode)
                 }
@@ -238,11 +251,23 @@ object MigrationEngine {
                 }
             }
 
+            val missingOutputs = newCapability.parameters?.filter { it.value.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }?.mapNotNull { (key, meta) ->
+                if (newOutputs.none { it.id == key }) {
+                    OutputPort(
+                        id = key,
+                        name = key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                        description = meta.description,
+                        dataType = meta.type,
+                        semanticTypes = meta.semanticTypes
+                    )
+                } else null
+            } ?: emptyList()
+
             val updatedNode = node.copy(
                 pluginInfo = currentManifest.plugin,
                 capability = newCapability,
                 inputs = newInputs,
-                outputs = newOutputs
+                outputs = newOutputs + missingOutputs
             )
 
             newNodes.add(updatedNode)

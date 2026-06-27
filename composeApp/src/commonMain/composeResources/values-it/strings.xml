@@ -326,4 +326,7 @@
     <string name="repo_action_cancel_update">Annulla</string>
     <string name="cancel_update_title">Annulla Aggiornamento</string>
     <string name="cancel_update_desc">Sei sicuro di voler annullare l\'aggiornamento del plugin?</string>
+    <string name="node_parameters_section">Parametri</string>
+    <string name="node_results_section">Risultati</string>
+    <string name="auto_generated_path_format">%1$s (Generato automaticamente)</string>
 </resources>

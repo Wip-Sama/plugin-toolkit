@@ -294,7 +294,7 @@ class FlowEditorViewModel(
                             }
                         )
                     } ?: emptyList(),
-                    outputs = event.capability.outputs?.map { out ->
+                    outputs = (event.capability.outputs?.map { out ->
                         OutputPort(
                             id = out.name,
                             name = out.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
@@ -310,7 +310,15 @@ class FlowEditorViewModel(
                             dataType = event.capability.returnType,
                             semanticTypes = event.capability.semanticTypes
                         )
-                    )
+                    )) + (event.capability.parameters?.filter { it.value.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }?.map { (key, meta) ->
+                        OutputPort(
+                            id = key,
+                            name = key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                            description = meta.description,
+                            dataType = meta.type,
+                            semanticTypes = meta.semanticTypes
+                        )
+                    } ?: emptyList())
                 ),
                 density = event.density
             )
