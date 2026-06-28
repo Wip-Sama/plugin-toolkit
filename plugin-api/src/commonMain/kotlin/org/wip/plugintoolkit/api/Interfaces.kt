@@ -93,13 +93,13 @@ interface PluginModuleProvider {
  * to prevent Path Traversal attacks (e.g., verifying paths do not contain "../" or start with "/").
  */
 interface ScopedFileSystem {
-    suspend fun readFile(relativePath: String): ByteArray?
-    suspend fun readTextFile(relativePath: String): String?
-    suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit>
-    suspend fun writeTextFile(relativePath: String, text: String): Result<Unit>
-    suspend fun exists(relativePath: String): Boolean
-    suspend fun listFiles(relativePath: String = ""): List<String>
-    suspend fun deleteFile(relativePath: String): Result<Unit>
+    suspend fun readFile(relativePath: RelativePath): ByteArray?
+    suspend fun readTextFile(relativePath: RelativePath): String?
+    suspend fun writeFile(relativePath: RelativePath, data: ByteArray): Result<Unit>
+    suspend fun writeTextFile(relativePath: RelativePath, text: String): Result<Unit>
+    suspend fun exists(relativePath: RelativePath): Boolean
+    suspend fun listFiles(relativePath: RelativePath = RelativePath.ROOT): List<String>
+    suspend fun deleteFile(relativePath: RelativePath): Result<Unit>
 
     /**
      * Get the absolute base path of the managed file area.
@@ -116,7 +116,7 @@ interface PluginFileSystem : ScopedFileSystem {
      * @param resourcePath Path to the resource inside the JAR (e.g. "scripts/install.bat").
      * @param targetRelativePath Relative path within the plugin's managed folder to write to.
      */
-    suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit>
+    suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit>
 }
 
 /**

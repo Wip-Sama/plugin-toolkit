@@ -43,10 +43,17 @@ class FlowConnectionManager(
 
             if (sourcePort == null || targetPort == null) return@update currentState
 
-            if (!sourcePort.dataType.isCompatibleWith(targetPort.dataType) ||
-                !isSemanticTypeCompatible(sourcePort.semanticTypes, targetPort.semanticTypes)
-            ) {
+            val isTypeAllowed = sourcePort.dataType.isCompatibleWith(targetPort.dataType) || 
+                                sourcePort.dataType.canConvert(targetPort.dataType)
+            if (!isTypeAllowed) {
                 return@update currentState
+            }
+
+            val semanticCheck = org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, targetPort.semanticTypes)
+            if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+                return@update currentState
+            } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
+                notificationService?.toast("Warning: ${semanticCheck.message}")
             }
 
             val isList = targetPort.dataType is DataType.Array
@@ -121,7 +128,14 @@ class FlowConnectionManager(
             currentState.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticTypes
 
         val typesCompatible = sourceInferredType.isCompatibleWith(targetInferredType)
-        val semanticsCompatible = isSemanticTypeCompatible(sourceInferredSemantic, targetInferredSemantic)
+        val semanticCheck = org.wip.plugintoolkit.api.checkSemanticCompatibility(sourceInferredSemantic, targetInferredSemantic)
+        val semanticsCompatible = semanticCheck !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
+
+        if (semanticsCompatible && semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
+            viewModelScope.launch {
+                notificationService?.toast("Warning: ${semanticCheck.message}")
+            }
+        }
 
         if (typesCompatible && semanticsCompatible) {
             onEvent(FlowEvent.ConnectPorts(sourceNodeId, sourcePortId, targetNodeId, targetPortId))

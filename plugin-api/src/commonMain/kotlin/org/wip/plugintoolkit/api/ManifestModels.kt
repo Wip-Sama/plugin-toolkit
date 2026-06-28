@@ -77,9 +77,9 @@ sealed class DataType {
     ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             if (value == null || value is JsonNull) return false
+            val jsonObj = value as? JsonObject ?: return false
             if (requiredProperties.isEmpty()) return true
 
-            val jsonObj = value as? JsonObject ?: return false
             return requiredProperties.all { prop ->
                 val propType = properties[prop]
                 val propValue = jsonObj[prop]
@@ -104,7 +104,9 @@ sealed class DataType {
         val optionRequirements: Map<String, List<String>> = emptyMap()
     ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
-            return value != null && value !is JsonNull
+            if (value == null || value is JsonNull) return false
+            val content = (value as? JsonPrimitive)?.content ?: return false
+            return options.contains(content)
         }
     }
 
@@ -123,7 +125,7 @@ sealed class DataType {
 
 @Serializable
 enum class PrimitiveType {
-    DOUBLE, INT, STRING, BOOLEAN, UNIT, ANY
+    DOUBLE, FLOAT, LONG, INT, SHORT, BYTE, STRING, BOOLEAN, UNIT, ANY
 }
 
 

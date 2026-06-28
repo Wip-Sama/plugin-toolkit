@@ -19,7 +19,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import org.wip.plugintoolkit.api.JobHandle
+import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.RelativePath
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
@@ -475,22 +478,29 @@ class JobManager(
                 val fs = DefaultPluginFileSystem.createCacheOnly(installPath)
                 val json = Json { prettyPrint = true }
                 val stateString = json.encodeToString(JsonElement.serializer(), job.resumeState ?: JsonNull)
-                fs.writeTextFile("resumes/${job.id}.json", stateString)
+                val resumePathResult = RelativePath.from("resumes/${job.id}.json")
+                if (resumePathResult.isSuccess) {
+                    val resumePath = resumePathResult.getOrThrow()
+                    fs.writeTextFile(resumePath, stateString)
 
-                // Update resumes.json index
-                val indexFile = "resumes.json"
-                val currentIndex = if (fs.exists(indexFile)) {
-                    val content = fs.readTextFile(indexFile) ?: "{}"
-                    try {
-                        json.decodeFromString<Map<String, String>>(content)
-                    } catch (e: Exception) {
-                        Logger.w(e) { "Error decoding resumes.json index" }
-                        emptyMap()
+                    // Update resumes.json index
+                    val indexFileResult = RelativePath.from("resumes.json")
+                    if (indexFileResult.isSuccess) {
+                        val indexFile = indexFileResult.getOrThrow()
+                        val currentIndex = if (fs.exists(indexFile)) {
+                            val content = fs.readTextFile(indexFile) ?: "{}"
+                            try {
+                                json.decodeFromString<Map<String, String>>(content)
+                            } catch (e: Exception) {
+                                Logger.w(e) { "Error decoding resumes.json index" }
+                                emptyMap()
+                            }
+                        } else emptyMap()
+
+                        val newIndex = currentIndex + (job.id to "resumes/${job.id}.json")
+                        fs.writeTextFile(indexFile, json.encodeToString(newIndex))
                     }
-                } else emptyMap()
-
-                val newIndex = currentIndex + (job.id to "resumes/${job.id}.json")
-                fs.writeTextFile(indexFile, json.encodeToString(newIndex))
+                }
             }
         }
     }

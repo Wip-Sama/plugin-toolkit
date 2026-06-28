@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
@@ -270,8 +271,8 @@ fun FlowEditorView(
                                     state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)]
                                         ?: targetPort.semanticTypes
 
-                                val compatible = startInferredType.isCompatibleWith(targetInferredType) &&
-                                        isSemanticTypeCompatible(startInferredSemantic, targetInferredSemantic)
+                                val compatible = (startInferredType.isCompatibleWith(targetInferredType) || startInferredType.canConvert(targetInferredType)) &&
+                                        org.wip.plugintoolkit.api.checkSemanticCompatibility(startInferredSemantic, targetInferredSemantic) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
                                 if (compatible) null else Color.Red
                             } else null
                         } else null

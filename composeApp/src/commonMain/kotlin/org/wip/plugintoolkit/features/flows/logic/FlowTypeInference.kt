@@ -3,6 +3,7 @@ package org.wip.plugintoolkit.features.flows.logic
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
+import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -104,7 +105,7 @@ object FlowTypeInference {
 
             if (srcType != null && tgtType != null) {
                 // If they are not compatible, generate an error!
-                if (!srcType.isCompatibleWith(tgtType)) {
+                if (!(srcType.isCompatibleWith(tgtType) || srcType.canConvert(tgtType))) {
                     errors.add(
                         ValidationError(
                             sourceNodeId = conn.sourceNodeId,
@@ -114,7 +115,7 @@ object FlowTypeInference {
                             message = "Type mismatch: ${srcType.format()} is not compatible with ${tgtType.format()}"
                         )
                     )
-                } else if (!isSemanticTypeCompatible(srcSemantic, tgtSemantic)) {
+                } else if (org.wip.plugintoolkit.api.checkSemanticCompatibility(srcSemantic, tgtSemantic) is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
                     errors.add(
                         ValidationError(
                             sourceNodeId = conn.sourceNodeId,

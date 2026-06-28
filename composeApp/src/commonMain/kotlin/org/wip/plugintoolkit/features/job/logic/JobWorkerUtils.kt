@@ -160,6 +160,38 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
             }
         }
 
+        PrimitiveType.LONG -> {
+            if (value is Number) value.toLong()
+            else {
+                val str = value.toString().trim()
+                str.toLongOrNull() ?: throw Exception("Failed to convert '$value' to Long")
+            }
+        }
+
+        PrimitiveType.FLOAT -> {
+            if (value is Number) value.toFloat()
+            else {
+                val str = value.toString().trim()
+                str.toFloatOrNull() ?: throw Exception("Failed to convert '$value' to Float")
+            }
+        }
+
+        PrimitiveType.SHORT -> {
+            if (value is Number) value.toShort()
+            else {
+                val str = value.toString().trim()
+                str.toShortOrNull() ?: throw Exception("Failed to convert '$value' to Short")
+            }
+        }
+
+        PrimitiveType.BYTE -> {
+            if (value is Number) value.toByte()
+            else {
+                val str = value.toString().trim()
+                str.toByteOrNull() ?: throw Exception("Failed to convert '$value' to Byte")
+            }
+        }
+
         PrimitiveType.ANY -> value
         PrimitiveType.UNIT -> Unit
     }

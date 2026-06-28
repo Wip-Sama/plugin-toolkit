@@ -10,6 +10,7 @@ import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 class DataTypeTest {
 
@@ -55,6 +56,7 @@ class DataTypeTest {
         val type = DataType.Enum("MyEnum", listOf("A", "B"))
 
         assertTrue(type.isProvided(JsonPrimitive("A")), "Should be provided for enum value")
+        assertFalse(type.isProvided(JsonPrimitive("C")), "Should NOT be provided for unknown enum value")
         assertFalse(type.isProvided(JsonNull), "Should not be provided for JsonNull")
     }
 
@@ -81,10 +83,12 @@ class DataTypeTest {
         assertTrue(stringArray.isCompatibleWith(anyArray), "Array of ANY should be compatible with Array of String")
 
         // Objects
-        val objA1 = DataType.Object("com.example.ClassA")
-        val objA2 = DataType.Object("com.example.ClassA")
+        val objA1 = DataType.Object("com.example.ClassA", properties = mapOf("id" to intType))
+        val objA2 = DataType.Object("com.example.ClassA", properties = mapOf("id" to intType))
+        val objA3 = DataType.Object("com.example.ClassA", properties = mapOf("id" to stringType))
         val objB = DataType.Object("com.example.ClassB")
-        assertTrue(objA1.isCompatibleWith(objA2), "Objects with same class name should be compatible")
+        assertTrue(objA1.isCompatibleWith(objA2), "Objects with same class name and properties should be compatible")
+        assertFalse(objA1.isCompatibleWith(objA3), "Objects with same class name but different properties should NOT be compatible")
         assertFalse(objA1.isCompatibleWith(objB), "Objects with different class names should not be compatible")
 
         // Enums
@@ -100,31 +104,19 @@ class DataTypeTest {
 
     @Test
     fun testSemanticTypeCompatibility() {
-        assertTrue(isSemanticTypeCompatible(null, null), "Null/null should be compatible")
-        assertTrue(isSemanticTypeCompatible("filepath", null), "Value/null should be compatible")
-        assertTrue(isSemanticTypeCompatible(null, "filepath"), "Null/value should be compatible")
-        assertTrue(isSemanticTypeCompatible("filepath", "filepath"), "Identical semantic types should be compatible")
-        assertTrue(
-            isSemanticTypeCompatible("Filepath", "filepath"),
-            "Case-insensitive semantic types should be compatible"
-        )
-        assertFalse(isSemanticTypeCompatible("filepath", "url"), "Different semantic types should not be compatible")
-        assertTrue(
-            isSemanticTypeCompatible("color/rgb color/rgba", "color/rgb"),
-            "Overlapping semantic types should be compatible"
-        )
-        assertTrue(
-            isSemanticTypeCompatible("color/rgb", "color/rgb, color/rgba"),
-            "Overlapping semantic types with comma should be compatible"
-        )
-        assertTrue(
-            isSemanticTypeCompatible("image/png image/jpg", "image/jpg image/gif"),
-            "Multiple overlapping semantic types should be compatible"
-        )
-        assertFalse(
-            isSemanticTypeCompatible("file/txt file/json", "image/png"),
-            "Non-overlapping multiple semantic types should not be compatible"
-        )
+        fun check(s: String?, t: String?): CompatibilityResult {
+            return checkSemanticCompatibility(parseSemanticTypes(s), parseSemanticTypes(t))
+        }
+        assertTrue(check(null, null) is CompatibilityResult.Warning, "Null/null should be a warning")
+        assertTrue(check("filepath", null) is CompatibilityResult.Warning, "Value/null should be a warning")
+        assertTrue(check(null, "filepath") is CompatibilityResult.Warning, "Null/value should be a warning")
+        assertEquals(CompatibilityResult.Compatible, check("filepath", "filepath"), "Identical semantic types should be compatible")
+        assertEquals(CompatibilityResult.Compatible, check("Filepath", "filepath"), "Case-insensitive semantic types should be compatible")
+        assertEquals(CompatibilityResult.Incompatible, check("filepath", "url"), "Different semantic types should not be compatible")
+        assertEquals(CompatibilityResult.Compatible, check("color/rgb color/rgba", "color/rgb"), "Overlapping semantic types should be compatible")
+        assertEquals(CompatibilityResult.Compatible, check("color/rgb", "color/rgb, color/rgba"), "Overlapping semantic types with comma should be compatible")
+        assertEquals(CompatibilityResult.Compatible, check("image/png image/jpg", "image/jpg image/gif"), "Multiple overlapping semantic types should be compatible")
+        assertEquals(CompatibilityResult.Incompatible, check("file/txt file/json", "image/png"), "Non-overlapping multiple semantic types should not be compatible")
     }
 
     @Test
@@ -135,6 +127,7 @@ class DataTypeTest {
 
         val intArray = DataType.Array(intType)
         val stringArray = DataType.Array(stringType)
+        val doubleArray = DataType.Array(doubleType)
 
         val tupleType = DataType.Object("Tuple2")
         val listType = DataType.Object("List")
@@ -148,13 +141,13 @@ class DataTypeTest {
         assertTrue(intArray.canConvert(tupleType), "Array of Int should convert to Tuple")
         assertTrue(tupleType.canConvert(intArray), "Tuple should convert to Array of Int")
         assertTrue(intArray.canConvert(listType), "Array should convert to List")
-        assertTrue(stringArray.canConvert(tupleType), "Array of String should convert to Tuple")
 
-        // Rule 3: Single element (Any / Primitive) to List / Tuple
-        val anyType = DataType.Primitive(PrimitiveType.ANY)
-        assertTrue(anyType.canConvert(intArray), "Any should convert to List/Array")
-        assertTrue(anyType.canConvert(tupleType), "Any should convert to Tuple")
-        assertTrue(intType.canConvert(intArray), "Primitive Int should convert to Array")
+        // Multi-step arrays (String -> List<Int> only if String -> Int works)
+        assertTrue(stringArray.canConvert(intArray), "Array of String should convert to Array of Int recursively")
+        assertTrue(intArray.canConvert(doubleArray), "Array of Int should convert to Array of Double recursively")
+
+        // Rule 3: Single element to List / Tuple
+        assertTrue(intType.canConvert(doubleArray), "Primitive Int should convert to Array of Double")
+        assertTrue(stringType.canConvert(intArray), "Primitive String should implicitly convert to Array of Int recursively")
     }
 }
-

@@ -7,6 +7,7 @@ import kotlinx.io.readByteArray
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import org.wip.plugintoolkit.api.ExecutionFileSystem
+import org.wip.plugintoolkit.api.RelativePath
 
 class DefaultExecutionFileSystem(
     private val sandboxPath: String
@@ -16,25 +17,23 @@ class DefaultExecutionFileSystem(
         SystemFileSystem.createDirectories(Path(sandboxPath))
     }
 
-    private fun resolvePath(relativePath: String): Path {
-        // Prevent path traversal
-        val sanitized = relativePath.replace("..", "").replace("\\", "/")
-        return Path(sandboxPath, sanitized)
+    private fun resolvePath(relativePath: RelativePath): Path {
+        return Path(sandboxPath, relativePath.value)
     }
 
-    override suspend fun readFile(relativePath: String): ByteArray? {
+    override suspend fun readFile(relativePath: RelativePath): ByteArray? {
         val path = resolvePath(relativePath)
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
-    override suspend fun readTextFile(relativePath: String): String? {
+    override suspend fun readTextFile(relativePath: RelativePath): String? {
         val path = resolvePath(relativePath)
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
 
-    override suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit> {
+    override suspend fun writeFile(relativePath: RelativePath, data: ByteArray): Result<Unit> {
         return try {
             val path = resolvePath(relativePath)
             path.parent?.let { SystemFileSystem.createDirectories(it) }
@@ -45,7 +44,7 @@ class DefaultExecutionFileSystem(
         }
     }
 
-    override suspend fun writeTextFile(relativePath: String, text: String): Result<Unit> {
+    override suspend fun writeTextFile(relativePath: RelativePath, text: String): Result<Unit> {
         return try {
             val path = resolvePath(relativePath)
             path.parent?.let { SystemFileSystem.createDirectories(it) }
@@ -56,11 +55,11 @@ class DefaultExecutionFileSystem(
         }
     }
 
-    override suspend fun exists(relativePath: String): Boolean {
+    override suspend fun exists(relativePath: RelativePath): Boolean {
         return SystemFileSystem.exists(resolvePath(relativePath))
     }
 
-    override suspend fun listFiles(relativePath: String): List<String> {
+    override suspend fun listFiles(relativePath: RelativePath): List<String> {
         val path = resolvePath(relativePath)
         if (!SystemFileSystem.exists(path)) return emptyList()
         val metadata = SystemFileSystem.metadataOrNull(path)
@@ -69,7 +68,7 @@ class DefaultExecutionFileSystem(
         return SystemFileSystem.list(path).map { it.name }
     }
 
-    override suspend fun deleteFile(relativePath: String): Result<Unit> {
+    override suspend fun deleteFile(relativePath: RelativePath): Result<Unit> {
         return try {
             val path = resolvePath(relativePath)
             if (SystemFileSystem.exists(path)) {

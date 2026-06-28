@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.SemanticType
+import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.features.flows.model.Connection
@@ -431,13 +432,13 @@ class FlowNodeManager(
         val targetPort = targetNode.inputs.find { it.id == targetPortId } ?: return null
 
         val compatibleInput = node.inputs.firstOrNull { input ->
-            sourcePort.dataType.isCompatibleWith(input.dataType) &&
-                    isSemanticTypeCompatible(sourcePort.semanticTypes, input.semanticTypes)
+            (sourcePort.dataType.isCompatibleWith(input.dataType) || sourcePort.dataType.canConvert(input.dataType)) &&
+                    org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, input.semanticTypes) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
         } ?: return null
 
         val compatibleOutput = node.outputs.firstOrNull { output ->
-            output.dataType.isCompatibleWith(targetPort.dataType) &&
-                    isSemanticTypeCompatible(output.semanticTypes, targetPort.semanticTypes)
+            (output.dataType.isCompatibleWith(targetPort.dataType) || output.dataType.canConvert(targetPort.dataType)) &&
+                    org.wip.plugintoolkit.api.checkSemanticCompatibility(output.semanticTypes, targetPort.semanticTypes) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
         } ?: return null
 
         return Pair(compatibleInput, compatibleOutput)

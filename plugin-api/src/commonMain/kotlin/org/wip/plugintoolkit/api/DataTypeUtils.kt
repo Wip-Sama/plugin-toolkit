@@ -9,13 +9,39 @@ import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.serializer
 
+sealed class CompatibilityResult {
+    object Compatible : CompatibilityResult()
+    data class Warning(val message: String) : CompatibilityResult()
+    object Incompatible : CompatibilityResult()
+
+    val isCompatible: Boolean get() = this is Compatible || this is Warning
+}
+
+fun interface TypeConverter {
+    fun canConvert(source: DataType, target: DataType): Boolean
+}
+
+object TypeConverterRegistry {
+    private val converters = mutableListOf<TypeConverter>()
+
+    fun register(converter: TypeConverter) {
+        converters.add(converter)
+    }
+
+    fun canConvert(source: DataType, target: DataType): Boolean {
+        return converters.any { it.canConvert(source, target) }
+    }
+}
+
 @OptIn(ExperimentalSerializationApi::class)
 fun SerialDescriptor.toDataType(): DataType {
     return when (this.kind) {
-        PrimitiveKind.DOUBLE, PrimitiveKind.FLOAT -> DataType.Primitive(PrimitiveType.DOUBLE)
-        PrimitiveKind.INT, PrimitiveKind.SHORT, PrimitiveKind.BYTE, PrimitiveKind.LONG -> DataType.Primitive(
-            PrimitiveType.INT
-        )
+        PrimitiveKind.DOUBLE -> DataType.Primitive(PrimitiveType.DOUBLE)
+        PrimitiveKind.FLOAT -> DataType.Primitive(PrimitiveType.FLOAT)
+        PrimitiveKind.LONG -> DataType.Primitive(PrimitiveType.LONG)
+        PrimitiveKind.INT -> DataType.Primitive(PrimitiveType.INT)
+        PrimitiveKind.SHORT -> DataType.Primitive(PrimitiveType.SHORT)
+        PrimitiveKind.BYTE -> DataType.Primitive(PrimitiveType.BYTE)
 
         PrimitiveKind.STRING, PrimitiveKind.CHAR -> DataType.Primitive(PrimitiveType.STRING)
         PrimitiveKind.BOOLEAN -> DataType.Primitive(PrimitiveType.BOOLEAN)
@@ -24,7 +50,10 @@ fun SerialDescriptor.toDataType(): DataType {
             DataType.Array(elementDescriptor.toDataType())
         }
 
-        StructureKind.MAP -> DataType.Object(this.serialName)
+        StructureKind.MAP -> {
+            val valueDescriptor = this.getElementDescriptor(1)
+            DataType.MapType(valueDescriptor.toDataType())
+        }
         PolymorphicKind.SEALED, PolymorphicKind.OPEN -> DataType.Object(this.serialName)
         SerialKind.ENUM -> {
             val options = (0 until this.elementsCount).map { this.getElementName(it) }
@@ -51,13 +80,6 @@ inline fun <reified T> getDataType(): DataType {
 
 /**
  * Checks if this [DataType] is compatible with and can connect to another [DataType].
- *
- * Compatibility rules:
- * 1. Two identical datatypes are compatible.
- * 2. Wildcard [PrimitiveType.ANY] is compatible with any datatype.
- * 3. Arrays are compatible if their item types are compatible.
- * 4. Objects are compatible if their class names are equal.
- * 5. Enums are compatible if their class names are equal (options can differ or be in different order).
  */
 fun DataType.isCompatibleWith(other: DataType): Boolean {
     if (this == other) return true
@@ -80,7 +102,13 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
         }
 
         is DataType.Object -> {
-            other is DataType.Object && this.className == other.className
+            if (other !is DataType.Object) return false
+            if (this.className != other.className) return false
+            if (this.properties.isEmpty() && other.properties.isEmpty()) return true
+            this.properties.size == other.properties.size && this.properties.all { (key, type) ->
+                val otherType = other.properties[key]
+                otherType != null && type.isCompatibleWith(otherType)
+            }
         }
 
         is DataType.Enum -> {
@@ -91,12 +119,12 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
 
 /**
  * Checks if two semantic types are compatible for a connection.
- *
- * If either semantic type list is empty, they are universally compatible.
- * Otherwise, at least one semantic type in the source must satisfy one in the target.
+ * Returns a CompatibilityResult indicating Compatible, Warning, or Incompatible.
  */
-fun isSemanticTypeCompatible(source: List<SemanticType>, target: List<SemanticType>, lenient: Boolean = true): Boolean {
-    if (source.isEmpty() || target.isEmpty()) return true
+fun checkSemanticCompatibility(source: List<SemanticType>, target: List<SemanticType>, lenient: Boolean = true): CompatibilityResult {
+    if (source.isEmpty() || target.isEmpty()) {
+        return CompatibilityResult.Warning("Semantic types are missing on one or both endpoints. Data mismatch may occur.")
+    }
     for (s in source) {
         for (t in target) {
             val nsMatches = if (s.namespace == null && t.namespace == null) {
@@ -123,33 +151,29 @@ fun isSemanticTypeCompatible(source: List<SemanticType>, target: List<SemanticTy
                         sVar == null -> lenient // Specialization (lenient mode)
                         else -> false
                     }
-                    if (variantMatches) return true
+                    if (variantMatches) return CompatibilityResult.Compatible
                 }
             }
         }
     }
-    return false
+    return CompatibilityResult.Incompatible
 }
 
 /**
- * Checks if two semantic types are compatible for a connection.
- *
- * If either semantic type is null or blank, they are compatible (lenient matching).
- * If both are specified, they must match.
+ * Legacy check for boolean result.
  */
-@Deprecated(
-    "Use List<SemanticType> comparison instead",
-    ReplaceWith("isSemanticTypeCompatible(parseSemanticTypes(source), parseSemanticTypes(target))")
-)
+@Deprecated("Use checkSemanticCompatibility instead", ReplaceWith("checkSemanticCompatibility(source, target, lenient).isCompatible"))
+fun isSemanticTypeCompatible(source: List<SemanticType>, target: List<SemanticType>, lenient: Boolean = true): Boolean {
+    return checkSemanticCompatibility(source, target, lenient).isCompatible
+}
+
+@Deprecated("Use List<SemanticType> comparison instead", ReplaceWith("isSemanticTypeCompatible(parseSemanticTypes(source), parseSemanticTypes(target))"))
 fun isSemanticTypeCompatible(source: String?, target: String?): Boolean {
     val srcList = parseSemanticTypes(source)
     val tgtList = parseSemanticTypes(target)
     return isSemanticTypeCompatible(srcList, tgtList, lenient = true)
 }
 
-/**
- * Formats a [DataType] into a user-friendly string representation.
- */
 fun DataType.format(): String {
     return when (this) {
         is DataType.Primitive -> this.primitiveType.name
@@ -173,51 +197,48 @@ private fun isIterable(type: DataType): Boolean {
 
 /**
  * Checks if a value of this [DataType] can be automatically converted to another [DataType].
- *
- * Conversion rules:
- * 1. Convert between numeric primitives (INT and DOUBLE).
- * 2. Convert between iterables (list, set, tuple, etc.).
- * 3. Wrap a single element into an iterable.
  */
 fun DataType.canConvert(other: DataType): Boolean {
     if (this == other) return false
+    if (this.isCompatibleWith(other)) return false
 
     val isThisIterable = isIterable(this)
     val isOtherIterable = isIterable(other)
 
     // Rule 2: Iterable to Iterable
     if (isThisIterable && isOtherIterable) {
-        return true
+        if (this is DataType.Array && other is DataType.Array) {
+            return this.items.isCompatibleWith(other.items) || this.items.canConvert(other.items)
+        }
+        return true // Fallback for generic iterables
     }
 
     // Rule 3: Single element to Iterable
     if (isOtherIterable && !isThisIterable) {
+        if (other is DataType.Array) {
+            return this.isCompatibleWith(other.items) || this.canConvert(other.items)
+        }
         return true
     }
-
-    if (this.isCompatibleWith(other)) return false
 
     // Rule 1: Numeric primitives & String conversions
     if (this is DataType.Primitive && other is DataType.Primitive) {
         val sType = this.primitiveType
         val tType = other.primitiveType
-        if ((sType == PrimitiveType.INT && tType == PrimitiveType.DOUBLE) ||
-            (sType == PrimitiveType.DOUBLE && tType == PrimitiveType.INT)
-        ) {
+        val numerics = setOf(PrimitiveType.INT, PrimitiveType.DOUBLE, PrimitiveType.LONG, PrimitiveType.FLOAT, PrimitiveType.SHORT, PrimitiveType.BYTE)
+        if (sType in numerics && tType in numerics) {
             return true
         }
-        // Allow String to Int, Double, Boolean
-        if (sType == PrimitiveType.STRING && (tType == PrimitiveType.INT || tType == PrimitiveType.DOUBLE || tType == PrimitiveType.BOOLEAN)) {
+        // Allow String to Numeric/Boolean
+        if (sType == PrimitiveType.STRING && (tType in numerics || tType == PrimitiveType.BOOLEAN)) {
             return true
         }
-        // Allow Int, Double, Boolean to String
-        if ((sType == PrimitiveType.INT || sType == PrimitiveType.DOUBLE || sType == PrimitiveType.BOOLEAN) && tType == PrimitiveType.STRING) {
+        // Allow Numeric/Boolean to String
+        if ((sType in numerics || sType == PrimitiveType.BOOLEAN) && tType == PrimitiveType.STRING) {
             return true
         }
     }
 
-    return false
+    // Rule 4: Dynamic Conversion Registry
+    return TypeConverterRegistry.canConvert(this, other)
 }
-
-
-
