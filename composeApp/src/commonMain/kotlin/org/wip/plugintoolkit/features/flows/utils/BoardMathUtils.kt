@@ -10,22 +10,49 @@ object BoardMathUtils {
      */
     fun getDistanceToBezier(p: Offset, start: Offset, end: Offset): Float {
         val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
-        val c1 = Offset(start.x + controlPointOffset, start.y)
-        val c2 = Offset(end.x - controlPointOffset, end.y)
+        val c1x = start.x + controlPointOffset
+        val c1y = start.y
+        val c2x = end.x - controlPointOffset
+        val c2y = end.y
 
         var minDistance = Float.MAX_VALUE
-        val steps = 15
-        for (i in 0..steps) {
+        val steps = 25
+        
+        var prevX = start.x
+        var prevY = start.y
+        
+        for (i in 1..steps) {
             val t = i.toFloat() / steps
             val mt = 1f - t
-            val bt = start * (mt * mt * mt) +
-                    c1 * (3f * mt * mt * t) +
-                    c2 * (3f * mt * t * t) +
-                    end * (t * t * t)
-            val dist = (p - bt).getDistance()
+            val mt2 = mt * mt
+            val mt3 = mt2 * mt
+            val t2 = t * t
+            val t3 = t2 * t
+            
+            val bx = start.x * mt3 + c1x * (3f * mt2 * t) + c2x * (3f * mt * t2) + end.x * t3
+            val by = start.y * mt3 + c1y * (3f * mt2 * t) + c2y * (3f * mt * t2) + end.y * t3
+            
+            val l2 = (bx - prevX) * (bx - prevX) + (by - prevY) * (by - prevY)
+            val dist = if (l2 == 0f) {
+                val dx = p.x - prevX
+                val dy = p.y - prevY
+                kotlin.math.sqrt(dx * dx + dy * dy)
+            } else {
+                var tProj = ((p.x - prevX) * (bx - prevX) + (p.y - prevY) * (by - prevY)) / l2
+                if (tProj < 0f) tProj = 0f else if (tProj > 1f) tProj = 1f
+                val projX = prevX + tProj * (bx - prevX)
+                val projY = prevY + tProj * (by - prevY)
+                val dx = p.x - projX
+                val dy = p.y - projY
+                kotlin.math.sqrt(dx * dx + dy * dy)
+            }
+            
             if (dist < minDistance) {
                 minDistance = dist
             }
+            
+            prevX = bx
+            prevY = by
         }
         return minDistance
     }

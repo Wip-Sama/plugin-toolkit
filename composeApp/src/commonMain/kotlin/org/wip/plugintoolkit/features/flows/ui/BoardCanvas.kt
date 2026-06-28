@@ -103,6 +103,7 @@ fun BoardCanvas(
     var hoveredConnection by remember { mutableStateOf<org.wip.plugintoolkit.features.flows.model.Connection?>(null) }
     var hoveredConnectionIsSource by remember { mutableStateOf<Boolean?>(null) }
     var isCtrlModifierPressed by remember { mutableStateOf(false) }
+    var lastPointerPosition by remember { mutableStateOf(Offset.Zero) }
 
     var selectionStart by remember { mutableStateOf<Offset?>(null) }
     var selectionEnd by remember { mutableStateOf<Offset?>(null) }
@@ -138,6 +139,24 @@ fun BoardCanvas(
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { keyEvent ->
+                val newCtrlPressed = keyEvent.isCtrlPressed
+                if (isCtrlModifierPressed != newCtrlPressed) {
+                    isCtrlModifierPressed = newCtrlPressed
+                    if (hoveredConnection != null && newCtrlPressed) {
+                        val sourcePortBoardPos = getPortBoardPosition(hoveredConnection!!.sourceNodeId, hoveredConnection!!.sourcePortId)
+                        val targetPortBoardPos = getPortBoardPosition(hoveredConnection!!.targetNodeId, hoveredConnection!!.targetPortId)
+                        if (sourcePortBoardPos != null && targetPortBoardPos != null) {
+                            val startPos = (sourcePortBoardPos * currentScale) + currentOffset
+                            val endPos = (targetPortBoardPos * currentScale) + currentOffset
+                            val distToSource = (lastPointerPosition - startPos).getDistance()
+                            val distToTarget = (lastPointerPosition - endPos).getDistance()
+                            hoveredConnectionIsSource = distToSource < distToTarget
+                        }
+                    } else {
+                        hoveredConnectionIsSource = null
+                    }
+                }
+                
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when {
                         keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> {
@@ -186,9 +205,13 @@ fun BoardCanvas(
                             val startPos = (sourcePortBoardPos * state.scale) + state.offset
                             val endPos = (targetPortBoardPos * state.scale) + state.offset
                             
+                            val controlPointOffset = kotlin.math.abs(endPos.x - startPos.x) / 2f
+                            val p1x = startPos.x + controlPointOffset
+                            val p2x = endPos.x - controlPointOffset
+                            
                             val padding = 30f * state.scale
-                            val aabbMinX = minOf(startPos.x, endPos.x) - padding
-                            val aabbMaxX = maxOf(startPos.x, endPos.x) + padding
+                            val aabbMinX = minOf(startPos.x, endPos.x, p1x, p2x) - padding
+                            val aabbMaxX = maxOf(startPos.x, endPos.x, p1x, p2x) + padding
                             val aabbMinY = minOf(startPos.y, endPos.y) - padding
                             val aabbMaxY = maxOf(startPos.y, endPos.y) + padding
                             
@@ -301,9 +324,13 @@ fun BoardCanvas(
                                         val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                                         val endPos = (targetPortBoardPos * currentScale) + currentOffset
                                         
+                                        val controlPointOffset = kotlin.math.abs(endPos.x - startPos.x) / 2f
+                                        val p1x = startPos.x + controlPointOffset
+                                        val p2x = endPos.x - controlPointOffset
+                                        
                                         val padding = 30f * currentScale
-                                        val aabbMinX = minOf(startPos.x, endPos.x) - padding
-                                        val aabbMaxX = maxOf(startPos.x, endPos.x) + padding
+                                        val aabbMinX = minOf(startPos.x, endPos.x, p1x, p2x) - padding
+                                        val aabbMaxX = maxOf(startPos.x, endPos.x, p1x, p2x) + padding
                                         val aabbMinY = minOf(startPos.y, endPos.y) - padding
                                         val aabbMaxY = maxOf(startPos.y, endPos.y) + padding
 
@@ -318,6 +345,7 @@ fun BoardCanvas(
                                 }
                             }
                             isCtrlModifierPressed = event.keyboardModifiers.isCtrlPressed
+                            lastPointerPosition = position
                             if (bestConnection != null && isCtrlModifierPressed) {
                                 val sourcePortBoardPos =
                                     getPortBoardPosition(bestConnection.sourceNodeId, bestConnection.sourcePortId)
