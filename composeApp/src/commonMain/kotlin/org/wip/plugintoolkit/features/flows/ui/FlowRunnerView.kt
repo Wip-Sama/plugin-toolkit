@@ -22,7 +22,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.json.JsonPrimitive
@@ -339,104 +337,104 @@ fun FlowRunnerView(
                     parameters = executionParameters
                 )
 
-                    // Expected Outputs (including SAVE node outputs)
-                    if (outputs.isNotEmpty()) {
-                        Text(
-                            stringResource(Res.string.flow_outputs_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small)
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
-                            outputs.forEach { param ->
-                                if (param.type == ParameterType.SAVE) {
-                                    val metadata = remember(param) {
-                                        org.wip.plugintoolkit.api.ParameterMetadata(
-                                            defaultValue = JsonPrimitive(param.defaultValue),
-                                            description = "Target path to save flow results",
-                                            type = param.dataType,
-                                            required = true,
-                                            semanticTypes = param.semanticTypes
-                                        )
-                                    }
-                                    var value by remember(param) {
-                                        mutableStateOf(
-                                            parameterValues["${param.nodeId}"] ?: param.defaultValue
-                                        )
-                                    }
-
-                                    DynamicParameterInput(
-                                        name = param.label,
-                                        metadata = metadata,
-                                        value = value,
-                                        onValueChange = { newValue ->
-                                            value = newValue
-                                            parameterValues["${param.nodeId}"] = newValue
-                                        }
+                // Expected Outputs (including SAVE node outputs)
+                if (outputs.isNotEmpty()) {
+                    Text(
+                        stringResource(Res.string.flow_outputs_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small)
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
+                        outputs.forEach { param ->
+                            if (param.type == ParameterType.SAVE) {
+                                val metadata = remember(param) {
+                                    org.wip.plugintoolkit.api.ParameterMetadata(
+                                        defaultValue = JsonPrimitive(param.defaultValue),
+                                        description = "Target path to save flow results",
+                                        type = param.dataType,
+                                        required = true,
+                                        semanticTypes = param.semanticTypes
                                     )
-                                } else {
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
-                                        shape = MaterialTheme.shapes.medium
+                                }
+                                var value by remember(param) {
+                                    mutableStateOf(
+                                        parameterValues["${param.nodeId}"] ?: param.defaultValue
+                                    )
+                                }
+
+                                DynamicParameterInput(
+                                    name = param.label,
+                                    metadata = metadata,
+                                    value = value,
+                                    onValueChange = { newValue ->
+                                        value = newValue
+                                        parameterValues["${param.nodeId}"] = newValue
+                                    }
+                                )
+                            } else {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                "${param.label} (${param.dataType.format()})",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                stringResource(Res.string.flow_collected_automatically),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                                            )
-                                        }
+                                        Text(
+                                            "${param.label} (${param.dataType.format()})",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            stringResource(Res.string.flow_collected_automatically),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                        )
                                     }
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
                     }
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
+                }
 
-                    // Validate all flow parameters
-                    val isFlowValid = remember(parameterValues.toMap(), flowParameters) {
-                        val allParams = flowParameters.filter { it.type != ParameterType.OUTPUT }
-                        allParams.all { param ->
-                            val value = parameterValues["${param.nodeId}"] ?: param.defaultValue
-                            val error = SettingsUtils.validateParameter(
-                                value = value,
-                                isRequired = true,
-                                type = param.dataType,
-                                constraints = null
-                            )
-                            error == null
-                        }
-                    }
-
-                    Button(
-                        onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        enabled = isFlowValid
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        Text(stringResource(Res.string.flow_execute_button))
-                    }
-                    if (!isFlowValid) {
-                        Text(
-                            text = "Fill in all required parameters before running",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(top = 4.dp)
+                // Validate all flow parameters
+                val isFlowValid = remember(parameterValues.toMap(), flowParameters) {
+                    val allParams = flowParameters.filter { it.type != ParameterType.OUTPUT }
+                    allParams.all { param ->
+                        val value = parameterValues["${param.nodeId}"] ?: param.defaultValue
+                        val error = SettingsUtils.validateParameter(
+                            value = value,
+                            isRequired = true,
+                            type = param.dataType,
+                            constraints = null
                         )
+                        error == null
                     }
+                }
+
+                Button(
+                    onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    enabled = isFlowValid
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                    Text(stringResource(Res.string.flow_execute_button))
+                }
+                if (!isFlowValid) {
+                    Text(
+                        text = "Fill in all required parameters before running",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraLarge))
 

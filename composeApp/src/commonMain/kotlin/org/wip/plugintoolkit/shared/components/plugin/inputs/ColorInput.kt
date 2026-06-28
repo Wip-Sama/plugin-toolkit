@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
-
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
 import org.wip.plugintoolkit.shared.components.plugin.StandardTextField
@@ -71,7 +69,11 @@ fun ColorInput(
                                 .size(24.dp)
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(if (value.isEmpty() || parsedColor == Color.Transparent) Color.Transparent else parsedColor)
-                                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                    RoundedCornerShape(4.dp)
+                                )
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         IconButton(
@@ -93,7 +95,7 @@ fun ColorInput(
             org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog(
                 show = showColorPicker,
                 onDismissRequest = { showColorPicker = false },
-                
+
                 onPickedColor = { color ->
                     showColorPicker = false
                     val formatted = if (metadata.semanticTypes.any {
@@ -125,12 +127,14 @@ fun parseColorString(colorStr: String): Color {
                     val b = hex[2].toString().repeat(2).toInt(16)
                     return Color(r, g, b, 255)
                 }
+
                 6 -> {
                     val r = hex.substring(0, 2).toInt(16)
                     val g = hex.substring(2, 4).toInt(16)
                     val b = hex.substring(4, 6).toInt(16)
                     return Color(r, g, b, 255)
                 }
+
                 8 -> {
                     val a = hex.substring(0, 2).toInt(16)
                     val r = hex.substring(2, 4).toInt(16)

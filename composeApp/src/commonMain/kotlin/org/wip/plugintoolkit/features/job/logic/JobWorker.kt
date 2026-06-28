@@ -12,6 +12,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.io.buffered
+import kotlinx.io.writeString
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import org.koin.core.component.inject
@@ -26,8 +28,6 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import kotlin.time.Duration.Companion.minutes
-import kotlinx.io.buffered
-import kotlinx.io.writeString
 
 class JobWorker(
     val workerId: Int,
@@ -142,7 +142,13 @@ class JobWorker(
 
         val processor = plugin.getProcessor().getOrThrow()
         val execFs = org.wip.plugintoolkit.features.plugin.logic.DefaultExecutionFileSystem(sandboxDir)
-        val context = pluginManager.createPluginContext(job.pluginId, job.id, allowedPaths = allowedPaths, isDestructiveAllowed = isDestructive, executionFileSystem = execFs)
+        val context = pluginManager.createPluginContext(
+            job.pluginId,
+            job.id,
+            allowedPaths = allowedPaths,
+            isDestructiveAllowed = isDestructive,
+            executionFileSystem = execFs
+        )
 
         val request = PluginRequest(
             method = job.capabilityName,
@@ -210,9 +216,9 @@ class JobWorker(
             is ExecutionResult.Success -> {
                 val response = result.response
                 manager.tryCompleteJob(job.id, response.result?.toString())
-                
-                val outputFile = job.parameters["_outputFile"]?.let { 
-                    if (it is kotlinx.serialization.json.JsonPrimitive) it.content else null 
+
+                val outputFile = job.parameters["_outputFile"]?.let {
+                    if (it is kotlinx.serialization.json.JsonPrimitive) it.content else null
                 }
                 if (!outputFile.isNullOrBlank() && response.result != null) {
                     try {

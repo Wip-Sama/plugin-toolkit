@@ -288,7 +288,14 @@ class PluginLifecycleManager(
         }
     }
 
-    fun createPluginContext(pkg: String, jobId: String? = null, manifest: PluginManifest? = null, allowedPaths: List<String> = emptyList(), isDestructiveAllowed: Boolean = false, executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null): PluginContext {
+    fun createPluginContext(
+        pkg: String,
+        jobId: String? = null,
+        manifest: PluginManifest? = null,
+        allowedPaths: List<String> = emptyList(),
+        isDestructiveAllowed: Boolean = false,
+        executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null
+    ): PluginContext {
         val plugin = registry.getPlugin(pkg)
         val installPath = plugin?.installPath ?: ""
         val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }

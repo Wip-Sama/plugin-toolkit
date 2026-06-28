@@ -1,33 +1,58 @@
 package org.wip.plugintoolkit.features.repository.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
-import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
-import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowState
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
+import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
+import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
-import plugintoolkit.composeapp.generated.resources.*
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.repo_conflicts_title
+import plugintoolkit.composeapp.generated.resources.repo_no_flows_found
+import plugintoolkit.composeapp.generated.resources.repo_no_plugins_found
+import plugintoolkit.composeapp.generated.resources.repo_search_flows_placeholder
+import plugintoolkit.composeapp.generated.resources.repo_search_plugins_placeholder
+import plugintoolkit.composeapp.generated.resources.repo_share_link_desc
+import plugintoolkit.composeapp.generated.resources.repo_tab_flows
+import plugintoolkit.composeapp.generated.resources.repo_tab_plugins
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,9 +92,9 @@ fun PluginRepoDetails(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                
+
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-                
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = currentRepo.url,
@@ -78,7 +103,15 @@ fun PluginRepoDetails(
                     )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                     IconButton(
-                        onClick = { scope.launch { clipboard.setClipEntry(org.wip.plugintoolkit.core.utils.PlatformUtils.clipEntryOf(currentRepo.url)) } },
+                        onClick = {
+                            scope.launch {
+                                clipboard.setClipEntry(
+                                    org.wip.plugintoolkit.core.utils.PlatformUtils.clipEntryOf(
+                                        currentRepo.url
+                                    )
+                                )
+                            }
+                        },
                         modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
@@ -89,7 +122,7 @@ fun PluginRepoDetails(
                         )
                     }
                 }
-                
+
                 val activeConflicts = conflicts.filter { (_, repos) -> repos.any { it.url == currentRepo.url } }
                 if (activeConflicts.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
@@ -118,9 +151,9 @@ fun PluginRepoDetails(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
-                
+
                 // Tabs
                 PrimaryTabRow(
                     selectedTabIndex = selectedTab,
@@ -147,10 +180,12 @@ fun PluginRepoDetails(
                 onValueChange = onSearchQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
-                    Text(stringResource(
-                        if (selectedTab == 0) Res.string.repo_search_plugins_placeholder 
-                        else Res.string.repo_search_flows_placeholder
-                    ))
+                    Text(
+                        stringResource(
+                            if (selectedTab == 0) Res.string.repo_search_plugins_placeholder
+                            else Res.string.repo_search_flows_placeholder
+                        )
+                    )
                 },
                 leadingIcon = {
                     Icon(
@@ -169,8 +204,8 @@ fun PluginRepoDetails(
                 // Plugins List
                 val filteredPlugins = plugins.filter {
                     it.name.contains(searchQuery, ignoreCase = true) ||
-                    (it.description ?: "").contains(searchQuery, ignoreCase = true) ||
-                    it.pkg.contains(searchQuery, ignoreCase = true)
+                            (it.description ?: "").contains(searchQuery, ignoreCase = true) ||
+                            it.pkg.contains(searchQuery, ignoreCase = true)
                 }
 
                 if (filteredPlugins.isEmpty()) {
@@ -209,8 +244,8 @@ fun PluginRepoDetails(
                 // Flows List
                 val filteredFlows = flows.filter {
                     it.name.contains(searchQuery, ignoreCase = true) ||
-                    (it.description ?: "").contains(searchQuery, ignoreCase = true) ||
-                    it.fileName.contains(searchQuery, ignoreCase = true)
+                            (it.description ?: "").contains(searchQuery, ignoreCase = true) ||
+                            it.fileName.contains(searchQuery, ignoreCase = true)
                 }
 
                 if (filteredFlows.isEmpty()) {

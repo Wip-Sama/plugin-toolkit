@@ -329,10 +329,10 @@ fun BoardCanvas(
                                 hoveredConnection?.let { conn ->
                                     val isSrc = hoveredConnectionIsSource ?: false
                                     onDetachConnection(conn, isSrc, position)
-                                    
+
                                     // Consume to prevent panning
                                     event.changes.forEach { it.consume() }
-                                    
+
                                     while (true) {
                                         val dragEvent = awaitPointerEvent()
                                         if (dragEvent.type == PointerEventType.Move) {
@@ -409,11 +409,25 @@ fun BoardCanvas(
 
                         val pathSource = Path().apply {
                             moveTo(sourceHalf.p0.x, sourceHalf.p0.y)
-                            cubicTo(sourceHalf.p1.x, sourceHalf.p1.y, sourceHalf.p2.x, sourceHalf.p2.y, sourceHalf.p3.x, sourceHalf.p3.y)
+                            cubicTo(
+                                sourceHalf.p1.x,
+                                sourceHalf.p1.y,
+                                sourceHalf.p2.x,
+                                sourceHalf.p2.y,
+                                sourceHalf.p3.x,
+                                sourceHalf.p3.y
+                            )
                         }
                         val pathTarget = Path().apply {
                             moveTo(targetHalf.p0.x, targetHalf.p0.y)
-                            cubicTo(targetHalf.p1.x, targetHalf.p1.y, targetHalf.p2.x, targetHalf.p2.y, targetHalf.p3.x, targetHalf.p3.y)
+                            cubicTo(
+                                targetHalf.p1.x,
+                                targetHalf.p1.y,
+                                targetHalf.p2.x,
+                                targetHalf.p2.y,
+                                targetHalf.p3.x,
+                                targetHalf.p3.y
+                            )
                         }
 
                         val highlightColor = Color(0xFFFF2D55)

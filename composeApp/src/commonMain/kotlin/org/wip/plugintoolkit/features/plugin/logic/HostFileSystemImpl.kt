@@ -18,7 +18,7 @@ class HostFileSystemImpl(
         // If allowedPaths is empty, it means the capability doesn't have any allowed paths configured
         // (perhaps it wasn't supposed to read/write files based on its parameters)
         if (allowedPaths.isEmpty()) return false
-        
+
         val file = File(pathString).absoluteFile
         val normalizedPath = file.absolutePath
 
@@ -57,7 +57,7 @@ class HostFileSystemImpl(
             val path = Path(absolutePath)
             val exists = SystemFileSystem.exists(path)
             validateAccess(absolutePath, requireDestructive = exists)
-            
+
             path.parent?.let { SystemFileSystem.createDirectories(it) }
             SystemFileSystem.sink(path).buffered().use { it.write(data) }
             Result.success(Unit)
@@ -71,7 +71,7 @@ class HostFileSystemImpl(
             val path = Path(absolutePath)
             val exists = SystemFileSystem.exists(path)
             validateAccess(absolutePath, requireDestructive = exists)
-            
+
             path.parent?.let { SystemFileSystem.createDirectories(it) }
             SystemFileSystem.sink(path).buffered().use { it.writeString(text) }
             Result.success(Unit)

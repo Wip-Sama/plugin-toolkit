@@ -1,13 +1,7 @@
 package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,37 +9,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cable
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DividerDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,61 +31,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isShiftPressed
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.booleanOrNull
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
-import org.wip.plugintoolkit.api.parseSemanticTypes
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.core.utils.PlatformUtils
-import org.wip.plugintoolkit.core.utils.SemanticRegistry
-import org.wip.plugintoolkit.features.colorpicker.utils.toHex
-import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
-import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
-import org.wip.plugintoolkit.shared.components.ToolkitChip
-import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
-import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.TooltipArea
-import org.wip.plugintoolkit.shared.components.tooltip
-import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.action_delete
-import plugintoolkit.composeapp.generated.resources.action_save
-import plugintoolkit.composeapp.generated.resources.auto_generated_path_format
-import plugintoolkit.composeapp.generated.resources.dialog_cancel
-import plugintoolkit.composeapp.generated.resources.node_class_name_label
-import plugintoolkit.composeapp.generated.resources.node_data_type_label
-import plugintoolkit.composeapp.generated.resources.node_delete_confirm
-import plugintoolkit.composeapp.generated.resources.node_delete_title
-import plugintoolkit.composeapp.generated.resources.node_edit_input_title
-import plugintoolkit.composeapp.generated.resources.node_edit_output_title
 import plugintoolkit.composeapp.generated.resources.node_parameters_section
-import plugintoolkit.composeapp.generated.resources.node_port_name_label
 import plugintoolkit.composeapp.generated.resources.node_results_section
-import plugintoolkit.composeapp.generated.resources.node_semantic_type_label
-import plugintoolkit.composeapp.generated.resources.node_semantic_type_placeholder
-import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun NodeComponent(
@@ -242,9 +181,12 @@ fun NodeComponent(
                     val visibleOutputs = node.outputs.filter { output ->
                         capNode?.capability?.parameters?.get(output.id)?.role != org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
                     }
-                    val parameters = node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role.let { r -> r == null || r == org.wip.plugintoolkit.api.ParameterRole.STANDARD } }
-                    val inputLocations = node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION }
-                    val outputLocations = node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }
+                    val parameters =
+                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role.let { r -> r == null || r == org.wip.plugintoolkit.api.ParameterRole.STANDARD } }
+                    val inputLocations =
+                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION }
+                    val outputLocations =
+                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }
 
                     val inputSections = listOf(
                         stringResource(Res.string.node_parameters_section) to parameters,
@@ -332,159 +274,177 @@ fun NodeComponent(
 
                         if (!isSectionCollapsed) {
                             sectionInputs.forEach { input ->
-                            
-                            val currentPortValue = input.value ?: input.defaultValue
-                            val portErrors = validationErrors.filter {
-                                (it.sourceNodeId == node.id && it.sourcePortId == input.id) ||
-                                        (it.targetNodeId == node.id && it.targetPortId == input.id)
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    PortCircle(
-                                        color = if (highlightedPortId == input.id) (highlightedPortColor
-                                            ?: headerColor) else headerColor,
-                                        isHighlighted = highlightedPortId == input.id,
-                                        onDragStart = { if (!isReadOnly) onStartConnection(node.id, input.id, false) },
-                                        onDrag = { if (!isReadOnly) onDragConnection(it) },
-                                        onDragEnd = { if (!isReadOnly) onDropConnection(it) },
-                                        modifier = Modifier.onGloballyPositioned { coords ->
-                                            if (boardLayoutCoordinates != null) {
-                                                val center =
-                                                    boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
-                                                onPortPositioned(node.id, input.id, center)
+
+                                val currentPortValue = input.value ?: input.defaultValue
+                                val portErrors = validationErrors.filter {
+                                    (it.sourceNodeId == node.id && it.sourcePortId == input.id) ||
+                                            (it.targetNodeId == node.id && it.targetPortId == input.id)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        PortCircle(
+                                            color = if (highlightedPortId == input.id) (highlightedPortColor
+                                                ?: headerColor) else headerColor,
+                                            isHighlighted = highlightedPortId == input.id,
+                                            onDragStart = {
+                                                if (!isReadOnly) onStartConnection(
+                                                    node.id,
+                                                    input.id,
+                                                    false
+                                                )
+                                            },
+                                            onDrag = { if (!isReadOnly) onDragConnection(it) },
+                                            onDragEnd = { if (!isReadOnly) onDropConnection(it) },
+                                            modifier = Modifier.onGloballyPositioned { coords ->
+                                                if (boardLayoutCoordinates != null) {
+                                                    val center =
+                                                        boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
+                                                    onPortPositioned(node.id, input.id, center)
+                                                }
                                             }
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        val isRequired = (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)?.required == true
-                                        val displayName = if (isRequired) "${input.name} *" else input.name
-                                        if (!input.description.isNullOrBlank()) {
-                                            TooltipArea(
-                                                delayMillis = 3000,
-                                                tooltip = {
+                                        )
+                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            val isRequired =
+                                                (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)?.required == true
+                                            val displayName = if (isRequired) "${input.name} *" else input.name
+                                            if (!input.description.isNullOrBlank()) {
+                                                TooltipArea(
+                                                    delayMillis = 3000,
+                                                    tooltip = {
+                                                        Text(
+                                                            text = input.description,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                ) {
                                                     Text(
-                                                        text = input.description,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        text = displayName,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.SemiBold
                                                     )
                                                 }
-                                            ) {
+                                            } else {
                                                 Text(
                                                     text = displayName,
                                                     style = MaterialTheme.typography.labelMedium,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
                                             }
-                                        } else {
+                                            val inferredType = inferredTypes[Pair(node.id, input.id)] ?: input.dataType
+                                            val typeLabel =
+                                                if (input.dataType is DataType.Primitive && input.dataType.primitiveType == PrimitiveType.ANY &&
+                                                    !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)
+                                                ) {
+                                                    "${formatDataType(inferredType)} (Implied)"
+                                                } else {
+                                                    formatDataType(input.dataType)
+                                                }
                                             Text(
-                                                text = displayName,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.SemiBold
+                                                text = typeLabel,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                             )
-                                        }
-                                        val inferredType = inferredTypes[Pair(node.id, input.id)] ?: input.dataType
-                                        val typeLabel =
-                                            if (input.dataType is DataType.Primitive && input.dataType.primitiveType == PrimitiveType.ANY &&
-                                                !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)
-                                            ) {
-                                                "${formatDataType(inferredType)} (Implied)"
-                                            } else {
-                                                formatDataType(input.dataType)
-                                            }
-                                        Text(
-                                            text = typeLabel,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                        )
-                                        val inferredSem =
-                                            inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes
-                                        if (inferredSem.isNotEmpty()) {
-                                            val first = inferredSem.first().canonicalId
-                                            val semText = if (inferredSem.size > 1) {
-                                                "$first (+${inferredSem.size - 1} more)"
-                                            } else {
-                                                first
-                                            }
-                                            TooltipArea(
-                                                tooltip = {
-                                                    Column(modifier = Modifier.padding(4.dp)) {
-                                                        inferredSem.forEach { sem ->
-                                                            Text(
-                                                                text = "• ${sem.canonicalId}",
-                                                                style = MaterialTheme.typography.bodySmall,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                            )
+                                            val inferredSem =
+                                                inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes
+                                            if (inferredSem.isNotEmpty()) {
+                                                val first = inferredSem.first().canonicalId
+                                                val semText = if (inferredSem.size > 1) {
+                                                    "$first (+${inferredSem.size - 1} more)"
+                                                } else {
+                                                    first
+                                                }
+                                                TooltipArea(
+                                                    tooltip = {
+                                                        Column(modifier = Modifier.padding(4.dp)) {
+                                                            inferredSem.forEach { sem ->
+                                                                Text(
+                                                                    text = "• ${sem.canonicalId}",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
                                                         }
                                                     }
+                                                ) {
+                                                    Text(
+                                                        text = semText,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
                                                 }
-                                            ) {
+                                            }
+                                            if (portErrors.isNotEmpty()) {
                                                 Text(
-                                                    text = semText,
+                                                    text = portErrors.first().message,
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = MaterialTheme.colorScheme.error,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                         }
-                                        if (portErrors.isNotEmpty()) {
-                                            Text(
-                                                text = portErrors.first().message,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.error,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
                                     }
-                                }
 
-                                // Default Value Editor
-                                val isConnected = connectedInputPortIds.contains(input.id)
-                                val valueModifier = if (isConnected) Modifier.alpha(0.5f) else Modifier
+                                    // Default Value Editor
+                                    val isConnected = connectedInputPortIds.contains(input.id)
+                                    val valueModifier = if (isConnected) Modifier.alpha(0.5f) else Modifier
 
-                                NodePropertyEditor(
-                                    node = node,
-                                    input = input,
-                                    currentPortValue = currentPortValue,
-                                    isConnected = isConnected,
-                                    isReadOnly = isReadOnly,
-                                    portErrors = portErrors,
-                                    inferredSem = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes,
-                                    onUpdateValue = onUpdateValue,
-                                    onFocusLost = onFocusLost,
-                                    onShowColorPicker = { inputId ->
-                                        activeColorInputId = inputId
-                                        showColorPicker = true
-                                    }
-                                )
-                                
-                                val correspondingOutput = node.outputs.find { it.id == input.id }
-                                val isOutputLocation = (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)?.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
-                                if (isOutputLocation && correspondingOutput != null) {
-                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                    PortCircle(
-                                        color = if (highlightedPortId == correspondingOutput.id) (highlightedPortColor
-                                            ?: headerColor) else headerColor,
-                                        isHighlighted = highlightedPortId == correspondingOutput.id,
-                                        onDragStart = { if (!isReadOnly) onStartConnection(node.id, correspondingOutput.id, true) },
-                                        onDrag = { if (!isReadOnly) onDragConnection(it) },
-                                        onDragEnd = { if (!isReadOnly) onDropConnection(it) },
-                                        modifier = Modifier.onGloballyPositioned { coords ->
-                                            if (boardLayoutCoordinates != null) {
-                                                val center =
-                                                    boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
-                                                onPortPositioned(node.id, correspondingOutput.id, center)
-                                            }
+                                    NodePropertyEditor(
+                                        node = node,
+                                        input = input,
+                                        currentPortValue = currentPortValue,
+                                        isConnected = isConnected,
+                                        isReadOnly = isReadOnly,
+                                        portErrors = portErrors,
+                                        inferredSem = inferredSemanticTypes[Pair(node.id, input.id)]
+                                            ?: input.semanticTypes,
+                                        onUpdateValue = onUpdateValue,
+                                        onFocusLost = onFocusLost,
+                                        onShowColorPicker = { inputId ->
+                                            activeColorInputId = inputId
+                                            showColorPicker = true
                                         }
                                     )
+
+                                    val correspondingOutput = node.outputs.find { it.id == input.id }
+                                    val isOutputLocation =
+                                        (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)?.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+                                    if (isOutputLocation && correspondingOutput != null) {
+                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                        PortCircle(
+                                            color = if (highlightedPortId == correspondingOutput.id) (highlightedPortColor
+                                                ?: headerColor) else headerColor,
+                                            isHighlighted = highlightedPortId == correspondingOutput.id,
+                                            onDragStart = {
+                                                if (!isReadOnly) onStartConnection(
+                                                    node.id,
+                                                    correspondingOutput.id,
+                                                    true
+                                                )
+                                            },
+                                            onDrag = { if (!isReadOnly) onDragConnection(it) },
+                                            onDragEnd = { if (!isReadOnly) onDropConnection(it) },
+                                            modifier = Modifier.onGloballyPositioned { coords ->
+                                                if (boardLayoutCoordinates != null) {
+                                                    val center =
+                                                        boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
+                                                    onPortPositioned(node.id, correspondingOutput.id, center)
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
                     }
 
                     if (node.inputs.isNotEmpty() && visibleOutputs.isNotEmpty()) {
@@ -503,7 +463,11 @@ fun NodeComponent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(stringResource(Res.string.node_results_section), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                stringResource(Res.string.node_results_section),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = if (node.isOutputsCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
@@ -531,7 +495,7 @@ fun NodeComponent(
                     }
                     if (!node.isOutputsCollapsed) {
                         visibleOutputs.forEach { output ->
-                            
+
                             Row(
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,

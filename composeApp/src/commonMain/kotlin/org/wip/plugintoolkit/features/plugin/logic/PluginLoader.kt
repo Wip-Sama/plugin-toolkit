@@ -89,7 +89,8 @@ object PluginLoader {
                 val manifest = pluginEntry.getManifest().getOrThrow()
                 val pluginId = manifest.plugin.id
 
-                val loadedPlugin = LoadedPlugin(pluginId, normalizedPath, pluginEntry, newClassLoader, koinApp, currentLastModified)
+                val loadedPlugin =
+                    LoadedPlugin(pluginId, normalizedPath, pluginEntry, newClassLoader, koinApp, currentLastModified)
                 loadedPlugins[normalizedPath] = loadedPlugin
                 idToJarPath[pluginId] = normalizedPath
 

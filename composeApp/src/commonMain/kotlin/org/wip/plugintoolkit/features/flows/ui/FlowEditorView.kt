@@ -44,19 +44,17 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
-import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
-import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_save
@@ -205,7 +203,15 @@ fun FlowEditorView(
                     val targetPortId =
                         if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
 
-                    viewModel.onEvent(FlowEvent.TryConnectPorts(sourceNodeId, sourcePortId, targetNodeId, targetPortId, isShiftPressed))
+                    viewModel.onEvent(
+                        FlowEvent.TryConnectPorts(
+                            sourceNodeId,
+                            sourcePortId,
+                            targetNodeId,
+                            targetPortId,
+                            isShiftPressed
+                        )
+                    )
                 }
                 isDrawingConnection = false
                 connectionStartNodeId = null
@@ -345,9 +351,13 @@ fun FlowEditorView(
                                     if (startBoardPos != null) {
                                         val boardPosition = startBoardPos + cumulativeDragOffset
                                         connectionCurrentPos = boardPosition
-                                        
+
                                         val (closestNodeId, closestPortId) = findClosestPort(
-                                            boardPosition, flow, connectionStartIsOutput, state.scale, getPortBoardPosition
+                                            boardPosition,
+                                            flow,
+                                            connectionStartIsOutput,
+                                            state.scale,
+                                            getPortBoardPosition
                                         )
                                         highlightedNodeId = closestNodeId
                                         highlightedPortId = closestPortId
@@ -365,7 +375,15 @@ fun FlowEditorView(
                                     val targetPortId =
                                         if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
 
-                                    viewModel.onEvent(FlowEvent.TryConnectPorts(sourceNodeId, sourcePortId, targetNodeId, targetPortId, isShiftPressed))
+                                    viewModel.onEvent(
+                                        FlowEvent.TryConnectPorts(
+                                            sourceNodeId,
+                                            sourcePortId,
+                                            targetNodeId,
+                                            targetPortId,
+                                            isShiftPressed
+                                        )
+                                    )
                                 }
                                 isDrawingConnection = false
                                 connectionStartNodeId = null

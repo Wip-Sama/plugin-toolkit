@@ -50,7 +50,7 @@ class JobWorkerUtilsTest {
             )
         )
         val manifest = createMockManifest(listOf(cap))
-        
+
         val parameters = mutableMapOf<String, JsonElement>(
             "inFile" to JsonPrimitive("/safe/path/file.txt"),
             "normalParam" to JsonPrimitive("just text")
@@ -79,7 +79,7 @@ class JobWorkerUtilsTest {
             fileAccess = FileAccess(writesFiles = true)
         )
         val manifest = createMockManifest(listOf(cap))
-        
+
         val parameters = mutableMapOf<String, JsonElement>() // Empty parameters!
 
         val sandboxPath = "/appData/jobs/123/sandbox/node_1"
@@ -107,7 +107,7 @@ class JobWorkerUtilsTest {
             fileAccess = FileAccess(isDestructive = true)
         )
         val manifest = createMockManifest(listOf(cap))
-        
+
         val parameters = mutableMapOf<String, JsonElement>()
 
         val (_, isDestructive) = resolveFileAccess(manifest, "deleteData", parameters)
@@ -137,7 +137,7 @@ class JobWorkerUtilsTest {
             fileAccess = FileAccess(writesFiles = true)
         )
         val manifest = createMockManifest(listOf(cap))
-        
+
         val parameters = mutableMapOf<String, JsonElement>(
             "inputPath" to JsonPrimitive("/test/folder/input.txt")
         )

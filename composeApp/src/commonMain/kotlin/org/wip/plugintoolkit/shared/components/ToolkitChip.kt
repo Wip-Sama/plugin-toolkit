@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 enum class ToolkitChipStyle {
@@ -41,7 +40,10 @@ fun ToolkitChip(
     }
 
     val border = if (style == ToolkitChipStyle.Outlined) {
-        BorderStroke(ToolkitTheme.dimensions.borderUnselected, containerColor.copy(alpha = ToolkitTheme.opacity.divider))
+        BorderStroke(
+            ToolkitTheme.dimensions.borderUnselected,
+            containerColor.copy(alpha = ToolkitTheme.opacity.divider)
+        )
     } else {
         null
     }

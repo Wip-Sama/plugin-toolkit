@@ -3,8 +3,8 @@ package org.wip.plugintoolkit.features.job.logic
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.readString
 import kotlinx.io.readByteArray
+import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -147,16 +147,20 @@ class SaveNodeExecutor : NodeExecutor {
             is JsonElement -> {
                 if (data is kotlinx.serialization.json.JsonPrimitive && data.isString) data.content else data.toString()
             }
+
             else -> data?.toString() ?: ""
         }
 
         val possibleSourcePath = Path(dataString)
-        if (possibleSourcePath.isAbsolute && SystemFileSystem.exists(possibleSourcePath) && !SystemFileSystem.metadataOrNull(possibleSourcePath)!!.isDirectory) {
+        if (possibleSourcePath.isAbsolute && SystemFileSystem.exists(possibleSourcePath) && !SystemFileSystem.metadataOrNull(
+                possibleSourcePath
+            )!!.isDirectory
+        ) {
             // It's a file, perform copy
             val sourceBytes = SystemFileSystem.source(possibleSourcePath).buffered().use { it.readByteArray() }
             SystemFileSystem.sink(fullPath).buffered().use { it.write(sourceBytes) }
             context.addLog("Copied file from $possibleSourcePath to $fullPath")
-            
+
             if (isDestructive) {
                 try {
                     SystemFileSystem.delete(possibleSourcePath)

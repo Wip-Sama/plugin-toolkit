@@ -81,7 +81,10 @@ class FlowBrokenTest {
         )
 
         val activeCapabilities = setOf("Capability A")
-        assertTrue(flow.isBroken(activeCapabilities), "Flow should be broken because the node is explicitly marked as broken")
+        assertTrue(
+            flow.isBroken(activeCapabilities),
+            "Flow should be broken because the node is explicitly marked as broken"
+        )
     }
 
     @Test

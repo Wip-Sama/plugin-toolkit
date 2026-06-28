@@ -1,35 +1,55 @@
 package org.wip.plugintoolkit.features.repository.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
-import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
-import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import plugintoolkit.composeapp.generated.resources.*
-import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Cancel
+import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
+import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_install
+import plugintoolkit.composeapp.generated.resources.repo_action_cancel_update
+import plugintoolkit.composeapp.generated.resources.repo_action_update_version
+import plugintoolkit.composeapp.generated.resources.repo_action_updating
+import plugintoolkit.composeapp.generated.resources.repo_plugin_installed_version_format
+import plugintoolkit.composeapp.generated.resources.repo_plugin_pkg_version_format
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -87,9 +107,9 @@ fun PluginListItem(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    
+
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    
+
                     if (isInstalled) {
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer,
@@ -133,7 +153,7 @@ fun PluginListItem(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                
+
                 val pluginConflicts = conflicts[plugin.pkg]
                 if (pluginConflicts != null && pluginConflicts.size > 1) {
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
@@ -144,11 +164,12 @@ fun PluginListItem(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        
+
                         Box(modifier = Modifier.height(24.dp)) {
                             ExpressiveMenu(
                                 options = pluginConflicts,
-                                selectedOption = pluginConflicts.firstOrNull { it.url == currentRepo.url } ?: pluginConflicts.first(),
+                                selectedOption = pluginConflicts.firstOrNull { it.url == currentRepo.url }
+                                    ?: pluginConflicts.first(),
                                 onOptionSelected = { onSetPackageSource(plugin.pkg, it.url) },
                                 labelProvider = { it.name }
                             )
@@ -162,7 +183,7 @@ fun PluginListItem(
             // Action Buttons
             if (progress != null) {
                 var isHovered by remember { mutableStateOf(false) }
-                
+
                 Surface(
                     shape = CircleShape,
                     color = if (isHovered) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
@@ -173,7 +194,10 @@ fun PluginListItem(
                         .clickable { onCancel(plugin.pkg) }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
                         if (isHovered) {
                             Icon(
                                 Icons.Default.Cancel,
@@ -181,7 +205,10 @@ fun PluginListItem(
                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Text(stringResource(Res.string.repo_action_cancel_update), style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                stringResource(Res.string.repo_action_cancel_update),
+                                style = MaterialTheme.typography.labelMedium
+                            )
                         } else {
                             CircularProgressIndicator(
                                 progress = { progress },
@@ -190,7 +217,10 @@ fun PluginListItem(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Text(stringResource(Res.string.repo_action_updating), style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                stringResource(Res.string.repo_action_updating),
+                                style = MaterialTheme.typography.labelMedium
+                            )
                         }
                     }
                 }

@@ -1,6 +1,5 @@
 package org.wip.plugintoolkit.features.flows.viewmodel
 
-import org.wip.plugintoolkit.features.flows.logic.format
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -18,12 +17,7 @@ import org.koin.mp.KoinPlatform.getKoin
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PrimitiveType
-import org.wip.plugintoolkit.api.SemanticType
-import org.wip.plugintoolkit.api.canConvert
-import org.wip.plugintoolkit.api.isCompatibleWith
-import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.core.notification.NotificationService
-import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.FlowUnpacker
 import org.wip.plugintoolkit.features.flows.model.InputPort
@@ -37,13 +31,7 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
-import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_semantics
-import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_types
-import plugintoolkit.composeapp.generated.resources.flow_editor_same_node_warning
-import org.jetbrains.compose.resources.getString
 import kotlin.math.roundToInt
-
 
 
 class FlowEditorViewModel(
@@ -287,15 +275,16 @@ class FlowEditorViewModel(
                             dataType = event.capability.returnType,
                             semanticTypes = event.capability.semanticTypes
                         )
-                    )) + (event.capability.parameters?.filter { it.value.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }?.map { (key, meta) ->
-                        OutputPort(
-                            id = key,
-                            name = key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
-                            description = meta.description,
-                            dataType = meta.type,
-                            semanticTypes = meta.semanticTypes
-                        )
-                    } ?: emptyList())
+                    )) + (event.capability.parameters?.filter { it.value.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }
+                        ?.map { (key, meta) ->
+                            OutputPort(
+                                id = key,
+                                name = key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                                description = meta.description,
+                                dataType = meta.type,
+                                semanticTypes = meta.semanticTypes
+                            )
+                        } ?: emptyList())
                 ),
                 density = event.density
             )
@@ -335,7 +324,12 @@ class FlowEditorViewModel(
             )
 
             is FlowEvent.AddSubFlowNode -> {
-                if (org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector.wouldCreateNestedFlowCycle(_state.value.flow.name, event.flowName, _state.value.flows)) {
+                if (org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector.wouldCreateNestedFlowCycle(
+                        _state.value.flow.name,
+                        event.flowName,
+                        _state.value.flows
+                    )
+                ) {
                     Logger.w { "Failed to add subflow node: adding subflow '${event.flowName}' to '${_state.value.flow.name}' would create a nested cycle." }
                     resolvedNotificationService?.toast("Cannot add subflow: Adding this subflow would create a cyclic dependency between flows.")
                     return
@@ -415,7 +409,12 @@ class FlowEditorViewModel(
             is FlowEvent.ResetBoard -> handleResetBoard()
             is FlowEvent.Save -> handleSave()
             is FlowEvent.SaveAs -> handleSaveAs(event.name)
-            is FlowEvent.UpdateInputPortValue -> nodeManager.handleUpdateInputPortValue(event.nodeId, event.portId, event.value)
+            is FlowEvent.UpdateInputPortValue -> nodeManager.handleUpdateInputPortValue(
+                event.nodeId,
+                event.portId,
+                event.value
+            )
+
             is FlowEvent.UpdateBoundaryNode -> nodeManager.handleUpdateBoundaryNode(
                 event.nodeId,
                 event.portName,
@@ -450,7 +449,11 @@ class FlowEditorViewModel(
             is FlowEvent.ToggleNodeCollapse -> nodeManager.handleToggleNodeCollapse(event.nodeId)
             is FlowEvent.ToggleNodeInputsCollapse -> nodeManager.handleToggleNodeInputsCollapse(event.nodeId)
             is FlowEvent.ToggleNodeOutputsCollapse -> nodeManager.handleToggleNodeOutputsCollapse(event.nodeId)
-            is FlowEvent.UpdateConnectionOrder -> connectionManager.handleUpdateConnectionOrder(event.connection, event.newOrderIndex)
+            is FlowEvent.UpdateConnectionOrder -> connectionManager.handleUpdateConnectionOrder(
+                event.connection,
+                event.newOrderIndex
+            )
+
             is FlowEvent.MoveConnectionFirst -> connectionManager.handleMoveConnectionFirst(event.connection)
             is FlowEvent.MoveConnectionLast -> connectionManager.handleMoveConnectionLast(event.connection)
             else -> {}
@@ -462,14 +465,6 @@ class FlowEditorViewModel(
             }
         }
     }
-
-
-
-
-
-
-
-
 
 
     private fun handlePan(delta: Offset) {
@@ -595,10 +590,6 @@ class FlowEditorViewModel(
     }
 
 
-
-
-
-
     private fun runTypeInference() {
         val result = org.wip.plugintoolkit.features.flows.logic.FlowTypeInference.runTypeInference(_state.value.flow)
         _state.update { currentState ->
@@ -652,19 +643,11 @@ class FlowEditorViewModel(
     }
 
 
-
-
-
-
-
-
-
-
 }
 
-    internal fun Offset.snapToGrid(gridSize: Float = 50f): Offset {
-        return Offset(
-            (x / gridSize).roundToInt() * gridSize,
-            (y / gridSize).roundToInt() * gridSize
-        )
-    }
+internal fun Offset.snapToGrid(gridSize: Float = 50f): Offset {
+    return Offset(
+        (x / gridSize).roundToInt() * gridSize,
+        (y / gridSize).roundToInt() * gridSize
+    )
+}

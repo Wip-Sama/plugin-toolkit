@@ -1,12 +1,10 @@
 package org.wip.plugintoolkit.features
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
 import org.wip.plugintoolkit.api.PluginManifest
-import kotlin.test.Test
-import kotlin.test.assertNotNull
 import java.io.File
 import java.util.zip.ZipFile
+import kotlin.test.Test
 
 class ManifestTest {
     @Test
@@ -15,10 +13,10 @@ class ManifestTest {
         val zip = ZipFile(jarFile)
         val entry = zip.getEntry("META-INF/manifest.json")
         val manifestString = zip.getInputStream(entry).reader().readText()
-        
+
         val format = Json { ignoreUnknownKeys = true }
         val manifest = format.decodeFromString<PluginManifest>(manifestString)
-        
+
         val batch = manifest.capabilities.find { it.name == "batch_process" }
         println("batch_process fileAccess: ${batch?.fileAccess}")
         val outA = batch?.parameters?.get("outputA")

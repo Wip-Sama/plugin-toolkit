@@ -11,7 +11,7 @@ import org.wip.plugintoolkit.api.ExecutionFileSystem
 class DefaultExecutionFileSystem(
     private val sandboxPath: String
 ) : ExecutionFileSystem {
-    
+
     init {
         SystemFileSystem.createDirectories(Path(sandboxPath))
     }

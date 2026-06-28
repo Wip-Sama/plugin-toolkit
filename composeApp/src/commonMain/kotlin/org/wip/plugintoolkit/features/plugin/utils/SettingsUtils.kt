@@ -30,7 +30,7 @@ object SettingsUtils {
                 return null // Cannot evaluate yet
             }
         }
-        
+
         // Normalize path
         val parts = evaluated.replace("\\", "/").split("/")
         val stack = mutableListOf<String>()

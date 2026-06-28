@@ -1,6 +1,5 @@
 package org.wip.plugintoolkit.features.flows.logic
 
-import org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
@@ -10,6 +9,7 @@ import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.OutputPort
+import org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry
 import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
 
 data class TypeInferenceResult(
@@ -274,8 +274,6 @@ object FlowTypeInference {
 
         return Pair(inputs, outputs)
     }
-
-
 
 
 }

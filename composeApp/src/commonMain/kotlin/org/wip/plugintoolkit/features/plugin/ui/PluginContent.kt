@@ -26,17 +26,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
@@ -46,11 +43,7 @@ import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
-import org.wip.plugintoolkit.shared.components.GlassCard
-import org.wip.plugintoolkit.shared.components.SectionHeader
-import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
-import org.wip.plugintoolkit.shared.components.plugin.FileAccessChips
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_clear
 import plugintoolkit.composeapp.generated.resources.plugin_execute_capability
@@ -59,7 +52,6 @@ import plugintoolkit.composeapp.generated.resources.plugin_execution_results
 import plugintoolkit.composeapp.generated.resources.plugin_id_format
 import plugintoolkit.composeapp.generated.resources.plugin_mem_format
 import plugintoolkit.composeapp.generated.resources.plugin_no_parameters
-import plugintoolkit.composeapp.generated.resources.plugin_save_results
 import plugintoolkit.composeapp.generated.resources.plugin_select_capability_hint
 import plugintoolkit.composeapp.generated.resources.plugin_tester_title
 
@@ -195,7 +187,7 @@ fun CapabilityItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
+
             if (capability.semanticTypes.isNotEmpty() || capability.fileAccess?.isDestructive == true) {
                 Spacer(modifier = Modifier.height(8.dp))
                 androidx.compose.foundation.layout.FlowRow(
@@ -250,7 +242,7 @@ fun CapabilityTester(
 ) {
     val capabilityParameters = capability.parameters ?: emptyMap()
     val allParams = capabilityParameters.toMutableMap()
-    
+
     if (saveResults && capability.returnType != org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.UNIT)) {
         allParams["_outputFile"] = org.wip.plugintoolkit.api.ParameterMetadata(
             description = "Optional file to save the capability's return result",
@@ -285,46 +277,46 @@ fun CapabilityTester(
 
 
 
-        if (capability.parameters.isNullOrEmpty()) {
-            Text(stringResource(Res.string.plugin_no_parameters), style = MaterialTheme.typography.bodyMedium)
-        }
+    if (capability.parameters.isNullOrEmpty()) {
+        Text(stringResource(Res.string.plugin_no_parameters), style = MaterialTheme.typography.bodyMedium)
+    }
 
-        Spacer(modifier = Modifier.height(24.dp))
+    Spacer(modifier = Modifier.height(24.dp))
 
-        val validationErrors = remember(parameterValues.toMap(), capability.parameters) {
-            org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateAllParameters(
-                parameterValues = parameterValues,
-                parameters = capability.parameters
+    val validationErrors = remember(parameterValues.toMap(), capability.parameters) {
+        org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateAllParameters(
+            parameterValues = parameterValues,
+            parameters = capability.parameters
+        )
+    }
+    val isValid = validationErrors.isEmpty()
+
+    Button(
+        onClick = onExecute,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        enabled = isValid
+    ) {
+        if (activeJobs.isNotEmpty()) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary
             )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(stringResource(Res.string.plugin_execute_capability_running, activeJobs.size))
+        } else {
+            Text(stringResource(Res.string.plugin_execute_capability))
         }
-        val isValid = validationErrors.isEmpty()
-
-        Button(
-            onClick = onExecute,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
-            enabled = isValid
-        ) {
-            if (activeJobs.isNotEmpty()) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(stringResource(Res.string.plugin_execute_capability_running, activeJobs.size))
-            } else {
-                Text(stringResource(Res.string.plugin_execute_capability))
-            }
-        }
-        if (!isValid) {
-            Text(
-                text = "Fix parameter errors before executing",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
+    }
+    if (!isValid) {
+        Text(
+            text = "Fix parameter errors before executing",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
 }
 
 @Composable

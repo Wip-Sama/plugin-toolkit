@@ -25,9 +25,9 @@ import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.FileAccess
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.ParameterRole
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.plugin_save_results
 

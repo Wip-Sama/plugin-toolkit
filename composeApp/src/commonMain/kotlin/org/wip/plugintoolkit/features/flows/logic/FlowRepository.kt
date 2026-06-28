@@ -105,7 +105,8 @@ class FlowRepository(
                             val updatedNodes = flow.nodes.map { node ->
                                 if (node is Node.CapabilityNode) {
                                     val currentManifest = manifests[node.pluginInfo.id]
-                                    val actualCapability = currentManifest?.capabilities?.find { it.name == node.capability.name }
+                                    val actualCapability =
+                                        currentManifest?.capabilities?.find { it.name == node.capability.name }
                                     if (currentManifest == null || actualCapability == null) {
                                         node.copy(isBroken = true)
                                     } else {

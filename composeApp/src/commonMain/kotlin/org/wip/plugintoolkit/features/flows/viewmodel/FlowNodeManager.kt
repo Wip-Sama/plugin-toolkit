@@ -1,23 +1,18 @@
 package org.wip.plugintoolkit.features.flows.viewmodel
 
 
-
-
-import org.wip.plugintoolkit.api.isCompatibleWith
-import org.wip.plugintoolkit.api.isSemanticTypeCompatible
-import org.wip.plugintoolkit.features.flows.model.InputPort
-import org.wip.plugintoolkit.features.flows.model.OutputPort
-import kotlin.math.sqrt
-import org.wip.plugintoolkit.features.flows.model.Connection
-import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.SemanticType
-import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import androidx.compose.ui.geometry.Offset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.SemanticType
+import org.wip.plugintoolkit.api.isCompatibleWith
+import org.wip.plugintoolkit.api.isSemanticTypeCompatible
+import org.wip.plugintoolkit.features.flows.model.Connection
+import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
-import plugintoolkit.composeapp.generated.resources.Res
-import org.jetbrains.compose.resources.getString
+import org.wip.plugintoolkit.features.flows.model.OutputPort
+import org.wip.plugintoolkit.features.flows.model.PortConstraints
 
 class FlowNodeManager(
     private val state: MutableStateFlow<FlowEditorState>,

@@ -18,7 +18,7 @@ class BoardMathUtilsTest {
 
         // Then the left curve should end at the exact midpoint
         assertEquals(Offset(50f, 0f), left.p3, "Left curve should end at midpoint")
-        
+
         // And the right curve should start at the exact midpoint
         assertEquals(Offset(50f, 0f), right.p0, "Right curve should start at midpoint")
 

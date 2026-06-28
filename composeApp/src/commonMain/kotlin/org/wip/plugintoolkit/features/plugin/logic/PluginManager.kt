@@ -127,7 +127,13 @@ class PluginManager(
 
     // --- Context & Jobs ---
 
-    fun createPluginContext(pkg: String, jobId: String? = null, allowedPaths: List<String> = emptyList(), isDestructiveAllowed: Boolean = false, executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null) =
+    fun createPluginContext(
+        pkg: String,
+        jobId: String? = null,
+        allowedPaths: List<String> = emptyList(),
+        isDestructiveAllowed: Boolean = false,
+        executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null
+    ) =
         lifecycleManager.createPluginContext(pkg, jobId, null, allowedPaths, isDestructiveAllowed, executionFileSystem)
 
     suspend fun validatePluginInJob(pkg: String) = coordinator.triggerValidation(pkg)

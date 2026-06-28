@@ -19,27 +19,27 @@ class FlowRepositoryTest {
     fun testReloadFlowsOnPluginChange() = runBlocking {
         val persistence = MockSettingsPersistence()
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
-        
+
         val installedPluginsFlow = MutableStateFlow<List<InstalledPlugin>>(emptyList())
         every { mockPluginManager.installedPlugins } returns installedPluginsFlow
-        
+
         // This will launch the collect job in its init block
         val repository = FlowRepository(persistence, mockPluginManager, CoroutineScope(Dispatchers.Unconfined))
-        
+
         var reloadCalled = false
         // Since we can't easily spy on reloadFlows (it's not open and repository is the real instance),
         // we can observe flows. When we emit to installedPluginsFlow, the collect block calls reloadFlows
         // which updates _flows.
         // We'll just verify that the collection happens.
-        
+
         val initialFlows = repository.flows.value
-        
+
         // Emit a new list
         installedPluginsFlow.value = listOf(InstalledPlugin("test", "test", "1.0", "path"))
-        
+
         // Wait a bit for the coroutine to process
         delay(100)
-        
+
         // At this point we just want to ensure it doesn't crash and the flow collected it.
         // A more robust test would require verifying file operations or observing changes to flow contents,
         // but given the system, we know `reloadFlows` is called.

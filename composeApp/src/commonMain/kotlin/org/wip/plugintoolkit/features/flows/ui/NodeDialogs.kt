@@ -323,7 +323,8 @@ fun NodeDialogs(
                         color.toHex(hexPrefix = true, includeAlpha = hasAlpha)
                     }
                     val isArray = input?.dataType is DataType.Array
-                    val existingValue = input?.let { getPortValueString(it.value ?: it.defaultValue, it.dataType) } ?: ""
+                    val existingValue =
+                        input?.let { getPortValueString(it.value ?: it.defaultValue, it.dataType) } ?: ""
                     val newValue = appendPickedValue(existingValue, formatted, isArray)
                     onUpdateValue(node.id, inputId, newValue)
                 }

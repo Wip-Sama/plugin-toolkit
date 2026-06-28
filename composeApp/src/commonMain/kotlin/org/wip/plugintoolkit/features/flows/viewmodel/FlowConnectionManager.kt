@@ -5,19 +5,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.api.isSemanticTypeCompatible
-import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.flows.logic.format
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Node
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_semantics
 import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_types
 import plugintoolkit.composeapp.generated.resources.flow_editor_same_node_warning
-import org.jetbrains.compose.resources.getString
-import org.wip.plugintoolkit.features.flows.logic.format
 
 class FlowConnectionManager(
     private val state: MutableStateFlow<FlowEditorState>,
@@ -62,7 +62,12 @@ class FlowConnectionManager(
                 return@update currentState // Already connected exactly
             }
 
-            if (org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector.wouldCreateCycle(sourceNodeId, targetNodeId, filteredConnections)) {
+            if (org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector.wouldCreateCycle(
+                    sourceNodeId,
+                    targetNodeId,
+                    filteredConnections
+                )
+            ) {
                 notificationService?.toast("Cannot connect: Connecting these ports would create a loop (Directed Cyclic Graph). Enforcing Directed Acyclic Graph (DAG).")
                 return@update currentState
             }
@@ -110,8 +115,10 @@ class FlowConnectionManager(
 
         val sourceInferredType = currentState.inferredTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.dataType
         val targetInferredType = currentState.inferredTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.dataType
-        val sourceInferredSemantic = currentState.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.semanticTypes
-        val targetInferredSemantic = currentState.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticTypes
+        val sourceInferredSemantic =
+            currentState.inferredSemanticTypes[Pair(sourceNodeId, sourcePortId)] ?: sourcePort.semanticTypes
+        val targetInferredSemantic =
+            currentState.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticTypes
 
         val typesCompatible = sourceInferredType.isCompatibleWith(targetInferredType)
         val semanticsCompatible = isSemanticTypeCompatible(sourceInferredSemantic, targetInferredSemantic)
@@ -122,23 +129,32 @@ class FlowConnectionManager(
             if (isShiftPressed) {
                 onEvent(FlowEvent.AutoConvertAndConnect(sourceNodeId, sourcePortId, targetNodeId, targetPortId))
             } else {
-                state.update { it.copy(
-                    pendingConnection = PendingConnection(
-                        sourceNodeId = sourceNodeId,
-                        sourcePortId = sourcePortId,
-                        targetNodeId = targetNodeId,
-                        targetPortId = targetPortId,
-                        sourceType = sourceInferredType,
-                        targetType = targetInferredType
+                state.update {
+                    it.copy(
+                        pendingConnection = PendingConnection(
+                            sourceNodeId = sourceNodeId,
+                            sourcePortId = sourcePortId,
+                            targetNodeId = targetNodeId,
+                            targetPortId = targetPortId,
+                            sourceType = sourceInferredType,
+                            targetType = targetInferredType
+                        )
                     )
-                )}
+                }
             }
         } else {
             viewModelScope.launch {
                 val message = if (!typesCompatible) {
-                    getString(Res.string.flow_editor_incompatible_types, sourceInferredType.format(), targetInferredType.format())
+                    getString(
+                        Res.string.flow_editor_incompatible_types,
+                        sourceInferredType.format(),
+                        targetInferredType.format()
+                    )
                 } else {
-                    getString(Res.string.flow_editor_incompatible_semantics, sourceInferredSemantic.joinToString { it.canonicalId }, targetInferredSemantic.joinToString { it.canonicalId })
+                    getString(
+                        Res.string.flow_editor_incompatible_semantics,
+                        sourceInferredSemantic.joinToString { it.canonicalId },
+                        targetInferredSemantic.joinToString { it.canonicalId })
                 }
                 notificationService?.toast(message)
             }

@@ -1,18 +1,13 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import kotlinx.coroutines.test.runTest
-import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.readString
-import kotlinx.io.writeString
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DefaultExecutionFileSystemTest {
@@ -101,7 +96,7 @@ class DefaultExecutionFileSystemTest {
         val outsidePath = Path("outside.txt")
         // Ensure it did not write outside the sandbox directory into the project root
         assertFalse(SystemFileSystem.exists(outsidePath), "File should not be written outside the sandbox")
-        
+
         // Similarly for read
         fileSystem.writeTextFile("safe.txt", "safe content")
         val content = fileSystem.readTextFile("../safe.txt")
