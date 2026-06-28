@@ -122,7 +122,6 @@ fun <T> NavigationSidebar(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
             ) {
                 bodySections.forEach { section ->
                     SidebarSection(

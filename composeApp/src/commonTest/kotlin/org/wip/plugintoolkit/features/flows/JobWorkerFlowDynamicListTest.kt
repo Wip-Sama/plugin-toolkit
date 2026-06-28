@@ -162,7 +162,7 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
 
         val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
             jobManager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
             mockk(relaxed = true),
             mockk(relaxed = true),
             backgroundScope
@@ -300,7 +300,7 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
 
         val engine = org.wip.plugintoolkit.features.job.logic.FlowEngine(
             jobManager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
             mockPluginManager,
             mockLifecycleCoordinator,
             backgroundScope

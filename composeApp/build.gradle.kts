@@ -49,6 +49,7 @@ kotlin {
             implementation(libs.ktor.client.mock)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.mockk)
+            implementation(libs.koin.test)
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
@@ -59,6 +60,7 @@ kotlin {
             implementation(libs.ktor.client.cio)
             implementation(libs.slf4j.simple)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.compose.ui.test.junit4)
         }
     }
 }

@@ -75,7 +75,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
@@ -146,7 +146,7 @@ val JobNavConfig = SavedStateConfiguration {
 
 @Composable
 fun JobDashboard(
-    viewModel: JobViewModel = koinViewModel()
+    viewModel: JobViewModel = koinInject()
 ) {
     val backStack = rememberNavBackStack(JobNavConfig, JobNavKey.General as JobNavKey)
     val currentKey = backStack.lastOrNull() ?: JobNavKey.General

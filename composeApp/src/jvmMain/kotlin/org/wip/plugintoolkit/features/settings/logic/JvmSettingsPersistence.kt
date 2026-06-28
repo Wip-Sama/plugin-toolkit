@@ -4,6 +4,8 @@ import co.touchlab.kermit.Logger
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
@@ -36,8 +38,8 @@ class JvmSettingsPersistence : SettingsPersistence, KoinComponent {
         return jobsDirPath
     }
 
-    override fun load(): AppSettings {
-        return try {
+    override suspend fun load(): AppSettings = withContext(Dispatchers.IO) {
+        try {
             if (SystemFileSystem.exists(settingsFile)) {
                 val content = SystemFileSystem.source(settingsFile).buffered().use { it.readString() }
                 if (content.isBlank()) {
@@ -54,7 +56,7 @@ class JvmSettingsPersistence : SettingsPersistence, KoinComponent {
         }
     }
 
-    override fun save(settings: AppSettings) {
+    override suspend fun save(settings: AppSettings) = withContext(Dispatchers.IO) {
         try {
             if (!SystemFileSystem.exists(settingsDir)) {
                 SystemFileSystem.createDirectories(settingsDir)

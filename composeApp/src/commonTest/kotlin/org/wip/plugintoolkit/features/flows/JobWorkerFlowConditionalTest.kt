@@ -62,7 +62,7 @@ class JobWorkerFlowConditionalTest : JobWorkerFlowTestBase() {
         // If only the true branch is executed, this runs successfully.
         val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
             jobManager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
             mockk(relaxed = true),
             mockk(relaxed = true),
             backgroundScope
@@ -117,7 +117,7 @@ class JobWorkerFlowConditionalTest : JobWorkerFlowTestBase() {
         // Otherwise, it runs successfully.
         val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
             jobManager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(),
+            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
             mockk(relaxed = true),
             mockk(relaxed = true),
             backgroundScope

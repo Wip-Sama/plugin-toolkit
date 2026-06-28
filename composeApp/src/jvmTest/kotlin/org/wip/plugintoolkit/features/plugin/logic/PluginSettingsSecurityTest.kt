@@ -47,8 +47,8 @@ class PluginSettingsSecurityTest {
 
     private class FakeSettingsPersistence : SettingsPersistence {
         var settings = AppSettings()
-        override fun load(): AppSettings = settings
-        override fun save(settings: AppSettings) {
+        override suspend fun load(): AppSettings = settings
+        override suspend fun save(settings: AppSettings) {
             this.settings = settings
         }
 
@@ -68,7 +68,8 @@ class PluginSettingsSecurityTest {
         val fileSystem = FakeFileSystem()
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
-        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
 
@@ -149,7 +150,8 @@ class PluginSettingsSecurityTest {
         val fileSystem = FakeFileSystem()
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
-        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
 

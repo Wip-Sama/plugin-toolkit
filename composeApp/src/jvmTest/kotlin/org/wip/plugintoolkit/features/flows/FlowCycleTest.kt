@@ -25,8 +25,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MockSettingsPersistence : SettingsPersistence {
-    override fun load(): AppSettings = AppSettings()
-    override fun save(settings: AppSettings) {}
+    override suspend fun load(): AppSettings = AppSettings()
+    override suspend fun save(settings: AppSettings) {}
     override fun getSettingsDir(): String = "build/tmp/test_flows"
     override fun getJobsDir(): String = "build/tmp/test_flows/jobs"
     override fun openLogFolder() {}
@@ -37,6 +37,7 @@ class FlowCycleTest {
 
     @Test
     fun testCyclePrevention() {
+        val mockAppConfig = mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
         val mockFlowRepo = mockk<org.wip.plugintoolkit.features.flows.logic.FlowRepository>(relaxed = true)
         val viewModel = FlowEditorViewModel(
             initialFlowName = "Default Flow",
@@ -121,7 +122,7 @@ class FlowCycleTest {
         val persistenceA = MockSettingsPersistence()
         val mockPluginManagerA = mockk<PluginManager>(relaxed = true)
         every { mockPluginManagerA.installedPlugins } returns MutableStateFlow(emptyList())
-        val realFlowRepoA = FlowRepository(persistenceA, mockPluginManagerA, CoroutineScope(Dispatchers.Unconfined))
+        val realFlowRepoA = FlowRepository(persistenceA, mockPluginManagerA, CoroutineScope(Dispatchers.Unconfined), mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true))
         val viewModelA = FlowEditorViewModel(
             initialFlowName = "Flow A",
             settingsPersistence = persistenceA,
@@ -149,7 +150,7 @@ class FlowCycleTest {
         val persistenceB = MockSettingsPersistence()
         val mockPluginManagerB = mockk<PluginManager>(relaxed = true)
         every { mockPluginManagerB.installedPlugins } returns MutableStateFlow(emptyList())
-        val realFlowRepoB = FlowRepository(persistenceB, mockPluginManagerB, CoroutineScope(Dispatchers.Unconfined))
+        val realFlowRepoB = FlowRepository(persistenceB, mockPluginManagerB, CoroutineScope(Dispatchers.Unconfined), mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true))
         val viewModelB = FlowEditorViewModel(
             initialFlowName = "Flow B",
             settingsPersistence = persistenceB,
@@ -176,7 +177,7 @@ class FlowCycleTest {
         val persistenceC = MockSettingsPersistence()
         val mockPluginManagerC = mockk<PluginManager>(relaxed = true)
         every { mockPluginManagerC.installedPlugins } returns MutableStateFlow(emptyList())
-        val realFlowRepoC = FlowRepository(persistenceC, mockPluginManagerC, CoroutineScope(Dispatchers.Unconfined))
+        val realFlowRepoC = FlowRepository(persistenceC, mockPluginManagerC, CoroutineScope(Dispatchers.Unconfined), mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true))
         val viewModelC = FlowEditorViewModel(
             initialFlowName = "Flow C",
             settingsPersistence = persistenceC,
@@ -245,7 +246,7 @@ class FlowCycleTest {
         val persistenceA = MockSettingsPersistence()
         val mockPluginManagerA = mockk<PluginManager>(relaxed = true)
         every { mockPluginManagerA.installedPlugins } returns MutableStateFlow(emptyList())
-        val realFlowRepoA = FlowRepository(persistenceA, mockPluginManagerA, CoroutineScope(Dispatchers.Unconfined))
+        val realFlowRepoA = FlowRepository(persistenceA, mockPluginManagerA, CoroutineScope(Dispatchers.Unconfined), mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true))
         val viewModelA = FlowEditorViewModel(
             initialFlowName = "Flow A",
             settingsPersistence = persistenceA,
@@ -271,7 +272,7 @@ class FlowCycleTest {
         val persistenceB = MockSettingsPersistence()
         val mockPluginManagerB = mockk<PluginManager>(relaxed = true)
         every { mockPluginManagerB.installedPlugins } returns MutableStateFlow(emptyList())
-        val realFlowRepoB = FlowRepository(persistenceB, mockPluginManagerB, CoroutineScope(Dispatchers.Unconfined))
+        val realFlowRepoB = FlowRepository(persistenceB, mockPluginManagerB, CoroutineScope(Dispatchers.Unconfined), mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true))
         val viewModelB = FlowEditorViewModel(
             initialFlowName = "Flow B",
             settingsPersistence = persistenceB,

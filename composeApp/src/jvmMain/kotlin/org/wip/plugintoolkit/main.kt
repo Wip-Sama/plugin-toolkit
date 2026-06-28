@@ -16,6 +16,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.delay
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
@@ -123,16 +138,13 @@ fun main(args: Array<String>) {
     }
 }
 
-fun runMain(args: Array<String>) {
-    FileKit.init(appId = "org.wip.plugintoolkit")
-
+suspend fun performStartup(args: Array<String>): Pair<SettingsViewModel, WindowStartMode> {
     // Determine initial window state based on persistence directly
     val persistence = JvmSettingsPersistence()
-    val initialSettings = persistence.load()
+    val initialSettings = persistence.load() // This is now a suspend call, no runBlocking
 
     // We need a late-init provider for settings because viewModel is created after startKoin
     // but viewModel needs NotificationService which needs settings.
-    // However, since viewModel is created manually, we can just use a lambda that captures it later.
     var viewModelProvider: () -> SettingsViewModel? = { null }
 
     startKoin {
@@ -306,98 +318,167 @@ fun runMain(args: Array<String>) {
 
     Logger.i { "Application started. Logging initialized at: $logDir" }
 
+    // Wait for the ViewModel to signal that settings persistence is fully loaded
+    viewModel.isLoaded.first { it }
 
-    // Determine initial window state based on settings and flags
     val startMinimizedOverride = args.contains(appConfig.STARTUP_FLAG_BACKGROUND)
     val startMode = if (startMinimizedOverride) WindowStartMode.Minimized else initialSettings.general.windowStartMode
 
+    return Pair(viewModel, startMode)
+}
+
+fun runMain(args: Array<String>) {
+    FileKit.init(appId = "org.wip.plugintoolkit")
+
     application {
-        val languageCode by viewModel.currentLanguageCode.collectAsState()
+        var isReady by remember { mutableStateOf(false) }
+        var appViewModel by remember { mutableStateOf<SettingsViewModel?>(null) }
+        var appStartMode by remember { mutableStateOf(WindowStartMode.Normal) }
+        var splashWindowOpen by remember { mutableStateOf(true) }
 
-        // Sync default JVM locale synchronously before composition
-        PlatformLocalization.setApplicationLanguage(languageCode)
-
-        // Provide a root ViewModelStoreOwner for the application to prevent StackOverflow in LocalViewModelStoreOwner
-        // on some Compose Multiplatform versions where the default lookup loops.
-        val viewModelStoreOwner = remember {
-            object : ViewModelStoreOwner {
-                override val viewModelStore = ViewModelStore()
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val (vm, mode) = performStartup(args)
+                appViewModel = vm
+                appStartMode = mode
+                isReady = true
+                delay(100)
+                splashWindowOpen = false
             }
         }
 
-        DisposableEffect(Unit) {
-            onDispose {
-                viewModelStoreOwner.viewModelStore.clear()
-            }
-        }
-
-        val trayState = rememberTrayState()
-        var isVisible by remember { mutableStateOf(startMode != WindowStartMode.Minimized) }
-
-        val windowState = rememberWindowState(
-            placement = when (startMode) {
-                WindowStartMode.Maximized -> WindowPlacement.Maximized
-                WindowStartMode.Fullscreen -> WindowPlacement.Fullscreen
-                else -> WindowPlacement.Floating
-            },
-            position = WindowPosition(Alignment.Center),
-            size = DpSize(1280.dp, 800.dp)
-        )
-
-        key(languageCode) {
-            Tray(
-                state = trayState,
-                icon = painterResource(Res.drawable.app_logo),
-                tooltip = stringResource(Res.string.app_name),
-                onAction = { isVisible = true },
-                menu = {
-                    Item("Open", onClick = { isVisible = true })
-                    Separator()
-                    Item("Exit", onClick = { exitApplication() })
-                }
-            )
-        }
-
-        if (isVisible) {
+        if (splashWindowOpen) {
             Window(
-                onCloseRequest = {
-                    if (viewModel.settings.value.general.closeToTray) {
-                        // Just hide the window, background jobs and processes continue to run
-                        isVisible = false
-                    } else {
-                        exitApplication()
-                    }
-                },
-                title = stringResource(Res.string.app_name),
-                icon = painterResource(Res.drawable.app_logo),
-                state = windowState
+                onCloseRequest = ::exitApplication,
+                state = rememberWindowState(
+                    placement = WindowPlacement.Floating,
+                    position = WindowPosition(Alignment.Center),
+                    size = DpSize(400.dp, 300.dp)
+                ),
+                undecorated = true,
+                transparent = true,
+                resizable = false
             ) {
-                // Set minimum window size
-                window.minimumSize = Dimension(1000, 600)
-                val notificationService = getKoin().get<NotificationService>()
+                Surface(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF1E1E1E), // Dark theme
+                    shadowElevation = 8.dp
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Image(
+                            painter = painterResource(Res.drawable.app_logo),
+                            contentDescription = "App Logo",
+                            modifier = Modifier.size(96.dp)
+                        )
+                        Spacer(modifier = Modifier.height(32.dp))
+                        CircularProgressIndicator(
+                            color = Color(0xFF64B5F6) // Light blue primary accent
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Starting Plugin Toolkit...",
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
 
-                LaunchedEffect(Unit) {
-                    val trayState = trayState // from application scope
-                    notificationService.events.collect { event ->
-                        if (event is NotificationEvent.System) {
-                            trayState.sendNotification(
-                                Notification(
-                                    title = event.record.title,
-                                    message = event.record.message,
-                                    type = when (event.record.type) {
-                                        NotificationType.Info -> Notification.Type.Info
-                                        NotificationType.Warning -> Notification.Type.Warning
-                                        NotificationType.Error -> Notification.Type.Error
-                                    }
+        if (isReady && appViewModel != null) {
+            val viewModel = appViewModel!!
+            val startMode = appStartMode
+            val languageCode by viewModel.currentLanguageCode.collectAsState()
+
+            // Sync default JVM locale synchronously before composition
+            PlatformLocalization.setApplicationLanguage(languageCode)
+
+            // Provide a root ViewModelStoreOwner for the application to prevent StackOverflow in LocalViewModelStoreOwner
+            // on some Compose Multiplatform versions where the default lookup loops.
+            val viewModelStoreOwner = remember {
+                object : ViewModelStoreOwner {
+                    override val viewModelStore = ViewModelStore()
+                }
+            }
+
+            DisposableEffect(Unit) {
+                onDispose {
+                    viewModelStoreOwner.viewModelStore.clear()
+                }
+            }
+
+            val trayState = rememberTrayState()
+            var isVisible by remember { mutableStateOf(startMode != WindowStartMode.Minimized) }
+
+            val windowState = rememberWindowState(
+                placement = when (startMode) {
+                    WindowStartMode.Maximized -> WindowPlacement.Maximized
+                    WindowStartMode.Fullscreen -> WindowPlacement.Fullscreen
+                    else -> WindowPlacement.Floating
+                },
+                position = WindowPosition(Alignment.Center),
+                size = DpSize(1280.dp, 800.dp)
+            )
+
+            key(languageCode) {
+                Tray(
+                    state = trayState,
+                    icon = painterResource(Res.drawable.app_logo),
+                    tooltip = stringResource(Res.string.app_name),
+                    onAction = { isVisible = true },
+                    menu = {
+                        Item("Open", onClick = { isVisible = true })
+                        Separator()
+                        Item("Exit", onClick = { exitApplication() })
+                    }
+                )
+            }
+
+            if (isVisible) {
+                Window(
+                    onCloseRequest = {
+                        if (viewModel.settings.value.general.closeToTray) {
+                            // Just hide the window, background jobs and processes continue to run
+                            isVisible = false
+                        } else {
+                            exitApplication()
+                        }
+                    },
+                    title = stringResource(Res.string.app_name),
+                    icon = painterResource(Res.drawable.app_logo),
+                    state = windowState
+                ) {
+                    // Set minimum window size
+                    window.minimumSize = Dimension(1000, 600)
+                    val notificationService = getKoin().get<NotificationService>()
+
+                    LaunchedEffect(Unit) {
+                        val trayState = trayState // from application scope
+                        notificationService.events.collect { event ->
+                            if (event is NotificationEvent.System) {
+                                trayState.sendNotification(
+                                    Notification(
+                                        title = event.record.title,
+                                        message = event.record.message,
+                                        type = when (event.record.type) {
+                                            NotificationType.Info -> Notification.Type.Info
+                                            NotificationType.Warning -> Notification.Type.Warning
+                                            NotificationType.Error -> Notification.Type.Error
+                                        }
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
-                }
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
-                        App(viewModel = viewModel)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
+                            App(viewModel = viewModel)
+                        }
                     }
                 }
             }

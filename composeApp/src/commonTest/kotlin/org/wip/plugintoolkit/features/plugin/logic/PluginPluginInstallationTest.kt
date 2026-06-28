@@ -78,8 +78,8 @@ class PluginPluginInstallationTest {
 
     private class FakeSettingsPersistence : SettingsPersistence {
         var settings = AppSettings()
-        override fun load(): AppSettings = settings
-        override fun save(settings: AppSettings) {
+        override suspend fun load(): AppSettings = settings
+        override suspend fun save(settings: AppSettings) {
             this.settings = settings
         }
 
@@ -150,7 +150,8 @@ class PluginPluginInstallationTest {
         val fileSystem = FakeFileSystem()
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
-        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
@@ -261,7 +262,8 @@ class PluginPluginInstallationTest {
         }
         val client = HttpClient(mockEngine) { install(ContentNegotiation) { json(json) } }
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
-        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val repoManager = RepoManager(settingsRepo, client, json, backgroundScope)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)

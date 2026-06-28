@@ -24,7 +24,8 @@ class FlowRepositoryTest {
         every { mockPluginManager.installedPlugins } returns installedPluginsFlow
 
         // This will launch the collect job in its init block
-        val repository = FlowRepository(persistence, mockPluginManager, CoroutineScope(Dispatchers.Unconfined))
+        val mockAppConfig = mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val repository = FlowRepository(persistence, mockPluginManager, CoroutineScope(Dispatchers.Unconfined), mockAppConfig)
 
         var reloadCalled = false
         // Since we can't easily spy on reloadFlows (it's not open and repository is the real instance),

@@ -70,7 +70,7 @@ class LoadNodeTest {
             // Load
             val loadNode = Node.SystemNode(2, Offset.Zero, "Load", "load", emptyList(), emptyList())
             val loadContext = MockNodeExecutionContext(loadNode, tempDir, mapOf("file_path" to fileName))
-            LoadNodeExecutor().execute(loadContext)
+            LoadNodeExecutor(io.mockk.mockk(relaxed = true)).execute(loadContext)
 
             assertEquals(content, loadContext.outputs["data"])
         } finally {
@@ -107,7 +107,7 @@ class LoadNodeTest {
             val loadNode = Node.SystemNode(2, Offset.Zero, "Load", "load", emptyList(), emptyList())
             // Pass absolute path as file_path
             val loadContext = MockNodeExecutionContext(loadNode, "dummy", mapOf("file_path" to absoluteFilePath))
-            LoadNodeExecutor().execute(loadContext)
+            LoadNodeExecutor(io.mockk.mockk(relaxed = true)).execute(loadContext)
 
             assertEquals(content, loadContext.outputs["data"], "Content should match for absolute path")
         } finally {

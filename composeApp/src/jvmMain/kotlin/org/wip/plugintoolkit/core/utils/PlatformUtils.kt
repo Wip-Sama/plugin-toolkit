@@ -408,6 +408,25 @@ actual object PlatformUtils {
     actual fun clipEntryOf(text: String): androidx.compose.ui.platform.ClipEntry {
         return androidx.compose.ui.platform.ClipEntry(java.awt.datatransfer.StringSelection(text))
     }
+
+    actual fun calculateFileChecksum(path: String, algorithm: String): String? {
+        val file = java.io.File(path)
+        if (!file.exists()) return null
+        return try {
+            val digest = java.security.MessageDigest.getInstance(algorithm)
+            file.inputStream().use { fis ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (fis.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to calculate $algorithm checksum for $path" }
+            null
+        }
+    }
 }
 
 interface PortalSettings : DBusInterface {
