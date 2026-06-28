@@ -66,7 +66,7 @@ fun BoardCanvas(
     state: FlowEditorState,
     flow: Flow,
     onPan: (Offset) -> Unit,
-    onZoom: (Float, Offset) -> Unit,
+    onZoom: (Float, Offset, Boolean) -> Unit,
     isDrawingConnection: Boolean,
     draggingNodeFromPalette: PaletteNode?,
     getPortBoardPosition: (Long, String) -> Offset?,
@@ -141,8 +141,12 @@ fun BoardCanvas(
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when {
                         keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> {
-                            onDeleteSelectedNodes()
-                            true
+                            if (selectedNodeIds.isNotEmpty()) {
+                                onDeleteSelectedNodes()
+                                true
+                            } else {
+                                false
+                            }
                         }
 
                         keyEvent.isCtrlPressed && keyEvent.key == Key.Z -> {
@@ -181,10 +185,19 @@ fun BoardCanvas(
                         if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                             val startPos = (sourcePortBoardPos * state.scale) + state.offset
                             val endPos = (targetPortBoardPos * state.scale) + state.offset
-                            val dist = BoardMathUtils.getDistanceToBezier(tapOffset, startPos, endPos)
-                            if (dist < minDistance) {
-                                minDistance = dist
-                                bestConnection = connection
+                            
+                            val padding = 30f * state.scale
+                            val aabbMinX = minOf(startPos.x, endPos.x) - padding
+                            val aabbMaxX = maxOf(startPos.x, endPos.x) + padding
+                            val aabbMinY = minOf(startPos.y, endPos.y) - padding
+                            val aabbMaxY = maxOf(startPos.y, endPos.y) + padding
+                            
+                            if (tapOffset.x in aabbMinX..aabbMaxX && tapOffset.y in aabbMinY..aabbMaxY) {
+                                val dist = BoardMathUtils.getDistanceToBezier(tapOffset, startPos, endPos)
+                                if (dist < minDistance) {
+                                    minDistance = dist
+                                    bestConnection = connection
+                                }
                             }
                         }
                     }
@@ -253,9 +266,11 @@ fun BoardCanvas(
                         val position = event.changes.firstOrNull()?.position ?: Offset.Zero
 
                         if (event.type == PointerEventType.Scroll) {
-                            val scrollDeltaY = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                            if (scrollDeltaY != 0f) {
-                                onZoom(scrollDeltaY, position)
+                            val scrollDelta = event.changes.firstOrNull()?.scrollDelta ?: Offset.Zero
+                            val delta = if (scrollDelta.y != 0f) scrollDelta.y else scrollDelta.x
+                            if (delta != 0f) {
+                                val isShiftPressed = event.keyboardModifiers.isShiftPressed
+                                onZoom(-delta, position, isShiftPressed)
                             }
                         } else if (event.type == PointerEventType.Move) {
                             var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
@@ -285,10 +300,19 @@ fun BoardCanvas(
                                     if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                                         val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                                         val endPos = (targetPortBoardPos * currentScale) + currentOffset
-                                        val dist = BoardMathUtils.getDistanceToBezier(position, startPos, endPos)
-                                        if (dist < minDistance) {
-                                            minDistance = dist
-                                            bestConnection = connection
+                                        
+                                        val padding = 30f * currentScale
+                                        val aabbMinX = minOf(startPos.x, endPos.x) - padding
+                                        val aabbMaxX = maxOf(startPos.x, endPos.x) + padding
+                                        val aabbMinY = minOf(startPos.y, endPos.y) - padding
+                                        val aabbMaxY = maxOf(startPos.y, endPos.y) + padding
+
+                                        if (position.x in aabbMinX..aabbMaxX && position.y in aabbMinY..aabbMaxY) {
+                                            val dist = BoardMathUtils.getDistanceToBezier(position, startPos, endPos)
+                                            if (dist < minDistance) {
+                                                minDistance = dist
+                                                bestConnection = connection
+                                            }
                                         }
                                     }
                                 }
@@ -361,15 +385,17 @@ fun BoardCanvas(
             val cols = (size.width / scaledGridSize).toInt() + 2
             val rows = (size.height / scaledGridSize).toInt() + 2
 
-            for (i in 0..cols) {
-                for (j in 0..rows) {
-                    val x = startX + i * scaledGridSize
-                    val y = startY + j * scaledGridSize
-                    drawCircle(
-                        color = gridColor,
-                        radius = 1.5f * state.scale,
-                        center = Offset(x, y)
-                    )
+            if (state.scale >= 0.4f) {
+                for (i in 0..cols) {
+                    for (j in 0..rows) {
+                        val x = startX + i * scaledGridSize
+                        val y = startY + j * scaledGridSize
+                        drawCircle(
+                            color = gridColor,
+                            radius = 1.5f * state.scale,
+                            center = Offset(x, y)
+                        )
+                    }
                 }
             }
 
@@ -407,29 +433,6 @@ fun BoardCanvas(
                         // Custom drawing for split bezier
                         val (sourceHalf, targetHalf) = BoardMathUtils.splitCubicBezierInHalf(startPos, endPos)
 
-                        val pathSource = Path().apply {
-                            moveTo(sourceHalf.p0.x, sourceHalf.p0.y)
-                            cubicTo(
-                                sourceHalf.p1.x,
-                                sourceHalf.p1.y,
-                                sourceHalf.p2.x,
-                                sourceHalf.p2.y,
-                                sourceHalf.p3.x,
-                                sourceHalf.p3.y
-                            )
-                        }
-                        val pathTarget = Path().apply {
-                            moveTo(targetHalf.p0.x, targetHalf.p0.y)
-                            cubicTo(
-                                targetHalf.p1.x,
-                                targetHalf.p1.y,
-                                targetHalf.p2.x,
-                                targetHalf.p2.y,
-                                targetHalf.p3.x,
-                                targetHalf.p3.y
-                            )
-                        }
-
                         val highlightColor = Color(0xFFFF2D55)
                         val sourceColor =
                             if (hoveredConnectionIsSource == true) highlightColor else connectionColor.copy(alpha = 0.4f)
@@ -440,41 +443,13 @@ fun BoardCanvas(
                         val targetStroke = if (hoveredConnectionIsSource == false) 5.dp.toPx() else 3.dp.toPx()
 
                         if (hoveredConnectionIsSource == true) {
-                            drawPath(
-                                pathSource,
-                                sourceColor.copy(alpha = 0.25f),
-                                style = Stroke(
-                                    width = 9.dp.toPx(),
-                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
-                                )
-                            )
+                            drawBezierCurveSegment(sourceHalf, sourceColor.copy(alpha = 0.25f), strokeWidth = 9.dp.toPx())
                         } else {
-                            drawPath(
-                                pathTarget,
-                                targetColor.copy(alpha = 0.25f),
-                                style = Stroke(
-                                    width = 9.dp.toPx(),
-                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
-                                )
-                            )
+                            drawBezierCurveSegment(targetHalf, targetColor.copy(alpha = 0.25f), strokeWidth = 9.dp.toPx())
                         }
 
-                        drawPath(
-                            pathSource,
-                            sourceColor,
-                            style = Stroke(
-                                width = sourceStroke,
-                                cap = androidx.compose.ui.graphics.StrokeCap.Round
-                            )
-                        )
-                        drawPath(
-                            pathTarget,
-                            targetColor,
-                            style = Stroke(
-                                width = targetStroke,
-                                cap = androidx.compose.ui.graphics.StrokeCap.Round
-                            )
-                        )
+                        drawBezierCurveSegment(sourceHalf, sourceColor, strokeWidth = sourceStroke)
+                        drawBezierCurveSegment(targetHalf, targetColor, strokeWidth = targetStroke)
                     } else {
                         val strokeWidth = if (isSelected || isHovered) 5.dp.toPx() else 3.dp.toPx()
                         drawBezierCurve(startPos, endPos, color, strokeWidth)
@@ -639,8 +614,8 @@ fun BoardCanvas(
         val centerPosition = Offset(boardSize.width / 2f, boardSize.height / 2f)
         ZoomControls(
             scale = state.scale,
-            onZoomIn = { onZoom(-1f, centerPosition) },
-            onZoomOut = { onZoom(1f, centerPosition) },
+            onZoomIn = { onZoom(-1f, centerPosition, false) },
+            onZoomOut = { onZoom(1f, centerPosition, false) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(ToolkitTheme.spacing.medium)
@@ -648,15 +623,35 @@ fun BoardCanvas(
     }
 }
 
+private val sharedBezierPath = Path()
+
 private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color, strokeWidth: Float = 3.dp.toPx()) {
     val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
-    val path = Path().apply {
-        moveTo(start.x, start.y)
-        cubicTo(
-            start.x + controlPointOffset, start.y,
-            end.x - controlPointOffset, end.y,
-            end.x, end.y
-        )
-    }
-    drawPath(path = path, color = color, style = Stroke(width = strokeWidth))
+    sharedBezierPath.reset()
+    sharedBezierPath.moveTo(start.x, start.y)
+    sharedBezierPath.cubicTo(
+        start.x + controlPointOffset, start.y,
+        end.x - controlPointOffset, end.y,
+        end.x, end.y
+    )
+    drawPath(
+        path = sharedBezierPath, 
+        color = color, 
+        style = Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+    )
+}
+
+private fun DrawScope.drawBezierCurveSegment(curve: BoardMathUtils.CubicBezierCurve, color: Color, strokeWidth: Float = 3.dp.toPx()) {
+    sharedBezierPath.reset()
+    sharedBezierPath.moveTo(curve.p0.x, curve.p0.y)
+    sharedBezierPath.cubicTo(
+        curve.p1.x, curve.p1.y,
+        curve.p2.x, curve.p2.y,
+        curve.p3.x, curve.p3.y
+    )
+    drawPath(
+        path = sharedBezierPath, 
+        color = color, 
+        style = Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+    )
 }

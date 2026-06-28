@@ -158,7 +158,7 @@ fun FlowEditorView(
             state = state,
             flow = flow,
             onPan = { viewModel.onEvent(FlowEvent.Pan(it)) },
-            onZoom = { scrollDeltaY, position -> viewModel.onEvent(FlowEvent.Zoom(scrollDeltaY, position)) },
+            onZoom = { delta, position, isShiftPressed -> viewModel.onEvent(FlowEvent.Zoom(delta, position, isShiftPressed)) },
             isDrawingConnection = isDrawingConnection,
             draggingNodeFromPalette = draggingNodeFromPalette,
             getPortBoardPosition = getPortBoardPosition,

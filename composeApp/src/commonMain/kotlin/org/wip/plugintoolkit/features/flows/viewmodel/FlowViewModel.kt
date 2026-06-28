@@ -93,7 +93,7 @@ sealed interface FlowEvent {
     data class DeleteConnection(val connection: Connection) : FlowEvent
 
     data class Pan(val delta: Offset) : FlowEvent
-    data class Zoom(val delta: Float, val focusPosition: Offset) : FlowEvent
+    data class Zoom(val delta: Float, val focusPosition: Offset, val isShiftPressed: Boolean = false) : FlowEvent
     data class SetZoom(val scale: Float) : FlowEvent
     data object ResetBoard : FlowEvent
 

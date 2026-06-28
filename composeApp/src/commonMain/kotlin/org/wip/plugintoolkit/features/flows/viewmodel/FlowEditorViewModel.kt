@@ -102,17 +102,10 @@ class FlowEditorViewModel(
     val state: StateFlow<FlowEditorState> = _state.asStateFlow()
 
 
-    private val nodeManager = FlowNodeManager(
-        state = _state,
-        saveToHistory = ::saveToHistory,
-        runTypeInference = ::runTypeInference
-    )
+    private val nodeManager = FlowNodeManager()
     private val connectionManager = FlowConnectionManager(
-        state = _state,
         notificationService = resolvedNotificationService,
         viewModelScope = viewModelScope,
-        saveToHistory = ::saveToHistory,
-        runTypeInference = ::runTypeInference,
         onEvent = ::onEvent
     )
 
@@ -239,10 +232,17 @@ class FlowEditorViewModel(
             }
         }
 
+        var shouldSaveHistory = false
+        var shouldRunTypeInference = false
+        val currentState = _state.value
+        var newState = currentState
+
         when (event) {
-            is FlowEvent.AddCapabilityNode -> nodeManager.handleAddNode(
-                Node.CapabilityNode(
-                    id = _state.value.nextId,
+            is FlowEvent.AddCapabilityNode -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                val node = Node.CapabilityNode(
+                    id = currentState.nextId,
                     position = event.position.snapToGrid(),
                     pluginInfo = event.pluginInfo,
                     capability = event.capability,
@@ -285,57 +285,63 @@ class FlowEditorViewModel(
                                 semanticTypes = meta.semanticTypes
                             )
                         } ?: emptyList())
-                ),
-                density = event.density
-            )
-
-            is FlowEvent.AddSystemNode -> {
-                val inputs = SystemNodesRegistry.getInputs(event.systemAction)
-                val outputs = SystemNodesRegistry.getOutputs(event.systemAction)
-                nodeManager.handleAddNode(
-                    Node.SystemNode(
-                        id = _state.value.nextId,
-                        position = event.position.snapToGrid(),
-                        title = event.systemAction.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
-                        systemAction = event.systemAction,
-                        inputs = inputs,
-                        outputs = outputs
-                    ),
-                    density = event.density
                 )
+                newState = nodeManager.handleAddNode(currentState, node, event.density)
             }
 
-            is FlowEvent.AddFlowInputNode -> nodeManager.handleAddNode(
-                Node.FlowInputNode(
-                    id = _state.value.nextId,
+            is FlowEvent.AddSystemNode -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                val inputs = SystemNodesRegistry.getInputs(event.systemAction)
+                val outputs = SystemNodesRegistry.getOutputs(event.systemAction)
+                val node = Node.SystemNode(
+                    id = currentState.nextId,
+                    position = event.position.snapToGrid(),
+                    title = event.systemAction.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                    systemAction = event.systemAction,
+                    inputs = inputs,
+                    outputs = outputs
+                )
+                newState = nodeManager.handleAddNode(currentState, node, event.density)
+            }
+
+            is FlowEvent.AddFlowInputNode -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                val node = Node.FlowInputNode(
+                    id = currentState.nextId,
                     position = event.position.snapToGrid(),
                     outputs = listOf(OutputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY)))
-                ),
-                density = event.density
-            )
+                )
+                newState = nodeManager.handleAddNode(currentState, node, event.density)
+            }
 
-            is FlowEvent.AddFlowOutputNode -> nodeManager.handleAddNode(
-                Node.FlowOutputNode(
-                    id = _state.value.nextId,
+            is FlowEvent.AddFlowOutputNode -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                val node = Node.FlowOutputNode(
+                    id = currentState.nextId,
                     position = event.position.snapToGrid(),
                     inputs = listOf(InputPort("output_data", "Output Data", DataType.Primitive(PrimitiveType.ANY)))
-                ),
-                density = event.density
-            )
+                )
+                newState = nodeManager.handleAddNode(currentState, node, event.density)
+            }
 
             is FlowEvent.AddSubFlowNode -> {
                 if (org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector.wouldCreateNestedFlowCycle(
-                        _state.value.flow.name,
+                        currentState.flow.name,
                         event.flowName,
-                        _state.value.flows
+                        currentState.flows
                     )
                 ) {
-                    Logger.w { "Failed to add subflow node: adding subflow '${event.flowName}' to '${_state.value.flow.name}' would create a nested cycle." }
+                    co.touchlab.kermit.Logger.w { "Failed to add subflow node: adding subflow '${event.flowName}' to '${currentState.flow.name}' would create a nested cycle." }
                     resolvedNotificationService?.toast("Cannot add subflow: Adding this subflow would create a cyclic dependency between flows.")
                     return
                 }
 
-                val targetFlow = _state.value.flows.find { it.name == event.flowName }
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                val targetFlow = currentState.flows.find { it.name == event.flowName }
                 val (inputs, outputs) = if (targetFlow != null) {
                     getSubflowPorts(targetFlow)
                 } else {
@@ -356,107 +362,178 @@ class FlowEditorViewModel(
                     )
                 } ?: emptyList()
 
-                nodeManager.handleAddNode(
-                    Node.SubFlowNode(
-                        id = _state.value.nextId,
-                        position = event.position.snapToGrid(),
-                        flowName = event.flowName,
-                        inputs = inputs,
-                        outputs = outputs,
-                        inputMappings = inputMappings,
-                        outputMappings = outputMappings
-                    ),
-                    density = event.density
+                val node = Node.SubFlowNode(
+                    id = currentState.nextId,
+                    position = event.position.snapToGrid(),
+                    flowName = event.flowName,
+                    inputs = inputs,
+                    outputs = outputs,
+                    inputMappings = inputMappings,
+                    outputMappings = outputMappings
                 )
+                newState = nodeManager.handleAddNode(currentState, node, event.density)
             }
 
             is FlowEvent.ExpandSubFlow -> handleExpandSubFlow(event.nodeId)
-            is FlowEvent.MoveNode -> nodeManager.handleMoveNode(event.id, event.delta, event.snap, event.showGhost)
-            is FlowEvent.EndMoveNode -> nodeManager.handleEndMoveNode(event.id, event.density)
-            is FlowEvent.DeleteNode -> nodeManager.handleDeleteNode(event.id)
-            is FlowEvent.ConnectPorts -> connectionManager.handleConnectPorts(
-                event.sourceNodeId,
-                event.sourcePortId,
-                event.targetNodeId,
-                event.targetPortId
-            )
-
-            is FlowEvent.TryConnectPorts -> connectionManager.handleTryConnectPorts(
-                event.sourceNodeId,
-                event.sourcePortId,
-                event.targetNodeId,
-                event.targetPortId,
-                event.isShiftPressed
-            )
-
-            is FlowEvent.CancelPendingConnection -> {
-                _state.update { currentState ->
-                    currentState.copy(pendingConnection = null)
-                }
+            is FlowEvent.MoveNode -> {
+                newState = nodeManager.handleMoveNode(currentState, event.id, event.delta, event.snap, event.showGhost)
+            }
+            is FlowEvent.EndMoveNode -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = nodeManager.handleEndMoveNode(currentState, event.id, event.density)
+            }
+            is FlowEvent.DeleteNode -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = nodeManager.handleDeleteNode(currentState, event.id)
+            }
+            is FlowEvent.ConnectPorts -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = connectionManager.handleConnectPorts(
+                    currentState,
+                    event.sourceNodeId,
+                    event.sourcePortId,
+                    event.targetNodeId,
+                    event.targetPortId
+                )
             }
 
-            is FlowEvent.AutoConvertAndConnect -> connectionManager.handleAutoConvertAndConnect(
-                event.sourceNodeId,
-                event.sourcePortId,
-                event.targetNodeId,
-                event.targetPortId
-            )
+            is FlowEvent.TryConnectPorts -> {
+                newState = connectionManager.handleTryConnectPorts(
+                    currentState,
+                    event.sourceNodeId,
+                    event.sourcePortId,
+                    event.targetNodeId,
+                    event.targetPortId,
+                    event.isShiftPressed
+                )
+            }
 
-            is FlowEvent.DeleteConnection -> connectionManager.handleDeleteConnection(event.connection)
+            is FlowEvent.CancelPendingConnection -> {
+                newState = currentState.copy(pendingConnection = null)
+            }
+
+            is FlowEvent.AutoConvertAndConnect -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = connectionManager.handleAutoConvertAndConnect(
+                    currentState,
+                    event.sourceNodeId,
+                    event.sourcePortId,
+                    event.targetNodeId,
+                    event.targetPortId
+                )
+            }
+
+            is FlowEvent.DeleteConnection -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = connectionManager.handleDeleteConnection(currentState, event.connection)
+            }
             is FlowEvent.Pan -> handlePan(event.delta)
-            is FlowEvent.Zoom -> handleZoom(event.delta, event.focusPosition)
+            is FlowEvent.Zoom -> handleZoom(event.delta, event.focusPosition, event.isShiftPressed)
             is FlowEvent.SetZoom -> handleSetZoom(event.scale)
             is FlowEvent.ResetBoard -> handleResetBoard()
             is FlowEvent.Save -> handleSave()
             is FlowEvent.SaveAs -> handleSaveAs(event.name)
-            is FlowEvent.UpdateInputPortValue -> nodeManager.handleUpdateInputPortValue(
-                event.nodeId,
-                event.portId,
-                event.value
-            )
+            is FlowEvent.UpdateInputPortValue -> {
+                // Throttled: no history save for every keystroke
+                shouldRunTypeInference = true
+                newState = nodeManager.handleUpdateInputPortValue(
+                    currentState,
+                    event.nodeId,
+                    event.portId,
+                    event.value
+                )
+            }
 
-            is FlowEvent.UpdateBoundaryNode -> nodeManager.handleUpdateBoundaryNode(
-                event.nodeId,
-                event.portName,
-                event.dataType,
-                event.semanticTypes,
-                event.constraints,
-                event.isList
-            )
+            is FlowEvent.UpdateBoundaryNode -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = nodeManager.handleUpdateBoundaryNode(
+                    currentState,
+                    event.nodeId,
+                    event.portName,
+                    event.dataType,
+                    event.semanticTypes,
+                    event.constraints,
+                    event.isList
+                )
+            }
 
-            is FlowEvent.UpdateSystemNodeSettings -> nodeManager.handleUpdateSystemNodeSettings(
-                event.nodeId,
-                event.portId,
-                event.semanticTypes,
-                event.inputPortId,
-                event.extensions
-            )
+            is FlowEvent.UpdateSystemNodeSettings -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = nodeManager.handleUpdateSystemNodeSettings(
+                    currentState,
+                    event.nodeId,
+                    event.portId,
+                    event.semanticTypes,
+                    event.inputPortId,
+                    event.extensions
+                )
+            }
 
-            is FlowEvent.BringToFront -> nodeManager.handleBringToFront(event.nodeId)
+            is FlowEvent.BringToFront -> {
+                newState = nodeManager.handleBringToFront(currentState, event.nodeId)
+            }
             is FlowEvent.SelectNodes -> {
-                _state.update { currentState ->
-                    currentState.copy(selectedNodeIds = event.ids)
-                }
+                newState = currentState.copy(selectedNodeIds = event.ids)
             }
 
             is FlowEvent.ClearSelection -> {
-                _state.update { currentState ->
-                    currentState.copy(selectedNodeIds = emptySet())
-                }
+                newState = currentState.copy(selectedNodeIds = emptySet())
             }
 
-            is FlowEvent.DeleteSelectedNodes -> nodeManager.handleDeleteSelectedNodes()
-            is FlowEvent.ToggleNodeCollapse -> nodeManager.handleToggleNodeCollapse(event.nodeId)
-            is FlowEvent.ToggleNodeInputsCollapse -> nodeManager.handleToggleNodeInputsCollapse(event.nodeId)
-            is FlowEvent.ToggleNodeOutputsCollapse -> nodeManager.handleToggleNodeOutputsCollapse(event.nodeId)
-            is FlowEvent.UpdateConnectionOrder -> connectionManager.handleUpdateConnectionOrder(
-                event.connection,
-                event.newOrderIndex
-            )
+            is FlowEvent.DeleteSelectedNodes -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = nodeManager.handleDeleteSelectedNodes(currentState)
+            }
+            is FlowEvent.ToggleNodeCollapse -> {
+                shouldSaveHistory = true
+                newState = nodeManager.handleToggleNodeCollapse(currentState, event.nodeId)
+            }
+            is FlowEvent.ToggleNodeInputsCollapse -> {
+                shouldSaveHistory = true
+                newState = nodeManager.handleToggleNodeInputsCollapse(currentState, event.nodeId)
+            }
+            is FlowEvent.ToggleNodeOutputsCollapse -> {
+                shouldSaveHistory = true
+                newState = nodeManager.handleToggleNodeOutputsCollapse(currentState, event.nodeId)
+            }
+            is FlowEvent.UpdateConnectionOrder -> {
+                shouldSaveHistory = true
+                newState = connectionManager.handleUpdateConnectionOrder(
+                    currentState,
+                    event.connection,
+                    event.newOrderIndex
+                )
+            }
 
-            is FlowEvent.MoveConnectionFirst -> connectionManager.handleMoveConnectionFirst(event.connection)
-            is FlowEvent.MoveConnectionLast -> connectionManager.handleMoveConnectionLast(event.connection)
+            is FlowEvent.MoveConnectionFirst -> {
+                shouldSaveHistory = true
+                newState = connectionManager.handleMoveConnectionFirst(currentState, event.connection)
+            }
+            is FlowEvent.MoveConnectionLast -> {
+                shouldSaveHistory = true
+                newState = connectionManager.handleMoveConnectionLast(currentState, event.connection)
+            }
             else -> {}
+        }
+
+        if (shouldSaveHistory && newState !== currentState) {
+            saveToHistory()
+        }
+
+        if (newState !== currentState) {
+            _state.value = newState
+        }
+
+        if (shouldRunTypeInference) {
+            runTypeInference()
         }
 
         if (_state.value.hasUnsavedChanges && event !is FlowEvent.Save && event !is FlowEvent.SaveAs) {
@@ -473,19 +550,15 @@ class FlowEditorViewModel(
         }
     }
 
-    private fun handleZoom(delta: Float, focusPosition: Offset) {
+    private fun handleZoom(delta: Float, focusPosition: Offset, isShiftPressed: Boolean) {
         _state.update { currentState ->
             val currentZoom = currentState.scale
-            val currentIndex = zoomLevels.indexOfFirst { it >= currentZoom }
-
-            val newScale = if (delta > 0) {
-                val newIndex = (currentIndex - 1).coerceAtLeast(0)
-                zoomLevels[newIndex]
+            val factor = if (isShiftPressed) {
+                if (delta > 0) 1.20f else 1f / 1.20f
             } else {
-                val newIndex =
-                    (if (currentIndex == -1) zoomLevels.size - 1 else currentIndex + 1).coerceAtMost(zoomLevels.size - 1)
-                zoomLevels[newIndex]
+                if (delta > 0) 1.05f else 1f / 1.05f
             }
+            val newScale = (currentZoom * factor).coerceIn(0.1f, 5.0f)
 
             if (newScale == currentZoom) return@update currentState
 
@@ -498,8 +571,7 @@ class FlowEditorViewModel(
 
     private fun handleSetZoom(scale: Float) {
         _state.update { currentState ->
-            val newScale = zoomLevels.minByOrNull { kotlin.math.abs(it - scale) } ?: scale
-            currentState.copy(scale = newScale)
+            currentState.copy(scale = scale.coerceIn(0.1f, 5.0f))
         }
     }
 

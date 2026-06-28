@@ -14,7 +14,7 @@ object BoardMathUtils {
         val c2 = Offset(end.x - controlPointOffset, end.y)
 
         var minDistance = Float.MAX_VALUE
-        val steps = 30
+        val steps = 15
         for (i in 0..steps) {
             val t = i.toFloat() / steps
             val mt = 1f - t
