@@ -10,12 +10,12 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNO
 object ActionRegistryGenerator {
     fun generateActionRegistry(registryName: String, actions: List<KSFunctionDeclaration>): TypeSpec {
         val registryType = TypeSpec.objectBuilder(registryName)
-        
+
         actions.forEach { func ->
             val ann = func.annotations.first { it.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val constName = actName.uppercase().replace(" ", "_")
-            
+
             registryType.addProperty(
                 PropertySpec.builder(constName, String::class)
                     .addModifiers(KModifier.CONST)
@@ -23,7 +23,7 @@ object ActionRegistryGenerator {
                     .build()
             )
         }
-        
+
         return registryType.build()
     }
 }

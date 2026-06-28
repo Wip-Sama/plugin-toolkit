@@ -26,7 +26,7 @@ object GeneratorUtils {
     fun mapKSTypeToDataType(ksType: KSType, visited: Set<String> = emptySet()): DataType {
         val declaration = ksType.declaration
         val qualifiedName = declaration.qualifiedName?.asString() ?: ""
-        
+
         return when (qualifiedName) {
             "kotlin.Double", "kotlin.Float" -> DataType.Primitive(PrimitiveType.DOUBLE)
             "kotlin.Int", "kotlin.Short", "kotlin.Byte", "kotlin.Long" -> DataType.Primitive(PrimitiveType.INT)
@@ -42,6 +42,7 @@ object GeneratorUtils {
                     DataType.Primitive(PrimitiveType.ANY)
                 }
             }
+
             "kotlin.collections.Map", "kotlin.collections.MutableMap" -> {
                 val valueType = ksType.arguments.getOrNull(1)?.type?.resolve()
                 if (valueType != null) {
@@ -50,6 +51,7 @@ object GeneratorUtils {
                     DataType.MapType(DataType.Primitive(PrimitiveType.ANY))
                 }
             }
+
             else -> {
                 if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
                     val enumEntries = declaration.declarations
@@ -58,8 +60,11 @@ object GeneratorUtils {
                         .toList()
                     val options = enumEntries.map { it.simpleName.asString() }
                     val optionRequirements = enumEntries.associate { entry ->
-                        val reqAnn = entry.annotations.find { it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.RequiresSetting") }
-                        val settings = (reqAnn?.arguments?.find { it.name?.asString() == "settings" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                        val reqAnn =
+                            entry.annotations.find { it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.RequiresSetting") }
+                        val settings =
+                            (reqAnn?.arguments?.find { it.name?.asString() == "settings" }?.value as? List<*>)?.filterIsInstance<String>()
+                                ?: emptyList()
                         entry.simpleName.asString() to settings
                     }.filter { it.value.isNotEmpty() }
                     DataType.Enum(qualifiedName, options, null, optionRequirements)
@@ -68,15 +73,18 @@ object GeneratorUtils {
                         DataType.Object(qualifiedName)
                     } else {
                         val newVisited = visited + qualifiedName
-                        val complexObjAnn = declaration.annotations.find { it.hasQualifiedName(ProcessorConstants.COMPLEX_OBJECT_ANNOTATION) }
+                        val complexObjAnn =
+                            declaration.annotations.find { it.hasQualifiedName(ProcessorConstants.COMPLEX_OBJECT_ANNOTATION) }
                         val annId = complexObjAnn?.arguments?.find { it.name?.asString() == "id" }?.value as? String
-                        val annDesc = complexObjAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String
-                        val annVersion = complexObjAnn?.arguments?.find { it.name?.asString() == "version" }?.value as? Int
-                        
+                        val annDesc =
+                            complexObjAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String
+                        val annVersion =
+                            complexObjAnn?.arguments?.find { it.name?.asString() == "version" }?.value as? Int
+
                         val id = if (annId.isNullOrEmpty()) null else annId
                         val description = if (annDesc.isNullOrEmpty()) null else annDesc
                         val version = if (complexObjAnn != null) (annVersion ?: 1) else null
-                        
+
                         val properties = if (declaration is KSClassDeclaration) {
                             declaration.getAllProperties().associate { prop ->
                                 prop.simpleName.asString() to mapKSTypeToDataType(prop.type.resolve(), newVisited)
@@ -97,23 +105,30 @@ object GeneratorUtils {
         val cnDataType = com.squareup.kotlinpoet.ClassName("org.wip.plugintoolkit.api", "DataType")
         val cnPrimitiveType = com.squareup.kotlinpoet.ClassName("org.wip.plugintoolkit.api", "PrimitiveType")
         return when (dataType) {
-            is DataType.Primitive -> com.squareup.kotlinpoet.CodeBlock.of("%T(%T.%L)", 
+            is DataType.Primitive -> com.squareup.kotlinpoet.CodeBlock.of(
+                "%T(%T.%L)",
                 cnDataType.nestedClass("Primitive"),
                 cnPrimitiveType,
                 dataType.primitiveType.name
             )
-            is DataType.Array -> com.squareup.kotlinpoet.CodeBlock.of("%T(%L)",
+
+            is DataType.Array -> com.squareup.kotlinpoet.CodeBlock.of(
+                "%T(%L)",
                 cnDataType.nestedClass("Array"),
                 generateDataTypeCode(dataType.items)
             )
-            is DataType.MapType -> com.squareup.kotlinpoet.CodeBlock.of("%T(%L)",
+
+            is DataType.MapType -> com.squareup.kotlinpoet.CodeBlock.of(
+                "%T(%L)",
                 cnDataType.nestedClass("MapType"),
                 generateDataTypeCode(dataType.valueType)
             )
+
             is DataType.Enum -> {
                 val optionsList = dataType.options.joinToString { "\"$it\"" }
                 if (dataType.optionRequirements.isEmpty()) {
-                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, listOf(%L))",
+                    com.squareup.kotlinpoet.CodeBlock.of(
+                        "%T(%S, listOf(%L))",
                         cnDataType.nestedClass("Enum"),
                         dataType.className,
                         optionsList
@@ -122,7 +137,8 @@ object GeneratorUtils {
                     val reqMapStr = dataType.optionRequirements.entries.joinToString(", ") { entry ->
                         "\"${entry.key}\" to listOf(${entry.value.joinToString { "\"$it\"" }})"
                     }
-                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, listOf(%L), null, mapOf(%L))",
+                    com.squareup.kotlinpoet.CodeBlock.of(
+                        "%T(%S, listOf(%L), null, mapOf(%L))",
                         cnDataType.nestedClass("Enum"),
                         dataType.className,
                         optionsList,
@@ -130,13 +146,15 @@ object GeneratorUtils {
                     )
                 }
             }
+
             is DataType.Object -> {
                 val idStr = dataType.id?.let { "\"$it\"" } ?: "null"
                 val descStr = dataType.description?.let { "\"$it\"" } ?: "null"
                 val verStr = dataType.version?.toString() ?: "null"
-                
+
                 if (dataType.properties.isEmpty()) {
-                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, %L, %L, %L)",
+                    com.squareup.kotlinpoet.CodeBlock.of(
+                        "%T(%S, %L, %L, %L)",
                         cnDataType.nestedClass("Object"),
                         dataType.className,
                         idStr, descStr, verStr
@@ -152,7 +170,8 @@ object GeneratorUtils {
                     }
                     propsCode.unindent()
                     propsCode.add(")")
-                    com.squareup.kotlinpoet.CodeBlock.of("%T(%S, %L, %L, %L, null, %L)",
+                    com.squareup.kotlinpoet.CodeBlock.of(
+                        "%T(%S, %L, %L, %L, null, %L)",
                         cnDataType.nestedClass("Object"),
                         dataType.className,
                         idStr, descStr, verStr,
@@ -166,19 +185,21 @@ object GeneratorUtils {
     fun getCapabilityOutputs(func: KSFunctionDeclaration): List<OutputInfo> {
         val returnTypeKS = func.returnType?.resolve() ?: return emptyList()
         val returnTypeName = returnTypeKS.toTypeName()
-        
+
         if (returnTypeName.toString() == "kotlin.Unit") {
             return emptyList()
         }
 
-        val funcOutputAnn = func.annotations.find { 
-            it.hasQualifiedName(ProcessorConstants.CAPABILITY_RESULT_ANNOTATION) 
+        val funcOutputAnn = func.annotations.find {
+            it.hasQualifiedName(ProcessorConstants.CAPABILITY_RESULT_ANNOTATION)
         }
 
         if (funcOutputAnn != null) {
             val name = funcOutputAnn.arguments.find { it.name?.asString() == "name" }?.value as? String ?: ""
             val desc = funcOutputAnn.arguments.find { it.name?.asString() == "description" }?.value as? String ?: ""
-            val semTypesVal = (funcOutputAnn.arguments.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val semTypesVal =
+                (funcOutputAnn.arguments.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                    ?: emptyList()
             val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
             return listOf(
                 OutputInfo(
@@ -204,15 +225,17 @@ object GeneratorUtils {
 
             if (hasAnnotatedProperties) {
                 return properties.map { prop ->
-                    val propAnn = prop.annotations.find { 
-                        it.hasQualifiedName(ProcessorConstants.CAPABILITY_RESULT_ANNOTATION) 
+                    val propAnn = prop.annotations.find {
+                        it.hasQualifiedName(ProcessorConstants.CAPABILITY_RESULT_ANNOTATION)
                     }
                     val name = propAnn?.arguments?.find { it.name?.asString() == "name" }?.value as? String ?: ""
                     val desc = propAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
-                    val semTypesVal = (propAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    val semTypesVal =
+                        (propAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                            ?: emptyList()
                     val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
                     val propTypeKS = prop.type.resolve()
-                    
+
                     OutputInfo(
                         name = name.ifEmpty { prop.simpleName.asString() },
                         originalName = prop.simpleName.asString(),

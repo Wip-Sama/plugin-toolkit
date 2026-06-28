@@ -43,7 +43,10 @@ class ManifestProcessor(
             val tokens = rawType.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
             for (token in tokens) {
                 if (!grammarRegex.matches(token)) {
-                    logger.warn("Semantic type '$token' does not follow the standard [namespace/][name][:variant] grammar", symbol)
+                    logger.warn(
+                        "Semantic type '$token' does not follow the standard [namespace/][name][:variant] grammar",
+                        symbol
+                    )
                 }
             }
         }
@@ -51,11 +54,11 @@ class ManifestProcessor(
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver.getSymbolsWithAnnotation(PluginInfoAnnotation::class.qualifiedName!!)
-        
+
         symbols.filterIsInstance<KSClassDeclaration>().forEach { classDeclaration ->
             generatePluginMetadata(classDeclaration, resolver)
         }
-        
+
         return emptyList()
     }
 
@@ -69,24 +72,30 @@ class ManifestProcessor(
         val version = pluginInfoAnnotation.arguments.find { it.name?.asString() == "version" }?.value as String
         val description = pluginInfoAnnotation.arguments.find { it.name?.asString() == "description" }?.value as String
         val minMemoryMb = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minMemoryMb" }?.value as Int
-        val minExecutionTimeMs = pluginInfoAnnotation.arguments.find { it.name?.asString() == "minExecutionTimeMs" }?.value as Int
-        val supportedOs = (pluginInfoAnnotation.arguments.find { it.name?.asString() == "supportedOs" }?.value as? List<*>)
-            ?.mapNotNull { item ->
-                val valStr = when (item) {
-                    is KSType -> item.declaration.simpleName.asString()
-                    is KSClassifierReference -> item.referencedName()
-                    is KSDeclaration -> item.simpleName.asString()
-                    else -> item?.toString() ?: ""
-                }
-                try { OS.valueOf(valStr.uppercase()) } catch (e: Exception) { null }
-            } ?: emptyList()
+        val minExecutionTimeMs =
+            pluginInfoAnnotation.arguments.find { it.name?.asString() == "minExecutionTimeMs" }?.value as Int
+        val supportedOs =
+            (pluginInfoAnnotation.arguments.find { it.name?.asString() == "supportedOs" }?.value as? List<*>)
+                ?.mapNotNull { item ->
+                    val valStr = when (item) {
+                        is KSType -> item.declaration.simpleName.asString()
+                        is KSClassifierReference -> item.referencedName()
+                        is KSDeclaration -> item.simpleName.asString()
+                        else -> item?.toString() ?: ""
+                    }
+                    try {
+                        OS.valueOf(valStr.uppercase())
+                    } catch (e: Exception) {
+                        null
+                    }
+                } ?: emptyList()
 
         val packageName = classDeclaration.packageName.asString()
         val baseClassName = classDeclaration.simpleName.asString()
 
         // Find all classes in this module that have @PluginSetting annotations
         val settingsClasses = resolver.getSymbolsWithAnnotation(PLUGIN_SETTING_ANNOTATION)
-            .mapNotNull { 
+            .mapNotNull {
                 var current = it.parent
                 while (current != null && current !is KSClassDeclaration) {
                     current = current.parent
@@ -96,37 +105,42 @@ class ManifestProcessor(
             .distinct()
             .toList()
 
-        val functions = classDeclaration.getAllFunctions().filter { 
+        val functions = classDeclaration.getAllFunctions().filter {
             it.annotations.any { ann -> ann.hasQualifiedName(CAPABILITY_ANNOTATION) }
         }.toList()
 
         // Validate semantic types on functions
         functions.forEach { func ->
             func.parameters.forEach { param ->
-                val paramAnn = param.annotations.find { it.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION) }
-                val sem = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                val paramAnn =
+                    param.annotations.find { it.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION) }
+                val sem =
+                    (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
                 validateSemanticTypes(sem, param)
             }
-            
+
             // Validate outputs
             val returnTypeKS = func.returnType?.resolve()
             if (returnTypeKS != null && returnTypeKS.toTypeName().toString() != "kotlin.Unit") {
-                val funcOutputAnn = func.annotations.find { 
-                    it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput") 
+                val funcOutputAnn = func.annotations.find {
+                    it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput")
                 }
                 if (funcOutputAnn != null) {
-                    val sem = (funcOutputAnn.arguments.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                    val sem =
+                        (funcOutputAnn.arguments.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
                     validateSemanticTypes(sem, func)
                 } else {
                     val declaration = returnTypeKS.declaration
-                    val isDataClass = declaration is KSClassDeclaration && declaration.modifiers.contains(com.google.devtools.ksp.symbol.Modifier.DATA)
+                    val isDataClass =
+                        declaration is KSClassDeclaration && declaration.modifiers.contains(com.google.devtools.ksp.symbol.Modifier.DATA)
                     if (isDataClass) {
                         val classDecl = declaration as KSClassDeclaration
                         classDecl.getAllProperties().forEach { prop ->
-                            val propAnn = prop.annotations.find { 
-                                it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput") 
+                            val propAnn = prop.annotations.find {
+                                it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput")
                             }
-                            val sem = (propAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                            val sem =
+                                (propAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
                             validateSemanticTypes(sem, prop)
                         }
                     }
@@ -134,7 +148,7 @@ class ManifestProcessor(
             }
         }
 
-        val actions = classDeclaration.getAllFunctions().filter { 
+        val actions = classDeclaration.getAllFunctions().filter {
             it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
         }.toList()
 
@@ -142,11 +156,11 @@ class ManifestProcessor(
         var changelogObj: Changelog? = null
         val sourceFile = classDeclaration.containingFile
         val changelogFile = sourceFile?.let { findChangelogFile(it) }
-        
+
         if (changelogFile != null) {
             val content = changelogFile.readText()
             changelogObj = org.wip.plugintoolkit.api.utils.ChangelogParser.parse(content)
-            
+
             // Bundle changelog into resources
             val extension = changelogFile.extension
             writeFile(sourceFile, "", "resources/changelog", extension, content)
@@ -157,20 +171,26 @@ class ManifestProcessor(
             packageName, baseClassName, id, name, version, description,
             minMemoryMb, minExecutionTimeMs, supportedOs, functions, settingsClasses, actions, classDeclaration
         )
-        
+
         val generatedFileName = baseClassName + "Generated"
         val file = codeGenerator.createNewFile(
             Dependencies(true, classDeclaration.containingFile!!),
             packageName,
             generatedFileName
         )
-        file.writer().use { 
-            fileSpec.writeTo(it) 
+        file.writer().use {
+            fileSpec.writeTo(it)
         }
 
         // 3. Generate SPI Service File
         val providerName = baseClassName + "ModuleProvider"
-        writeFile(sourceFile, "", "META-INF/services/${org.wip.plugintoolkit.api.PluginModuleProvider::class.qualifiedName}", "", "$packageName.$providerName")
+        writeFile(
+            sourceFile,
+            "",
+            "META-INF/services/${org.wip.plugintoolkit.api.PluginModuleProvider::class.qualifiedName}",
+            "",
+            "$packageName.$providerName"
+        )
 
         // 4. Check for migrations.json
         val migrationsFile = sourceFile?.let { findMigrationsFile(it) }
@@ -181,15 +201,35 @@ class ManifestProcessor(
         }
 
         // 5. Generate manifest.json
-        val allSettingsProperties = settingsClasses.flatMap { it.getAllProperties().filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } } }.toList()
+        val allSettingsProperties = settingsClasses.flatMap {
+            it.getAllProperties()
+                .filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } }
+        }.toList()
         val manifestJson = ManifestJsonGenerator.generate(
-            classDeclaration, id, name, version, description,
-            minMemoryMb, minExecutionTimeMs, supportedOs, functions, allSettingsProperties, actions, changelogObj, hasMigrations
+            classDeclaration,
+            id,
+            name,
+            version,
+            description,
+            minMemoryMb,
+            minExecutionTimeMs,
+            supportedOs,
+            functions,
+            allSettingsProperties,
+            actions,
+            changelogObj,
+            hasMigrations
         )
         writeFile(sourceFile, "", "META-INF/manifest", "json", manifestJson)
     }
 
-    private fun writeFile(sourceFile: KSFile?, packageName: String, fileName: String, extension: String, content: String) {
+    private fun writeFile(
+        sourceFile: KSFile?,
+        packageName: String,
+        fileName: String,
+        extension: String,
+        content: String
+    ) {
         val file = codeGenerator.createNewFile(
             Dependencies(true, sourceFile!!),
             packageName,

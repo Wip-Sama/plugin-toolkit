@@ -29,26 +29,26 @@ object ModuleGenerator {
     ): TypeSpec {
         val jsonElementCN = ClassName("kotlinx.serialization.json", "JsonElement")
         val settingsMapType = CN_MAP.parameterizedBy(String::class.asClassName(), jsonElementCN)
-        
+
         val getModuleFunc = FunSpec.builder("getKoinModule")
             .addModifiers(KModifier.OVERRIDE)
             .addParameter("settings", settingsMapType)
             .returns(ClassName("org.koin.core.module", "Module"))
             .addCode("return org.koin.dsl.module {\n")
-        
+
         settingsClasses.forEach { cls ->
             val clsName = cls.toClassName()
             getModuleFunc.addCode("  single {\n")
             getModuleFunc.addCode("    %T(\n", clsName)
-            
-            val props = cls.getAllProperties().filter { p -> 
+
+            val props = cls.getAllProperties().filter { p ->
                 p.annotations.any { a -> a.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
             }.toList()
-            
+
             props.forEachIndexed { index, prop ->
                 val name = prop.simpleName.asString()
                 val type = prop.type.resolve().toTypeName()
-                
+
                 val defaultValue = when (type) {
                     String::class.asClassName() -> CodeBlock.of("%S", "")
                     Int::class.asClassName() -> CodeBlock.of("0")
@@ -65,15 +65,15 @@ object ModuleGenerator {
                 if (index < props.size - 1) getModuleFunc.addCode(", ")
                 getModuleFunc.addCode("\n")
             }
-            
+
             getModuleFunc.addCode("    )\n")
             getModuleFunc.addCode("  }\n")
         }
-        
+
         val constructorArgs = settingsClasses.joinToString(", ") { "get()" }
         getModuleFunc.addStatement("  single { %T($constructorArgs) }", ClassName(packageName, baseClassName))
         getModuleFunc.addStatement("  single<%T> { %T(get()) }", CN_PLUGIN_ENTRY, ClassName(packageName, entryName))
-        
+
         getModuleFunc.addCode("}\n")
 
         return TypeSpec.classBuilder(providerName)

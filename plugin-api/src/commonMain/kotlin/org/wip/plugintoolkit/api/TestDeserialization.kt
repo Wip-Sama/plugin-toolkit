@@ -1,5 +1,7 @@
 package org.wip.plugintoolkit.api
+
 import kotlinx.serialization.json.Json
+
 fun main() {
     val jsonString = """{
         "description": "First input file",

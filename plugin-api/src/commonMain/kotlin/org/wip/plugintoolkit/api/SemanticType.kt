@@ -16,11 +16,12 @@ class SemanticType {
         this.variant = variant?.trim()?.lowercase()?.let { normalizeNFKC(it) }?.takeIf { it.isNotEmpty() }
     }
 
-    val canonicalId: String get() = buildString {
-        if (namespace != null) append("$namespace/")
-        append(name)
-        if (variant != null) append(":$variant")
-    }
+    val canonicalId: String
+        get() = buildString {
+            if (namespace != null) append("$namespace/")
+            append(name)
+            if (variant != null) append(":$variant")
+        }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

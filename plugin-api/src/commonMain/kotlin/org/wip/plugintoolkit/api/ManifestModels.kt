@@ -1,21 +1,21 @@
 package org.wip.plugintoolkit.api
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 
@@ -67,7 +67,7 @@ sealed class DataType {
     @Serializable
     @SerialName("object")
     data class Object(
-        val className: String, 
+        val className: String,
         val id: String? = null,
         val description: String? = null,
         val version: Int? = null,
@@ -78,7 +78,7 @@ sealed class DataType {
         override fun isProvided(value: JsonElement?): Boolean {
             if (value == null || value is JsonNull) return false
             if (requiredProperties.isEmpty()) return true
-            
+
             val jsonObj = value as? JsonObject ?: return false
             return requiredProperties.all { prop ->
                 val propType = properties[prop]
@@ -98,8 +98,8 @@ sealed class DataType {
     @Serializable
     @SerialName("enum")
     data class Enum(
-        val className: String, 
-        val options: List<String>, 
+        val className: String,
+        val options: List<String>,
         val namespace: String? = null,
         val optionRequirements: Map<String, List<String>> = emptyMap()
     ) : DataType() {

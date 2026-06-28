@@ -1,40 +1,49 @@
 Version: 1.4.0
 Date: 2026-05-12
 Features:
-  - Added support for required and secret settings.
-  - Added 'serverToken' (secret) and 'operatorName' (required) settings.
-Changes:
-  - Updated manifest schema to support configuration validation enforcement.
+
+- Added support for required and secret settings.
+- Added 'serverToken' (secret) and 'operatorName' (required) settings.
+  Changes:
+- Updated manifest schema to support configuration validation enforcement.
+
 ----------------------------------------------------------------------------------------------------
 Version: 1.3.2
 Date: 2026-05-09
 Changes:
--	Changelog is now .md
+
+- Changelog is now .md
 - Moved from JVM_11 to JVM_21
+
 ----------------------------------------------------------------------------------------------------
 Version: 1.3.1
 Date: 2026-05-01
 Changes:
-  - Initial release.
-  - Selection tool to rebuild copper wires between electric poles by distance.
-  - Reverse-select to disconnect all internal copper wires in an area.
-  - Per-player setting for max connections per pole (1-8, default 4).
-Features:
-  - ALT + W shortcut and shortcut bar icon to get the tool.
-  - Localized into 26 languages.
+
+- Initial release.
+- Selection tool to rebuild copper wires between electric poles by distance.
+- Reverse-select to disconnect all internal copper wires in an area.
+- Per-player setting for max connections per pole (1-8, default 4).
+  Features:
+- ALT + W shortcut and shortcut bar icon to get the tool.
+- Localized into 26 languages.
+
 ----------------------------------------------------------------------------------------------------
 Version: 1.2.0
 Date: 2026-04-30
 Features:
-  - Initial release.
-  - Selection tool to rebuild copper wires between electric poles by distance.
-  - Reverse-select to disconnect all internal copper wires in an area.
-  - Per-player setting for max connections per pole (1-8, default 4).
-  - ALT + W shortcut and shortcut bar icon to get the tool.
-  - Localized into 26 languages.
+
+- Initial release.
+- Selection tool to rebuild copper wires between electric poles by distance.
+- Reverse-select to disconnect all internal copper wires in an area.
+- Per-player setting for max connections per pole (1-8, default 4).
+- ALT + W shortcut and shortcut bar icon to get the tool.
+- Localized into 26 languages.
+
 ----------------------------------------------------------------------------------------------------
 Version: 1.1.0
 Date: 2026-04-15
 Fixes:
-  - Fixed a crash when deleting a pole with multiple connections.
-  - Improved performance of the selection tool.
+
+- Fixed a crash when deleting a pole with multiple connections.
+- Improved performance of the selection tool.

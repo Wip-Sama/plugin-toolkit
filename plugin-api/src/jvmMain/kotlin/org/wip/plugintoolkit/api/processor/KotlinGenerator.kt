@@ -38,13 +38,18 @@ object KotlinGenerator {
         val fileSpec = FileSpec.builder(packageName, generatedFileName)
 
         // 1. Generate Manifest Object
-        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
-        val updateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
-        
+        val setupFunction = classDeclaration.getAllFunctions()
+            .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
+        val updateFunction = classDeclaration.getAllFunctions()
+            .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
+
         val manifestType = ManifestGenerator.generateManifestObject(
-            manifestName, id, name, version, description, 
-            minMemoryMb, minExecutionTimeMs, supportedOs, functions, 
-            settingsClasses.flatMap { it.getAllProperties().filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } } }.toList(), 
+            manifestName, id, name, version, description,
+            minMemoryMb, minExecutionTimeMs, supportedOs, functions,
+            settingsClasses.flatMap {
+                it.getAllProperties()
+                    .filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } }
+            }.toList(),
             actions, updateFunction != null, setupFunction != null
         )
         fileSpec.addType(manifestType)
