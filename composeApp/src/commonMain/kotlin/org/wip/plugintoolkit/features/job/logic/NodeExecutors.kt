@@ -94,10 +94,12 @@ interface SystemNodeExecutorRegistry {
     fun getExecutor(action: String): NodeExecutor
 }
 
-class DefaultSystemNodeExecutorRegistry : SystemNodeExecutorRegistry {
+class DefaultSystemNodeExecutorRegistry(
+    private val semanticRegistry: SemanticRegistry
+) : SystemNodeExecutorRegistry {
     private val executors = mapOf(
         "save" to SaveNodeExecutor(),
-        "load" to LoadNodeExecutor(),
+        "load" to LoadNodeExecutor(semanticRegistry),
         "log" to LogNodeExecutor(),
         "delay" to DelayNodeExecutor(),
         "convert" to ConvertNodeExecutor(),
@@ -185,13 +187,15 @@ class SaveNodeExecutor : NodeExecutor {
  * Reads data from a file. If the file path is relative, it's resolved against the app data directory.
  * Returns the file content as a string.
  */
-class LoadNodeExecutor : NodeExecutor {
+class LoadNodeExecutor(
+    private val semanticRegistry: SemanticRegistry
+) : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val filePath = context.getInputValue("file_path", "output.txt") as String
         val dataPort = context.node.outputs.find { it.id == "data" }
         val semanticTypes = dataPort?.semanticTypes ?: emptyList()
         if (semanticTypes.isNotEmpty()) {
-            val allowedExtensions = SemanticRegistry.getAllowedExtensions(semanticTypes)
+            val allowedExtensions = semanticRegistry.getAllowedExtensions(semanticTypes)
             if (allowedExtensions.isNotEmpty()) {
                 val filename = filePath.substringAfterLast('/').substringAfterLast('\\')
                 val ext = filename.substringAfterLast('.', "").lowercase()

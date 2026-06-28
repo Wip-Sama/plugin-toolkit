@@ -38,6 +38,7 @@ import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 import org.wip.plugintoolkit.features.flows.model.Node
@@ -65,7 +66,8 @@ fun NodePropertyEditor(
     val valueModifier = if (isConnected) Modifier.alpha(0.5f) else Modifier
 
     Box(modifier = Modifier.width(120.dp).then(valueModifier)) {
-        val category = SemanticRegistry.getCategory(inferredSem)?.name?.lowercase()
+        val semanticRegistry = koinInject<SemanticRegistry>()
+    val category = semanticRegistry.getCategory(inferredSem)?.name?.lowercase()
         when (category) {
             "color" -> {
                 val rawValue = getPortValueString(currentPortValue, input.dataType)
@@ -226,7 +228,7 @@ fun NodePropertyEditor(
                         onClick = {
                             scope.launch {
                                 val allowedExtensions =
-                                    SemanticRegistry.getAllowedExtensions(inferredSem)
+                                    semanticRegistry.getAllowedExtensions(inferredSem)
                                 val pickedPath =
                                     PlatformUtils.pickFile("Select File", allowedExtensions)
                                 if (pickedPath != null) {
@@ -425,7 +427,7 @@ fun NodePropertyEditor(
                         onClick = {
                             scope.launch {
                                 val allowedExtensions =
-                                    SemanticRegistry.getAllowedExtensions(inferredSem)
+                                    semanticRegistry.getAllowedExtensions(inferredSem)
                                 val pickedPath =
                                     PlatformUtils.pickFile("Select File", allowedExtensions)
                                 if (pickedPath != null) {

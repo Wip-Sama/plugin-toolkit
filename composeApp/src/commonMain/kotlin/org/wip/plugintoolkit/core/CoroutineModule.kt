@@ -38,7 +38,6 @@ val coroutineModule = module {
 }
 
 /**
- * JVM implementation of the Virtual Thread dispatcher.
+ * Platform-specific dispatcher for massive concurrency (Virtual Threads on JVM, IO on Android).
  */
-val loomDispatcher: CoroutineDispatcher =
-    java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()
+expect val loomDispatcher: CoroutineDispatcher

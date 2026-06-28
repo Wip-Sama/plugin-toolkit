@@ -11,12 +11,25 @@ enum class SemanticCategory {
     PATH
 }
 
-object SemanticRegistry {
+interface SemanticRegistry {
     /**
      * Maps a list of SemanticTypes to a SemanticCategory choosing the "best" match based on priority:
      * COLOR > IMAGE > AUDIO > VIDEO > FILE > PATH.
      */
-    fun getCategory(types: List<SemanticType>): SemanticCategory? {
+    fun getCategory(types: List<SemanticType>): SemanticCategory?
+
+    /**
+     * Extracts allowed file extensions from a list of SemanticTypes.
+     */
+    fun getAllowedExtensions(types: List<SemanticType>): List<String>
+}
+
+class DefaultSemanticRegistry : SemanticRegistry {
+    /**
+     * Maps a list of SemanticTypes to a SemanticCategory choosing the "best" match based on priority:
+     * COLOR > IMAGE > AUDIO > VIDEO > FILE > PATH.
+     */
+    override fun getCategory(types: List<SemanticType>): SemanticCategory? {
         val mappedCategories = types.mapNotNull { type ->
             val primary = (type.namespace ?: type.name).lowercase()
             when (primary) {
@@ -44,7 +57,7 @@ object SemanticRegistry {
     /**
      * Extracts allowed file extensions from a list of SemanticTypes.
      */
-    fun getAllowedExtensions(types: List<SemanticType>): List<String> {
+    override fun getAllowedExtensions(types: List<SemanticType>): List<String> {
         val extensions = mutableListOf<String>()
         var hasGenericImage = false
         var hasGenericAudio = false

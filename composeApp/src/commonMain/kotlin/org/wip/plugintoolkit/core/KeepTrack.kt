@@ -4,47 +4,34 @@ package org.wip.plugintoolkit.core
  * Central registry of system locations and parameters used by the application.
  * This file serves as a reference for all persistent data and system integration points.
  */
-object KeepTrack {
-    // --- Settings Storage ---
-    /** The base directory name for app settings. */
-    const val APP_DATA_DIR_NAME = "PluginToolkit"
+interface SystemConfig {
+    val APP_DATA_DIR_NAME: String
+    val LEGACY_SETTINGS_DIR_NAME: String
+    val SETTINGS_FILE_NAME: String
+    val FLOWS_FILE_NAME: String
+    val LOGS_DIR_NAME: String
+    val PLUGINS_DIR_NAME: String
+    val JOBS_DIR_NAME: String
+    val INSTALLED_PLUGINS_FILE_NAME: String
+    val STARTUP_APP_NAME: String
+    val STARTUP_FLAG_BACKGROUND: String
+    val WINDOWS_STARTUP_REGISTRY_PATH: String
+    val LINUX_AUTOSTART_DIR: String
+    val LINUX_DESKTOP_FILENAME: String
+}
 
-    /** The directory in the user's home where app settings are stored (legacy/Linux). */
-    const val LEGACY_SETTINGS_DIR_NAME = ".plugintoolkit"
-
-    /** The filename for the application settings. */
-    const val SETTINGS_FILE_NAME = "settings.json"
-
-    /** The filename for the visual flows settings. */
-    const val FLOWS_FILE_NAME = "flows.json"
-
-    /** The directory for application logs. */
-    const val LOGS_DIR_NAME = "logs"
-
-    /** The directory for plugins. */
-    const val PLUGINS_DIR_NAME = "plugins"
-
-    /** The directory for background job states. */
-    const val JOBS_DIR_NAME = "jobs"
-
-    /** The filename for tracking installed plugins within managed folders. */
-    const val INSTALLED_PLUGINS_FILE_NAME = "installed_plugins.json"
-
-    // --- Startup Parameters ---
-    /** The name used for system startup entries (Registry/Desktop file). */
-    const val STARTUP_APP_NAME = "PluginToolkit"
-
-    /** The command-line flag used to launch the app in background mode. */
-    const val STARTUP_FLAG_BACKGROUND = "--background"
-
-    // --- Platform Specific Locations (Reference) ---
-
-    /** Windows Registry key for autostart. */
-    const val WINDOWS_STARTUP_REGISTRY_PATH = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
-
-    /** Linux Autostart directory relative to user home. */
-    const val LINUX_AUTOSTART_DIR = ".config/autostart"
-
-    /** Linux Desktop entry filename. */
-    val LINUX_DESKTOP_FILENAME = "${STARTUP_APP_NAME.lowercase()}.desktop"
+class DefaultSystemConfig : SystemConfig {
+    override val APP_DATA_DIR_NAME = "PluginToolkit"
+    override val LEGACY_SETTINGS_DIR_NAME = ".plugintoolkit"
+    override val SETTINGS_FILE_NAME = "settings.json"
+    override val FLOWS_FILE_NAME = "flows.json"
+    override val LOGS_DIR_NAME = "logs"
+    override val PLUGINS_DIR_NAME = "plugins"
+    override val JOBS_DIR_NAME = "jobs"
+    override val INSTALLED_PLUGINS_FILE_NAME = "installed_plugins.json"
+    override val STARTUP_APP_NAME = "PluginToolkit"
+    override val STARTUP_FLAG_BACKGROUND = "--background"
+    override val WINDOWS_STARTUP_REGISTRY_PATH = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+    override val LINUX_AUTOSTART_DIR = ".config/autostart"
+    override val LINUX_DESKTOP_FILENAME = "${STARTUP_APP_NAME.lowercase()}.desktop"
 }

@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
@@ -40,7 +40,8 @@ class PluginRepoViewModel(
     private val notificationService: NotificationService,
     private val dialogService: org.wip.plugintoolkit.core.ui.DialogService,
     private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository,
-    private val jobManager: JobManager
+    private val jobManager: JobManager,
+    private val appConfig: SystemConfig
 ) : ViewModel() {
 
     private val ResStrings = plugintoolkit.composeapp.generated.resources.Res.string
@@ -156,7 +157,7 @@ class PluginRepoViewModel(
     }
 
     private fun pickInstallLocation(onSelected: (String) -> Unit) {
-        val defaultPath = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
+        val defaultPath = settingsRepository.getSettingsDir() + "/" + appConfig.PLUGINS_DIR_NAME
         val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
         val allFolders = (listOf(defaultPath) + savedFolders).distinct()
 

@@ -48,8 +48,11 @@ import org.koin.core.context.startKoin
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.mp.KoinPlatform.getKoin
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.DefaultSystemConfig
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.coroutineModule
+import org.wip.plugintoolkit.core.utils.DefaultSemanticRegistry
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.core.logging.FileLogWriter
 import org.wip.plugintoolkit.core.notification.JvmNotificationService
 import org.wip.plugintoolkit.core.notification.NotificationEvent
@@ -134,6 +137,8 @@ fun runMain(args: Array<String>) {
 
     startKoin {
         modules(coroutineModule, module {
+            single<SystemConfig> { DefaultSystemConfig() }
+            single<SemanticRegistry> { DefaultSemanticRegistry() }
             single<SettingsPersistence> { JvmSettingsPersistence() }
             single { SettingsRepository(get(), get(named("LoomScope"))) }
             single<NotificationService> {
@@ -177,12 +182,12 @@ fun runMain(args: Array<String>) {
             single { RepoManager(get(), get(), get(), get(named("LoomScope"))) }
             single { DialogService() }
             single { PluginLockProvider() }
-            single { PluginRegistry(get(), get(named("AppScope")), get(named("LoomDispatcher"))) }
+            single { PluginRegistry(get(), get(named("AppScope")), get(named("LoomDispatcher")), get()) }
             single { PluginLifecycleManager(get(), get(), get(), get()) }
             single { PluginLifecycleCoordinator(get(), get(), get(), get(named("AppScope"))) }
             single { PluginFolderManager(get(), get(), get()) }
             single { PluginInstaller(get(), get(), get(), get(), get(), get(), get()) }
-            single { PluginScanner(get()) }
+            single { PluginScanner(get(), get()) }
             single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(named("LoomScope"))) }
             single {
                 JobManager(
@@ -192,7 +197,7 @@ fun runMain(args: Array<String>) {
             }
             single { PluginViewModel(get(), get(), get()) }
             single { SettingsViewModel(get(), get(), get(), get()) }
-            single { FlowRepository(get(), get(), get(named("LoomScope"))) }
+            single { FlowRepository(get(), get(), get(named("LoomScope")), get()) }
             single { FlowViewModel(get(), getOrNull(), getOrNull()) }
             single { ActiveFlowEditorTracker() }
             factory { (flowName: String) ->
@@ -208,12 +213,12 @@ fun runMain(args: Array<String>) {
             }
             factory { NotificationViewModel(get()) }
             factory { SettingsSearchViewModel(get()) }
-            factory { PluginRepoViewModel(get(), get(), get(), get(), get(), get(), get()) }
-            factory { PluginManagerViewModel(get(), get(), get(), get(), get(), get()) }
+            factory { PluginRepoViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
+            factory { PluginManagerViewModel(get(), get(), get(), get(), get(), get(), get()) }
             factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
             factory { JobViewModel(get()) }
             factory { AppViewModel(get(), get()) }
-            single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry() }
+            single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
             single { UpdateService(get()) }
         })
     }
@@ -225,6 +230,7 @@ fun runMain(args: Array<String>) {
     val appScope = koin.get<CoroutineScope>(named("AppScope"))
     val settingsRepository = koin.get<SettingsRepository>()
     val updateService = koin.get<UpdateService>()
+    val appConfig = koin.get<SystemConfig>()
 
     // Cleanup old updates on startup
     updateService.cleanupOldUpdates(settingsRepository.getSettingsDir())
@@ -277,7 +283,7 @@ fun runMain(args: Array<String>) {
     }
 
     // Initialize Logging with Kermit
-    val logDirPath = "${PlatformPathUtils.getAppDataDir()}/${KeepTrack.LOGS_DIR_NAME}"
+    val logDirPath = "${PlatformPathUtils.getAppDataDir()}/${appConfig.LOGS_DIR_NAME}"
     val logDir = Path(logDirPath)
 
     Logger.setLogWriters(
@@ -302,7 +308,7 @@ fun runMain(args: Array<String>) {
 
 
     // Determine initial window state based on settings and flags
-    val startMinimizedOverride = args.contains(KeepTrack.STARTUP_FLAG_BACKGROUND)
+    val startMinimizedOverride = args.contains(appConfig.STARTUP_FLAG_BACKGROUND)
     val startMode = if (startMinimizedOverride) WindowStartMode.Minimized else initialSettings.general.windowStartMode
 
     application {

@@ -44,7 +44,7 @@ class JobWorker(
         try {
             get<SystemNodeExecutorRegistry>()
         } catch (e: Exception) {
-            DefaultSystemNodeExecutorRegistry()
+            DefaultSystemNodeExecutorRegistry(get())
         }
     }
 

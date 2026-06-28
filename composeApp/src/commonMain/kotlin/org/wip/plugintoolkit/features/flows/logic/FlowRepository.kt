@@ -14,7 +14,7 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.MigrationEngine
 import org.wip.plugintoolkit.features.flows.model.Node
@@ -24,7 +24,8 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 class FlowRepository(
     private val settingsPersistence: SettingsPersistence,
     private val pluginManager: PluginManager,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val appConfig: SystemConfig
 ) {
     private val json = Json {
         prettyPrint = true
@@ -60,7 +61,7 @@ class FlowRepository(
                 }
 
                 // Check for legacy migration first
-                val legacyFile = Path("$appDataDir/${KeepTrack.FLOWS_FILE_NAME}")
+                val legacyFile = Path("$appDataDir/${appConfig.FLOWS_FILE_NAME}")
                 if (SystemFileSystem.exists(legacyFile)) {
                     try {
                         val legacyContent = SystemFileSystem.source(legacyFile).buffered().use { it.readString() }
@@ -74,7 +75,7 @@ class FlowRepository(
                                 }
                             }
                         }
-                        val backupFile = Path("$appDataDir/${KeepTrack.FLOWS_FILE_NAME}.bak")
+                        val backupFile = Path("$appDataDir/${appConfig.FLOWS_FILE_NAME}.bak")
                         if (SystemFileSystem.exists(backupFile)) {
                             SystemFileSystem.delete(backupFile)
                         }

@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
@@ -45,14 +45,15 @@ class PluginManagerViewModel(
     private val settingsRepository: SettingsRepository,
     private val repoManager: RepoManager,
     private val jobManager: JobManager,
-    private val flowViewModel: FlowViewModel
+    private val flowViewModel: FlowViewModel,
+    private val appConfig: SystemConfig
 ) : ViewModel() {
 
     val installedPlugins = pluginManager.installedPlugins
     val loadedPlugins = pluginManager.loadedPlugins
     val isRegistryReady = pluginManager.isRegistryReady
 
-    val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
+    val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + appConfig.PLUGINS_DIR_NAME
 
     val managedFolders: StateFlow<List<String>> = settingsRepository.settings
         .map { settings ->
