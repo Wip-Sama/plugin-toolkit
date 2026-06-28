@@ -13,23 +13,28 @@ import kotlinx.serialization.serializer
 fun SerialDescriptor.toDataType(): DataType {
     return when (this.kind) {
         PrimitiveKind.DOUBLE, PrimitiveKind.FLOAT -> DataType.Primitive(PrimitiveType.DOUBLE)
-        PrimitiveKind.INT, PrimitiveKind.SHORT, PrimitiveKind.BYTE, PrimitiveKind.LONG -> DataType.Primitive(PrimitiveType.INT)
+        PrimitiveKind.INT, PrimitiveKind.SHORT, PrimitiveKind.BYTE, PrimitiveKind.LONG -> DataType.Primitive(
+            PrimitiveType.INT
+        )
+
         PrimitiveKind.STRING, PrimitiveKind.CHAR -> DataType.Primitive(PrimitiveType.STRING)
         PrimitiveKind.BOOLEAN -> DataType.Primitive(PrimitiveType.BOOLEAN)
         StructureKind.LIST -> {
             val elementDescriptor = this.getElementDescriptor(0)
             DataType.Array(elementDescriptor.toDataType())
         }
+
         StructureKind.MAP -> DataType.Object(this.serialName)
         PolymorphicKind.SEALED, PolymorphicKind.OPEN -> DataType.Object(this.serialName)
         SerialKind.ENUM -> {
             val options = (0 until this.elementsCount).map { this.getElementName(it) }
             DataType.Enum(this.serialName, options)
         }
+
         else -> {
             val unitName = serializer<Unit>().descriptor.serialName
             val jsonElementName = serializer<JsonElement>().descriptor.serialName
-            
+
             when (this.serialName) {
                 unitName -> DataType.Primitive(PrimitiveType.UNIT)
                 jsonElementName -> DataType.Primitive(PrimitiveType.ANY)
@@ -65,15 +70,19 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
         is DataType.Primitive -> {
             other is DataType.Primitive && this.primitiveType == other.primitiveType
         }
+
         is DataType.Array -> {
             other is DataType.Array && this.items.isCompatibleWith(other.items)
         }
+
         is DataType.MapType -> {
             other is DataType.MapType && this.valueType.isCompatibleWith(other.valueType)
         }
+
         is DataType.Object -> {
             other is DataType.Object && this.className == other.className
         }
+
         is DataType.Enum -> {
             other is DataType.Enum && this.className == other.className
         }
@@ -104,7 +113,7 @@ fun isSemanticTypeCompatible(source: List<SemanticType>, target: List<SemanticTy
                     sName == null -> lenient // Source provides anything
                     else -> false
                 }
-                
+
                 if (nameMatches) {
                     val sVar = if (s.variant == "*") null else s.variant
                     val tVar = if (t.variant == "*") null else t.variant
@@ -128,7 +137,10 @@ fun isSemanticTypeCompatible(source: List<SemanticType>, target: List<SemanticTy
  * If either semantic type is null or blank, they are compatible (lenient matching).
  * If both are specified, they must match.
  */
-@Deprecated("Use List<SemanticType> comparison instead", ReplaceWith("isSemanticTypeCompatible(parseSemanticTypes(source), parseSemanticTypes(target))"))
+@Deprecated(
+    "Use List<SemanticType> comparison instead",
+    ReplaceWith("isSemanticTypeCompatible(parseSemanticTypes(source), parseSemanticTypes(target))")
+)
 fun isSemanticTypeCompatible(source: String?, target: String?): Boolean {
     val srcList = parseSemanticTypes(source)
     val tgtList = parseSemanticTypes(target)
@@ -152,9 +164,9 @@ private fun isIterable(type: DataType): Boolean {
     if (type is DataType.Array) return true
     if (type is DataType.Object) {
         val name = type.className.substringAfterLast('.').lowercase()
-        return name.contains("list") || name.contains("array") || name.contains("tuple") || 
-               name.contains("pair") || name.contains("triple") || name.contains("set") || 
-               name.contains("collection") || name.contains("iterable")
+        return name.contains("list") || name.contains("array") || name.contains("tuple") ||
+                name.contains("pair") || name.contains("triple") || name.contains("set") ||
+                name.contains("collection") || name.contains("iterable")
     }
     return false
 }
@@ -190,7 +202,8 @@ fun DataType.canConvert(other: DataType): Boolean {
         val sType = this.primitiveType
         val tType = other.primitiveType
         if ((sType == PrimitiveType.INT && tType == PrimitiveType.DOUBLE) ||
-            (sType == PrimitiveType.DOUBLE && tType == PrimitiveType.INT)) {
+            (sType == PrimitiveType.DOUBLE && tType == PrimitiveType.INT)
+        ) {
             return true
         }
         // Allow String to Int, Double, Boolean

@@ -59,7 +59,6 @@ enum class CapabilityContext {
 }
 
 
-
 /**
  * Indicates that the annotated element requires specific plugin settings to be provided.
  * Can be applied to enum entries or properties.

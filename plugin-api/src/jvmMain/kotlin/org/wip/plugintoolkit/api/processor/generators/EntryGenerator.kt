@@ -86,10 +86,14 @@ object EntryGenerator {
                     .build()
             )
 
-        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
-        val validateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_VALIDATE_ANNOTATION) } }
-        val loadFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_LOAD_ANNOTATION) } }
-        val updateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
+        val setupFunction = classDeclaration.getAllFunctions()
+            .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
+        val validateFunction = classDeclaration.getAllFunctions()
+            .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_VALIDATE_ANNOTATION) } }
+        val loadFunction = classDeclaration.getAllFunctions()
+            .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_LOAD_ANNOTATION) } }
+        val updateFunction = classDeclaration.getAllFunctions()
+            .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
 
         // performLoad
         val loadFunBuilder = FunSpec.builder("performLoad")
@@ -162,7 +166,7 @@ object EntryGenerator {
             validateFunBuilder.addStatement("return Result.success(Unit)")
         }
         entryType.addFunction(validateFunBuilder.build())
-        
+
         // performUpdate
         val updateFunBuilder = FunSpec.builder("performUpdate")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)

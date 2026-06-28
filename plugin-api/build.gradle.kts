@@ -40,7 +40,7 @@ kotlin {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
-            
+
             // Processor dependencies
             implementation(libs.ksp.api)
             implementation(libs.kotlinpoet)

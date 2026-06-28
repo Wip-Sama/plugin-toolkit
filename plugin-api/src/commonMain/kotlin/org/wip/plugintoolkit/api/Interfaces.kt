@@ -1,7 +1,6 @@
 package org.wip.plugintoolkit.api
 
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonElement
 import org.koin.core.module.Module
 
@@ -47,7 +46,7 @@ interface PluginEntry {
      * @param context The execution context providing logger, progress, and file system access.
      */
     suspend fun performSetup(context: PluginContext): Result<Unit> = Result.success(Unit)
-    
+
     /**
      * Optional update step called by the host application during plugin update.
      * 
@@ -154,7 +153,7 @@ interface PluginLogger {
     fun info(message: String)
     fun warn(message: String)
     fun error(message: String, throwable: Throwable? = null)
-    
+
     // Compatibility/helper method
     fun log(message: String) = info(message)
 }
@@ -257,7 +256,7 @@ interface PluginContext {
      * @param actionName The function name of the action to be displayed, or null to clear.
      */
     fun setRequiredAction(actionName: String?)
-    
+
     /**
      * Typed helpers for settings access.
      */

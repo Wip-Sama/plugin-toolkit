@@ -8,14 +8,16 @@ import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.CapabilityContext
 import org.wip.plugintoolkit.api.Changelog
+import org.wip.plugintoolkit.api.FileAccess
+import org.wip.plugintoolkit.api.HostFileSystem
 import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.OutputMetadata
 import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
+import org.wip.plugintoolkit.api.ParameterRole
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginFileSystem
-import org.wip.plugintoolkit.api.HostFileSystem
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginManifest
@@ -23,13 +25,11 @@ import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.Requirements
 import org.wip.plugintoolkit.api.SettingMetadata
 import org.wip.plugintoolkit.api.parseSemanticTypes
-import org.wip.plugintoolkit.api.FileAccess
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_INPUT_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION
-import org.wip.plugintoolkit.api.ParameterRole
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
@@ -56,70 +56,89 @@ object ManifestJsonGenerator {
             val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
-            val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
-            val supportsCancel = capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
-            
-            val contextEnumKS = capAnn.arguments.find { it.name?.asString() == "context" }?.value as? com.google.devtools.ksp.symbol.KSType
+            val supportsPause =
+                capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
+            val supportsCancel =
+                capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
+
+            val contextEnumKS =
+                capAnn.arguments.find { it.name?.asString() == "context" }?.value as? com.google.devtools.ksp.symbol.KSType
             val contextName = contextEnumKS?.declaration?.simpleName?.asString() ?: "ANY"
             val context = CapabilityContext.valueOf(contextName)
-            val requiresSettingsList = (capAnn.arguments.find { it.name?.asString() == "requiresSettings" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-            
+            val requiresSettingsList =
+                (capAnn.arguments.find { it.name?.asString() == "requiresSettings" }?.value as? List<*>)?.filterIsInstance<String>()
+                    ?: emptyList()
+
             val params = func.parameters.filter { param ->
                 val paramType = param.type.resolve().toTypeName().toString()
-                paramType != PluginLogger::class.qualifiedName && 
-                paramType != ProgressReporter::class.qualifiedName && 
-                paramType != PluginFileSystem::class.qualifiedName && 
-                paramType != HostFileSystem::class.qualifiedName && 
-                paramType != PluginContext::class.qualifiedName
+                paramType != PluginLogger::class.qualifiedName &&
+                        paramType != ProgressReporter::class.qualifiedName &&
+                        paramType != PluginFileSystem::class.qualifiedName &&
+                        paramType != HostFileSystem::class.qualifiedName &&
+                        paramType != PluginContext::class.qualifiedName
             }.associate { param ->
                 val isInputLoc = param.annotations.any { it.hasQualifiedName(CAPABILITY_INPUT_ANNOTATION) }
                 val isOutputLoc = param.annotations.any { it.hasQualifiedName(CAPABILITY_OUTPUT_ANNOTATION) }
-                val paramAnn = param.annotations.find { 
+                val paramAnn = param.annotations.find {
                     it.hasQualifiedName(CAPABILITY_PARAM_ANNOTATION) ||
-                    it.hasQualifiedName(CAPABILITY_INPUT_ANNOTATION) ||
-                    it.hasQualifiedName(CAPABILITY_OUTPUT_ANNOTATION)
+                            it.hasQualifiedName(CAPABILITY_INPUT_ANNOTATION) ||
+                            it.hasQualifiedName(CAPABILITY_OUTPUT_ANNOTATION)
                 }
-                val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
-                val defaultValue = paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
+                val paramDesc =
+                    paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
+                val defaultValue =
+                    paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
                 val paramName = param.name?.asString() ?: ""
                 val ksType = param.type.resolve()
-                
+
                 val defaultJson = if (defaultValue.isNotEmpty()) {
-                    try { Json.parseToJsonElement(defaultValue) } catch(e: Exception) { null }
+                    try {
+                        Json.parseToJsonElement(defaultValue)
+                    } catch (e: Exception) {
+                        null
+                    }
                 } else null
-                
-                val minValue = paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
-                val maxValue = paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
+
+                val minValue =
+                    paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
+                val maxValue =
+                    paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
                 val minLength = paramAnn?.arguments?.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
                 val maxLength = paramAnn?.arguments?.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
                 val regex = paramAnn?.arguments?.find { it.name?.asString() == "regex" }?.value as? String ?: ""
-                val multiSelect = paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
+                val multiSelect =
+                    paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
                 val minChoices = paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
                 val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
                 val isNullable = ksType.isMarkedNullable
                 val hasDefault = param.hasDefault
-                val explicitRequired = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+                val explicitRequired =
+                    paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
                 val required = explicitRequired || (!isNullable && !hasDefault)
                 val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
-                val semTypesVal = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                val pathTemplate = paramAnn?.arguments?.find { it.name?.asString() == "pathTemplate" }?.value as? String ?: ""
-                
+                val semTypesVal =
+                    (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                        ?: emptyList()
+                val pathTemplate =
+                    paramAnn?.arguments?.find { it.name?.asString() == "pathTemplate" }?.value as? String ?: ""
+
                 val autogeneratedPattern = if (isOutputLoc) {
                     paramAnn?.arguments?.find { it.name?.asString() == "autogeneratedPattern" }?.value as? String ?: ""
                 } else null
-                
+
                 val isDestructive = if (isOutputLoc) {
                     paramAnn?.arguments?.find { it.name?.asString() == "isDestructive" }?.value as? Boolean ?: false
                 } else false
-                
+
                 val role = when {
                     isOutputLoc -> ParameterRole.OUTPUT_LOCATION
                     isInputLoc -> ParameterRole.INPUT_LOCATION
                     else -> ParameterRole.STANDARD
                 }
-                
-                val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
-                
+
+                val hasConstraints =
+                    !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
+
                 val constraints = if (hasConstraints) {
                     ParameterConstraints(
                         minValue = if (!minValue.isNaN()) minValue else null,
@@ -132,7 +151,7 @@ object ManifestJsonGenerator {
                         maxChoices = if (maxChoices != -1) maxChoices else null
                     )
                 } else null
-                
+
                 paramName to ParameterMetadata(
                     defaultValue = defaultJson,
                     description = paramDesc,
@@ -146,7 +165,7 @@ object ManifestJsonGenerator {
                     isDestructive = isDestructive
                 )
             }
-            
+
             var inferredReadsFiles = false
             var inferredWritesFiles = false
             var inferredDestructive = false
@@ -158,7 +177,7 @@ object ManifestJsonGenerator {
                     inferredWritesFiles = true
                     if (pMeta.isDestructive) inferredDestructive = true
                 }
-                
+
                 // legacy support for semantic types
                 pMeta.semanticTypes.forEach { st ->
                     val fullType = "${st.namespace}/${st.name}"
@@ -175,8 +194,8 @@ object ManifestJsonGenerator {
                     isDestructive = inferredDestructive
                 )
             } else null
-            
-            val hasResumeState = func.parameters.any { param -> 
+
+            val hasResumeState = func.parameters.any { param ->
                 param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }
             }
 
@@ -214,11 +233,15 @@ object ManifestJsonGenerator {
             val explicitRequired = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
             val required = explicitRequired || (!isNullable)
             val secret = ann.arguments.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
-            
+
             val defaultJson = if (defaultVal.isNotEmpty()) {
-                try { Json.parseToJsonElement(defaultVal) } catch(e: Exception) { null }
+                try {
+                    Json.parseToJsonElement(defaultVal)
+                } catch (e: Exception) {
+                    null
+                }
             } else null
-            
+
             val minValue = ann.arguments.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
             val maxValue = ann.arguments.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
             val minLength = ann.arguments.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
@@ -227,9 +250,10 @@ object ManifestJsonGenerator {
             val multiSelect = ann.arguments.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
             val minChoices = ann.arguments.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
             val maxChoices = ann.arguments.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
-            
-            val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
-            
+
+            val hasConstraints =
+                !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
+
             val constraints = if (hasConstraints) {
                 ParameterConstraints(
                     minValue = if (!minValue.isNaN()) minValue else null,
@@ -242,7 +266,7 @@ object ManifestJsonGenerator {
                     maxChoices = if (maxChoices != -1) maxChoices else null
                 )
             } else null
-            
+
             propName to SettingMetadata(
                 defaultValue = defaultJson,
                 description = desc,
@@ -257,7 +281,7 @@ object ManifestJsonGenerator {
             val ann = func.annotations.first { it.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
-            
+
             PluginAction(
                 name = actName,
                 description = actDesc,
@@ -265,8 +289,10 @@ object ManifestJsonGenerator {
             )
         }
 
-        val setupFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
-        val updateFunction = classDeclaration.getAllFunctions().find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
+        val setupFunction = classDeclaration.getAllFunctions()
+            .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }
+        val updateFunction = classDeclaration.getAllFunctions()
+            .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_UPDATE_ANNOTATION) } }
 
         val manifestObj = PluginManifest(
             manifestVersion = "1.0",
@@ -289,7 +315,7 @@ object ManifestJsonGenerator {
             hasSetupHandler = setupFunction != null,
             hasMigrations = hasMigrations
         )
-        
+
         val json = Json { prettyPrint = true }
         return json.encodeToString(manifestObj)
     }

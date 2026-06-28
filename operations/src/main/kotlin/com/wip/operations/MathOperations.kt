@@ -16,8 +16,8 @@ import org.wip.plugintoolkit.api.annotations.Capability
 import org.wip.plugintoolkit.api.annotations.CapabilityContext
 import org.wip.plugintoolkit.api.annotations.CapabilityInput
 import org.wip.plugintoolkit.api.annotations.CapabilityOutput
-import org.wip.plugintoolkit.api.annotations.CapabilityResult
 import org.wip.plugintoolkit.api.annotations.CapabilityParam
+import org.wip.plugintoolkit.api.annotations.CapabilityResult
 import org.wip.plugintoolkit.api.annotations.PluginAction
 import org.wip.plugintoolkit.api.annotations.PluginInfo
 import org.wip.plugintoolkit.api.annotations.PluginSetting
@@ -307,7 +307,10 @@ class MathProcessor(val settings: MathProcessorSettings) {
             metadata = config.mapValues { it.value.toInt() })
     }
 
-    @Capability(name = "process_complex_object", description = "Processes a complex object by appending a suffix to its ID")
+    @Capability(
+        name = "process_complex_object",
+        description = "Processes a complex object by appending a suffix to its ID"
+    )
     fun processComplexObject(
         @CapabilityParam(description = "The complex object to process") obj: ComplexObject
     ): ComplexObject {
@@ -362,7 +365,11 @@ class MathProcessor(val settings: MathProcessorSettings) {
 
     @Capability(name = "write_report", description = "Writes a mock report to the given file.")
     fun writeReport(
-        @CapabilityOutput(description = "Where to save the report", isDestructive = true, semanticTypes = ["file/text"]) reportPath: String
+        @CapabilityOutput(
+            description = "Where to save the report",
+            isDestructive = true,
+            semanticTypes = ["file/text"]
+        ) reportPath: String
     ): String {
         return "Report saved successfully"
     }

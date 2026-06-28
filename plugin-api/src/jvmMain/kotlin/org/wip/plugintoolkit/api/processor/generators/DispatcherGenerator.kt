@@ -14,12 +14,9 @@ import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_COROUTINE_SCOPE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DATA_PROCESSOR
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DISPATCHERS
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_RESULT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_ILLEGAL_ARGUMENT_EXCEPTION
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JOB_HANDLE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_MAP
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ACTION
@@ -28,17 +25,10 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_FILESYST
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_LOGGER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_REQUEST
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_RESPONSE
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_SIGNAL
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PROGRESS_REPORTER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_RESULT
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_ASYNC
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_CANCEL
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_DECODE_FROM_JSON_ELEMENT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_ENCODE_FROM_JSON_ELEMENT
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_LAUNCH
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SIGNAL_CANCEL
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SIGNAL_PAUSE
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_SUPERVISOR_JOB
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object DispatcherGenerator {
@@ -89,55 +79,88 @@ object DispatcherGenerator {
         val mapCode = CodeBlock.builder()
         mapCode.add("mapOf(\n")
         mapCode.indent()
-        
+
         functions.forEachIndexed { index, func ->
             val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val methodName = func.simpleName.asString()
-            
+
             mapCode.add("%S to { request, context ->\n", capName.lowercase())
             mapCode.indent()
             mapCode.add("val result = processor.%L(\n", methodName)
             mapCode.indent()
-            
+
             val paramsList = func.parameters
             paramsList.forEachIndexed { pIndex, param ->
                 val paramName = param.name?.asString() ?: ""
                 val paramType = param.type.resolve().toTypeName()
                 val isNullable = param.type.resolve().isMarkedNullable
                 val hasDefault = param.hasDefault
-                
+
                 when {
                     paramType == CN_PLUGIN_LOGGER -> {
                         mapCode.add("context.logger")
                     }
+
                     paramType == CN_PROGRESS_REPORTER -> {
                         mapCode.add("context.progress")
                     }
+
                     paramType == CN_PLUGIN_FILESYSTEM -> {
                         mapCode.add("context.fileSystem")
                     }
+
                     paramType == CN_PLUGIN_CONTEXT -> {
                         mapCode.add("context")
                     }
+
                     param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) } -> {
-                        mapCode.add("request.resumeState?.let { %T.%M<%T>(it) }", CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType)
+                        mapCode.add(
+                            "request.resumeState?.let { %T.%M<%T>(it) }",
+                            CN_JSON,
+                            MN_DECODE_FROM_JSON_ELEMENT,
+                            paramType
+                        )
                     }
+
                     hasDefault -> {
-                        mapCode.add("if (request.parameters.containsKey(%S)) %T.%M<%T>(request.parameters[%S]!!) else null", paramName, CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType.copy(nullable = false), paramName)
+                        mapCode.add(
+                            "if (request.parameters.containsKey(%S)) %T.%M<%T>(request.parameters[%S]!!) else null",
+                            paramName,
+                            CN_JSON,
+                            MN_DECODE_FROM_JSON_ELEMENT,
+                            paramType.copy(nullable = false),
+                            paramName
+                        )
                     }
+
                     isNullable -> {
-                        mapCode.add("request.parameters[%S]?.let { %T.%M<%T>(it) }", paramName, CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType)
+                        mapCode.add(
+                            "request.parameters[%S]?.let { %T.%M<%T>(it) }",
+                            paramName,
+                            CN_JSON,
+                            MN_DECODE_FROM_JSON_ELEMENT,
+                            paramType
+                        )
                     }
+
                     else -> {
-                        mapCode.add("%T.%M<%T>(request.parameters[%S] ?: throw %T(%S))", CN_JSON, MN_DECODE_FROM_JSON_ELEMENT, paramType, paramName, CN_ILLEGAL_ARGUMENT_EXCEPTION, "Missing mandatory parameter: $paramName")
+                        mapCode.add(
+                            "%T.%M<%T>(request.parameters[%S] ?: throw %T(%S))",
+                            CN_JSON,
+                            MN_DECODE_FROM_JSON_ELEMENT,
+                            paramType,
+                            paramName,
+                            CN_ILLEGAL_ARGUMENT_EXCEPTION,
+                            "Missing mandatory parameter: $paramName"
+                        )
                     }
                 }
                 if (pIndex < paramsList.size - 1) mapCode.add(",\n") else mapCode.add("\n")
             }
             mapCode.unindent()
             mapCode.add(")\n")
-            
+
             val returnType = func.returnType?.resolve()?.toTypeName()
             if (returnType == CN_EXECUTION_RESULT) {
                 mapCode.add("result\n")
@@ -147,30 +170,50 @@ object DispatcherGenerator {
                     mapCode.add("val jsonResult = %T {\n", ClassName("kotlinx.serialization.json", "buildJsonObject"))
                     mapCode.indent()
                     outputs.forEach { out ->
-                        mapCode.add("put(%S, %T.%M(result.%L))\n", out.name, CN_JSON, MN_ENCODE_FROM_JSON_ELEMENT, out.originalName)
+                        mapCode.add(
+                            "put(%S, %T.%M(result.%L))\n",
+                            out.name,
+                            CN_JSON,
+                            MN_ENCODE_FROM_JSON_ELEMENT,
+                            out.originalName
+                        )
                     }
                     mapCode.unindent()
                     mapCode.add("}\n")
-                    mapCode.add("%T.Success(%T(result = jsonResult, metadata = mapOf(\"status\" to \"success\")))\n", CN_EXECUTION_RESULT, CN_PLUGIN_RESPONSE)
+                    mapCode.add(
+                        "%T.Success(%T(result = jsonResult, metadata = mapOf(\"status\" to \"success\")))\n",
+                        CN_EXECUTION_RESULT,
+                        CN_PLUGIN_RESPONSE
+                    )
                 } else if (outputs.size == 1 && outputs.first().name != "result") {
                     mapCode.add("val jsonResult = %T {\n", ClassName("kotlinx.serialization.json", "buildJsonObject"))
                     mapCode.indent()
                     mapCode.add("put(%S, %T.%M(result))\n", outputs.first().name, CN_JSON, MN_ENCODE_FROM_JSON_ELEMENT)
                     mapCode.unindent()
                     mapCode.add("}\n")
-                    mapCode.add("%T.Success(%T(result = jsonResult, metadata = mapOf(\"status\" to \"success\")))\n", CN_EXECUTION_RESULT, CN_PLUGIN_RESPONSE)
+                    mapCode.add(
+                        "%T.Success(%T(result = jsonResult, metadata = mapOf(\"status\" to \"success\")))\n",
+                        CN_EXECUTION_RESULT,
+                        CN_PLUGIN_RESPONSE
+                    )
                 } else {
-                    mapCode.add("%T.Success(%T(result = %T.%M(result), metadata = mapOf(\"status\" to \"success\")))\n", CN_EXECUTION_RESULT, CN_PLUGIN_RESPONSE, CN_JSON, MN_ENCODE_FROM_JSON_ELEMENT)
+                    mapCode.add(
+                        "%T.Success(%T(result = %T.%M(result), metadata = mapOf(\"status\" to \"success\")))\n",
+                        CN_EXECUTION_RESULT,
+                        CN_PLUGIN_RESPONSE,
+                        CN_JSON,
+                        MN_ENCODE_FROM_JSON_ELEMENT
+                    )
                 }
             }
             mapCode.unindent()
             mapCode.add("}")
             if (index < functions.size - 1) mapCode.add(",\n") else mapCode.add("\n")
         }
-        
+
         mapCode.unindent()
         mapCode.add(")\n")
-        
+
         dispatcherType.addProperty(
             PropertySpec.builder("handlers", mapType)
                 .initializer(mapCode.build())
@@ -184,12 +227,16 @@ object DispatcherGenerator {
             .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(CN_EXECUTION_RESULT)
             .beginControlFlow("return try")
-            .addStatement("val handler = handlers[request.method.lowercase()] ?: throw %T(%S)", CN_ILLEGAL_ARGUMENT_EXCEPTION, "Unknown method: \${request.method}")
+            .addStatement(
+                "val handler = handlers[request.method.lowercase()] ?: throw %T(%S)",
+                CN_ILLEGAL_ARGUMENT_EXCEPTION,
+                "Unknown method: \${request.method}"
+            )
             .addStatement("handler(request, context)")
             .nextControlFlow("catch (e: Exception)")
             .addStatement("%T.Error(e.message ?: \"Unknown error\", e)", CN_EXECUTION_RESULT)
             .endControlFlow()
-        
+
         dispatcherType.addFunction(processFunc.build())
 
         // RunAction
@@ -239,9 +286,13 @@ object DispatcherGenerator {
             .addParameter("action", CN_PLUGIN_ACTION)
             .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(CN_RESULT.parameterizedBy(Unit::class.asClassName()))
-            .addStatement("val handler = actionHandlers[action.functionName.lowercase()] ?: return %T.failure(%T(\"Unknown action: \${action.functionName}\"))", CN_RESULT, CN_ILLEGAL_ARGUMENT_EXCEPTION)
+            .addStatement(
+                "val handler = actionHandlers[action.functionName.lowercase()] ?: return %T.failure(%T(\"Unknown action: \${action.functionName}\"))",
+                CN_RESULT,
+                CN_ILLEGAL_ARGUMENT_EXCEPTION
+            )
             .addStatement("return handler(context)")
-        
+
         dispatcherType.addFunction(runActionFunc.build())
 
         return dispatcherType.build()
