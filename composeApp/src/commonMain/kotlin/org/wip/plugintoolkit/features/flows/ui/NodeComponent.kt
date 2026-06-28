@@ -443,7 +443,6 @@ fun NodeComponent(
                                 }
 
                                 // Default Value Editor
-                                // Default Value Editor
                                 val isConnected = connectedInputPortIds.contains(input.id)
                                 val valueModifier = if (isConnected) Modifier.alpha(0.5f) else Modifier
 

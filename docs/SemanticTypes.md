@@ -27,7 +27,7 @@ Annotations and serialized manifests represent semantic types using the followin
 
 #### Parsing & Normalization Rules:
 1. **Normalization**: All namespace, name, and variant parts are trimmed, converted to lowercase, and Unicode NFKC normalized.
-2. **MIME Fallback**: Standard MIME types (e.g. `image/png`) are parsed gracefully with `name = "image"` and `variant = "png"`.
+2. **MIME Delimiter Syntax**: Standard MIME types (e.g. `image/png`) are parsed using standard delimiter syntax: `/` separates the namespace and name, resulting in `namespace = "image"` and `name = "png"`.
 3. **Delimiter Syntax**:
    - `/` separates the namespace and name.
    - `:` separates the name and variant.
@@ -35,7 +35,7 @@ Annotations and serialized manifests represent semantic types using the followin
 #### Examples:
 - `sys/color:hex` &rarr; Namespace: `sys`, Name: `color`, Variant: `hex`
 - `file:path` &rarr; Namespace: `null`, Name: `file`, Variant: `path`
-- `image/png` &rarr; Namespace: `null`, Name: `image`, Variant: `png`
+- `image/png` &rarr; Namespace: `image`, Name: `png`, Variant: `null`
 - `color` &rarr; Namespace: `null`, Name: `color`, Variant: `null`
 
 ---

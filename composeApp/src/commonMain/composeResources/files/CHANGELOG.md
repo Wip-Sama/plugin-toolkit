@@ -1,5 +1,5 @@
 Version: 1.7.0
-Date: 24-06-2026
+Date: 28-06-2026
 Added:
 	- It's not possible to change a connection destination/origin after its creation
 	- Tooltip names for the capability/flows with long names
