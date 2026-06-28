@@ -47,6 +47,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -158,6 +159,13 @@ fun NodeComponent(
     val scope = rememberCoroutineScope()
     var showColorPicker by remember { mutableStateOf(false) }
     var activeColorInputId by remember { mutableStateOf<String?>(null) }
+    var inputLocationsCollapsed by remember(node.id) { mutableStateOf(node.isCollapsed) }
+    var outputLocationsCollapsed by remember(node.id) { mutableStateOf(node.isCollapsed) }
+
+    LaunchedEffect(node.isCollapsed) {
+        inputLocationsCollapsed = node.isCollapsed
+        outputLocationsCollapsed = node.isCollapsed
+    }
 
 
 
@@ -231,6 +239,9 @@ fun NodeComponent(
                     verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
                 ) {
                     val capNode = node as? Node.CapabilityNode
+                    val visibleOutputs = node.outputs.filter { output ->
+                        capNode?.capability?.parameters?.get(output.id)?.role != org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+                    }
                     val parameters = node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role.let { r -> r == null || r == org.wip.plugintoolkit.api.ParameterRole.STANDARD } }
                     val inputLocations = node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION }
                     val outputLocations = node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }
@@ -242,6 +253,12 @@ fun NodeComponent(
                     ).filter { it.second.isNotEmpty() }
 
                     inputSections.forEachIndexed { index, (title, sectionInputs) ->
+                        val isSectionCollapsed = when (title) {
+                            "Input Locations" -> inputLocationsCollapsed
+                            "Output Locations" -> outputLocationsCollapsed
+                            else -> node.isInputsCollapsed
+                        }
+
                         if (index > 0) {
                             HorizontalDivider(
                                 Modifier.padding(vertical = ToolkitTheme.spacing.small),
@@ -251,12 +268,18 @@ fun NodeComponent(
                         }
 
                         Row(
-                            modifier = Modifier.fillMaxWidth().clickable { onToggleInputsCollapse(node.id) },
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                when (title) {
+                                    "Input Locations" -> inputLocationsCollapsed = !inputLocationsCollapsed
+                                    "Output Locations" -> outputLocationsCollapsed = !outputLocationsCollapsed
+                                    else -> onToggleInputsCollapse(node.id)
+                                }
+                            },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (node.isInputsCollapsed) {
+                                if (isSectionCollapsed) {
                                     PortCircle(
                                         color = headerColor,
                                         isHighlighted = false,
@@ -279,13 +302,35 @@ fun NodeComponent(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            Icon(
-                                imageVector = if (node.isInputsCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                contentDescription = "Toggle $title"
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Toggle $title"
+                                )
+                                if (isSectionCollapsed && title == "Output Locations") {
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                    PortCircle(
+                                        color = headerColor,
+                                        isHighlighted = false,
+                                        onDragStart = {}, onDrag = {}, onDragEnd = {},
+                                        modifier = Modifier.onGloballyPositioned { coords ->
+                                            if (boardLayoutCoordinates != null) {
+                                                val center =
+                                                    boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
+                                                sectionInputs.forEach { input ->
+                                                    val correspondingOutput = node.outputs.find { it.id == input.id }
+                                                    if (correspondingOutput != null) {
+                                                        onPortPositioned(node.id, correspondingOutput.id, center)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
                         }
 
-                        if (!node.isInputsCollapsed) {
+                        if (!isSectionCollapsed) {
                             sectionInputs.forEach { input ->
                             
                             val currentPortValue = input.value ?: input.defaultValue
@@ -443,7 +488,7 @@ fun NodeComponent(
                     }
                     }
 
-                    if (node.inputs.isNotEmpty() && node.outputs.isNotEmpty() && !node.isInputsCollapsed && !node.isOutputsCollapsed) {
+                    if (node.inputs.isNotEmpty() && visibleOutputs.isNotEmpty()) {
                         HorizontalDivider(
                             Modifier,
                             thickness = 0.5.dp,
@@ -453,7 +498,7 @@ fun NodeComponent(
 
                     // Outputs Section
                     // Outputs Section
-                    if (node.outputs.isNotEmpty()) {
+                    if (visibleOutputs.isNotEmpty()) {
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable { onToggleOutputsCollapse(node.id) },
                             verticalAlignment = Alignment.CenterVertically,
@@ -486,9 +531,7 @@ fun NodeComponent(
                         }
                     }
                     if (!node.isOutputsCollapsed) {
-                        node.outputs.forEach { output ->
-                            val isOutputLocation = (node as? Node.CapabilityNode)?.capability?.parameters?.get(output.id)?.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
-                            if (isOutputLocation) return@forEach
+                        visibleOutputs.forEach { output ->
                             
                             Row(
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp),
