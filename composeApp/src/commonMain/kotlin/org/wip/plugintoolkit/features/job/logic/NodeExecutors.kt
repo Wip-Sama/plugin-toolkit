@@ -437,6 +437,7 @@ class ForNodeExecutor : NodeExecutor {
             if (step != 0) {
                 val range = if (step > 0) currentIndex until end step step else currentIndex downTo end + 1 step (-step)
                 for (i in range) {
+                    kotlinx.coroutines.yield()
                     val subParameters = mutableMapOf<String, JsonElement>()
                     subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>()
                         .forEach { inputNode ->
@@ -515,6 +516,7 @@ class WhileNodeExecutor : NodeExecutor {
             }
 
             while (condition) {
+                kotlinx.coroutines.yield()
                 val subParameters = mutableMapOf<String, JsonElement>()
                 subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>()
                     .forEach { inputNode ->

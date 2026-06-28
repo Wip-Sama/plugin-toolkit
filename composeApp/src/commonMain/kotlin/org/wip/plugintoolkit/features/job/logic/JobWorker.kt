@@ -36,6 +36,7 @@ class JobWorker(
 ) : KoinComponent {
     private val pluginManager: PluginManager by inject()
     private val lifecycleCoordinator: PluginLifecycleCoordinator by inject()
+    private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository by inject()
     private var isWorkerActive = true
     private val workerJob = SupervisorJob(scope.coroutineContext[kotlinx.coroutines.Job])
     private val workerScope = scope + workerJob
@@ -173,9 +174,47 @@ class JobWorker(
         val currentJob = currentCoroutineContext()[kotlinx.coroutines.Job]!!
 
         val deferredResult = workerScope.async {
-            kotlinx.coroutines.withTimeout(10.minutes) {
-                processor.process(request, context)
+            val settings = settingsRepository.settings.value.jobs
+            val timeout = settings.pluginTimeoutMs
+            val retries = if (settings.enableTransientRetries) settings.maxRetries else 0
+            var attempt = 0
+            var lastError: Throwable? = null
+
+            while (attempt <= retries) {
+                try {
+                    if (timeout == -1L) {
+                        return@async kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            processor.process(request, context)
+                        }
+                    } else {
+                        return@async kotlinx.coroutines.withTimeout(timeout) {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                processor.process(request, context)
+                            }
+                        }
+                    }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    lastError = e
+                    attempt++
+                    if (attempt <= retries) {
+                        manager.addJobLog(job.id, "Timeout executing capability ${job.capabilityName}, retrying ($attempt/$retries)...", "WARN")
+                        kotlinx.coroutines.delay(2000)
+                    }
+                } catch (e: kotlinx.io.IOException) {
+                    lastError = e
+                    attempt++
+                    if (attempt <= retries) {
+                        manager.addJobLog(job.id, "IO error executing capability ${job.capabilityName}, retrying ($attempt/$retries)...", "WARN")
+                        kotlinx.coroutines.delay(2000)
+                    }
+                } catch (e: Exception) {
+                    if (e is org.wip.plugintoolkit.features.job.logic.PauseFlowException || e is kotlinx.coroutines.CancellationException) {
+                        throw e
+                    }
+                    throw e
+                }
             }
+            throw Exception(lastError?.message ?: "Execution failed", lastError)
         }
 
         val handle = object : JobHandle {

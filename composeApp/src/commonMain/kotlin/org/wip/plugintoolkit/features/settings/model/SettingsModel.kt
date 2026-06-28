@@ -118,7 +118,10 @@ data class JobSettings(
     val maxConcurrentJobs: Int = 2,
     val saveHistory: Boolean = true,
     val maxHistoryLength: Int = 200,
-    val maxEndedJobs: Int = 20
+    val maxEndedJobs: Int = 20,
+    val pluginTimeoutMs: Long = 600000L,
+    val enableTransientRetries: Boolean = true,
+    val maxRetries: Int = 2
 )
 
 @Serializable

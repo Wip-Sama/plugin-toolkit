@@ -44,6 +44,7 @@ class FlowEngine(
     private val lifecycleCoordinator: PluginLifecycleCoordinator,
     private val workerScope: CoroutineScope
 ) : KoinComponent {
+    private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository by inject()
 
     suspend fun executeFlowJob(job: BackgroundJob) {
         manager.addJobLog(job.id, "Starting flow execution for '${job.capabilityName}'...")
@@ -68,7 +69,7 @@ class FlowEngine(
         )
 
         try {
-            val jsonOutputs = executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject)
+            val jsonOutputs = executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject, 0)
             val finalJson = toJsonElement(jsonOutputs).toString()
             val outputFileStr = job.parameters["-1"]?.let { param ->
                 try {
@@ -107,9 +108,11 @@ class FlowEngine(
         flow: org.wip.plugintoolkit.features.flows.model.Flow,
         job: BackgroundJob,
         appDataDir: String,
-        resumeStateOverride: JsonObject? = null
+        resumeStateOverride: JsonObject? = null,
+        depth: Int = 0
     ): Map<String, Any?> {
-        return executeGraph(flow, job, appDataDir, job.parameters, false, resumeStateOverride)
+        if (depth > 50) throw Exception("StackOverflow prevention: Subflow recursion depth exceeded 50.")
+        return executeGraph(flow, job, appDataDir, job.parameters, false, resumeStateOverride, depth)
     }
 
     private suspend fun executeGraph(
@@ -118,7 +121,8 @@ class FlowEngine(
         appDataDir: String,
         initialParameters: Map<String, JsonElement>,
         isRoot: Boolean,
-        resumeStateOverride: JsonObject?
+        resumeStateOverride: JsonObject?,
+        depth: Int
     ): Map<String, Any?> {
         val runtimeInferred = FlowTypeInferenceCache.getOrCreate(flow) { runRuntimeTypeInference(flow) }
         val nodesById = flow.nodes.associateBy { it.id }
@@ -277,6 +281,7 @@ class FlowEngine(
         }
 
         executionOrder.forEachIndexed { index, nodeId ->
+            kotlinx.coroutines.yield()
             val node = nodesById[nodeId] ?: return@forEachIndexed
             if (executedNodeIds.contains(node.id)) return@forEachIndexed
             if (!activeNodes.contains(node.id)) return@forEachIndexed
@@ -346,7 +351,7 @@ class FlowEngine(
 
                             val nestedResumeState =
                                 (sysResumeState as? JsonObject)?.get("subflowResumeState") as? JsonObject
-                            return executeSubFlowRecursively(subFlow, subJob, appDataDir, nestedResumeState)
+                            return executeSubFlowRecursively(subFlow, subJob, appDataDir, nestedResumeState, depth + 1)
                         }
                     }
                     try {
@@ -417,9 +422,48 @@ class FlowEngine(
                     )
 
                     val deferredResult = workerScope.async {
-                        kotlinx.coroutines.withTimeout(600_000L) {
-                            processor.process(request, context)
+                        val settings = settingsRepository.settings.value.jobs
+                        val timeout = settings.pluginTimeoutMs
+                        val retries = if (settings.enableTransientRetries) settings.maxRetries else 0
+                        var attempt = 0
+                        var lastError: Throwable? = null
+
+                        while (attempt <= retries) {
+                            try {
+                                if (timeout == -1L) {
+                                    return@async kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        processor.process(request, context)
+                                    }
+                                } else {
+                                    return@async kotlinx.coroutines.withTimeout(timeout) {
+                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                            processor.process(request, context)
+                                        }
+                                    }
+                                }
+                            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                                lastError = e
+                                attempt++
+                                if (attempt <= retries) {
+                                    manager.addJobLog(job.id, "Timeout executing node ${node.capability.name}, retrying ($attempt/$retries)...", "WARN")
+                                    kotlinx.coroutines.delay(2000)
+                                }
+                            } catch (e: kotlinx.io.IOException) {
+                                lastError = e
+                                attempt++
+                                if (attempt <= retries) {
+                                    manager.addJobLog(job.id, "IO error executing node ${node.capability.name}, retrying ($attempt/$retries)...", "WARN")
+                                    kotlinx.coroutines.delay(2000)
+                                }
+                            } catch (e: Exception) {
+                                // If it's a PauseFlowException or CancellationException, let it bubble up immediately
+                                if (e is org.wip.plugintoolkit.features.job.logic.PauseFlowException || e is kotlinx.coroutines.CancellationException) {
+                                    throw e
+                                }
+                                throw e // Non-transient errors bubble up immediately
+                            }
                         }
+                        throw Exception(lastError?.message ?: "Execution failed", lastError)
                     }
 
                     val handle = object : JobHandle {
@@ -516,7 +560,7 @@ class FlowEngine(
 
                         val subResumeState = capabilityResumeStates[node.id] as? JsonObject
                         val subOutputs = try {
-                            executeSubFlowRecursively(subFlow, subJob, appDataDir, subResumeState)
+                            executeSubFlowRecursively(subFlow, subJob, appDataDir, subResumeState, depth + 1)
                         } catch (e: PauseFlowException) {
                             capabilityResumeStates[node.id] = e.resumeState
                             throw PauseFlowException(buildCurrentState())

@@ -329,4 +329,7 @@
     <string name="node_parameters_section">Parametri</string>
     <string name="node_results_section">Risultati</string>
     <string name="auto_generated_path_format">%1$s (Generato automaticamente)</string>
+    <string name="setting_plugin_timeout">Timeout Plugin (ms)</string>
+    <string name="setting_enable_transient_retries">Abilita Tentativi Transitori</string>
+    <string name="setting_max_retries">Numero Massimo Tentativi</string>
 </resources>

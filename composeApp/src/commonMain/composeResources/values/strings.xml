@@ -339,4 +339,7 @@
     <string name="repo_action_cancel_update">Cancel</string>
     <string name="cancel_update_title">Cancel Update</string>
     <string name="cancel_update_desc">Are you sure you want to cancel the plugin update?</string>
+    <string name="setting_plugin_timeout">Plugin Timeout (ms)</string>
+    <string name="setting_enable_transient_retries">Enable Transient Retries</string>
+    <string name="setting_max_retries">Max Retries</string>
 </resources>
