@@ -103,6 +103,7 @@ class PluginRegistry(
             val next = transform(current)
             if (current != next) {
                 _installedPlugins.value = next
+                saveToManagedFolders(next)
                 next
             } else {
                 null
@@ -110,7 +111,6 @@ class PluginRegistry(
         }
 
         if (updated != null) {
-            saveToManagedFolders(updated)
             Logger.d { "Plugin list updated and persisted (Total: ${updated.size})" }
         }
     }

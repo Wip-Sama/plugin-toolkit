@@ -27,7 +27,16 @@ class DefaultPluginFileSystem(
 
     //TODO: need to check better if this should be implemented in platform specific FileSystem like it is for PlatformUtils
     private fun resolvePath(relativePath: RelativePath): Path {
-        return Path(basePath, relativePath.value)
+        val resolved = Path(basePath, relativePath.value)
+        val file = java.io.File(resolved.toString())
+        val normalized = try { file.canonicalPath } catch (e: Exception) { file.absolutePath }
+        val baseFile = java.io.File(basePath)
+        val baseCanonical = try { baseFile.canonicalPath } catch (e: Exception) { baseFile.absolutePath }
+        
+        if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + java.io.File.separator)) {
+            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin files directory.")
+        }
+        return resolved
     }
 
     override suspend fun readFile(relativePath: RelativePath): ByteArray? {
@@ -138,7 +147,16 @@ class DefaultPluginFileSystem(
     }
 
     private fun resolveCachePath(relativePath: RelativePath): Path {
-        return Path(cachePath, relativePath.value)
+        val resolved = Path(cachePath, relativePath.value)
+        val file = java.io.File(resolved.toString())
+        val normalized = try { file.canonicalPath } catch (e: Exception) { file.absolutePath }
+        val baseFile = java.io.File(cachePath)
+        val baseCanonical = try { baseFile.canonicalPath } catch (e: Exception) { baseFile.absolutePath }
+        
+        if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + java.io.File.separator)) {
+            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin cache directory.")
+        }
+        return resolved
     }
 
     private suspend fun readFromCache(relativePath: RelativePath): ByteArray? {

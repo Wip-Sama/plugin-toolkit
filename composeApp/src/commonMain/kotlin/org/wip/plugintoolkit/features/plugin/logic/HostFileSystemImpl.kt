@@ -19,13 +19,15 @@ class HostFileSystemImpl(
         // (perhaps it wasn't supposed to read/write files based on its parameters)
         if (allowedPaths.isEmpty()) return false
 
-        val file = File(pathString).absoluteFile
-        val normalizedPath = file.absolutePath
+        val file = File(pathString)
+        val normalizedPath = try { file.canonicalPath } catch (e: Exception) { file.absolutePath }
 
         // If the path is inside any of the allowedPaths, it is allowed
         return allowedPaths.any { allowed ->
-            val allowedFile = File(allowed).absoluteFile
-            normalizedPath.startsWith(allowedFile.absolutePath)
+            val allowedFile = File(allowed)
+            val allowedCanonical = try { allowedFile.canonicalPath } catch (e: Exception) { allowedFile.absolutePath }
+            
+            normalizedPath == allowedCanonical || normalizedPath.startsWith(allowedCanonical + File.separator)
         }
     }
 

@@ -22,6 +22,8 @@ import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Manages the runtime lifecycle of plugins (loading, unloading, context creation).
@@ -45,10 +47,17 @@ class PluginLifecycleManager(
         encodeDefaults = true
     }
 
+    private val pluginLocks = ConcurrentHashMap<String, Mutex>()
+    private fun getPluginLock(pkg: String) = pluginLocks.getOrPut(pkg) { Mutex() }
+
     /**
      * Loads a plugin into the JVM and initializes it.
      */
-    suspend fun loadPlugin(pkg: String): Result<Unit> {
+    suspend fun loadPlugin(pkg: String): Result<Unit> = getPluginLock(pkg).withLock {
+        loadPluginInternal(pkg)
+    }
+
+    private suspend fun loadPluginInternal(pkg: String): Result<Unit> {
         Logger.i { "Loading plugin: $pkg" }
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin $pkg not found in registry"))
 
@@ -144,7 +153,11 @@ class PluginLifecycleManager(
     /**
      * Unloads a plugin from the runtime.
      */
-    suspend fun unloadPlugin(pkg: String) {
+    suspend fun unloadPlugin(pkg: String) = getPluginLock(pkg).withLock {
+        unloadPluginInternal(pkg)
+    }
+
+    private suspend fun unloadPluginInternal(pkg: String) {
         Logger.i { "Unloading plugin: $pkg" }
 
         // Safety check for running jobs
@@ -167,9 +180,9 @@ class PluginLifecycleManager(
     /**
      * Sequential unload and load.
      */
-    suspend fun reloadPlugin(pkg: String) {
-        unloadPlugin(pkg)
-        loadPlugin(pkg)
+    suspend fun reloadPlugin(pkg: String) = getPluginLock(pkg).withLock {
+        unloadPluginInternal(pkg)
+        loadPluginInternal(pkg)
     }
 
     /**
