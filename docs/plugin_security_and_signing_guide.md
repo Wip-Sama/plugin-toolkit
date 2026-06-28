@@ -18,11 +18,15 @@ If the host application grants a plugin access to a specific directory (e.g., `/
 ### 3. Asynchronous Initialization
 Heavy blocking tasks inside `initialize()` or `performLoad()` will stall the plugin lifecycle. All heavy lifting should be delegated to coroutines scoped to the `PluginContext`.
 
+> **Migration Plan:** Plugin initialization methods (`initialize()` and `performLoad()`) are now strictly sequential. If your plugin spawned a heavy blocking task directly inside `initialize()`, it will block subsequent reload attempts. Offload heavy work to Coroutines using the provided `PluginContext` lifecycle scope rather than hanging the initialization thread.
+
 ---
 
 ## 🔐 How to Sign a Plugin JAR
 
 To distribute a plugin securely, its JAR file must be cryptographically signed. The host application strictly verifies the signatures of all files inside the JAR, including the `META-INF/MANIFEST.MF` file.
+
+> **Migration Plan (Signed Manifests Requirement):** Older or custom-built test plugins that were signed without signing the manifest file itself will now fail to load at runtime. Ensure that any build tool (e.g., jarsigner) signs the entire archive, particularly ensuring `MANIFEST.MF` holds its digest under the `.SF` entries.
 
 If a plugin is tampered with after signing, or if the manifest is left unsigned, the runtime will reject the plugin and it will not load.
 

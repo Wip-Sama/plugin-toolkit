@@ -495,7 +495,7 @@ keytool -genkeypair -alias plugin-key -keyalg RSA -keysize 2048 -keystore my-rel
 Once you have your keystore, you can sign your plugin JAR using `jarsigner`:
 
 ```bash
-jarsigner -keystore my-release-key.jks my-plugin.jar plugin-key
+jarsigner -keystore my-release-key.jks -sigalg SHA256withRSA -digestalg SHA-256 my-plugin.jar plugin-key
 ```
 
 ### 4. Exporting the Public Key

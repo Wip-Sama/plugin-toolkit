@@ -6,6 +6,7 @@ Added:
 	- Flows and Nodes now are in a not-ready state if a required parameter is not connected or has a default
 	- Components no longer default to the color purple for accents
 	- PluginsSetting can now define constraints like the CapabilityParameter
+	- Signing for manifest files
 Changes:
   - now updating a plugin will make the button reflect what's happening to avoid confusion
   - shift is not used to fast delete a node connection
