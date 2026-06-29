@@ -51,7 +51,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -62,7 +61,6 @@ import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitChip
-import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
@@ -347,28 +345,45 @@ fun PluginCard(
                     Text(plugin.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if (plugin.loadError != null) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        StatusBadge(stringResource(Res.string.plugin_broken), MaterialTheme.colorScheme.error)
+                        ToolkitChip(
+                            text= stringResource(Res.string.plugin_broken),
+                            containerColor =  MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        )
                     } else if (isLoaded) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        StatusBadge(stringResource(Res.string.plugin_loaded), ToolkitTheme.colors.success)
+                        ToolkitChip(
+                            stringResource(Res.string.plugin_loaded),
+                            containerColor = ToolkitTheme.colors.success,
+                            contentColor = ToolkitTheme.colors.onSuccess, //TODO: do not like having the same color here
+                        )
                     }
 
                     if (plugin.requiredAction != null) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                         val badgeText =
                             if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Setup Required" else "Action Required"
-                        StatusBadge(badgeText, ToolkitTheme.colors.warning)
+                        ToolkitChip(
+                            badgeText,
+                            containerColor = ToolkitTheme.colors.warning,
+                            contentColor = ToolkitTheme.colors.onWarning //TODO: not liking having the same color here
+                        )
                     }
 
                     if (plugin.loadError == null) {
                         if (plugin.isValidated) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            StatusBadge(stringResource(Res.string.plugin_validated), ToolkitTheme.colors.validated)
+                            ToolkitChip(
+                                text = stringResource(Res.string.plugin_validated),
+                                contentColor = ToolkitTheme.colors.validated,
+                                containerColor = ToolkitTheme.colors.onValidated
+                            )
                         } else {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            StatusBadge(
-                                stringResource(Res.string.plugin_validation_pending),
-                                MaterialTheme.colorScheme.error
+                            ToolkitChip(
+                                text = stringResource(Res.string.plugin_validation_pending),
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
                     }
@@ -547,18 +562,6 @@ fun PluginCard(
             }
         }
     }
-}
-
-@Composable
-private fun StatusBadge(text: String, color: Color) {
-    ToolkitChip(
-        text = text,
-        containerColor = color,
-        contentColor = color,
-        style = ToolkitChipStyle.Outlined,
-        shape = MaterialTheme.shapes.extraSmall,
-        fontWeight = FontWeight.Bold
-    )
 }
 
 sealed class PluginStatusAction {

@@ -80,7 +80,12 @@ data class CustomColors(
     val warning: Color = Color(0xFFFF9800),
     val info: Color = Color(0xFF2196F3),
     val validated: Color = Color(0xFFD0BCFF)
-)
+) {
+    val onSuccess: Color = if (success.luminance() > 0.5f) Color.Black else Color.White
+    val onWarning: Color = if (warning.luminance() > 0.5f) Color.Black else Color.White
+    val onInfo: Color = if (info.luminance() > 0.5f) Color.Black else Color.White
+    val onValidated: Color = if (validated.luminance() > 0.5f) Color.Black else Color.White
+}
 
 data class Opacity(
     val transparent: Float = 0.0f,
