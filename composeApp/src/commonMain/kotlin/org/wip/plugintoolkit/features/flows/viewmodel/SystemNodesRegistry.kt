@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.flows.viewmodel
 
+import kotlinx.serialization.json.booleanOrNull
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
@@ -19,6 +20,50 @@ object SystemNodesRegistry {
                     "File Path",
                     DataType.Primitive(PrimitiveType.STRING),
                     defaultValue = "output.txt"
+                )
+            )
+
+            "save_file" -> listOf(
+                InputPort("data", "Data (File Path)", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("file")),
+                InputPort(
+                    "destination_folder",
+                    "Destination Folder",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    semanticTypes = parseSemanticTypes("path")
+                ),
+                InputPort(
+                    "file_name",
+                    "File Name (Optional)",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = ""
+                ),
+                InputPort(
+                    "is_destructive",
+                    "Delete Source",
+                    DataType.Primitive(PrimitiveType.BOOLEAN),
+                    defaultValue = false
+                )
+            )
+
+            "save_folder" -> listOf(
+                InputPort("data", "Data (Folder Path)", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("folder")),
+                InputPort(
+                    "destination_folder",
+                    "Destination Folder",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    semanticTypes = parseSemanticTypes("path")
+                ),
+                InputPort(
+                    "folder_name",
+                    "Folder Name (Optional)",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = ""
+                ),
+                InputPort(
+                    "is_destructive",
+                    "Delete Source",
+                    DataType.Primitive(PrimitiveType.BOOLEAN),
+                    defaultValue = false
                 )
             )
 
@@ -120,7 +165,7 @@ object SystemNodesRegistry {
                     "path",
                     "Path",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("sys/path")
+                    semanticTypes = parseSemanticTypes("path")
                 ),
                 InputPort("folder_name", "Folder Name", DataType.Primitive(PrimitiveType.STRING))
             )
@@ -133,6 +178,16 @@ object SystemNodesRegistry {
         val actionLower = action.lowercase()
         return when (actionLower) {
             "save" -> listOf(
+                OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
+            )
+
+            "save_file" -> listOf(
+                OutputPort("saved_path", "Saved Path", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("file")),
+                OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
+            )
+
+            "save_folder" -> listOf(
+                OutputPort("saved_path", "Saved Path", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("folder")),
                 OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
             )
 
@@ -183,7 +238,7 @@ object SystemNodesRegistry {
                     "created_path",
                     "Path",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("sys/path")
+                    semanticTypes = parseSemanticTypes("path")
                 ),
                 OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
             )
@@ -318,7 +373,16 @@ object SystemNodesRegistry {
 
             "convert" -> {
                 val ignoreSemanticPort = node.inputs.find { it.id == "ignore_semantic_type" }
-                val ignoreSemantic = ignoreSemanticPort?.value as? Boolean ?: false
+                val ignoreSemanticVal = ignoreSemanticPort?.value
+                val ignoreSemantic = when (ignoreSemanticVal) {
+                    is Boolean -> ignoreSemanticVal
+                    is String -> ignoreSemanticVal.toBoolean()
+                    is Number -> ignoreSemanticVal.toInt() != 0
+                    is kotlinx.serialization.json.JsonPrimitive -> {
+                        ignoreSemanticVal.booleanOrNull ?: ignoreSemanticVal.content.toBoolean()
+                    }
+                    else -> false
+                }
                 if (!ignoreSemantic) {
                     val inputSemantic = inferredSemantic[Pair(node.id, "input_data")].orEmpty()
                     val outputSemantic = inferredSemantic[Pair(node.id, "output_data")].orEmpty()

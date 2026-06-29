@@ -110,6 +110,14 @@ object DispatcherGenerator {
                         mapCode.add("context.fileSystem")
                     }
 
+                    paramType == org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_HOST_FILESYSTEM -> {
+                        mapCode.add("context.hostFileSystem")
+                    }
+
+                    paramType == org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_FILESYSTEM -> {
+                        mapCode.add("context.executionFileSystem")
+                    }
+
                     paramType == CN_PLUGIN_CONTEXT -> {
                         mapCode.add("context")
                     }
@@ -260,6 +268,8 @@ object DispatcherGenerator {
                 val paramType = param.type.resolve().toTypeName()
                 when (paramType) {
                     CN_PLUGIN_FILESYSTEM -> "context.fileSystem"
+                    org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_HOST_FILESYSTEM -> "context.hostFileSystem"
+                    org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_FILESYSTEM -> "context.executionFileSystem"
                     CN_PLUGIN_LOGGER -> "context.logger"
                     CN_PROGRESS_REPORTER -> "context.progress"
                     CN_PLUGIN_CONTEXT -> "context"

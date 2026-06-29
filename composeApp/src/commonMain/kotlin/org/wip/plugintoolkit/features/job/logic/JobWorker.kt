@@ -122,10 +122,13 @@ class JobWorker(
             lifecycleCoordinator.onLifecycleJobFailed(job, e.message)
             Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
         } finally {
-            val settingsPersistence: SettingsPersistence = get()
-            val appDataDir = settingsPersistence.getSettingsDir()
-            val sandboxDir = kotlinx.io.files.Path("$appDataDir/jobs/${job.id}/sandbox")
-            deleteRecursively(sandboxDir)
+            val currentJob = manager.jobs.value.find { it.id == job.id }
+            if (currentJob?.status != org.wip.plugintoolkit.features.job.model.JobStatus.Paused) {
+                val settingsPersistence: SettingsPersistence = get()
+                val appDataDir = settingsPersistence.getSettingsDir()
+                val sandboxDir = kotlinx.io.files.Path("$appDataDir/jobs/${job.id}/sandbox")
+                deleteRecursively(sandboxDir)
+            }
         }
     }
 

@@ -15,7 +15,7 @@ To support modern, highly-extensible pipelines, ports support **multi-valued sem
 ## 2. Grammar & Structured Identity
 
 Every `SemanticType` has a structured identity:
-- **Namespace (Optional)**: Avoids collisions between different plugin ecosystems (e.g. `sys/` vs `wip/` vs custom domains).
+- **Namespace (Optional)**: Avoids collisions between different plugin ecosystems (e.g. `wip/` vs custom domains).
 - **Name (Required)**: The primary semantic category (e.g. `color`, `file`, `image`).
 - **Variant (Optional)**: Specialization or subtype (e.g. `rgb`, `png`, `path`).
 
@@ -33,7 +33,7 @@ Annotations and serialized manifests represent semantic types using the followin
    - `:` separates the name and variant.
    
 #### Examples:
-- `sys/color:hex` &rarr; Namespace: `sys`, Name: `color`, Variant: `hex`
+- `color:hex` &rarr; Namespace: `null`, Name: `color`, Variant: `hex`
 - `file:path` &rarr; Namespace: `null`, Name: `file`, Variant: `path`
 - `image/png` &rarr; Namespace: `image`, Name: `png`, Variant: `null`
 - `color` &rarr; Namespace: `null`, Name: `color`, Variant: `null`
@@ -42,19 +42,19 @@ Annotations and serialized manifests represent semantic types using the followin
 
 ## 3. Standard Semantic Registry
 
-To ensure interoperability across independent plugins, the system recognizes a set of standard namespaces and types under the `sys` namespace.
+To ensure interoperability across independent plugins, the system recognizes a set of standard semantic types.
 
 ### Centralized Priority Categories
 The `SemanticRegistry` resolves a `List<SemanticType>` into one of the following high-priority visual categories:
-1. **COLOR** (`sys/color`) - Triggers UI color picker controls.
-2. **IMAGE** (`sys/image`, `image/*`) - Triggers inline image previews.
-3. **AUDIO** (`sys/audio`, `audio/*`) - Triggers audio player UI.
-4. **VIDEO** (`sys/video`, `video/*`) - Triggers video player UI.
-5. **FILE** (`sys/file`, `sys/directory`, `application/*`) - Triggers file picker UI.
-6. **PATH** (`sys/path`) - Triggers local path explorer.
+1. **COLOR** (`color`) - Triggers UI color picker controls.
+2. **IMAGE** (`image`, `image/*`) - Triggers inline image previews.
+3. **AUDIO** (`audio`, `audio/*`) - Triggers audio player UI.
+4. **VIDEO** (`video`, `video/*`) - Triggers video player UI.
+5. **FILE** (`file`, `directory`, `application/*`) - Triggers file picker UI.
+6. **PATH** (`path`) - Triggers local path explorer.
 
 ### Visual Priority Resolution
-When a port lists multiple semantic types, the category is determined by the highest-priority match in the list above. For example, if a port lists `[sys/image:png, sys/file:path]`, the resolved category is `IMAGE`.
+When a port lists multiple semantic types, the category is determined by the highest-priority match in the list above. For example, if a port lists `[image:png, file:path]`, the resolved category is `IMAGE`.
 
 ---
 
@@ -70,9 +70,9 @@ When connecting an output port (source) to an input port (target), compatibility
 For two individual `SemanticType` objects (source `S`, target `T`), a match is established if:
 1. **Identity**: `S.namespace == T.namespace && S.name == T.name && S.variant == T.variant`.
 2. **Generalization**: The source is specialized but the target is general.
-   - e.g. Source `sys/color:rgb` matches Target `sys/color`.
+   - e.g. Source `color:rgb` matches Target `color`.
 3. **Lenient Specialization** (Enabled by default): The source is general but the target is specialized.
-   - e.g. Source `sys/color` matches Target `sys/color:hex`.
+   - e.g. Source `color` matches Target `color:hex`.
 4. **Wildcards**: The target specifies a wildcard `*` variant, or name/namespace wildcards.
    - e.g. Source `image/png` matches Target `image/*`.
 
@@ -99,8 +99,8 @@ The old `semanticType: String?` property is deprecated across all models and ann
 ### 2. JSON Deserialization Backwards Compatibility
 To handle older plugins and saved flow files:
 - Custom `JsonTransformingSerializer` layers are implemented on `InputPort`, `OutputPort`, and manifest data structures.
-- If a JSON payload contains `semanticType: "sys/color"` but lacks `semanticTypes`, the parser automatically parses the legacy string and populates the `semanticTypes` list containing `SemanticType(namespace="sys", name="color")`.
+- If a JSON payload contains `semanticType: "color"` but lacks `semanticTypes`, the parser automatically parses the legacy string and populates the `semanticTypes` list containing `SemanticType(namespace=null, name="color")`.
 
 ### 3. KSP Generator Alignment
 - The KSP code generators write output utilizing the new `semanticTypes` property.
-- To prevent compilation breakage in older codebases referencing generated templates, the legacy `semanticType` string is also outputted as a concatenated canonical string (e.g. `"sys/color:hex"`).
+- To prevent compilation breakage in older codebases referencing generated templates, the legacy `semanticType` string is also outputted as a concatenated canonical string (e.g. `"color:hex"`).

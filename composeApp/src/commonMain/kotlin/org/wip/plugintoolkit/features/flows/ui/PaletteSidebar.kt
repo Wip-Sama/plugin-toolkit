@@ -318,6 +318,8 @@ private fun SystemPalette(
 
             listOf(
                 "Save",
+                "save_file",
+                "save_folder",
                 "Load",
                 "Log",
                 "Delay",
