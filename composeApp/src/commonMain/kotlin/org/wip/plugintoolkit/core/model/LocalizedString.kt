@@ -7,6 +7,7 @@ import org.wip.plugintoolkit.core.ui.LocalLanguage
 
 sealed interface LocalizedString {
     data class Resource(val res: StringResource) : LocalizedString
+    data class ResourceWithArgs(val res: StringResource, val args: List<Any>) : LocalizedString
     data class Raw(val text: String) : LocalizedString {
         init {
             println("WARN: String '$text' should be localized")
@@ -19,7 +20,10 @@ sealed interface LocalizedString {
             LocalLanguage.current // Register dependency to trigger recomposition when language changes
             stringResource(res)
         }
-
+        is ResourceWithArgs -> {
+            LocalLanguage.current
+            stringResource(res, *args.toTypedArray())
+        }
         is Raw -> text
     }
 
@@ -27,8 +31,9 @@ sealed interface LocalizedString {
      * Non-composable resolver for use in platform / non-UI code.
      * Uses org.jetbrains.compose.resources.getString for Resource entries.
      */
-    fun resolveNonComposable(vararg args: Any): String = when (this) {
-        is Resource -> kotlinx.coroutines.runBlocking { org.jetbrains.compose.resources.getString(res, *args) }
+    fun resolveNonComposable(vararg additionalArgs: Any): String = when (this) {
+        is Resource -> kotlinx.coroutines.runBlocking { org.jetbrains.compose.resources.getString(res, *additionalArgs) }
+        is ResourceWithArgs -> kotlinx.coroutines.runBlocking { org.jetbrains.compose.resources.getString(res, *args.toTypedArray(), *additionalArgs) }
         is Raw -> text
     }
 }

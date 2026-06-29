@@ -205,7 +205,12 @@ class PluginInstaller(
             return Result.failure(e)
         }
 
-        fileSystem.deleteDirectory(plugin.installPath)
+        try {
+            fileSystem.deleteDirectory(plugin.installPath)
+        } catch (e: Exception) {
+            Logger.w(e) { "Failed to fully delete plugin directory for $pkg (it may be locked by the OS), but it will be removed from registry." }
+        }
+
         registry.removePlugin(pkg)
         Logger.i { "Successfully uninstalled plugin: $pkg" }
         return Result.success(Unit)

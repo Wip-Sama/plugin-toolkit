@@ -88,7 +88,7 @@ class DataTypeTest {
         val objA3 = DataType.Object("com.example.ClassA", properties = mapOf("id" to stringType))
         val objB = DataType.Object("com.example.ClassB")
         assertTrue(objA1.isCompatibleWith(objA2), "Objects with same class name and properties should be compatible")
-        assertFalse(objA1.isCompatibleWith(objA3), "Objects with same class name but different properties should NOT be compatible")
+        assertTrue(objA1.isCompatibleWith(objA3), "Objects with same class name but different properties SHOULD be compatible")
         assertFalse(objA1.isCompatibleWith(objB), "Objects with different class names should not be compatible")
 
         // Enums

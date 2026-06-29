@@ -114,23 +114,19 @@ object PathPatternResolver {
         val parts = pathStr.split(Regex("[\\\\/]"))
 
         val resolvedParts = mutableListOf<String>()
-        var isAbsoluteUnix = pathStr.startsWith("/")
         var windowsRoot = ""
 
         if (parts.isNotEmpty() && parts[0].endsWith(":")) {
             windowsRoot = parts[0]
         }
+        val isAbsoluteUnix = windowsRoot.isEmpty() && (pathStr.startsWith("/") || pathStr.startsWith("\\"))
 
         for (i in parts.indices) {
             val part = parts[i]
-            if (part == "." || part.isEmpty()) {
-                // Keep empty parts only if it's the root (e.g. first part of /a or first part after C:)
-                if (i == 0 && isAbsoluteUnix) {
-                    resolvedParts.add("")
-                }
+            if (part == "." || part.isEmpty() || (i == 0 && part == windowsRoot)) {
                 continue
             } else if (part == "..") {
-                if (resolvedParts.isEmpty() || (resolvedParts.size == 1 && resolvedParts[0] == "") || (resolvedParts.size == 0 && windowsRoot.isNotEmpty())) {
+                if (resolvedParts.isEmpty() || (resolvedParts.size == 0 && windowsRoot.isNotEmpty())) {
                     throw IllegalArgumentException("Invalid path generated: escapes root directory ($pathStr)")
                 }
                 resolvedParts.removeLast()
@@ -139,17 +135,14 @@ object PathPatternResolver {
             }
         }
 
-        if (resolvedParts.isEmpty()) {
-            return if (windowsRoot.isNotEmpty()) "$windowsRoot$separator" else if (isAbsoluteUnix) "/" else "."
-        }
-
         var normalized = resolvedParts.joinToString(separator)
-        if (windowsRoot.isNotEmpty() && !normalized.startsWith(windowsRoot)) {
+        if (windowsRoot.isNotEmpty()) {
             normalized = "$windowsRoot$separator$normalized"
-        } else if (isAbsoluteUnix && !normalized.startsWith("/")) {
-            normalized = "/$normalized"
+        } else if (isAbsoluteUnix) {
+            normalized = "$separator$normalized"
+        } else if (resolvedParts.isEmpty()) {
+            normalized = "."
         }
-
         return normalized
     }
 }

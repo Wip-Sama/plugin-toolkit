@@ -224,13 +224,17 @@ fun PluginListItem(
                         }
                     }
                 }
-            } else if (hasUpdate) {
+            } else if (isInstalled) {
+                val isDowngrade = org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion!!) < 0
+                val buttonColor = if (hasUpdate) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer
+                val contentColor = if (hasUpdate) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                
                 Button(
                     onClick = { onInstall(plugin) },
                     enabled = !isRefreshing,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        containerColor = buttonColor,
+                        contentColor = contentColor
                     )
                 ) {
                     Icon(
@@ -239,9 +243,14 @@ fun PluginListItem(
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(stringResource(Res.string.repo_action_update_version, plugin.version))
+                    val label = when {
+                        hasUpdate -> stringResource(Res.string.repo_action_update_version, plugin.version)
+                        isDowngrade -> "Downgrade to ${plugin.version}"
+                        else -> "Reinstall ${plugin.version}"
+                    }
+                    Text(label)
                 }
-            } else if (!isInstalled) {
+            } else {
                 Button(
                     onClick = { onInstall(plugin) },
                     enabled = !isRefreshing

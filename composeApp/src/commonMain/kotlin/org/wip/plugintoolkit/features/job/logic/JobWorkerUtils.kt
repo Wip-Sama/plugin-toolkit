@@ -16,6 +16,7 @@ import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry
+import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 
 object FlowTypeInferenceCache {
     private val mutex = Mutex()
@@ -328,18 +329,19 @@ fun resolveFileAccess(
 
         if (currentValue.isNullOrBlank()) {
             if (!template.isNullOrEmpty()) {
-                var resolvedPath = template
-                val regex = Regex("""\{([^}]+)\}""")
-                resolvedPath = regex.replace(resolvedPath) { matchResult ->
-                    val key = matchResult.groupValues[1]
-                    if (sandboxPath != null && key == "output_folder") {
-                        sandboxPath
-                    } else {
-                        val value = parameters[key]?.let { if (it is JsonPrimitive) it.content else null } ?: ""
-                        value
+                val strParams = parameters.mapValues { (_, el) -> if (el is JsonPrimitive) el.content else "" }.toMutableMap()
+                if (sandboxPath != null) {
+                    strParams["output_folder"] = sandboxPath
+                }
+                
+                try {
+                    val resolvedPath = PathPatternResolver.resolve(template, strParams)
+                    parameters[paramName] = JsonPrimitive(resolvedPath)
+                } catch (e: IllegalArgumentException) {
+                    if (!e.message!!.startsWith("Missing required parameter")) {
+                        throw e
                     }
                 }
-                parameters[paramName] = JsonPrimitive(resolvedPath)
             } else if (sandboxPath != null && isFileOutput) {
                 // Auto route unmapped outputs to sandbox
                 val generatedPath = kotlinx.io.files.Path(

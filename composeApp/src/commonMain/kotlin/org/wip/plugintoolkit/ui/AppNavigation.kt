@@ -95,7 +95,7 @@ fun AppNavigation(
             }
 
             is Screen.FlowEditor -> NavEntry(key) {
-                val editorViewModel: FlowEditorViewModel = koinViewModel(parameters = { parametersOf(key.flowName) })
+                val editorViewModel: FlowEditorViewModel = koinViewModel(key = key.flowName, parameters = { parametersOf(key.flowName) })
                 FlowEditorView(
                     viewModel = editorViewModel,
                     notificationService = notificationService,

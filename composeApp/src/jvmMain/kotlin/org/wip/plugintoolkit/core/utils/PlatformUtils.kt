@@ -427,6 +427,19 @@ actual object PlatformUtils {
             null
         }
     }
+
+    actual fun openFolder(path: String) {
+        try {
+            val file = File(path)
+            if (file.exists()) {
+                Desktop.getDesktop().open(file)
+            } else {
+                Logger.w { "Folder does not exist: $path" }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to open folder $path" }
+        }
+    }
 }
 
 interface PortalSettings : DBusInterface {

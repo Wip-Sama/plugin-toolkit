@@ -64,10 +64,10 @@ fun AppScaffold(
                 modifier = Modifier.fillMaxHeight()
             )
 
-            // ToastHost(
-            //     notificationService = notificationService, settings = settings.notifications
-            // )
-            // DialogHost(dialogService)
+            ToastHost(
+                notificationService = notificationService, settings = settings.notifications
+            )
+            DialogHost(dialogService)
         }
     }
 }

@@ -38,6 +38,8 @@ import plugintoolkit.composeapp.generated.resources.plugin_uninstall_title
 import plugintoolkit.composeapp.generated.resources.plugin_validated_success
 import plugintoolkit.composeapp.generated.resources.plugin_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_result
+import plugintoolkit.composeapp.generated.resources.plugin_validation_result
+import org.wip.plugintoolkit.core.notification.NotificationService
 
 class PluginManagerViewModel(
     private val pluginManager: PluginManager,
@@ -46,7 +48,8 @@ class PluginManagerViewModel(
     private val repoManager: RepoManager,
     private val jobManager: JobManager,
     private val flowViewModel: FlowViewModel,
-    private val appConfig: SystemConfig
+    private val appConfig: SystemConfig,
+    private val notificationService: NotificationService
 ) : ViewModel() {
 
     val installedPlugins = pluginManager.installedPlugins
@@ -255,24 +258,47 @@ class PluginManagerViewModel(
 
     fun uninstall(pkg: String) {
         viewModelScope.launch {
-            val msg = getString(Res.string.plugin_uninstall_confirmation, pkg)
-            val title = getString(Res.string.plugin_uninstall_title)
-            dialogService.showConfirmation(
-                title,
-                msg,
-                onConfirm = {
-                    viewModelScope.launch {
-                        val result = pluginManager.uninstall(pkg)
-                        result.onFailure { error ->
-                            dialogService.showWarning(
-                                getString(Res.string.plugin_uninstall_blocked),
-                                error.message ?: getString(Res.string.plugin_uninstall_error),
-                                onConfirm = {}
-                            )
+            try {
+                notificationService.toast("Initiating removal of $pkg...")
+                try {
+                    val msg = getString(Res.string.plugin_uninstall_confirmation, pkg)
+                    val title = getString(Res.string.plugin_uninstall_title)
+                    dialogService.showConfirmation(
+                        title,
+                        msg,
+                        onConfirm = {
+                            viewModelScope.launch {
+                                notificationService.toast("Uninstall confirmed for $pkg")
+                                val result = pluginManager.uninstall(pkg)
+                                result.onFailure { error ->
+                                    notificationService.toast("Failed to uninstall $pkg: ${error.message}")
+                                }.onSuccess {
+                                    notificationService.toast("Plugin $pkg uninstalled")
+                                }
+                            }
                         }
-                    }
+                    )
+                } catch (e: Throwable) {
+                    // Fallback if getString fails (e.g. format args mismatch in CMP)
+                    dialogService.showConfirmation(
+                        "Uninstall Plugin",
+                        "Are you sure you want to uninstall $pkg?",
+                        onConfirm = {
+                            viewModelScope.launch {
+                                notificationService.toast("Uninstall confirmed for $pkg (Fallback)")
+                                val result = pluginManager.uninstall(pkg)
+                                result.onFailure { error ->
+                                    notificationService.toast("Failed to uninstall $pkg: ${error.message}")
+                                }.onSuccess {
+                                    notificationService.toast("Plugin $pkg uninstalled")
+                                }
+                            }
+                        }
+                    )
                 }
-            )
+            } catch (t: Throwable) {
+                notificationService.toast("Critical error during uninstall init: ${t.message}")
+            }
         }
     }
 
@@ -383,6 +409,13 @@ class PluginManagerViewModel(
 
     fun closeSettings() {
         _settingsPkg.value = null
+    }
+
+    fun openFolder(pkg: String) {
+        val plugin = pluginManager.installedPlugins.value.find { it.pkg == pkg }
+        plugin?.installPath?.let { path ->
+            PlatformUtils.openFolder(path)
+        }
     }
 
     fun getUpdate(pkg: String) = pluginManager.getUpdate(pkg)

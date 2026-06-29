@@ -145,16 +145,15 @@ class FlowConnectionManager(
         } else {
             viewModelScope.launch {
                 val message = if (!typesCompatible) {
-                    getString(
+                    org.wip.plugintoolkit.core.model.LocalizedString.ResourceWithArgs(
                         Res.string.flow_editor_incompatible_types,
-                        sourceInferredType.format(),
-                        targetInferredType.format()
+                        listOf(sourceInferredType.format(), targetInferredType.format())
                     )
                 } else {
-                    getString(
+                    org.wip.plugintoolkit.core.model.LocalizedString.ResourceWithArgs(
                         Res.string.flow_editor_incompatible_semantics,
-                        sourceInferredSemantic.joinToString { it.canonicalId },
-                        targetInferredSemantic.joinToString { it.canonicalId })
+                        listOf(sourceInferredSemantic.joinToString { it.canonicalId }, targetInferredSemantic.joinToString { it.canonicalId })
+                    )
                 }
                 notificationService?.toast(message)
             }

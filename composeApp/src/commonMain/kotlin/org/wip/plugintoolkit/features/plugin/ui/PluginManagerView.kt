@@ -235,6 +235,7 @@ fun PluginManagerView(
                                 PluginStatusAction.RerunSetup -> viewModel.rerunSetup(plugin.pkg)
                                 PluginStatusAction.Changelog -> viewModel.showChangelog(plugin.pkg)
                                 PluginStatusAction.Settings -> viewModel.openSettings(plugin.pkg)
+                                PluginStatusAction.OpenFolder -> viewModel.openFolder(plugin.pkg)
                                 is PluginStatusAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
                             }
                         }
@@ -538,6 +539,11 @@ fun PluginCard(
                                     onClick = { onAction(PluginStatusAction.Settings); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
                                 )
+                                DropdownMenuItem(
+                                    text = { Text("Open Folder") },
+                                    onClick = { onAction(PluginStatusAction.OpenFolder); expanded = false },
+                                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
+                                )
                                 androidx.compose.material3.HorizontalDivider()
                                 DropdownMenuItem(
                                     text = {
@@ -572,5 +578,6 @@ sealed class PluginStatusAction {
     object RerunSetup : PluginStatusAction()
     object Changelog : PluginStatusAction()
     object Settings : PluginStatusAction()
+    object OpenFolder : PluginStatusAction()
     data class Custom(val name: String) : PluginStatusAction()
 }

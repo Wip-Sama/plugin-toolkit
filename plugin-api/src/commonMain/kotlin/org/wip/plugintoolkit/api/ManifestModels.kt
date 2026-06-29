@@ -251,6 +251,13 @@ enum class ParameterRole {
     STANDARD, INPUT_LOCATION, OUTPUT_LOCATION
 }
 
+/**
+ * Metadata for a parameter required by a capability.
+ *
+ * **File Location Checks**: For parameters with role [ParameterRole.INPUT_LOCATION] or [ParameterRole.OUTPUT_LOCATION],
+ * the host application does **NOT** verify if the path actually exists on the filesystem or if a file will be overwritten.
+ * It is the plugin's responsibility to handle file creation, check for existence, and manage overwriting as needed.
+ */
 @Serializable(with = ParameterMetadataSerializer::class)
 data class ParameterMetadata(
     val defaultValue: JsonElement? = null,

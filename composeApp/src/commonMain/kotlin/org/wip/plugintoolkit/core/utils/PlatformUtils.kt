@@ -30,4 +30,5 @@ expect object PlatformUtils {
     fun unzipEntries(bytes: ByteArray): Map<String, String>
     fun clipEntryOf(text: String): androidx.compose.ui.platform.ClipEntry
     fun calculateFileChecksum(path: String, algorithm: String = "SHA-256"): String?
+    fun openFolder(path: String)
 }

@@ -34,7 +34,9 @@ object TypeConverterRegistry {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-fun SerialDescriptor.toDataType(): DataType {
+fun SerialDescriptor.toDataType(): DataType = toDataTypeImpl(mutableSetOf())
+
+private fun SerialDescriptor.toDataTypeImpl(visited: MutableSet<String>): DataType {
     return when (this.kind) {
         PrimitiveKind.DOUBLE -> DataType.Primitive(PrimitiveType.DOUBLE)
         PrimitiveKind.FLOAT -> DataType.Primitive(PrimitiveType.FLOAT)
@@ -47,12 +49,24 @@ fun SerialDescriptor.toDataType(): DataType {
         PrimitiveKind.BOOLEAN -> DataType.Primitive(PrimitiveType.BOOLEAN)
         StructureKind.LIST -> {
             val elementDescriptor = this.getElementDescriptor(0)
-            DataType.Array(elementDescriptor.toDataType())
+            DataType.Array(elementDescriptor.toDataTypeImpl(visited))
         }
 
         StructureKind.MAP -> {
             val valueDescriptor = this.getElementDescriptor(1)
-            DataType.MapType(valueDescriptor.toDataType())
+            DataType.MapType(valueDescriptor.toDataTypeImpl(visited))
+        }
+        StructureKind.CLASS, StructureKind.OBJECT -> {
+            if (this.serialName in visited) {
+                DataType.Object(this.serialName)
+            } else {
+                visited.add(this.serialName)
+                val properties = (0 until this.elementsCount).associate { i ->
+                    this.getElementName(i) to this.getElementDescriptor(i).toDataTypeImpl(visited)
+                }
+                visited.remove(this.serialName)
+                DataType.Object(this.serialName, properties = properties)
+            }
         }
         PolymorphicKind.SEALED, PolymorphicKind.OPEN -> DataType.Object(this.serialName)
         SerialKind.ENUM -> {
@@ -103,11 +117,12 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
 
         is DataType.Object -> {
             if (other !is DataType.Object) return false
-            if (this.className != other.className) return false
-            if (this.properties.isEmpty() && other.properties.isEmpty()) return true
+            val shortName1 = this.className.substringAfterLast('.')
+            val shortName2 = other.className.substringAfterLast('.')
+            if (shortName1 != shortName2) return false
+            if (this.properties.isEmpty() || other.properties.isEmpty()) return true
             this.properties.size == other.properties.size && this.properties.all { (key, type) ->
-                val otherType = other.properties[key]
-                otherType != null && type.isCompatibleWith(otherType)
+                other.properties[key]?.let { type.isCompatibleWith(it) } ?: false
             }
         }
 
