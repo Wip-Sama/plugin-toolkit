@@ -43,21 +43,21 @@ class SemanticTypeTest {
         assertEquals("rgb", t4.variant)
         assertEquals("sys/color:rgb", t4.canonicalId)
 
-        // MIME-like fallback
+        // Standard parsing without MIME hacks (image/png -> namespace: image, name: png)
         val t5 = parseSemanticType("image/png")
         assertNotNull(t5)
-        assertNull(t5.namespace)
-        assertEquals("image", t5.name)
-        assertEquals("png", t5.variant)
-        assertEquals("image:png", t5.canonicalId)
+        assertEquals("image", t5.namespace)
+        assertEquals("png", t5.name)
+        assertNull(t5.variant)
+        assertEquals("image/png", t5.canonicalId)
 
-        // MIME-like fallback with general mime type
-        val t6 = parseSemanticType("text/plain")
+        // Wildcard name
+        val t6 = parseSemanticType("image/*")
         assertNotNull(t6)
-        assertNull(t6.namespace)
-        assertEquals("text", t6.name)
-        assertEquals("plain", t6.variant)
-        assertEquals("text:plain", t6.canonicalId)
+        assertEquals("image", t6.namespace)
+        assertEquals("*", t6.name)
+        assertNull(t6.variant)
+        assertEquals("image/*", t6.canonicalId)
 
         // Non-mime slash category behaves as namespace/name
         val t7 = parseSemanticType("custom/test")
@@ -157,5 +157,21 @@ class SemanticTypeTest {
         val multiTargetStrict = parseSemanticTypes("sys/image, sys/color:rgb")
         assertTrue(isSemanticTypeCompatible(multiSource, multiTargetStrict, lenient = true))
         assertFalse(isSemanticTypeCompatible(multiSource, multiTargetStrict, lenient = false))
+    }
+
+    @Test
+    fun testCommonSemanticTypes() {
+        assertEquals("path", CommonSemanticTypes.PATH.canonicalId)
+        assertEquals("path/file", CommonSemanticTypes.PATH_FILE.canonicalId)
+        assertEquals("path/folder", CommonSemanticTypes.PATH_FOLDER.canonicalId)
+        assertEquals("image", CommonSemanticTypes.IMAGE.canonicalId)
+        assertEquals("image/png", CommonSemanticTypes.IMAGE_PNG.canonicalId)
+        assertEquals("image/jpeg", CommonSemanticTypes.IMAGE_JPEG.canonicalId)
+        assertEquals("text", CommonSemanticTypes.TEXT.canonicalId)
+        assertEquals("text/plain", CommonSemanticTypes.TEXT_PLAIN.canonicalId)
+        assertEquals("text/markdown", CommonSemanticTypes.TEXT_MARKDOWN.canonicalId)
+        assertEquals("text/html", CommonSemanticTypes.TEXT_HTML.canonicalId)
+        assertEquals("json", CommonSemanticTypes.JSON.canonicalId)
+        assertEquals("xml", CommonSemanticTypes.XML.canonicalId)
     }
 }

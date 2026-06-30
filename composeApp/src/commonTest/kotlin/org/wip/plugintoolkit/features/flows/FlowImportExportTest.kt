@@ -3,10 +3,8 @@ package org.wip.plugintoolkit.features.flows
 import androidx.compose.ui.geometry.Offset
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.core.utils.PlatformUtils
-import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Node
-import org.wip.plugintoolkit.features.flows.viewmodel.ConflictResolutionAction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -116,14 +114,18 @@ class FlowImportExportTest {
 
         val updatedFlowA = updatedFlows.find { it.name == "FlowA" }!!
         val subflowNode = updatedFlowA.nodes.first() as Node.SubFlowNode
-        assertEquals("FlowB (Imported)", subflowNode.flowName, "Subflow reference in FlowA should be updated to renamed FlowB")
+        assertEquals(
+            "FlowB (Imported)",
+            subflowNode.flowName,
+            "Subflow reference in FlowA should be updated to renamed FlowB"
+        )
     }
 
     private fun getTransitiveSubflowDependencies(flow: Flow, allFlows: List<Flow>): List<Flow> {
         val dependencies = mutableSetOf<Flow>()
         val toVisit = mutableListOf(flow)
         val visited = mutableSetOf<String>()
-        
+
         while (toVisit.isNotEmpty()) {
             val current = toVisit.removeAt(0)
             if (current.name in visited) continue
@@ -131,11 +133,11 @@ class FlowImportExportTest {
             if (current != flow) {
                 dependencies.add(current)
             }
-            
+
             val subflowNames = current.nodes
                 .filterIsInstance<Node.SubFlowNode>()
                 .map { it.flowName }
-                
+
             subflowNames.forEach { subflowName ->
                 val depFlow = allFlows.find { it.name == subflowName }
                 if (depFlow != null && depFlow.name !in visited) {
@@ -149,7 +151,7 @@ class FlowImportExportTest {
     @Test
     fun testGenerateUniqueFlowNameWithCustomName() {
         val existingNames = setOf("FlowA", "FlowB", "MyCustomFlow")
-        
+
         fun generateUnique(baseName: String): String {
             if (baseName !in existingNames) return baseName
             var candidate = "$baseName (Imported)"
@@ -164,10 +166,10 @@ class FlowImportExportTest {
 
         // Test non-clashing custom name (should return unchanged)
         assertEquals("NewUniqueFlow", generateUnique("NewUniqueFlow"))
-        
+
         // Test clashing base name (should generate a unique name with suffix)
         assertEquals("FlowA (Imported)", generateUnique("FlowA"))
-        
+
         // Test with clashing suffix (should append sequential counter)
         val existingNamesWithSuffix = existingNames + "FlowA (Imported)"
         fun generateUnique2(baseName: String): String {

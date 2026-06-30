@@ -1,6 +1,5 @@
 package org.wip.plugintoolkit.features.settings.ui
 
-import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +60,7 @@ import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
+import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
@@ -143,6 +143,7 @@ fun SettingsScreen(
                             Res.string.update_new_version_found,
                             *event.args.toTypedArray()
                         )
+
                         SettingsToast.UpdateNoUpdates -> getString(Res.string.update_no_updates)
                         SettingsToast.UpdateCheckFailed -> getString(Res.string.update_check_failed)
                     }
@@ -274,9 +275,11 @@ fun SettingsScreen(
                             SettingNavKey.Appearance -> NavEntry(key) {
                                 AutoSettingsView(key as SettingNavKey, viewModel, registry)
                             }
+
                             SettingNavKey.SystemSettings -> NavEntry(key) {
                                 AutoSettingsView(key as SettingNavKey, viewModel, registry)
                             }
+
                             SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
                             SettingNavKey.About -> NavEntry(key) { AboutView() }
                             SettingNavKey.BroadSearch -> NavEntry(key) {
@@ -291,6 +294,7 @@ fun SettingsScreen(
                                         }
                                     })
                             }
+
                             else -> NavEntry(key) { PlaceholderView("Error") }
                         }
                     }

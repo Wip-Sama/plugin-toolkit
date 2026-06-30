@@ -51,12 +51,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import org.wip.plugintoolkit.core.model.LocalizedString
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.settings.model.NotificationSettings
 import java.util.UUID
-
-import org.wip.plugintoolkit.core.model.LocalizedString
 
 data class ToastData(
     val id: String = UUID.randomUUID().toString(),
@@ -163,21 +162,24 @@ private fun ToastItem(
     toast: ToastData,
     onDismiss: () -> Unit
 ) {
-    var progress by remember(toast.id) { mutableStateOf(1f) }
+    var isDismissing by remember(toast.id) { mutableStateOf(false) }
     val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(if (toast.durationMillis == Long.MAX_VALUE) 0 else 100, easing = LinearEasing),
-        label = "ProgressAnimation"
+        targetValue = if (isDismissing) 0f else 1f,
+        animationSpec = tween(
+            durationMillis = if (toast.durationMillis == Long.MAX_VALUE) 0 else toast.durationMillis.toInt(),
+            easing = LinearEasing
+        ),
+        label = "ProgressAnimation",
+        finishedListener = {
+            if (it == 0f) {
+                onDismiss()
+            }
+        }
     )
 
     LaunchedEffect(toast.id) {
         if (toast.durationMillis != Long.MAX_VALUE) {
-            val startTime = System.currentTimeMillis()
-            while (System.currentTimeMillis() - startTime < toast.durationMillis) {
-                progress = 1f - (System.currentTimeMillis() - startTime).toFloat() / toast.durationMillis
-                delay(16)
-            }
-            onDismiss()
+            isDismissing = true
         }
     }
 

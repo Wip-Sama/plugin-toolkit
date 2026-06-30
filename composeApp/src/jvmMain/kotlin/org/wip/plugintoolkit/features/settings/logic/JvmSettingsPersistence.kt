@@ -4,28 +4,33 @@ import co.touchlab.kermit.Logger
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 
-class JvmSettingsPersistence : SettingsPersistence {
+class JvmSettingsPersistence : SettingsPersistence, KoinComponent {
+    private val appConfig: SystemConfig by inject()
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
 
-    private val settingsDirPath = PlatformPathUtils.getAppDataDir()
-    private val settingsDir = Path(settingsDirPath)
-    private val settingsFile = Path("$settingsDirPath/${KeepTrack.SETTINGS_FILE_NAME}")
+    private val settingsDirPath by lazy { PlatformPathUtils.getAppDataDir() }
+    private val settingsDir by lazy { Path(settingsDirPath) }
+    private val settingsFile by lazy { Path("$settingsDirPath/${appConfig.SETTINGS_FILE_NAME}") }
 
     override fun getSettingsDir(): String = settingsDirPath
 
     override fun getJobsDir(): String {
-        val jobsDirPath = "$settingsDirPath/${KeepTrack.JOBS_DIR_NAME}"
+        val jobsDirPath = "$settingsDirPath/${appConfig.JOBS_DIR_NAME}"
         val jobsDir = Path(jobsDirPath)
         if (!SystemFileSystem.exists(jobsDir)) {
             SystemFileSystem.createDirectories(jobsDir)
@@ -33,8 +38,8 @@ class JvmSettingsPersistence : SettingsPersistence {
         return jobsDirPath
     }
 
-    override fun load(): AppSettings {
-        return try {
+    override suspend fun load(): AppSettings = withContext(Dispatchers.IO) {
+        try {
             if (SystemFileSystem.exists(settingsFile)) {
                 val content = SystemFileSystem.source(settingsFile).buffered().use { it.readString() }
                 if (content.isBlank()) {
@@ -51,7 +56,7 @@ class JvmSettingsPersistence : SettingsPersistence {
         }
     }
 
-    override fun save(settings: AppSettings) {
+    override suspend fun save(settings: AppSettings) = withContext(Dispatchers.IO) {
         try {
             if (!SystemFileSystem.exists(settingsDir)) {
                 SystemFileSystem.createDirectories(settingsDir)
@@ -65,7 +70,7 @@ class JvmSettingsPersistence : SettingsPersistence {
 
     override fun openLogFolder() {
         try {
-            val logDirPath = "$settingsDirPath/${KeepTrack.LOGS_DIR_NAME}"
+            val logDirPath = "$settingsDirPath/${appConfig.LOGS_DIR_NAME}"
             val logDir = Path(logDirPath)
             if (!SystemFileSystem.exists(logDir)) {
                 SystemFileSystem.createDirectories(logDir)
@@ -80,8 +85,9 @@ class JvmSettingsPersistence : SettingsPersistence {
 
     override fun openLatestLog() {
         try {
-            val logDirPath = "$settingsDirPath/${KeepTrack.LOGS_DIR_NAME}"
-            val dateString = java.text.SimpleDateFormat("yyyy_MM_dd", java.util.Locale.getDefault()).format(java.util.Date())
+            val logDirPath = "$settingsDirPath/${appConfig.LOGS_DIR_NAME}"
+            val dateString =
+                java.text.SimpleDateFormat("yyyy_MM_dd", java.util.Locale.getDefault()).format(java.util.Date())
             val logFilePath = "$logDirPath/$dateString.log"
             val logFile = java.io.File(logFilePath)
 

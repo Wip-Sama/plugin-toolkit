@@ -8,6 +8,7 @@ import kotlinx.io.readByteArray
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import org.wip.plugintoolkit.api.PluginFileSystem
+import org.wip.plugintoolkit.api.RelativePath
 import org.wip.plugintoolkit.core.loomDispatcher
 import java.io.File
 import java.util.jar.JarFile
@@ -25,25 +26,32 @@ class DefaultPluginFileSystem(
     }
 
     //TODO: need to check better if this should be implemented in platform specific FileSystem like it is for PlatformUtils
-    private fun resolvePath(relativePath: String): Path {
-        // Prevent path traversal
-        val sanitized = relativePath.replace("..", "").replace("\\", "/")
-        return Path(basePath, sanitized)
+    private fun resolvePath(relativePath: RelativePath): Path {
+        val resolved = Path(basePath, relativePath.value)
+        val file = java.io.File(resolved.toString())
+        val normalized = try { file.canonicalPath } catch (e: Exception) { file.absolutePath }
+        val baseFile = java.io.File(basePath)
+        val baseCanonical = try { baseFile.canonicalPath } catch (e: Exception) { baseFile.absolutePath }
+        
+        if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + java.io.File.separator)) {
+            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin files directory.")
+        }
+        return resolved
     }
 
-    override suspend fun readFile(relativePath: String): ByteArray? {
+    override suspend fun readFile(relativePath: RelativePath): ByteArray? {
         val path = resolvePath(relativePath)
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
-    override suspend fun readTextFile(relativePath: String): String? {
+    override suspend fun readTextFile(relativePath: RelativePath): String? {
         val path = resolvePath(relativePath)
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
 
-    override suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit> {
+    override suspend fun writeFile(relativePath: RelativePath, data: ByteArray): Result<Unit> {
         return try {
             val path = resolvePath(relativePath)
             path.parent?.let { SystemFileSystem.createDirectories(it) }
@@ -54,7 +62,7 @@ class DefaultPluginFileSystem(
         }
     }
 
-    override suspend fun writeTextFile(relativePath: String, text: String): Result<Unit> {
+    override suspend fun writeTextFile(relativePath: RelativePath, text: String): Result<Unit> {
         return try {
             val path = resolvePath(relativePath)
             path.parent?.let { SystemFileSystem.createDirectories(it) }
@@ -65,11 +73,11 @@ class DefaultPluginFileSystem(
         }
     }
 
-    override suspend fun exists(relativePath: String): Boolean {
+    override suspend fun exists(relativePath: RelativePath): Boolean {
         return SystemFileSystem.exists(resolvePath(relativePath))
     }
 
-    override suspend fun listFiles(relativePath: String): List<String> {
+    override suspend fun listFiles(relativePath: RelativePath): List<String> {
         val path = resolvePath(relativePath)
         if (!SystemFileSystem.exists(path)) return emptyList()
         val metadata = SystemFileSystem.metadataOrNull(path)
@@ -78,7 +86,7 @@ class DefaultPluginFileSystem(
         return SystemFileSystem.list(path).map { it.name }
     }
 
-    override suspend fun deleteFile(relativePath: String): Result<Unit> {
+    override suspend fun deleteFile(relativePath: RelativePath): Result<Unit> {
         return try {
             val path = resolvePath(relativePath)
             if (SystemFileSystem.exists(path)) {
@@ -90,7 +98,7 @@ class DefaultPluginFileSystem(
         }
     }
 
-    override suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit> {
+    override suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit> {
         return try {
             withContext(loomDispatcher) {
                 val jar = jarPath
@@ -118,44 +126,52 @@ class DefaultPluginFileSystem(
                 // Create a variant that uses cachePath as basePath
                 object : PluginFileSystem by fs {
                     override fun getBasePath(): String = fs.cachePath
-                    override suspend fun readFile(relativePath: String): ByteArray? = fs.readFromCache(relativePath)
-                    override suspend fun readTextFile(relativePath: String): String? =
+                    override suspend fun readFile(relativePath: RelativePath): ByteArray? = fs.readFromCache(relativePath)
+                    override suspend fun readTextFile(relativePath: RelativePath): String? =
                         fs.readTextFromCache(relativePath)
 
-                    override suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit> =
+                    override suspend fun writeFile(relativePath: RelativePath, data: ByteArray): Result<Unit> =
                         fs.writeToCache(relativePath, data)
 
-                    override suspend fun writeTextFile(relativePath: String, text: String): Result<Unit> =
+                    override suspend fun writeTextFile(relativePath: RelativePath, text: String): Result<Unit> =
                         fs.writeTextToCache(relativePath, text)
 
-                    override suspend fun exists(relativePath: String): Boolean =
+                    override suspend fun exists(relativePath: RelativePath): Boolean =
                         SystemFileSystem.exists(fs.resolveCachePath(relativePath))
 
-                    override suspend fun deleteFile(relativePath: String): Result<Unit> =
+                    override suspend fun deleteFile(relativePath: RelativePath): Result<Unit> =
                         fs.deleteFromCache(relativePath)
                 }
             }
         }
     }
 
-    private fun resolveCachePath(relativePath: String): Path {
-        val sanitized = relativePath.replace("..", "").replace("\\", "/")
-        return Path(cachePath, sanitized)
+    private fun resolveCachePath(relativePath: RelativePath): Path {
+        val resolved = Path(cachePath, relativePath.value)
+        val file = java.io.File(resolved.toString())
+        val normalized = try { file.canonicalPath } catch (e: Exception) { file.absolutePath }
+        val baseFile = java.io.File(cachePath)
+        val baseCanonical = try { baseFile.canonicalPath } catch (e: Exception) { baseFile.absolutePath }
+        
+        if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + java.io.File.separator)) {
+            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin cache directory.")
+        }
+        return resolved
     }
 
-    private suspend fun readFromCache(relativePath: String): ByteArray? {
+    private suspend fun readFromCache(relativePath: RelativePath): ByteArray? {
         val path = resolveCachePath(relativePath)
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
-    private suspend fun readTextFromCache(relativePath: String): String? {
+    private suspend fun readTextFromCache(relativePath: RelativePath): String? {
         val path = resolveCachePath(relativePath)
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
 
-    private suspend fun writeToCache(relativePath: String, data: ByteArray): Result<Unit> {
+    private suspend fun writeToCache(relativePath: RelativePath, data: ByteArray): Result<Unit> {
         return try {
             val path = resolveCachePath(relativePath)
             path.parent?.let { SystemFileSystem.createDirectories(it) }
@@ -166,7 +182,7 @@ class DefaultPluginFileSystem(
         }
     }
 
-    private suspend fun writeTextToCache(relativePath: String, text: String): Result<Unit> {
+    private suspend fun writeTextToCache(relativePath: RelativePath, text: String): Result<Unit> {
         return try {
             val path = resolveCachePath(relativePath)
             path.parent?.let { SystemFileSystem.createDirectories(it) }
@@ -177,7 +193,7 @@ class DefaultPluginFileSystem(
         }
     }
 
-    private suspend fun deleteFromCache(relativePath: String): Result<Unit> {
+    private suspend fun deleteFromCache(relativePath: RelativePath): Result<Unit> {
         return try {
             val path = resolveCachePath(relativePath)
             if (SystemFileSystem.exists(path)) {

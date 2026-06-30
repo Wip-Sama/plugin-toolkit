@@ -24,4 +24,13 @@ in your IDE’s toolbar or run it directly from the terminal:
 
 ---
 
+## Execution Engine & Concurrency (PluginToolkit)
+
+The internal job execution engine (`FlowEngine` and `JobWorker`) enforces strict concurrency policies to maintain stability:
+
+- **Cooperative Cancellation**: Long-running synchronous system flows (e.g. infinite `while` loops) implement `yield()` at each step, ensuring that UI or user-requested cancellations tear down the coroutine instantly without leaking resources.
+- **Resource Starvation Prevention**: All 3rd-party plugin invocations run in isolated `Dispatchers.IO` threads. If a plugin intentionally blocks the thread, it will not hijack the main worker dispatcher.
+- **Recursion Depth Limits**: Deep subflow execution limits the stack frame depth to 50 iterations. Attempting to create an infinitely recursive subflow safely fails before hitting a JVM StackOverflow.
+- **Configurable Capabilities Policies**: Transient network execution failures in plugins automatically back off and retry up to `maxRetries` (configurable in app settings). Executions are also bound by a strict `pluginTimeoutMs` to prevent hung plugins.
+
 Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…

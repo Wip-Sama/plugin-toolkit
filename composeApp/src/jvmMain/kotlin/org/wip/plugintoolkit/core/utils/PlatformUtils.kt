@@ -246,7 +246,8 @@ actual object PlatformUtils {
     actual fun readFileFromZip(zipPath: String, fileName: String): String? {
         return try {
             java.util.zip.ZipFile(zipPath).use { zip ->
-                val entry = zip.getEntry(fileName) ?: zip.entries().asSequence().find { it.name.equals(fileName, ignoreCase = true) }
+                val entry = zip.getEntry(fileName) ?: zip.entries().asSequence()
+                    .find { it.name.equals(fileName, ignoreCase = true) }
                 ?: return null
                 zip.getInputStream(entry).use { it.bufferedReader().readText() }
             }
@@ -289,10 +290,12 @@ actual object PlatformUtils {
                         val base = "/i \"$normalizedPath\""
                         if (currentInstallDir != null) "$base INSTALLDIR=\"$currentInstallDir\"" else base
                     }
+
                     normalizedPath.endsWith(".exe") -> {
                         print(currentInstallDir)
                         if (currentInstallDir != null) "INSTALLDIR=\"$currentInstallDir\"" else ""
                     }
+
                     else -> ""
                 }
 
@@ -404,6 +407,38 @@ actual object PlatformUtils {
     @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
     actual fun clipEntryOf(text: String): androidx.compose.ui.platform.ClipEntry {
         return androidx.compose.ui.platform.ClipEntry(java.awt.datatransfer.StringSelection(text))
+    }
+
+    actual fun calculateFileChecksum(path: String, algorithm: String): String? {
+        val file = java.io.File(path)
+        if (!file.exists()) return null
+        return try {
+            val digest = java.security.MessageDigest.getInstance(algorithm)
+            file.inputStream().use { fis ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (fis.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to calculate $algorithm checksum for $path" }
+            null
+        }
+    }
+
+    actual fun openFolder(path: String) {
+        try {
+            val file = File(path)
+            if (file.exists()) {
+                Desktop.getDesktop().open(file)
+            } else {
+                Logger.w { "Folder does not exist: $path" }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to open folder $path" }
+        }
     }
 }
 

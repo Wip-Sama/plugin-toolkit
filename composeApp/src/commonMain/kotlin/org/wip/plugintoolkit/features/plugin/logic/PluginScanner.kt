@@ -3,7 +3,7 @@ package org.wip.plugintoolkit.features.plugin.logic
 import co.touchlab.kermit.Logger
 import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.api.PluginManifest
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.VersionUtils
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
@@ -12,7 +12,8 @@ import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
  * Handles discovery of plugins by scanning managed folders on the filesystem.
  */
 class PluginScanner(
-    private val registry: PluginRegistry
+    private val registry: PluginRegistry,
+    private val appConfig: SystemConfig
 ) {
     private val json = kotlinx.serialization.json.Json {
         prettyPrint = true
@@ -63,8 +64,8 @@ class PluginScanner(
 
         folders.forEach { folderPath ->
             val normalizedFolder = normalizePath(folderPath)
-            val trackingFile = "$normalizedFolder/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
-            
+            val trackingFile = "$normalizedFolder/${appConfig.INSTALLED_PLUGINS_FILE_NAME}"
+
             val existingContent = PlatformUtils.readFile(trackingFile)
             val existingPlugins = try {
                 if (existingContent != null) json.decodeFromString<List<InstalledPlugin>>(existingContent) else emptyList()

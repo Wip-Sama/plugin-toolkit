@@ -22,22 +22,27 @@ object MigrationEngine {
     ): PluginMigration? {
         if (fromVersion == toVersion) return null
 
-        // Simple linear resolution for now: find exact step-by-step
-        var currentVersion = fromVersion
-        val path = mutableListOf<PluginMigration>()
+        // BFS to find the shortest path
+        val queue = ArrayDeque<List<PluginMigration>>()
+        migrations.filter { it.fromVersion == fromVersion }.forEach { queue.add(listOf(it)) }
 
-        while (currentVersion != toVersion) {
-            val step = migrations.find { it.fromVersion == currentVersion }
-            if (step == null) {
-                // Cannot find a full path. Unhandled migration.
-                return null
+        while (queue.isNotEmpty()) {
+            val path = queue.removeFirst()
+            val currentVersion = path.last().toVersion
+
+            if (currentVersion == toVersion) {
+                return mergeMigrations(path)
             }
-            path.add(step)
-            currentVersion = step.toVersion
+
+            migrations.filter { it.fromVersion == currentVersion }.forEach { nextStep ->
+                // Avoid cycles
+                if (path.none { it.fromVersion == nextStep.toVersion }) {
+                    queue.add(path + nextStep)
+                }
+            }
         }
 
-        // Merge the path into a single effective migration
-        return mergeMigrations(path)
+        return null
     }
 
     private fun mergeMigrations(path: List<PluginMigration>): PluginMigration {
@@ -49,35 +54,45 @@ object MigrationEngine {
 
         // Merge capabilities
         val capabilityMigrations = mutableMapOf<String, org.wip.plugintoolkit.api.CapabilityMigration>()
-        
+
         for (step in path) {
             for (capMig in step.capabilityMigrations) {
                 // If this capability was already migrated in a previous step, we need to chain it
-                val existingEntry = capabilityMigrations.entries.find { it.value.newName == capMig.oldName }
-                
-                if (existingEntry != null) {
-                    // Update the existing migration chain
-                    val oldMig = existingEntry.value
-                    
-                    // Merge ports
-                    val mergedPorts = oldMig.portMigrations.toMutableList()
-                    for (portMig in capMig.portMigrations) {
-                        val existingPort = mergedPorts.find { it.newName == portMig.oldName }
-                        if (existingPort != null) {
-                            mergedPorts.remove(existingPort)
-                            mergedPorts.add(org.wip.plugintoolkit.api.PortMigration(existingPort.oldName, portMig.newName))
-                        } else {
-                            mergedPorts.add(portMig)
-                        }
-                    }
+                val existingEntries = capabilityMigrations.entries.filter { it.value.newName == capMig.oldName }
 
-                    capabilityMigrations[existingEntry.key] = org.wip.plugintoolkit.api.CapabilityMigration(
-                        oldName = oldMig.oldName,
-                        newName = capMig.newName,
-                        isDropInReplacement = oldMig.isDropInReplacement && capMig.isDropInReplacement,
-                        portMigrations = mergedPorts
-                    )
-                } else {
+                if (existingEntries.isNotEmpty()) {
+                    for (entry in existingEntries) {
+                        // Update the existing migration chain
+                        val oldMig = entry.value
+
+                        // Merge ports
+                        val mergedPorts = oldMig.portMigrations.toMutableList()
+                        for (portMig in capMig.portMigrations) {
+                            val existingPort = mergedPorts.find { it.newName == portMig.oldName }
+                            if (existingPort != null) {
+                                mergedPorts.remove(existingPort)
+                                mergedPorts.add(
+                                    org.wip.plugintoolkit.api.PortMigration(
+                                        existingPort.oldName,
+                                        portMig.newName
+                                    )
+                                )
+                            } else {
+                                mergedPorts.add(portMig)
+                            }
+                        }
+
+                        capabilityMigrations[entry.key] = org.wip.plugintoolkit.api.CapabilityMigration(
+                            oldName = oldMig.oldName,
+                            newName = capMig.newName,
+                            isDropInReplacement = oldMig.isDropInReplacement && capMig.isDropInReplacement,
+                            portMigrations = mergedPorts
+                        )
+                    }
+                }
+
+                // Add as a fresh migration chain if it wasn't already tracked from the original version
+                if (!capabilityMigrations.containsKey(capMig.oldName)) {
                     capabilityMigrations[capMig.oldName] = capMig
                 }
             }
@@ -143,26 +158,37 @@ object MigrationEngine {
             val migrations = if (currentManifest.hasMigrations) getMigrations(pluginId) else emptyList()
             val migrationPath = resolveMigrationPath(nodeVersion, currentVersion, migrations)
 
-            if (migrationPath == null) {
-                // No migration path found. Unhandled migration. Mark as broken.
-                val brokenNode = node.copy(isBroken = true)
-                newNodes.add(brokenNode)
-                brokenNodes.add(brokenNode)
-                continue
-            }
-
-            val capMig = migrationPath.capabilityMigrations.find { it.oldName == node.capability.name }
+            val capMig = migrationPath?.capabilityMigrations?.find { it.oldName == node.capability.name }
 
             if (capMig == null) {
-                // Capability was not touched in migrations. Verify it still exists in the manifest.
-                if (currentManifest.capabilities.none { it.name == node.capability.name }) {
+                // Capability was not touched in migrations (or no migration path exists). Verify it still exists in the manifest.
+                val newCapability = currentManifest.capabilities.find { it.name == node.capability.name }
+                if (newCapability == null) {
                     // Removed without a migration rule! Break it.
                     val brokenNode = node.copy(isBroken = true)
                     newNodes.add(brokenNode)
                     brokenNodes.add(brokenNode)
                 } else {
-                    // Just a version bump, capability intact.
-                    val updatedNode = node.copy(pluginInfo = currentManifest.plugin)
+                    // Just a version bump or unaffected capability, capability intact.
+                    val missingOutputs =
+                        newCapability.parameters?.filter { it.value.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }
+                            ?.mapNotNull { (key, meta) ->
+                                if (node.outputs.none { it.id == key }) {
+                                    OutputPort(
+                                        id = key,
+                                        name = key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                                        description = meta.description,
+                                        dataType = meta.type,
+                                        semanticTypes = meta.semanticTypes
+                                    )
+                                } else null
+                            } ?: emptyList()
+
+                    val updatedNode = node.copy(
+                        pluginInfo = currentManifest.plugin,
+                        capability = newCapability,
+                        outputs = node.outputs + missingOutputs
+                    )
                     newNodes.add(updatedNode)
                 }
                 continue
@@ -227,11 +253,25 @@ object MigrationEngine {
                 }
             }
 
+            val missingOutputs =
+                newCapability.parameters?.filter { it.value.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }
+                    ?.mapNotNull { (key, meta) ->
+                        if (newOutputs.none { it.id == key }) {
+                            OutputPort(
+                                id = key,
+                                name = key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                                description = meta.description,
+                                dataType = meta.type,
+                                semanticTypes = meta.semanticTypes
+                            )
+                        } else null
+                    } ?: emptyList()
+
             val updatedNode = node.copy(
                 pluginInfo = currentManifest.plugin,
                 capability = newCapability,
                 inputs = newInputs,
-                outputs = newOutputs
+                outputs = newOutputs + missingOutputs
             )
 
             newNodes.add(updatedNode)

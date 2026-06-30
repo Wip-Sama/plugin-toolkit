@@ -33,14 +33,14 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.serialization.json)
             api(libs.kotlinx.coroutines.core)
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.core)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
-            implementation(project.dependencies.platform(libs.koin.bom))
-            implementation(libs.koin.core)
-            
+
             // Processor dependencies
             implementation(libs.ksp.api)
             implementation(libs.kotlinpoet)

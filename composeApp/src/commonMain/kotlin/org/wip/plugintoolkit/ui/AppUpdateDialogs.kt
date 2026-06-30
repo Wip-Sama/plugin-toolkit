@@ -4,9 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import org.wip.plugintoolkit.features.settings.model.UpdateState
-import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import org.wip.plugintoolkit.features.settings.ui.UpdateConfirmationDialog
 import org.wip.plugintoolkit.features.settings.ui.UpdateDialog
+import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 
 @Composable
 fun AppUpdateDialogs(viewModel: SettingsViewModel) {

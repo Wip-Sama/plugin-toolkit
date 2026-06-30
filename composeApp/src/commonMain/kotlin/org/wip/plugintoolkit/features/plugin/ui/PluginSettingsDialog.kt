@@ -99,7 +99,12 @@ fun PluginSettingsDialog(
                                     secret = meta.secret
                                 ),
                                 value = SettingsUtils.jsonToString(value, meta.type),
-                                onValueChange = { viewModel.updateSetting(key, SettingsUtils.stringToJson(it, meta.type)) },
+                                onValueChange = {
+                                    viewModel.updateSetting(
+                                        key,
+                                        SettingsUtils.stringToJson(it, meta.type)
+                                    )
+                                },
                                 enabled = !isBusy
                             )
                         }
@@ -115,7 +120,12 @@ fun PluginSettingsDialog(
                                 name = key,
                                 metadata = meta,
                                 value = SettingsUtils.jsonToString(value, meta.type),
-                                onValueChange = { viewModel.updateGlobalParam(key, SettingsUtils.stringToJson(it, meta.type)) },
+                                onValueChange = {
+                                    viewModel.updateGlobalParam(
+                                        key,
+                                        SettingsUtils.stringToJson(it, meta.type)
+                                    )
+                                },
                                 enabled = !isBusy
                             )
                         }
@@ -131,7 +141,13 @@ fun PluginSettingsDialog(
                                 name = key,
                                 metadata = meta,
                                 value = SettingsUtils.jsonToString(value, meta.type),
-                                onValueChange = { viewModel.updateCapabilityParam(capability.name, key, SettingsUtils.stringToJson(it, meta.type)) },
+                                onValueChange = {
+                                    viewModel.updateCapabilityParam(
+                                        capability.name,
+                                        key,
+                                        SettingsUtils.stringToJson(it, meta.type)
+                                    )
+                                },
                                 enabled = !isBusy
                             )
                         }

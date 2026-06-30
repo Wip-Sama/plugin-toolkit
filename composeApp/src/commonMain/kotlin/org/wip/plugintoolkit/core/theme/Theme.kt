@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -79,7 +80,12 @@ data class CustomColors(
     val warning: Color = Color(0xFFFF9800),
     val info: Color = Color(0xFF2196F3),
     val validated: Color = Color(0xFFD0BCFF)
-)
+) {
+    val onSuccess: Color = if (success.luminance() > 0.5f) Color.Black else Color.White
+    val onWarning: Color = if (warning.luminance() > 0.5f) Color.Black else Color.White
+    val onInfo: Color = if (info.luminance() > 0.5f) Color.Black else Color.White
+    val onValidated: Color = if (validated.luminance() > 0.5f) Color.Black else Color.White
+}
 
 data class Opacity(
     val transparent: Float = 0.0f,
@@ -182,9 +188,13 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
             else -> LightColorScheme
         }
 
+    val isLightPrimary = seedColor.luminance() > 0.5f
+    val onPrimaryColor = if (isLightPrimary) Color.Black else Color.White
+
     val colorScheme =
         baseScheme.copy(
             primary = seedColor,
+            onPrimary = onPrimaryColor,
             primaryContainer = seedColor.copy(alpha = 0.2f),
             onPrimaryContainer = seedColor,
             error = Color(0xFFB00020),

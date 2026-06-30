@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -22,7 +22,8 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 class PluginRegistry(
     private val settingsRepository: SettingsRepository,
     val scope: CoroutineScope,
-    private val loomDispatcher: CoroutineDispatcher
+    private val loomDispatcher: CoroutineDispatcher,
+    private val appConfig: SystemConfig
 ) {
     private val _installedPlugins = MutableStateFlow<List<InstalledPlugin>>(emptyList())
     val installedPlugins: StateFlow<List<InstalledPlugin>> = _installedPlugins.asStateFlow()
@@ -37,7 +38,7 @@ class PluginRegistry(
         encodeDefaults = true
     }
 
-    private val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
+    private val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + appConfig.PLUGINS_DIR_NAME
 
     init {
         Logger.i { "Initializing PluginRegistry" }
@@ -78,7 +79,7 @@ class PluginRegistry(
     suspend fun loadFromManagedFolders() = withContext(loomDispatcher) {
         val allPlugins = mutableListOf<InstalledPlugin>()
         getManagedFolders().forEach { folderPath ->
-            val file = "${normalizePath(folderPath)}/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
+            val file = "${normalizePath(folderPath)}/${appConfig.INSTALLED_PLUGINS_FILE_NAME}"
             val content = PlatformUtils.readFile(file)
             if (content != null) {
                 try {
@@ -102,6 +103,7 @@ class PluginRegistry(
             val next = transform(current)
             if (current != next) {
                 _installedPlugins.value = next
+                saveToManagedFolders(next)
                 next
             } else {
                 null
@@ -109,7 +111,6 @@ class PluginRegistry(
         }
 
         if (updated != null) {
-            saveToManagedFolders(updated)
             Logger.d { "Plugin list updated and persisted (Total: ${updated.size})" }
         }
     }
@@ -146,7 +147,7 @@ class PluginRegistry(
         folders.forEach { folderPath ->
             val normalizedFolder = normalizePath(folderPath)
             val folderPlugins = plugins.filter { normalizePath(it.installPath).startsWith(normalizedFolder) }
-            val file = "$normalizedFolder/${KeepTrack.INSTALLED_PLUGINS_FILE_NAME}"
+            val file = "$normalizedFolder/${appConfig.INSTALLED_PLUGINS_FILE_NAME}"
 
             try {
                 PlatformUtils.writeFile(file, json.encodeToString(folderPlugins))
@@ -159,6 +160,6 @@ class PluginRegistry(
     fun getPlugin(pkg: String): InstalledPlugin? {
         return _installedPlugins.value.find { it.pkg == pkg }
     }
-    
+
     fun getDefaultPluginFolder(): String = defaultPluginFolder
 }

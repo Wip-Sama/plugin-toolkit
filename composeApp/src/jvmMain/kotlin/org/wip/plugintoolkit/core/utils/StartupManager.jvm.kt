@@ -6,16 +6,20 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import java.util.Locale
 
-actual object StartupManager {
+actual object StartupManager : KoinComponent {
+    private val appConfig: SystemConfig by inject()
+
     private val osName = System.getProperty("os.name").lowercase(Locale.ENGLISH)
     private val isWindows = osName.contains("win")
     private val isLinux = osName.contains("linux")
 
-    private val appName = KeepTrack.STARTUP_APP_NAME
-    private val backgroundFlag = KeepTrack.STARTUP_FLAG_BACKGROUND
+    private val appName get() = appConfig.STARTUP_APP_NAME
+    private val backgroundFlag get() = appConfig.STARTUP_FLAG_BACKGROUND
 
     actual suspend fun setLaunchAtStartup(enabled: Boolean, minimized: Boolean) {
         withContext(Dispatchers.IO) {
@@ -55,7 +59,7 @@ actual object StartupManager {
             arrayOf(
                 "reg",
                 "add",
-                KeepTrack.WINDOWS_STARTUP_REGISTRY_PATH,
+                appConfig.WINDOWS_STARTUP_REGISTRY_PATH,
                 "/v",
                 appName,
                 "/t",
@@ -65,7 +69,7 @@ actual object StartupManager {
                 "/f"
             )
         } else {
-            arrayOf("reg", "delete", KeepTrack.WINDOWS_STARTUP_REGISTRY_PATH, "/v", appName, "/f")
+            arrayOf("reg", "delete", appConfig.WINDOWS_STARTUP_REGISTRY_PATH, "/v", appName, "/f")
         }
 
         try {
@@ -77,7 +81,7 @@ actual object StartupManager {
 
     private fun isWindowsStartupEnabled(): Boolean {
         try {
-            val process = ProcessBuilder("reg", "query", KeepTrack.WINDOWS_STARTUP_REGISTRY_PATH, "/v", appName).start()
+            val process = ProcessBuilder("reg", "query", appConfig.WINDOWS_STARTUP_REGISTRY_PATH, "/v", appName).start()
             return process.waitFor() == 0
         } catch (e: Exception) {
             return false
@@ -86,12 +90,12 @@ actual object StartupManager {
 
     private fun setLinuxStartup(enabled: Boolean, minimized: Boolean) {
         val exePath = getExecutablePath() ?: return
-        val autostartDirPath = "${System.getProperty("user.home")}/${KeepTrack.LINUX_AUTOSTART_DIR}"
+        val autostartDirPath = "${System.getProperty("user.home")}/${appConfig.LINUX_AUTOSTART_DIR}"
         val autostartDir = Path(autostartDirPath)
         if (!SystemFileSystem.exists(autostartDir)) {
             SystemFileSystem.createDirectories(autostartDir)
         }
-        val desktopFile = Path("$autostartDirPath/${KeepTrack.LINUX_DESKTOP_FILENAME}")
+        val desktopFile = Path("$autostartDirPath/${appConfig.LINUX_DESKTOP_FILENAME}")
 
         if (enabled) {
             val execCommand = if (minimized) "$exePath $backgroundFlag" else exePath
@@ -114,8 +118,8 @@ actual object StartupManager {
     }
 
     private fun isLinuxStartupEnabled(): Boolean {
-        val autostartDirPath = "${System.getProperty("user.home")}/${KeepTrack.LINUX_AUTOSTART_DIR}"
-        val desktopFile = Path("$autostartDirPath/${KeepTrack.LINUX_DESKTOP_FILENAME}")
+        val autostartDirPath = "${System.getProperty("user.home")}/${appConfig.LINUX_AUTOSTART_DIR}"
+        val desktopFile = Path("$autostartDirPath/${appConfig.LINUX_DESKTOP_FILENAME}")
         return SystemFileSystem.exists(desktopFile)
     }
 }

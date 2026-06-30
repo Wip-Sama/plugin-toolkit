@@ -58,10 +58,10 @@ class SettingsViewModel(
             if (isManual) {
                 _events.emit(SettingsEvent.ShowToast(SettingsToast.UpdateCheckStarted))
             }
-            
+
             val update = updateService.checkForUpdates()
             availableUpdate = update
-            
+
             if (update != null) {
                 _updateState.value = UpdateState.UpdateAvailable(update)
                 if (isManual) {
@@ -83,7 +83,7 @@ class SettingsViewModel(
 
     fun downloadAndInstallUpdate() {
         val update = availableUpdate ?: return
-        
+
         // Check for running jobs first
         val runningJobs = jobManager.jobs.value.filter { it.status == JobStatus.Running }
         if (runningJobs.isNotEmpty()) {
@@ -110,7 +110,8 @@ class SettingsViewModel(
             isDownloadingUpdate = true
             val dest = "${repository.getSettingsDir()}/${update.fileName}"
             val file = java.io.File(dest)
-            
+            val partFile = java.io.File("$dest.part")
+
             // Caching check: If file exists and size matches, skip download
             if (file.exists() && file.length() == update.size) {
                 Logger.i { "Update already downloaded: $dest" }
@@ -119,12 +120,47 @@ class SettingsViewModel(
                 return@launch
             }
 
-            val result = updateService.downloadUpdate(update, dest)
-            if (result.isSuccess) {
+            var retries = 3
+            var success = false
+            
+            while (retries > 0 && !success) {
+                try {
+                    val result = updateService.downloadUpdate(update, dest)
+                    if (result.isSuccess) {
+                        success = true
+                    } else {
+                        retries--
+                        if (partFile.exists()) partFile.delete()
+                        Logger.w { "Download failed. Retries left: $retries" }
+                    }
+                } catch (e: Exception) {
+                    retries--
+                    if (partFile.exists()) partFile.delete()
+                    Logger.e(e) { "Exception during download. Retries left: $retries" }
+                }
+            }
+
+            if (success) {
+                // Checksum validation
+                if (update.checksum != null) {
+                    val actualChecksum = PlatformUtils.calculateFileChecksum(dest)
+                    if (actualChecksum != null && !actualChecksum.equals(update.checksum, ignoreCase = true)) {
+                        Logger.e { "Checksum mismatch! Expected: ${update.checksum}, Actual: $actualChecksum" }
+                        if (file.exists()) file.delete()
+                        if (partFile.exists()) partFile.delete()
+                        isDownloadingUpdate = false
+                        _events.emit(SettingsEvent.ShowToast(SettingsToast.UpdateCheckFailed))
+                        _updateState.value = UpdateState.Error
+                        return@launch
+                    } else {
+                        Logger.i { "Checksum validation passed." }
+                    }
+                }
+                
                 PlatformUtils.installUpdate(dest)
-                // If we reach here, it means the installer failed to launch or didn't exit the app
                 isDownloadingUpdate = false
             } else {
+                if (file.exists() && file.length() != update.size) file.delete()
                 isDownloadingUpdate = false
                 _events.emit(SettingsEvent.ShowToast(SettingsToast.UpdateCheckFailed))
                 _updateState.value = UpdateState.Error
@@ -132,8 +168,8 @@ class SettingsViewModel(
         }
     }
 
-    // Connect to repository settings flow
     val settings: StateFlow<AppSettings> = repository.settings
+    val isLoaded: StateFlow<Boolean> = repository.isLoaded
 
     val currentLanguageCode: StateFlow<String> = settings
         .map { s ->
@@ -147,7 +183,11 @@ class SettingsViewModel(
                 }
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), if (PlatformLocalization.getSystemLanguage() == "it") "it" else "en")
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            if (PlatformLocalization.getSystemLanguage() == "it") "it" else "en"
+        )
 
 
     fun updateSettings(update: (AppSettings) -> AppSettings) {

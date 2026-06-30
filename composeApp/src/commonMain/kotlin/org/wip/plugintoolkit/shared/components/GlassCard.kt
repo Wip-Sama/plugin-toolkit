@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -22,10 +25,21 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 fun GlassCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val baseModifier = modifier
+    val clickableModifier = if (onClick != null) {
+        Modifier.clickable(
+            interactionSource = interactionSource,
+            indication = LocalIndication.current,
+            onClick = onClick
+        )
+    } else Modifier
+
+    val finalModifier = modifier
+        .animateContentSize()
         .clip(MaterialTheme.shapes.large)
+        .then(clickableModifier)
         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
         .border(
             width = 1.dp,
@@ -38,11 +52,8 @@ fun GlassCard(
             shape = MaterialTheme.shapes.large
         )
 
-    val finalModifier = if (onClick != null) baseModifier.clickable(onClick = onClick) else baseModifier
-
     Column(
         modifier = finalModifier
-            .animateContentSize()
             .padding(ToolkitTheme.spacing.medium),
         content = content
     )

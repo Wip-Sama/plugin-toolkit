@@ -19,7 +19,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import org.wip.plugintoolkit.api.JobHandle
+import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.RelativePath
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
@@ -28,14 +31,12 @@ import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.time.Clock
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 
 class JobManager(
     /** Injected [AppScope] for managing job lifecycles and worker coordination. */
     private val scope: CoroutineScope,
     private val settingsRepository: SettingsRepository
-) : KoinComponent {
+) {
     private val maxConcurrentJobs get() = settingsRepository.settings.value.jobs.maxConcurrentJobs
     private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
     private val maxHistoryLength get() = settingsRepository.settings.value.jobs.maxHistoryLength
@@ -69,7 +70,8 @@ class JobManager(
     private val handlesMutex = Mutex()
     private val activeJobHandles = mutableMapOf<String, JobHandle>()
 
-    private val settingsPersistence: org.wip.plugintoolkit.features.settings.logic.SettingsPersistence by inject()
+    private val settingsPersistence: org.wip.plugintoolkit.features.settings.logic.SettingsPersistence =
+        settingsRepository.persistence
     private val jobRepository = JobRepository(settingsPersistence)
 
     init {
@@ -80,12 +82,13 @@ class JobManager(
                     val newJobIds = currentJobs.map { it.id }.toSet()
                     savedJobs.filterNot { it.id in newJobIds } + currentJobs
                 }
-                
+
                 // Wake up workers in case we loaded queued jobs
                 if (_jobs.value.any { it.status == JobStatus.Queued }) {
                     jobSignal.trySend(Unit)
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Logger.e(e) { "Error loading jobs from repository" }
             }
 
@@ -272,12 +275,12 @@ class JobManager(
 
             // Wait for signal if no jobs are queued
             Logger.v { "No queued jobs, worker waiting for signal..." }
-            
+
             // Before receiving, do one more quick check to avoid unnecessary suspension
             if (_jobs.value.any { it.status == JobStatus.Queued }) {
                 continue
             }
-            
+
             jobSignal.receive()
         }
     }
@@ -475,22 +478,29 @@ class JobManager(
                 val fs = DefaultPluginFileSystem.createCacheOnly(installPath)
                 val json = Json { prettyPrint = true }
                 val stateString = json.encodeToString(JsonElement.serializer(), job.resumeState ?: JsonNull)
-                fs.writeTextFile("resumes/${job.id}.json", stateString)
+                val resumePathResult = RelativePath.from("resumes/${job.id}.json")
+                if (resumePathResult.isSuccess) {
+                    val resumePath = resumePathResult.getOrThrow()
+                    fs.writeTextFile(resumePath, stateString)
 
-                // Update resumes.json index
-                val indexFile = "resumes.json"
-                val currentIndex = if (fs.exists(indexFile)) {
-                    val content = fs.readTextFile(indexFile) ?: "{}"
-                    try {
-                        json.decodeFromString<Map<String, String>>(content)
-                    } catch (e: Exception) {
-                        Logger.w(e) { "Error decoding resumes.json index" }
-                        emptyMap()
+                    // Update resumes.json index
+                    val indexFileResult = RelativePath.from("resumes.json")
+                    if (indexFileResult.isSuccess) {
+                        val indexFile = indexFileResult.getOrThrow()
+                        val currentIndex = if (fs.exists(indexFile)) {
+                            val content = fs.readTextFile(indexFile) ?: "{}"
+                            try {
+                                json.decodeFromString<Map<String, String>>(content)
+                            } catch (e: Exception) {
+                                Logger.w(e) { "Error decoding resumes.json index" }
+                                emptyMap()
+                            }
+                        } else emptyMap()
+
+                        val newIndex = currentIndex + (job.id to "resumes/${job.id}.json")
+                        fs.writeTextFile(indexFile, json.encodeToString(newIndex))
                     }
-                } else emptyMap()
-
-                val newIndex = currentIndex + (job.id to "resumes/${job.id}.json")
-                fs.writeTextFile(indexFile, json.encodeToString(newIndex))
+                }
             }
         }
     }

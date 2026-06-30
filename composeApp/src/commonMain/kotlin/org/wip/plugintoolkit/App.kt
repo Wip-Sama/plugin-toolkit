@@ -1,5 +1,18 @@
 package org.wip.plugintoolkit
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -7,13 +20,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.rememberNavBackStack
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import org.wip.plugintoolkit.core.model.localized
-import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
-import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import org.koin.compose.koinInject
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.app_logo
+import org.jetbrains.compose.resources.painterResource
+import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.AppTheme
 import org.wip.plugintoolkit.core.ui.DialogService
@@ -28,6 +41,7 @@ import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.ui.AppNavigation
 import org.wip.plugintoolkit.ui.AppScaffold
 import org.wip.plugintoolkit.ui.AppUpdateDialogs
@@ -44,6 +58,7 @@ fun App(
 ) {
     val settings by viewModel.settings.collectAsState()
     val languageCode by viewModel.currentLanguageCode.collectAsState()
+    val isLoaded by viewModel.isLoaded.collectAsState()
 
     // Immediately set/update default locale during composition to avoid race conditions
     // where stringResource() evaluates before LaunchedEffect runs.
@@ -104,9 +119,9 @@ private fun AppContentImpl(
                     val newElements = mgtSection.elements.toMutableList()
                     val flowManagerIndex = newElements.indexOfFirst { it.id == Screen.FlowManager }
                     val insertIndex = if (flowManagerIndex >= 0) flowManagerIndex + 1 else newElements.size
-                    
+
                     val editorId = if (currentScreen is Screen.FlowEditor) currentScreen else Screen.FlowEditor("")
-                    
+
                     val editorElement = SidebarElement(
                         id = editorId as Screen,
                         icon = Icons.Default.Edit,

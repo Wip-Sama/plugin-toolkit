@@ -11,14 +11,28 @@ enum class SemanticCategory {
     PATH
 }
 
-object SemanticRegistry {
+interface SemanticRegistry {
     /**
      * Maps a list of SemanticTypes to a SemanticCategory choosing the "best" match based on priority:
      * COLOR > IMAGE > AUDIO > VIDEO > FILE > PATH.
      */
-    fun getCategory(types: List<SemanticType>): SemanticCategory? {
+    fun getCategory(types: List<SemanticType>): SemanticCategory?
+
+    /**
+     * Extracts allowed file extensions from a list of SemanticTypes.
+     */
+    fun getAllowedExtensions(types: List<SemanticType>): List<String>
+}
+
+class DefaultSemanticRegistry : SemanticRegistry {
+    /**
+     * Maps a list of SemanticTypes to a SemanticCategory choosing the "best" match based on priority:
+     * COLOR > IMAGE > AUDIO > VIDEO > FILE > PATH.
+     */
+    override fun getCategory(types: List<SemanticType>): SemanticCategory? {
         val mappedCategories = types.mapNotNull { type ->
-            when (type.name.lowercase()) {
+            val primary = (type.namespace ?: type.name).lowercase()
+            when (primary) {
                 "color" -> SemanticCategory.COLOR
                 "image" -> SemanticCategory.IMAGE
                 "audio" -> SemanticCategory.AUDIO
@@ -43,41 +57,48 @@ object SemanticRegistry {
     /**
      * Extracts allowed file extensions from a list of SemanticTypes.
      */
-    fun getAllowedExtensions(types: List<SemanticType>): List<String> {
+    override fun getAllowedExtensions(types: List<SemanticType>): List<String> {
         val extensions = mutableListOf<String>()
         var hasGenericImage = false
         var hasGenericAudio = false
         var hasGenericVideo = false
 
         for (type in types) {
-            val nameLower = type.name.lowercase()
+            val primary = (type.namespace ?: type.name).lowercase()
             val variant = type.variant
 
-            when (nameLower) {
+            when (primary) {
                 "image" -> {
-                    if (variant == null || variant == "*") {
+                    val ext = if (type.namespace != null) type.name else type.variant
+                    if (ext == null || ext == "*") {
                         hasGenericImage = true
                     } else {
-                        extensions.add(variant)
+                        extensions.add(ext)
                     }
                 }
+
                 "audio" -> {
-                    if (variant == null || variant == "*") {
+                    val ext = if (type.namespace != null) type.name else type.variant
+                    if (ext == null || ext == "*") {
                         hasGenericAudio = true
                     } else {
-                        extensions.add(variant)
+                        extensions.add(ext)
                     }
                 }
+
                 "video" -> {
-                    if (variant == null || variant == "*") {
+                    val ext = if (type.namespace != null) type.name else type.variant
+                    if (ext == null || ext == "*") {
                         hasGenericVideo = true
                     } else {
-                        extensions.add(variant)
+                        extensions.add(ext)
                     }
                 }
+
                 "file" -> {
-                    if (variant != null && variant != "*") {
-                        extensions.add(variant)
+                    val ext = if (type.namespace != null) type.name else type.variant
+                    if (ext != null && ext != "*") {
+                        extensions.add(ext)
                     }
                 }
             }

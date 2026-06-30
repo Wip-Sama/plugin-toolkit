@@ -1,10 +1,31 @@
+Version: 1.7.0
+Date: 01-07-2026
+Added:
+	- It's not possible to change a connection destination/origin after its creation
+	- Tooltip names for the capability/flows with long names
+	- Flows and Nodes now are in a not-ready state if a required parameter is not connected or has a default
+	- Components no longer default to the color purple for accents
+	- PluginsSetting can now define constraints like the CapabilityParameter
+	- Signing for manifest files
+	- Splash screen when opening the application
+	- A couple of nodes to move content out of the sandbox
+Changes:
+  - now updating a plugin will make the button reflect what's happening to avoid confusion
+  - shift is not used to fast delete a node connection
+  - BIG refactor to the plugin-api so 1.7.x is not compatible with 1.6.x
+  - PluginFileSystem is completely revamped with new features and pipelines to follow to be compliant with best practices for plugins
+  - Update download are more resilient
+Fixed:
+  - Broken flow would appear as running
+  - plugin-api would improperly identify the required capability param
+----------------------------------------------------------------------------------------------------
 Version: 1.6.1
 Date: 13-06-2026
 Changes:
 	- Minor improvements to the codebase
 Fixed:
-	- Parsing of null / empty values in flows
-	- Create folder system node not accepting connection in the path port
+  - Parsing of null / empty values in flows
+  - Create folder system node not accepting connection in the path port
 Planned:
   - Create folder would return an error if the folder already existed
 ----------------------------------------------------------------------------------------------------

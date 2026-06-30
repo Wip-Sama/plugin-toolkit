@@ -1,6 +1,5 @@
 package org.wip.plugintoolkit.features.settings.definitions
 
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
@@ -12,13 +11,11 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.NotificationHistorySettings
@@ -27,6 +24,7 @@ import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
 import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
+import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 
 fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewModel) {
     nav(SettingNavKey.SystemSettings) {

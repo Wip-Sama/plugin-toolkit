@@ -25,15 +25,23 @@ class PluginLifecycleManagerTest {
         override fun deleteDirectory(path: String): Boolean = true
         override fun readFileFromZip(zipPath: String, fileName: String): String? = null
         override fun listFiles(path: String): List<String> = emptyList()
-        override fun saveFile(path: String, content: ByteArray) { files[path] = content.decodeToString() }
+        override fun saveFile(path: String, content: ByteArray) {
+            files[path] = content.decodeToString()
+        }
+
         override fun readFile(path: String): String? = files[path]
-        override fun writeFile(path: String, content: String) { files[path] = content }
+        override fun writeFile(path: String, content: String) {
+            files[path] = content
+        }
     }
 
     private class FakeSettingsPersistence : SettingsPersistence {
         var settings = AppSettings()
-        override fun load(): AppSettings = settings
-        override fun save(settings: AppSettings) { this.settings = settings }
+        override suspend fun load(): AppSettings = settings
+        override suspend fun save(settings: AppSettings) {
+            this.settings = settings
+        }
+
         override fun getSettingsDir(): String = "/tmp"
         override fun getJobsDir(): String = "/tmp/jobs"
         override fun openLogFolder() {}
@@ -45,12 +53,20 @@ class PluginLifecycleManagerTest {
         val fileSystem = FakeFileSystem()
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
-        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
 
         val pkg = "test.plugin"
-        registry.addOrUpdatePlugin(InstalledPlugin(pkg = pkg, name = "Test", version = "1.0.0", installPath = "/tmp/test.plugin"))
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(
+                pkg = pkg,
+                name = "Test",
+                version = "1.0.0",
+                installPath = "/tmp/test.plugin"
+            )
+        )
 
         val store = PluginSettingsStore(settings = mapOf("key" to JsonPrimitive("value")))
         lifecycleManager.savePluginSettings(pkg, store)
@@ -62,12 +78,12 @@ class PluginLifecycleManagerTest {
 
         println("Asserting loaded1 === loaded2")
         assertSame(loaded1, loaded2, "Should return cached instance")
-        
+
         // Update settings
         val newStore = PluginSettingsStore(settings = mapOf("key" to JsonPrimitive("new-value")))
         println("Saving new settings")
         lifecycleManager.savePluginSettings(pkg, newStore)
-        
+
         println("Loading settings again")
         val loaded3 = lifecycleManager.loadPluginSettings(pkg)
         println("Asserting loaded1 !== loaded3")
@@ -85,27 +101,43 @@ class PluginLifecycleManagerTest {
         val fileSystem = FakeFileSystem()
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
-        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
 
         val pkg = "test.error.plugin"
-        registry.addOrUpdatePlugin(InstalledPlugin(pkg = pkg, name = "Test", version = "1.0.0", installPath = "/tmp/test.plugin", isEnabled = true))
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(
+                pkg = pkg,
+                name = "Test",
+                version = "1.0.0",
+                installPath = "/tmp/test.plugin",
+                isEnabled = true
+            )
+        )
 
         io.mockk.mockkObject(PluginLoader)
         try {
             io.mockk.every { PluginLoader.loadPlugin(any(), any()) } throws Error("Incompatible plugin")
 
             val result = lifecycleManager.loadPlugin(pkg)
-            
+
             kotlin.test.assertTrue(result.isFailure, "Result should be failure when an Error is thrown")
             val exception = result.exceptionOrNull()
             kotlin.test.assertNotNull(exception, "Exception should not be null")
-            kotlin.test.assertTrue(exception.message?.contains("Fatal error loading plugin classes") == true, "Exception message should indicate fatal error")
-            
+            kotlin.test.assertTrue(
+                exception.message?.contains("Fatal error loading plugin classes") == true,
+                "Exception message should indicate fatal error"
+            )
+
             // Check if loadError was updated
             val updatedPlugin = registry.getPlugin(pkg)
-            kotlin.test.assertEquals("Fatal error loading plugin classes", updatedPlugin?.loadError, "Load error should be set on the plugin")
+            kotlin.test.assertEquals(
+                "Fatal error loading plugin classes",
+                updatedPlugin?.loadError,
+                "Load error should be set on the plugin"
+            )
         } finally {
             io.mockk.unmockkAll()
         }

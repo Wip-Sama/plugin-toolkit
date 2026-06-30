@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -87,7 +86,8 @@ fun DialogHost(dialogService: DialogService) {
                                         data.onSelected(folder)
                                         dialogService.dismiss()
                                     },
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = ToolkitTheme.spacing.extraSmall)
+                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(vertical = ToolkitTheme.spacing.extraSmall)
                                 ) {
                                     Text(folder)
                                 }

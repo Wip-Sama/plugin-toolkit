@@ -22,6 +22,8 @@ import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Manages the runtime lifecycle of plugins (loading, unloading, context creation).
@@ -38,20 +40,27 @@ class PluginLifecycleManager(
 
     // Cache for decrypted plugin settings to avoid redundant IO and decryption
     private val settingsCache = ConcurrentHashMap<String, PluginSettingsStore>()
-    
+
     private val json = kotlinx.serialization.json.Json {
         prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
 
+    private val pluginLocks = ConcurrentHashMap<String, Mutex>()
+    private fun getPluginLock(pkg: String) = pluginLocks.getOrPut(pkg) { Mutex() }
+
     /**
      * Loads a plugin into the JVM and initializes it.
      */
-    suspend fun loadPlugin(pkg: String): Result<Unit> {
+    suspend fun loadPlugin(pkg: String): Result<Unit> = getPluginLock(pkg).withLock {
+        loadPluginInternal(pkg)
+    }
+
+    private suspend fun loadPluginInternal(pkg: String): Result<Unit> {
         Logger.i { "Loading plugin: $pkg" }
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin $pkg not found in registry"))
-        
+
         if (!plugin.isEnabled) {
             Logger.d { "Plugin $pkg is disabled, skipping runtime load" }
             return Result.success(Unit)
@@ -93,12 +102,12 @@ class PluginLifecycleManager(
         } catch (t: Throwable) {
             Result.failure(Exception("Fatal error loading plugin classes", t))
         }
-        
+
         return if (result.isSuccess) {
             val entry = result.getOrThrow()
             try {
                 // Initialize with context
-                val manifest = entry.getManifest()
+                val manifest = entry.getManifest().getOrThrow()
                 val initResult = entry.initialize(createPluginContext(pkg, manifest = manifest))
                 if (initResult.isFailure) {
                     val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")
@@ -144,9 +153,13 @@ class PluginLifecycleManager(
     /**
      * Unloads a plugin from the runtime.
      */
-    suspend fun unloadPlugin(pkg: String) {
+    suspend fun unloadPlugin(pkg: String) = getPluginLock(pkg).withLock {
+        unloadPluginInternal(pkg)
+    }
+
+    private suspend fun unloadPluginInternal(pkg: String) {
         Logger.i { "Unloading plugin: $pkg" }
-        
+
         // Safety check for running jobs
         ensureSafeToUnload(listOf(pkg)).onFailure { throw it }
 
@@ -155,10 +168,10 @@ class PluginLifecycleManager(
             Logger.w { "Cannot unload $pkg: not found in registry" }
             return
         }
-        
+
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"
-        
+
         PluginLoader.unloadPlugin(jarFile)
         _loadedPlugins.update { it - pkg }
         Logger.d { "Plugin $pkg unloaded and removed from active set" }
@@ -167,9 +180,9 @@ class PluginLifecycleManager(
     /**
      * Sequential unload and load.
      */
-    suspend fun reloadPlugin(pkg: String) {
-        unloadPlugin(pkg)
-        loadPlugin(pkg)
+    suspend fun reloadPlugin(pkg: String) = getPluginLock(pkg).withLock {
+        unloadPluginInternal(pkg)
+        loadPluginInternal(pkg)
     }
 
     /**
@@ -197,7 +210,8 @@ class PluginLifecycleManager(
         if (runningJobs.isNotEmpty()) {
             val settings = settingsRepository.loadSettings()
             if (settings.extensions.pluginUnplugBehavior == PluginUnplugBehavior.Block) {
-                val msg = "Cannot proceed: ${runningJobs.size} jobs are still running for plugins: ${pkgs.joinToString()}"
+                val msg =
+                    "Cannot proceed: ${runningJobs.size} jobs are still running for plugins: ${pkgs.joinToString()}"
                 Logger.w { msg }
                 return Result.failure(Exception(msg))
             } else {
@@ -209,7 +223,7 @@ class PluginLifecycleManager(
     }
 
     private suspend fun updateLoadError(pkg: String, error: String?) {
-        registry.updatePlugin(pkg) { 
+        registry.updatePlugin(pkg) {
             it.copy(
                 loadError = error,
                 // Fatal load errors invalidate the plugin state
@@ -237,14 +251,18 @@ class PluginLifecycleManager(
         }
 
         val manifest = getManifest(pkg)
-        
+
         val decryptedSettings = store.settings.mapValues { (key, value) ->
             val isSecret = manifest?.settings?.get(key)?.secret == true
             if (isSecret && value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
                 val content = value.content
                 if (content.startsWith("ENC[") && content.endsWith("]")) {
                     val encryptedPart = content.substring(4, content.length - 1)
-                    kotlinx.serialization.json.JsonPrimitive(org.wip.plugintoolkit.core.utils.SecureStorage.decrypt(encryptedPart))
+                    kotlinx.serialization.json.JsonPrimitive(
+                        org.wip.plugintoolkit.core.utils.SecureStorage.decrypt(
+                            encryptedPart
+                        )
+                    )
                 } else {
                     value
                 }
@@ -261,7 +279,7 @@ class PluginLifecycleManager(
     fun savePluginSettings(pkg: String, store: PluginSettingsStore) {
         val plugin = registry.getPlugin(pkg) ?: return
         val settingsFile = "${plugin.installPath}/settings.json"
-        
+
         val manifest = getManifest(pkg)
         val encryptedSettings = store.settings.mapValues { (key, value) ->
             val isSecret = manifest?.settings?.get(key)?.secret == true
@@ -283,7 +301,14 @@ class PluginLifecycleManager(
         }
     }
 
-    fun createPluginContext(pkg: String, jobId: String? = null, manifest: PluginManifest? = null): PluginContext {
+    fun createPluginContext(
+        pkg: String,
+        jobId: String? = null,
+        manifest: PluginManifest? = null,
+        allowedPaths: List<String> = emptyList(),
+        isDestructiveAllowed: Boolean = false,
+        executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null
+    ): PluginContext {
         val plugin = registry.getPlugin(pkg)
         val installPath = plugin?.installPath ?: ""
         val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }
@@ -291,12 +316,12 @@ class PluginLifecycleManager(
         val storedSettings = loadPluginSettings(pkg)
         val actualManifest = manifest ?: getManifest(pkg)
         val mergedSettings = mutableMapOf<String, JsonElement>()
-        
+
         // 1. Manifest defaults
         actualManifest?.settings?.forEach { (key, meta) ->
             meta.defaultValue?.let { mergedSettings[key] = it }
         }
-        
+
         // 2. User overrides
         mergedSettings.putAll(storedSettings.settings)
 
@@ -312,6 +337,8 @@ class PluginLifecycleManager(
             progress = progressReporter,
             fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
             cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath),
+            executionFileSystem = executionFileSystem ?: DefaultExecutionFileSystem("${installPath}/temp_execution"),
+            hostFileSystem = HostFileSystemImpl(allowedPaths, isDestructiveAllowed),
             settings = mergedSettings,
             onRequiredActionChange = { actionName ->
                 registry.scope.launch {
@@ -325,10 +352,10 @@ class PluginLifecycleManager(
         val plugin = registry.getPlugin(pkg) ?: return null
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"
-        
+
         val manifestContent = fileSystem.readFileFromZip(jarFile, "manifest.json")
             ?: fileSystem.readFileFromZip(jarFile, "META-INF/manifest.json")
-            
+
         return manifestContent?.let {
             try {
                 json.decodeFromString<PluginManifest>(it)
@@ -343,10 +370,10 @@ class PluginLifecycleManager(
         val plugin = registry.getPlugin(pkg) ?: return emptyList()
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"
-        
+
         val content = fileSystem.readFileFromZip(jarFile, "migrations.json")
             ?: fileSystem.readFileFromZip(jarFile, "META-INF/migrations.json")
-            
+
         return content?.let {
             try {
                 json.decodeFromString<List<PluginMigration>>(it)
@@ -382,6 +409,8 @@ class DefaultPluginContext(
     override val progress: ProgressReporter,
     override val fileSystem: PluginFileSystem,
     override val cacheFileSystem: PluginFileSystem,
+    override val executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem,
+    override val hostFileSystem: org.wip.plugintoolkit.api.HostFileSystem,
     override val settings: Map<String, JsonElement>,
     override val signals: PluginSignalManager = DefaultPluginSignalManager(),
     private val onRequiredActionChange: (String?) -> Unit = {}

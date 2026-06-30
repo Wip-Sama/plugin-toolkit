@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,17 +33,15 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,8 +51,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -65,8 +60,7 @@ import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.CircularProgressIndicator
+import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
@@ -116,7 +110,7 @@ fun PluginManagerView(
         val availablePlugins by viewModel.availableRemotePlugins.collectAsState()
         val installedPlugins by viewModel.installedPlugins.collectAsState()
         val activeJobs by viewModel.activePluginInstallationJobs.collectAsState()
-        
+
         RemotePluginInstallDialog(
             availablePlugins = availablePlugins,
             installedPackageNames = installedPlugins.map { it.pkg }.toSet(),
@@ -241,6 +235,7 @@ fun PluginManagerView(
                                 PluginStatusAction.RerunSetup -> viewModel.rerunSetup(plugin.pkg)
                                 PluginStatusAction.Changelog -> viewModel.showChangelog(plugin.pkg)
                                 PluginStatusAction.Settings -> viewModel.openSettings(plugin.pkg)
+                                PluginStatusAction.OpenFolder -> viewModel.openFolder(plugin.pkg)
                                 is PluginStatusAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
                             }
                         }
@@ -351,27 +346,45 @@ fun PluginCard(
                     Text(plugin.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if (plugin.loadError != null) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        StatusBadge(stringResource(Res.string.plugin_broken), MaterialTheme.colorScheme.error)
+                        ToolkitChip(
+                            text= stringResource(Res.string.plugin_broken),
+                            containerColor =  MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        )
                     } else if (isLoaded) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        StatusBadge(stringResource(Res.string.plugin_loaded), ToolkitTheme.colors.success)
+                        ToolkitChip(
+                            stringResource(Res.string.plugin_loaded),
+                            containerColor = ToolkitTheme.colors.success,
+                            contentColor = ToolkitTheme.colors.onSuccess, //TODO: do not like having the same color here
+                        )
                     }
 
                     if (plugin.requiredAction != null) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        val badgeText = if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Setup Required" else "Action Required"
-                        StatusBadge(badgeText, ToolkitTheme.colors.warning)
+                        val badgeText =
+                            if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Setup Required" else "Action Required"
+                        ToolkitChip(
+                            badgeText,
+                            containerColor = ToolkitTheme.colors.warning,
+                            contentColor = ToolkitTheme.colors.onWarning //TODO: not liking having the same color here
+                        )
                     }
-                    
+
                     if (plugin.loadError == null) {
                         if (plugin.isValidated) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            StatusBadge(stringResource(Res.string.plugin_validated), ToolkitTheme.colors.validated)
+                            ToolkitChip(
+                                text = stringResource(Res.string.plugin_validated),
+                                contentColor = ToolkitTheme.colors.validated,
+                                containerColor = ToolkitTheme.colors.onValidated
+                            )
                         } else {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            StatusBadge(
-                                stringResource(Res.string.plugin_validation_pending),
-                                MaterialTheme.colorScheme.error
+                            ToolkitChip(
+                                text = stringResource(Res.string.plugin_validation_pending),
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
                     }
@@ -404,11 +417,11 @@ fun PluginCard(
                         val action = customActions.find { it.functionName == reqAction }
                         item { shape, modifierSpec ->
                             Button(
-                                onClick = { 
+                                onClick = {
                                     if (reqAction == "CONFIGURE_SETTINGS") {
                                         onAction(PluginStatusAction.Settings)
                                     } else {
-                                        onAction(PluginStatusAction.Custom(reqAction)) 
+                                        onAction(PluginStatusAction.Custom(reqAction))
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
@@ -416,7 +429,10 @@ fun PluginCard(
                                 modifier = modifierSpec,
                                 enabled = readyStatus
                             ) {
-                                Text(if (reqAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue"))
+                                Text(
+                                    if (reqAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name
+                                        ?: "Fix Issue")
+                                )
                             }
                         }
                     }
@@ -523,6 +539,11 @@ fun PluginCard(
                                     onClick = { onAction(PluginStatusAction.Settings); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
                                 )
+                                DropdownMenuItem(
+                                    text = { Text("Open Folder") },
+                                    onClick = { onAction(PluginStatusAction.OpenFolder); expanded = false },
+                                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
+                                )
                                 androidx.compose.material3.HorizontalDivider()
                                 DropdownMenuItem(
                                     text = {
@@ -549,26 +570,6 @@ fun PluginCard(
     }
 }
 
-@Composable
-private fun StatusBadge(text: String, color: Color) {
-    Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = MaterialTheme.shapes.extraSmall,
-        modifier = Modifier.border(ToolkitTheme.dimensions.borderUnselected, color.copy(alpha = 0.2f), MaterialTheme.shapes.extraSmall)
-    ) {
-        Text(
-            text,
-            modifier = Modifier.padding(
-                horizontal = ToolkitTheme.spacing.extraSmall,
-                vertical = ToolkitTheme.spacing.extraSmall / 2
-            ),
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
 sealed class PluginStatusAction {
     object Uninstall : PluginStatusAction()
     object Reload : PluginStatusAction()
@@ -577,5 +578,6 @@ sealed class PluginStatusAction {
     object RerunSetup : PluginStatusAction()
     object Changelog : PluginStatusAction()
     object Settings : PluginStatusAction()
+    object OpenFolder : PluginStatusAction()
     data class Custom(val name: String) : PluginStatusAction()
 }

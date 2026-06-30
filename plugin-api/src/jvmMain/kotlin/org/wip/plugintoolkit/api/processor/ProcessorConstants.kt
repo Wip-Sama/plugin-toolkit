@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.DataProcessor
 import org.wip.plugintoolkit.api.ExecutionResult
+import org.wip.plugintoolkit.api.HostFileSystem
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
@@ -30,11 +31,14 @@ import org.wip.plugintoolkit.api.SettingMetadata
 object ProcessorConstants {
     const val API_PACKAGE = "org.wip.plugintoolkit.api"
     const val ANNOTATION_PACKAGE = "$API_PACKAGE.annotations"
-    
+
     // Annotations
     const val PLUGIN_INFO_ANNOTATION = "$ANNOTATION_PACKAGE.PluginInfo"
     const val CAPABILITY_ANNOTATION = "$ANNOTATION_PACKAGE.Capability"
     const val CAPABILITY_PARAM_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityParam"
+    const val CAPABILITY_INPUT_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityInput"
+    const val CAPABILITY_OUTPUT_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityOutput"
+    const val CAPABILITY_RESULT_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityResult"
     const val PLUGIN_SETTING_ANNOTATION = "$ANNOTATION_PACKAGE.PluginSetting"
     const val PLUGIN_ACTION_ANNOTATION = "$ANNOTATION_PACKAGE.PluginAction"
     const val RESUME_STATE_ANNOTATION = "$ANNOTATION_PACKAGE.ResumeState"
@@ -42,6 +46,7 @@ object ProcessorConstants {
     const val PLUGIN_VALIDATE_ANNOTATION = "$ANNOTATION_PACKAGE.PluginValidate"
     const val PLUGIN_LOAD_ANNOTATION = "$ANNOTATION_PACKAGE.PluginLoad"
     const val PLUGIN_UPDATE_ANNOTATION = "$ANNOTATION_PACKAGE.PluginUpdate"
+    const val COMPLEX_OBJECT_ANNOTATION = "$ANNOTATION_PACKAGE.ComplexObject"
 
     // API Classes
     val CN_PLUGIN_MANIFEST = PluginManifest::class.asClassName()
@@ -62,11 +67,13 @@ object ProcessorConstants {
     val CN_PLUGIN_MODULE_PROVIDER = PluginModuleProvider::class.asClassName()
     val CN_PLUGIN_LOGGER = PluginLogger::class.asClassName()
     val CN_PLUGIN_FILESYSTEM = PluginFileSystem::class.asClassName()
+    val CN_EXECUTION_FILESYSTEM = org.wip.plugintoolkit.api.ExecutionFileSystem::class.asClassName()
+    val CN_HOST_FILESYSTEM = HostFileSystem::class.asClassName()
     val CN_PROGRESS_REPORTER = ProgressReporter::class.asClassName()
     val CN_EXECUTION_RESULT = ExecutionResult::class.asClassName()
     val CN_EXECUTION_RESULT_SUCCESS = ExecutionResult.Success::class.asClassName()
     val CN_EXECUTION_RESULT_ERROR = ExecutionResult.Error::class.asClassName()
-    
+
     // Common Types
     val CN_MAP = ClassName("kotlin.collections", "Map")
     val CN_LIST = ClassName("kotlin.collections", "List")
@@ -80,7 +87,7 @@ object ProcessorConstants {
     val CN_JSON = Json::class.asClassName()
     val MN_DECODE_FROM_JSON_ELEMENT = MemberName("kotlinx.serialization.json", "decodeFromJsonElement")
     val MN_ENCODE_FROM_JSON_ELEMENT = MemberName("kotlinx.serialization.json", "encodeToJsonElement")
-    
+
     val CN_COROUTINE_SCOPE = CoroutineScope::class.asClassName()
     val CN_DISPATCHERS = Dispatchers::class.asClassName()
     val MN_SUPERVISOR_JOB = MemberName("kotlinx.coroutines", "SupervisorJob")
@@ -96,6 +103,8 @@ object ProcessorConstants {
         CN_PLUGIN_LOGGER,
         CN_PROGRESS_REPORTER,
         CN_PLUGIN_FILESYSTEM,
+        CN_EXECUTION_FILESYSTEM,
+        CN_HOST_FILESYSTEM,
         CN_PLUGIN_CONTEXT
     )
 }

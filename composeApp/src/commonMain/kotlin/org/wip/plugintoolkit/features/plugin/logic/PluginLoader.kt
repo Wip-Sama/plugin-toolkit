@@ -17,7 +17,8 @@ private data class LoadedPlugin(
     val jarPath: String,
     val entry: PluginEntry,
     val classLoader: URLClassLoader,
-    val koinApp: org.koin.core.KoinApplication
+    val koinApp: org.koin.core.KoinApplication,
+    val lastModified: Long
 )
 
 object PluginLoader {
@@ -46,13 +47,21 @@ object PluginLoader {
         // while allowing different plugins to load in parallel.
         synchronized(getJarLock(normalizedPath)) {
             try {
-                // If already loaded, return it
+                val path = Path(normalizedPath)
+                val file = File(normalizedPath)
+                val currentLastModified = if (file.exists()) file.lastModified() else 0L
+
+                // If already loaded, return it (unless it was modified)
                 loadedPlugins[normalizedPath]?.let {
-                    Logger.d { "Plugin already loaded: $normalizedPath" }
-                    return Result.success(it.entry)
+                    if (it.lastModified == currentLastModified) {
+                        Logger.d { "Plugin already loaded and up to date: $normalizedPath" }
+                        return Result.success(it.entry)
+                    } else {
+                        Logger.i { "Plugin jar was modified, reloading: $normalizedPath" }
+                        unloadPlugin(jarPath) // Unload the old version first
+                    }
                 }
 
-                val path = Path(normalizedPath)
                 if (!SystemFileSystem.exists(path)) {
                     Logger.e { "Plugin JAR file not found: $normalizedPath (original: $jarPath)" }
                     return Result.failure(Exception("File not found: $normalizedPath"))
@@ -65,7 +74,8 @@ object PluginLoader {
                 // Use ServiceLoader to find the PluginModuleProvider implementation
                 val loader = ServiceLoader.load(PluginModuleProvider::class.java, newClassLoader)
                 val moduleProvider =
-                    loader.firstOrNull() ?: throw Exception("No PluginModuleProvider implementation found in $normalizedPath")
+                    loader.firstOrNull()
+                        ?: throw Exception("No PluginModuleProvider implementation found in $normalizedPath")
 
                 // Create an isolated Koin application for this plugin
                 val koinApp = koinApplication {
@@ -76,10 +86,11 @@ object PluginLoader {
                 val pluginEntry = koinApp.koin.get<PluginEntry>()
 
                 // Cache the ID for O(1) lookups
-                val manifest = pluginEntry.getManifest()
+                val manifest = pluginEntry.getManifest().getOrThrow()
                 val pluginId = manifest.plugin.id
 
-                val loadedPlugin = LoadedPlugin(pluginId, normalizedPath, pluginEntry, newClassLoader, koinApp)
+                val loadedPlugin =
+                    LoadedPlugin(pluginId, normalizedPath, pluginEntry, newClassLoader, koinApp, currentLastModified)
                 loadedPlugins[normalizedPath] = loadedPlugin
                 idToJarPath[pluginId] = normalizedPath
 

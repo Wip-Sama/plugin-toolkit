@@ -70,14 +70,14 @@ fun DirectExecutionSidebar(
         ) { pluginId ->
             if (pluginId == null) {
                 val pluginsElements = loadedPlugins.map { plugin ->
-                    val manifest = plugin.getManifest()
+                    val manifest = plugin.getManifest().getOrThrow()
                     SidebarElement(
                         id = manifest.plugin.id,
                         icon = Icons.Default.Extension,
                         title = manifest.plugin.name.localized
                     )
                 }
-                
+
                 NavigationSidebar(
                     title = Res.string.section_loaded_plugins.localized,
                     bodySections = listOf(SidebarSectionData(title = null, elements = pluginsElements)),
@@ -88,9 +88,9 @@ fun DirectExecutionSidebar(
                     canCollapse = false
                 )
             } else {
-                val plugin = loadedPlugins.find { it.getManifest().plugin.id == pluginId }
+                val plugin = loadedPlugins.find { it.getManifest().getOrThrow().plugin.id == pluginId }
                 if (plugin != null) {
-                    val manifest = plugin.getManifest()
+                    val manifest = plugin.getManifest().getOrThrow()
                     val capabilityElements = manifest.capabilities.map { capability ->
                         SidebarElement(
                             id = capability,
@@ -119,9 +119,16 @@ fun DirectExecutionSidebar(
                             ) {
                                 TextButton(
                                     onClick = onBackToPlugins,
-                                    contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                                    contentPadding = PaddingValues(
+                                        horizontal = ToolkitTheme.spacing.small,
+                                        vertical = ToolkitTheme.spacing.extraSmall
+                                    )
                                 ) {
-                                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        Icons.Default.ArrowBack,
+                                        contentDescription = "Back",
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                                     Text("Back", style = MaterialTheme.typography.labelMedium)
                                 }
@@ -135,7 +142,7 @@ fun DirectExecutionSidebar(
                                         style = MaterialTheme.typography.labelSmall,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
-                                     )
+                                    )
                                 }
                             }
                         }

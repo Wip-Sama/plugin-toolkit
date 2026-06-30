@@ -14,8 +14,11 @@ class JobManagerTest {
 
     private class FakeSettingsPersistence : SettingsPersistence {
         var settings = AppSettings()
-        override fun load(): AppSettings = settings
-        override fun save(settings: AppSettings) { this.settings = settings }
+        override suspend fun load(): AppSettings = settings
+        override suspend fun save(settings: AppSettings) {
+            this.settings = settings
+        }
+
         override fun getSettingsDir(): String = "/tmp"
         override fun getJobsDir(): String = "/tmp/jobs"
         override fun openLogFolder() {}
@@ -38,13 +41,13 @@ class JobManagerTest {
             keepResult = true
         )
         jobManager.enqueueJob(job1)
-        
+
         // Claim the job and run it, then complete it
         val claimed1 = jobManager.waitForNextJob()
         assertEquals("job-1", claimed1.id)
         val completed1 = jobManager.tryCompleteJob("job-1", "result-1")
         assertTrue(completed1)
-        
+
         // Verify it is in endedJobs
         assertEquals(1, jobManager.endedJobs.value.size)
         assertEquals("job-1", jobManager.endedJobs.value[0].id)
@@ -59,7 +62,7 @@ class JobManagerTest {
             keepResult = false
         )
         jobManager.enqueueJob(job2)
-        
+
         // Verify job1 (keepResult = true) was NOT deleted when job2 was enqueued!
         assertEquals(1, jobManager.endedJobs.value.size)
         assertEquals("job-1", jobManager.endedJobs.value[0].id)

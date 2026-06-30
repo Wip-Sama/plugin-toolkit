@@ -16,11 +16,12 @@ class SemanticType {
         this.variant = variant?.trim()?.lowercase()?.let { normalizeNFKC(it) }?.takeIf { it.isNotEmpty() }
     }
 
-    val canonicalId: String get() = buildString {
-        if (namespace != null) append("$namespace/")
-        append(name)
-        if (variant != null) append(":$variant")
-    }
+    val canonicalId: String
+        get() = buildString {
+            if (namespace != null) append("$namespace/")
+            append(name)
+            if (variant != null) append(":$variant")
+        }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -54,17 +55,6 @@ fun parseSemanticType(token: String): SemanticType? {
     var namespace = g1
     var name = g2
     var variant = g3
-
-    if (namespace != null && variant == null) {
-        val isMimeCategory = namespace.lowercase() in setOf(
-            "image", "audio", "video", "text", "application", "font", "file", "color", "path"
-        )
-        if (isMimeCategory) {
-            variant = name
-            name = namespace
-            namespace = null
-        }
-    }
 
     return SemanticType(namespace, name, variant)
 }

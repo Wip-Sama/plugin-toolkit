@@ -44,7 +44,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
-import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -69,7 +69,7 @@ import plugintoolkit.composeapp.generated.resources.landing_welcome_title
 @Composable
 fun LandingPage(
     modifier: Modifier = Modifier,
-    viewModel: PluginViewModel = koinViewModel(),
+    viewModel: PluginViewModel = koinInject(),
     jobManager: JobManager = koinInject(),
     onNavigate: (Screen) -> Unit = {}
 ) {

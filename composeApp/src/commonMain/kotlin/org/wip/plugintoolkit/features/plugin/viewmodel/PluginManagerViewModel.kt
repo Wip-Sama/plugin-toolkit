@@ -12,13 +12,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
@@ -38,6 +38,8 @@ import plugintoolkit.composeapp.generated.resources.plugin_uninstall_title
 import plugintoolkit.composeapp.generated.resources.plugin_validated_success
 import plugintoolkit.composeapp.generated.resources.plugin_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_result
+import plugintoolkit.composeapp.generated.resources.plugin_validation_result
+import org.wip.plugintoolkit.core.notification.NotificationService
 
 class PluginManagerViewModel(
     private val pluginManager: PluginManager,
@@ -45,14 +47,16 @@ class PluginManagerViewModel(
     private val settingsRepository: SettingsRepository,
     private val repoManager: RepoManager,
     private val jobManager: JobManager,
-    private val flowViewModel: FlowViewModel
+    private val flowViewModel: FlowViewModel,
+    private val appConfig: SystemConfig,
+    private val notificationService: NotificationService
 ) : ViewModel() {
 
     val installedPlugins = pluginManager.installedPlugins
     val loadedPlugins = pluginManager.loadedPlugins
     val isRegistryReady = pluginManager.isRegistryReady
 
-    val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
+    val defaultPluginFolder = settingsRepository.getSettingsDir() + "/" + appConfig.PLUGINS_DIR_NAME
 
     val managedFolders: StateFlow<List<String>> = settingsRepository.settings
         .map { settings ->
@@ -79,7 +83,7 @@ class PluginManagerViewModel(
 
     private val _togglingPlugins = MutableStateFlow<Set<String>>(emptySet())
     val togglingPlugins: StateFlow<Set<String>> = _togglingPlugins.asStateFlow()
-    
+
     // Persistence flags handled via InstalledPlugin now
 
     init {
@@ -104,10 +108,15 @@ class PluginManagerViewModel(
                         dialogService.showConfirmation(
                             title = "Invalid Signature",
                             message = "Plugin ${plugin.name} has an invalid signature. Do you want to load it anyway? If you ignore, the plugin will remain locked and unloaded.",
-                            onConfirm = { 
+                            onConfirm = {
                                 viewModelScope.launch {
                                     pluginManager.updatePlugin(plugin.pkg) { p ->
-                                        p.copy(requiredAction = null, isEnabled = true, loadError = null, isValidated = true) 
+                                        p.copy(
+                                            requiredAction = null,
+                                            isEnabled = true,
+                                            loadError = null,
+                                            isValidated = true
+                                        )
                                     }
                                     pluginManager.reloadPlugin(plugin.pkg)
                                 }
@@ -249,24 +258,47 @@ class PluginManagerViewModel(
 
     fun uninstall(pkg: String) {
         viewModelScope.launch {
-            val msg = getString(Res.string.plugin_uninstall_confirmation, pkg)
-            val title = getString(Res.string.plugin_uninstall_title)
-            dialogService.showConfirmation(
-                title,
-                msg,
-                onConfirm = {
-                    viewModelScope.launch {
-                        val result = pluginManager.uninstall(pkg)
-                        result.onFailure { error ->
-                            dialogService.showWarning(
-                                getString(Res.string.plugin_uninstall_blocked),
-                                error.message ?: getString(Res.string.plugin_uninstall_error),
-                                onConfirm = {}
-                            )
+            try {
+                notificationService.toast("Initiating removal of $pkg...")
+                try {
+                    val msg = getString(Res.string.plugin_uninstall_confirmation, pkg)
+                    val title = getString(Res.string.plugin_uninstall_title)
+                    dialogService.showConfirmation(
+                        title,
+                        msg,
+                        onConfirm = {
+                            viewModelScope.launch {
+                                notificationService.toast("Uninstall confirmed for $pkg")
+                                val result = pluginManager.uninstall(pkg)
+                                result.onFailure { error ->
+                                    notificationService.toast("Failed to uninstall $pkg: ${error.message}")
+                                }.onSuccess {
+                                    notificationService.toast("Plugin $pkg uninstalled")
+                                }
+                            }
                         }
-                    }
+                    )
+                } catch (e: Throwable) {
+                    // Fallback if getString fails (e.g. format args mismatch in CMP)
+                    dialogService.showConfirmation(
+                        "Uninstall Plugin",
+                        "Are you sure you want to uninstall $pkg?",
+                        onConfirm = {
+                            viewModelScope.launch {
+                                notificationService.toast("Uninstall confirmed for $pkg (Fallback)")
+                                val result = pluginManager.uninstall(pkg)
+                                result.onFailure { error ->
+                                    notificationService.toast("Failed to uninstall $pkg: ${error.message}")
+                                }.onSuccess {
+                                    notificationService.toast("Plugin $pkg uninstalled")
+                                }
+                            }
+                        }
+                    )
                 }
-            )
+            } catch (t: Throwable) {
+                notificationService.toast("Critical error during uninstall init: ${t.message}")
+            }
         }
     }
 
@@ -379,8 +411,15 @@ class PluginManagerViewModel(
         _settingsPkg.value = null
     }
 
+    fun openFolder(pkg: String) {
+        val plugin = pluginManager.installedPlugins.value.find { it.pkg == pkg }
+        plugin?.installPath?.let { path ->
+            PlatformUtils.openFolder(path)
+        }
+    }
+
     fun getUpdate(pkg: String) = pluginManager.getUpdate(pkg)
-    
+
     fun fixIssue(pkg: String) {
         openSettings(pkg)
     }

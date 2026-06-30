@@ -15,12 +15,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.composed
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -71,8 +71,15 @@ fun TooltipArea(
                 Box(
                     modifier = Modifier
                         .shadow(ToolkitTheme.spacing.small, RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
-                        .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(ToolkitTheme.spacing.extraSmall)
+                        )
+                        .border(
+                            ToolkitTheme.dimensions.borderUnselected,
+                            MaterialTheme.colorScheme.outlineVariant,
+                            RoundedCornerShape(ToolkitTheme.spacing.extraSmall)
+                        )
                         .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                 ) {
                     tooltip()

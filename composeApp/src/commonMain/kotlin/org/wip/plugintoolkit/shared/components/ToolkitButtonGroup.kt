@@ -1,17 +1,16 @@
 package org.wip.plugintoolkit.shared.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
-
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.draw.clip
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun ToolkitButtonGroup(
@@ -51,12 +50,14 @@ fun ToolkitButtonGroup(
                     topEnd = innerCorner,
                     bottomEnd = innerCorner
                 )
+
                 isLast -> RoundedCornerShape(
                     topStart = innerCorner,
                     bottomStart = innerCorner,
                     topEnd = buttonOuterCorner,
                     bottomEnd = buttonOuterCorner
                 )
+
                 else -> RoundedCornerShape(innerCorner)
             }
 

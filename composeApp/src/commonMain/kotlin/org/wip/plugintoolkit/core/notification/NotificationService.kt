@@ -10,6 +10,7 @@ interface NotificationService {
 
     fun notify(title: String, message: String, type: NotificationType = NotificationType.Info)
     fun toast(message: String, isNotification: Boolean = true)
+
     // Prefer using LocalizedString for messages that should remain up-to-date when language changes.
     fun toast(message: LocalizedString, isNotification: Boolean = true)
 

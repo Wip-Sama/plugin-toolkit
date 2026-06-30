@@ -13,43 +13,20 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.io.buffered
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.readString
 import kotlinx.io.writeString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.long
-import kotlinx.serialization.json.longOrNull
 import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 import org.koin.core.component.inject
-import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.SemanticType
-import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginRequest
-import org.wip.plugintoolkit.api.PrimitiveType
-import org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
-import org.koin.core.component.get
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
 class JobWorker(
@@ -59,6 +36,7 @@ class JobWorker(
 ) : KoinComponent {
     private val pluginManager: PluginManager by inject()
     private val lifecycleCoordinator: PluginLifecycleCoordinator by inject()
+    private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository by inject()
     private var isWorkerActive = true
     private val workerJob = SupervisorJob(scope.coroutineContext[kotlinx.coroutines.Job])
     private val workerScope = scope + workerJob
@@ -67,7 +45,7 @@ class JobWorker(
         try {
             get<SystemNodeExecutorRegistry>()
         } catch (e: Exception) {
-            DefaultSystemNodeExecutorRegistry()
+            DefaultSystemNodeExecutorRegistry(get())
         }
     }
 
@@ -143,6 +121,14 @@ class JobWorker(
             manager.tryFailJob(job.id, e.message)
             lifecycleCoordinator.onLifecycleJobFailed(job, e.message)
             Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
+        } finally {
+            val currentJob = manager.jobs.value.find { it.id == job.id }
+            if (currentJob?.status != org.wip.plugintoolkit.features.job.model.JobStatus.Paused) {
+                val settingsPersistence: SettingsPersistence = get()
+                val appDataDir = settingsPersistence.getSettingsDir()
+                val sandboxDir = kotlinx.io.files.Path("$appDataDir/jobs/${job.id}/sandbox")
+                deleteRecursively(sandboxDir)
+            }
         }
     }
 
@@ -150,14 +136,27 @@ class JobWorker(
         val plugin = PluginLoader.getPluginById(job.pluginId)
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
-        validateCapabilityParameters(plugin.getManifest(), job.capabilityName, job.parameters)
+        val manifest = plugin.getManifest().getOrThrow()
+        val mutableParams = job.parameters.toMutableMap()
+        val settingsPersistence: SettingsPersistence = get()
+        val sandboxDir = "${settingsPersistence.getSettingsDir()}/jobs/${job.id}/sandbox/node_0"
+        val (allowedPaths, isDestructive) = resolveFileAccess(manifest, job.capabilityName, mutableParams, sandboxDir)
 
-        val processor = plugin.getProcessor()
-        val context = pluginManager.createPluginContext(job.pluginId, job.id)
+        validateCapabilityParameters(manifest, job.capabilityName, mutableParams)
+
+        val processor = plugin.getProcessor().getOrThrow()
+        val execFs = org.wip.plugintoolkit.features.plugin.logic.DefaultExecutionFileSystem(sandboxDir)
+        val context = pluginManager.createPluginContext(
+            job.pluginId,
+            job.id,
+            allowedPaths = allowedPaths,
+            isDestructiveAllowed = isDestructive,
+            executionFileSystem = execFs
+        )
 
         val request = PluginRequest(
             method = job.capabilityName,
-            parameters = job.parameters,
+            parameters = mutableParams,
             resumeState = job.resumeState
         )
 
@@ -178,9 +177,47 @@ class JobWorker(
         val currentJob = currentCoroutineContext()[kotlinx.coroutines.Job]!!
 
         val deferredResult = workerScope.async {
-            kotlinx.coroutines.withTimeout(10.minutes) {
-                processor.process(request, context)
+            val settings = settingsRepository.settings.value.jobs
+            val timeout = settings.pluginTimeoutMs
+            val retries = if (settings.enableTransientRetries) settings.maxRetries else 0
+            var attempt = 0
+            var lastError: Throwable? = null
+
+            while (attempt <= retries) {
+                try {
+                    if (timeout == -1L) {
+                        return@async kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            processor.process(request, context)
+                        }
+                    } else {
+                        return@async kotlinx.coroutines.withTimeout(timeout) {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                processor.process(request, context)
+                            }
+                        }
+                    }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    lastError = e
+                    attempt++
+                    if (attempt <= retries) {
+                        manager.addJobLog(job.id, "Timeout executing capability ${job.capabilityName}, retrying ($attempt/$retries)...", "WARN")
+                        kotlinx.coroutines.delay(2000)
+                    }
+                } catch (e: kotlinx.io.IOException) {
+                    lastError = e
+                    attempt++
+                    if (attempt <= retries) {
+                        manager.addJobLog(job.id, "IO error executing capability ${job.capabilityName}, retrying ($attempt/$retries)...", "WARN")
+                        kotlinx.coroutines.delay(2000)
+                    }
+                } catch (e: Exception) {
+                    if (e is org.wip.plugintoolkit.features.job.logic.PauseFlowException || e is kotlinx.coroutines.CancellationException) {
+                        throw e
+                    }
+                    throw e
+                }
             }
+            throw Exception(lastError?.message ?: "Execution failed", lastError)
         }
 
         val handle = object : JobHandle {
@@ -209,7 +246,10 @@ class JobWorker(
             throw e
         } catch (e: Exception) {
             Logger.e(e) { "Worker $workerId: Capability job ${job.id} failed with exception" }
-            ExecutionResult.Error("Capability invocation failed (Plugin: '${job.pluginId}', Capability: '${job.capabilityName}'): ${e.message ?: "Unknown error"}", e)
+            ExecutionResult.Error(
+                "Capability invocation failed (Plugin: '${job.pluginId}', Capability: '${job.capabilityName}'): ${e.message ?: "Unknown error"}",
+                e
+            )
         } finally {
             progressJob?.cancel()
         }
@@ -218,13 +258,31 @@ class JobWorker(
             is ExecutionResult.Success -> {
                 val response = result.response
                 manager.tryCompleteJob(job.id, response.result?.toString())
+
+                val outputFile = job.parameters["_outputFile"]?.let {
+                    if (it is kotlinx.serialization.json.JsonPrimitive) it.content else null
+                }
+                if (!outputFile.isNullOrBlank() && response.result != null) {
+                    try {
+                        val path = kotlinx.io.files.Path(outputFile)
+                        kotlinx.io.files.SystemFileSystem.sink(path).buffered().use { sink ->
+                            sink.writeString(response.result.toString())
+                        }
+                    } catch (e: Exception) {
+                        Logger.e(e) { "Failed to save capability result to $outputFile" }
+                    }
+                }
+
                 lifecycleCoordinator.onLifecycleJobCompleted(job)
             }
+
             is ExecutionResult.Paused -> {
                 manager.tryPauseJob(job.id, result.resumeState)
             }
+
             is ExecutionResult.Error -> {
-                val enhancedMessage = "Capability invocation failed (Plugin: '${job.pluginId}', Capability: '${job.capabilityName}'): ${result.message}"
+                val enhancedMessage =
+                    "Capability invocation failed (Plugin: '${job.pluginId}', Capability: '${job.capabilityName}'): ${result.message}"
                 manager.tryFailJob(job.id, enhancedMessage)
                 lifecycleCoordinator.onLifecycleJobFailed(job, enhancedMessage)
             }
@@ -252,9 +310,9 @@ class JobWorker(
         })
 
         manager.updateJobProgress(job.id, 0.1f)
-        manager.addJobLog(job.id, "Performing setup for ${plugin.getManifest().plugin.name}...")
+        manager.addJobLog(job.id, "Performing setup for ${plugin.getManifest().getOrThrow().plugin.name}...")
 
-        if (!plugin.getManifest().hasSetupHandler) {
+        if (!plugin.getManifest().getOrThrow().hasSetupHandler) {
             manager.addJobLog(job.id, "No setup handler found, skipping setup phase.")
         } else {
             val setupResult = plugin.performSetup(context)
@@ -284,7 +342,8 @@ class JobWorker(
             override val result: Deferred<ExecutionResult>
                 get() = throw UnsupportedOperationException("Not used for update")
 
-            override fun pause() { /* Not supported */ }
+            override fun pause() { /* Not supported */
+            }
 
             override fun cancel(force: Boolean) {
                 jobExecution.cancel()
@@ -292,9 +351,9 @@ class JobWorker(
         })
 
         manager.updateJobProgress(job.id, 0.2f)
-        manager.addJobLog(job.id, "Running update handler for ${plugin.getManifest().plugin.name}...")
+        manager.addJobLog(job.id, "Running update handler for ${plugin.getManifest().getOrThrow().plugin.name}...")
 
-        if (!plugin.getManifest().hasUpdateHandler) {
+        if (!plugin.getManifest().getOrThrow().hasUpdateHandler) {
             manager.addJobLog(job.id, "No update handler found, skipping update phase.")
         } else {
             val updateResult = plugin.performUpdate(context)
@@ -317,10 +376,10 @@ class JobWorker(
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
         val context = pluginManager.createPluginContext(job.pluginId, job.id)
- 
-         // Register a simple handle for cancellation
-         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
-         manager.registerJobHandle(job.id, object : JobHandle {
+
+        // Register a simple handle for cancellation
+        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        manager.registerJobHandle(job.id, object : JobHandle {
             override val result: Deferred<ExecutionResult>
                 get() = throw UnsupportedOperationException("Not used for validation")
 
@@ -333,7 +392,7 @@ class JobWorker(
         })
 
         manager.updateJobProgress(job.id, 0.2f)
-        manager.addJobLog(job.id, "Running validation for ${plugin.getManifest().plugin.name}...")
+        manager.addJobLog(job.id, "Running validation for ${plugin.getManifest().getOrThrow().plugin.name}...")
 
         val validationResult = plugin.validate(context)
         if (validationResult.isFailure) {
@@ -352,7 +411,7 @@ class JobWorker(
         val plugin = PluginLoader.getPluginById(job.pluginId)
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
-        val processor = plugin.getProcessor()
+        val processor = plugin.getProcessor().getOrThrow()
         val context = pluginManager.createPluginContext(job.pluginId, job.id)
 
         // Register a simple handle for cancellation
@@ -361,7 +420,8 @@ class JobWorker(
             override val result: Deferred<ExecutionResult>
                 get() = throw UnsupportedOperationException("Not used for actions")
 
-            override fun pause() { /* Not supported for actions currently */ }
+            override fun pause() { /* Not supported for actions currently */
+            }
 
             override fun cancel(force: Boolean) {
                 jobExecution.cancel()
@@ -371,12 +431,12 @@ class JobWorker(
         manager.updateJobProgress(job.id, 0.1f)
         manager.addJobLog(job.id, "Executing action: ${job.capabilityName}")
 
-        val manifest = plugin.getManifest()
+        val manifest = plugin.getManifest().getOrThrow()
         val action = manifest.actions.find { it.functionName == job.capabilityName }
             ?: throw Exception("Action ${job.capabilityName} not found in manifest")
 
         val result = processor.runAction(action, context)
-        
+
         if (result.isSuccess) {
             manager.updateJobProgress(job.id, 1.0f)
             manager.addJobLog(job.id, "Action completed successfully.")
@@ -409,7 +469,8 @@ class JobWorker(
             override val result: Deferred<ExecutionResult>
                 get() = throw UnsupportedOperationException("Not used for installation")
 
-            override fun pause() { /* Not supported */ }
+            override fun pause() { /* Not supported */
+            }
 
             override fun cancel(force: Boolean) {
                 jobExecution.cancel()

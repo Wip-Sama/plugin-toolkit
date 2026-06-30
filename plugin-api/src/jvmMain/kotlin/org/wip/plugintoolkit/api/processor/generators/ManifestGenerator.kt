@@ -8,8 +8,8 @@ import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
+import org.wip.plugintoolkit.api.processor.ProcessorConstants
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
-import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_CAPABILITY
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PARAMETER_CONSTRAINTS
@@ -34,7 +34,13 @@ object ManifestGenerator {
         types.forEachIndexed { idx, type ->
             val ns = if (type.namespace != null) "\"${type.namespace}\"" else "null"
             val variant = if (type.variant != null) "\"${type.variant}\"" else "null"
-            builder.add("%T(%L, %S, %L)", ClassName("org.wip.plugintoolkit.api", "SemanticType"), ns, type.name, variant)
+            builder.add(
+                "%T(%L, %S, %L)",
+                ClassName("org.wip.plugintoolkit.api", "SemanticType"),
+                ns,
+                type.name,
+                variant
+            )
             if (idx < types.size - 1) builder.add(",\n") else builder.add("\n")
         }
         builder.unindent()
@@ -58,7 +64,7 @@ object ManifestGenerator {
         hasSetupHandler: Boolean
     ): TypeSpec {
         val manifestType = TypeSpec.objectBuilder(manifestName)
-        
+
         val capabilitiesCode = CodeBlock.builder()
         capabilitiesCode.add("listOf(\n")
         capabilitiesCode.indent()
@@ -66,15 +72,57 @@ object ManifestGenerator {
             val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
-            val supportsPause = capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
-            val supportsCancel = capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
+            val supportsPause =
+                capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
+            val supportsCancel =
+                capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
 
-            val contextEnumKS = capAnn.arguments.find { it.name?.asString() == "context" }?.value as? com.google.devtools.ksp.symbol.KSType
+            val contextEnumKS =
+                capAnn.arguments.find { it.name?.asString() == "context" }?.value as? com.google.devtools.ksp.symbol.KSType
             val contextName = contextEnumKS?.declaration?.simpleName?.asString() ?: "ANY"
-            val requiresSettingsList = (capAnn.arguments.find { it.name?.asString() == "requiresSettings" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val requiresSettingsList =
+                (capAnn.arguments.find { it.name?.asString() == "requiresSettings" }?.value as? List<*>)?.filterIsInstance<String>()
+                    ?: emptyList()
 
-            val hasResumeState = func.parameters.any { param -> 
+            val hasResumeState = func.parameters.any { param ->
                 param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) }
+            }
+
+            var inferredReadsFiles = false
+            var inferredWritesFiles = false
+            var inferredDestructive = false
+
+            func.parameters.forEach { param ->
+                val isInputLoc =
+                    param.annotations.any { it.hasQualifiedName(ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) }
+                val isOutputLoc =
+                    param.annotations.any { it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION) }
+                val outputAnn =
+                    param.annotations.find { it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION) }
+                val paramAnnLocal =
+                    param.annotations.find { 
+                        it.hasQualifiedName(ProcessorConstants.CAPABILITY_PARAM_ANNOTATION) ||
+                        it.hasQualifiedName(ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) ||
+                        it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION)
+                    }
+                val semTypesVal =
+                    (paramAnnLocal?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                        ?: emptyList()
+                val semanticTypesList = semTypesVal.flatMap { org.wip.plugintoolkit.api.parseSemanticTypes(it) }
+
+                if (isInputLoc) inferredReadsFiles = true
+                if (isOutputLoc) {
+                    inferredWritesFiles = true
+                    val destr = outputAnn?.arguments?.find { it.name?.asString() == "isDestructive" }?.value as? Boolean
+                        ?: false
+                    if (destr) inferredDestructive = true
+                }
+                semanticTypesList.forEach { st ->
+                    val fullType = "${st.namespace}/${st.name}"
+                    if (fullType == "path/file" || fullType == "path/folder") {
+                        inferredReadsFiles = true
+                    }
+                }
             }
 
             capabilitiesCode.add("%T(\n", CN_CAPABILITY)
@@ -83,23 +131,48 @@ object ManifestGenerator {
             capabilitiesCode.add("description = %S,\n", capDesc)
             capabilitiesCode.add("isPausable = %L,\n", supportsPause || hasResumeState)
             capabilitiesCode.add("isCancellable = %L,\n", supportsCancel)
-            capabilitiesCode.add("context = %T.%L,\n", ClassName("org.wip.plugintoolkit.api", "CapabilityContext"), contextName)
+            capabilitiesCode.add(
+                "context = %T.%L,\n",
+                ClassName("org.wip.plugintoolkit.api", "CapabilityContext"),
+                contextName
+            )
+
+            val fileAccessCode = if (inferredReadsFiles || inferredWritesFiles || inferredDestructive) {
+                CodeBlock.of(
+                    "%T(readsFiles = %L, writesFiles = %L, isDestructive = %L)",
+                    ClassName("org.wip.plugintoolkit.api", "FileAccess"),
+                    inferredReadsFiles,
+                    inferredWritesFiles,
+                    inferredDestructive
+                )
+            } else {
+                CodeBlock.of("null")
+            }
+            capabilitiesCode.add("fileAccess = %L,\n", fileAccessCode)
             if (requiresSettingsList.isEmpty()) {
                 capabilitiesCode.add("requiresSettings = emptyList(),\n")
             } else {
-                capabilitiesCode.add("requiresSettings = listOf(%L),\n", requiresSettingsList.joinToString { "\"$it\"" })
+                capabilitiesCode.add(
+                    "requiresSettings = listOf(%L),\n",
+                    requiresSettingsList.joinToString { "\"$it\"" })
             }
             capabilitiesCode.add("parameters = mapOf(\n")
             capabilitiesCode.indent()
-            
+
             val paramsList = func.parameters
             paramsList.forEachIndexed { pIndex, param ->
-                val paramAnn = param.annotations.find { it.hasQualifiedName(CAPABILITY_PARAM_ANNOTATION) }
-                val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
-                val defaultValue = paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
+                val paramAnn = param.annotations.find { 
+                    it.hasQualifiedName(ProcessorConstants.CAPABILITY_PARAM_ANNOTATION) ||
+                    it.hasQualifiedName(ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) ||
+                    it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION)
+                }
+                val paramDesc =
+                    paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
+                val defaultValue =
+                    paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
                 val paramNameStr = param.name?.asString() ?: ""
                 val paramType = param.type.resolve().toTypeName()
-                
+
                 val isInfrastructure = INFRASTRUCTURE_TYPES.any { it == paramType }
 
                 if (!isInfrastructure) {
@@ -108,21 +181,36 @@ object ManifestGenerator {
                     } else {
                         CodeBlock.of("%L", "null")
                     }
-                    
-                    val minValue = paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
-                    val maxValue = paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
-                    val minLength = paramAnn?.arguments?.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
-                    val maxLength = paramAnn?.arguments?.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
+
+                    val minValue =
+                        paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
+                    val maxValue =
+                        paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
+                    val minLength =
+                        paramAnn?.arguments?.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
+                    val maxLength =
+                        paramAnn?.arguments?.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
                     val regex = paramAnn?.arguments?.find { it.name?.asString() == "regex" }?.value as? String ?: ""
-                    val multiSelect = paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
-                    val minChoices = paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
-                    val maxChoices = paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
-                    val required = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
-                    val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
-                    val semTypesVal = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                    
-                    val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
-                    
+                    val multiSelect =
+                        paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
+                    val minChoices =
+                        paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
+                    val maxChoices =
+                        paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
+                    val isNullable = param.type.resolve().isMarkedNullable
+                    val hasDefault = param.hasDefault
+                    val explicitRequired =
+                        paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+                    val required = explicitRequired || (!isNullable && !hasDefault)
+                    val secret =
+                        paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
+                    val semTypesVal =
+                        (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
+                            ?: emptyList()
+
+                    val hasConstraints =
+                        !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
+
                     val constraintsCode = if (hasConstraints) {
                         val regexCode = if (regex.isNotEmpty()) CodeBlock.of("%S", regex) else CodeBlock.of("null")
                         CodeBlock.of(
@@ -138,28 +226,76 @@ object ManifestGenerator {
                             if (maxChoices != -1) maxChoices else "null"
                         )
                     } else "null"
-                    
+
+                    val isInputLoc =
+                        param.annotations.any { it.hasQualifiedName(ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) }
+                    val isOutputLoc =
+                        param.annotations.any { it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION) }
+                    val roleStr = when {
+                        isInputLoc -> "INPUT_LOCATION"
+                        isOutputLoc -> "OUTPUT_LOCATION"
+                        else -> "STANDARD"
+                    }
+                    val roleCode = CodeBlock.of("%T.%L", org.wip.plugintoolkit.api.ParameterRole::class, roleStr)
+
+                    val outputAnn =
+                        param.annotations.find { it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION) }
+                    val autogeneratedPattern = if (isOutputLoc) {
+                        val pattern = outputAnn?.arguments?.find { it.name?.asString() == "autogeneratedPattern" }?.value as? String
+                        if (pattern.isNullOrBlank()) null else pattern
+                    } else null
+
+                    val isDestructive = if (isOutputLoc) {
+                        outputAnn?.arguments?.find { it.name?.asString() == "isDestructive" }?.value as? Boolean
+                            ?: false
+                    } else false
+
                     val semanticTypesList = semTypesVal.flatMap { org.wip.plugintoolkit.api.parseSemanticTypes(it) }
                     val semanticTypesCode = generateSemanticTypesCode(semanticTypesList)
-                    
-                    capabilitiesCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L, semanticTypes = %L)", paramNameStr, CN_PARAMETER_METADATA, defaultValueCode, paramDesc, MN_GET_DATA_TYPE, paramType, constraintsCode, required, secret, semanticTypesCode)
+
+                    val autogeneratedPatternCode = if (autogeneratedPattern != null) CodeBlock.of(
+                        "%S",
+                        autogeneratedPattern
+                    ) else CodeBlock.of("null")
+
+                    capabilitiesCode.add(
+                        "%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), constraints = %L, required = %L, secret = %L, semanticTypes = %L, role = %L, autogeneratedPattern = %L, isDestructive = %L)",
+                        paramNameStr,
+                        CN_PARAMETER_METADATA,
+                        defaultValueCode,
+                        paramDesc,
+                        MN_GET_DATA_TYPE,
+                        paramType,
+                        constraintsCode,
+                        required,
+                        secret,
+                        semanticTypesCode,
+                        roleCode,
+                        autogeneratedPatternCode,
+                        isDestructive
+                    )
                     if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
                 }
             }
             capabilitiesCode.unindent()
             capabilitiesCode.add("),\n")
-            
+
             val returnTypeKS = func.returnType?.resolve()
-            val returnDataType = if (returnTypeKS != null) org.wip.plugintoolkit.api.processor.GeneratorUtils.mapKSTypeToDataType(returnTypeKS) else org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.UNIT)
-            val returnDataTypeCode = org.wip.plugintoolkit.api.processor.GeneratorUtils.generateDataTypeCode(returnDataType)
-            
+            val returnDataType =
+                if (returnTypeKS != null) org.wip.plugintoolkit.api.processor.GeneratorUtils.mapKSTypeToDataType(
+                    returnTypeKS
+                ) else org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.UNIT)
+            val returnDataTypeCode =
+                org.wip.plugintoolkit.api.processor.GeneratorUtils.generateDataTypeCode(returnDataType)
+
             val outputs = org.wip.plugintoolkit.api.processor.GeneratorUtils.getCapabilityOutputs(func)
             val outputsCode = CodeBlock.builder()
             outputsCode.add("listOf(\n")
             outputsCode.indent()
             outputs.forEachIndexed { oIndex, out ->
                 val semanticTypesCode = generateSemanticTypesCode(out.semanticTypes)
-                outputsCode.add("%T(name = %S, description = %S, type = %L, semanticTypes = %L)", 
+                outputsCode.add(
+                    "%T(name = %S, description = %S, type = %L, semanticTypes = %L)",
                     ClassName("org.wip.plugintoolkit.api", "OutputMetadata"),
                     out.name,
                     out.description,
@@ -190,7 +326,9 @@ object ManifestGenerator {
             val ann = prop.annotations.first { it.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
             val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
             val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as String
-            val required = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+            val explicitRequired = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+            val isNullable = prop.type.resolve().isMarkedNullable
+            val required = explicitRequired || !isNullable
             val secret = ann.arguments.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
             val propName = prop.simpleName.asString()
             val propType = prop.type.resolve().toTypeName()
@@ -199,8 +337,18 @@ object ManifestGenerator {
             } else {
                 CodeBlock.of("null")
             }
-            
-            settingsCode.add("%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), required = %L, secret = %L)", propName, CN_SETTING_METADATA, defaultValueCode, desc, MN_GET_DATA_TYPE, propType, required, secret)
+
+            settingsCode.add(
+                "%S to %T(defaultValue = %L, description = %S, type = %M<%T>(), required = %L, secret = %L)",
+                propName,
+                CN_SETTING_METADATA,
+                defaultValueCode,
+                desc,
+                MN_GET_DATA_TYPE,
+                propType,
+                required,
+                secret
+            )
             if (index < settingsProperties.size - 1) settingsCode.add(",\n") else settingsCode.add("\n")
         }
         settingsCode.unindent()
@@ -213,8 +361,14 @@ object ManifestGenerator {
             val ann = func.annotations.first { it.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
-            
-            actionsCode.add("%T(name = %S, description = %S, functionName = %S)", CN_PLUGIN_ACTION, actName, actDesc, func.simpleName.asString())
+
+            actionsCode.add(
+                "%T(name = %S, description = %S, functionName = %S)",
+                CN_PLUGIN_ACTION,
+                actName,
+                actDesc,
+                func.simpleName.asString()
+            )
             if (index < actions.size - 1) actionsCode.add(",\n") else actionsCode.add("\n")
         }
         actionsCode.unindent()
@@ -235,8 +389,21 @@ object ManifestGenerator {
                         .add("%T(\n", CN_PLUGIN_MANIFEST)
                         .indent()
                         .add("manifestVersion = %S,\n", "1.0")
-                        .add("plugin = %T(id = %S, name = %S, version = %S, description = %S, supportedOs = %L),\n", CN_PLUGIN_INFO, id, name, version, description, supportedOsCode.build())
-                        .add("requirements = %T(minMemoryMb = %L, minExecutionTimeMs = %L),\n", CN_REQUIREMENTS, minMemoryMb, minExecutionTimeMs)
+                        .add(
+                            "plugin = %T(id = %S, name = %S, version = %S, description = %S, supportedOs = %L),\n",
+                            CN_PLUGIN_INFO,
+                            id,
+                            name,
+                            version,
+                            description,
+                            supportedOsCode.build()
+                        )
+                        .add(
+                            "requirements = %T(minMemoryMb = %L, minExecutionTimeMs = %L),\n",
+                            CN_REQUIREMENTS,
+                            minMemoryMb,
+                            minExecutionTimeMs
+                        )
                         .add("capabilities = ")
                         .add(capabilitiesCode.build())
                         .add(",\nactions = ")

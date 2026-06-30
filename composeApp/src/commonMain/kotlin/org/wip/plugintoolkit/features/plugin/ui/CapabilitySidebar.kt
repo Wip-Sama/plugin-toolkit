@@ -39,7 +39,7 @@ fun CapabilitySidebar(
     onCapabilitySelected: (Capability) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val manifest = plugin.getManifest()
+    val manifest = plugin.getManifest().getOrThrow()
 
     Surface(
         modifier = modifier

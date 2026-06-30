@@ -14,8 +14,10 @@ import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.annotations.Capability
 import org.wip.plugintoolkit.api.annotations.CapabilityContext
+import org.wip.plugintoolkit.api.annotations.CapabilityInput
 import org.wip.plugintoolkit.api.annotations.CapabilityOutput
 import org.wip.plugintoolkit.api.annotations.CapabilityParam
+import org.wip.plugintoolkit.api.annotations.CapabilityResult
 import org.wip.plugintoolkit.api.annotations.PluginAction
 import org.wip.plugintoolkit.api.annotations.PluginInfo
 import org.wip.plugintoolkit.api.annotations.PluginSetting
@@ -43,8 +45,8 @@ data class MathProcessorSettings(
 
 @Serializable
 data class DivisionResult(
-    @CapabilityOutput(name = "quotient", description = "The quotient of the division") val quotient: Int,
-    @CapabilityOutput(name = "remainder", description = "The remainder of the division") val remainder: Int
+    @CapabilityResult(name = "quotient", description = "The quotient of the division") val quotient: Int,
+    @CapabilityResult(name = "remainder", description = "The remainder of the division") val remainder: Int
 )
 
 enum class VoiceOption {
@@ -58,6 +60,11 @@ enum class VoiceOption {
 @Serializable
 data class ComplexObject(
     val id: String, val properties: Map<String, String>, val metadata: Map<String, Int>
+)
+
+@Serializable
+data class DataPoint(
+    val x: Double, val y: Double, val label: String
 )
 
 @PluginInfo(
@@ -138,7 +145,7 @@ class MathProcessor(val settings: MathProcessorSettings) {
     }
 
     @Capability(name = "formatted_sum", description = "Returns the sum formatted as text")
-    @CapabilityOutput(
+    @CapabilityResult(
         name = "formattedResult",
         description = "The sum formatted as currency",
         semanticTypes = ["text/plain"]
@@ -252,20 +259,8 @@ class MathProcessor(val settings: MathProcessorSettings) {
         return true
     }
 
-    @Capability(
-        name = "sum_from_file",
-        description = "Reads a txt file where each row contains a number, and sums them up"
-    )
-    fun sumFromFile(
-        @CapabilityParam(description = "Path to the text file", semanticTypes = ["file/txt"]) filePath: String
-    ): Double {
-        val file = java.io.File(filePath)
-        if (!file.exists()) throw IllegalArgumentException("File does not exist: $filePath")
-        return file.readLines().map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { it.toDoubleOrNull() }.sum()
-    }
-
     @Capability(name = "invert_color", description = "Inverts a color string in rgb(r, g, b) format")
-    @CapabilityOutput(
+    @CapabilityResult(
         name = "invertedColor",
         description = "The inverted color in rgb(r, g, b) format",
         semanticTypes = ["color/rgb"]
@@ -282,7 +277,7 @@ class MathProcessor(val settings: MathProcessorSettings) {
     }
 
     @Capability(name = "multi_semantic_op", description = "Test capability with multiple semantic types")
-    @CapabilityOutput(
+    @CapabilityResult(
         name = "output_data",
         description = "Multi-typed output",
         semanticTypes = ["color/rgb", "file/txt"]
@@ -310,6 +305,104 @@ class MathProcessor(val settings: MathProcessorSettings) {
             id = "test-123",
             properties = mapOf("voice" to voice.name),
             metadata = config.mapValues { it.value.toInt() })
+    }
+
+    @Capability(
+        name = "process_complex_object",
+        description = "Processes a complex object by appending a suffix to its ID"
+    )
+    fun processComplexObject(
+        @CapabilityParam(description = "The complex object to process") obj: ComplexObject
+    ): ComplexObject {
+        return obj.copy(
+            id = obj.id + "-processed",
+            properties = obj.properties + ("processed" to "true")
+        )
+    }
+
+    @Capability(name = "merge_complex_objects", description = "Merges a list of complex objects into one")
+    fun mergeComplexObjects(
+        @CapabilityParam(description = "List of complex objects to merge") objects: List<ComplexObject>
+    ): ComplexObject {
+        if (objects.isEmpty()) return ComplexObject("empty", emptyMap(), emptyMap())
+        val mergedProperties = objects.flatMap { it.properties.entries }.associate { it.key to it.value }
+        val mergedMetadata = objects.flatMap { it.metadata.entries }.associate { it.key to it.value }
+        return ComplexObject(
+            id = objects.joinToString("-") { it.id },
+            properties = mergedProperties,
+            metadata = mergedMetadata
+        )
+    }
+
+    @Capability(name = "process_data_points", description = "Calculates the centroid of data points")
+    fun processDataPoints(
+        @CapabilityParam(description = "List of data points") points: List<DataPoint>
+    ): DataPoint {
+        if (points.isEmpty()) return DataPoint(0.0, 0.0, "empty")
+        val sumX = points.sumOf { it.x }
+        val sumY = points.sumOf { it.y }
+        return DataPoint(sumX, sumY, "centroid")
+    }
+
+    @Capability(
+        name = "sum_from_file",
+        description = "Reads a txt file where each row contains a number, and sums them up"
+    )
+    fun sumFromFile(
+        @CapabilityInput(description = "Path to the text file", semanticTypes = ["file/txt"]) filePath: String
+    ): Double {
+        val file = java.io.File(filePath)
+        if (!file.exists()) throw IllegalArgumentException("File does not exist: $filePath")
+        return file.readLines().map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { it.toDoubleOrNull() }.sum()
+    }
+
+    @Capability(name = "analyze_file", description = "Analyzes a file without writing anything.")
+    fun analyzeFile(
+        @CapabilityInput(description = "The file to analyze", semanticTypes = ["file/text"]) inputPath: String
+    ): Int {
+        return 42
+    }
+
+    @Capability(name = "write_report", description = "Writes a mock report to the given file.")
+    fun writeReport(
+        @CapabilityOutput(
+            description = "Where to save the report",
+            isDestructive = true,
+            semanticTypes = ["file/text"]
+        ) reportPath: String
+    ): String {
+        return "Report saved successfully"
+    }
+
+    @Capability(name = "convert_data", description = "Reads data and converts it, saving to a new file.")
+    fun convertData(
+        @CapabilityInput(description = "The input file", semanticTypes = ["file/text"]) inputPath: String,
+        @CapabilityOutput(
+            description = "The output converted file",
+            autogeneratedPattern = "{inputPath}/../../converted.txt",
+            isDestructive = true,
+            semanticTypes = ["file/text"]
+        ) outputPath: String
+    ) {
+    }
+
+    @Capability(name = "batch_process", description = "Processes multiple inputs and writes multiple outputs.")
+    fun batchProcess(
+        @CapabilityInput(description = "First input file", semanticTypes = ["file/text"]) inputA: String,
+        @CapabilityInput(description = "Second input file", semanticTypes = ["file/text"]) inputB: String,
+        @CapabilityOutput(
+            description = "Output of first file",
+            autogeneratedPattern = "{inputA}/../../outA.txt",
+            isDestructive = true,
+            semanticTypes = ["file/text"]
+        ) outputA: String,
+        @CapabilityOutput(
+            description = "Output of second file",
+            autogeneratedPattern = "{inputB}/../../outB.txt",
+            isDestructive = true,
+            semanticTypes = ["file/text"]
+        ) outputB: String
+    ) {
     }
 }
 

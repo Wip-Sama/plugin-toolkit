@@ -39,9 +39,9 @@ class JobRepository(
         try {
             val content = SystemFileSystem.source(file).buffered().use { it.readString() }
             if (content.isBlank()) return@withContext emptyList()
-            
+
             val jobs = json.decodeFromString<List<BackgroundJob>>(content)
-            
+
             // Adjust states for recovered jobs
             return@withContext jobs.map { job ->
                 if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {

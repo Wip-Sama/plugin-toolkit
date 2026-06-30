@@ -2,7 +2,8 @@ package org.wip.plugintoolkit.features.flows.model
 
 object FlowUnpacker {
     fun hasCycle(connections: List<Connection>): Boolean {
-        val adjacencyList = connections.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
+        val adjacencyList =
+            connections.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
         val visited = mutableSetOf<Long>()
         val visiting = mutableSetOf<Long>()
 
@@ -29,15 +30,15 @@ object FlowUnpacker {
     fun unpackSubflowInFlow(parentFlow: Flow, nodeId: Long, subflow: Flow): Flow {
         val subFlowNode = parentFlow.nodes.find { it.id == nodeId } as? Node.SubFlowNode ?: return parentFlow
         val baseOffset = subFlowNode.position
-        
+
         var nextId = (parentFlow.nodes.maxOfOrNull { it.id } ?: -1L) + 1
         val oldToNewId = mutableMapOf<Long, Long>()
         subflow.nodes.forEach { node ->
             oldToNewId[node.id] = nextId++
         }
-        
-        val newNodes = subflow.nodes.filter { 
-            it !is Node.FlowInputNode && it !is Node.FlowOutputNode 
+
+        val newNodes = subflow.nodes.filter {
+            it !is Node.FlowInputNode && it !is Node.FlowOutputNode
         }.map { node ->
             val newId = oldToNewId[node.id]!!
             node.copyWithPosition(node.position + baseOffset).copyWithId(newId)
@@ -47,7 +48,7 @@ object FlowUnpacker {
             val sourceNode = subflow.nodes.find { it.id == conn.sourceNodeId }
             val targetNode = subflow.nodes.find { it.id == conn.targetNodeId }
             sourceNode !is Node.FlowInputNode && sourceNode !is Node.FlowOutputNode &&
-            targetNode !is Node.FlowInputNode && targetNode !is Node.FlowOutputNode
+                    targetNode !is Node.FlowInputNode && targetNode !is Node.FlowOutputNode
         }.map { conn ->
             Connection(
                 sourceNodeId = oldToNewId[conn.sourceNodeId] ?: conn.sourceNodeId,
@@ -91,8 +92,10 @@ object FlowUnpacker {
         }
 
         val updatedNodes = parentFlow.nodes.filter { it.id != nodeId } + newNodes
-        val externalConnections = parentFlow.connections.filter { it.sourceNodeId != nodeId && it.targetNodeId != nodeId }
-        val updatedConnections = externalConnections + newConnections + mappedIncomingConnections + mappedOutgoingConnections
+        val externalConnections =
+            parentFlow.connections.filter { it.sourceNodeId != nodeId && it.targetNodeId != nodeId }
+        val updatedConnections =
+            externalConnections + newConnections + mappedIncomingConnections + mappedOutgoingConnections
 
         return parentFlow.copy(nodes = updatedNodes, connections = updatedConnections)
     }

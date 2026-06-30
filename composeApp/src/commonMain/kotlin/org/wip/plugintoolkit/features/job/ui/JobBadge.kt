@@ -18,13 +18,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.koin.compose.viewmodel.koinViewModel
+// import org.koin.compose.viewmodel.koinViewModel
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 
 @Composable
 fun JobBadge(
     isExpanded: Boolean,
-    viewModel: JobViewModel = koinViewModel()
+    viewModel: JobViewModel = org.koin.compose.koinInject()
 ) {
     val runningJobs by viewModel.runningJobs.collectAsState()
     val queuedJobs by viewModel.queuedJobs.collectAsState()

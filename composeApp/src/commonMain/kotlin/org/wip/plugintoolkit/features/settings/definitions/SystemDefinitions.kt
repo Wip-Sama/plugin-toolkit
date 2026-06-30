@@ -5,9 +5,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Launch
 import androidx.compose.material.icons.filled.Minimize
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Window
-import androidx.compose.material.icons.filled.Save
 import org.wip.plugintoolkit.core.utils.StartupManager
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.AutoUpdateSettings

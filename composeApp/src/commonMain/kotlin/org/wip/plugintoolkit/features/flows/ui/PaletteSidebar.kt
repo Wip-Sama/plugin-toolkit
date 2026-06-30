@@ -23,10 +23,9 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -50,6 +49,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.palette_search_placeholder
 import plugintoolkit.composeapp.generated.resources.palette_tab_flows
@@ -57,7 +57,11 @@ import plugintoolkit.composeapp.generated.resources.palette_tab_plugins
 import plugintoolkit.composeapp.generated.resources.palette_tab_system
 
 sealed class PaletteNode {
-    data class Capability(val pluginInfo: org.wip.plugintoolkit.api.PluginInfo, val capability: org.wip.plugintoolkit.api.Capability) : PaletteNode()
+    data class Capability(
+        val pluginInfo: org.wip.plugintoolkit.api.PluginInfo,
+        val capability: org.wip.plugintoolkit.api.Capability
+    ) : PaletteNode()
+
     data class System(val action: String) : PaletteNode()
     object FlowInput : PaletteNode()
     object FlowOutput : PaletteNode()
@@ -78,12 +82,15 @@ fun PaletteSidebar(
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
-    
+
     // Aligns perfectly with standard sidebars
     Surface(
         modifier = modifier.width(280.dp).fillMaxHeight(),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder))
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder)
+        )
     ) {
         Column {
             PrimaryTabRow(selectedTabIndex = selectedTab) {
@@ -132,8 +139,19 @@ fun PaletteSidebar(
             ToolkitTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text(stringResource(Res.string.palette_search_placeholder), style = MaterialTheme.typography.bodySmall) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)) },
+                placeholder = {
+                    Text(
+                        stringResource(Res.string.palette_search_placeholder),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                    )
+                },
                 modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.mediumSmall),
                 singleLine = true
             )
@@ -149,6 +167,7 @@ fun PaletteSidebar(
                         onDragEnd = onDragEnd,
                         onClick = onClick
                     )
+
                     1 -> SystemPalette(
                         rootLayoutCoordinates = rootLayoutCoordinates,
                         onDragStart = onDragStart,
@@ -156,6 +175,7 @@ fun PaletteSidebar(
                         onDragEnd = onDragEnd,
                         onClick = onClick
                     )
+
                     2 -> FlowsPalette(
                         flows = flows.filter { it.name != currentFlowName },
                         searchQuery = searchQuery,
@@ -174,7 +194,7 @@ fun PaletteSidebar(
 @Composable
 private fun CapabilitiesPalette(
     plugins: List<PluginEntry>,
-    searchQuery: String, 
+    searchQuery: String,
     rootLayoutCoordinates: LayoutCoordinates?,
     onDragStart: (PaletteNode, Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
@@ -183,7 +203,7 @@ private fun CapabilitiesPalette(
 ) {
     val groupedCaps = remember(searchQuery, plugins) {
         plugins.map { p ->
-            val manifest = p.getManifest()
+            val manifest = p.getManifest().getOrThrow()
             manifest.plugin to manifest.capabilities.filter { it.name.contains(searchQuery, ignoreCase = true) }
         }.filter { it.second.isNotEmpty() }
     }
@@ -202,7 +222,10 @@ private fun CapabilitiesPalette(
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
+                    modifier = Modifier.padding(
+                        horizontal = ToolkitTheme.spacing.extraSmall,
+                        vertical = ToolkitTheme.spacing.extraSmall
+                    )
                 )
                 caps.forEach { cap ->
                     val paletteNode = PaletteNode.Capability(plugin, cap)
@@ -237,13 +260,16 @@ private fun SystemPalette(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
             Text(
-                "STANDARD NODES", 
-                style = MaterialTheme.typography.labelSmall, 
+                "STANDARD NODES",
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
+                modifier = Modifier.padding(
+                    horizontal = ToolkitTheme.spacing.extraSmall,
+                    vertical = ToolkitTheme.spacing.extraSmall
+                )
             )
-            
+
             val flowInput = PaletteNode.FlowInput
             PaletteItem(
                 text = "Flow Input",
@@ -254,7 +280,7 @@ private fun SystemPalette(
                 onDragEnd = onDragEnd,
                 onClick = { onClick(flowInput) }
             )
-            
+
             val flowOutput = PaletteNode.FlowOutput
             PaletteItem(
                 text = "Flow Output",
@@ -277,17 +303,34 @@ private fun SystemPalette(
                 onClick = { onClick(errorNode) }
             )
         }
-        
+
         Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
             Text(
-                "SYSTEM ACTIONS", 
-                style = MaterialTheme.typography.labelSmall, 
+                "SYSTEM ACTIONS",
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
+                modifier = Modifier.padding(
+                    horizontal = ToolkitTheme.spacing.extraSmall,
+                    vertical = ToolkitTheme.spacing.extraSmall
+                )
             )
-            
-            listOf("Save", "Load", "Log", "Delay", "Convert", "Merger", "Conditional", "Comparator", "For", "While", "create_folder").forEach { action ->
+
+            listOf(
+                "Save",
+                "save_file",
+                "save_folder",
+                "Load",
+                "Log",
+                "Delay",
+                "Convert",
+                "Merger",
+                "Conditional",
+                "Comparator",
+                "For",
+                "While",
+                "create_folder"
+            ).forEach { action ->
                 val systemNode = PaletteNode.System(action)
                 PaletteItem(
                     text = action,
@@ -305,8 +348,8 @@ private fun SystemPalette(
 
 @Composable
 private fun FlowsPalette(
-    flows: List<Flow>, 
-    searchQuery: String, 
+    flows: List<Flow>,
+    searchQuery: String,
     rootLayoutCoordinates: LayoutCoordinates?,
     onDragStart: (PaletteNode, Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
@@ -350,61 +393,79 @@ private fun PaletteItem(
 ) {
     var lastPosition by remember { mutableStateOf(Offset.Zero) }
     var cumulativeDrag by remember { mutableStateOf(Offset.Zero) }
-    
+
     val currentOnDragStart by rememberUpdatedState(onDragStart)
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
-    
+
     // Styled beautifully as premium interactive sidebar items
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { localOffset ->
-                        cumulativeDrag = Offset.Zero
-                        currentOnDragStart(localOffset + lastPosition, localOffset)
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        cumulativeDrag += dragAmount
-                        currentOnDrag(cumulativeDrag)
-                    },
-                    onDragEnd = currentOnDragEnd,
-                    onDragCancel = currentOnDragEnd
+    org.wip.plugintoolkit.shared.components.TooltipArea(
+        tooltip = {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        delayMillis = 1000,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Surface(
+            onClick = onClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { localOffset ->
+                            cumulativeDrag = Offset.Zero
+                            currentOnDragStart(localOffset + lastPosition, localOffset)
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            cumulativeDrag += dragAmount
+                            currentOnDrag(cumulativeDrag)
+                        },
+                        onDragEnd = currentOnDragEnd,
+                        onDragCancel = currentOnDragEnd
+                    )
+                }
+                .onGloballyPositioned {
+                    val rootCoords = rootLayoutCoordinates
+                    val localPos = if (rootCoords != null && it.isAttached && rootCoords.isAttached) {
+                        rootCoords.localPositionOf(it, Offset.Zero)
+                    } else {
+                        it.positionInWindow()
+                    }
+                    lastPosition = localPos
+                },
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.cardBackground),
+            border = BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(
+                    horizontal = ToolkitTheme.spacing.medium,
+                    vertical = ToolkitTheme.spacing.mediumSmall
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(ToolkitTheme.spacing.small)
+                        .background(color, CircleShape)
+                )
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            .onGloballyPositioned {
-                val rootCoords = rootLayoutCoordinates
-                val localPos = if (rootCoords != null && it.isAttached && rootCoords.isAttached) {
-                    rootCoords.localPositionOf(it, Offset.Zero)
-                } else {
-                    it.positionInWindow()
-                }
-                lastPosition = localPos
-            },
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.cardBackground),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.mediumSmall),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(ToolkitTheme.spacing.small)
-                    .background(color, CircleShape)
-            )
-            Text(
-                text = text, 
-                style = MaterialTheme.typography.bodyMedium, 
-                fontWeight = FontWeight.Medium, 
-                maxLines = 1, 
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }
@@ -420,6 +481,7 @@ fun PaletteItemPreview(node: PaletteNode) {
                 Pair(ToolkitTheme.colors.success, Color.White)
             }
         }
+
         is PaletteNode.FlowInput -> Pair(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary)
         is PaletteNode.FlowOutput -> Pair(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary)
         is PaletteNode.SubFlow -> Pair(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.onSecondary)
@@ -441,7 +503,7 @@ fun PaletteItemPreview(node: PaletteNode) {
                     .padding(ToolkitTheme.spacing.mediumSmall)
             ) {
                 Text(
-                    text = when(node) {
+                    text = when (node) {
                         is PaletteNode.Capability -> node.capability.name
                         is PaletteNode.System -> node.action
                         is PaletteNode.FlowInput -> "Flow Input"

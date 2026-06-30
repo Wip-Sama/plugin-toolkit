@@ -1,19 +1,31 @@
 package org.wip.plugintoolkit.features.job.logic
 
-import kotlinx.serialization.json.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry
-import org.wip.plugintoolkit.api.PluginManifest
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 
 object FlowTypeInferenceCache {
     private val mutex = Mutex()
     private val cache = mutableMapOf<Int, Map<Pair<Long, String>, DataType>>()
 
-    suspend fun getOrCreate(flow: Flow, compute: suspend () -> Map<Pair<Long, String>, DataType>): Map<Pair<Long, String>, DataType> {
+    suspend fun getOrCreate(
+        flow: Flow,
+        compute: suspend () -> Map<Pair<Long, String>, DataType>
+    ): Map<Pair<Long, String>, DataType> {
         val key = flow.hashCode()
         mutex.withLock {
             val cached = cache[key]
@@ -49,9 +61,11 @@ fun fromJsonElement(je: JsonElement): Any? {
                 je.booleanOrNull ?: je.intOrNull ?: je.longOrNull ?: je.doubleOrNull ?: je.content
             }
         }
+
         is JsonArray -> {
             je.map { fromJsonElement(it) }
         }
+
         is JsonObject -> {
             je.entries.associate { it.key to fromJsonElement(it.value) }
         }
@@ -76,12 +90,14 @@ fun runRuntimeTypeInference(flow: Flow): Map<Pair<Long, String>, DataType> {
             val tgtType = inferred[tgtKey]
             if (srcType != null && tgtType != null) {
                 if (srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY &&
-                    !(tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY)) {
+                    !(tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY)
+                ) {
                     inferred[srcKey] = tgtType
                     changed = true
                 }
                 if (tgtType is DataType.Primitive && tgtType.primitiveType == PrimitiveType.ANY &&
-                    !(srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY)) {
+                    !(srcType is DataType.Primitive && srcType.primitiveType == PrimitiveType.ANY)
+                ) {
                     inferred[tgtKey] = srcType
                     changed = true
                 }
@@ -112,6 +128,7 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
                 str.toIntOrNull() ?: throw Exception("Failed to convert '$value' to Int")
             }
         }
+
         PrimitiveType.DOUBLE -> {
             if (value is Number) value.toDouble()
             else {
@@ -119,6 +136,7 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
                 str.toDoubleOrNull() ?: throw Exception("Failed to convert '$value' to Double")
             }
         }
+
         PrimitiveType.BOOLEAN -> {
             if (value is Boolean) value
             else if (value is Number) {
@@ -142,6 +160,39 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
                 }
             }
         }
+
+        PrimitiveType.LONG -> {
+            if (value is Number) value.toLong()
+            else {
+                val str = value.toString().trim()
+                str.toLongOrNull() ?: throw Exception("Failed to convert '$value' to Long")
+            }
+        }
+
+        PrimitiveType.FLOAT -> {
+            if (value is Number) value.toFloat()
+            else {
+                val str = value.toString().trim()
+                str.toFloatOrNull() ?: throw Exception("Failed to convert '$value' to Float")
+            }
+        }
+
+        PrimitiveType.SHORT -> {
+            if (value is Number) value.toShort()
+            else {
+                val str = value.toString().trim()
+                str.toShortOrNull() ?: throw Exception("Failed to convert '$value' to Short")
+            }
+        }
+
+        PrimitiveType.BYTE -> {
+            if (value is Number) value.toByte()
+            else {
+                val str = value.toString().trim()
+                str.toByteOrNull() ?: throw Exception("Failed to convert '$value' to Byte")
+            }
+        }
+
         PrimitiveType.ANY -> value
         PrimitiveType.UNIT -> Unit
     }
@@ -157,7 +208,7 @@ fun validateCapabilityParameters(
 
     for ((paramName, metadata) in paramMetadataMap) {
         val valueElement = parameters[paramName]
-        
+
         // Check if required
         if (metadata.required) {
             if (valueElement == null || valueElement is JsonNull) {
@@ -219,6 +270,7 @@ fun validateCapabilityParameters(
                         val itemType = t.items
                         itemType is DataType.Primitive && (itemType.primitiveType == PrimitiveType.INT || itemType.primitiveType == PrimitiveType.DOUBLE)
                     }
+
                     else -> false
                 }
                 if (isNumericType && valStr.isNotEmpty()) {
@@ -236,17 +288,106 @@ private fun getLeafPrimitives(element: JsonElement, type: DataType): List<String
                 is JsonArray -> {
                     element.flatMap { getLeafPrimitives(it, type.items) }
                 }
+
                 is JsonPrimitive -> {
-                    val parts = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.splitArrayValue(element.content, type)
+                    val parts =
+                        org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.splitArrayValue(element.content, type)
                     parts.flatMap {
                         getLeafPrimitives(JsonPrimitive(it), type.items)
                     }
                 }
+
                 else -> emptyList()
             }
         }
+
         else -> {
             if (element is JsonPrimitive) listOf(element.content) else emptyList()
         }
     }
 }
+
+fun resolveFileAccess(
+    manifest: PluginManifest,
+    capabilityName: String,
+    parameters: MutableMap<String, JsonElement>,
+    sandboxPath: String? = null
+): Pair<List<String>, Boolean> {
+    val capability = manifest.capabilities.find { it.name == capabilityName } ?: return Pair(emptyList(), false)
+    val paramMetadataMap = capability.parameters ?: return Pair(emptyList(), false)
+
+    val allowedPaths = mutableListOf<String>()
+
+    // First pass: Resolve pathTemplate or auto-route to sandbox for parameters that are empty or missing
+    for ((paramName, metadata) in paramMetadataMap) {
+        val isFileOutput = metadata.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+        val isFileOrFolder =
+            metadata.role == org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION || metadata.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+
+        val currentValue = parameters[paramName]?.let { if (it is JsonPrimitive) it.content else null }
+        val template = metadata.autogeneratedPattern
+
+        if (currentValue.isNullOrBlank()) {
+            if (!template.isNullOrEmpty()) {
+                val strParams = parameters.mapValues { (_, el) -> if (el is JsonPrimitive) el.content else "" }.toMutableMap()
+                if (sandboxPath != null) {
+                    strParams["output_folder"] = sandboxPath
+                }
+                
+                try {
+                    val resolvedPath = PathPatternResolver.resolve(template, strParams)
+                    parameters[paramName] = JsonPrimitive(resolvedPath)
+                } catch (e: IllegalArgumentException) {
+                    if (!e.message!!.startsWith("Missing required parameter")) {
+                        throw e
+                    }
+                }
+            } else if (sandboxPath != null && isFileOutput) {
+                // Auto route unmapped outputs to sandbox
+                val generatedPath = kotlinx.io.files.Path(
+                    sandboxPath,
+                    "${capabilityName}_${paramName}_${kotlin.random.Random.nextInt(10000)}.tmp"
+                ).toString()
+                parameters[paramName] = JsonPrimitive(generatedPath)
+            }
+        }
+    }
+
+    // Second pass: Collect allowed paths
+    for ((paramName, metadata) in paramMetadataMap) {
+        val isFileOrFolder =
+            metadata.role == org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION || metadata.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+        if (isFileOrFolder) {
+            val valueElement = parameters[paramName]
+            if (valueElement != null && valueElement !is JsonNull) {
+                val valuesToValidate = getLeafPrimitives(valueElement, metadata.type)
+                for (valStr in valuesToValidate) {
+                    if (valStr.isNotBlank()) {
+                        allowedPaths.add(valStr)
+                    }
+                }
+            }
+        }
+    }
+
+    val isDestructive = capability.fileAccess?.isDestructive == true
+
+    return Pair(allowedPaths, isDestructive)
+}
+
+fun deleteRecursively(path: kotlinx.io.files.Path) {
+    if (kotlinx.io.files.SystemFileSystem.exists(path)) {
+        val metadata = kotlinx.io.files.SystemFileSystem.metadataOrNull(path)
+        if (metadata?.isDirectory == true) {
+            kotlinx.io.files.SystemFileSystem.list(path).forEach { child ->
+                deleteRecursively(child)
+            }
+        }
+        try {
+            kotlinx.io.files.SystemFileSystem.delete(path)
+        } catch (e: Exception) {
+            // Ignore errors during cleanup
+        }
+    }
+}
+

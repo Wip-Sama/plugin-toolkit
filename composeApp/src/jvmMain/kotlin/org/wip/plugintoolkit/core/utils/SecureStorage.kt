@@ -18,15 +18,18 @@ actual object SecureStorage {
                     val encryptedBytes = Crypt32Util.cryptProtectData(clearText.toByteArray(StandardCharsets.UTF_8))
                     "dpapi:" + Base64.getEncoder().encodeToString(encryptedBytes)
                 }
+
                 PlatformUtils.isMac -> {
                     // macOS doesn't have a simple generic encrypt-only data API via CLI like dpapi.
                     // Instead of storing it in the keychain and returning a key, we can use a machine-derived key.
                     // If we wanted to use keychain, we'd need to manage service/account names per setting.
                     "aes:" + fallbackEncrypt(clearText)
                 }
+
                 PlatformUtils.isLinux -> {
                     "aes:" + fallbackEncrypt(clearText)
                 }
+
                 else -> "aes:" + fallbackEncrypt(clearText)
             }
         } catch (e: Exception) {
@@ -52,9 +55,11 @@ actual object SecureStorage {
                         throw IllegalStateException("Cannot decrypt DPAPI on non-Windows platform")
                     }
                 }
+
                 "aes" -> {
                     fallbackDecrypt(payload)
                 }
+
                 else -> encryptedText // Not encrypted or unknown prefix
             }
         } catch (e: Exception) {

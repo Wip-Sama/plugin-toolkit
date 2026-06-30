@@ -44,7 +44,8 @@ class PluginInstaller(
             fileSystem.mkdirs(targetFolderPath)
 
             val manifest = getManifestFromJar(filePath)
-            val pkg = manifest?.plugin?.id ?: filePath.replace('\\', '/').substringAfterLast("/").substringBeforeLast(".")
+            val pkg =
+                manifest?.plugin?.id ?: filePath.replace('\\', '/').substringAfterLast("/").substringBeforeLast(".")
             val name = manifest?.plugin?.name ?: pkg
             val version = manifest?.plugin?.version ?: "1.0.0"
             val description = manifest?.plugin?.description
@@ -118,7 +119,7 @@ class PluginInstaller(
             downloadFile(pluginFileUrl, destFile, onProgress).onFailure { return Result.failure(it) }
 
             // Download optional assets
-            listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach { 
+            listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach {
                 downloadFile("$baseUrl/$it", "$pluginDir/$it")
             }
             downloadFile("$baseUrl/changelog.md", "$pluginDir/changelog.md")
@@ -178,7 +179,10 @@ class PluginInstaller(
             pluginId = plugin.pkg,
             capabilityName = "install",
             parameters = mapOf(
-                "pluginJson" to kotlinx.serialization.json.Json.encodeToJsonElement(ExtensionPlugin.serializer(), plugin),
+                "pluginJson" to kotlinx.serialization.json.Json.encodeToJsonElement(
+                    ExtensionPlugin.serializer(),
+                    plugin
+                ),
                 "targetFolderPath" to kotlinx.serialization.json.JsonPrimitive(targetFolderPath)
             ),
             isCancellable = true,
@@ -201,7 +205,12 @@ class PluginInstaller(
             return Result.failure(e)
         }
 
-        fileSystem.deleteDirectory(plugin.installPath)
+        try {
+            fileSystem.deleteDirectory(plugin.installPath)
+        } catch (e: Exception) {
+            Logger.w(e) { "Failed to fully delete plugin directory for $pkg (it may be locked by the OS), but it will be removed from registry." }
+        }
+
         registry.removePlugin(pkg)
         Logger.i { "Successfully uninstalled plugin: $pkg" }
         return Result.success(Unit)
@@ -243,9 +252,9 @@ class PluginInstaller(
         return if (fileSystem.exists(filesPath)) {
             try {
                 // We don't delete the "files" folder itself, only its content
-                fileSystem.listFiles(filesPath).forEach { 
+                fileSystem.listFiles(filesPath).forEach {
                     val path = "$filesPath/$it"
-                    fileSystem.deleteDirectory(path) 
+                    fileSystem.deleteDirectory(path)
                 }
                 Result.success(Unit)
             } catch (e: Exception) {
@@ -302,7 +311,7 @@ class PluginInstaller(
             if (response.status.value !in 200..299) {
                 return Result.failure(Exception("Failed to download: ${response.status}"))
             }
-            
+
             val contentLength = response.headers[io.ktor.http.HttpHeaders.ContentLength]?.toLong()
             val bytes = if (contentLength != null && onProgress != null) {
                 val channel = response.bodyAsChannel()

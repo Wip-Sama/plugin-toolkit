@@ -1,21 +1,21 @@
 package org.wip.plugintoolkit.api
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 
@@ -55,7 +55,9 @@ sealed class DataType {
     data class Array(val items: DataType) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             if (value == null || value is JsonNull) return false
-            return (value as? JsonArray)?.isNotEmpty() ?: true
+            val array = value as? JsonArray ?: return false
+            if (array.isEmpty()) return false
+            return array.all { items.isProvided(it) }
         }
     }
 
@@ -65,19 +67,27 @@ sealed class DataType {
     @Serializable
     @SerialName("object")
     data class Object(
-        val className: String, 
+        val className: String,
+        val id: String? = null,
+        val description: String? = null,
+        val version: Int? = null,
         val namespace: String? = null,
         val properties: Map<String, DataType> = emptyMap(),
         val requiredProperties: List<String> = emptyList()
     ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             if (value == null || value is JsonNull) return false
-            if (requiredProperties.isEmpty()) return true
-            
             val jsonObj = value as? JsonObject ?: return false
+            if (requiredProperties.isEmpty()) return true
+
             return requiredProperties.all { prop ->
+                val propType = properties[prop]
                 val propValue = jsonObj[prop]
-                propValue != null && propValue !is JsonNull
+                if (propType != null) {
+                    propType.isProvided(propValue)
+                } else {
+                    propValue != null && propValue !is JsonNull
+                }
             }
         }
     }
@@ -88,13 +98,15 @@ sealed class DataType {
     @Serializable
     @SerialName("enum")
     data class Enum(
-        val className: String, 
-        val options: List<String>, 
+        val className: String,
+        val options: List<String>,
         val namespace: String? = null,
         val optionRequirements: Map<String, List<String>> = emptyMap()
     ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
-            return value != null && value !is JsonNull
+            if (value == null || value is JsonNull) return false
+            val content = (value as? JsonPrimitive)?.content ?: return false
+            return options.contains(content)
         }
     }
 
@@ -113,7 +125,7 @@ sealed class DataType {
 
 @Serializable
 enum class PrimitiveType {
-    DOUBLE, INT, STRING, BOOLEAN, UNIT, ANY
+    DOUBLE, FLOAT, LONG, INT, SHORT, BYTE, STRING, BOOLEAN, UNIT, ANY
 }
 
 
@@ -135,7 +147,8 @@ data class SettingMetadata(
     val description: String,
     val type: DataType,
     val required: Boolean = false,
-    val secret: Boolean = false
+    val secret: Boolean = false,
+    val constraints: ParameterConstraints? = null
 )
 
 /**
@@ -233,6 +246,18 @@ data class Requirements(
     val targetAppVersion: String? = ApiConfig.VERSION
 )
 
+@Serializable
+enum class ParameterRole {
+    STANDARD, INPUT_LOCATION, OUTPUT_LOCATION
+}
+
+/**
+ * Metadata for a parameter required by a capability.
+ *
+ * **File Location Checks**: For parameters with role [ParameterRole.INPUT_LOCATION] or [ParameterRole.OUTPUT_LOCATION],
+ * the host application does **NOT** verify if the path actually exists on the filesystem or if a file will be overwritten.
+ * It is the plugin's responsibility to handle file creation, check for existence, and manage overwriting as needed.
+ */
 @Serializable(with = ParameterMetadataSerializer::class)
 data class ParameterMetadata(
     val defaultValue: JsonElement? = null,
@@ -241,7 +266,10 @@ data class ParameterMetadata(
     val constraints: ParameterConstraints? = null,
     val required: Boolean = false,
     val secret: Boolean = false,
-    val semanticTypes: List<SemanticType> = emptyList()
+    val semanticTypes: List<SemanticType> = emptyList(),
+    val role: ParameterRole = ParameterRole.STANDARD,
+    val autogeneratedPattern: String? = null,
+    val isDestructive: Boolean = false
 )
 
 object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
@@ -255,7 +283,10 @@ object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
             constraints = value.constraints,
             required = value.required,
             secret = value.secret,
-            semanticTypes = value.semanticTypes
+            semanticTypes = value.semanticTypes,
+            role = value.role,
+            autogeneratedPattern = value.autogeneratedPattern,
+            isDestructive = value.isDestructive
         )
         encoder.encodeSerializableValue(ParameterMetadataSurrogate.serializer(), surrogate)
     }
@@ -285,7 +316,10 @@ object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
             constraints = surrogate.constraints,
             required = surrogate.required,
             secret = surrogate.secret,
-            semanticTypes = surrogate.semanticTypes
+            semanticTypes = surrogate.semanticTypes,
+            role = surrogate.role,
+            autogeneratedPattern = surrogate.autogeneratedPattern,
+            isDestructive = surrogate.isDestructive
         )
     }
 }
@@ -299,7 +333,10 @@ private class ParameterMetadataSurrogate(
     val constraints: ParameterConstraints? = null,
     val required: Boolean = false,
     val secret: Boolean = false,
-    val semanticTypes: List<SemanticType> = emptyList()
+    val semanticTypes: List<SemanticType> = emptyList(),
+    val role: ParameterRole = ParameterRole.STANDARD,
+    val autogeneratedPattern: String? = null,
+    val isDestructive: Boolean = false
 )
 
 @Serializable(with = OutputMetadataSerializer::class)
@@ -364,6 +401,13 @@ enum class CapabilityContext {
     ANY, FLOW_ONLY, STANDALONE_ONLY
 }
 
+@Serializable
+data class FileAccess(
+    val readsFiles: Boolean = false,
+    val writesFiles: Boolean = false,
+    val isDestructive: Boolean = false
+)
+
 /**
  * Metadata for a specific capability provided by the plugin.
  */
@@ -378,7 +422,8 @@ data class Capability(
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true,
     val context: CapabilityContext = CapabilityContext.ANY,
-    val requiresSettings: List<String> = emptyList()
+    val requiresSettings: List<String> = emptyList(),
+    val fileAccess: FileAccess? = null
 )
 
 object CapabilitySerializer : KSerializer<Capability> {
@@ -395,7 +440,8 @@ object CapabilitySerializer : KSerializer<Capability> {
             isPausable = value.isPausable,
             isCancellable = value.isCancellable,
             context = value.context,
-            requiresSettings = value.requiresSettings
+            requiresSettings = value.requiresSettings,
+            fileAccess = value.fileAccess
         )
         encoder.encodeSerializableValue(CapabilitySurrogate.serializer(), surrogate)
     }
@@ -428,7 +474,8 @@ object CapabilitySerializer : KSerializer<Capability> {
             isPausable = surrogate.isPausable,
             isCancellable = surrogate.isCancellable,
             context = surrogate.context,
-            requiresSettings = surrogate.requiresSettings
+            requiresSettings = surrogate.requiresSettings,
+            fileAccess = surrogate.fileAccess
         )
     }
 }
@@ -445,7 +492,8 @@ private class CapabilitySurrogate(
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true,
     val context: CapabilityContext = CapabilityContext.ANY,
-    val requiresSettings: List<String> = emptyList()
+    val requiresSettings: List<String> = emptyList(),
+    val fileAccess: FileAccess? = null
 )
 
 /**

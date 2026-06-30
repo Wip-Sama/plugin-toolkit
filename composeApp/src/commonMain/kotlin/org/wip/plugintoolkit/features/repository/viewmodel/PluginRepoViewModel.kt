@@ -5,24 +5,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import co.touchlab.kermit.Logger
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.wip.plugintoolkit.core.KeepTrack
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.repository.logic.AddRepoResult
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
+import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
-import co.touchlab.kermit.Logger
 import plugintoolkit.composeapp.generated.resources.plugin_choose_install_location
 import plugintoolkit.composeapp.generated.resources.repo_add_error
 import plugintoolkit.composeapp.generated.resources.repo_add_success
@@ -40,7 +40,8 @@ class PluginRepoViewModel(
     private val notificationService: NotificationService,
     private val dialogService: org.wip.plugintoolkit.core.ui.DialogService,
     private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository,
-    private val jobManager: JobManager
+    private val jobManager: JobManager,
+    private val appConfig: SystemConfig
 ) : ViewModel() {
 
     private val ResStrings = plugintoolkit.composeapp.generated.resources.Res.string
@@ -145,8 +146,18 @@ class PluginRepoViewModel(
         }
     }
 
+    fun cancelPluginInstall(pkg: String) {
+        viewModelScope.launch {
+            val job =
+                jobManager.jobs.value.find { it.type == JobType.PluginInstallation && it.status == JobStatus.Running && it.pluginId == pkg }
+            if (job != null) {
+                jobManager.cancelJob(job.id, force = true)
+            }
+        }
+    }
+
     private fun pickInstallLocation(onSelected: (String) -> Unit) {
-        val defaultPath = settingsRepository.getSettingsDir() + "/" + KeepTrack.PLUGINS_DIR_NAME
+        val defaultPath = settingsRepository.getSettingsDir() + "/" + appConfig.PLUGINS_DIR_NAME
         val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
         val allFolders = (listOf(defaultPath) + savedFolders).distinct()
 
@@ -212,7 +223,8 @@ class PluginRepoViewModel(
                         val parsedFlow = org.koin.mp.KoinPlatform.getKoin().get<kotlinx.serialization.json.Json>()
                             .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(flowContent)
 
-                        val subflows = parsedFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode>()
+                        val subflows =
+                            parsedFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode>()
                         for (subflow in subflows) {
                             val name = subflow.flowName
                             if (!isFlowInstalled(name)) {
@@ -254,7 +266,8 @@ class PluginRepoViewModel(
                 val parsedFlow = org.koin.mp.KoinPlatform.getKoin().get<kotlinx.serialization.json.Json>()
                     .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(flowContent)
 
-                val subflows = parsedFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode>()
+                val subflows =
+                    parsedFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode>()
                 for (subflow in subflows) {
                     val name = subflow.flowName
                     if (!isFlowInstalled(name)) {

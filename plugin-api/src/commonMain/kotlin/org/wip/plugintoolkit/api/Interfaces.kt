@@ -1,7 +1,6 @@
 package org.wip.plugintoolkit.api
 
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonElement
 import org.koin.core.module.Module
 
@@ -22,12 +21,12 @@ interface PluginEntry {
     /**
      * Get the plugin manifest information.
      */
-    fun getManifest(): PluginManifest
+    fun getManifest(): Result<PluginManifest>
 
     /**
      * Provide the worker instance.
      */
-    fun getProcessor(): DataProcessor
+    fun getProcessor(): Result<DataProcessor>
 
 
     /**
@@ -47,7 +46,7 @@ interface PluginEntry {
      * @param context The execution context providing logger, progress, and file system access.
      */
     suspend fun performSetup(context: PluginContext): Result<Unit> = Result.success(Unit)
-    
+
     /**
      * Optional update step called by the host application during plugin update.
      * 
@@ -85,31 +84,61 @@ interface PluginModuleProvider {
 }
 
 /**
- * File system interface for plugins, restricting operations to the plugin's managed folder.
+ * Base interface for isolated file systems, restricting operations to a specific managed folder.
  *
- * All paths provided to these methods are relative to the plugin's base directory.
- * This ensures that plugins cannot interfere with each other or the host application's files.
+ * All paths provided to these methods are relative to the base directory.
+ * This ensures that operations cannot interfere with files outside the managed scope.
+ * 
+ * **SECURITY WARNING:** Implementations of this interface must rigidly validate all relative paths
+ * to prevent Path Traversal attacks (e.g., verifying paths do not contain "../" or start with "/").
  */
-interface PluginFileSystem {
-    suspend fun readFile(relativePath: String): ByteArray?
-    suspend fun readTextFile(relativePath: String): String?
-    suspend fun writeFile(relativePath: String, data: ByteArray): Result<Unit>
-    suspend fun writeTextFile(relativePath: String, text: String): Result<Unit>
-    suspend fun exists(relativePath: String): Boolean
-    suspend fun listFiles(relativePath: String = ""): List<String>
-    suspend fun deleteFile(relativePath: String): Result<Unit>
+interface ScopedFileSystem {
+    suspend fun readFile(relativePath: RelativePath): ByteArray?
+    suspend fun readTextFile(relativePath: RelativePath): String?
+    suspend fun writeFile(relativePath: RelativePath, data: ByteArray): Result<Unit>
+    suspend fun writeTextFile(relativePath: RelativePath, text: String): Result<Unit>
+    suspend fun exists(relativePath: RelativePath): Boolean
+    suspend fun listFiles(relativePath: RelativePath = RelativePath.ROOT): List<String>
+    suspend fun deleteFile(relativePath: RelativePath): Result<Unit>
 
+    /**
+     * Get the absolute base path of the managed file area.
+     */
+    fun getBasePath(): String
+}
+
+/**
+ * File system interface for persistent plugin storage (e.g. settings, downloaded models).
+ */
+interface PluginFileSystem : ScopedFileSystem {
     /**
      * Extract a resource bundled inside the plugin JAR to the plugin's managed file area.
      * @param resourcePath Path to the resource inside the JAR (e.g. "scripts/install.bat").
      * @param targetRelativePath Relative path within the plugin's managed folder to write to.
      */
-    suspend fun extractResource(resourcePath: String, targetRelativePath: String): Result<Unit>
+    suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit>
+}
 
-    /**
-     * Get the absolute base path of the plugin's managed file area.
-     */
-    fun getBasePath(): String
+/**
+ * File system interface for temporary execution storage (e.g. job sandboxes).
+ */
+interface ExecutionFileSystem : ScopedFileSystem
+
+/**
+ * File system interface for interacting with the host machine's external file system.
+ * 
+ * Operations are strictly limited by the File Access rules declared in the plugin's capabilities.
+ * If a capability attempts to perform unauthorized operations, a SecurityException will be thrown.
+ */
+interface HostFileSystem {
+    suspend fun readFile(absolutePath: String): ByteArray?
+    suspend fun readTextFile(absolutePath: String): String?
+    suspend fun writeFile(absolutePath: String, data: ByteArray): Result<Unit>
+    suspend fun writeTextFile(absolutePath: String, text: String): Result<Unit>
+    suspend fun exists(absolutePath: String): Boolean
+    suspend fun listFiles(absolutePath: String): List<String>
+    suspend fun deleteFile(absolutePath: String): Result<Unit>
+    suspend fun createDirectory(absolutePath: String): Result<Unit>
 }
 
 /**
@@ -124,7 +153,7 @@ interface PluginLogger {
     fun info(message: String)
     fun warn(message: String)
     fun error(message: String, throwable: Throwable? = null)
-    
+
     // Compatibility/helper method
     fun log(message: String) = info(message)
 }
@@ -217,6 +246,8 @@ interface PluginContext {
     val progress: ProgressReporter
     val fileSystem: PluginFileSystem
     val cacheFileSystem: PluginFileSystem
+    val executionFileSystem: ExecutionFileSystem
+    val hostFileSystem: HostFileSystem
     val settings: Map<String, JsonElement>
     val signals: PluginSignalManager
 
@@ -225,32 +256,50 @@ interface PluginContext {
      * @param actionName The function name of the action to be displayed, or null to clear.
      */
     fun setRequiredAction(actionName: String?)
-    
+
     /**
      * Typed helpers for settings access.
      */
     fun getStringSetting(key: String, defaultValue: String = ""): String {
-        return settings[key]?.let {
-            if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString()
-        } ?: defaultValue
+        return try {
+            settings[key]?.let {
+                if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString()
+            } ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
     }
 
     fun getIntSetting(key: String, defaultValue: Int = 0): Int {
-        return settings[key]?.let {
-            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toIntOrNull() else null
-        } ?: defaultValue
+        return try {
+            settings[key]?.let {
+                if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toIntOrNull() else null
+            } ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
     }
 
     fun getBooleanSetting(key: String, defaultValue: Boolean = false): Boolean {
-        return settings[key]?.let {
-            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toBooleanStrictOrNull() else null
-        } ?: defaultValue
+        return try {
+            settings[key]?.let {
+                if (it is kotlinx.serialization.json.JsonPrimitive) {
+                    it.content.toBooleanStrictOrNull()
+                } else null
+            } ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
     }
 
     fun getDoubleSetting(key: String, defaultValue: Double = 0.0): Double {
-        return settings[key]?.let {
-            if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toDoubleOrNull() else null
-        } ?: defaultValue
+        return try {
+            settings[key]?.let {
+                if (it is kotlinx.serialization.json.JsonPrimitive) it.content.toDoubleOrNull() else null
+            } ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
     }
 
     /**
@@ -285,7 +334,7 @@ interface DataProcessor {
     /**
      * Observe processing progress (0.0 to 1.0).
      */
-    fun observeProgress(): Flow<Float>? = null
+    fun observeProgress(): kotlinx.coroutines.flow.StateFlow<Float>? = null
 
     /**
      * Run a custom action.

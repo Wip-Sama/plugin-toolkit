@@ -27,7 +27,7 @@ import plugintoolkit.composeapp.generated.resources.update_new_version_found
 @Composable
 fun CheckForUpdatesControl(viewModel: SettingsViewModel) {
     val updateState by viewModel.updateState.collectAsState()
-    
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (updateState is UpdateState.Checking) {
             CircularProgressIndicator(
@@ -42,7 +42,10 @@ fun CheckForUpdatesControl(viewModel: SettingsViewModel) {
         } else {
             if (updateState is UpdateState.UpdateAvailable) {
                 Text(
-                    text = stringResource(Res.string.update_new_version_found, (updateState as UpdateState.UpdateAvailable).info.version),
+                    text = stringResource(
+                        Res.string.update_new_version_found,
+                        (updateState as UpdateState.UpdateAvailable).info.version
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(end = ToolkitTheme.spacing.small)

@@ -17,12 +17,12 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
+import org.wip.plugintoolkit.core.model.LocalizedString
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
-import org.wip.plugintoolkit.core.model.LocalizedString
 
 class JvmNotificationService(
     private val scope: CoroutineScope,

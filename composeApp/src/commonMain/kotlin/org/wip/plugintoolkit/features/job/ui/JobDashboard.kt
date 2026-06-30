@@ -43,7 +43,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProgressIndicatorDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -76,13 +75,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.shared.components.SectionHeader
+import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
@@ -145,7 +146,7 @@ val JobNavConfig = SavedStateConfiguration {
 
 @Composable
 fun JobDashboard(
-    viewModel: JobViewModel = koinViewModel()
+    viewModel: JobViewModel = koinInject()
 ) {
     val backStack = rememberNavBackStack(JobNavConfig, JobNavKey.General as JobNavKey)
     val currentKey = backStack.lastOrNull() ?: JobNavKey.General
@@ -412,7 +413,12 @@ fun HistoryTab(viewModel: JobViewModel) {
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
 
-                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium))
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                    )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -492,7 +498,8 @@ fun JobCard(
             if (job.status == JobStatus.Running) {
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke).clip(MaterialTheme.shapes.small),
+                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke)
+                        .clip(MaterialTheme.shapes.small),
                     color = ProgressIndicatorDefaults.linearColor,
                     trackColor = ProgressIndicatorDefaults.linearTrackColor,
                     strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
@@ -623,19 +630,13 @@ fun StatusBadge(status: JobStatus) {
         JobStatus.Cancelled -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Surface(
-        color = color.copy(alpha = ToolkitTheme.opacity.buttonBackground),
+    ToolkitChip(
+        text = status.name,
+        containerColor = color,
         contentColor = color,
-        shape = RoundedCornerShape(ToolkitTheme.dimensions.settingsIconCornerRadius),
-        border = androidx.compose.foundation.BorderStroke(ToolkitTheme.dimensions.borderUnselected, color.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder))
-    ) {
-        Text(
-            text = status.name,
-            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold
-        )
-    }
+        style = ToolkitChipStyle.Outlined,
+        shape = RoundedCornerShape(ToolkitTheme.dimensions.settingsIconCornerRadius)
+    )
 }
 
 @Composable

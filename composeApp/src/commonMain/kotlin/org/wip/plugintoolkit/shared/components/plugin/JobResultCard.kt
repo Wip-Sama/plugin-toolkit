@@ -91,13 +91,13 @@ fun JobResultCard(
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    
+
                     val title = if (job.type == JobType.Flow) {
                         stringResource(Res.string.flow_run_id_label, job.id.takeLast(12))
                     } else {
                         stringResource(Res.string.plugin_execution_id_format, job.id)
                     }
-                    
+
                     Column {
                         Text(
                             text = title,
@@ -116,7 +116,7 @@ fun JobResultCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatusBadge(job.status)
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    
+
                     IconButton(
                         onClick = onDelete,
                         modifier = Modifier.size(24.dp)
@@ -130,10 +130,10 @@ fun JobResultCard(
                     }
 
                     // Only show expand button if there are details to show (success result, error, or logs)
-                    val hasDetails = job.status == JobStatus.Completed || 
-                                     job.status == JobStatus.Failed || 
-                                     job.status == JobStatus.Cancelled || 
-                                     logs.isNotEmpty()
+                    val hasDetails = job.status == JobStatus.Completed ||
+                            job.status == JobStatus.Failed ||
+                            job.status == JobStatus.Cancelled ||
+                            logs.isNotEmpty()
 
                     if (hasDetails) {
                         IconButton(
@@ -205,7 +205,10 @@ fun JobResultCard(
                                     verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), MaterialTheme.shapes.medium)
+                                        .background(
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                            MaterialTheme.shapes.medium
+                                        )
                                         .padding(ToolkitTheme.spacing.medium)
                                 ) {
                                     outputsParsed.forEach { (portName, element) ->
@@ -224,6 +227,7 @@ fun JobResultCard(
                                                     is JsonPrimitive -> {
                                                         if (element.isString) element.content else element.toString()
                                                     }
+
                                                     else -> element.toString()
                                                 },
                                                 style = MaterialTheme.typography.bodyMedium,
@@ -298,6 +302,7 @@ fun JobResultCard(
                         }
                         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                     }
+
                     else -> {}
                 }
 
@@ -315,7 +320,10 @@ fun JobResultCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f), MaterialTheme.shapes.medium)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                MaterialTheme.shapes.medium
+                            )
                             .padding(ToolkitTheme.spacing.medium)
                             .verticalScroll(rememberScrollState())
                     ) {
@@ -326,8 +334,16 @@ fun JobResultCard(
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace,
                                     color = when {
-                                        logLine.contains("[ERROR]", ignoreCase = true) || logLine.startsWith("ERROR:") -> MaterialTheme.colorScheme.error
-                                        logLine.contains("[WARN]", ignoreCase = true) || logLine.startsWith("WARN:") -> MaterialTheme.colorScheme.tertiary
+                                        logLine.contains(
+                                            "[ERROR]",
+                                            ignoreCase = true
+                                        ) || logLine.startsWith("ERROR:") -> MaterialTheme.colorScheme.error
+
+                                        logLine.contains(
+                                            "[WARN]",
+                                            ignoreCase = true
+                                        ) || logLine.startsWith("WARN:") -> MaterialTheme.colorScheme.tertiary
+
                                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                                     }
                                 )

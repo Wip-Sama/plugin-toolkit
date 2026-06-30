@@ -14,6 +14,16 @@ object PluginSecurity {
      * Verifies that the JAR file is signed by the provided public key.
      * Uses standard JVM JAR verification.
      * 
+     * To properly sign a plugin JAR for this toolkit, ensure you include the manifest in the signature.
+     * Example using `jarsigner`:
+     * ```bash
+     * # 1. Generate a keystore if you don't have one
+     * keytool -genkeypair -alias plugin-key -keyalg RSA -keysize 2048 -validity 3650 -keystore plugin-keystore.jks
+     * 
+     * # 2. Sign the JAR file
+     * jarsigner -keystore plugin-keystore.jks -sigalg SHA256withRSA -digestalg SHA-256 my-plugin.jar plugin-key
+     * ```
+     * 
      * @param jarPath Path to the JAR file
      * @param publicKeyBase64 Base64 encoded X.509 public key
      * @return true if the JAR is correctly signed by the key, false otherwise
@@ -57,14 +67,18 @@ object PluginSecurity {
         try {
             val entries = jar.entries()
             var hasSignedEntries = false
+            var isManifestSigned = false
 
             while (entries.hasMoreElements()) {
                 val entry = entries.nextElement()
                 if (entry.isDirectory) continue
-                
+
                 // Exclude the signature files themselves from needing to be signed
-                if (entry.name.startsWith("META-INF/") && 
-                    (entry.name.endsWith(".SF") || entry.name.endsWith(".RSA") || entry.name.endsWith(".DSA") || entry.name.endsWith(".EC"))) {
+                if (entry.name.startsWith("META-INF/") &&
+                    (entry.name.endsWith(".SF") || entry.name.endsWith(".RSA") || entry.name.endsWith(".DSA") || entry.name.endsWith(
+                        ".EC"
+                    ))
+                ) {
                     continue
                 }
 
@@ -73,14 +87,14 @@ object PluginSecurity {
 
                 val signers = entry.codeSigners
                 if (signers == null || signers.isEmpty()) {
-                    // All non-signature files must be signed
-                    if (entry.name != "META-INF/MANIFEST.MF") {
-                        Logger.w { "Unsigned entry found in JAR: ${entry.name}" }
-                        return false
-                    }
-                    continue
+                    // ALL files must be signed, including MANIFEST.MF
+                    Logger.w { "Unsigned entry found in JAR: ${entry.name}" }
+                    return false
                 }
 
+                if (entry.name == "META-INF/MANIFEST.MF") {
+                    isManifestSigned = true
+                }
                 hasSignedEntries = true
 
                 // Check if any of the signers matches our trusted public key
@@ -98,9 +112,14 @@ object PluginSecurity {
                     return false
                 }
             }
-            
+
             if (!hasSignedEntries) {
                 Logger.w { "JAR file contains no signed entries: ${file.name}" }
+                return false
+            }
+            
+            if (!isManifestSigned) {
+                Logger.w { "MANIFEST.MF is not signed or missing in JAR: ${file.name}" }
                 return false
             }
 

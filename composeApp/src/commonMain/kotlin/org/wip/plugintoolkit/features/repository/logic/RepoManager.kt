@@ -5,6 +5,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readBytes
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -19,12 +20,11 @@ import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.features.plugin.logic.PluginSecurity
+import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.model.RepoIndex
-import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
-import io.ktor.client.statement.readBytes
 
 class RepoManager(
     private val settingsRepository: SettingsRepository,
@@ -63,7 +63,7 @@ class RepoManager(
     suspend fun addRepository(url: String): AddRepoResult {
         // Aggressively clean the URL to remove any hidden characters or whitespace
         val trimmedUrl = url.replace(Regex("\\s+"), "").replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
-        
+
         if (_repositories.value.any { it.url == trimmedUrl }) {
 
             Logger.w { "Repository already added: $trimmedUrl" }
@@ -103,7 +103,8 @@ class RepoManager(
             coroutineScope {
                 val updatedPlugins = index.plugins.map { plugin ->
                     async {
-                        val baseUrl = trimmedUrl.substringBeforeLast("/") + "/" + (index.pluginsFolder ?: "plugins") + "/${plugin.pkg}"
+                        val baseUrl = trimmedUrl.substringBeforeLast("/") + "/" + (index.pluginsFolder
+                            ?: "plugins") + "/${plugin.pkg}"
                         val manifestContent = fetchText("$baseUrl/manifest.json")
                         val manifest = manifestContent?.let {
                             try {
@@ -112,26 +113,28 @@ class RepoManager(
                                 null
                             }
                         }
-                        val isSignatureValid = if (index.signPublicKey != null && plugin.signature != null && plugin.hash != null) {
-                            PluginSecurity.verifyDetached(
-                                plugin.hash,
-                                plugin.signature,
-                                index.signPublicKey
-                            )
-                        } else null
+                        val isSignatureValid =
+                            if (index.signPublicKey != null && plugin.signature != null && plugin.hash != null) {
+                                PluginSecurity.verifyDetached(
+                                    plugin.hash,
+                                    plugin.signature,
+                                    index.signPublicKey
+                                )
+                            } else null
                         plugin.copy(repoUrl = trimmedUrl, manifest = manifest, isSignatureValid = isSignatureValid)
                     }
                 }.awaitAll()
                 _plugins.value += (trimmedUrl to updatedPlugins)
 
                 val updatedFlows = index.flows.map { flow ->
-                    val isSignatureValid = if (index.signPublicKey != null && flow.signature != null && flow.hash != null) {
-                        PluginSecurity.verifyDetached(
-                            flow.hash,
-                            flow.signature,
-                            index.signPublicKey
-                        )
-                    } else null
+                    val isSignatureValid =
+                        if (index.signPublicKey != null && flow.signature != null && flow.hash != null) {
+                            PluginSecurity.verifyDetached(
+                                flow.hash,
+                                flow.signature,
+                                index.signPublicKey
+                            )
+                        } else null
                     flow.copy(repoUrl = trimmedUrl, isSignatureValid = isSignatureValid)
                 }
                 _flows.value += (trimmedUrl to updatedFlows)
@@ -171,11 +174,12 @@ class RepoManager(
             }
             val responseBody = response.bodyAsText()
             val index = jsonConfig.decodeFromString<RepoIndex>(responseBody)
-            
+
             coroutineScope {
                 val updatedPlugins = index.plugins.map { plugin ->
                     async {
-                        val baseUrl = trimmedUrl.substringBeforeLast("/") + "/" + (index.pluginsFolder ?: "plugins") + "/${plugin.pkg}"
+                        val baseUrl = trimmedUrl.substringBeforeLast("/") + "/" + (index.pluginsFolder
+                            ?: "plugins") + "/${plugin.pkg}"
 
                         val manifestContent = fetchText("$baseUrl/manifest.json")
                         val manifest = manifestContent?.let {
@@ -185,26 +189,28 @@ class RepoManager(
                                 null
                             }
                         }
-                        val isSignatureValid = if (index.signPublicKey != null && plugin.signature != null && plugin.hash != null) {
-                            PluginSecurity.verifyDetached(
-                                plugin.hash,
-                                plugin.signature,
-                                index.signPublicKey
-                            )
-                        } else null
+                        val isSignatureValid =
+                            if (index.signPublicKey != null && plugin.signature != null && plugin.hash != null) {
+                                PluginSecurity.verifyDetached(
+                                    plugin.hash,
+                                    plugin.signature,
+                                    index.signPublicKey
+                                )
+                            } else null
                         plugin.copy(repoUrl = trimmedUrl, manifest = manifest, isSignatureValid = isSignatureValid)
                     }
                 }.awaitAll()
                 _plugins.value += (trimmedUrl to updatedPlugins)
 
                 val updatedFlows = index.flows.map { flow ->
-                    val isSignatureValid = if (index.signPublicKey != null && flow.signature != null && flow.hash != null) {
-                        PluginSecurity.verifyDetached(
-                            flow.hash,
-                            flow.signature,
-                            index.signPublicKey
-                        )
-                    } else null
+                    val isSignatureValid =
+                        if (index.signPublicKey != null && flow.signature != null && flow.hash != null) {
+                            PluginSecurity.verifyDetached(
+                                flow.hash,
+                                flow.signature,
+                                index.signPublicKey
+                            )
+                        } else null
                     flow.copy(repoUrl = trimmedUrl, isSignatureValid = isSignatureValid)
                 }
                 _flows.value += (trimmedUrl to updatedFlows)
@@ -256,7 +262,7 @@ class RepoManager(
     }
 
     private fun saveReposToSettings(repos: List<ExtensionRepo>) {
-        settingsRepository.updateSettings { 
+        settingsRepository.updateSettings {
             it.copy(extensions = it.extensions.copy(repositories = repos))
         }
     }
@@ -280,7 +286,7 @@ class RepoManager(
     }
 
     fun setPackageSourceOverride(pkg: String, repoUrl: String) {
-        settingsRepository.updateSettings { 
+        settingsRepository.updateSettings {
             it.copy(
                 extensions = it.extensions.copy(
                     packageSourceOverrides = it.extensions.packageSourceOverrides + (pkg to repoUrl)

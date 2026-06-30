@@ -1,17 +1,35 @@
 package org.wip.plugintoolkit.features.job.logic
 
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.writeString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class LoopNodeExecutorsTest {
+
+    @BeforeTest
+    fun setup() {
+        val appDataDir = "build/tmp/test_loop_nodes"
+        val flowsDir = Path("$appDataDir/flows")
+        if (!SystemFileSystem.exists(flowsDir)) {
+            SystemFileSystem.createDirectories(flowsDir)
+        }
+        val dummyJson = """{"name":"dummy","nodes":[],"connections":[]}"""
+        SystemFileSystem.sink(Path("$appDataDir/flows/dummy.json")).buffered().use {
+            it.writeString(dummyJson)
+        }
+    }
 
     private class MockNodeExecutionContext(
         private val inputValues: Map<String, Any?>,
@@ -25,8 +43,15 @@ class LoopNodeExecutorsTest {
             inputs = emptyList(),
             outputs = emptyList()
         )
-        override val job = BackgroundJob("1", "job", JobType.Flow, "system", "mock", emptyMap())
-        override val appDataDir = "/tmp"
+        override val job = BackgroundJob(
+            "1",
+            "job",
+            JobType.Flow,
+            pluginId = "system",
+            capabilityName = "mock",
+            parameters = emptyMap<String, JsonElement>()
+        )
+        override val appDataDir = "build/tmp/test_loop_nodes"
         override val runtimeInferredTypes = emptyMap<Pair<Long, String>, DataType>()
 
         val outputs = mutableMapOf<String, Any?>()
@@ -64,10 +89,10 @@ class LoopNodeExecutorsTest {
             mapOf("output_data" to 2),
             mapOf("output_data" to 3)
         )
-        
+
         val executor = ForNodeExecutor()
         executor.execute(context)
-        
+
         assertEquals(3, context.subflowCallCount)
         assertEquals(3, context.outputs["output_data"])
     }
@@ -80,17 +105,17 @@ class LoopNodeExecutorsTest {
         )
         context1.throwPauseOnCallIndex = 1 // pause on i=1
         context1.subflowOutputsToReturn = listOf(mapOf("output_data" to 10))
-        
+
         val executor = ForNodeExecutor()
-        
+
         val pauseException = assertFailsWith<PauseFlowException> {
             executor.execute(context1)
         }
-        
+
         val state = pauseException.resumeState as kotlinx.serialization.json.JsonObject
-        assertEquals(1, state["index"]?.kotlinx.serialization.json.jsonPrimitive?.intOrNull)
-        assertEquals(10, state["accumulator"]?.kotlinx.serialization.json.jsonPrimitive?.intOrNull)
-        
+        assertEquals(1, state["index"]?.let { it as? JsonPrimitive }?.content?.toIntOrNull())
+        assertEquals(10, state["accumulator"]?.let { it as? JsonPrimitive }?.content?.toIntOrNull())
+
         // Resume
         val context2 = MockNodeExecutionContext(
             inputValues = mapOf("start" to 0, "end" to 3, "step" to 1, "subflow_name" to "dummy", "input_data" to 0),
@@ -101,9 +126,9 @@ class LoopNodeExecutorsTest {
             mapOf("output_data" to 20),
             mapOf("output_data" to 30)
         )
-        
+
         executor.execute(context2)
-        
+
         assertEquals(2, context2.subflowCallCount) // Should have called for i=1 and i=2
         assertEquals(30, context2.outputs["output_data"])
     }

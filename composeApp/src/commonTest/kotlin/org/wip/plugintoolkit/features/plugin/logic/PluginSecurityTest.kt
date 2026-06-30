@@ -38,7 +38,7 @@ class PluginSecurityTest {
         val otherKp = kpg.generateKeyPair()
         val otherPublicKeyBase64 = Base64.getEncoder().encodeToString(otherKp.public.encoded)
         assertFalse(PluginSecurity.verifyDetached(data, signatureBase64, otherPublicKeyBase64))
-        
+
         // 6. Malformed base64 signature - Should be false
         assertFalse(PluginSecurity.verifyDetached(data, "invalid-base64", publicKeyBase64))
     }
@@ -71,7 +71,7 @@ class PluginSecurityTest {
             kpg.initialize(2048)
             val kp = kpg.generateKeyPair()
             val publicKeyBase64 = Base64.getEncoder().encodeToString(kp.public.encoded)
-            
+
             assertFalse(PluginSecurity.verify(unsignedJar.absolutePath, publicKeyBase64))
         } finally {
             unsignedJar.delete()
