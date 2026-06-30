@@ -71,7 +71,7 @@ class FlowEngine(
         try {
             val jsonOutputs = executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject, 0)
             val finalJson = toJsonElement(jsonOutputs).toString()
-            val outputFileStr = job.parameters["-1"]?.let { param ->
+            val outputFileStr = job.parameters["-1_flow_output_file"]?.let { param ->
                 try {
                     val primitive = param as? JsonPrimitive
                     if (primitive != null && primitive.isString) primitive.content else null
@@ -318,7 +318,8 @@ class FlowEngine(
                     val outputPort = node.outputs.firstOrNull()
                     if (outputPort != null) {
                         val key = "${node.id}"
-                        val valueJson = initialParameters[key] ?: initialParameters[outputPort.id]
+                        val portKey = "${node.id}_${outputPort.id}"
+                        val valueJson = initialParameters[portKey] ?: initialParameters[key] ?: initialParameters[outputPort.id]
                         val rawValue = valueJson?.let { je -> fromJsonElement(je) } ?: ""
                         computedValues[Pair(node.id, outputPort.id)] = rawValue
                     }

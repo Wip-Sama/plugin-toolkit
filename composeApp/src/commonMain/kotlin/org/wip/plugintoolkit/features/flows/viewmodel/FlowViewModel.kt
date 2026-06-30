@@ -501,7 +501,9 @@ class FlowViewModel(
 
                 val params = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
                 parameterValues.forEach { (key, value) ->
-                    val nodeId = key.toLongOrNull()
+                    val parts = key.split("_", limit = 2)
+                    val nodeId = parts[0].toLongOrNull()
+                    val portId = parts.getOrNull(1)
                     val node = flow.nodes.find { it.id == nodeId }
 
                     val dataType = when (node) {
@@ -515,7 +517,8 @@ class FlowViewModel(
                         }
 
                         is Node.SystemNode -> {
-                            node.inputs.firstOrNull()?.dataType
+                            val targetPort = if (portId != null) node.inputs.find { it.id == portId } else node.inputs.firstOrNull()
+                            targetPort?.dataType
                                 ?: DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.ANY)
                         }
 

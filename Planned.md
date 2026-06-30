@@ -18,3 +18,6 @@ A build of the application to allow for a portable installation
 ### Support for local repositories
 
 A way to insert a local folder as local repository on the system
+
+### Making flow resum work properly
+

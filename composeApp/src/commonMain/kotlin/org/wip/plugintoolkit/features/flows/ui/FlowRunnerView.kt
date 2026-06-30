@@ -192,46 +192,78 @@ fun FlowRunnerView(
                                     "load" -> {
                                         val filePort = node.inputs.find { it.id == "file_path" }
                                         if (filePort != null) {
-                                            listOf(
-                                                FlowParameter(
-                                                    nodeId = node.id,
-                                                    type = ParameterType.LOAD,
-                                                    label = "${node.title} -> File Path",
-                                                    portId = filePort.id,
-                                                    dataType = filePort.dataType,
-                                                    defaultValue = filePort.value as? String
-                                                        ?: filePort.defaultValue as? String ?: "output.txt",
-                                                    semanticTypes = filePort.semanticTypes.ifEmpty {
-                                                        org.wip.plugintoolkit.api.parseSemanticTypes(
-                                                            "file"
-                                                        )
-                                                    },
-                                                    role = org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION
+                                            val isConnected = currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == filePort.id }
+                                            if (!isConnected) {
+                                                listOf(
+                                                    FlowParameter(
+                                                        nodeId = node.id,
+                                                        type = ParameterType.LOAD,
+                                                        label = "${node.title} -> File Path",
+                                                        portId = filePort.id,
+                                                        dataType = filePort.dataType,
+                                                        defaultValue = filePort.value as? String
+                                                            ?: filePort.defaultValue as? String ?: "output.txt",
+                                                        semanticTypes = filePort.semanticTypes.ifEmpty {
+                                                            org.wip.plugintoolkit.api.parseSemanticTypes(
+                                                                "file"
+                                                            )
+                                                        },
+                                                        role = org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION
+                                                    )
                                                 )
-                                            )
+                                            } else emptyList()
                                         } else emptyList()
                                     }
 
                                     "save" -> {
                                         val filePort = node.inputs.find { it.id == "file_path" }
                                         if (filePort != null) {
-                                            listOf(
-                                                FlowParameter(
-                                                    nodeId = node.id,
-                                                    type = ParameterType.SAVE,
-                                                    label = "${node.title} -> File Path",
-                                                    portId = filePort.id,
-                                                    dataType = filePort.dataType,
-                                                    defaultValue = filePort.value as? String
-                                                        ?: filePort.defaultValue as? String ?: "output.txt",
-                                                    semanticTypes = filePort.semanticTypes.ifEmpty {
-                                                        org.wip.plugintoolkit.api.parseSemanticTypes(
-                                                            "file"
-                                                        )
-                                                    },
-                                                    role = org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+                                            val isConnected = currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == filePort.id }
+                                            if (!isConnected) {
+                                                listOf(
+                                                    FlowParameter(
+                                                        nodeId = node.id,
+                                                        type = ParameterType.SAVE,
+                                                        label = "${node.title} -> File Path",
+                                                        portId = filePort.id,
+                                                        dataType = filePort.dataType,
+                                                        defaultValue = filePort.value as? String
+                                                            ?: filePort.defaultValue as? String ?: "output.txt",
+                                                        semanticTypes = filePort.semanticTypes.ifEmpty {
+                                                            org.wip.plugintoolkit.api.parseSemanticTypes(
+                                                                "file"
+                                                            )
+                                                        },
+                                                        role = org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+                                                    )
                                                 )
-                                            )
+                                            } else emptyList()
+                                        } else emptyList()
+                                    }
+
+                                    "save_file", "save_folder" -> {
+                                        val destPort = node.inputs.find { it.id == "destination_folder" }
+                                        if (destPort != null) {
+                                            val isConnected = currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == destPort.id }
+                                            if (!isConnected) {
+                                                listOf(
+                                                    FlowParameter(
+                                                        nodeId = node.id,
+                                                        type = ParameterType.SAVE,
+                                                        label = "${node.title} -> Destination Folder",
+                                                        portId = destPort.id,
+                                                        dataType = destPort.dataType,
+                                                        defaultValue = destPort.value as? String
+                                                            ?: destPort.defaultValue as? String ?: "",
+                                                        semanticTypes = destPort.semanticTypes.ifEmpty {
+                                                            org.wip.plugintoolkit.api.parseSemanticTypes(
+                                                                "path"
+                                                            )
+                                                        },
+                                                        role = org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+                                                    )
+                                                )
+                                            } else emptyList()
                                         } else emptyList()
                                     }
 
@@ -279,7 +311,7 @@ fun FlowRunnerView(
                     val map = mutableStateMapOf<String, String>()
                     flowParameters.forEach { param ->
                         if (param.type != ParameterType.OUTPUT) {
-                            map["${param.nodeId}"] = param.defaultValue
+                            map["${param.nodeId}_${param.portId}"] = param.defaultValue
                         }
                     }
                     map
@@ -318,10 +350,10 @@ fun FlowRunnerView(
                     }
                     org.wip.plugintoolkit.shared.components.plugin.ExecutionParameter(
                         name = param.label,
-                        value = parameterValues["${param.nodeId}"] ?: param.defaultValue,
+                        value = parameterValues["${param.nodeId}_${param.portId}"] ?: param.defaultValue,
                         metadata = metadata,
                         onValueChange = { newValue ->
-                            parameterValues["${param.nodeId}"] = newValue
+                            parameterValues["${param.nodeId}_${param.portId}"] = newValue
                         }
                     )
                 }
@@ -360,7 +392,7 @@ fun FlowRunnerView(
                                 }
                                 var value by remember(param) {
                                     mutableStateOf(
-                                        parameterValues["${param.nodeId}"] ?: param.defaultValue
+                                        parameterValues["${param.nodeId}_${param.portId}"] ?: param.defaultValue
                                     )
                                 }
 
@@ -370,7 +402,7 @@ fun FlowRunnerView(
                                     value = value,
                                     onValueChange = { newValue ->
                                         value = newValue
-                                        parameterValues["${param.nodeId}"] = newValue
+                                        parameterValues["${param.nodeId}_${param.portId}"] = newValue
                                     }
                                 )
                             } else {
@@ -406,7 +438,7 @@ fun FlowRunnerView(
                 val isFlowValid = remember(parameterValues.toMap(), flowParameters) {
                     val allParams = flowParameters.filter { it.type != ParameterType.OUTPUT }
                     allParams.all { param ->
-                        val value = parameterValues["${param.nodeId}"] ?: param.defaultValue
+                        val value = parameterValues["${param.nodeId}_${param.portId}"] ?: param.defaultValue
                         val error = SettingsUtils.validateParameter(
                             value = value,
                             isRequired = true,

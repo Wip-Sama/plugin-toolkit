@@ -1,5 +1,5 @@
 Version: 1.7.0
-Date: 28-06-2026
+Date: 01-07-2026
 Added:
 	- It's not possible to change a connection destination/origin after its creation
 	- Tooltip names for the capability/flows with long names
@@ -8,7 +8,7 @@ Added:
 	- PluginsSetting can now define constraints like the CapabilityParameter
 	- Signing for manifest files
 	- Splash screen when opening the application
-	- A node to move content out of the sandbox
+	- A couple of nodes to move content out of the sandbox
 Changes:
   - now updating a plugin will make the button reflect what's happening to avoid confusion
   - shift is not used to fast delete a node connection
