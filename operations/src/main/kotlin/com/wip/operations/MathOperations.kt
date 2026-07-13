@@ -28,7 +28,7 @@ import org.wip.plugintoolkit.api.annotations.ResumeState
 data class MathProcessorSettings(
     @PluginSetting(
         description = "API Key for Google services",
-        defaultValue = "null",
+        defaultValue = "null"
     ) val googleApiKey: String = "null",
 
     @PluginSetting(
@@ -54,7 +54,25 @@ enum class VoiceOption {
     GOOGLE,
 
     @RequiresSetting(["serverToken"])
-    SERVER, LOCAL
+    SERVER,
+    LOCAL
+}
+
+enum class PartialLockedVoices {
+    @RequiresSetting(["operatorName"])
+    PREMIUM_MALE,
+    @RequiresSetting(["operatorName"])
+    PREMIUM_FEMALE,
+    BASIC_VOICE
+}
+
+enum class AllLockedVoices {
+    @RequiresSetting(["googleApiKey"])
+    GOOGLE_CLOUD_1,
+    @RequiresSetting(["googleApiKey"])
+    GOOGLE_CLOUD_2,
+    @RequiresSetting(["serverToken"])
+    ON_PREMISE_1
 }
 
 @Serializable
@@ -289,6 +307,40 @@ class MathProcessor(val settings: MathProcessorSettings) {
         ) inputVal: String
     ): String {
         return inputVal
+    }
+
+    @Capability(
+        name = "test_voices_enum",
+        description = "Test capability with VoiceOption",
+        requiresSettings = ["operatorName"]
+    )
+    fun testVoiceEnum(
+        @CapabilityParam(description = "Voice to use") voice: VoiceOption,
+        @CapabilityParam(description = "Configuration map") config: Map<String, Double>
+    ): String {
+        return "Voice selected: $voice, config size: ${config.size}"
+    }
+
+    @Capability(
+        name = "test_partial_locked_voices",
+        description = "Test capability with partially locked voices enum",
+        requiresSettings = []
+    )
+    fun testPartialLockedVoicesEnum(
+        @CapabilityParam(description = "Voice to use") voice: PartialLockedVoices
+    ): String {
+        return "Partial locked voice selected: $voice"
+    }
+
+    @Capability(
+        name = "test_all_locked_voices",
+        description = "Test capability with all voices locked enum",
+        requiresSettings = []
+    )
+    fun testAllLockedVoicesEnum(
+        @CapabilityParam(description = "Voice to use") voice: AllLockedVoices
+    ): String {
+        return "All locked voice selected: $voice"
     }
 
     @Capability(

@@ -120,9 +120,22 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
             val shortName1 = this.className.substringAfterLast('.')
             val shortName2 = other.className.substringAfterLast('.')
             if (shortName1 != shortName2) return false
-            if (this.properties.isEmpty() || other.properties.isEmpty()) return true
-            this.properties.size == other.properties.size && this.properties.all { (key, type) ->
-                other.properties[key]?.let { type.isCompatibleWith(it) } ?: false
+            
+            // Check that all required properties in 'other' are present in 'this'
+            // NOTE: We CAN check for optional parameters using requiredProperties. 
+            // Any property not in requiredProperties is considered optional.
+            val hasAllRequired = other.requiredProperties.all { this.properties.containsKey(it) }
+            if (!hasAllRequired) return false
+
+            // Check that for any property in 'other', if it is provided by 'this', the types are compatible
+            other.properties.all { (key, otherType) ->
+                val thisType = this.properties[key]
+                if (thisType == null) {
+                    // Missing property is allowed only if it is an optional parameter (not required)
+                    !other.requiredProperties.contains(key)
+                } else {
+                    thisType.isCompatibleWith(otherType)
+                }
             }
         }
 

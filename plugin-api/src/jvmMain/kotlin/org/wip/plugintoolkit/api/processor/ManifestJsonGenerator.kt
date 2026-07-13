@@ -34,10 +34,12 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNO
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_UPDATE_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.REQUIRES_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object ManifestJsonGenerator {
     fun generate(
+        resolver: com.google.devtools.ksp.processing.Resolver,
         classDeclaration: KSClassDeclaration,
         id: String,
         name: String,
@@ -223,6 +225,16 @@ object ManifestJsonGenerator {
             )
         }
 
+        // Extract all settings required by any Enum entry in the module
+        val enumRequiredSettings = resolver.getSymbolsWithAnnotation(ProcessorConstants.REQUIRES_SETTING_ANNOTATION)
+            .filterIsInstance<com.google.devtools.ksp.symbol.KSClassDeclaration>()
+            .flatMap { entry ->
+                val ann = entry.annotations.find { it.hasQualifiedName(ProcessorConstants.REQUIRES_SETTING_ANNOTATION) }
+                (ann?.arguments?.find { it.name?.asString() == "settings" }?.value as? List<*>)
+                    ?.filterIsInstance<String>() ?: emptyList()
+            }
+            .toSet()
+
         val manifestSettings = settingsProperties.associate { prop ->
             val ann = prop.annotations.first { it.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
             val desc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
@@ -231,7 +243,21 @@ object ManifestJsonGenerator {
             val ksType = prop.type.resolve()
             val isNullable = ksType.isMarkedNullable
             val explicitRequired = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
-            val required = explicitRequired || (!isNullable)
+            
+            // Collect capabilities that require this setting
+            val requiredBy = manifestCapabilities.filter { it.requiresSettings.contains(propName) }.map { it.name }
+            val isRequiredByEnum = enumRequiredSettings.contains(propName)
+            
+            // A setting is globally required if explicitly marked or non-nullable, 
+            // BUT NOT if it is a context-specific requirement (capability or enum option), UNLESS explicitly marked.
+            val required = if (explicitRequired) {
+                true
+            } else if (requiredBy.isNotEmpty() || isRequiredByEnum) {
+                false
+            } else {
+                !isNullable
+            }
+            
             val secret = ann.arguments.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
 
             val defaultJson = if (defaultVal.isNotEmpty()) {
@@ -273,7 +299,8 @@ object ManifestJsonGenerator {
                 type = GeneratorUtils.mapKSTypeToDataType(ksType),
                 required = required,
                 secret = secret,
-                constraints = constraints
+                constraints = constraints,
+                requiredByCapabilities = requiredBy
             )
         }
 
@@ -305,7 +332,8 @@ object ManifestJsonGenerator {
             ),
             requirements = Requirements(
                 minMemoryMb = minMemoryMb,
-                minExecutionTimeMs = minExecutionTimeMs
+                minExecutionTimeMs = minExecutionTimeMs,
+                targetAppVersion = org.wip.plugintoolkit.api.ApiConfig.VERSION
             ),
             capabilities = manifestCapabilities,
             actions = manifestActions,
@@ -316,7 +344,10 @@ object ManifestJsonGenerator {
             hasMigrations = hasMigrations
         )
 
-        val json = Json { prettyPrint = true }
+        val json = Json { 
+            prettyPrint = true 
+            encodeDefaults = true
+        }
         return json.encodeToString(manifestObj)
     }
 }

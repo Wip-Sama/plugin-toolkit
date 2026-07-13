@@ -78,7 +78,7 @@ buildkonfig {
         buildConfigField(
             com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
             "MIN_COMPATIBLE_PLUGIN_VERSION",
-            "1.6.0"
+            "1.7.1"
         )
     }
 }

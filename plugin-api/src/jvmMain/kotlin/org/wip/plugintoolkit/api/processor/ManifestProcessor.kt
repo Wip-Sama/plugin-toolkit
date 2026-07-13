@@ -90,6 +90,10 @@ class ManifestProcessor(
                     }
                 } ?: emptyList()
 
+        if (supportedOs.isEmpty()) {
+            logger.warn("No compatible OS specified for plugin '$id'. It is recommended to specify at least one supported OS in @PluginInfo.supportedOs", classDeclaration)
+        }
+
         val packageName = classDeclaration.packageName.asString()
         val baseClassName = classDeclaration.simpleName.asString()
 
@@ -206,6 +210,7 @@ class ManifestProcessor(
                 .filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } }
         }.toList()
         val manifestJson = ManifestJsonGenerator.generate(
+            resolver,
             classDeclaration,
             id,
             name,

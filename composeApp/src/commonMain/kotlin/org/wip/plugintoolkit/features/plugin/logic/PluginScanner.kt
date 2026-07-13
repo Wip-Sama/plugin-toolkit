@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
 import org.wip.plugintoolkit.AppConfig
+import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.PlatformUtils
@@ -26,31 +27,7 @@ class PluginScanner(
     }
 
     private fun checkCompatibility(manifest: PluginManifest): Pair<Boolean, String?> {
-        val target = manifest.requirements.targetAppVersion ?: return true to null
-        val current = AppConfig.VERSION
-        val min = AppConfig.MIN_COMPATIBLE_PLUGIN_VERSION
-
-        if (VersionUtils.compare(target, current) > 0) {
-            return false to "Plugin requires a newer app version (targeted for $target)"
-        }
-        if (VersionUtils.compare(target, min) < 0) {
-            return false to "Plugin is obsolete (targeted for $target, min supported $min)"
-        }
-
-        val supportedOs = manifest.plugin.supportedOs
-        if (supportedOs.isNotEmpty()) {
-            val currentOs = when {
-                PlatformUtils.isWindows -> org.wip.plugintoolkit.api.OS.WINDOWS
-                PlatformUtils.isLinux -> org.wip.plugintoolkit.api.OS.LINUX
-                PlatformUtils.isMac -> org.wip.plugintoolkit.api.OS.MACOS
-                else -> null
-            }
-            if (currentOs == null || currentOs !in supportedOs) {
-                return false to "Plugin does not support the current operating system (supported: ${supportedOs.joinToString { it.name }})"
-            }
-        }
-
-        return true to null
+        return org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils.checkCompatibility(manifest)
     }
 
     /**
@@ -107,7 +84,8 @@ class PluginScanner(
                                         jarFileName = jarFileName,
                                         description = manifest.plugin.description,
                                         isCompatible = isCompatible,
-                                        compatibilityError = compError
+                                        compatibilityError = compError,
+                                        supportedOs = manifest.plugin.supportedOs
                                     )
                                 } else {
                                     folderChanged = true
@@ -119,7 +97,8 @@ class PluginScanner(
                                         jarFileName = jarFileName,
                                         description = manifest.plugin.description,
                                         isCompatible = isCompatible,
-                                        compatibilityError = compError
+                                        compatibilityError = compError,
+                                        supportedOs = manifest.plugin.supportedOs
                                     )
                                 }
                                 folderPlugins.add(updatedPlugin)

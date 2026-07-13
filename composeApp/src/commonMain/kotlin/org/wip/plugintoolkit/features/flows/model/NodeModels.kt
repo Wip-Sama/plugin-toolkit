@@ -244,7 +244,7 @@ sealed class Node {
     abstract fun copyWithCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithInputsCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithOutputsCollapsedState(isCollapsed: Boolean): Node
-    abstract fun isReady(connections: List<Connection>): Boolean
+    abstract fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>? = null): Boolean
 
     @Serializable
     @SerialName("capability")
@@ -272,13 +272,30 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>): Boolean {
+        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean {
             if (isBroken) return false
             val parameters = capability.parameters ?: return true
             for ((portId, metadata) in parameters) {
+                val inputPort = inputs.find { it.id == portId }
+                val effectiveValue = inputPort?.value ?: inputPort?.defaultValue
+
+                if (metadata.type is org.wip.plugintoolkit.api.DataType.Enum) {
+                    val enumType = metadata.type as org.wip.plugintoolkit.api.DataType.Enum
+                    val selectedValueStr = effectiveValue?.let { 
+                        if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString() 
+                    }
+                    if (selectedValueStr != null && settings != null) {
+                        val reqs = enumType.optionRequirements[selectedValueStr]
+                        if (reqs != null && reqs.any { reqSetting -> 
+                            val s = settings[reqSetting]
+                            s == null || s is kotlinx.serialization.json.JsonNull || (s as? kotlinx.serialization.json.JsonPrimitive)?.content?.isBlank() == true
+                        }) {
+                            return false
+                        }
+                    }
+                }
+
                 if (metadata.required) {
-                    val inputPort = inputs.find { it.id == portId }
-                    val effectiveValue = inputPort?.value ?: inputPort?.defaultValue
                     val providedByValue =
                         inputPort?.dataType?.isProvided(AnySerializer.toJsonElement(effectiveValue)) == true
                     val providedByConnection = connections.any { it.targetNodeId == id && it.targetPortId == portId }
@@ -322,7 +339,7 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean = true
     }
 
     @Serializable
@@ -345,7 +362,7 @@ sealed class Node {
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node = this
-        override fun isReady(connections: List<Connection>): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean = true
     }
 
     @Serializable
@@ -371,7 +388,7 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean = true
     }
 
     @Serializable
@@ -400,7 +417,7 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean = true
     }
 }
 

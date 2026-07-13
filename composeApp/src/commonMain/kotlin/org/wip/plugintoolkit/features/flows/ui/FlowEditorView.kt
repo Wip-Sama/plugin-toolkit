@@ -89,6 +89,7 @@ fun FlowEditorView(
 ) {
     val state by viewModel.state.collectAsState()
     val flow = state.flow
+    val pluginManager = org.koin.compose.koinInject<org.wip.plugintoolkit.features.plugin.logic.PluginManager>()
     val density = androidx.compose.ui.platform.LocalDensity.current
 
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
@@ -290,7 +291,7 @@ fun FlowEditorView(
                             inferredTypes = state.inferredTypes,
                             inferredSemanticTypes = state.inferredSemanticTypes,
                             validationErrors = state.validationErrors,
-                            isReady = node.isReady(flow.connections),
+                            isReady = node.isReady(flow.connections, if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null),
                             onFocusLost = { viewModel.onEvent(FlowEvent.Save) },
                             onMove = { id, delta, snap, showGhost ->
                                 viewModel.onEvent(
@@ -717,7 +718,7 @@ fun FlowEditorView(
 @Composable
 private fun NodeComponentPlaceholder(node: Node, height: Dp = 120.dp) {
     Surface(
-        modifier = Modifier.width(300.dp).height(height),
+        modifier = Modifier.width(380.dp).height(height),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
         border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))

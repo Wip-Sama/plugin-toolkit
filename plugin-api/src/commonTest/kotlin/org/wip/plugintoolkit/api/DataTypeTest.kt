@@ -86,9 +86,24 @@ class DataTypeTest {
         val objA1 = DataType.Object("com.example.ClassA", properties = mapOf("id" to intType))
         val objA2 = DataType.Object("com.example.ClassA", properties = mapOf("id" to intType))
         val objA3 = DataType.Object("com.example.ClassA", properties = mapOf("id" to stringType))
+        val objA4 = DataType.Object("com.example.ClassA", properties = mapOf("id" to intType, "name" to stringType))
         val objB = DataType.Object("com.example.ClassB")
+        
+        // Optional/Required Tests
+        val objWithOptionalName = DataType.Object("com.example.ClassA", properties = mapOf("id" to intType, "name" to stringType), requiredProperties = listOf("id"))
+        val objWithRequiredName = DataType.Object("com.example.ClassA", properties = mapOf("id" to intType, "name" to stringType), requiredProperties = listOf("id", "name"))
+
         assertTrue(objA1.isCompatibleWith(objA2), "Objects with same class name and properties should be compatible")
-        assertTrue(objA1.isCompatibleWith(objA3), "Objects with same class name but different properties SHOULD be compatible")
+        assertFalse(objA1.isCompatibleWith(objA3), "Objects with same class name but different properties types should NOT be compatible")
+        assertTrue(objA4.isCompatibleWith(objA1), "Objects with superset of properties should be compatible")
+        assertTrue(objA1.isCompatibleWith(objA4), "Objects with subset of properties ARE compatible if the missing ones are optional (requiredProperties is empty)")
+        
+        // Test optional/required
+        assertTrue(objA1.isCompatibleWith(objWithOptionalName), "Object missing an optional property should be compatible")
+        assertFalse(objA1.isCompatibleWith(objWithRequiredName), "Object missing a required property should NOT be compatible")
+        assertTrue(objA4.isCompatibleWith(objWithRequiredName), "Object providing all required properties should be compatible")
+        assertTrue(objA4.isCompatibleWith(objWithOptionalName), "Object providing optional property should be compatible")
+
         assertFalse(objA1.isCompatibleWith(objB), "Objects with different class names should not be compatible")
 
         // Enums

@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -39,6 +40,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.koin.compose.koinInject
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
@@ -47,6 +49,7 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
+import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.shared.components.TooltipArea
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.node_parameters_section
@@ -106,6 +109,15 @@ fun NodeComponent(
         outputLocationsCollapsed = node.isCollapsed
     }
 
+    val pluginManager = koinInject<PluginManager>()
+    val providedSettings = remember(node) {
+        if (node is Node.CapabilityNode) {
+            pluginManager.loadPluginSettings(node.pluginInfo.id).settings
+        } else {
+            emptyMap()
+        }
+    }
+
 
 
     val (headerColor, onHeaderColor) = when (node) {
@@ -141,7 +153,7 @@ fun NodeComponent(
 
     Box(
         modifier = modifier
-            .width(300.dp)
+            .width(380.dp)
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -398,22 +410,38 @@ fun NodeComponent(
                                     val isConnected = connectedInputPortIds.contains(input.id)
                                     val valueModifier = if (isConnected) Modifier.alpha(0.5f) else Modifier
 
-                                    NodePropertyEditor(
-                                        node = node,
-                                        input = input,
-                                        currentPortValue = currentPortValue,
-                                        isConnected = isConnected,
-                                        isReadOnly = isReadOnly,
-                                        portErrors = portErrors,
-                                        inferredSem = inferredSemanticTypes[Pair(node.id, input.id)]
-                                            ?: input.semanticTypes,
-                                        onUpdateValue = onUpdateValue,
-                                        onFocusLost = onFocusLost,
-                                        onShowColorPicker = { inputId ->
-                                            activeColorInputId = inputId
-                                            showColorPicker = true
-                                        }
-                                    )
+                                    val metadata = (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)
+                                        ?: org.wip.plugintoolkit.api.ParameterMetadata(
+                                            type = input.dataType,
+                                            semanticTypes = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes,
+                                            description = input.description ?: "",
+                                            required = false,
+                                            defaultValue = input.defaultValue?.let { org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(it) }
+                                        )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .width(200.dp)
+                                            .then(valueModifier)
+                                            .onFocusChanged { if (!it.isFocused) onFocusLost() }
+                                    ) {
+                                        org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
+                                            name = "",
+                                            metadata = metadata,
+                                            value = org.wip.plugintoolkit.features.flows.ui.getPortValueString(currentPortValue, input.dataType),
+                                            onValueChange = { newValue ->
+                                                onUpdateValue(
+                                                    node.id,
+                                                    input.id,
+                                                    org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(newValue, input.dataType)
+                                                )
+                                            },
+                                            enabled = !isConnected && !isReadOnly,
+                                            isAutoGenerated = metadata.autogeneratedPattern != null,
+                                            providedSettings = providedSettings,
+                                            compact = true
+                                        )
+                                    }
 
                                     val correspondingOutput = node.outputs.find { it.id == input.id }
                                     val isOutputLocation =

@@ -77,8 +77,9 @@ fun AboutView(
             val content = Res.readBytes("files/CHANGELOG.md").decodeToString()
             changelogVersions = ChangelogParser.parse(content).releases
 
-        } catch (e: Exception) {
-            // Log or handle error
+        } catch (e: Throwable) {
+            //TODO: Log or handle error
+            e.printStackTrace()
         }
     }
 

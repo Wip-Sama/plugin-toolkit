@@ -148,7 +148,13 @@ data class SettingMetadata(
     val type: DataType,
     val required: Boolean = false,
     val secret: Boolean = false,
-    val constraints: ParameterConstraints? = null
+    val constraints: ParameterConstraints? = null,
+    /**
+     * List of capability names that require this setting.
+     * This allows UI to show which capabilities are locked behind this setting
+     * without making the setting globally required for the plugin to load.
+     */
+    val requiredByCapabilities: List<String> = emptyList()
 )
 
 /**
@@ -243,7 +249,7 @@ data class PluginInfo(
 data class Requirements(
     val minMemoryMb: Int,
     val minExecutionTimeMs: Int,
-    val targetAppVersion: String? = ApiConfig.VERSION
+    val targetAppVersion: String? = null
 )
 
 @Serializable
@@ -424,7 +430,20 @@ data class Capability(
     val context: CapabilityContext = CapabilityContext.ANY,
     val requiresSettings: List<String> = emptyList(),
     val fileAccess: FileAccess? = null
-)
+) {
+    /**
+     * Checks whether all settings required by this capability are provided and valid.
+     */
+    fun isReady(providedSettings: Map<String, kotlinx.serialization.json.JsonElement>, manifestSettings: Map<String, SettingMetadata>?): Boolean {
+        if (requiresSettings.isEmpty()) return true
+        if (manifestSettings == null) return false
+        return requiresSettings.all { req ->
+            val meta = manifestSettings[req] ?: return@all false
+            val value = providedSettings[req] ?: return@all false
+            meta.type.isProvided(value)
+        }
+    }
+}
 
 object CapabilitySerializer : KSerializer<Capability> {
     override val descriptor: SerialDescriptor = CapabilitySurrogate.serializer().descriptor

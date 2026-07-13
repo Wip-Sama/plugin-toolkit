@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -28,6 +31,8 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
@@ -43,6 +48,7 @@ import plugintoolkit.composeapp.generated.resources.plugin_settings_actions
 import plugintoolkit.composeapp.generated.resources.plugin_settings_custom
 import plugintoolkit.composeapp.generated.resources.plugin_settings_global_defaults
 import plugintoolkit.composeapp.generated.resources.plugin_settings_capability
+import plugintoolkit.composeapp.generated.resources.settings_locked_capability
 
 @Composable
 fun PluginSettingsDialog(
@@ -116,6 +122,31 @@ fun PluginSettingsDialog(
     val hasGlobalParams = globalParams.isNotEmpty()
     val hasCapabilities = capabilities.isNotEmpty()
     val hasAnyResults = hasActions || hasCustomSettings || hasGlobalParams || hasCapabilities
+
+    val lockedEnumOptions = remember(manifest) {
+        val result = mutableMapOf<String, MutableList<String>>()
+        fun scanType(type: org.wip.plugintoolkit.api.DataType) {
+            when (type) {
+                is org.wip.plugintoolkit.api.DataType.Enum -> {
+                    type.optionRequirements.forEach { (option, requiredSettings) ->
+                        requiredSettings.forEach { req ->
+                            result.getOrPut(req) { mutableListOf() }.add(option)
+                        }
+                    }
+                }
+                is org.wip.plugintoolkit.api.DataType.Array -> scanType(type.items)
+                is org.wip.plugintoolkit.api.DataType.Object -> type.properties.values.forEach { scanType(it) }
+                is org.wip.plugintoolkit.api.DataType.MapType -> scanType(type.valueType)
+                else -> {}
+            }
+        }
+        
+        manifest.capabilities.forEach { cap ->
+            cap.parameters?.values?.forEach { p -> scanType(p.type) }
+        }
+        manifest.defaultParameters?.values?.forEach { p -> scanType(p.type) }
+        result
+    }
 
     val sectionIndices = remember(actions, customSettings, globalParams, capabilities, actionsTitle, customTitle, globalTitle, capabilityTitles) {
         val map = mutableMapOf<String, Int>()
@@ -297,22 +328,69 @@ fun PluginSettingsDialog(
                                         item {
                                             SettingsGroup(title = customTitle) {
                                                 customSettings.forEach { (key, meta) ->
-                                                    val value = store.settings[key] ?: meta.defaultValue
-                                                    DynamicParameterInput(
-                                                        name = key,
-                                                        metadata = ParameterMetadata(
-                                                            description = meta.description,
-                                                            type = meta.type,
-                                                            defaultValue = meta.defaultValue,
-                                                            required = meta.required,
-                                                            secret = meta.secret
-                                                        ),
-                                                        value = SettingsUtils.jsonToString(value, meta.type),
-                                                        onValueChange = {
-                                                            viewModel.updateSetting(key, SettingsUtils.stringToJson(it, meta.type))
-                                                        },
-                                                        enabled = !isBusy
-                                                    )
+                                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                                        val value = store.settings[key] ?: meta.defaultValue
+                                                        DynamicParameterInput(
+                                                            name = key,
+                                                            metadata = ParameterMetadata(
+                                                                description = meta.description,
+                                                                type = meta.type,
+                                                                defaultValue = meta.defaultValue,
+                                                                required = meta.required,
+                                                                secret = meta.secret
+                                                            ),
+                                                            value = SettingsUtils.jsonToString(value, meta.type),
+                                                            onValueChange = {
+                                                                viewModel.updateSetting(key, SettingsUtils.stringToJson(it, meta.type))
+                                                            },
+                                                            enabled = !isBusy,
+                                                            providedSettings = store.settings
+                                                        )
+                                                        
+                                                        val lockedOptionsForSetting = lockedEnumOptions[key]?.distinct() ?: emptyList()
+                                                        
+                                                        if (meta.requiredByCapabilities.isNotEmpty() || lockedOptionsForSetting.isNotEmpty()) {
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .padding(start = 16.dp, bottom = 12.dp, end = 16.dp)
+                                                                    .horizontalScroll(rememberScrollState()),
+                                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                            ) {
+                                                                meta.requiredByCapabilities.forEach { capName ->
+                                                                    ToolkitChip(
+                                                                        text = stringResource(Res.string.settings_locked_capability, capName),
+                                                                        icon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                                                                        style = ToolkitChipStyle.Tinted
+                                                                    )
+                                                                }
+                                                                if (lockedOptionsForSetting.isNotEmpty()) {
+                                                                    org.wip.plugintoolkit.shared.components.TooltipArea(
+                                                                        offsetY = 60,
+                                                                        tooltip = {
+                                                                            Surface(
+                                                                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                                                                shape = MaterialTheme.shapes.small
+                                                                            ) {
+                                                                                Text(
+                                                                                    text = "Locked values:\n" + lockedOptionsForSetting.joinToString("\n"),
+                                                                                    modifier = Modifier.padding(8.dp),
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                )
+                                                                            }
+                                                                        }
+                                                                    ) {
+                                                                        ToolkitChip(
+                                                                            text = "Locked Enum Options",
+                                                                            icon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                                                                            style = ToolkitChipStyle.Tinted
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -330,7 +408,8 @@ fun PluginSettingsDialog(
                                                         onValueChange = {
                                                             viewModel.updateGlobalParam(key, SettingsUtils.stringToJson(it, meta.type))
                                                         },
-                                                        enabled = !isBusy
+                                                        enabled = !isBusy,
+                                                        providedSettings = store.settings
                                                     )
                                                 }
                                             }
@@ -350,7 +429,8 @@ fun PluginSettingsDialog(
                                                         onValueChange = {
                                                             viewModel.updateCapabilityParam(capability.name, key, SettingsUtils.stringToJson(it, meta.type))
                                                         },
-                                                        enabled = !isBusy
+                                                        enabled = !isBusy,
+                                                        providedSettings = store.settings
                                                     )
                                                 }
                                             }
