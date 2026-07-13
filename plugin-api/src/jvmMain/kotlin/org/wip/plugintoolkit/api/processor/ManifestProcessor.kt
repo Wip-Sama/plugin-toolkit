@@ -211,6 +211,7 @@ class ManifestProcessor(
         }.toList()
         val manifestJson = ManifestJsonGenerator.generate(
             resolver,
+            logger,
             classDeclaration,
             id,
             name,

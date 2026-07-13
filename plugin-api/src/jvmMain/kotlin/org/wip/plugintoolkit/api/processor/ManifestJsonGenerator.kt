@@ -5,6 +5,7 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.ksp.toTypeName
 import kotlinx.serialization.json.Json
+import com.google.devtools.ksp.processing.KSPLogger
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.CapabilityContext
 import org.wip.plugintoolkit.api.Changelog
@@ -40,6 +41,7 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOT
 object ManifestJsonGenerator {
     fun generate(
         resolver: com.google.devtools.ksp.processing.Resolver,
+        logger: KSPLogger,
         classDeclaration: KSClassDeclaration,
         id: String,
         name: String,
@@ -248,14 +250,10 @@ object ManifestJsonGenerator {
             val requiredBy = manifestCapabilities.filter { it.requiresSettings.contains(propName) }.map { it.name }
             val isRequiredByEnum = enumRequiredSettings.contains(propName)
             
-            // A setting is globally required if explicitly marked or non-nullable, 
-            // BUT NOT if it is a context-specific requirement (capability or enum option), UNLESS explicitly marked.
-            val required = if (explicitRequired) {
-                true
-            } else if (requiredBy.isNotEmpty() || isRequiredByEnum) {
-                false
-            } else {
-                !isNullable
+            val required = explicitRequired && requiredBy.isEmpty() && !isRequiredByEnum
+            
+            if (!required && !isNullable) {
+                logger.error("Optional setting to non nullable field: '$propName'. Please make the field nullable (e.g., add '?') or mark it as required=true.", prop)
             }
             
             val secret = ann.arguments.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false

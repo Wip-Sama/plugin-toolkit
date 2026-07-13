@@ -49,13 +49,17 @@ object ModuleGenerator {
                 val name = prop.simpleName.asString()
                 val type = prop.type.resolve().toTypeName()
 
-                val defaultValue = when (type) {
-                    String::class.asClassName() -> CodeBlock.of("%S", "")
-                    Int::class.asClassName() -> CodeBlock.of("0")
-                    Boolean::class.asClassName() -> CodeBlock.of("false")
-                    Double::class.asClassName() -> CodeBlock.of("0.0")
-                    Float::class.asClassName() -> CodeBlock.of("0f")
-                    else -> CodeBlock.of("%T()", type)
+                val defaultValue = if (type.isNullable) {
+                    CodeBlock.of("null")
+                } else {
+                    when (type) {
+                        String::class.asClassName() -> CodeBlock.of("%S", "")
+                        Int::class.asClassName() -> CodeBlock.of("0")
+                        Boolean::class.asClassName() -> CodeBlock.of("false")
+                        Double::class.asClassName() -> CodeBlock.of("0.0")
+                        Float::class.asClassName() -> CodeBlock.of("0f")
+                        else -> CodeBlock.of("%T()", type)
+                    }
                 }
 
                 getModuleFunc.addCode(
