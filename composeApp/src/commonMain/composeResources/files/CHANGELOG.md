@@ -1,3 +1,8 @@
+Version: 1.7.2
+Date: 13-07-2026
+Fixed:
+	- Minor plugin api compilation problem regarding incorrect optional plugin setting parsing and tagging
+----------------------------------------------------------------------------------------------------
 Version: 1.7.1
 Date: 13-07-2026
 Added:
