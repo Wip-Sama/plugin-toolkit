@@ -1,3 +1,10 @@
+Version: 1.7.1
+Date: 13-07-2026
+Changes:
+  - New and improved plugin settings
+  - Now the required plugin setting for specific capabilities will noe prevent the plugin from working, only the capabilities locked behind them (TODO)
+  - Plugin capabilities with obligatory parameters are now not shown as required in plugin settings
+----------------------------------------------------------------------------------------------------
 Version: 1.7.0
 Date: 01-07-2026
 Added:

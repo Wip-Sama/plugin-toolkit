@@ -1,24 +1,25 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
@@ -26,6 +27,7 @@ import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
@@ -34,6 +36,13 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_cancel
 import plugintoolkit.composeapp.generated.resources.action_save
 import plugintoolkit.composeapp.generated.resources.plugin_settings_title
+import plugintoolkit.composeapp.generated.resources.settings_no_results
+import plugintoolkit.composeapp.generated.resources.settings_search_placeholder
+import plugintoolkit.composeapp.generated.resources.settings_search_by_section
+import plugintoolkit.composeapp.generated.resources.plugin_settings_actions
+import plugintoolkit.composeapp.generated.resources.plugin_settings_custom
+import plugintoolkit.composeapp.generated.resources.plugin_settings_global_defaults
+import plugintoolkit.composeapp.generated.resources.plugin_settings_capability
 
 @Composable
 fun PluginSettingsDialog(
@@ -45,131 +54,359 @@ fun PluginSettingsDialog(
     val isBusy by viewModel.isBusy.collectAsState()
     val manifest = viewModel.manifest ?: return
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(
-                    stringResource(Res.string.plugin_settings_title, manifest.plugin.name),
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.weight(1f)
-                )
-                if (isBusy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                }
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = ToolkitTheme.spacing.small)
-            ) {
-                // 1. Actions Section
-                if (!manifest.actions.isNullOrEmpty()) {
-                    SettingsGroup(title = "Actions") {
-                        manifest.actions.forEachIndexed { index, action ->
-                            SettingsItem(
-                                title = action.name,
-                                subtitle = action.description,
-                                icon = Icons.Default.PlayArrow,
-                                enabled = !isBusy,
-                                shape = getGroupedShape(index, manifest.actions.size),
-                                onClick = { viewModel.runAction(action.functionName) }
-                            )
-                        }
-                    }
-                }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchBySection by remember { mutableStateOf(false) }
 
-                // 2. Custom Settings (from manifest.settings)
-                if (!manifest.settings.isNullOrEmpty()) {
-                    SettingsGroup(title = "Custom Settings") {
-                        manifest.settings!!.forEach { (key, meta) ->
-                            val value = store.settings[key] ?: meta.defaultValue
-                            DynamicParameterInput(
-                                name = key,
-                                metadata = ParameterMetadata(
-                                    description = meta.description,
-                                    type = meta.type,
-                                    defaultValue = meta.defaultValue,
-                                    required = meta.required,
-                                    secret = meta.secret
-                                ),
-                                value = SettingsUtils.jsonToString(value, meta.type),
-                                onValueChange = {
-                                    viewModel.updateSetting(
-                                        key,
-                                        SettingsUtils.stringToJson(it, meta.type)
-                                    )
-                                },
-                                enabled = !isBusy
-                            )
-                        }
-                    }
-                }
+    val lazyListState = rememberLazyListState()
+    val sidebarListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
-                // 3. Global Parameter Defaults (from manifest.defaultParameters)
-                if (!manifest.defaultParameters.isNullOrEmpty()) {
-                    SettingsGroup(title = "Global Parameter Defaults") {
-                        manifest.defaultParameters!!.forEach { (key, meta) ->
-                            val value = store.globalParams[key] ?: meta.defaultValue
-                            DynamicParameterInput(
-                                name = key,
-                                metadata = meta,
-                                value = SettingsUtils.jsonToString(value, meta.type),
-                                onValueChange = {
-                                    viewModel.updateGlobalParam(
-                                        key,
-                                        SettingsUtils.stringToJson(it, meta.type)
-                                    )
-                                },
-                                enabled = !isBusy
-                            )
-                        }
-                    }
-                }
+    val actionsTitle = stringResource(Res.string.plugin_settings_actions)
+    val customTitle = stringResource(Res.string.plugin_settings_custom)
+    val globalTitle = stringResource(Res.string.plugin_settings_global_defaults)
 
-                // 4. Capability Parameter Defaults (grouped by capability)
-                manifest.capabilities.filter { !it.parameters.isNullOrEmpty() }.forEach { capability ->
-                    SettingsGroup(title = "Capability: ${capability.name}") {
-                        capability.parameters!!.forEach { (key, meta) ->
-                            val value = store.capabilityParams[capability.name]?.get(key) ?: meta.defaultValue
-                            DynamicParameterInput(
-                                name = key,
-                                metadata = meta,
-                                value = SettingsUtils.jsonToString(value, meta.type),
-                                onValueChange = {
-                                    viewModel.updateCapabilityParam(
-                                        capability.name,
-                                        key,
-                                        SettingsUtils.stringToJson(it, meta.type)
-                                    )
-                                },
-                                enabled = !isBusy
-                            )
-                        }
+    val capabilityTitles = manifest.capabilities.associate {
+        it.name to stringResource(Res.string.plugin_settings_capability, it.name)
+    }
+
+    val actions = if (searchBySection) {
+        if (searchQuery.isBlank() || actionsTitle.contains(searchQuery, ignoreCase = true)) manifest.actions else emptyList()
+    } else {
+        manifest.actions.filter { 
+            it.name.contains(searchQuery, ignoreCase = true) || 
+            it.description.contains(searchQuery, ignoreCase = true) 
+        }
+    }
+
+    val customSettings = if (searchBySection) {
+        if (searchQuery.isBlank() || customTitle.contains(searchQuery, ignoreCase = true)) manifest.settings ?: emptyMap() else emptyMap()
+    } else {
+        manifest.settings?.filter { (key, meta) -> 
+            key.contains(searchQuery, ignoreCase = true) || 
+            meta.description.contains(searchQuery, ignoreCase = true) 
+        } ?: emptyMap()
+    }
+
+    val globalParams = if (searchBySection) {
+        if (searchQuery.isBlank() || globalTitle.contains(searchQuery, ignoreCase = true)) manifest.defaultParameters ?: emptyMap() else emptyMap()
+    } else {
+        manifest.defaultParameters?.filter { (key, meta) -> 
+            key.contains(searchQuery, ignoreCase = true) || 
+            meta.description.contains(searchQuery, ignoreCase = true) 
+        } ?: emptyMap()
+    }
+
+    val capabilities = manifest.capabilities.mapNotNull { capability ->
+        if (searchBySection) {
+            val capTitle = capabilityTitles[capability.name] ?: capability.name
+            if (searchQuery.isBlank() || capTitle.contains(searchQuery, ignoreCase = true)) capability else null
+        } else {
+            val filteredParams = capability.parameters?.filter { (key, meta) ->
+                key.contains(searchQuery, ignoreCase = true) || 
+                meta.description.contains(searchQuery, ignoreCase = true) 
+            }
+            if (!filteredParams.isNullOrEmpty()) {
+                capability.copy(parameters = filteredParams)
+            } else null
+        }
+    }
+
+    val hasActions = actions.isNotEmpty()
+    val hasCustomSettings = customSettings.isNotEmpty()
+    val hasGlobalParams = globalParams.isNotEmpty()
+    val hasCapabilities = capabilities.isNotEmpty()
+    val hasAnyResults = hasActions || hasCustomSettings || hasGlobalParams || hasCapabilities
+
+    val sectionIndices = remember(actions, customSettings, globalParams, capabilities, actionsTitle, customTitle, globalTitle, capabilityTitles) {
+        val map = mutableMapOf<String, Int>()
+        var currentIndex = 0
+        if (hasActions) {
+            map[actionsTitle] = currentIndex++
+        }
+        if (hasCustomSettings) {
+            map[customTitle] = currentIndex++
+        }
+        if (hasGlobalParams) {
+            map[globalTitle] = currentIndex++
+        }
+        capabilities.forEach { capability ->
+            map[capabilityTitles[capability.name] ?: capability.name] = currentIndex++
+        }
+        map
+    }
+
+    val firstVisibleIndex by remember { derivedStateOf { lazyListState.firstVisibleItemIndex } }
+
+    LaunchedEffect(firstVisibleIndex) {
+        if (hasAnyResults) {
+            val visibleItems = sidebarListState.layoutInfo.visibleItemsInfo
+            if (visibleItems.isNotEmpty()) {
+                val isVisible = visibleItems.any { it.index == firstVisibleIndex }
+                if (!isVisible) {
+                    val firstVisible = visibleItems.first().index
+                    val lastVisible = visibleItems.last().index
+                    
+                    if (firstVisibleIndex > lastVisible) {
+                        // It's below the viewport. Scroll so it appears fully at the bottom.
+                        val viewportStart = sidebarListState.layoutInfo.viewportStartOffset
+                        val viewportEnd = sidebarListState.layoutInfo.viewportEndOffset
+                        val fullyVisibleItemsCount = visibleItems.count { 
+                            it.offset >= viewportStart && (it.offset + it.size) <= viewportEnd 
+                        }.coerceAtLeast(1)
+                        
+                        val targetTopIndex = maxOf(0, firstVisibleIndex - fullyVisibleItemsCount + 1)
+                        sidebarListState.animateScrollToItem(targetTopIndex)
+                    } else if (firstVisibleIndex < firstVisible) {
+                        // It's above the viewport. Scroll so it appears at the top.
+                        sidebarListState.animateScrollToItem(firstVisibleIndex)
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { viewModel.save(); onDismiss() },
-                enabled = !isBusy
-            ) {
-                Text(stringResource(Res.string.action_save))
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = true
-            ) {
-                Text(if (isBusy) "Close" else stringResource(Res.string.action_cancel))
             }
         }
-    )
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .fillMaxHeight(0.85f)
+                .widthIn(max = 1200.dp)
+                .heightIn(max = 900.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.large)) {
+                // Header row with title and search bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = ToolkitTheme.spacing.large),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        stringResource(Res.string.plugin_settings_title, manifest.plugin.name),
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(end = ToolkitTheme.spacing.large)
+                    )
+                    
+                    ToolkitTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text(stringResource(Res.string.settings_search_placeholder)) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+
+                    Text(
+                        text = stringResource(Res.string.settings_search_by_section),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                    Switch(
+                        checked = searchBySection,
+                        onCheckedChange = { searchBySection = it }
+                    )
+
+                    if (isBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(ToolkitTheme.dimensions.iconMedium)
+                                .padding(start = ToolkitTheme.spacing.medium),
+                            strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth
+                        )
+                    }
+                }
+
+                Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    LazyColumn(
+                        state = sidebarListState,
+                        modifier = Modifier
+                            .width(ToolkitTheme.dimensions.sidebarExpandedWidth)
+                            .fillMaxHeight()
+                            .padding(end = ToolkitTheme.spacing.medium),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                    ) {
+                        items(sectionIndices.toList()) { (name, index) ->
+                            val isSelected = firstVisibleIndex == index
+                            SidebarItem(
+                                text = name,
+                                isSelected = isSelected,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        lazyListState.animateScrollToItem(index)
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(start = ToolkitTheme.spacing.medium)
+                    ) {
+                        if (!hasAnyResults) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    stringResource(Res.string.settings_no_results),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            OutlinedCard(
+                                modifier = Modifier.fillMaxSize(),
+                                colors = CardDefaults.outlinedCardColors(
+                                    containerColor = Color.Transparent
+                                ),
+                                border = CardDefaults.outlinedCardBorder().copy(
+                                    brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outlineVariant)
+                                )
+                            ) {
+                                LazyColumn(
+                                    state = lazyListState,
+                                    modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.medium),
+                                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                                ) {
+                                    if (hasActions) {
+                                        item {
+                                            SettingsGroup(title = actionsTitle) {
+                                                actions.forEachIndexed { index, action ->
+                                                    SettingsItem(
+                                                        title = action.name,
+                                                        subtitle = action.description,
+                                                        icon = Icons.Default.PlayArrow,
+                                                        enabled = !isBusy,
+                                                        shape = getGroupedShape(index, actions.size),
+                                                        onClick = { viewModel.runAction(action.functionName) }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (hasCustomSettings) {
+                                        item {
+                                            SettingsGroup(title = customTitle) {
+                                                customSettings.forEach { (key, meta) ->
+                                                    val value = store.settings[key] ?: meta.defaultValue
+                                                    DynamicParameterInput(
+                                                        name = key,
+                                                        metadata = ParameterMetadata(
+                                                            description = meta.description,
+                                                            type = meta.type,
+                                                            defaultValue = meta.defaultValue,
+                                                            required = meta.required,
+                                                            secret = meta.secret
+                                                        ),
+                                                        value = SettingsUtils.jsonToString(value, meta.type),
+                                                        onValueChange = {
+                                                            viewModel.updateSetting(key, SettingsUtils.stringToJson(it, meta.type))
+                                                        },
+                                                        enabled = !isBusy
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (hasGlobalParams) {
+                                        item {
+                                            SettingsGroup(title = globalTitle) {
+                                                globalParams.forEach { (key, meta) ->
+                                                    val value = store.globalParams[key] ?: meta.defaultValue
+                                                    DynamicParameterInput(
+                                                        name = key,
+                                                        metadata = meta,
+                                                        value = SettingsUtils.jsonToString(value, meta.type),
+                                                        onValueChange = {
+                                                            viewModel.updateGlobalParam(key, SettingsUtils.stringToJson(it, meta.type))
+                                                        },
+                                                        enabled = !isBusy
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    capabilities.forEach { capability ->
+                                        item {
+                                            val capTitle = capabilityTitles[capability.name] ?: capability.name
+                                            SettingsGroup(title = capTitle) {
+                                                capability.parameters!!.forEach { (key, meta) ->
+                                                    val value = store.capabilityParams[capability.name]?.get(key) ?: meta.defaultValue
+                                                    DynamicParameterInput(
+                                                        name = key,
+                                                        metadata = meta.copy(required = false), // override required
+                                                        value = SettingsUtils.jsonToString(value, meta.type),
+                                                        onValueChange = {
+                                                            viewModel.updateCapabilityParam(capability.name, key, SettingsUtils.stringToJson(it, meta.type))
+                                                        },
+                                                        enabled = !isBusy
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = ToolkitTheme.spacing.large),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        enabled = true,
+                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
+                    ) {
+                        Text(if (isBusy) "Close" else stringResource(Res.string.action_cancel))
+                    }
+                    Button(
+                        onClick = { viewModel.save(); onDismiss() },
+                        enabled = !isBusy
+                    ) {
+                        Text(stringResource(Res.string.action_save))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SidebarItem(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(percent = 50))
+            .background(backgroundColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.mediumSmall),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = contentColor
+        )
+    }
 }
