@@ -30,6 +30,7 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -41,14 +42,6 @@ class JobWorkerFlowSandboxTest : JobWorkerFlowTestBase() {
     @BeforeTest
     fun setup() {
         mockkObject(PluginLoader)
-        org.koin.core.context.startKoin {
-            modules(org.koin.dsl.module {
-                single<SemanticRegistry> { DefaultSemanticRegistry() }
-                single<SettingsRepository> { SettingsRepository(FakeSettingsPersistence(), kotlinx.coroutines.test.TestScope()) }
-                single<PluginManager> { mockk(relaxed = true) }
-                single<PluginLifecycleCoordinator> { mockk(relaxed = true) }
-            })
-        }
     }
 
     @AfterTest
@@ -135,8 +128,18 @@ class JobWorkerFlowSandboxTest : JobWorkerFlowTestBase() {
 
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
         
+        org.koin.core.context.stopKoin()
+        org.koin.core.context.startKoin {
+            modules(org.koin.dsl.module {
+                single<SettingsPersistence> { persistence }
+                single { settingsRepo }
+                single<SemanticRegistry> { DefaultSemanticRegistry() }
+            })
+        }
+
         val engine = org.wip.plugintoolkit.features.job.logic.FlowEngine(
             jobManager,
             org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),

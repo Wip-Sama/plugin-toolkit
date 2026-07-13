@@ -51,6 +51,7 @@ class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
         stopKoin()
         val settingsPersistence = FakeSettingsPersistence()
         settingsRepo = SettingsRepository(settingsPersistence, kotlinx.coroutines.test.TestScope())
+        settingsRepo.updateSettings { settingsPersistence.settings }
         pluginManager = io.mockk.mockk(relaxed = true)
         lifecycleCoordinator = io.mockk.mockk(relaxed = true)
         

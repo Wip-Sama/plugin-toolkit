@@ -52,6 +52,7 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
     fun testDynamicListParameters() = runTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val jobWorker = JobWorker(1, jobManager, backgroundScope)
 
@@ -201,6 +202,7 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
     fun testDynamicListFlattening() = runTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val jobWorker = JobWorker(1, jobManager, backgroundScope)
 

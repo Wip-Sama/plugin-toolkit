@@ -21,6 +21,7 @@ class JobWorkerFlowConditionalTest : JobWorkerFlowTestBase() {
     fun testConditionalNodeFiresOnlyOneBranch_True() = runTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val jobWorker = JobWorker(1, jobManager, backgroundScope)
 
@@ -76,6 +77,7 @@ class JobWorkerFlowConditionalTest : JobWorkerFlowTestBase() {
     fun testConditionalNodeFiresOnlyOneBranch_False() = runTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
         val jobWorker = JobWorker(1, jobManager, backgroundScope)
 

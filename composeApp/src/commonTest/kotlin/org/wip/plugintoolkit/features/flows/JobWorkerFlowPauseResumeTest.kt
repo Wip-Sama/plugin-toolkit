@@ -53,6 +53,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
     fun testFlowPauseAndResumeBetweenNodes() = runTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
 
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
@@ -301,6 +302,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
     fun testFlowPauseAndResumeMidCapability() = runTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
 
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
@@ -492,6 +494,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
     fun testFlowPauseAndResumeWithRealSignalPropagation() = runTest {
         val persistence = FakeSettingsPersistence()
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
 
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
