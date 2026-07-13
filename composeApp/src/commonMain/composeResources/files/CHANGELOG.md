@@ -4,7 +4,7 @@ Added:
 	- Plugin-api version to the compiled plugin version
 Changes:
   - New and improved plugin settings
-  - Now the required plugin setting for specific capabilities will not prevent the plugin from working, only the capabilities locked behind them (TODO)
+  - Now the required plugin setting for specific capabilities will not prevent the plugin from working, only the capabilities locked behind them
   - Plugin capabilities with obligatory parameters are now not shown as required in plugin settings
   - Node fields are now the same as capability fields
   - Now incompatible plugin by version (installed or not) should be properly displayed as such
