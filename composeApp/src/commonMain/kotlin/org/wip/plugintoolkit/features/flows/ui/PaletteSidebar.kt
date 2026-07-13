@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -50,6 +51,10 @@ import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.koin.compose.koinInject
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.draw.alpha
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.palette_search_placeholder
 import plugintoolkit.composeapp.generated.resources.palette_tab_flows
@@ -201,6 +206,8 @@ private fun CapabilitiesPalette(
     onDragEnd: () -> Unit,
     onClick: (PaletteNode) -> Unit
 ) {
+    val pluginManager = koinInject<PluginManager>()
+
     val groupedCaps = remember(searchQuery, plugins) {
         plugins.map { p ->
             val manifest = p.getManifest().getOrThrow()
@@ -210,11 +217,15 @@ private fun CapabilitiesPalette(
 
     Column(
         modifier = Modifier
+            .fillMaxSize()
             .padding(ToolkitTheme.spacing.mediumSmall)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
         groupedCaps.forEach { (plugin, caps) ->
+            val settingsStore = remember(plugin.id, plugins) { pluginManager.loadPluginSettings(plugin.id) }
+            val manifest = remember(plugin.id, plugins) { plugins.find { it.getManifest().getOrThrow().plugin.id == plugin.id }?.getManifest()?.getOrNull() }
+
             Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
                 // Sleek sidebar headers
                 Text(
@@ -228,10 +239,16 @@ private fun CapabilitiesPalette(
                     )
                 )
                 caps.forEach { cap ->
+                    val isReady = remember(cap, settingsStore.settings, manifest?.settings) {
+                        cap.isReady(settingsStore.settings, manifest?.settings)
+                    }
+
                     val paletteNode = PaletteNode.Capability(plugin, cap)
                     PaletteItem(
                         text = cap.name,
                         color = MaterialTheme.colorScheme.primary,
+                        enabled = isReady,
+                        tooltip = if (!isReady) "Configuration required" else null,
                         rootLayoutCoordinates = rootLayoutCoordinates,
                         onDragStart = { pos, grabOffset -> onDragStart(paletteNode, pos, grabOffset) },
                         onDrag = onDrag,
@@ -385,6 +402,8 @@ private fun FlowsPalette(
 private fun PaletteItem(
     text: String,
     color: Color = MaterialTheme.colorScheme.primary,
+    enabled: Boolean = true,
+    tooltip: String? = null,
     rootLayoutCoordinates: LayoutCoordinates?,
     onDragStart: (Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
@@ -402,32 +421,34 @@ private fun PaletteItem(
     org.wip.plugintoolkit.shared.components.TooltipArea(
         tooltip = {
             Text(
-                text = text,
+                text = tooltip ?: text,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (!enabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
         delayMillis = 1000,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.5f)
     ) {
         Surface(
-            onClick = onClick,
+            onClick = { if (enabled) onClick() },
             modifier = Modifier
                 .fillMaxWidth()
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { localOffset ->
-                            cumulativeDrag = Offset.Zero
-                            currentOnDragStart(localOffset + lastPosition, localOffset)
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            cumulativeDrag += dragAmount
-                            currentOnDrag(cumulativeDrag)
-                        },
-                        onDragEnd = currentOnDragEnd,
-                        onDragCancel = currentOnDragEnd
-                    )
+                .pointerInput(enabled) {
+                    if (enabled) {
+                        detectDragGestures(
+                            onDragStart = { localOffset ->
+                                cumulativeDrag = Offset.Zero
+                                currentOnDragStart(localOffset + lastPosition, localOffset)
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                cumulativeDrag += dragAmount
+                                currentOnDrag(cumulativeDrag)
+                            },
+                            onDragEnd = currentOnDragEnd,
+                            onDragCancel = currentOnDragEnd
+                        )
+                    }
                 }
                 .onGloballyPositioned {
                     val rootCoords = rootLayoutCoordinates

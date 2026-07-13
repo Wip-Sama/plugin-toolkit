@@ -344,7 +344,14 @@ fun PluginCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(plugin.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (plugin.loadError != null) {
+                    if (!plugin.isCompatible) {
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        ToolkitChip(
+                            text = plugin.compatibilityError ?: "Incompatible",
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    } else if (plugin.loadError != null) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                         ToolkitChip(
                             text= stringResource(Res.string.plugin_broken),
@@ -371,7 +378,7 @@ fun PluginCard(
                         )
                     }
 
-                    if (plugin.loadError == null) {
+                    if (plugin.isCompatible && plugin.loadError == null) {
                         if (plugin.isValidated) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                             ToolkitChip(
@@ -392,8 +399,15 @@ fun PluginCard(
                 Text(
                     stringResource(Res.string.plugin_version_pkg_format, plugin.version, plugin.pkg),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (plugin.loadError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (plugin.loadError != null || !plugin.isCompatible) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (plugin.supportedOs.isNotEmpty()) {
+                    Text(
+                        "Supported OS: ${plugin.supportedOs.joinToString { it.name }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (plugin.loadError != null) {
                     Text(
                         plugin.loadError,

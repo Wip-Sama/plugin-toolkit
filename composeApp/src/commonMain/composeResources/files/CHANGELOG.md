@@ -1,3 +1,15 @@
+Version: 1.7.1
+Date: 13-07-2026
+Added:
+	- Plugin-api version to the compiled plugin version
+Changes:
+  - New and improved plugin settings
+  - Now the required plugin setting for specific capabilities will not prevent the plugin from working, only the capabilities locked behind them
+  - Plugin capabilities with obligatory parameters are now not shown as required in plugin settings
+  - Node fields are now the same as capability fields
+  - Now incompatible plugin by version (installed or not) should be properly displayed as such
+  - Plugins are now encouraged to define a list of compatible operating systems
+----------------------------------------------------------------------------------------------------
 Version: 1.7.0
 Date: 01-07-2026
 Added:

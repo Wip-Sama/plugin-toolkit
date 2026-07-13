@@ -50,7 +50,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.utils.PluginSearchUtils
+import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
+import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 
 @Composable
@@ -149,6 +151,10 @@ fun RemotePluginCard(
     val alpha = if (isInstalled) 0.6f else 1f
     var showInfo by remember { mutableStateOf(false) }
 
+    val (isCompatible, compError) = remember(plugin) {
+        PluginCompatibilityUtils.checkCompatibility(plugin)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth().alpha(alpha),
         colors = CardDefaults.cardColors(
@@ -185,7 +191,14 @@ fun RemotePluginCard(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        if (isInstalled) {
+                        if (!isCompatible) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            ToolkitChip(
+                                text = compError ?: "Incompatible",
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        } else if (isInstalled) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                             Surface(
                                 color = MaterialTheme.colorScheme.secondaryContainer,
@@ -206,8 +219,16 @@ fun RemotePluginCard(
                     Text(
                         "v${plugin.version} • ${plugin.pkg}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (!isCompatible) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    val supportedOs = plugin.manifest?.plugin?.supportedOs
+                    if (!supportedOs.isNullOrEmpty()) {
+                        Text(
+                            "Supported OS: ${supportedOs.joinToString { it.name }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -229,6 +250,7 @@ fun RemotePluginCard(
                     } else if (!isInstalled) {
                         Button(
                             onClick = onInstall,
+                            enabled = isCompatible,
                             contentPadding = PaddingValues(
                                 horizontal = ToolkitTheme.spacing.mediumSmall,
                                 vertical = ToolkitTheme.spacing.small

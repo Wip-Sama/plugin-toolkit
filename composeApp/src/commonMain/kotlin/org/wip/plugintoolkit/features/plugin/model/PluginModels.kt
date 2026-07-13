@@ -18,7 +18,8 @@ data class InstalledPlugin(
     val loadError: String? = null,
     val requiredAction: String? = null,
     val configurationPrompted: Boolean = false,
-    val signaturePrompted: Boolean = false
+    val signaturePrompted: Boolean = false,
+    val supportedOs: List<org.wip.plugintoolkit.api.OS> = emptyList()
 )
 
 sealed class InstallationSource {

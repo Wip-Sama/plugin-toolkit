@@ -28,7 +28,8 @@ fun <T> ExpressiveMenu(
     selectedOption: T,
     onOptionSelected: (T) -> Unit,
     labelProvider: @Composable (T) -> String,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    disabledOptions: Set<T> = emptySet()
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -59,12 +60,16 @@ fun <T> ExpressiveMenu(
             onDismissRequest = { expanded = false }
         ) {
             options.forEach { option ->
+                val isDisabled = option in disabledOptions
                 DropdownMenuItem(
                     text = { Text(labelProvider(option)) },
                     onClick = {
-                        onOptionSelected(option)
-                        expanded = false
+                        if (!isDisabled) {
+                            onOptionSelected(option)
+                            expanded = false
+                        }
                     },
+                    enabled = !isDisabled,
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
             }

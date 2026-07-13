@@ -164,9 +164,16 @@
     <!-- Settings -->
     <string name="plugin_settings_title">Settings: %1$s</string>
     <string name="settings_search_placeholder">Search settings...</string>
-    <string name="settings_no_results">No results found in %1$s</string>
+    <string name="settings_search_by_section">By Section</string>
+    <string name="settings_no_results">No results found</string>
     <string name="settings_search_whole">Search in whole settings</string>
     <string name="settings_feature_placeholder">Content for %1$s will appear here.</string>
+    <string name="plugin_settings_actions">Actions</string>
+    <string name="plugin_settings_custom">Custom Settings</string>
+    <string name="plugin_settings_global_defaults">Global Parameter Defaults</string>
+    <string name="plugin_settings_capability">Capability: %1$s</string>
+    <string name="settings_enum_unlock_message">Configure required settings to unlock options</string>
+    <string name="settings_locked_capability">Locked capability: %1$s</string>
 
     <!-- Jobs -->
     <string name="job_running_jobs">Running Jobs</string>

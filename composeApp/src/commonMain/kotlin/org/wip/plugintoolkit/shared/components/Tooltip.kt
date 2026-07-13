@@ -35,6 +35,7 @@ fun TooltipArea(
     tooltip: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     delayMillis: Int = 0,
+    offsetY: Int = 30,
     content: @Composable () -> Unit
 ) {
     var isHovered by remember { mutableStateOf(false) }
@@ -61,7 +62,7 @@ fun TooltipArea(
         if (isTooltipVisible) {
             Popup(
                 alignment = Alignment.TopCenter,
-                offset = IntOffset(0, -60), // Position slightly above the hovered component
+                offset = IntOffset(0, offsetY), // Position relative to the hovered component
                 properties = PopupProperties(
                     focusable = false,
                     dismissOnClickOutside = true,

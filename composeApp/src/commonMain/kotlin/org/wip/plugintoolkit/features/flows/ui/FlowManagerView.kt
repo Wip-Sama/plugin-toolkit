@@ -96,6 +96,7 @@ fun FlowManagerView(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
+    val pluginManager = org.koin.compose.koinInject<org.wip.plugintoolkit.features.plugin.logic.PluginManager>()
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFlowName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
@@ -215,7 +216,10 @@ fun FlowManagerView(
                     }
 
                     val notReadyNodes = remember(flow, state.flows) {
-                        flow.nodes.filter { !it.isReady(flow.connections) }
+                        flow.nodes.filter { node -> 
+                            val settings = if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
+                            !node.isReady(flow.connections, settings) 
+                        }
                     }
 
                     val isRunning = remember(flow.name, state.flows) {

@@ -115,6 +115,7 @@ fun DirectExecutionSidebar(
                         headerContent = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
+
                                 modifier = Modifier.padding(bottom = ToolkitTheme.spacing.mediumSmall)
                             ) {
                                 TextButton(

@@ -48,6 +48,7 @@ annotation class Capability(
     val supportsPause: Boolean = false,
     val supportsCancel: Boolean = true,
     val context: CapabilityContext = CapabilityContext.ANY,
+    @Deprecated("Use @RequiresSetting on the capability function instead")
     val requiresSettings: Array<String> = []
 )
 
@@ -60,8 +61,13 @@ enum class CapabilityContext {
 
 
 /**
- * Indicates that the annotated element requires specific plugin settings to be provided.
- * Can be applied to enum entries or properties.
+ * Indicates that the annotated element requires specific plugin settings to be configured before it can be used.
+ * Can be applied to enum entries or capability parameters/functions.
+ * 
+ * **Behavioral Note:** Any setting specified in `@RequiresSetting` (or within a Capability's `requiresSettings`)
+ * is treated as a context-specific requirement. This means that even if the setting is non-nullable or explicitly 
+ * marked with `@PluginSetting(required = true)`, it will **not** prevent the plugin from loading globally. 
+ * Instead, the specific capability or enum option will be locked/disabled until the user configures the setting.
  */
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 @Retention(AnnotationRetention.SOURCE)
