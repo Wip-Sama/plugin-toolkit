@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.job.logic
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -376,15 +377,15 @@ fun resolveFileAccess(
 }
 
 fun deleteRecursively(path: kotlinx.io.files.Path) {
-    if (kotlinx.io.files.SystemFileSystem.exists(path)) {
-        val metadata = kotlinx.io.files.SystemFileSystem.metadataOrNull(path)
+    if (SystemFileSystem.exists(path)) {
+        val metadata = SystemFileSystem.metadataOrNull(path)
         if (metadata?.isDirectory == true) {
-            kotlinx.io.files.SystemFileSystem.list(path).forEach { child ->
+            SystemFileSystem.list(path).forEach { child ->
                 deleteRecursively(child)
             }
         }
         try {
-            kotlinx.io.files.SystemFileSystem.delete(path)
+            SystemFileSystem.delete(path)
         } catch (e: Exception) {
             // Ignore errors during cleanup
         }

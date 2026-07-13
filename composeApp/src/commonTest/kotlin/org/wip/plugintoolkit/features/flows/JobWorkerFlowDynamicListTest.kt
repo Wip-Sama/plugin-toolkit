@@ -6,21 +6,33 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
+import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.DataProcessor
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.ExecutionResult
+import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginEntry
+import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.Requirements
+import org.wip.plugintoolkit.core.utils.DefaultSemanticRegistry
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.OutputPort
+import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
+import org.wip.plugintoolkit.features.job.logic.FlowEngine
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.logic.JobWorker
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
@@ -60,13 +72,13 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
         val mergeNode = Node.CapabilityNode(
             id = 3,
             position = Offset.Zero,
-            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(
+            pluginInfo = PluginInfo(
                 id = "test-plugin",
                 name = "Test Plugin",
                 version = "1.0.0",
                 description = "Test"
             ),
-            capability = org.wip.plugintoolkit.api.Capability(
+            capability = Capability(
                 name = "merge",
                 description = "test merge",
                 returnType = DataType.Primitive(PrimitiveType.STRING)
@@ -100,13 +112,18 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
         val mockPluginEntry = mockk<PluginEntry>(relaxed = true)
         val mockProcessor = mockk<DataProcessor>(relaxed = true)
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
+        val mockPluginContext = mockk<PluginContext>(relaxed = true)
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
+        org.koin.core.context.stopKoin()
         startKoin {
             modules(module {
                 single<SettingsPersistence> { persistence }
+                single { settingsRepo }
                 single { mockPluginManager }
                 single { mockLifecycleCoordinator }
+                single<SemanticRegistry> { DefaultSemanticRegistry() }
             })
         }
 
@@ -116,15 +133,15 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
             Result.success(
                 org.wip.plugintoolkit.api.PluginManifest(
                     manifestVersion = "1.0",
-                    plugin = org.wip.plugintoolkit.api.PluginInfo(
+                    plugin = PluginInfo(
                         id = "test-plugin",
                         name = "Test Plugin",
                         version = "1.0.0",
                         description = "Test"
                     ),
-                    requirements = org.wip.plugintoolkit.api.Requirements(minMemoryMb = 128, minExecutionTimeMs = 100),
+                    requirements = Requirements(minMemoryMb = 128, minExecutionTimeMs = 100),
                     capabilities = listOf(
-                        org.wip.plugintoolkit.api.Capability(
+                        Capability(
                             name = "merge",
                             description = "test merge",
                             returnType = DataType.Primitive(PrimitiveType.STRING),
@@ -140,13 +157,13 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
             )
         }
 
-        var capturedParameters: Map<String, kotlinx.serialization.json.JsonElement>? = null
+        var capturedParameters: Map<String, JsonElement>? = null
         coEvery { mockProcessor.process(any(), any()) } coAnswers {
             val req = firstArg<PluginRequest>()
             capturedParameters = req.parameters
-            org.wip.plugintoolkit.api.ExecutionResult.Success(
-                org.wip.plugintoolkit.api.PluginResponse(
-                    result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("merged-result")))
+            ExecutionResult.Success(
+                PluginResponse(
+                    result = JsonObject(mapOf("result" to JsonPrimitive("merged-result")))
                 )
             )
         }
@@ -160,9 +177,9 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
             parameters = mapOf("1" to JsonPrimitive("A"), "2" to JsonPrimitive("B"))
         )
 
-        val outputs = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+        val outputs = FlowEngine(
             jobManager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
+            DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
             mockk(relaxed = true),
             mockk(relaxed = true),
             backgroundScope
@@ -170,7 +187,7 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
 
         // The expected order based on orderIndex is source2 (B) then source1 (A)
         assertNotNull(capturedParameters)
-        val listInputParam = capturedParameters!!["list_input"]!!
+        val listInputParam = capturedParameters["list_input"]!!
 
         val jsonArray = listInputParam.jsonArray
         assertEquals(2, jsonArray.size)
@@ -198,13 +215,13 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
         val mergeNode = Node.CapabilityNode(
             id = 3,
             position = Offset.Zero,
-            pluginInfo = org.wip.plugintoolkit.api.PluginInfo(
+            pluginInfo = PluginInfo(
                 id = "test-plugin",
                 name = "Test Plugin",
                 version = "1.0.0",
                 description = "Test"
             ),
-            capability = org.wip.plugintoolkit.api.Capability(
+            capability = Capability(
                 name = "merge",
                 description = "test merge",
                 returnType = DataType.Primitive(PrimitiveType.STRING)
@@ -235,13 +252,18 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
         val mockPluginEntry = mockk<PluginEntry>(relaxed = true)
         val mockProcessor = mockk<DataProcessor>(relaxed = true)
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
+        val mockPluginContext = mockk<PluginContext>(relaxed = true)
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
+        org.koin.core.context.stopKoin()
         startKoin {
             modules(module {
                 single<SettingsPersistence> { persistence }
+                single { settingsRepo }
                 single { mockPluginManager }
                 single { mockLifecycleCoordinator }
+                single<SemanticRegistry> { DefaultSemanticRegistry() }
             })
         }
 
@@ -251,15 +273,15 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
             Result.success(
                 org.wip.plugintoolkit.api.PluginManifest(
                     manifestVersion = "1.0",
-                    plugin = org.wip.plugintoolkit.api.PluginInfo(
+                    plugin = PluginInfo(
                         id = "test-plugin",
                         name = "Test Plugin",
                         version = "1.0.0",
                         description = "Test"
                     ),
-                    requirements = org.wip.plugintoolkit.api.Requirements(minMemoryMb = 128, minExecutionTimeMs = 100),
+                    requirements = Requirements(minMemoryMb = 128, minExecutionTimeMs = 100),
                     capabilities = listOf(
-                        org.wip.plugintoolkit.api.Capability(
+                        Capability(
                             name = "merge",
                             description = "test merge",
                             returnType = DataType.Primitive(PrimitiveType.STRING),
@@ -275,13 +297,13 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
             )
         }
 
-        var capturedParameters: Map<String, kotlinx.serialization.json.JsonElement>? = null
+        var capturedParameters: Map<String, JsonElement>? = null
         coEvery { mockProcessor.process(any(), any()) } coAnswers {
             val req = firstArg<PluginRequest>()
             capturedParameters = req.parameters
-            org.wip.plugintoolkit.api.ExecutionResult.Success(
-                org.wip.plugintoolkit.api.PluginResponse(
-                    result = kotlinx.serialization.json.JsonObject(mapOf("result" to JsonPrimitive("merged-result")))
+            ExecutionResult.Success(
+                PluginResponse(
+                    result = JsonObject(mapOf("result" to JsonPrimitive("merged-result")))
                 )
             )
         }
@@ -298,9 +320,9 @@ class JobWorkerFlowDynamicListTest : JobWorkerFlowTestBase() {
             )
         )
 
-        val engine = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+        val engine = FlowEngine(
             jobManager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
+            DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
             mockPluginManager,
             mockLifecycleCoordinator,
             backgroundScope

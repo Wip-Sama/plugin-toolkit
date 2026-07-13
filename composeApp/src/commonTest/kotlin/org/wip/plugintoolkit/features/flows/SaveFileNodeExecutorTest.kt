@@ -43,7 +43,7 @@ class SaveFileNodeExecutorTest : JobWorkerFlowTestBase() {
         val context = mockk<NodeExecutionContext>(relaxed = true)
         every { context.appDataDir } returns appDataDir
         every { context.getInputValue("data", any()) } returns JsonPrimitive(sourceFile.toString())
-        every { context.getInputValue("destination_folder", any()) } returns JsonPrimitive(destFolder.toString())
+        every { context.getInputValue("destination_folder", any()) } returns JsonPrimitive("dest")
         every { context.getInputValue("file_name", any()) } returns ""
         every { context.getInputValue("is_destructive", any()) } returns false
 

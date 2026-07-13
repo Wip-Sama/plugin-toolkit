@@ -29,18 +29,18 @@ data class MathProcessorSettings(
     @PluginSetting(
         description = "API Key for Google services",
         defaultValue = "null"
-    ) val googleApiKey: String = "null",
+    ) val googleApiKey: String? = "null",
 
     @PluginSetting(
         description = "Secure token for the operations server",
         required = true,
         secret = true
-    ) val serverToken: String = "",
+    ) val serverToken: String? = "",
 
     @PluginSetting(
         description = "Name of the person performing the operations",
         required = true
-    ) val operatorName: String = ""
+    ) val operatorName: String? = ""
 )
 
 @Serializable

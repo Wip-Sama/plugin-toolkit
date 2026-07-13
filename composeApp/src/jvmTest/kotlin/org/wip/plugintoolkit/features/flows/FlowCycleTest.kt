@@ -25,6 +25,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MockSettingsPersistence : SettingsPersistence {
+
     override suspend fun load(): AppSettings = AppSettings()
     override suspend fun save(settings: AppSettings) {}
     override fun getSettingsDir(): String = "build/tmp/test_flows"
@@ -39,12 +40,19 @@ class FlowCycleTest {
     fun testCyclePrevention() {
         val mockAppConfig = mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
         val mockFlowRepo = mockk<org.wip.plugintoolkit.features.flows.logic.FlowRepository>(relaxed = true)
+        io.mockk.every { mockFlowRepo.flows } returns kotlinx.coroutines.flow.MutableStateFlow(emptyList())
         val viewModel = FlowEditorViewModel(
             initialFlowName = "Default Flow",
             settingsPersistence = MockSettingsPersistence(),
             notificationService = null,
             flowRepository = mockFlowRepo
         )
+        runBlocking {
+            for (i in 1..50) {
+                if (viewModel.state.value.flow.name == "Default Flow") break
+                delay(10)
+            }
+        }
 
         // 1. Add some system nodes: Node A (Log), Node B (Log), Node C (Log)
         viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(100f, 100f)))
@@ -303,12 +311,19 @@ class FlowCycleTest {
     @Test
     fun testConnectionOrderUpdateOnDelete() {
         val mockFlowRepo = mockk<org.wip.plugintoolkit.features.flows.logic.FlowRepository>(relaxed = true)
+        io.mockk.every { mockFlowRepo.flows } returns kotlinx.coroutines.flow.MutableStateFlow(emptyList())
         val viewModel = FlowEditorViewModel(
             initialFlowName = "Default Flow",
             settingsPersistence = MockSettingsPersistence(),
             notificationService = null,
             flowRepository = mockFlowRepo
         )
+        runBlocking {
+            for (i in 1..50) {
+                if (viewModel.state.value.flow.name == "Default Flow") break
+                delay(10)
+            }
+        }
 
         viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(100f, 100f)))
         viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(200f, 200f)))
@@ -361,12 +376,19 @@ class FlowCycleTest {
     @Test
     fun testTryConnectPorts() {
         val mockFlowRepo = mockk<org.wip.plugintoolkit.features.flows.logic.FlowRepository>(relaxed = true)
+        io.mockk.every { mockFlowRepo.flows } returns kotlinx.coroutines.flow.MutableStateFlow(emptyList())
         val viewModel = FlowEditorViewModel(
             initialFlowName = "Default Flow",
             settingsPersistence = MockSettingsPersistence(),
             notificationService = null,
             flowRepository = mockFlowRepo
         )
+        runBlocking {
+            for (i in 1..50) {
+                if (viewModel.state.value.flow.name == "Default Flow") break
+                delay(10)
+            }
+        }
 
         viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(100f, 100f)))
         viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(200f, 200f)))

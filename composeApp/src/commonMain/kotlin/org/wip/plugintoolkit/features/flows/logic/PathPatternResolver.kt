@@ -85,11 +85,13 @@ object PathPatternResolver {
         return when (modifier) {
             "dir" -> {
                 val parent = path.parent?.toString() ?: ""
+                val separator = if (pathString.contains("\\")) "\\" else "/"
+                val normalizedParent = parent.replace("\\", separator).replace("/", separator)
                 // Edge case handling for windows roots
                 if (isWindows && parent.isEmpty()) {
                     pathString.substringBefore("\\").substringBefore("/") + "\\"
                 } else {
-                    parent
+                    normalizedParent
                 }
             }
 

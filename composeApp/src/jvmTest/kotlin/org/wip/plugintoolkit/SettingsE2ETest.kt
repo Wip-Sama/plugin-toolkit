@@ -20,7 +20,6 @@ import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import io.mockk.coEvery
 import io.mockk.mockk
-import kotlinx.coroutines.test.runTest
 
 class SettingsE2ETest {
 
@@ -44,7 +43,9 @@ class SettingsE2ETest {
                 single { SettingsViewModel(get(), mockUpdateService, mockk(relaxed = true), mockk(relaxed = true)) }
                 single { PluginViewModel(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true)) }
                 single { AppViewModel(get(), mockUpdateService) }
-                single<NotificationService> { mockk(relaxed = true) }
+                val mockNotificationService = mockk<NotificationService>(relaxed = true)
+                io.mockk.every { mockNotificationService.events } returns kotlinx.coroutines.flow.MutableSharedFlow()
+                single<NotificationService> { mockNotificationService }
                 single { DialogService() }
                 val mockFlowRepo = mockk<org.wip.plugintoolkit.features.flows.logic.FlowRepository>(relaxed = true)
                 io.mockk.every { mockFlowRepo.flows } returns kotlinx.coroutines.flow.MutableStateFlow(emptyList())

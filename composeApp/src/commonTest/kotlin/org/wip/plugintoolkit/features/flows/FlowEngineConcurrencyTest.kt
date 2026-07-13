@@ -6,31 +6,36 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
-import kotlinx.serialization.json.JsonElement
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.writeString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.core.utils.DefaultSemanticRegistry
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.logic.FlowEngine
 import org.wip.plugintoolkit.features.job.logic.JobManager
-import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
-import org.wip.plugintoolkit.features.job.logic.SystemNodeExecutorRegistry
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
@@ -51,10 +56,11 @@ class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
         
         startKoin {
             modules(module {
-                single<org.wip.plugintoolkit.features.settings.logic.SettingsPersistence> { settingsPersistence }
+                single<SettingsPersistence> { settingsPersistence }
                 single { settingsRepo }
                 single { pluginManager }
                 single { lifecycleCoordinator }
+                single<SemanticRegistry> { DefaultSemanticRegistry() }
             })
         }
     }
@@ -66,19 +72,19 @@ class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
 
     @Test
     fun testCooperativeCancellation_doesNotLeak() = runTest {
-        manager = JobManager(this, settingsRepo)
+        manager = JobManager(backgroundScope, settingsRepo)
         flowEngine = FlowEngine(
             manager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(io.mockk.mockk(relaxed = true)),
+            DefaultSystemNodeExecutorRegistry(io.mockk.mockk(relaxed = true)),
             pluginManager,
             lifecycleCoordinator,
             this
         )
         
         // Flow with infinite While node
-        val input = createInputNode(1, "start", DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.BOOLEAN))
+        val input = createInputNode(1, "start", DataType.Primitive(PrimitiveType.BOOLEAN))
         val whileNode = createSystemNode(2, "while")
-        val output = createOutputNode(3, "end", DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.BOOLEAN))
+        val output = createOutputNode(3, "end", DataType.Primitive(PrimitiveType.BOOLEAN))
 
         val flow = Flow(
             name = "Infinite Flow",
@@ -119,10 +125,10 @@ class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
 
     @Test
     fun testSubflowRecursionDepthLimit() = runTest {
-        manager = JobManager(this, settingsRepo)
+        manager = JobManager(backgroundScope, settingsRepo)
         flowEngine = FlowEngine(
             manager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(io.mockk.mockk(relaxed = true)),
+            DefaultSystemNodeExecutorRegistry(io.mockk.mockk(relaxed = true)),
             pluginManager,
             lifecycleCoordinator,
             this
@@ -142,6 +148,15 @@ class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
             nodes = listOf(subFlowNode),
             connections = emptyList()
         )
+        
+        val appDataDir = "/tmp"
+        val flowsDir = Path(appDataDir, "flows")
+        SystemFileSystem.createDirectories(flowsDir)
+        val flowFile = Path(flowsDir, "recursive_flow.json")
+        val flowJson = Json { encodeDefaults = true }
+        SystemFileSystem.sink(flowFile).buffered().use {
+            it.writeString(flowJson.encodeToString(Flow.serializer(), flow))
+        }
 
         val job = BackgroundJob(
             id = "test-job-depth",
@@ -155,16 +170,16 @@ class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
         manager.enqueueJob(job)
 
         val exception = assertFailsWith<Exception> {
-            flowEngine.executeSubFlowRecursively(flow, job, "/tmp")
+            flowEngine.executeSubFlowRecursively(flow, job, appDataDir)
         }
-        
-        assertTrue(exception.message?.contains("StackOverflow prevention") == true)
+
+        assertEquals(exception.message?.contains("StackOverflow prevention"), true)
     }
 
     @Test
     fun testTopologicalOrder_100Nodes() = runTest {
-        manager = JobManager(this, settingsRepo)
-        val systemRegistry = org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(io.mockk.mockk(relaxed = true))
+        manager = JobManager(backgroundScope, settingsRepo)
+        val systemRegistry = DefaultSystemNodeExecutorRegistry(io.mockk.mockk(relaxed = true))
         flowEngine = FlowEngine(
             manager,
             systemRegistry,
@@ -177,7 +192,7 @@ class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
         val connections = mutableListOf<Connection>()
 
         // Node 0 is input
-        nodes.add(createInputNode(0L, "start", DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.BOOLEAN)))
+        nodes.add(createInputNode(0L, "start", DataType.Primitive(PrimitiveType.BOOLEAN)))
 
         // Create 98 intermediate simple nodes (e.g. conditional evaluating to true)
         for (i in 1L..98L) {
@@ -187,7 +202,7 @@ class FlowEngineConcurrencyTest : JobWorkerFlowTestBase() {
         }
 
         // Node 99 is output
-        nodes.add(createOutputNode(99L, "end", DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.BOOLEAN)))
+        nodes.add(createOutputNode(99L, "end", DataType.Primitive(PrimitiveType.BOOLEAN)))
         connections.add(Connection(98L, "output_true", 99L, "input_data"))
 
         val flow = Flow(

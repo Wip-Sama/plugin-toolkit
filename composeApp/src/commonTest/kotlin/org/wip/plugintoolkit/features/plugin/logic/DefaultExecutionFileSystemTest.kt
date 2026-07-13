@@ -86,21 +86,12 @@ class DefaultExecutionFileSystemTest {
 
     @Test
     fun testPathTraversalPrevention() = runTest {
-        // Attempt to write outside the sandbox using ../
-        val result = fileSystem.writeTextFile(RelativePath.from("../outside.txt").getOrNull() ?: RelativePath.ROOT, "sneaky")
-        assertTrue(result.isFailure) // The file system sanitizes it, so it writes somewhere else.
+        // Attempt to create a path outside the sandbox using ../
+        val maliciousPathResult = RelativePath.from("../outside.txt")
+        assertTrue(maliciousPathResult.isFailure, "RelativePath should prevent directory traversal")
 
-        // The sanitized path for "../outside.txt" should be "outside.txt" in the sandbox
-        val expectedPath = Path(sandboxPath, "outside.txt")
-        assertTrue(SystemFileSystem.exists(expectedPath), "Path should be sanitized and placed in sandbox")
-
-        val outsidePath = Path("outside.txt")
         // Ensure it did not write outside the sandbox directory into the project root
+        val outsidePath = Path("outside.txt")
         assertFalse(SystemFileSystem.exists(outsidePath), "File should not be written outside the sandbox")
-
-        // Similarly for read
-        fileSystem.writeTextFile(RelativePath.from("safe.txt").getOrThrow(), "safe content")
-        val content = fileSystem.readTextFile(RelativePath.from("../safe.txt").getOrNull() ?: RelativePath.ROOT)
-        // This won't work anymore since from returns Failure. Let's just remove this read part.
     }
 }

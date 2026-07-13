@@ -13,16 +13,32 @@ import org.wip.plugintoolkit.features.settings.model.AppSettings
 open class JobWorkerFlowTestBase {
     protected val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
+    @kotlin.test.AfterTest
+    open fun tearDownTest() {
+        try {
+            org.koin.core.context.stopKoin()
+        } catch (e: Exception) {}
+        io.mockk.unmockkAll()
+    }
 
     protected class FakeSettingsPersistence : SettingsPersistence {
-        var settings = AppSettings()
+        private val uniqueId = kotlin.random.Random.nextInt().toString()
+        init {
+            try {
+                kotlinx.io.files.SystemFileSystem.createDirectories(kotlinx.io.files.Path(getSettingsDir()))
+                kotlinx.io.files.SystemFileSystem.createDirectories(kotlinx.io.files.Path(getJobsDir()))
+            } catch (e: Exception) {}
+        }
+        var settings = AppSettings(
+            jobs = org.wip.plugintoolkit.features.settings.model.JobSettings(pluginTimeoutMs = -1L)
+        )
         override suspend fun load(): AppSettings = settings
         override suspend fun save(settings: AppSettings) {
             this.settings = settings
         }
 
-        override fun getSettingsDir(): String = "/tmp"
-        override fun getJobsDir(): String = "/tmp/jobs"
+        override fun getSettingsDir(): String = "build/tmp/test_flows_$uniqueId"
+        override fun getJobsDir(): String = "build/tmp/test_flows_$uniqueId/jobs"
         override fun openLogFolder() {}
         override fun openLatestLog() {}
     }

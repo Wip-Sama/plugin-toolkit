@@ -5,13 +5,18 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.io.buffered
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import org.wip.plugintoolkit.api.DataProcessor
 import org.wip.plugintoolkit.api.DataType
@@ -21,6 +26,8 @@ import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.core.utils.DefaultSemanticRegistry
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.InputPort
@@ -38,6 +45,7 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.time.Duration.Companion.milliseconds
 
 class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
 
@@ -48,13 +56,18 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val jobManager = JobManager(backgroundScope, settingsRepo)
 
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
+        val mockPluginContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
+        stopKoin()
         startKoin {
             modules(module {
                 single<SettingsPersistence> { persistence }
+                single { settingsRepo }
                 single { mockPluginManager }
                 single { mockLifecycleCoordinator }
+                single<SemanticRegistry> { DefaultSemanticRegistry() }
             })
         }
 
@@ -201,14 +214,14 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         jobWorker.start()
 
         // Wait for job to start running
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                kotlinx.coroutines.withTimeout(5000) {
+        withContext(Dispatchers.Default) {
+            withContext(Dispatchers.Default) {
+                withTimeout(5000.milliseconds) {
                     while (true) {
                         val activeJob = jobManager.jobs.value.find { it.id == job.id }
                         val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
                         if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
-                        kotlinx.coroutines.delay(10)
+                        delay(10.milliseconds)
                     }
                 }
             }
@@ -227,13 +240,13 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         jobManager.pauseJob(job.id)
 
         // Wait for job to transition to Paused status and save resumeState
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                kotlinx.coroutines.withTimeout(5000) {
+        withContext(Dispatchers.Default) {
+            withContext(Dispatchers.Default) {
+                withTimeout(5000) {
                     while (true) {
                         val activeJob = jobManager.jobs.value.find { it.id == job.id }
                         if (activeJob?.resumeState != null) break
-                        kotlinx.coroutines.delay(10)
+                        delay(10)
                     }
                 }
             }
@@ -249,14 +262,14 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         jobManager.resumeJob(job.id)
 
         // Wait for job to transition back to Running
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                kotlinx.coroutines.withTimeout(5000) {
+        withContext(Dispatchers.Default) {
+            withContext(Dispatchers.Default) {
+                withTimeout(5000) {
                     while (true) {
                         val activeJob = jobManager.jobs.value.find { it.id == job.id }
                         val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
                         if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
-                        kotlinx.coroutines.delay(10)
+                        delay(10)
                     }
                 }
             }
@@ -272,9 +285,9 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         )
 
         // Wait for job to complete
-        kotlinx.coroutines.withTimeout(2000) {
+        withTimeout(2000) {
             while (jobManager.endedJobs.value.none { it.id == job.id }) {
-                kotlinx.coroutines.delay(10)
+                delay(10)
             }
         }
 
@@ -291,13 +304,18 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val jobManager = JobManager(backgroundScope, settingsRepo)
 
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
+        val mockPluginContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
+        stopKoin()
         startKoin {
             modules(module {
                 single<SettingsPersistence> { persistence }
+                single { settingsRepo }
                 single { mockPluginManager }
                 single { mockLifecycleCoordinator }
+                single<SemanticRegistry> { DefaultSemanticRegistry() }
             })
         }
 
@@ -411,16 +429,12 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         jobWorker.start()
 
         // Wait for job to start running
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                kotlinx.coroutines.withTimeout(5000) {
-                    while (true) {
-                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
-                        val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
-                        if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
-                        kotlinx.coroutines.delay(10)
-                    }
-                }
+        withTimeout(5000) {
+            while (true) {
+                val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
+                if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
+                delay(10)
             }
         }
 
@@ -432,22 +446,21 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         )
 
         // Wait for flow job to transition to Paused status
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                kotlinx.coroutines.withTimeout(5000) {
-                    while (true) {
-                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
-                        val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
-                        if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Paused || endedJob != null) break
-                        kotlinx.coroutines.delay(10)
-                    }
-                }
+        withTimeout(5000) {
+            while (true) {
+                val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
+                if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Paused || endedJob != null) break
+                delay(10)
             }
         }
 
         // Verify capability resume state is serialized
+        println("JOBS: ${jobManager.jobs.value}")
+        println("ENDED: ${jobManager.endedJobs.value}")
         val pausedJob =
             jobManager.jobs.value.find { it.id == job.id } ?: jobManager.endedJobs.value.first { it.id == job.id }
+        println("PAUSED JOB: $pausedJob")
         val resumeState = pausedJob.resumeState as? kotlinx.serialization.json.JsonObject
         assertNotNull(resumeState)
         val capResumeStates = resumeState["capabilityResumeStates"]?.jsonObject
@@ -461,9 +474,9 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         jobManager.resumeJob(job.id)
 
         // Wait for job to complete
-        kotlinx.coroutines.withTimeout(2000) {
+        withTimeout(2000) {
             while (jobManager.endedJobs.value.none { it.id == job.id }) {
-                kotlinx.coroutines.delay(10)
+                delay(10)
             }
         }
 
@@ -472,6 +485,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
 
         val finalJob = jobManager.endedJobs.value.first { it.id == job.id }
         assertEquals(org.wip.plugintoolkit.features.job.model.JobStatus.Completed, finalJob.status)
+        jobWorker.stop()
     }
 
     @Test
@@ -481,6 +495,8 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val jobManager = JobManager(backgroundScope, settingsRepo)
 
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
+        val mockPluginContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
         val signalManager = org.wip.plugintoolkit.features.plugin.logic.DefaultPluginSignalManager()
@@ -489,13 +505,16 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         every { mockContext.onSignal(any()) } answers {
             signalManager.onSignal(firstArg())
         }
-        every { mockPluginManager.createPluginContext(any(), any(), any(), any()) } returns mockContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockContext
 
+        stopKoin()
         startKoin {
             modules(module {
                 single<SettingsPersistence> { persistence }
+                single { settingsRepo }
                 single { mockPluginManager }
                 single { mockLifecycleCoordinator }
+                single<SemanticRegistry> { DefaultSemanticRegistry() }
             })
         }
 
@@ -616,16 +635,11 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
             jobWorker.start()
 
             // Wait for job to start running
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                    kotlinx.coroutines.withTimeout(5000) {
-                        while (true) {
-                            val activeJob = jobManager.jobs.value.find { it.id == job.id }
-                            val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
-                            if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
-                            kotlinx.coroutines.delay(10)
-                        }
-                    }
+            withTimeout(5000) {
+                while (true) {
+                    val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                    if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running) break
+                    delay(10)
                 }
             }
 
@@ -633,15 +647,11 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
             jobManager.pauseJob(job.id)
 
             // Wait for flow job to transition to Paused status and save resumeState
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                    kotlinx.coroutines.withTimeout(5000) {
-                        while (true) {
-                            val activeJob = jobManager.jobs.value.find { it.id == job.id }
-                            if (activeJob?.resumeState != null) break
-                            kotlinx.coroutines.delay(10)
-                        }
-                    }
+            withTimeout(5000) {
+                while (true) {
+                    val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                    if (activeJob?.resumeState != null) break
+                    delay(10)
                 }
             }
 
@@ -661,9 +671,9 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
             jobManager.resumeJob(job.id)
 
             // Wait for job to complete
-            kotlinx.coroutines.withTimeout(2000) {
+            withTimeout(2000) {
                 while (jobManager.endedJobs.value.none { it.id == job.id }) {
-                    kotlinx.coroutines.delay(10)
+                    delay(10)
                 }
             }
 
@@ -672,8 +682,9 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
 
             val finalJob = jobManager.endedJobs.value.first { it.id == job.id }
             assertEquals(org.wip.plugintoolkit.features.job.model.JobStatus.Completed, finalJob.status)
+            jobWorker.stop()
         } finally {
-            org.koin.core.context.stopKoin()
+            stopKoin()
         }
     }
 

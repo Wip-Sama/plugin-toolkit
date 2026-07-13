@@ -13,6 +13,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.io.buffered
+import kotlinx.io.files.Path
 import kotlinx.io.writeString
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -20,6 +21,7 @@ import org.koin.core.component.inject
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -114,6 +116,8 @@ class JobWorker(
                 JobType.Flow -> executeFlowJob(job)
                 else -> throw Exception("Unsupported job type: ${job.type}")
             }
+        } catch (e: PauseFlowException) {
+            manager.tryPauseJob(job.id, e.resumeState)
         } catch (e: CancellationException) {
             Logger.w { "Worker $workerId: Job ${job.name} was cancelled" }
             throw e
@@ -123,10 +127,10 @@ class JobWorker(
             Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
         } finally {
             val currentJob = manager.jobs.value.find { it.id == job.id }
-            if (currentJob?.status != org.wip.plugintoolkit.features.job.model.JobStatus.Paused) {
+            if (currentJob?.status != JobStatus.Paused) {
                 val settingsPersistence: SettingsPersistence = get()
                 val appDataDir = settingsPersistence.getSettingsDir()
-                val sandboxDir = kotlinx.io.files.Path("$appDataDir/jobs/${job.id}/sandbox")
+                val sandboxDir = Path("$appDataDir/jobs/${job.id}/sandbox")
                 deleteRecursively(sandboxDir)
             }
         }
@@ -224,12 +228,12 @@ class JobWorker(
             override val result: Deferred<ExecutionResult> = deferredResult
 
             override fun pause() {
-                workerScope.launch { context.signals.sendSignal(org.wip.plugintoolkit.api.PluginSignal.PAUSE) }
+                workerScope.launch { context.signals.sendSignal(PluginSignal.PAUSE) }
             }
 
             override fun cancel(force: Boolean) {
                 Logger.d { "Worker $workerId: Cancelling capability job ${job.id} (force=$force)" }
-                workerScope.launch { context.signals.sendSignal(org.wip.plugintoolkit.api.PluginSignal.CANCEL) }
+                workerScope.launch { context.signals.sendSignal(PluginSignal.CANCEL) }
                 deferredResult.cancel()
                 currentJob.cancel()
             }
@@ -495,6 +499,28 @@ class JobWorker(
 
     private suspend fun executeFlowJob(job: BackgroundJob) {
         manager.addJobLog(job.id, "Executing via FlowEngine...")
+        
+        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        manager.registerJobHandle(job.id, object : JobHandle {
+            override val result: Deferred<ExecutionResult>
+                get() = throw UnsupportedOperationException("Not used for flow jobs directly")
+
+            override fun pause() {
+                workerScope.launch { 
+                    val context = pluginManager.createPluginContext(job.pluginId, job.id)
+                    context.signals.sendSignal(PluginSignal.PAUSE)
+                }
+            }
+
+            override fun cancel(force: Boolean) {
+                workerScope.launch { 
+                    val context = pluginManager.createPluginContext(job.pluginId, job.id)
+                    context.signals.sendSignal(PluginSignal.CANCEL)
+                }
+                jobExecution.cancel()
+            }
+        })
+
         val engine = FlowEngine(manager, executorRegistry, pluginManager, lifecycleCoordinator, workerScope)
         engine.executeFlowJob(job)
     }

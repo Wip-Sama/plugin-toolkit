@@ -17,6 +17,8 @@ import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.Requirements
+import org.wip.plugintoolkit.core.utils.DefaultSemanticRegistry
+import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.InputPort
@@ -25,6 +27,7 @@ import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.logic.JobWorker
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -38,11 +41,19 @@ class JobWorkerFlowSandboxTest : JobWorkerFlowTestBase() {
     @BeforeTest
     fun setup() {
         mockkObject(PluginLoader)
+        org.koin.core.context.startKoin {
+            modules(org.koin.dsl.module {
+                single<SemanticRegistry> { DefaultSemanticRegistry() }
+                single<SettingsRepository> { SettingsRepository(FakeSettingsPersistence(), kotlinx.coroutines.test.TestScope()) }
+                single<PluginManager> { mockk(relaxed = true) }
+                single<PluginLifecycleCoordinator> { mockk(relaxed = true) }
+            })
+        }
     }
 
     @AfterTest
     fun tearDown() {
-        stopKoin()
+        org.koin.core.context.stopKoin()
         unmockkAll()
     }
 
