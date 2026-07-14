@@ -26,6 +26,7 @@ import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import org.wip.plugintoolkit.shared.components.TooltipProvider
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.ui.AppNavigation
 import org.wip.plugintoolkit.ui.AppScaffold
@@ -91,86 +92,88 @@ private fun AppContentImpl(
 
     CompositionLocalProvider(LocalDensity provides customDensity) {
         AppTheme(appearance = settings.appearance) {
-            val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
-            val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
-
-            val baseSections = appViewModel.sections
-            val sections = remember(baseSections, currentScreen) {
-                val isEditingFlow = currentScreen is Screen.FlowEditor
-                val newSections = baseSections.toMutableList()
-                val mgtIndex = newSections.indexOfFirst { it.title == "Management".localized }
-                if (mgtIndex != -1) {
-                    val mgtSection = newSections[mgtIndex]
-                    val newElements = mgtSection.elements.toMutableList()
-                    val flowManagerIndex = newElements.indexOfFirst { it.id == Screen.FlowManager }
-                    val insertIndex = if (flowManagerIndex >= 0) flowManagerIndex + 1 else newElements.size
-
-                    val editorId = currentScreen as? Screen.FlowEditor ?: Screen.FlowEditor("")
-
-                    val editorElement = SidebarElement(
-                        id = editorId as Screen,
-                        icon = Icons.Default.Edit,
-                        title = "Editor".localized,
-                        isVisible = isEditingFlow
-                    )
-                    newElements.add(insertIndex, editorElement)
-                    newSections[mgtIndex] = mgtSection.copy(elements = newElements)
-                }
-                newSections
-            }
-            val bottomSections = remember(appViewModel.bottomSections) {
-                appViewModel.bottomSections.map { section ->
-                    section.copy(elements = section.elements.map { element ->
-                        if (element.id == Screen.JobDashboard) {
-                            element.copy(trailingContent = { JobBadge(it) })
-                        } else element
-                    })
-                }
-            }
-
-            val hasUnsavedChanges by activeFlowEditorTracker.hasUnsavedChanges.collectAsState()
-
-            // Render UI normally without destroying the composition tree.
-            // Recomposition is triggered reactively since the screens and localized strings
-            // read from LocalLanguage / trigger recomposition.
-            AppScaffold(
-                settings = settings,
-                sections = sections,
-                bottomSections = bottomSections,
-                currentScreen = currentScreen,
-                onScreenSelected = { screen ->
-                    if (currentScreen != screen) {
-                        if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
-                            dialogService.showConfirmation(
-                                title = "Unsaved Changes",
-                                message = "All the unsaved data will be lost. Are you sure you want to exit?",
-                                onConfirm = {
-                                    activeFlowEditorTracker.setHasUnsavedChanges(false)
-                                    backStack.clear()
-                                    backStack.add(screen)
-                                }
-                            )
-                        } else {
-                            backStack.clear()
-                            backStack.add(screen)
-                        }
+            TooltipProvider {
+                val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
+                val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
+    
+                val baseSections = appViewModel.sections
+                val sections = remember(baseSections, currentScreen) {
+                    val isEditingFlow = currentScreen is Screen.FlowEditor
+                    val newSections = baseSections.toMutableList()
+                    val mgtIndex = newSections.indexOfFirst { it.title == "Management".localized }
+                    if (mgtIndex != -1) {
+                        val mgtSection = newSections[mgtIndex]
+                        val newElements = mgtSection.elements.toMutableList()
+                        val flowManagerIndex = newElements.indexOfFirst { it.id == Screen.FlowManager }
+                        val insertIndex = if (flowManagerIndex >= 0) flowManagerIndex + 1 else newElements.size
+    
+                        val editorId = currentScreen as? Screen.FlowEditor ?: Screen.FlowEditor("")
+    
+                        val editorElement = SidebarElement(
+                            id = editorId as Screen,
+                            icon = Icons.Default.Edit,
+                            title = "Editor".localized,
+                            isVisible = isEditingFlow
+                        )
+                        newElements.add(insertIndex, editorElement)
+                        newSections[mgtIndex] = mgtSection.copy(elements = newElements)
                     }
-                },
-                notificationService = notificationService,
-                dialogService = dialogService
-            ) {
-                AppNavigation(
-                    backStack = backStack,
+                    newSections
+                }
+                val bottomSections = remember(appViewModel.bottomSections) {
+                    appViewModel.bottomSections.map { section ->
+                        section.copy(elements = section.elements.map { element ->
+                            if (element.id == Screen.JobDashboard) {
+                                element.copy(trailingContent = { JobBadge(it) })
+                            } else element
+                        })
+                    }
+                }
+    
+                val hasUnsavedChanges by activeFlowEditorTracker.hasUnsavedChanges.collectAsState()
+    
+                // Render UI normally without destroying the composition tree.
+                // Recomposition is triggered reactively since the screens and localized strings
+                // read from LocalLanguage / trigger recomposition.
+                AppScaffold(
+                    settings = settings,
+                    sections = sections,
+                    bottomSections = bottomSections,
                     currentScreen = currentScreen,
-                    activeFlowEditorTracker = activeFlowEditorTracker,
-                    dialogService = dialogService,
+                    onScreenSelected = { screen ->
+                        if (currentScreen != screen) {
+                            if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
+                                dialogService.showConfirmation(
+                                    title = "Unsaved Changes",
+                                    message = "All the unsaved data will be lost. Are you sure you want to exit?",
+                                    onConfirm = {
+                                        activeFlowEditorTracker.setHasUnsavedChanges(false)
+                                        backStack.clear()
+                                        backStack.add(screen)
+                                    }
+                                )
+                            } else {
+                                backStack.clear()
+                                backStack.add(screen)
+                            }
+                        }
+                    },
                     notificationService = notificationService,
-                    flowViewModel = flowViewModel,
-                    settingsViewModel = viewModel
-                )
+                    dialogService = dialogService
+                ) {
+                    AppNavigation(
+                        backStack = backStack,
+                        currentScreen = currentScreen,
+                        activeFlowEditorTracker = activeFlowEditorTracker,
+                        dialogService = dialogService,
+                        notificationService = notificationService,
+                        flowViewModel = flowViewModel,
+                        settingsViewModel = viewModel
+                    )
+                }
+    
+                AppUpdateDialogs(viewModel = viewModel)
             }
-
-            AppUpdateDialogs(viewModel = viewModel)
         }
     }
 }

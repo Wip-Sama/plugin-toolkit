@@ -55,6 +55,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
+import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
@@ -162,9 +163,9 @@ fun PluginSettingsDialog(
 
     val lockedEnumOptions = remember(manifest) {
         val result = mutableMapOf<String, MutableList<String>>()
-        fun scanType(type: org.wip.plugintoolkit.api.DataType) {
+        fun scanType(type: DataType) {
             when (type) {
-                is org.wip.plugintoolkit.api.DataType.Enum -> {
+                is DataType.Enum -> {
                     type.optionRequirements.forEach { (option, requiredSettings) ->
                         requiredSettings.forEach { req ->
                             result.getOrPut(req) { mutableListOf() }.add(option)
@@ -172,9 +173,9 @@ fun PluginSettingsDialog(
                     }
                 }
 
-                is org.wip.plugintoolkit.api.DataType.Array -> scanType(type.items)
-                is org.wip.plugintoolkit.api.DataType.Object -> type.properties.values.forEach { scanType(it) }
-                is org.wip.plugintoolkit.api.DataType.MapType -> scanType(type.valueType)
+                is DataType.Array -> scanType(type.items)
+                is DataType.Object -> type.properties.values.forEach { scanType(it) }
+                is DataType.MapType -> scanType(type.valueType)
                 else -> {}
             }
         }
@@ -431,24 +432,22 @@ fun PluginSettingsDialog(
                                                                     )
                                                                 }
                                                                 if (lockedOptionsForSetting.isNotEmpty()) {
-                                                                    Box {
-                                                                        ToolkitChip(
-                                                                            text = "Locked Enum Options",
-                                                                            modifier = Modifier.tooltip(
-                                                                                text = "Locked values:\n" + lockedOptionsForSetting.joinToString(
-                                                                                    "\n"
-                                                                                ),
+                                                                    ToolkitChip(
+                                                                        text = "Locked Enum Options",
+                                                                        modifier = Modifier.tooltip(
+                                                                            text = "Locked values:\n" + lockedOptionsForSetting.joinToString(
+                                                                                "\n"
                                                                             ),
-                                                                            icon = {
-                                                                                Icon(
-                                                                                    Icons.Default.Lock,
-                                                                                    contentDescription = null,
-                                                                                    modifier = Modifier.size(14.dp)
-                                                                                )
-                                                                            },
-                                                                            style = ToolkitChipStyle.Tinted
-                                                                        )
-                                                                    }
+                                                                        ),
+                                                                        icon = {
+                                                                            Icon(
+                                                                                Icons.Default.Lock,
+                                                                                contentDescription = null,
+                                                                                modifier = Modifier.size(14.dp)
+                                                                            )
+                                                                        },
+                                                                        style = ToolkitChipStyle.Tinted
+                                                                    )
                                                                 }
                                                             }
                                                         }

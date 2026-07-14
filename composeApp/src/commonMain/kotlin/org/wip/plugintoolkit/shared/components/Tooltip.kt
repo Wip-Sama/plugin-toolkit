@@ -37,6 +37,9 @@ import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 
 /**
  * A reusable Composable wrapper that shows a custom tooltip when the content is hovered.
@@ -124,64 +127,95 @@ fun Modifier.tooltip(text: String, delay: Duration = Duration.ZERO): Modifier = 
     tooltipImpl(text, delay)
 }
 
+data class TooltipData(
+    val text: String,
+    val coordinates: LayoutCoordinates
+)
+
+class TooltipState {
+    var tooltipData by mutableStateOf<TooltipData?>(null)
+}
+
+val LocalTooltipState = staticCompositionLocalOf<TooltipState?> { null }
+
+@Composable
+fun TooltipProvider(content: @Composable () -> Unit) {
+    val tooltipState = remember { TooltipState() }
+    
+    CompositionLocalProvider(LocalTooltipState provides tooltipState) {
+        content()
+        
+        tooltipState.tooltipData?.let { data ->
+            Popup(
+                popupPositionProvider = object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize
+                    ): IntOffset {
+                        val position = data.coordinates.positionInWindow()
+                        val size = data.coordinates.size
+                        
+                        val x = (position.x + size.width / 2f - popupContentSize.width / 2f).toInt()
+                        val y = (position.y - popupContentSize.height - 8).toInt() // 8px offset
+                        
+                        val adjustedX = x.coerceIn(0, maxOf(0, windowSize.width - popupContentSize.width))
+                        val adjustedY = y.coerceIn(0, maxOf(0, windowSize.height - popupContentSize.height))
+                        
+                        return IntOffset(adjustedX, adjustedY)
+                    }
+                },
+                properties = PopupProperties(
+                    focusable = false,
+                    dismissOnClickOutside = true,
+                    dismissOnBackPress = true
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .shadow(4.dp, RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = data.text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun Modifier.tooltipImpl(text: String, delay: Duration): Modifier {
+    val tooltipState = LocalTooltipState.current
     var isHovered by remember { mutableStateOf(false) }
-    var isTooltipVisible by remember { mutableStateOf(false) }
     var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
-    LaunchedEffect(isHovered) {
+    LaunchedEffect(isHovered, tooltipState) {
         if (isHovered) {
             if (delay > Duration.ZERO) {
                 delay(delay)
             }
-            isTooltipVisible = true
+            if (layoutCoordinates != null) {
+                tooltipState?.tooltipData = TooltipData(text, layoutCoordinates!!)
+            }
         } else {
-            isTooltipVisible = false
+            if (tooltipState?.tooltipData?.text == text && tooltipState.tooltipData?.coordinates == layoutCoordinates) {
+                tooltipState?.tooltipData = null
+            }
         }
     }
 
-    if (isTooltipVisible) {
-        Popup(
-            popupPositionProvider = object : PopupPositionProvider {
-                override fun calculatePosition(
-                    anchorBounds: IntRect,
-                    windowSize: IntSize,
-                    layoutDirection: LayoutDirection,
-                    popupContentSize: IntSize
-                ): IntOffset {
-                    val coords = layoutCoordinates ?: return IntOffset.Zero
-                    val position = coords.positionInWindow()
-                    val size = coords.size
-                    
-                    val x = (position.x + size.width / 2f - popupContentSize.width / 2f).toInt()
-                    val y = (position.y - popupContentSize.height - 8).toInt() // 8px offset
-                    
-                    val adjustedX = x.coerceIn(0, maxOf(0, windowSize.width - popupContentSize.width))
-                    val adjustedY = y.coerceIn(0, maxOf(0, windowSize.height - popupContentSize.height))
-                    
-                    return IntOffset(adjustedX, adjustedY)
-                }
-            },
-            properties = PopupProperties(
-                focusable = false,
-                dismissOnClickOutside = true,
-                dismissOnBackPress = true
-            )
-        ) {
-            Box(
-                modifier = Modifier
-                    .shadow(4.dp, RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    DisposableEffect(text, layoutCoordinates, tooltipState) {
+        onDispose {
+            if (tooltipState?.tooltipData?.text == text && tooltipState.tooltipData?.coordinates == layoutCoordinates) {
+                tooltipState?.tooltipData = null
             }
         }
     }
