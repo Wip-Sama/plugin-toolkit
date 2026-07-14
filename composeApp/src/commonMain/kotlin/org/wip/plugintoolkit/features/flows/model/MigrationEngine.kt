@@ -124,7 +124,18 @@ object MigrationEngine {
 
         for (node in flow.nodes) {
             if (node !is Node.CapabilityNode) {
-                newNodes.add(node)
+                if (node is Node.SystemNode) {
+                    val systemInputs = org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry.getInputs(node.systemAction)
+                    val newInputs = node.inputs.map { input ->
+                        val defInput = systemInputs.find { it.id == input.id }
+                        if (defInput != null) {
+                            input.copy(isRequired = defInput.isRequired)
+                        } else input
+                    }
+                    newNodes.add(node.copy(inputs = newInputs))
+                } else {
+                    newNodes.add(node)
+                }
                 continue
             }
 

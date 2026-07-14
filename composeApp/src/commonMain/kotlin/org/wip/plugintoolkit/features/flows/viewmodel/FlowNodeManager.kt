@@ -179,7 +179,8 @@ class FlowNodeManager {
         dataType: DataType,
         semanticTypes: List<SemanticType>,
         constraints: PortConstraints?,
-        isList: Boolean
+        isList: Boolean,
+        isRequired: Boolean
     ): FlowEditorState {
         val updatedNodes = currentState.flow.nodes.map { node ->
             if (node.id == nodeId) {
@@ -194,7 +195,8 @@ class FlowNodeManager {
                         node.copy(
                             outputs = listOf(port),
                             constraints = constraints,
-                            isList = isList
+                            isList = isList,
+                            isRequired = isRequired
                         )
                     }
 

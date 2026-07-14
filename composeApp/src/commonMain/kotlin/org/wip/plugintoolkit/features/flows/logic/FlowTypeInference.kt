@@ -258,7 +258,8 @@ object FlowTypeInference {
                 id = "input_${inputNode.id}",
                 name = port?.name ?: "Input Data",
                 dataType = inferredType,
-                semanticTypes = inferredSem
+                semanticTypes = inferredSem,
+                isRequired = inputNode.isRequired
             )
         }
 

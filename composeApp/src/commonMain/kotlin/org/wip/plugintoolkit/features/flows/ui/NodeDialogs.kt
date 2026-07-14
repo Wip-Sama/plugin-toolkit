@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.AlertDialog
@@ -29,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
@@ -63,7 +65,7 @@ fun NodeDialogs(
     onConfirmDelete: () -> Unit,
     showEditBoundaryDialog: Boolean,
     onDismissEditBoundary: () -> Unit,
-    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean) -> Unit,
+    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean) -> Unit,
     showColorPicker: Boolean,
     activeColorInputId: String?,
     onDismissColorPicker: () -> Unit,
@@ -131,6 +133,9 @@ fun NodeDialogs(
             var isList by remember {
                 mutableStateOf(if (node is Node.FlowInputNode) node.isList else false)
             }
+            var isRequired by remember {
+                mutableStateOf(if (node is Node.FlowInputNode) node.isRequired else true)
+            }
             var minValStr by remember {
                 mutableStateOf(if (node is Node.FlowInputNode) node.constraints?.min?.toString() ?: "" else "")
             }
@@ -168,34 +173,19 @@ fun NodeDialogs(
                         val typeOptions = listOf("Any", "String", "Int", "Double", "Boolean", "Object")
                         var dropdownExpanded by remember { mutableStateOf(false) }
 
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            ToolkitTextField(
-                                value = selectedTypeOption,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text(stringResource(Res.string.node_data_type_label)) },
-                                trailingIcon = {
-                                    IconButton(onClick = { dropdownExpanded = true }) {
-                                        Icon(Icons.Default.UnfoldMore, contentDescription = "Select Type")
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(Res.string.node_data_type_label),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            DropdownMenu(
-                                expanded = dropdownExpanded,
-                                onDismissRequest = { dropdownExpanded = false },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                typeOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option) },
-                                        onClick = {
-                                            selectedTypeOption = option
-                                            dropdownExpanded = false
-                                        }
-                                    )
-                                }
-                            }
+                            Spacer(Modifier.size(4.dp))
+                            org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu(
+                                options = typeOptions,
+                                selectedOption = selectedTypeOption,
+                                onOptionSelected = { selectedTypeOption = it },
+                                labelProvider = { it }
+                            )
                         }
 
                         if (selectedTypeOption == "Object") {
@@ -225,6 +215,12 @@ fun NodeDialogs(
                                 Text("Accept multiple items (List)")
                                 Spacer(modifier = Modifier.weight(1f))
                                 Switch(checked = isList, onCheckedChange = { isList = it })
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Required")
+                                Spacer(modifier = Modifier.weight(1f))
+                                Switch(checked = isRequired, onCheckedChange = { isRequired = it })
                             }
 
                             if (selectedTypeOption == "String") {
@@ -286,7 +282,8 @@ fun NodeDialogs(
                                 computedDataType,
                                 parseSemanticTypes(semanticType),
                                 constraints,
-                                isList
+                                isList,
+                                isRequired
                             )
                             onDismissEditBoundary()
                         }

@@ -21,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -28,10 +29,12 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -44,6 +47,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.isCompatibleWith
@@ -55,6 +59,8 @@ import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
+import org.wip.plugintoolkit.shared.components.LocalOverlayHost
+import org.wip.plugintoolkit.shared.components.OverlayHost
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_save
@@ -82,7 +88,7 @@ import kotlin.math.roundToInt
 @Composable
 fun FlowEditorView(
     viewModel: FlowEditorViewModel,
-    notificationService: NotificationService,
+    notificationService: org.wip.plugintoolkit.core.notification.NotificationService,
     onExit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -94,6 +100,26 @@ fun FlowEditorView(
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     var boardLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var rootLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    var overlayContent by remember { mutableStateOf<(@Composable () -> Unit)?>(null) }
+    var overlayBounds by remember { mutableStateOf<Rect?>(null) }
+    var overlayOnDismiss by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val dropdownOverlay = remember {
+        object : OverlayHost {
+            override fun show(bounds: Rect, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+                overlayBounds = bounds
+                overlayContent = content
+                overlayOnDismiss = onDismiss
+            }
+
+            override fun hide() {
+                overlayContent = null
+                overlayBounds = null
+                overlayOnDismiss = null
+            }
+        }
+    }
 
     var showSaveAsDialog by remember { mutableStateOf(false) }
     var saveAsName by remember { mutableStateOf("") }
@@ -234,215 +260,225 @@ fun FlowEditorView(
             onSelectNodes = { viewModel.onEvent(FlowEvent.SelectNodes(it)) },
             onClearSelection = { viewModel.onEvent(FlowEvent.ClearSelection) },
             onDeleteSelectedNodes = { viewModel.onEvent(FlowEvent.DeleteSelectedNodes) },
+            onCopy = { viewModel.onEvent(FlowEvent.CopySelectedNodes) },
+            onPaste = { viewModel.onEvent(FlowEvent.PasteNodes(it)) },
             onUndo = { viewModel.undo() },
             onRedo = { viewModel.redo() },
             nodeSizes = nodeSizes
-        ) {
-            // 1.2 Nodes
-            flow.nodes.forEach { node ->
-                key(node.id) {
-                    val isDragged = state.draggedNodeId == node.id
-                    val isPartofSelectedGroupDrag = state.draggedNodeId != null &&
-                            state.selectedNodeIds.contains(state.draggedNodeId) &&
-                            state.selectedNodeIds.contains(node.id)
-                    val dragOffset =
-                        if (isDragged || isPartofSelectedGroupDrag) state.currentDragOffset else Offset.Zero
+        ) { hoveredConnection ->
+            CompositionLocalProvider(LocalOverlayHost provides dropdownOverlay) {
+                // 1.2 Nodes
+                flow.nodes.forEach { node ->
+                    key(node.id) {
+                        val isDragged = state.draggedNodeId == node.id
+                        val isPartofSelectedGroupDrag = state.draggedNodeId != null &&
+                                state.selectedNodeIds.contains(state.draggedNodeId) &&
+                                state.selectedNodeIds.contains(node.id)
+                        val dragOffset =
+                            if (isDragged || isPartofSelectedGroupDrag) state.currentDragOffset else Offset.Zero
 
-                    val isNodeHighlighted = highlightedNodeId == node.id
-                    val nodeHighlightedPortId = if (isNodeHighlighted) highlightedPortId else null
+                        val isNodeHighlighted = highlightedNodeId == node.id
+                        val nodeHighlightedPortId = if (isNodeHighlighted) highlightedPortId else null
 
-                    val nodeHighlightedPortColor =
-                        if (isNodeHighlighted && highlightedPortId != null && connectionStartNodeId != null && connectionStartPortId != null) {
-                            val startNode = flow.nodes.find { it.id == connectionStartNodeId }
-                            val startPort = if (connectionStartIsOutput) {
-                                startNode?.outputs?.find { it.id == connectionStartPortId }
-                            } else {
-                                startNode?.inputs?.find { it.id == connectionStartPortId }
-                            }
+                        val nodeHighlightedPortColor =
+                            if (isNodeHighlighted && highlightedPortId != null && connectionStartNodeId != null && connectionStartPortId != null) {
+                                val startNode = flow.nodes.find { it.id == connectionStartNodeId }
+                                val startPort = if (connectionStartIsOutput) {
+                                    startNode?.outputs?.find { it.id == connectionStartPortId }
+                                } else {
+                                    startNode?.inputs?.find { it.id == connectionStartPortId }
+                                }
 
-                            val targetPort = if (connectionStartIsOutput) {
-                                node.inputs.find { it.id == highlightedPortId }
-                            } else {
-                                node.outputs.find { it.id == highlightedPortId }
-                            }
+                                val targetPort = if (connectionStartIsOutput) {
+                                    node.inputs.find { it.id == highlightedPortId }
+                                } else {
+                                    node.outputs.find { it.id == highlightedPortId }
+                                }
 
-                            if (startPort != null && targetPort != null) {
-                                val startInferredType =
-                                    state.inferredTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)]
-                                        ?: startPort.dataType
-                                val targetInferredType =
-                                    state.inferredTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.dataType
-                                val startInferredSemantic =
-                                    state.inferredSemanticTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)]
-                                        ?: startPort.semanticTypes
-                                val targetInferredSemantic =
-                                    state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)]
-                                        ?: targetPort.semanticTypes
+                                if (startPort != null && targetPort != null) {
+                                    val startInferredType =
+                                        state.inferredTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)]
+                                            ?: startPort.dataType
+                                    val targetInferredType =
+                                        state.inferredTypes[Pair(node.id, highlightedPortId!!)] ?: targetPort.dataType
+                                    val startInferredSemantic =
+                                        state.inferredSemanticTypes[Pair(connectionStartNodeId!!, connectionStartPortId!!)]
+                                            ?: startPort.semanticTypes
+                                    val targetInferredSemantic =
+                                        state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)]
+                                            ?: targetPort.semanticTypes
 
-                                val compatible =
-                                    (startInferredType.isCompatibleWith(targetInferredType) || startInferredType.canConvert(
-                                        targetInferredType
-                                    )) &&
-                                            org.wip.plugintoolkit.api.checkSemanticCompatibility(
-                                                startInferredSemantic,
-                                                targetInferredSemantic
-                                            ) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
-                                if (compatible) null else Color.Red
+                                    val compatible =
+                                        (startInferredType.isCompatibleWith(targetInferredType) || startInferredType.canConvert(
+                                            targetInferredType
+                                        )) &&
+                                                org.wip.plugintoolkit.api.checkSemanticCompatibility(
+                                                    startInferredSemantic,
+                                                    targetInferredSemantic
+                                                ) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
+                                    if (compatible) null else Color.Red
+                                } else null
                             } else null
-                        } else null
 
-                    NodeCardContainer(
-                        nodePosition = node.position,
-                        dragOffset = dragOffset,
-                        scale = state.scale,
-                        boardOffset = state.offset
-                    ) {
-                        NodeComponent(
-                            node = node,
-                            connectedInputPortIds = flow.connections.filter { it.targetNodeId == node.id }
-                                .map { it.targetPortId }.toSet(),
-                            inferredTypes = state.inferredTypes,
-                            inferredSemanticTypes = state.inferredSemanticTypes,
-                            validationErrors = state.validationErrors,
-                            isReady = node.isReady(
-                                flow.connections,
-                                if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
+                        val isDimmedByHover = hoveredConnection != null && 
+                                hoveredConnection.sourceNodeId != node.id && 
+                                hoveredConnection.targetNodeId != node.id
+                                
+                        val targetAlpha = if (isDimmedByHover) 0.6f else 1f
+                        val animatedAlpha by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = targetAlpha,
+                            animationSpec = androidx.compose.animation.core.tween(
+                                durationMillis = 200,
+                                delayMillis = if (isDimmedByHover) 500 else 0
                             ),
-                            onFocusLost = { viewModel.onEvent(FlowEvent.Save) },
-                            onMove = { id, delta, snap, showGhost ->
-                                viewModel.onEvent(
-                                    FlowEvent.MoveNode(
-                                        id,
-                                        delta,
-                                        snap,
-                                        showGhost
-                                    )
-                                )
-                            },
-                            onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
-                            onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
-                            onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
-                            onUpdateValue = { id, portId, value ->
-                                viewModel.onEvent(
-                                    FlowEvent.UpdateInputPortValue(
-                                        id,
-                                        portId,
-                                        NodeSerializationUtils.anyToJsonElement(value)
-                                    )
-                                )
-                            },
-                            onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList ->
-                                viewModel.onEvent(
-                                    FlowEvent.UpdateBoundaryNode(id, name, dataType, semanticTypes, constraints, isList)
-                                )
-                            },
-                            onUpdateSystemNodeSettings = { id, portId, semanticTypes, inputPortId, extensions ->
-                                viewModel.onEvent(
-                                    FlowEvent.UpdateSystemNodeSettings(
-                                        id,
-                                        portId,
-                                        semanticTypes,
-                                        inputPortId,
-                                        extensions
-                                    )
-                                )
-                            },
-                            onToggleCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeCollapse(id)) },
-                            onToggleInputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeInputsCollapse(id)) },
-                            onToggleOutputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeOutputsCollapse(id)) },
-                            onPortPositioned = { nodeId, portId, pos ->
-                                portPositions[Pair(nodeId, portId)] = (pos - state.offset) / state.scale
-                            },
-                            onStartConnection = { nodeId, portId, isOutput ->
-                                isDrawingConnection = true
-                                connectionStartNodeId = nodeId
-                                connectionStartPortId = portId
-                                connectionStartIsOutput = isOutput
-                                getPortBoardPosition(nodeId, portId)?.let {
-                                    connectionCurrentPos = it
-                                }
-                            },
-                            onDragConnection = { cumulativeDragOffset ->
-                                if (connectionStartNodeId != null && connectionStartPortId != null) {
-                                    val startBoardPos =
-                                        getPortBoardPosition(connectionStartNodeId!!, connectionStartPortId!!)
-                                    if (startBoardPos != null) {
-                                        val boardPosition = startBoardPos + cumulativeDragOffset
-                                        connectionCurrentPos = boardPosition
-
-                                        val (closestNodeId, closestPortId) = findClosestPort(
-                                            boardPosition,
-                                            flow,
-                                            connectionStartIsOutput,
-                                            state.scale,
-                                            getPortBoardPosition
-                                        )
-                                        highlightedNodeId = closestNodeId
-                                        highlightedPortId = closestPortId
-                                    }
-                                }
-                            },
-                            onDropConnection = { isShiftPressed ->
-                                if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
-                                    val sourceNodeId =
-                                        if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
-                                    val sourcePortId =
-                                        if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
-                                    val targetNodeId =
-                                        if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
-                                    val targetPortId =
-                                        if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
-
-                                    viewModel.onEvent(
-                                        FlowEvent.TryConnectPorts(
-                                            sourceNodeId,
-                                            sourcePortId,
-                                            targetNodeId,
-                                            targetPortId,
-                                            isShiftPressed
-                                        )
-                                    )
-                                }
-                                isDrawingConnection = false
-                                connectionStartNodeId = null
-                                connectionStartPortId = null
-                                highlightedPortId = null
-                                highlightedNodeId = null
-                            },
-
-                            onPress = { id -> viewModel.onEvent(FlowEvent.BringToFront(id)) },
-                            highlightedPortId = nodeHighlightedPortId,
-                            highlightedPortColor = nodeHighlightedPortColor,
-                            boardLayoutCoordinates = boardLayoutCoordinates,
-                            stateScale = state.scale,
-                            stateOffset = state.offset,
-                            selectedNodeIds = state.selectedNodeIds,
-                            isReadOnly = state.isReadOnly,
-                            modifier = Modifier.onSizeChanged { size ->
-                                nodeSizes[node.id] = size
-                            }
+                            label = "NodeAlpha"
                         )
+
+                        NodeCardContainer(
+                            nodePosition = node.position,
+                            dragOffset = dragOffset,
+                            scale = state.scale,
+                            boardOffset = state.offset,
+                            alpha = animatedAlpha
+                        ) {
+                            NodeComponent(
+                                node = node,
+                                connectedInputPortIds = flow.connections.filter { it.targetNodeId == node.id }
+                                    .map { it.targetPortId }.toSet(),
+                                inferredTypes = state.inferredTypes,
+                                inferredSemanticTypes = state.inferredSemanticTypes,
+                                validationErrors = state.validationErrors,
+                                isReady = node.isReady(
+                                    flow.connections,
+                                    if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
+                                ),
+                                onFocusLost = { viewModel.onEvent(FlowEvent.Save) },
+                                onMove = { id, delta, snap, showGhost ->
+                                    viewModel.onEvent(
+                                        FlowEvent.MoveNode(
+                                            id,
+                                            delta,
+                                            snap,
+                                            showGhost
+                                        )
+                                    )
+                                },
+                                onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
+                                onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
+                                onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
+                                onUpdateValue = { id, portId, value ->
+                                    viewModel.onEvent(
+                                        FlowEvent.UpdateInputPortValue(
+                                            id,
+                                            portId,
+                                            NodeSerializationUtils.anyToJsonElement(value)
+                                        )
+                                    )
+                                },
+                                onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList, isRequired ->
+                                    viewModel.onEvent(
+                                        FlowEvent.UpdateBoundaryNode(
+                                            id,
+                                            name,
+                                            dataType,
+                                            semanticTypes,
+                                            constraints,
+                                            isList,
+                                            isRequired
+                                        )
+                                    )
+                                },
+                                onUpdateSystemNodeSettings = { id, portId, semanticTypes, inputPortId, extensions ->
+                                    viewModel.onEvent(
+                                        FlowEvent.UpdateSystemNodeSettings(
+                                            id,
+                                            portId,
+                                            semanticTypes,
+                                            inputPortId,
+                                            extensions
+                                        )
+                                    )
+                                },
+                                onToggleCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeCollapse(id)) },
+                                onToggleInputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeInputsCollapse(id)) },
+                                onToggleOutputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeOutputsCollapse(id)) },
+                                onPortPositioned = { nodeId, portId, pos ->
+                                    portPositions[Pair(nodeId, portId)] = (pos - state.offset) / state.scale
+                                },
+                                onStartConnection = { nodeId, portId, isOutput ->
+                                    isDrawingConnection = true
+                                    connectionStartNodeId = nodeId
+                                    connectionStartPortId = portId
+                                    connectionStartIsOutput = isOutput
+                                    getPortBoardPosition(nodeId, portId)?.let {
+                                        connectionCurrentPos = it
+                                    }
+                                },
+                                onDragConnection = {
+                                    // Ignored, BoardCanvas handles it
+                                },
+                                onDropConnection = { isShiftPressed ->
+                                    if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
+                                        val sourceNodeId =
+                                            if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
+                                        val sourcePortId =
+                                            if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
+                                        val targetNodeId =
+                                            if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
+                                        val targetPortId =
+                                            if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
+
+                                        viewModel.onEvent(
+                                            FlowEvent.TryConnectPorts(
+                                                sourceNodeId,
+                                                sourcePortId,
+                                                targetNodeId,
+                                                targetPortId,
+                                                isShiftPressed
+                                            )
+                                        )
+                                    }
+                                    isDrawingConnection = false
+                                    connectionStartNodeId = null
+                                    connectionStartPortId = null
+                                    highlightedPortId = null
+                                    highlightedNodeId = null
+                                },
+
+                                onPress = { id -> viewModel.onEvent(FlowEvent.BringToFront(id)) },
+                                highlightedPortId = nodeHighlightedPortId,
+                                highlightedPortColor = nodeHighlightedPortColor,
+                                boardLayoutCoordinates = boardLayoutCoordinates,
+                                stateScale = state.scale,
+                                stateOffset = state.offset,
+                                selectedNodeIds = state.selectedNodeIds,
+                                isReadOnly = state.isReadOnly,
+                                modifier = Modifier.onSizeChanged { size ->
+                                    nodeSizes[node.id] = size
+                                }
+                            )
+                        }
                     }
                 }
-            }
 
-            // Ghost Preview for Snapping
-            state.ghostPosition?.let { ghostPos ->
-                val draggedNode = state.flow.nodes.find { it.id == state.draggedNodeId }
-                val heightDp = draggedNode?.let { node ->
-                    nodeSizes[node.id]?.let { size ->
-                        with(density) { size.height.toDp() }
+                // Ghost Preview for Snapping
+                state.ghostPosition?.let { ghostPos ->
+                    val draggedNode = state.flow.nodes.find { it.id == state.draggedNodeId }
+                    val heightDp = draggedNode?.let { node ->
+                        nodeSizes[node.id]?.let { size ->
+                            with(density) { size.height.toDp() }
+                        }
+                    } ?: 120.dp
+
+                    NodeCardContainer(
+                        nodePosition = ghostPos,
+                        dragOffset = Offset.Zero,
+                        scale = state.scale,
+                        boardOffset = state.offset,
+                        modifier = Modifier.alpha(0.3f)
+                    ) {
+                        draggedNode?.let { NodeComponentPlaceholder(it, heightDp) }
                     }
-                } ?: 120.dp
-
-                NodeCardContainer(
-                    nodePosition = ghostPos,
-                    dragOffset = Offset.Zero,
-                    scale = state.scale,
-                    boardOffset = state.offset,
-                    modifier = Modifier.alpha(0.3f)
-                ) {
-                    draggedNode?.let { NodeComponentPlaceholder(it, heightDp) }
                 }
             }
         }
@@ -729,6 +765,8 @@ fun FlowEditorView(
                 }
             )
         }
+        
+        overlayContent?.invoke()
     }
 }
 

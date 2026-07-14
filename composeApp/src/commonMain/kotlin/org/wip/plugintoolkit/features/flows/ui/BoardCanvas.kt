@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -58,6 +59,7 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
+import org.wip.plugintoolkit.shared.components.LocalOverlayHost
 import org.wip.plugintoolkit.shared.components.ZoomControls
 import kotlin.math.roundToInt
 
@@ -88,11 +90,13 @@ fun BoardCanvas(
     onSelectNodes: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
     onDeleteSelectedNodes: () -> Unit,
+    onCopy: () -> Unit,
+    onPaste: (Offset) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     nodeSizes: Map<Long, IntSize>,
     modifier: Modifier = Modifier,
-    content: @Composable BoxScope.() -> Unit
+    content: @Composable BoxScope.(hoveredConnection: org.wip.plugintoolkit.features.flows.model.Connection?) -> Unit
 ) {
     val gridSize = 50f
     val density = LocalDensity.current
@@ -112,6 +116,7 @@ fun BoardCanvas(
     val currentNodes by rememberUpdatedState(flow.nodes)
     val currentScale by rememberUpdatedState(state.scale)
     val currentOffset by rememberUpdatedState(state.offset)
+    val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
 
     LaunchedEffect(flow.connections) {
         if (hoveredConnection != null && !flow.connections.contains(hoveredConnection)) {
@@ -180,6 +185,17 @@ fun BoardCanvas(
                             true
                         }
 
+                        keyEvent.isCtrlPressed && keyEvent.key == Key.C -> {
+                            onCopy()
+                            true
+                        }
+
+                        keyEvent.isCtrlPressed && keyEvent.key == Key.V -> {
+                            val boardPos = (lastPointerPosition - currentOffset) / currentScale
+                            onPaste(boardPos)
+                            true
+                        }
+
                         else -> false
                     }
                 } else {
@@ -193,25 +209,25 @@ fun BoardCanvas(
                     }
                 }
             }
-            .pointerInput(flow.connections, state.scale, state.offset, getPortBoardPosition) {
+            .pointerInput(flow.connections, getPortBoardPosition) {
                 detectTapGestures { tapOffset ->
                     focusRequester.requestFocus()
                     var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
-                    var minDistance = 20f * state.scale
+                    var minDistance = 20f * currentScale
                     if (minDistance < 15f) minDistance = 15f
 
                     flow.connections.forEach { connection ->
                         val sourcePortBoardPos = getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
                         val targetPortBoardPos = getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
                         if (sourcePortBoardPos != null && targetPortBoardPos != null) {
-                            val startPos = (sourcePortBoardPos * state.scale) + state.offset
-                            val endPos = (targetPortBoardPos * state.scale) + state.offset
+                            val startPos = (sourcePortBoardPos * currentScale) + currentOffset
+                            val endPos = (targetPortBoardPos * currentScale) + currentOffset
 
                             val controlPointOffset = kotlin.math.abs(endPos.x - startPos.x) / 2f
                             val p1x = startPos.x + controlPointOffset
                             val p2x = endPos.x - controlPointOffset
 
-                            val padding = 30f * state.scale
+                            val padding = 30f * currentScale
                             val aabbMinX = minOf(startPos.x, endPos.x, p1x, p2x) - padding
                             val aabbMaxX = maxOf(startPos.x, endPos.x, p1x, p2x) + padding
                             val aabbMinY = minOf(startPos.y, endPos.y) - padding
@@ -232,7 +248,7 @@ fun BoardCanvas(
                     }
                 }
             }
-            .pointerInput(state.scale, state.offset, flow.nodes, nodeSizes) {
+            .pointerInput(flow.nodes, nodeSizes) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -240,44 +256,65 @@ fun BoardCanvas(
                             focusRequester.requestFocus()
                             val startPoint = event.changes.first().position
                             selectionStart = startPoint
-                            selectionEnd = startPoint
-
-                            event.changes.forEach { it.consume() }
-
-                            while (true) {
-                                val dragEvent = awaitPointerEvent()
-                                if (dragEvent.type == PointerEventType.Move) {
-                                    selectionEnd = dragEvent.changes.first().position
-                                    dragEvent.changes.forEach { it.consume() }
-
-                                    val modelStart = (selectionStart!! - state.offset) / state.scale
-                                    val modelEnd = (selectionEnd!! - state.offset) / state.scale
-                                    val selectLeft = minOf(modelStart.x, modelEnd.x)
-                                    val selectRight = maxOf(modelStart.x, modelEnd.x)
-                                    val selectTop = minOf(modelStart.y, modelEnd.y)
-                                    val selectBottom = maxOf(modelStart.y, modelEnd.y)
-
-                                    val selectedIds = mutableSetOf<Long>()
-                                    flow.nodes.forEach { node ->
-                                        val nodeLeft = node.position.x
-                                        val nodeTop = node.position.y
-                                        val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: (300f * density.density)
-                                        val nodeHeight =
-                                            nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
-                                        val nodeRight = nodeLeft + nodeWidth
-                                        val nodeBottom = nodeTop + nodeHeight
-
-                                        if (selectLeft < nodeRight && selectRight > nodeLeft &&
-                                            selectTop < nodeBottom && selectBottom > nodeTop
-                                        ) {
-                                            selectedIds.add(node.id)
-                                        }
+                            
+                            if (currentIsDrawingConnection) {
+                                event.changes.forEach { it.consume() }
+                                var lastPoint = startPoint
+                                while (true) {
+                                    val dragEvent = awaitPointerEvent()
+                                    if (!dragEvent.buttons.isSecondaryPressed) {
+                                        selectionStart = null
+                                        break
                                     }
-                                    onSelectNodes(selectedIds)
-                                } else if (dragEvent.type == PointerEventType.Release) {
-                                    selectionStart = null
-                                    selectionEnd = null
-                                    break
+                                    if (dragEvent.type == PointerEventType.Move) {
+                                        val currentPoint = dragEvent.changes.first().position
+                                        val delta = currentPoint - lastPoint
+                                        onPan(delta)
+                                        lastPoint = currentPoint
+                                        dragEvent.changes.forEach { it.consume() }
+                                    }
+                                }
+                            } else {
+                                selectionEnd = startPoint
+    
+                                event.changes.forEach { it.consume() }
+    
+                                while (true) {
+                                    val dragEvent = awaitPointerEvent()
+                                    if (!dragEvent.buttons.isSecondaryPressed) {
+                                        selectionStart = null
+                                        selectionEnd = null
+                                        break
+                                    }
+                                    if (dragEvent.type == PointerEventType.Move) {
+                                        selectionEnd = dragEvent.changes.first().position
+                                        dragEvent.changes.forEach { it.consume() }
+
+                                        val modelStart = (selectionStart!! - currentOffset) / currentScale
+                                        val modelEnd = (selectionEnd!! - currentOffset) / currentScale
+                                        val selectLeft = minOf(modelStart.x, modelEnd.x)
+                                        val selectRight = maxOf(modelStart.x, modelEnd.x)
+                                        val selectTop = minOf(modelStart.y, modelEnd.y)
+                                        val selectBottom = maxOf(modelStart.y, modelEnd.y)
+
+                                        val selectedIds = mutableSetOf<Long>()
+                                        flow.nodes.forEach { node ->
+                                            val nodeLeft = node.position.x
+                                            val nodeTop = node.position.y
+                                            val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: (300f * density.density)
+                                            val nodeHeight =
+                                                nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
+                                            val nodeRight = nodeLeft + nodeWidth
+                                            val nodeBottom = nodeTop + nodeHeight
+
+                                            if (selectLeft < nodeRight && selectRight > nodeLeft &&
+                                                selectTop < nodeBottom && selectBottom > nodeTop
+                                            ) {
+                                                selectedIds.add(node.id)
+                                            }
+                                        }
+                                        onSelectNodes(selectedIds)
+                                    }
                                 }
                             }
                         }
@@ -298,6 +335,12 @@ fun BoardCanvas(
                                 onZoom(-delta, position, isShiftPressed)
                             }
                         } else if (event.type == PointerEventType.Move) {
+                            lastPointerPosition = position
+                            if (currentIsDrawingConnection) {
+                                val boardPos = (position - currentOffset) / currentScale
+                                onConnectionDrag(boardPos)
+                            }
+                            
                             var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
                             var minDistance = 20f * currentScale
                             if (minDistance < 15f) minDistance = 15f
@@ -406,6 +449,19 @@ fun BoardCanvas(
                 }
             }
     ) {
+        val connectionAlphas = flow.connections.associateWith { connection ->
+            val isDimmed = hoveredConnection != null && hoveredConnection != connection
+            val targetAlpha = if (isDimmed) 0.6f else 1f
+            androidx.compose.animation.core.animateFloatAsState(
+                targetValue = targetAlpha,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 200,
+                    delayMillis = if (isDimmed) 500 else 0
+                ),
+                label = "ConnectionAlpha"
+            ).value
+        }
+        
         // 1.1 Grid and Connections Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val scaledGridSize = gridSize * state.scale
@@ -453,7 +509,7 @@ fun BoardCanvas(
                         Color.Red
                     } else {
                         connectionColor
-                    }
+                    }.copy(alpha = connectionAlphas[connection] ?: 1f)
 
                     if (isHovered && hoveredConnectionIsSource == null) {
                         drawBezierCurve(startPos, endPos, color.copy(alpha = 0.25f), strokeWidth = 9.dp.toPx())
@@ -502,7 +558,7 @@ fun BoardCanvas(
                     val currentPos = if (highlightedPortId != null && highlightedNodeId != null) {
                         getPortBoardPosition(highlightedNodeId, highlightedPortId)!!
                     } else {
-                        connectionCurrentPos
+                        (lastPointerPosition - state.offset) / state.scale
                     }
 
                     val (startPos, endPos) = if (connectionStartIsOutput) {
@@ -521,7 +577,7 @@ fun BoardCanvas(
         }
 
         // Render main children (nodes, preview)
-        content()
+        content(hoveredConnection)
 
         // Selection Box overlay drawing
         if (selectionStart != null && selectionEnd != null) {
@@ -584,24 +640,46 @@ fun BoardCanvas(
                                 fontWeight = FontWeight.Bold
                             )
 
-                            androidx.compose.material3.DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
-                            ) {
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { androidx.compose.material3.Text("Move First") },
-                                    onClick = {
-                                        onMoveConnectionFirst(conn)
-                                        showMenu = false
+                            val overlay = LocalOverlayHost.current
+                            LaunchedEffect(showMenu) {
+                                if (showMenu) {
+                                    val scaledMidPoint = (midPoint * state.scale) + state.offset
+                                    val bounds = androidx.compose.ui.geometry.Rect(
+                                        left = scaledMidPoint.x,
+                                        top = scaledMidPoint.y,
+                                        right = scaledMidPoint.x,
+                                        bottom = scaledMidPoint.y
+                                    )
+                                    overlay?.show(
+                                        bounds = bounds,
+                                        onDismiss = { showMenu = false }
+                                    ) {
+                                        androidx.compose.material3.Card(
+                                            elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                            shape = MaterialTheme.shapes.medium,
+                                            modifier = Modifier.width(150.dp)
+                                        ) {
+                                            androidx.compose.foundation.layout.Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                                androidx.compose.material3.DropdownMenuItem(
+                                                    text = { androidx.compose.material3.Text("Move to Start") },
+                                                    onClick = {
+                                                        onMoveConnectionFirst(conn)
+                                                        showMenu = false
+                                                    }
+                                                )
+                                                androidx.compose.material3.DropdownMenuItem(
+                                                    text = { androidx.compose.material3.Text("Move to End") },
+                                                    onClick = {
+                                                        onMoveConnectionLast(conn)
+                                                        showMenu = false
+                                                    }
+                                                )
+                                            }
+                                        }
                                     }
-                                )
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { androidx.compose.material3.Text("Move Last") },
-                                    onClick = {
-                                        onMoveConnectionLast(conn)
-                                        showMenu = false
-                                    }
-                                )
+                                } else {
+                                    overlay?.hide()
+                                }
                             }
                         }
                     }

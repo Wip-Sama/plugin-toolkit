@@ -18,6 +18,7 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.FlowUnpacker
 import org.wip.plugintoolkit.features.flows.model.InputPort
@@ -43,6 +44,11 @@ class FlowEditorViewModel(
     private val activeFlowEditorTracker: ActiveFlowEditorTracker? = null,
     private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository? = null
 ) : ViewModel() {
+
+    companion object {
+        private var clipboardNodes: List<Node> = emptyList()
+        private var clipboardConnections: List<Connection> = emptyList()
+    }
 
     private val resolvedSettingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository? by lazy {
         settingsRepository ?: try {
@@ -111,6 +117,9 @@ class FlowEditorViewModel(
 
     private val undoStack = mutableListOf<Flow>()
     private val redoStack = mutableListOf<Flow>()
+
+    private var clipboardNodes: List<Node> = emptyList()
+    private var clipboardConnections: List<Connection> = emptyList()
 
     private fun saveToHistory() {
         val currentFlow = _state.value.flow
@@ -390,6 +399,64 @@ class FlowEditorViewModel(
                 shouldRunTypeInference = true
                 newState = nodeManager.handleDeleteNode(currentState, event.id)
             }
+            is FlowEvent.CopySelectedNodes -> {
+                val selected = currentState.selectedNodeIds
+                if (selected.isNotEmpty()) {
+                    clipboardNodes = currentState.flow.nodes.filter { it.id in selected }
+                    clipboardConnections = currentState.flow.connections.filter { 
+                        it.sourceNodeId in selected && it.targetNodeId in selected 
+                    }
+                }
+            }
+            is FlowEvent.PasteNodes -> {
+                if (clipboardNodes.isNotEmpty()) {
+                    shouldSaveHistory = true
+                    shouldRunTypeInference = true
+                    
+                    var nextId = currentState.nextId
+                    val idMapping = mutableMapOf<Long, Long>()
+                    
+                    val newNodes = clipboardNodes.map { node ->
+                        val newId = nextId++
+                        idMapping[node.id] = newId
+                        node.copyWithId(newId)
+                    }
+                    
+                    // Calculate bounding box center to offset nodes to cursor position
+                    val minX = newNodes.minOfOrNull { it.position.x } ?: 0f
+                    val minY = newNodes.minOfOrNull { it.position.y } ?: 0f
+                    val maxX = newNodes.maxOfOrNull { it.position.x } ?: 0f
+                    val maxY = newNodes.maxOfOrNull { it.position.y } ?: 0f
+                    val centerX = minX + (maxX - minX) / 2f
+                    val centerY = minY + (maxY - minY) / 2f
+                    
+                    val offsetDelta = Offset(event.position.x - centerX, event.position.y - centerY)
+                    
+                    val positionedNodes = newNodes.map { node ->
+                        node.copyWithPosition((node.position + offsetDelta).snapToGrid())
+                    }
+                    
+                    val newConnections = clipboardConnections.mapNotNull { conn ->
+                        val newSourceId = idMapping[conn.sourceNodeId]
+                        val newTargetId = idMapping[conn.targetNodeId]
+                        if (newSourceId != null && newTargetId != null) {
+                            conn.copy(
+                                sourceNodeId = newSourceId,
+                                targetNodeId = newTargetId
+                            )
+                        } else null
+                    }
+                    
+                    newState = currentState.copy(
+                        nextId = nextId,
+                        flow = currentState.flow.copy(
+                            nodes = currentState.flow.nodes + positionedNodes,
+                            connections = currentState.flow.connections + newConnections
+                        ),
+                        selectedNodeIds = positionedNodes.map { it.id }.toSet()
+                    )
+                }
+            }
 
             is FlowEvent.ConnectPorts -> {
                 shouldSaveHistory = true
@@ -463,7 +530,8 @@ class FlowEditorViewModel(
                     event.dataType,
                     event.semanticTypes,
                     event.constraints,
-                    event.isList
+                    event.isList,
+                    event.isRequired
                 )
             }
 
@@ -496,6 +564,66 @@ class FlowEditorViewModel(
                 shouldSaveHistory = true
                 shouldRunTypeInference = true
                 newState = nodeManager.handleDeleteSelectedNodes(currentState)
+            }
+
+            is FlowEvent.CopySelectedNodes -> {
+                val selectedIds = currentState.selectedNodeIds
+                if (selectedIds.isNotEmpty()) {
+                    clipboardNodes = currentState.flow.nodes.filter { it.id in selectedIds }
+                    clipboardConnections = currentState.flow.connections.filter {
+                        it.sourceNodeId in selectedIds && it.targetNodeId in selectedIds
+                    }
+                }
+            }
+
+            is FlowEvent.PasteNodes -> {
+                if (clipboardNodes.isNotEmpty()) {
+                    shouldSaveHistory = true
+                    shouldRunTypeInference = true
+                    
+                    var minX = Float.MAX_VALUE
+                    var maxX = Float.MIN_VALUE
+                    var minY = Float.MAX_VALUE
+                    var maxY = Float.MIN_VALUE
+                    
+                    clipboardNodes.forEach {
+                        if (it.position.x < minX) minX = it.position.x
+                        if (it.position.x > maxX) maxX = it.position.x
+                        if (it.position.y < minY) minY = it.position.y
+                        if (it.position.y > maxY) maxY = it.position.y
+                    }
+                    
+                    val centerX = (minX + maxX) / 2
+                    val centerY = (minY + maxY) / 2
+                    val offsetDelta = event.position - Offset(centerX, centerY)
+                    val snappedOffsetDelta = offsetDelta.snapToGrid()
+                    
+                    val idMap = mutableMapOf<Long, Long>()
+                    var currentNextId = currentState.nextId
+                    
+                    val newNodes = clipboardNodes.map { oldNode ->
+                        val newId = currentNextId++
+                        idMap[oldNode.id] = newId
+                        oldNode.copyWithId(newId).copyWithPosition(oldNode.position + snappedOffsetDelta)
+                    }
+                    
+                    val newConnections = clipboardConnections.mapNotNull { oldConn ->
+                        val newSource = idMap[oldConn.sourceNodeId]
+                        val newTarget = idMap[oldConn.targetNodeId]
+                        if (newSource != null && newTarget != null) {
+                            oldConn.copy(sourceNodeId = newSource, targetNodeId = newTarget)
+                        } else null
+                    }
+                    
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(
+                            nodes = currentState.flow.nodes + newNodes,
+                            connections = currentState.flow.connections + newConnections
+                        ),
+                        nextId = currentNextId,
+                        selectedNodeIds = newNodes.map { it.id }.toSet()
+                    )
+                }
             }
 
             is FlowEvent.ToggleNodeCollapse -> {

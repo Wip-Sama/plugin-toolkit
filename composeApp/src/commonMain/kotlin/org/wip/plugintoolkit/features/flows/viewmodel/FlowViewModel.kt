@@ -65,6 +65,8 @@ sealed interface FlowEvent {
 
     data class EndMoveNode(val id: Long, val density: Float = 1f) : FlowEvent
     data class DeleteNode(val id: Long) : FlowEvent
+    data object CopySelectedNodes : FlowEvent
+    data class PasteNodes(val position: Offset) : FlowEvent
 
     data class ConnectPorts(
         val sourceNodeId: Long,
@@ -113,7 +115,8 @@ sealed interface FlowEvent {
         val dataType: DataType,
         val semanticTypes: List<SemanticType>,
         val constraints: org.wip.plugintoolkit.features.flows.model.PortConstraints? = null,
-        val isList: Boolean = false
+        val isList: Boolean = false,
+        val isRequired: Boolean = true
     ) : FlowEvent
 
     data class UpdateSystemNodeSettings(

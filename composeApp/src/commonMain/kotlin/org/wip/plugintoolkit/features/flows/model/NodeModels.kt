@@ -106,6 +106,7 @@ data class InputPort(
     @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
     @Serializable(with = AnySerializer::class) val value: Any? = null,
     val constraints: PortConstraints? = null,
+    val isRequired: Boolean = true,
     override val description: String? = null
 ) : Port
 
@@ -122,7 +123,8 @@ object InputPortSerializer : KSerializer<InputPort> {
             defaultValue = value.defaultValue,
             value = value.value,
             regex = value.constraints?.regex,
-            constraints = value.constraints
+            constraints = value.constraints,
+            isRequired = value.isRequired
         )
         encoder.encodeSerializableValue(InputPortSurrogate.serializer(), surrogate)
     }
@@ -138,7 +140,8 @@ object InputPortSerializer : KSerializer<InputPort> {
             semanticTypes = surrogate.semanticTypes ?: emptyList(),
             defaultValue = surrogate.defaultValue,
             value = surrogate.value,
-            constraints = migratedConstraints
+            constraints = migratedConstraints,
+            isRequired = surrogate.isRequired
         )
     }
 }
@@ -155,6 +158,7 @@ private data class InputPortSurrogate(
     @Serializable(with = AnySerializer::class) val value: Any? = null,
     val regex: String? = null,
     val constraints: PortConstraints? = null,
+    val isRequired: Boolean = true,
     val description: String? = null
 )
 
@@ -339,7 +343,16 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean {
+            if (systemAction.lowercase() == "load") return true
+            return inputs.all { input ->
+                if (!input.isRequired) return@all true
+                val effectiveValue = input.value ?: input.defaultValue
+                val providedByValue = input.dataType.isProvided(AnySerializer.toJsonElement(effectiveValue))
+                val providedByConnection = connections.any { it.targetNodeId == id && it.targetPortId == input.id }
+                providedByValue || providedByConnection
+            }
+        }
     }
 
     @Serializable
@@ -350,6 +363,7 @@ sealed class Node {
         override val outputs: List<OutputPort>,
         val constraints: PortConstraints? = null,
         val isList: Boolean = false,
+        val isRequired: Boolean = true,
         override val isCollapsed: Boolean = false,
         override val isInputsCollapsed: Boolean = false,
         override val isOutputsCollapsed: Boolean = false

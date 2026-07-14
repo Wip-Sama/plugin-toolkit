@@ -40,7 +40,8 @@ object SystemNodesRegistry {
                     "file_name",
                     "File Name (Optional)",
                     DataType.Primitive(PrimitiveType.STRING),
-                    defaultValue = ""
+                    defaultValue = "",
+                    isRequired = false
                 ),
                 InputPort(
                     "is_destructive",
@@ -67,7 +68,8 @@ object SystemNodesRegistry {
                     "folder_name",
                     "Folder Name (Optional)",
                     DataType.Primitive(PrimitiveType.STRING),
-                    defaultValue = ""
+                    defaultValue = "",
+                    isRequired = false
                 ),
                 InputPort(
                     "is_destructive",
@@ -98,7 +100,7 @@ object SystemNodesRegistry {
                     defaultValue = "INFO"
                 ),
                 InputPort("message", "Message", DataType.Primitive(PrimitiveType.ANY)),
-                InputPort("data", "Data", DataType.Primitive(PrimitiveType.ANY))
+                InputPort("data", "Data", DataType.Primitive(PrimitiveType.ANY), isRequired = false)
             )
 
             "delay" -> listOf(
@@ -133,7 +135,7 @@ object SystemNodesRegistry {
                     DataType.Primitive(PrimitiveType.STRING),
                     defaultValue = "An error occurred during flow execution"
                 ),
-                InputPort("data", "Data", DataType.Primitive(PrimitiveType.ANY))
+                InputPort("data", "Data", DataType.Primitive(PrimitiveType.ANY), isRequired = false)
             )
 
             "comparator" -> listOf(

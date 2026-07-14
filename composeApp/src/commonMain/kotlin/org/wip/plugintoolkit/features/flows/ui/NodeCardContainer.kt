@@ -18,6 +18,7 @@ fun NodeCardContainer(
     scale: Float,
     boardOffset: Offset,
     modifier: Modifier = Modifier,
+    alpha: Float = 1f,
     content: @Composable () -> Unit
 ) {
     Box(
@@ -31,6 +32,7 @@ fun NodeCardContainer(
             .graphicsLayer(
                 scaleX = scale,
                 scaleY = scale,
+                alpha = alpha,
                 transformOrigin = TransformOrigin(0f, 0f)
             )
             .wrapContentSize(unbounded = true)
