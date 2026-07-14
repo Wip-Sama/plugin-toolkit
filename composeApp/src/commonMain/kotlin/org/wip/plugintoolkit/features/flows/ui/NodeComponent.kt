@@ -492,7 +492,6 @@ fun NodeComponent(
                     }
 
                     // Outputs Section
-                    // Outputs Section
                     if (visibleOutputs.isNotEmpty()) {
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable { onToggleOutputsCollapse(node.id) },

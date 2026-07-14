@@ -1,14 +1,23 @@
 package org.wip.plugintoolkit.shared.components.settings
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,9 +27,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
+@Deprecated(
+    message = "This is a workaround for the Material 3 Expressive Dropdown menu. Migrate to native when JetBrains drops support.",
+    level = DeprecationLevel.WARNING
+)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> ExpressiveMenu(
@@ -29,7 +45,8 @@ fun <T> ExpressiveMenu(
     onOptionSelected: (T) -> Unit,
     labelProvider: @Composable (T) -> String,
     enabled: Boolean = true,
-    disabledOptions: Set<T> = emptySet()
+    disabledOptions: Set<T> = emptySet(),
+    gapAfter: (T) -> Boolean = { false }
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -43,7 +60,7 @@ fun <T> ExpressiveMenu(
             shape = MaterialTheme.shapes.medium
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -55,23 +72,85 @@ fun <T> ExpressiveMenu(
             }
         }
 
+
+        // Determine container shape
+        val containerRadius = ToolkitTheme.spacing.medium
+        val itemNormalRadius = ToolkitTheme.spacing.small
+        val itemInnerRadius = ToolkitTheme.spacing.small
+
+        val groups = mutableListOf<List<T>>()
+        var currentGroup = mutableListOf<T>()
+        options.forEach { option ->
+            currentGroup.add(option)
+            if (gapAfter(option)) {
+                groups.add(currentGroup)
+                currentGroup = mutableListOf<T>()
+            }
+        }
+        if (currentGroup.isNotEmpty()) {
+            groups.add(currentGroup)
+        }
+
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            modifier = Modifier,
+            onDismissRequest = { expanded = false },
+            shape = RoundedCornerShape(containerRadius),
+            shadowElevation = 0.dp,
+            containerColor = Color.Transparent
         ) {
-            options.forEach { option ->
-                val isDisabled = option in disabledOptions
-                DropdownMenuItem(
-                    text = { Text(labelProvider(option)) },
-                    onClick = {
-                        if (!isDisabled) {
-                            onOptionSelected(option)
-                            expanded = false
-                        }
-                    },
-                    enabled = !isDisabled,
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+            groups.forEachIndexed { groupIndex, group ->
+                val topRadius = if (groupIndex == 0) containerRadius else itemInnerRadius
+                val bottomRadius = if (groupIndex == groups.lastIndex) containerRadius else itemInnerRadius
+                val surfaceShape = RoundedCornerShape(
+                    topStart = topRadius,
+                    topEnd = topRadius,
+                    bottomStart = bottomRadius,
+                    bottomEnd = bottomRadius
                 )
+
+                Surface(
+                    shape = surfaceShape,
+                    color = MenuDefaults.containerColor,
+                    shadowElevation = ToolkitTheme.spacing.medium,
+                    modifier = Modifier.padding(bottom = if (groupIndex != groups.lastIndex) ToolkitTheme.spacing.extraSmall else 0.dp)
+                ) {
+                    androidx.compose.foundation.layout.Column(
+                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
+                    ) {
+                        group.forEachIndexed { index, option ->
+                            val isDisabled = option in disabledOptions
+                            val isSelected = option == selectedOption
+                            
+                            val itemShape = RoundedCornerShape(itemNormalRadius)
+            
+                            DropdownMenuItem(
+                                text = { Text(labelProvider(option)) },
+                                onClick = {
+                                    if (!isDisabled) {
+                                        onOptionSelected(option)
+                                        expanded = false
+                                    }
+                                },
+                                modifier = Modifier
+                                    .padding(horizontal = ToolkitTheme.spacing.small)
+                                    .height(ToolkitTheme.dimensions.menuItem)
+                                    .clip(itemShape)
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else Color.Transparent
+                                    ),
+                                colors = MenuDefaults.itemColors(
+                                    textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary 
+                                                else MaterialTheme.colorScheme.onSurface
+                                ),
+                                enabled = !isDisabled,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -81,14 +160,113 @@ fun <T> ExpressiveMenu(
 @Composable
 private fun ExpressiveMenuPreview() {
     MaterialTheme {
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(32.dp)) {
             ExpressiveMenu(
-                options = listOf("Option 1", "Option 2", "Option 3"),
-                selectedOption = "Option 1",
+                options = listOf("System", "Light", "Dark", "Amoled"),
+                selectedOption = "Amoled",
                 onOptionSelected = {},
-                labelProvider = { it }
+                labelProvider = { it },
+                gapAfter = { it == "Light" }
             )
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview
+@Composable
+private fun ExpandedExpressiveMenuPreview() {
+    MaterialTheme {
+        Box() {
+            androidx.compose.foundation.layout.Column {
+                // First Menu Block
+                Surface(
+                    shape = RoundedCornerShape(
+                        topStart = ToolkitTheme.spacing.medium, 
+                        topEnd = ToolkitTheme.spacing.medium, 
+                        bottomStart = ToolkitTheme.spacing.extraSmall, 
+                        bottomEnd = ToolkitTheme.spacing.extraSmall
+                    ),
+                    color = MenuDefaults.containerColor,
+                    shadowElevation = ToolkitTheme.spacing.medium,
+                    modifier = Modifier.padding(bottom = ToolkitTheme.spacing.extraSmall)
+                ) {
+                    androidx.compose.foundation.layout.Column(
+                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
+                    ) {
+                        // 1. Normal Item
+                        DropdownMenuItem(
+                            text = { Text("System") },
+                            onClick = {},
+                            modifier = Modifier
+                                .padding(horizontal = ToolkitTheme.spacing.small)
+                                .height(ToolkitTheme.dimensions.menuItem)
+                                .clip(RoundedCornerShape(ToolkitTheme.spacing.extraSmall)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        )
+                        
+                        HorizontalDivider()
+                        
+                        // 2. Hovered Item
+                        DropdownMenuItem(
+                            text = { Text("Light") },
+                            onClick = {},
+                            modifier = Modifier
+                                .padding(horizontal = ToolkitTheme.spacing.small)
+                                .height(ToolkitTheme.dimensions.menuItem)
+                                .clip(RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        )
+                    }
+                }
+                
+                // Second Menu Block
+                Surface(
+                    shape = RoundedCornerShape(
+                        topStart = ToolkitTheme.spacing.extraSmall, 
+                        topEnd = ToolkitTheme.spacing.extraSmall, 
+                        bottomStart = ToolkitTheme.spacing.medium, 
+                        bottomEnd = ToolkitTheme.spacing.medium
+                    ),
+                    color = MenuDefaults.containerColor,
+                    shadowElevation = ToolkitTheme.spacing.medium
+                ) {
+                    androidx.compose.foundation.layout.Column(
+                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
+                    ) {
+                        // 3. Normal Item
+                        DropdownMenuItem(
+                            text = { Text("Dark") },
+                            onClick = {},
+                            modifier = Modifier
+                                .padding(horizontal = ToolkitTheme.spacing.small)
+                                .height(ToolkitTheme.dimensions.menuItem)
+                                .clip(RoundedCornerShape(ToolkitTheme.spacing.extraSmall)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        )
+                        
+                        // 4. Selected Item
+                        DropdownMenuItem(
+                            text = { Text("Amoled") },
+                            onClick = {},
+                            modifier = Modifier
+                                .padding(horizontal = ToolkitTheme.spacing.small)
+                                .height(ToolkitTheme.dimensions.menuItem)
+                                .clip(RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
+                                .background(MaterialTheme.colorScheme.primary),
+                            colors = MenuDefaults.itemColors(
+                                textColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 

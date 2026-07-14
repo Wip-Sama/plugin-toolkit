@@ -43,6 +43,7 @@ data class Spacing(
 data class Dimensions(
     val sidebarCollapsedWidth: Dp = 80.dp,
     val sidebarExpandedWidth: Dp = 250.dp,
+    val menuItem: Dp = 36.dp,
     val iconSmall: Dp = 16.dp,
     val iconMedium: Dp = 24.dp,
     val iconLarge: Dp = 32.dp,

@@ -62,10 +62,12 @@ import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.shared.components.TooltipArea
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
+import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_cancel
 import plugintoolkit.composeapp.generated.resources.action_save
@@ -429,26 +431,14 @@ fun PluginSettingsDialog(
                                                                     )
                                                                 }
                                                                 if (lockedOptionsForSetting.isNotEmpty()) {
-                                                                    org.wip.plugintoolkit.shared.components.TooltipArea(
-                                                                        offsetY = 60,
-                                                                        tooltip = {
-                                                                            Surface(
-                                                                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                                                                shape = MaterialTheme.shapes.small
-                                                                            ) {
-                                                                                Text(
-                                                                                    text = "Locked values:\n" + lockedOptionsForSetting.joinToString(
-                                                                                        "\n"
-                                                                                    ),
-                                                                                    modifier = Modifier.padding(8.dp),
-                                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                                                )
-                                                                            }
-                                                                        }
-                                                                    ) {
+                                                                    Box {
                                                                         ToolkitChip(
                                                                             text = "Locked Enum Options",
+                                                                            modifier = Modifier.tooltip(
+                                                                                text = "Locked values:\n" + lockedOptionsForSetting.joinToString(
+                                                                                    "\n"
+                                                                                ),
+                                                                            ),
                                                                             icon = {
                                                                                 Icon(
                                                                                     Icons.Default.Lock,

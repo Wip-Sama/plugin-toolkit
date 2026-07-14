@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,17 +20,33 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * A reusable Composable wrapper that shows a custom tooltip when the content is hovered.
  */
 @OptIn(ExperimentalComposeUiApi::class)
+@Deprecated(
+    message = "Use Modifier.tooltip instead",
+    replaceWith = ReplaceWith("Modifier.tooltip(textResource, delay)"),
+    level = DeprecationLevel.WARNING
+)
 @Composable
 fun TooltipArea(
     tooltip: @Composable () -> Unit,
@@ -94,13 +111,59 @@ fun TooltipArea(
  * A modifier extension that displays a text tooltip when hovering over the component.
  */
 @OptIn(ExperimentalComposeUiApi::class)
-fun Modifier.tooltip(text: String): Modifier = composed {
-    var isHovered by remember { mutableStateOf(false) }
+fun Modifier.tooltip(textResource: StringResource, delay: Duration = Duration.ZERO): Modifier = composed {
+    val text = stringResource(textResource)
+    tooltipImpl(text, delay)
+}
 
-    if (isHovered) {
+/**
+ * A modifier extension that displays a text tooltip when hovering over the component.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+fun Modifier.tooltip(text: String, delay: Duration = Duration.ZERO): Modifier = composed {
+    tooltipImpl(text, delay)
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun Modifier.tooltipImpl(text: String, delay: Duration): Modifier {
+    var isHovered by remember { mutableStateOf(false) }
+    var isTooltipVisible by remember { mutableStateOf(false) }
+    var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    LaunchedEffect(isHovered) {
+        if (isHovered) {
+            if (delay > Duration.ZERO) {
+                delay(delay)
+            }
+            isTooltipVisible = true
+        } else {
+            isTooltipVisible = false
+        }
+    }
+
+    if (isTooltipVisible) {
         Popup(
-            alignment = Alignment.TopCenter,
-            offset = IntOffset(0, -60),
+            popupPositionProvider = object : PopupPositionProvider {
+                override fun calculatePosition(
+                    anchorBounds: IntRect,
+                    windowSize: IntSize,
+                    layoutDirection: LayoutDirection,
+                    popupContentSize: IntSize
+                ): IntOffset {
+                    val coords = layoutCoordinates ?: return IntOffset.Zero
+                    val position = coords.positionInWindow()
+                    val size = coords.size
+                    
+                    val x = (position.x + size.width / 2f - popupContentSize.width / 2f).toInt()
+                    val y = (position.y - popupContentSize.height - 8).toInt() // 8px offset
+                    
+                    val adjustedX = x.coerceIn(0, maxOf(0, windowSize.width - popupContentSize.width))
+                    val adjustedY = y.coerceIn(0, maxOf(0, windowSize.height - popupContentSize.height))
+                    
+                    return IntOffset(adjustedX, adjustedY)
+                }
+            },
             properties = PopupProperties(
                 focusable = false,
                 dismissOnClickOutside = true,
@@ -123,7 +186,8 @@ fun Modifier.tooltip(text: String): Modifier = composed {
         }
     }
 
-    this
+    return this
+        .onGloballyPositioned { layoutCoordinates = it }
         .onPointerEvent(PointerEventType.Enter) { isHovered = true }
         .onPointerEvent(PointerEventType.Exit) { isHovered = false }
 }

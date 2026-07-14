@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit
 
+import androidx.compose.foundation.ComposeFoundationFlags
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
@@ -129,7 +130,9 @@ import javax.swing.JOptionPane.showMessageDialog
 import javax.swing.JWindow
 import kotlin.time.Duration.Companion.seconds
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun main(args: Array<String>) {
+    ComposeFoundationFlags.isNewContextMenuEnabled = true
     val splashWindow = try {
         showSplashWindow()
     } catch (e: Throwable) {
