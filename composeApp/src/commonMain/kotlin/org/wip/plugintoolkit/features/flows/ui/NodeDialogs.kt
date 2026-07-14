@@ -273,7 +273,7 @@ fun NodeDialogs(
                             }
 
                             val constraints = if (node is Node.FlowInputNode) {
-                                org.wip.plugintoolkit.features.flows.model.PortConstraints(
+                                PortConstraints(
                                     regex = regexStr.takeIf { it.isNotBlank() },
                                     min = minValStr.toDoubleOrNull(),
                                     max = maxValStr.toDoubleOrNull()

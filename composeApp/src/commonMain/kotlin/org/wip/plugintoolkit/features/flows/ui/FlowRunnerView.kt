@@ -112,11 +112,12 @@ fun FlowRunnerView(
     }
 
     LaunchedEffect(executableFlows) {
-        if (selectedFlowToRun == null || !executableFlows.any { it.name == selectedFlowToRun?.name }) {
-            selectedFlowToRun = executableFlows.firstOrNull()
-        } else {
-            selectedFlowToRun = executableFlows.find { it.name == selectedFlowToRun?.name }
-        }
+        selectedFlowToRun =
+            if (selectedFlowToRun == null || !executableFlows.any { it.name == selectedFlowToRun?.name }) {
+                executableFlows.firstOrNull()
+            } else {
+                executableFlows.find { it.name == selectedFlowToRun?.name }
+            }
     }
 
     Row(modifier = modifier.fillMaxSize()) {
@@ -163,9 +164,7 @@ fun FlowRunnerView(
                                     val inferredType =
                                         currentFlow.getInferredDataTypeForOutput(node.id, outPort.id, outPort.dataType)
 
-                                    val inferredSemanticTypes = if (outPort.semanticTypes.isNotEmpty()) {
-                                        outPort.semanticTypes
-                                    } else {
+                                    val inferredSemanticTypes = outPort.semanticTypes.ifEmpty {
                                         val connection =
                                             currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
                                         val targetNode = currentFlow.nodes.find { it.id == connection?.targetNodeId }
@@ -192,7 +191,8 @@ fun FlowRunnerView(
                                     "load" -> {
                                         val filePort = node.inputs.find { it.id == "file_path" }
                                         if (filePort != null) {
-                                            val isConnected = currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == filePort.id }
+                                            val isConnected =
+                                                currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == filePort.id }
                                             if (!isConnected) {
                                                 listOf(
                                                     FlowParameter(
@@ -218,7 +218,8 @@ fun FlowRunnerView(
                                     "save" -> {
                                         val filePort = node.inputs.find { it.id == "file_path" }
                                         if (filePort != null) {
-                                            val isConnected = currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == filePort.id }
+                                            val isConnected =
+                                                currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == filePort.id }
                                             if (!isConnected) {
                                                 listOf(
                                                     FlowParameter(
@@ -244,7 +245,8 @@ fun FlowRunnerView(
                                     "save_file", "save_folder" -> {
                                         val destPort = node.inputs.find { it.id == "destination_folder" }
                                         if (destPort != null) {
-                                            val isConnected = currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == destPort.id }
+                                            val isConnected =
+                                                currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == destPort.id }
                                             if (!isConnected) {
                                                 listOf(
                                                     FlowParameter(
@@ -277,9 +279,7 @@ fun FlowRunnerView(
                                     val inferredType =
                                         currentFlow.getInferredDataTypeForInput(node.id, inPort.id, inPort.dataType)
 
-                                    val inferredSemanticTypes = if (inPort.semanticTypes.isNotEmpty()) {
-                                        inPort.semanticTypes
-                                    } else {
+                                    val inferredSemanticTypes = inPort.semanticTypes.ifEmpty {
                                         val connection =
                                             currentFlow.connections.find { it.targetNodeId == node.id && it.targetPortId == inPort.id }
                                         val sourceNode = currentFlow.nodes.find { it.id == connection?.sourceNodeId }
@@ -328,7 +328,7 @@ fun FlowRunnerView(
                         type = ParameterType.SAVE,
                         label = "_outputFile",
                         portId = "flow_output_file",
-                        dataType = org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.STRING),
+                        dataType = DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.STRING),
                         defaultValue = "",
                         semanticTypes = org.wip.plugintoolkit.api.parseSemanticTypes("file"),
                         role = org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
@@ -340,7 +340,7 @@ fun FlowRunnerView(
                 val executionParameters = inputs.map { param ->
                     val metadata = remember(param) {
                         org.wip.plugintoolkit.api.ParameterMetadata(
-                            defaultValue = kotlinx.serialization.json.JsonPrimitive(param.defaultValue),
+                            defaultValue = JsonPrimitive(param.defaultValue),
                             description = "",
                             type = param.dataType,
                             required = param.nodeId != -1L,

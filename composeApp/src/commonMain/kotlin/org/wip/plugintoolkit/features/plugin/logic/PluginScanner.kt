@@ -1,12 +1,9 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
-import org.wip.plugintoolkit.AppConfig
-import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.PlatformUtils
-import org.wip.plugintoolkit.core.utils.VersionUtils
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 
 /**
@@ -63,7 +60,7 @@ class PluginScanner(
                     val normalizedJarPath = normalizePath(jarPath)
                     val jarFileName = normalizedJarPath.substringAfterLast("/")
 
-                    var manifestContent = PlatformUtils.readFileFromZip(normalizedJarPath, "manifest.json")
+                    val manifestContent = PlatformUtils.readFileFromZip(normalizedJarPath, "manifest.json")
                         ?: PlatformUtils.readFileFromZip(normalizedJarPath, "META-INF/manifest.json")
 
                     if (manifestContent != null) {

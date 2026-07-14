@@ -122,7 +122,7 @@ class SettingsViewModel(
 
             var retries = 3
             var success = false
-            
+
             while (retries > 0 && !success) {
                 try {
                     val result = updateService.downloadUpdate(update, dest)
@@ -156,7 +156,7 @@ class SettingsViewModel(
                         Logger.i { "Checksum validation passed." }
                     }
                 }
-                
+
                 PlatformUtils.installUpdate(dest)
                 isDownloadingUpdate = false
             } else {

@@ -2,19 +2,48 @@ package org.wip.plugintoolkit.features.plugin.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,9 +59,9 @@ import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
-import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
@@ -40,15 +69,15 @@ import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_cancel
 import plugintoolkit.composeapp.generated.resources.action_save
-import plugintoolkit.composeapp.generated.resources.plugin_settings_title
-import plugintoolkit.composeapp.generated.resources.settings_no_results
-import plugintoolkit.composeapp.generated.resources.settings_search_placeholder
-import plugintoolkit.composeapp.generated.resources.settings_search_by_section
 import plugintoolkit.composeapp.generated.resources.plugin_settings_actions
+import plugintoolkit.composeapp.generated.resources.plugin_settings_capability
 import plugintoolkit.composeapp.generated.resources.plugin_settings_custom
 import plugintoolkit.composeapp.generated.resources.plugin_settings_global_defaults
-import plugintoolkit.composeapp.generated.resources.plugin_settings_capability
+import plugintoolkit.composeapp.generated.resources.plugin_settings_title
 import plugintoolkit.composeapp.generated.resources.settings_locked_capability
+import plugintoolkit.composeapp.generated.resources.settings_no_results
+import plugintoolkit.composeapp.generated.resources.settings_search_by_section
+import plugintoolkit.composeapp.generated.resources.settings_search_placeholder
 
 @Composable
 fun PluginSettingsDialog(
@@ -76,29 +105,35 @@ fun PluginSettingsDialog(
     }
 
     val actions = if (searchBySection) {
-        if (searchQuery.isBlank() || actionsTitle.contains(searchQuery, ignoreCase = true)) manifest.actions else emptyList()
+        if (searchQuery.isBlank() || actionsTitle.contains(
+                searchQuery,
+                ignoreCase = true
+            )
+        ) manifest.actions else emptyList()
     } else {
-        manifest.actions.filter { 
-            it.name.contains(searchQuery, ignoreCase = true) || 
-            it.description.contains(searchQuery, ignoreCase = true) 
+        manifest.actions.filter {
+            it.name.contains(searchQuery, ignoreCase = true) ||
+                    it.description.contains(searchQuery, ignoreCase = true)
         }
     }
 
     val customSettings = if (searchBySection) {
-        if (searchQuery.isBlank() || customTitle.contains(searchQuery, ignoreCase = true)) manifest.settings ?: emptyMap() else emptyMap()
+        if (searchQuery.isBlank() || customTitle.contains(searchQuery, ignoreCase = true)) manifest.settings
+            ?: emptyMap() else emptyMap()
     } else {
-        manifest.settings?.filter { (key, meta) -> 
-            key.contains(searchQuery, ignoreCase = true) || 
-            meta.description.contains(searchQuery, ignoreCase = true) 
+        manifest.settings?.filter { (key, meta) ->
+            key.contains(searchQuery, ignoreCase = true) ||
+                    meta.description.contains(searchQuery, ignoreCase = true)
         } ?: emptyMap()
     }
 
     val globalParams = if (searchBySection) {
-        if (searchQuery.isBlank() || globalTitle.contains(searchQuery, ignoreCase = true)) manifest.defaultParameters ?: emptyMap() else emptyMap()
+        if (searchQuery.isBlank() || globalTitle.contains(searchQuery, ignoreCase = true)) manifest.defaultParameters
+            ?: emptyMap() else emptyMap()
     } else {
-        manifest.defaultParameters?.filter { (key, meta) -> 
-            key.contains(searchQuery, ignoreCase = true) || 
-            meta.description.contains(searchQuery, ignoreCase = true) 
+        manifest.defaultParameters?.filter { (key, meta) ->
+            key.contains(searchQuery, ignoreCase = true) ||
+                    meta.description.contains(searchQuery, ignoreCase = true)
         } ?: emptyMap()
     }
 
@@ -108,8 +143,8 @@ fun PluginSettingsDialog(
             if (searchQuery.isBlank() || capTitle.contains(searchQuery, ignoreCase = true)) capability else null
         } else {
             val filteredParams = capability.parameters?.filter { (key, meta) ->
-                key.contains(searchQuery, ignoreCase = true) || 
-                meta.description.contains(searchQuery, ignoreCase = true) 
+                key.contains(searchQuery, ignoreCase = true) ||
+                        meta.description.contains(searchQuery, ignoreCase = true)
             }
             if (!filteredParams.isNullOrEmpty()) {
                 capability.copy(parameters = filteredParams)
@@ -134,13 +169,14 @@ fun PluginSettingsDialog(
                         }
                     }
                 }
+
                 is org.wip.plugintoolkit.api.DataType.Array -> scanType(type.items)
                 is org.wip.plugintoolkit.api.DataType.Object -> type.properties.values.forEach { scanType(it) }
                 is org.wip.plugintoolkit.api.DataType.MapType -> scanType(type.valueType)
                 else -> {}
             }
         }
-        
+
         manifest.capabilities.forEach { cap ->
             cap.parameters?.values?.forEach { p -> scanType(p.type) }
         }
@@ -148,7 +184,16 @@ fun PluginSettingsDialog(
         result
     }
 
-    val sectionIndices = remember(actions, customSettings, globalParams, capabilities, actionsTitle, customTitle, globalTitle, capabilityTitles) {
+    val sectionIndices = remember(
+        actions,
+        customSettings,
+        globalParams,
+        capabilities,
+        actionsTitle,
+        customTitle,
+        globalTitle,
+        capabilityTitles
+    ) {
         val map = mutableMapOf<String, Int>()
         var currentIndex = 0
         if (hasActions) {
@@ -176,15 +221,15 @@ fun PluginSettingsDialog(
                 if (!isVisible) {
                     val firstVisible = visibleItems.first().index
                     val lastVisible = visibleItems.last().index
-                    
+
                     if (firstVisibleIndex > lastVisible) {
                         // It's below the viewport. Scroll so it appears fully at the bottom.
                         val viewportStart = sidebarListState.layoutInfo.viewportStartOffset
                         val viewportEnd = sidebarListState.layoutInfo.viewportEndOffset
-                        val fullyVisibleItemsCount = visibleItems.count { 
-                            it.offset >= viewportStart && (it.offset + it.size) <= viewportEnd 
+                        val fullyVisibleItemsCount = visibleItems.count {
+                            it.offset >= viewportStart && (it.offset + it.size) <= viewportEnd
                         }.coerceAtLeast(1)
-                        
+
                         val targetTopIndex = maxOf(0, firstVisibleIndex - fullyVisibleItemsCount + 1)
                         sidebarListState.animateScrollToItem(targetTopIndex)
                     } else if (firstVisibleIndex < firstVisible) {
@@ -222,13 +267,19 @@ fun PluginSettingsDialog(
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.padding(end = ToolkitTheme.spacing.large)
                     )
-                    
+
                     ToolkitTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.weight(1f),
                         placeholder = { Text(stringResource(Res.string.settings_search_placeholder)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
                         singleLine = true
                     )
 
@@ -341,14 +392,18 @@ fun PluginSettingsDialog(
                                                             ),
                                                             value = SettingsUtils.jsonToString(value, meta.type),
                                                             onValueChange = {
-                                                                viewModel.updateSetting(key, SettingsUtils.stringToJson(it, meta.type))
+                                                                viewModel.updateSetting(
+                                                                    key,
+                                                                    SettingsUtils.stringToJson(it, meta.type)
+                                                                )
                                                             },
                                                             enabled = !isBusy,
                                                             providedSettings = store.settings
                                                         )
-                                                        
-                                                        val lockedOptionsForSetting = lockedEnumOptions[key]?.distinct() ?: emptyList()
-                                                        
+
+                                                        val lockedOptionsForSetting =
+                                                            lockedEnumOptions[key]?.distinct() ?: emptyList()
+
                                                         if (meta.requiredByCapabilities.isNotEmpty() || lockedOptionsForSetting.isNotEmpty()) {
                                                             Row(
                                                                 modifier = Modifier
@@ -359,8 +414,17 @@ fun PluginSettingsDialog(
                                                             ) {
                                                                 meta.requiredByCapabilities.forEach { capName ->
                                                                     ToolkitChip(
-                                                                        text = stringResource(Res.string.settings_locked_capability, capName),
-                                                                        icon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                                                                        text = stringResource(
+                                                                            Res.string.settings_locked_capability,
+                                                                            capName
+                                                                        ),
+                                                                        icon = {
+                                                                            Icon(
+                                                                                Icons.Default.Lock,
+                                                                                contentDescription = null,
+                                                                                modifier = Modifier.size(14.dp)
+                                                                            )
+                                                                        },
                                                                         style = ToolkitChipStyle.Tinted
                                                                     )
                                                                 }
@@ -373,7 +437,9 @@ fun PluginSettingsDialog(
                                                                                 shape = MaterialTheme.shapes.small
                                                                             ) {
                                                                                 Text(
-                                                                                    text = "Locked values:\n" + lockedOptionsForSetting.joinToString("\n"),
+                                                                                    text = "Locked values:\n" + lockedOptionsForSetting.joinToString(
+                                                                                        "\n"
+                                                                                    ),
                                                                                     modifier = Modifier.padding(8.dp),
                                                                                     style = MaterialTheme.typography.bodySmall,
                                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -383,7 +449,13 @@ fun PluginSettingsDialog(
                                                                     ) {
                                                                         ToolkitChip(
                                                                             text = "Locked Enum Options",
-                                                                            icon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                                                                            icon = {
+                                                                                Icon(
+                                                                                    Icons.Default.Lock,
+                                                                                    contentDescription = null,
+                                                                                    modifier = Modifier.size(14.dp)
+                                                                                )
+                                                                            },
                                                                             style = ToolkitChipStyle.Tinted
                                                                         )
                                                                     }
@@ -406,7 +478,10 @@ fun PluginSettingsDialog(
                                                         metadata = meta,
                                                         value = SettingsUtils.jsonToString(value, meta.type),
                                                         onValueChange = {
-                                                            viewModel.updateGlobalParam(key, SettingsUtils.stringToJson(it, meta.type))
+                                                            viewModel.updateGlobalParam(
+                                                                key,
+                                                                SettingsUtils.stringToJson(it, meta.type)
+                                                            )
                                                         },
                                                         enabled = !isBusy,
                                                         providedSettings = store.settings
@@ -421,13 +496,18 @@ fun PluginSettingsDialog(
                                             val capTitle = capabilityTitles[capability.name] ?: capability.name
                                             SettingsGroup(title = capTitle) {
                                                 capability.parameters!!.forEach { (key, meta) ->
-                                                    val value = store.capabilityParams[capability.name]?.get(key) ?: meta.defaultValue
+                                                    val value = store.capabilityParams[capability.name]?.get(key)
+                                                        ?: meta.defaultValue
                                                     DynamicParameterInput(
                                                         name = key,
                                                         metadata = meta.copy(required = false), // override required
                                                         value = SettingsUtils.jsonToString(value, meta.type),
                                                         onValueChange = {
-                                                            viewModel.updateCapabilityParam(capability.name, key, SettingsUtils.stringToJson(it, meta.type))
+                                                            viewModel.updateCapabilityParam(
+                                                                capability.name,
+                                                                key,
+                                                                SettingsUtils.stringToJson(it, meta.type)
+                                                            )
                                                         },
                                                         enabled = !isBusy,
                                                         providedSettings = store.settings
@@ -472,7 +552,8 @@ private fun SidebarItem(
     onClick: () -> Unit
 ) {
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-    val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val contentColor =
+        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
         modifier = Modifier

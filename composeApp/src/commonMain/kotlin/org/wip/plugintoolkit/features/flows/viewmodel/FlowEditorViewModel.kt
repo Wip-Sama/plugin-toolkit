@@ -334,7 +334,7 @@ class FlowEditorViewModel(
                         currentState.flows
                     )
                 ) {
-                    co.touchlab.kermit.Logger.w { "Failed to add subflow node: adding subflow '${event.flowName}' to '${currentState.flow.name}' would create a nested cycle." }
+                    Logger.w { "Failed to add subflow node: adding subflow '${event.flowName}' to '${currentState.flow.name}' would create a nested cycle." }
                     resolvedNotificationService?.toast("Cannot add subflow: Adding this subflow would create a cyclic dependency between flows.")
                     return
                 }
@@ -378,16 +378,19 @@ class FlowEditorViewModel(
             is FlowEvent.MoveNode -> {
                 newState = nodeManager.handleMoveNode(currentState, event.id, event.delta, event.snap, event.showGhost)
             }
+
             is FlowEvent.EndMoveNode -> {
                 shouldSaveHistory = true
                 shouldRunTypeInference = true
                 newState = nodeManager.handleEndMoveNode(currentState, event.id, event.density)
             }
+
             is FlowEvent.DeleteNode -> {
                 shouldSaveHistory = true
                 shouldRunTypeInference = true
                 newState = nodeManager.handleDeleteNode(currentState, event.id)
             }
+
             is FlowEvent.ConnectPorts -> {
                 shouldSaveHistory = true
                 shouldRunTypeInference = true
@@ -432,6 +435,7 @@ class FlowEditorViewModel(
                 shouldRunTypeInference = true
                 newState = connectionManager.handleDeleteConnection(currentState, event.connection)
             }
+
             is FlowEvent.Pan -> handlePan(event.delta)
             is FlowEvent.Zoom -> handleZoom(event.delta, event.focusPosition, event.isShiftPressed)
             is FlowEvent.SetZoom -> handleSetZoom(event.scale)
@@ -479,6 +483,7 @@ class FlowEditorViewModel(
             is FlowEvent.BringToFront -> {
                 newState = nodeManager.handleBringToFront(currentState, event.nodeId)
             }
+
             is FlowEvent.SelectNodes -> {
                 newState = currentState.copy(selectedNodeIds = event.ids)
             }
@@ -492,18 +497,22 @@ class FlowEditorViewModel(
                 shouldRunTypeInference = true
                 newState = nodeManager.handleDeleteSelectedNodes(currentState)
             }
+
             is FlowEvent.ToggleNodeCollapse -> {
                 shouldSaveHistory = true
                 newState = nodeManager.handleToggleNodeCollapse(currentState, event.nodeId)
             }
+
             is FlowEvent.ToggleNodeInputsCollapse -> {
                 shouldSaveHistory = true
                 newState = nodeManager.handleToggleNodeInputsCollapse(currentState, event.nodeId)
             }
+
             is FlowEvent.ToggleNodeOutputsCollapse -> {
                 shouldSaveHistory = true
                 newState = nodeManager.handleToggleNodeOutputsCollapse(currentState, event.nodeId)
             }
+
             is FlowEvent.UpdateConnectionOrder -> {
                 shouldSaveHistory = true
                 newState = connectionManager.handleUpdateConnectionOrder(
@@ -517,10 +526,12 @@ class FlowEditorViewModel(
                 shouldSaveHistory = true
                 newState = connectionManager.handleMoveConnectionFirst(currentState, event.connection)
             }
+
             is FlowEvent.MoveConnectionLast -> {
                 shouldSaveHistory = true
                 newState = connectionManager.handleMoveConnectionLast(currentState, event.connection)
             }
+
             else -> {}
         }
 

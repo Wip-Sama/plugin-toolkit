@@ -5,7 +5,6 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.isCompatibleWith
-import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
@@ -39,7 +38,13 @@ class FlowNodeManager {
         )
     }
 
-    fun handleMoveNode(currentState: FlowEditorState, id: Long, delta: Offset, snap: Boolean, showGhost: Boolean): FlowEditorState {
+    fun handleMoveNode(
+        currentState: FlowEditorState,
+        id: Long,
+        delta: Offset,
+        snap: Boolean,
+        showGhost: Boolean
+    ): FlowEditorState {
         val newOffset = currentState.currentDragOffset + delta
         val node = currentState.flow.nodes.find { it.id == id } ?: return currentState
         val ghostToSet = if (showGhost) (node.position + newOffset).snapToGrid() else null
@@ -103,8 +108,8 @@ class FlowNodeManager {
             nodes = currentState.flow.nodes.filter { it.id != id },
             connections = currentState.flow.connections.filter { it.sourceNodeId != id && it.targetNodeId != id }
         )
-        val newValidationErrors = currentState.validationErrors.filter { 
-            it.sourceNodeId != id && it.targetNodeId != id 
+        val newValidationErrors = currentState.validationErrors.filter {
+            it.sourceNodeId != id && it.targetNodeId != id
         }
         val newPendingConnection = currentState.pendingConnection?.let {
             if (it.sourceNodeId == id || it.targetNodeId == id) null else it
@@ -129,8 +134,8 @@ class FlowNodeManager {
                 !selectedIds.contains(it.sourceNodeId) && !selectedIds.contains(it.targetNodeId)
             }
         )
-        
-        val newValidationErrors = currentState.validationErrors.filter { 
+
+        val newValidationErrors = currentState.validationErrors.filter {
             !selectedIds.contains(it.sourceNodeId) && !selectedIds.contains(it.targetNodeId)
         }
         val newPendingConnection = currentState.pendingConnection?.let {
@@ -146,7 +151,12 @@ class FlowNodeManager {
         )
     }
 
-    fun handleUpdateInputPortValue(currentState: FlowEditorState, nodeId: Long, portId: String, value: Any?): FlowEditorState {
+    fun handleUpdateInputPortValue(
+        currentState: FlowEditorState,
+        nodeId: Long,
+        portId: String,
+        value: Any?
+    ): FlowEditorState {
         val updatedNodes = currentState.flow.nodes.map { node ->
             if (node.id == nodeId) {
                 node.copyWithUpdatedInput(
@@ -228,7 +238,7 @@ class FlowNodeManager {
                     node.inputs.map { port ->
                         if (port.id == inputPortId) {
                             val currentConstraints =
-                                port.constraints ?: org.wip.plugintoolkit.features.flows.model.PortConstraints()
+                                port.constraints ?: PortConstraints()
                             port.copy(constraints = currentConstraints.copy(extensions = extensions))
                         } else port
                     }
@@ -406,12 +416,18 @@ class FlowNodeManager {
 
         val compatibleInput = node.inputs.firstOrNull { input ->
             (sourcePort.dataType.isCompatibleWith(input.dataType) || sourcePort.dataType.canConvert(input.dataType)) &&
-                    org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, input.semanticTypes) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
+                    org.wip.plugintoolkit.api.checkSemanticCompatibility(
+                        sourcePort.semanticTypes,
+                        input.semanticTypes
+                    ) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
         } ?: return null
 
         val compatibleOutput = node.outputs.firstOrNull { output ->
             (output.dataType.isCompatibleWith(targetPort.dataType) || output.dataType.canConvert(targetPort.dataType)) &&
-                    org.wip.plugintoolkit.api.checkSemanticCompatibility(output.semanticTypes, targetPort.semanticTypes) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
+                    org.wip.plugintoolkit.api.checkSemanticCompatibility(
+                        output.semanticTypes,
+                        targetPort.semanticTypes
+                    ) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
         } ?: return null
 
         return Pair(compatibleInput, compatibleOutput)

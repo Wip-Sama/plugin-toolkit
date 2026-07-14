@@ -216,9 +216,10 @@ fun FlowManagerView(
                     }
 
                     val notReadyNodes = remember(flow, state.flows) {
-                        flow.nodes.filter { node -> 
-                            val settings = if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
-                            !node.isReady(flow.connections, settings) 
+                        flow.nodes.filter { node ->
+                            val settings =
+                                if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
+                            !node.isReady(flow.connections, settings)
                         }
                     }
 

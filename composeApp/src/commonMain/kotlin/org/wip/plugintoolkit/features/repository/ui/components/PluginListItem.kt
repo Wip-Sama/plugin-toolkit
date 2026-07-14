@@ -225,10 +225,13 @@ fun PluginListItem(
                     }
                 }
             } else if (isInstalled) {
-                val isDowngrade = org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion!!) < 0
-                val buttonColor = if (hasUpdate) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer
-                val contentColor = if (hasUpdate) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
-                
+                val isDowngrade =
+                    org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion!!) < 0
+                val buttonColor =
+                    if (hasUpdate) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer
+                val contentColor =
+                    if (hasUpdate) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+
                 Button(
                     onClick = { onInstall(plugin) },
                     enabled = !isRefreshing,

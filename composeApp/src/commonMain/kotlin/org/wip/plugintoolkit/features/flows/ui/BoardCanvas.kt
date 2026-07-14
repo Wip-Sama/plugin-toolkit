@@ -143,8 +143,10 @@ fun BoardCanvas(
                 if (isCtrlModifierPressed != newCtrlPressed) {
                     isCtrlModifierPressed = newCtrlPressed
                     if (hoveredConnection != null && newCtrlPressed) {
-                        val sourcePortBoardPos = getPortBoardPosition(hoveredConnection!!.sourceNodeId, hoveredConnection!!.sourcePortId)
-                        val targetPortBoardPos = getPortBoardPosition(hoveredConnection!!.targetNodeId, hoveredConnection!!.targetPortId)
+                        val sourcePortBoardPos =
+                            getPortBoardPosition(hoveredConnection!!.sourceNodeId, hoveredConnection!!.sourcePortId)
+                        val targetPortBoardPos =
+                            getPortBoardPosition(hoveredConnection!!.targetNodeId, hoveredConnection!!.targetPortId)
                         if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                             val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                             val endPos = (targetPortBoardPos * currentScale) + currentOffset
@@ -156,7 +158,7 @@ fun BoardCanvas(
                         hoveredConnectionIsSource = null
                     }
                 }
-                
+
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when {
                         keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> {
@@ -204,17 +206,17 @@ fun BoardCanvas(
                         if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                             val startPos = (sourcePortBoardPos * state.scale) + state.offset
                             val endPos = (targetPortBoardPos * state.scale) + state.offset
-                            
+
                             val controlPointOffset = kotlin.math.abs(endPos.x - startPos.x) / 2f
                             val p1x = startPos.x + controlPointOffset
                             val p2x = endPos.x - controlPointOffset
-                            
+
                             val padding = 30f * state.scale
                             val aabbMinX = minOf(startPos.x, endPos.x, p1x, p2x) - padding
                             val aabbMaxX = maxOf(startPos.x, endPos.x, p1x, p2x) + padding
                             val aabbMinY = minOf(startPos.y, endPos.y) - padding
                             val aabbMaxY = maxOf(startPos.y, endPos.y) + padding
-                            
+
                             if (tapOffset.x in aabbMinX..aabbMaxX && tapOffset.y in aabbMinY..aabbMaxY) {
                                 val dist = BoardMathUtils.getDistanceToBezier(tapOffset, startPos, endPos)
                                 if (dist < minDistance) {
@@ -323,11 +325,11 @@ fun BoardCanvas(
                                     if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                                         val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                                         val endPos = (targetPortBoardPos * currentScale) + currentOffset
-                                        
+
                                         val controlPointOffset = kotlin.math.abs(endPos.x - startPos.x) / 2f
                                         val p1x = startPos.x + controlPointOffset
                                         val p2x = endPos.x - controlPointOffset
-                                        
+
                                         val padding = 30f * currentScale
                                         val aabbMinX = minOf(startPos.x, endPos.x, p1x, p2x) - padding
                                         val aabbMaxX = maxOf(startPos.x, endPos.x, p1x, p2x) + padding
@@ -471,9 +473,17 @@ fun BoardCanvas(
                         val targetStroke = if (hoveredConnectionIsSource == false) 5.dp.toPx() else 3.dp.toPx()
 
                         if (hoveredConnectionIsSource == true) {
-                            drawBezierCurveSegment(sourceHalf, sourceColor.copy(alpha = 0.25f), strokeWidth = 9.dp.toPx())
+                            drawBezierCurveSegment(
+                                sourceHalf,
+                                sourceColor.copy(alpha = 0.25f),
+                                strokeWidth = 9.dp.toPx()
+                            )
                         } else {
-                            drawBezierCurveSegment(targetHalf, targetColor.copy(alpha = 0.25f), strokeWidth = 9.dp.toPx())
+                            drawBezierCurveSegment(
+                                targetHalf,
+                                targetColor.copy(alpha = 0.25f),
+                                strokeWidth = 9.dp.toPx()
+                            )
                         }
 
                         drawBezierCurveSegment(sourceHalf, sourceColor, strokeWidth = sourceStroke)
@@ -663,13 +673,17 @@ private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color, 
         end.x, end.y
     )
     drawPath(
-        path = sharedBezierPath, 
-        color = color, 
+        path = sharedBezierPath,
+        color = color,
         style = Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
     )
 }
 
-private fun DrawScope.drawBezierCurveSegment(curve: BoardMathUtils.CubicBezierCurve, color: Color, strokeWidth: Float = 3.dp.toPx()) {
+private fun DrawScope.drawBezierCurveSegment(
+    curve: BoardMathUtils.CubicBezierCurve,
+    color: Color,
+    strokeWidth: Float = 3.dp.toPx()
+) {
     sharedBezierPath.reset()
     sharedBezierPath.moveTo(curve.p0.x, curve.p0.y)
     sharedBezierPath.cubicTo(
@@ -678,8 +692,8 @@ private fun DrawScope.drawBezierCurveSegment(curve: BoardMathUtils.CubicBezierCu
         curve.p3.x, curve.p3.y
     )
     drawPath(
-        path = sharedBezierPath, 
-        color = color, 
+        path = sharedBezierPath,
+        color = color,
         style = Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
     )
 }

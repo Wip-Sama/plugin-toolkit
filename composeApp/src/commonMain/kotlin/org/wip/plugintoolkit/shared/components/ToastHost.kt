@@ -50,7 +50,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import org.wip.plugintoolkit.core.model.LocalizedString
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService

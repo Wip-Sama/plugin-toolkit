@@ -6,4 +6,4 @@ import org.wip.plugintoolkit.features.settings.model.SettingDefinition
 val LocalSettingsSearchQuery = compositionLocalOf { "" }
 val LocalSettingsRegistry = compositionLocalOf<List<SettingDefinition>> { emptyList() }
 val LocalSettingsResolvedStrings =
-    compositionLocalOf<Map<org.wip.plugintoolkit.features.settings.utils.SettingText, String>> { emptyMap() }
+    compositionLocalOf<Map<SettingText, String>> { emptyMap() }

@@ -24,7 +24,12 @@ object SystemNodesRegistry {
             )
 
             "save_file" -> listOf(
-                InputPort("data", "Data (File Path)", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("file")),
+                InputPort(
+                    "data",
+                    "Data (File Path)",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    semanticTypes = parseSemanticTypes("file")
+                ),
                 InputPort(
                     "destination_folder",
                     "Destination Folder",
@@ -46,7 +51,12 @@ object SystemNodesRegistry {
             )
 
             "save_folder" -> listOf(
-                InputPort("data", "Data (Folder Path)", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("folder")),
+                InputPort(
+                    "data",
+                    "Data (Folder Path)",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    semanticTypes = parseSemanticTypes("folder")
+                ),
                 InputPort(
                     "destination_folder",
                     "Destination Folder",
@@ -182,12 +192,22 @@ object SystemNodesRegistry {
             )
 
             "save_file" -> listOf(
-                OutputPort("saved_path", "Saved Path", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("file")),
+                OutputPort(
+                    "saved_path",
+                    "Saved Path",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    semanticTypes = parseSemanticTypes("file")
+                ),
                 OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
             )
 
             "save_folder" -> listOf(
-                OutputPort("saved_path", "Saved Path", DataType.Primitive(PrimitiveType.STRING), semanticTypes = parseSemanticTypes("folder")),
+                OutputPort(
+                    "saved_path",
+                    "Saved Path",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    semanticTypes = parseSemanticTypes("folder")
+                ),
                 OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
             )
 
@@ -373,14 +393,14 @@ object SystemNodesRegistry {
 
             "convert" -> {
                 val ignoreSemanticPort = node.inputs.find { it.id == "ignore_semantic_type" }
-                val ignoreSemanticVal = ignoreSemanticPort?.value
-                val ignoreSemantic = when (ignoreSemanticVal) {
+                val ignoreSemantic = when (val ignoreSemanticVal = ignoreSemanticPort?.value) {
                     is Boolean -> ignoreSemanticVal
                     is String -> ignoreSemanticVal.toBoolean()
                     is Number -> ignoreSemanticVal.toInt() != 0
                     is kotlinx.serialization.json.JsonPrimitive -> {
                         ignoreSemanticVal.booleanOrNull ?: ignoreSemanticVal.content.toBoolean()
                     }
+
                     else -> false
                 }
                 if (!ignoreSemantic) {

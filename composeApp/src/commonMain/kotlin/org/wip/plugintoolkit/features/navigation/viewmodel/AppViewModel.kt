@@ -21,7 +21,7 @@ import plugintoolkit.composeapp.generated.resources.nav_main
 import plugintoolkit.composeapp.generated.resources.settings
 
 class AppViewModel(
-    private val settingsRepository: SettingsRepository,
+    settingsRepository: SettingsRepository,
     private val updateService: UpdateService
 ) : ViewModel() {
 

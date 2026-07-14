@@ -49,8 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.features.plugin.utils.PluginSearchUtils
 import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
+import org.wip.plugintoolkit.features.plugin.utils.PluginSearchUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitTextField

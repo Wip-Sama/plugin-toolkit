@@ -517,7 +517,8 @@ class FlowViewModel(
                         }
 
                         is Node.SystemNode -> {
-                            val targetPort = if (portId != null) node.inputs.find { it.id == portId } else node.inputs.firstOrNull()
+                            val targetPort =
+                                if (portId != null) node.inputs.find { it.id == portId } else node.inputs.firstOrNull()
                             targetPort?.dataType
                                 ?: DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.ANY)
                         }

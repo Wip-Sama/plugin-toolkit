@@ -20,10 +20,18 @@ class DefaultExecutionFileSystem(
     private fun resolvePath(relativePath: RelativePath): Path {
         val resolved = Path(sandboxPath, relativePath.value)
         val file = java.io.File(resolved.toString())
-        val normalized = try { file.canonicalPath } catch (e: Exception) { file.absolutePath }
+        val normalized = try {
+            file.canonicalPath
+        } catch (e: Exception) {
+            file.absolutePath
+        }
         val baseFile = java.io.File(sandboxPath)
-        val baseCanonical = try { baseFile.canonicalPath } catch (e: Exception) { baseFile.absolutePath }
-        
+        val baseCanonical = try {
+            baseFile.canonicalPath
+        } catch (e: Exception) {
+            baseFile.absolutePath
+        }
+
         if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + java.io.File.separator)) {
             throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the sandbox.")
         }

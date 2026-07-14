@@ -244,7 +244,7 @@ sealed class Node {
     abstract fun copyWithCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithInputsCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithOutputsCollapsedState(isCollapsed: Boolean): Node
-    abstract fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>? = null): Boolean
+    abstract fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>? = null): Boolean
 
     @Serializable
     @SerialName("capability")
@@ -272,24 +272,24 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean {
+        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean {
             if (isBroken) return false
             val parameters = capability.parameters ?: return true
             for ((portId, metadata) in parameters) {
                 val inputPort = inputs.find { it.id == portId }
                 val effectiveValue = inputPort?.value ?: inputPort?.defaultValue
 
-                if (metadata.type is org.wip.plugintoolkit.api.DataType.Enum) {
-                    val enumType = metadata.type as org.wip.plugintoolkit.api.DataType.Enum
-                    val selectedValueStr = effectiveValue?.let { 
-                        if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString() 
+                if (metadata.type is DataType.Enum) {
+                    val enumType = metadata.type as DataType.Enum
+                    val selectedValueStr = effectiveValue?.let {
+                        if (it is JsonPrimitive) it.content else it.toString()
                     }
                     if (selectedValueStr != null && settings != null) {
                         val reqs = enumType.optionRequirements[selectedValueStr]
-                        if (reqs != null && reqs.any { reqSetting -> 
-                            val s = settings[reqSetting]
-                            s == null || s is kotlinx.serialization.json.JsonNull || (s as? kotlinx.serialization.json.JsonPrimitive)?.content?.isBlank() == true
-                        }) {
+                        if (reqs != null && reqs.any { reqSetting ->
+                                val s = settings[reqSetting]
+                                s == null || s is JsonNull || (s as? JsonPrimitive)?.content?.isBlank() == true
+                            }) {
                             return false
                         }
                     }
@@ -339,7 +339,7 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean = true
     }
 
     @Serializable
@@ -362,7 +362,7 @@ sealed class Node {
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node = this
-        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean = true
     }
 
     @Serializable
@@ -388,7 +388,7 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean = true
     }
 
     @Serializable
@@ -417,7 +417,7 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, kotlinx.serialization.json.JsonElement>?): Boolean = true
+        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean = true
     }
 }
 
@@ -439,11 +439,10 @@ data class Flow(
     val description: String? = null
 ) {
     fun getInferredDataTypeForOutput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
-        val baseType = fallbackType
-        val baseArray = baseType as? DataType.Array
+        val baseArray = fallbackType as? DataType.Array
         val baseItems = baseArray?.items
 
-        if (baseType is DataType.Primitive && baseType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+        if (fallbackType is DataType.Primitive && fallbackType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
             val connection = connections.find { it.sourceNodeId == nodeId && it.sourcePortId == portId }
             val targetNode = nodes.find { it.id == connection?.targetNodeId }
             val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
@@ -453,17 +452,16 @@ data class Flow(
             val targetNode = nodes.find { it.id == connection?.targetNodeId }
             val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
             val targetType = targetPort?.dataType
-            if (targetType is DataType.Array) return targetType else return fallbackType
+            return targetType as? DataType.Array ?: fallbackType
         }
         return fallbackType
     }
 
     fun getInferredDataTypeForInput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
-        val baseType = fallbackType
-        val baseArray = baseType as? DataType.Array
+        val baseArray = fallbackType as? DataType.Array
         val baseItems = baseArray?.items
 
-        if (baseType is DataType.Primitive && baseType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
+        if (fallbackType is DataType.Primitive && fallbackType.primitiveType == org.wip.plugintoolkit.api.PrimitiveType.ANY) {
             val connection = connections.find { it.targetNodeId == nodeId && it.targetPortId == portId }
             val sourceNode = nodes.find { it.id == connection?.sourceNodeId }
             val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
@@ -473,7 +471,7 @@ data class Flow(
             val sourceNode = nodes.find { it.id == connection?.sourceNodeId }
             val sourcePort = sourceNode?.outputs?.find { it.id == connection?.sourcePortId }
             val sourceType = sourcePort?.dataType
-            if (sourceType is DataType.Array) return sourceType else return fallbackType
+            return sourceType as? DataType.Array ?: fallbackType
         }
         return fallbackType
     }

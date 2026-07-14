@@ -7,7 +7,6 @@ import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.isCompatibleWith
-import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.flows.logic.format
 import org.wip.plugintoolkit.features.flows.model.Connection
@@ -23,7 +22,13 @@ class FlowConnectionManager(
     private val onEvent: (FlowEvent) -> Unit
 ) {
 
-    fun handleConnectPorts(currentState: FlowEditorState, sourceNodeId: Long, sourcePortId: String, targetNodeId: Long, targetPortId: String): FlowEditorState {
+    fun handleConnectPorts(
+        currentState: FlowEditorState,
+        sourceNodeId: Long,
+        sourcePortId: String,
+        targetNodeId: Long,
+        targetPortId: String
+    ): FlowEditorState {
         if (sourceNodeId == targetNodeId) return currentState
 
         val sourceNode = currentState.flow.nodes.find { it.id == sourceNodeId }
@@ -36,13 +41,14 @@ class FlowConnectionManager(
 
         if (sourcePort == null || targetPort == null) return currentState
 
-        val isTypeAllowed = sourcePort.dataType.isCompatibleWith(targetPort.dataType) || 
-                            sourcePort.dataType.canConvert(targetPort.dataType)
+        val isTypeAllowed = sourcePort.dataType.isCompatibleWith(targetPort.dataType) ||
+                sourcePort.dataType.canConvert(targetPort.dataType)
         if (!isTypeAllowed) {
             return currentState
         }
 
-        val semanticCheck = org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, targetPort.semanticTypes)
+        val semanticCheck =
+            org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, targetPort.semanticTypes)
         if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
             return currentState
         } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
@@ -119,7 +125,8 @@ class FlowConnectionManager(
             currentState.inferredSemanticTypes[Pair(targetNodeId, targetPortId)] ?: targetPort.semanticTypes
 
         val typesCompatible = sourceInferredType.isCompatibleWith(targetInferredType)
-        val semanticCheck = org.wip.plugintoolkit.api.checkSemanticCompatibility(sourceInferredSemantic, targetInferredSemantic)
+        val semanticCheck =
+            org.wip.plugintoolkit.api.checkSemanticCompatibility(sourceInferredSemantic, targetInferredSemantic)
         val semanticsCompatible = semanticCheck !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
 
 
@@ -152,7 +159,9 @@ class FlowConnectionManager(
                 } else {
                     org.wip.plugintoolkit.core.model.LocalizedString.ResourceWithArgs(
                         Res.string.flow_editor_incompatible_semantics,
-                        listOf(sourceInferredSemantic.joinToString { it.canonicalId }, targetInferredSemantic.joinToString { it.canonicalId })
+                        listOf(
+                            sourceInferredSemantic.joinToString { it.canonicalId },
+                            targetInferredSemantic.joinToString { it.canonicalId })
                     )
                 }
                 notificationService?.toast(message)
@@ -233,7 +242,11 @@ class FlowConnectionManager(
         )
     }
 
-    fun handleUpdateConnectionOrder(currentState: FlowEditorState, connection: Connection, newOrderIndex: Int): FlowEditorState {
+    fun handleUpdateConnectionOrder(
+        currentState: FlowEditorState,
+        connection: Connection,
+        newOrderIndex: Int
+    ): FlowEditorState {
         val targetConnections = currentState.flow.connections.filter {
             it.targetNodeId == connection.targetNodeId && it.targetPortId == connection.targetPortId
         }.sortedBy { it.orderIndex ?: 0 }.toMutableList()

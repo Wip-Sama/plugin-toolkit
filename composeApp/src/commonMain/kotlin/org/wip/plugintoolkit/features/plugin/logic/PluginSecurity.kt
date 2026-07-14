@@ -117,7 +117,7 @@ object PluginSecurity {
                 Logger.w { "JAR file contains no signed entries: ${file.name}" }
                 return false
             }
-            
+
             if (!isManifestSigned) {
                 Logger.w { "MANIFEST.MF is not signed or missing in JAR: ${file.name}" }
                 return false

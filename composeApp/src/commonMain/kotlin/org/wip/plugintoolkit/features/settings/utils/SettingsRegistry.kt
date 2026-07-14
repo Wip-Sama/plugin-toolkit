@@ -17,7 +17,7 @@ class SettingsRegistry(
     initialDefinitions: List<SettingDefinition> = emptyList(),
     initialSideEffects: Map<String, suspend (AppSettings) -> Unit> = emptyMap()
 ) {
-    private val _definitions = MutableStateFlow<List<SettingDefinition>>(initialDefinitions)
+    private val _definitions = MutableStateFlow(initialDefinitions)
     val definitions: StateFlow<List<SettingDefinition>> = _definitions.asStateFlow()
 
     private val sideEffects = initialSideEffects.toMutableMap()

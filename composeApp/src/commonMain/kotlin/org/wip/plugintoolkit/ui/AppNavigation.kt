@@ -9,7 +9,6 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.NavDisplay
-import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import org.wip.plugintoolkit.core.notification.NotificationService
@@ -95,7 +94,8 @@ fun AppNavigation(
             }
 
             is Screen.FlowEditor -> NavEntry(key) {
-                val editorViewModel: FlowEditorViewModel = koinViewModel(key = key.flowName, parameters = { parametersOf(key.flowName) })
+                val editorViewModel: FlowEditorViewModel =
+                    koinViewModel(key = key.flowName, parameters = { parametersOf(key.flowName) })
                 FlowEditorView(
                     viewModel = editorViewModel,
                     notificationService = notificationService,

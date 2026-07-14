@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.wip.plugintoolkit.core.SystemConfig
+import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
@@ -31,24 +32,20 @@ import plugintoolkit.composeapp.generated.resources.plugin_changelog_not_found_j
 import plugintoolkit.composeapp.generated.resources.plugin_changelog_not_found_remote
 import plugintoolkit.composeapp.generated.resources.plugin_choose_install_location
 import plugintoolkit.composeapp.generated.resources.plugin_state_change_error
-import plugintoolkit.composeapp.generated.resources.plugin_uninstall_blocked
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall_confirmation
-import plugintoolkit.composeapp.generated.resources.plugin_uninstall_error
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall_title
 import plugintoolkit.composeapp.generated.resources.plugin_validated_success
 import plugintoolkit.composeapp.generated.resources.plugin_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_result
-import plugintoolkit.composeapp.generated.resources.plugin_validation_result
-import org.wip.plugintoolkit.core.notification.NotificationService
 
 class PluginManagerViewModel(
     private val pluginManager: PluginManager,
     private val dialogService: DialogService,
     private val settingsRepository: SettingsRepository,
-    private val repoManager: RepoManager,
-    private val jobManager: JobManager,
+    repoManager: RepoManager,
+    jobManager: JobManager,
     private val flowViewModel: FlowViewModel,
-    private val appConfig: SystemConfig,
+    appConfig: SystemConfig,
     private val notificationService: NotificationService
 ) : ViewModel() {
 
@@ -372,7 +369,7 @@ class PluginManagerViewModel(
         viewModelScope.launch {
             val plugin = pluginManager.installedPlugins.value.find { it.pkg == pkg }
 
-            var content: String? = null
+            var content: String?
 
             if (plugin != null) {
                 // Fetch from JAR resources

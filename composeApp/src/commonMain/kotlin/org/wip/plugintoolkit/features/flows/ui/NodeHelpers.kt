@@ -249,5 +249,5 @@ fun appendPickedValue(existingValue: String, newValue: String, isArray: Boolean)
 fun getFileNames(path: String, isArray: Boolean): String {
     if (path.isEmpty()) return ""
     if (!isArray) return getFileName(path)
-    return path.split(",").map { it.trim() }.filter { it.isNotEmpty() }.map { getFileName(it) }.joinToString(", ")
+    return path.split(",").map { it.trim() }.filter { it.isNotEmpty() }.joinToString(", ") { getFileName(it) }
 }

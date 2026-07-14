@@ -77,9 +77,7 @@ object SettingsUtils {
         val isNested = type.items is DataType.Array
         return if (isNested) {
             val blocks = extractMatchingParentheses(cleaned)
-            if (blocks.isNotEmpty()) {
-                blocks
-            } else {
+            blocks.ifEmpty {
                 listOf(cleaned)
             }
         } else {
@@ -260,9 +258,9 @@ object SettingsUtils {
                 if (element is JsonArray) {
                     val isNested = type.items is DataType.Array
                     if (isNested) {
-                        element.map { "(${jsonToString(it, type.items)})" }.joinToString(", ")
+                        element.joinToString(", ") { "(${jsonToString(it, type.items)})" }
                     } else {
-                        element.map { jsonToString(it, type.items) }.joinToString(",")
+                        element.joinToString(",") { jsonToString(it, type.items) }
                     }
                 } else {
                     element.toString()

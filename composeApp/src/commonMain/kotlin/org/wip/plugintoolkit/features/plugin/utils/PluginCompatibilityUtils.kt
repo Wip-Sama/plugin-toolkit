@@ -51,7 +51,7 @@ object PluginCompatibilityUtils {
         if (VersionUtils.compare(target, min) < 0) {
             return false to "Plugin is obsolete (targeted for $target, min supported $min)"
         }
-        
+
         return true to null
     }
 }

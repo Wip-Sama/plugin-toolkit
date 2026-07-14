@@ -37,7 +37,7 @@ class PluginManager(
             if (manifest != null) {
                 coordinator.handlePostInstall(manifest.plugin.id, manifest)
             }
-        }.map { Unit }
+        }.map { }
 
     suspend fun enqueueRemoteInstall(plugin: ExtensionPlugin, targetFolderPath: String) =
         installer.enqueueRemoteInstall(plugin, targetFolderPath)
@@ -50,7 +50,7 @@ class PluginManager(
         if (manifest != null) {
             coordinator.handlePostInstall(plugin.pkg, manifest)
         }
-    }.map { Unit }
+    }.map { }
 
     suspend fun uninstall(pkg: String) = installer.uninstall(pkg)
 
@@ -59,14 +59,14 @@ class PluginManager(
             if (manifest != null) {
                 coordinator.handlePostUpdate(pkg, manifest, installer)
             }
-        }.map { Unit }
+        }.map { }
 
     suspend fun updateRemote(pkg: String) =
         installer.updateRemote(pkg).onSuccess { manifest ->
             if (manifest != null) {
                 coordinator.handlePostUpdate(pkg, manifest, installer)
             }
-        }.map { Unit }
+        }.map { }
 
     fun getUpdate(pkg: String) = installer.getUpdate(pkg)
 

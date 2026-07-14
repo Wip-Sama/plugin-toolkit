@@ -29,12 +29,11 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
-import kotlin.time.Duration.Companion.minutes
 
 class JobWorker(
     val workerId: Int,
     private val manager: JobManager,
-    private val scope: CoroutineScope
+    scope: CoroutineScope
 ) : KoinComponent {
     private val pluginManager: PluginManager by inject()
     private val lifecycleCoordinator: PluginLifecycleCoordinator by inject()
@@ -204,18 +203,26 @@ class JobWorker(
                     lastError = e
                     attempt++
                     if (attempt <= retries) {
-                        manager.addJobLog(job.id, "Timeout executing capability ${job.capabilityName}, retrying ($attempt/$retries)...", "WARN")
+                        manager.addJobLog(
+                            job.id,
+                            "Timeout executing capability ${job.capabilityName}, retrying ($attempt/$retries)...",
+                            "WARN"
+                        )
                         kotlinx.coroutines.delay(2000)
                     }
                 } catch (e: kotlinx.io.IOException) {
                     lastError = e
                     attempt++
                     if (attempt <= retries) {
-                        manager.addJobLog(job.id, "IO error executing capability ${job.capabilityName}, retrying ($attempt/$retries)...", "WARN")
+                        manager.addJobLog(
+                            job.id,
+                            "IO error executing capability ${job.capabilityName}, retrying ($attempt/$retries)...",
+                            "WARN"
+                        )
                         kotlinx.coroutines.delay(2000)
                     }
                 } catch (e: Exception) {
-                    if (e is org.wip.plugintoolkit.features.job.logic.PauseFlowException || e is kotlinx.coroutines.CancellationException) {
+                    if (e is PauseFlowException || e is CancellationException) {
                         throw e
                     }
                     throw e
@@ -499,21 +506,21 @@ class JobWorker(
 
     private suspend fun executeFlowJob(job: BackgroundJob) {
         manager.addJobLog(job.id, "Executing via FlowEngine...")
-        
+
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
             override val result: Deferred<ExecutionResult>
                 get() = throw UnsupportedOperationException("Not used for flow jobs directly")
 
             override fun pause() {
-                workerScope.launch { 
+                workerScope.launch {
                     val context = pluginManager.createPluginContext(job.pluginId, job.id)
                     context.signals.sendSignal(PluginSignal.PAUSE)
                 }
             }
 
             override fun cancel(force: Boolean) {
-                workerScope.launch { 
+                workerScope.launch {
                     val context = pluginManager.createPluginContext(job.pluginId, job.id)
                     context.signals.sendSignal(PluginSignal.CANCEL)
                 }

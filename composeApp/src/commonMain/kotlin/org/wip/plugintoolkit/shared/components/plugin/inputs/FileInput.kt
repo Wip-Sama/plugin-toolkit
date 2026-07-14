@@ -17,11 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.SemanticCategory
-import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.shared.components.plugin.StandardTextField
 

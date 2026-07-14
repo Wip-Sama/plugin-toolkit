@@ -68,7 +68,7 @@ fun PluginContent(
 
         val jobProgressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
         val capabilityJobs = remember(allJobs, viewModel.selectedPlugin, selectedCapability) {
-            val pluginId = viewModel.selectedPlugin?.let { it.getManifest().getOrThrow().plugin.id }
+            val pluginId = viewModel.selectedPlugin?.getManifest()?.getOrThrow()?.plugin?.id
             val capName = selectedCapability?.name
             if (pluginId == null || capName == null) emptyList()
             else allJobs.filter { it.pluginId == pluginId && it.capabilityName == capName }

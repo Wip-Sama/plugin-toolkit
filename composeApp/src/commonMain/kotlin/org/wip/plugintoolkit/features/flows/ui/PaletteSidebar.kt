@@ -37,6 +37,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -47,14 +48,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
-import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
-import org.koin.compose.koinInject
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.draw.alpha
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.palette_search_placeholder
 import plugintoolkit.composeapp.generated.resources.palette_tab_flows
@@ -224,7 +223,9 @@ private fun CapabilitiesPalette(
     ) {
         groupedCaps.forEach { (plugin, caps) ->
             val settingsStore = remember(plugin.id, plugins) { pluginManager.loadPluginSettings(plugin.id) }
-            val manifest = remember(plugin.id, plugins) { plugins.find { it.getManifest().getOrThrow().plugin.id == plugin.id }?.getManifest()?.getOrNull() }
+            val manifest = remember(plugin.id, plugins) {
+                plugins.find { it.getManifest().getOrThrow().plugin.id == plugin.id }?.getManifest()?.getOrNull()
+            }
 
             Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
                 // Sleek sidebar headers
@@ -451,12 +452,12 @@ private fun PaletteItem(
                     }
                 }
                 .onGloballyPositioned {
-                    val rootCoords = rootLayoutCoordinates
-                    val localPos = if (rootCoords != null && it.isAttached && rootCoords.isAttached) {
-                        rootCoords.localPositionOf(it, Offset.Zero)
-                    } else {
-                        it.positionInWindow()
-                    }
+                    val localPos =
+                        if (rootLayoutCoordinates != null && it.isAttached && rootLayoutCoordinates.isAttached) {
+                            rootLayoutCoordinates.localPositionOf(it, Offset.Zero)
+                        } else {
+                            it.positionInWindow()
+                        }
                     lastPosition = localPos
                 },
             shape = MaterialTheme.shapes.medium,

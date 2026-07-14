@@ -47,7 +47,6 @@ import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.isCompatibleWith
-import org.wip.plugintoolkit.api.isSemanticTypeCompatible
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -159,7 +158,15 @@ fun FlowEditorView(
             state = state,
             flow = flow,
             onPan = { viewModel.onEvent(FlowEvent.Pan(it)) },
-            onZoom = { delta, position, isShiftPressed -> viewModel.onEvent(FlowEvent.Zoom(delta, position, isShiftPressed)) },
+            onZoom = { delta, position, isShiftPressed ->
+                viewModel.onEvent(
+                    FlowEvent.Zoom(
+                        delta,
+                        position,
+                        isShiftPressed
+                    )
+                )
+            },
             isDrawingConnection = isDrawingConnection,
             draggingNodeFromPalette = draggingNodeFromPalette,
             getPortBoardPosition = getPortBoardPosition,
@@ -272,8 +279,14 @@ fun FlowEditorView(
                                     state.inferredSemanticTypes[Pair(node.id, highlightedPortId!!)]
                                         ?: targetPort.semanticTypes
 
-                                val compatible = (startInferredType.isCompatibleWith(targetInferredType) || startInferredType.canConvert(targetInferredType)) &&
-                                        org.wip.plugintoolkit.api.checkSemanticCompatibility(startInferredSemantic, targetInferredSemantic) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
+                                val compatible =
+                                    (startInferredType.isCompatibleWith(targetInferredType) || startInferredType.canConvert(
+                                        targetInferredType
+                                    )) &&
+                                            org.wip.plugintoolkit.api.checkSemanticCompatibility(
+                                                startInferredSemantic,
+                                                targetInferredSemantic
+                                            ) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
                                 if (compatible) null else Color.Red
                             } else null
                         } else null
@@ -291,7 +304,10 @@ fun FlowEditorView(
                             inferredTypes = state.inferredTypes,
                             inferredSemanticTypes = state.inferredSemanticTypes,
                             validationErrors = state.validationErrors,
-                            isReady = node.isReady(flow.connections, if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null),
+                            isReady = node.isReady(
+                                flow.connections,
+                                if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
+                            ),
                             onFocusLost = { viewModel.onEvent(FlowEvent.Save) },
                             onMove = { id, delta, snap, showGhost ->
                                 viewModel.onEvent(
@@ -547,6 +563,7 @@ fun FlowEditorView(
                                 )
                             }
                             if (state.isReadOnly) {
+                                @Suppress("SimplifiableCallChain")
                                 val reasonString = state.readOnlyReasons.map { reason ->
                                     when (reason) {
                                         ReadOnlyReason.Running -> stringResource(Res.string.flow_readonly_reason_running)

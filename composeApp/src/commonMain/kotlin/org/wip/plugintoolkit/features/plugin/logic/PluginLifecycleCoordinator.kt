@@ -60,7 +60,7 @@ class PluginLifecycleCoordinator(
     private val jobManager: JobManager,
     private val lifecycleManager: PluginLifecycleManager,
     /** Injected [AppScope] for non-blocking logic and state transitions. */
-    private val scope: CoroutineScope
+    scope: CoroutineScope
 ) {
 
     private val actorChannel = Channel<LifecycleAction>(Channel.UNLIMITED)

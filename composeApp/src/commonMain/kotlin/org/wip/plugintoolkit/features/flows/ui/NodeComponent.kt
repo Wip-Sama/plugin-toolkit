@@ -40,8 +40,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.koin.compose.koinInject
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SemanticType
@@ -413,10 +413,15 @@ fun NodeComponent(
                                     val metadata = (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)
                                         ?: org.wip.plugintoolkit.api.ParameterMetadata(
                                             type = input.dataType,
-                                            semanticTypes = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes,
+                                            semanticTypes = inferredSemanticTypes[Pair(node.id, input.id)]
+                                                ?: input.semanticTypes,
                                             description = input.description ?: "",
                                             required = false,
-                                            defaultValue = input.defaultValue?.let { org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(it) }
+                                            defaultValue = input.defaultValue?.let {
+                                                org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(
+                                                    it
+                                                )
+                                            }
                                         )
 
                                     Box(
@@ -428,12 +433,15 @@ fun NodeComponent(
                                         org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
                                             name = "",
                                             metadata = metadata,
-                                            value = org.wip.plugintoolkit.features.flows.ui.getPortValueString(currentPortValue, input.dataType),
+                                            value = getPortValueString(currentPortValue, input.dataType),
                                             onValueChange = { newValue ->
                                                 onUpdateValue(
                                                     node.id,
                                                     input.id,
-                                                    org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(newValue, input.dataType)
+                                                    org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(
+                                                        newValue,
+                                                        input.dataType
+                                                    )
                                                 )
                                             },
                                             enabled = !isConnected && !isReadOnly,

@@ -5,7 +5,6 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readByteArray
 import kotlinx.io.readString
-import kotlinx.io.write
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -97,7 +96,7 @@ interface SystemNodeExecutorRegistry {
 }
 
 class DefaultSystemNodeExecutorRegistry(
-    private val semanticRegistry: SemanticRegistry
+    semanticRegistry: SemanticRegistry
 ) : SystemNodeExecutorRegistry {
     private val executors = mapOf(
         "save" to SaveNodeExecutor(),
@@ -130,8 +129,7 @@ class SaveNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val data = context.getInputValue("data", "")
         val filePath = context.getInputValue("file_path", "output.txt") as String
-        val isDestructiveVal = context.getInputValue("is_destructive", false)
-        val isDestructive = when (isDestructiveVal) {
+        val isDestructive = when (val isDestructiveVal = context.getInputValue("is_destructive", false)) {
             is Boolean -> isDestructiveVal
             is String -> isDestructiveVal.toBoolean()
             is Number -> isDestructiveVal.toInt() != 0
@@ -142,7 +140,7 @@ class SaveNodeExecutor : NodeExecutor {
         val fullPath = if (path.isAbsolute) {
             path
         } else {
-            kotlinx.io.files.Path(context.appDataDir, filePath)
+            Path(context.appDataDir, filePath)
         }
 
         val parent = fullPath.parent
@@ -202,16 +200,20 @@ class SaveNodeExecutor : NodeExecutor {
 class SaveFileNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val dataVal = context.getInputValue("data", "")
-        val sourcePathStr = if (dataVal is JsonPrimitive && dataVal.isString) dataVal.content else dataVal?.toString() ?: ""
-        
+        val sourcePathStr =
+            if (dataVal is JsonPrimitive && dataVal.isString) dataVal.content else dataVal?.toString() ?: ""
+
         val destinationFolderVal = context.getInputValue("destination_folder", "")
-        val destinationFolderStr = if (destinationFolderVal is JsonPrimitive && destinationFolderVal.isString) destinationFolderVal.content else destinationFolderVal?.toString() ?: ""
-        
+        val destinationFolderStr =
+            if (destinationFolderVal is JsonPrimitive && destinationFolderVal.isString) destinationFolderVal.content else destinationFolderVal?.toString()
+                ?: ""
+
         val fileNameVal = context.getInputValue("file_name", "")
-        val providedFileName = if (fileNameVal is JsonPrimitive && fileNameVal.isString) fileNameVal.content else fileNameVal?.toString() ?: ""
-        
-        val isDestructiveVal = context.getInputValue("is_destructive", false)
-        val isDestructive = when (isDestructiveVal) {
+        val providedFileName =
+            if (fileNameVal is JsonPrimitive && fileNameVal.isString) fileNameVal.content else fileNameVal?.toString()
+                ?: ""
+
+        val isDestructive = when (val isDestructiveVal = context.getInputValue("is_destructive", false)) {
             is Boolean -> isDestructiveVal
             is String -> isDestructiveVal.toBoolean()
             is Number -> isDestructiveVal.toInt() != 0
@@ -246,7 +248,7 @@ class SaveFileNodeExecutor : NodeExecutor {
             throw Exception("Destination path exists but is not a directory: $fullDestFolderPath")
         }
 
-        val finalFileName = if (providedFileName.isNotBlank()) providedFileName else sourcePath.name
+        val finalFileName = providedFileName.ifBlank { sourcePath.name }
         val fullDestFilePath = Path(fullDestFolderPath, finalFileName)
 
         val sourceBytes = SystemFileSystem.source(sourcePath).buffered().use { it.readByteArray() }
@@ -267,16 +269,16 @@ class SaveFileNodeExecutor : NodeExecutor {
     }
 }
 
-private fun copyRecursively(source: kotlinx.io.files.Path, dest: kotlinx.io.files.Path) {
+private fun copyRecursively(source: Path, dest: Path) {
     if (!SystemFileSystem.exists(source)) return
-    
+
     val metadata = SystemFileSystem.metadataOrNull(source)
     if (metadata?.isDirectory == true) {
         if (!SystemFileSystem.exists(dest)) {
             SystemFileSystem.createDirectories(dest)
         }
         SystemFileSystem.list(source).forEach { child ->
-            val childDest = kotlinx.io.files.Path(dest, child.name)
+            val childDest = Path(dest, child.name)
             copyRecursively(child, childDest)
         }
     } else {
@@ -292,16 +294,20 @@ private fun copyRecursively(source: kotlinx.io.files.Path, dest: kotlinx.io.file
 class SaveFolderNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val dataVal = context.getInputValue("data", "")
-        val sourcePathStr = if (dataVal is JsonPrimitive && dataVal.isString) dataVal.content else dataVal?.toString() ?: ""
-        
+        val sourcePathStr =
+            if (dataVal is JsonPrimitive && dataVal.isString) dataVal.content else dataVal?.toString() ?: ""
+
         val destinationFolderVal = context.getInputValue("destination_folder", "")
-        val destinationFolderStr = if (destinationFolderVal is JsonPrimitive && destinationFolderVal.isString) destinationFolderVal.content else destinationFolderVal?.toString() ?: ""
-        
+        val destinationFolderStr =
+            if (destinationFolderVal is JsonPrimitive && destinationFolderVal.isString) destinationFolderVal.content else destinationFolderVal?.toString()
+                ?: ""
+
         val folderNameVal = context.getInputValue("folder_name", "")
-        val providedFolderName = if (folderNameVal is JsonPrimitive && folderNameVal.isString) folderNameVal.content else folderNameVal?.toString() ?: ""
-        
-        val isDestructiveVal = context.getInputValue("is_destructive", false)
-        val isDestructive = when (isDestructiveVal) {
+        val providedFolderName =
+            if (folderNameVal is JsonPrimitive && folderNameVal.isString) folderNameVal.content else folderNameVal?.toString()
+                ?: ""
+
+        val isDestructive = when (val isDestructiveVal = context.getInputValue("is_destructive", false)) {
             is Boolean -> isDestructiveVal
             is String -> isDestructiveVal.toBoolean()
             is Number -> isDestructiveVal.toInt() != 0
@@ -336,7 +342,7 @@ class SaveFolderNodeExecutor : NodeExecutor {
             throw Exception("Destination path exists but is not a directory: $fullDestFolderPath")
         }
 
-        val finalFolderName = if (providedFolderName.isNotBlank()) providedFolderName else sourcePath.name
+        val finalFolderName = providedFolderName.ifBlank { sourcePath.name }
         val fullDestFolderPathFinal = Path(fullDestFolderPath, finalFolderName)
 
         copyRecursively(sourcePath, fullDestFolderPathFinal)
@@ -345,7 +351,7 @@ class SaveFolderNodeExecutor : NodeExecutor {
         if (isDestructive) {
             try {
                 // Assuming JobWorkerUtils.deleteRecursively is available or we implement a simple delete
-                org.wip.plugintoolkit.features.job.logic.deleteRecursively(sourcePath)
+                deleteRecursively(sourcePath)
                 context.addLog("Deleted source folder $sourcePath (is_destructive=true)")
             } catch (e: Exception) {
                 context.addLog("Warning: failed to delete source folder $sourcePath: ${e.message}", "WARN")
@@ -367,7 +373,9 @@ class LoadNodeExecutor(
 ) : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
         val filePathVal = context.getInputValue("file_path", "")
-        val filePath = if (filePathVal is JsonPrimitive && filePathVal.isString) filePathVal.content else filePathVal?.toString() ?: ""
+        val filePath =
+            if (filePathVal is JsonPrimitive && filePathVal.isString) filePathVal.content else filePathVal?.toString()
+                ?: ""
         if (filePath.isBlank()) {
             throw Exception("File path is required")
         }
@@ -460,8 +468,7 @@ class ConvertNodeExecutor : NodeExecutor {
 
 class ConditionalNodeExecutor : NodeExecutor {
     override suspend fun execute(context: NodeExecutionContext) {
-        val conditionVal = context.getInputValue("condition", false)
-        val condition = when (conditionVal) {
+        val condition = when (val conditionVal = context.getInputValue("condition", false)) {
             is Boolean -> conditionVal
             is String -> conditionVal.toBoolean()
             is Number -> conditionVal.toInt() != 0
@@ -622,7 +629,7 @@ class ForNodeExecutor : NodeExecutor {
                 for (i in range) {
                     kotlinx.coroutines.yield()
                     val subParameters = mutableMapOf<String, JsonElement>()
-                    subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>()
+                    subFlow.nodes.filterIsInstance<Node.FlowInputNode>()
                         .forEach { inputNode ->
                             val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
                             val portId = inputNode.outputs.firstOrNull()?.id ?: ""
@@ -678,11 +685,10 @@ class WhileNodeExecutor : NodeExecutor {
                 throw Exception("Subflow file not found: $subflowName")
             }
             val subFlowContent = SystemFileSystem.source(subFlowFile).buffered().use { it.readString() }
-            val subFlow = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+            val subFlow = Json { ignoreUnknownKeys = true; encodeDefaults = true }
                 .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(subFlowContent)
 
-            var conditionVal = context.getInputValue("condition", true)
-            var condition = when (conditionVal) {
+            var condition = when (val conditionVal = context.getInputValue("condition", true)) {
                 is Boolean -> conditionVal
                 is String -> conditionVal.toBoolean()
                 is Number -> conditionVal.toInt() != 0
@@ -701,7 +707,7 @@ class WhileNodeExecutor : NodeExecutor {
             while (condition) {
                 kotlinx.coroutines.yield()
                 val subParameters = mutableMapOf<String, JsonElement>()
-                subFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode>()
+                subFlow.nodes.filterIsInstance<Node.FlowInputNode>()
                     .forEach { inputNode ->
                         val portName = inputNode.outputs.firstOrNull()?.name?.lowercase() ?: ""
                         val portId = inputNode.outputs.firstOrNull()?.id ?: ""
@@ -782,13 +788,13 @@ class CreateFolderNodeExecutor : NodeExecutor {
             val fullBasePath = if (path.isAbsolute) {
                 path
             } else {
-                kotlinx.io.files.Path(context.appDataDir, basePath)
+                Path(context.appDataDir, basePath)
             }
 
-            val newFolderPath = kotlinx.io.files.Path(fullBasePath, folderName)
+            val newFolderPath = Path(fullBasePath, folderName)
 
-            if (!kotlinx.io.files.SystemFileSystem.exists(newFolderPath)) {
-                kotlinx.io.files.SystemFileSystem.createDirectories(newFolderPath)
+            if (!SystemFileSystem.exists(newFolderPath)) {
+                SystemFileSystem.createDirectories(newFolderPath)
                 context.addLog("Created folder: $newFolderPath")
             } else {
                 context.addLog("Folder already exists: $newFolderPath")

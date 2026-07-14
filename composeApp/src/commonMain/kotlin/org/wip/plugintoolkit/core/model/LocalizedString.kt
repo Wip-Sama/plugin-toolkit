@@ -20,10 +20,12 @@ sealed interface LocalizedString {
             LocalLanguage.current // Register dependency to trigger recomposition when language changes
             stringResource(res)
         }
+
         is ResourceWithArgs -> {
             LocalLanguage.current
             stringResource(res, *args.toTypedArray())
         }
+
         is Raw -> text
     }
 
@@ -32,8 +34,21 @@ sealed interface LocalizedString {
      * Uses org.jetbrains.compose.resources.getString for Resource entries.
      */
     fun resolveNonComposable(vararg additionalArgs: Any): String = when (this) {
-        is Resource -> kotlinx.coroutines.runBlocking { org.jetbrains.compose.resources.getString(res, *additionalArgs) }
-        is ResourceWithArgs -> kotlinx.coroutines.runBlocking { org.jetbrains.compose.resources.getString(res, *args.toTypedArray(), *additionalArgs) }
+        is Resource -> kotlinx.coroutines.runBlocking {
+            org.jetbrains.compose.resources.getString(
+                res,
+                *additionalArgs
+            )
+        }
+
+        is ResourceWithArgs -> kotlinx.coroutines.runBlocking {
+            org.jetbrains.compose.resources.getString(
+                res,
+                *args.toTypedArray(),
+                *additionalArgs
+            )
+        }
+
         is Raw -> text
     }
 }

@@ -6,10 +6,8 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.readBytes
 import io.ktor.utils.io.readAvailable
-import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.utils.FileSystem
-import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.VersionUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob

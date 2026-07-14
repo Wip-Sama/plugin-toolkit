@@ -30,7 +30,7 @@ class RepoManager(
     private val settingsRepository: SettingsRepository,
     private val client: HttpClient,
     private val jsonConfig: Json,
-    private val scope: CoroutineScope
+    scope: CoroutineScope
 ) {
 
     private val _repositories = MutableStateFlow<List<ExtensionRepo>>(emptyList())

@@ -12,7 +12,7 @@ import org.wip.plugintoolkit.features.settings.model.AppSettings
 
 class SettingsRepository(
     val persistence: SettingsPersistence,
-    private val scope: CoroutineScope
+    scope: CoroutineScope
 ) {
 
     private val _settings = MutableStateFlow(AppSettings())

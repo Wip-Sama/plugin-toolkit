@@ -19,9 +19,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import org.wip.plugintoolkit.api.JobHandle
-import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginLogger
-import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.RelativePath
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
@@ -178,7 +176,7 @@ class JobManager(
             }
             val finishedJob = _jobs.value.find { it.id == jobId }
             if (finishedJob != null) {
-                _jobs.update { it.filterNot { it.id == jobId } }
+                _jobs.update { it.filterNot { k -> k.id == jobId } }
                 _endedJobs.update { (listOf(finishedJob) + it).take(maxEndedJobs) }
             }
             addHistoryEntryInternal(jobId, jobName, "Cancelled")
@@ -340,7 +338,7 @@ class JobManager(
         if (completed) {
             val finishedJob = _jobs.value.find { it.id == jobId }
             if (finishedJob != null) {
-                _jobs.update { it.filterNot { it.id == jobId } }
+                _jobs.update { it.filterNot { k -> k.id == jobId } }
                 _endedJobs.update { (listOf(finishedJob) + it).take(maxEndedJobs) }
             }
             addHistoryEntryInternal(jobId, jobName, "Completed")
@@ -375,7 +373,7 @@ class JobManager(
         if (failed) {
             val finishedJob = _jobs.value.find { it.id == jobId }
             if (finishedJob != null) {
-                _jobs.update { it.filterNot { it.id == jobId } }
+                _jobs.update { it.filterNot { k -> k.id == jobId } }
                 _endedJobs.update { (listOf(finishedJob) + it).take(maxEndedJobs) }
             }
             addHistoryEntryInternal(jobId, jobName, "Failed", errorMessage)
@@ -526,7 +524,7 @@ class JobManager(
     }
 
     fun clearEndedJob(jobId: String) {
-        _endedJobs.update { it.filterNot { it.id == jobId } }
+        _endedJobs.update { it.filterNot { k -> k.id == jobId } }
         _jobLogs.update { it - jobId }
     }
 

@@ -15,9 +15,9 @@ import kotlinx.serialization.json.longOrNull
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.viewmodel.SystemNodesRegistry
-import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 
 object FlowTypeInferenceCache {
     private val mutex = Mutex()
@@ -139,27 +139,27 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
         }
 
         PrimitiveType.BOOLEAN -> {
-            if (value is Boolean) value
-            else if (value is Number) {
-                value.toInt() != 0
-            } else {
-                val str = value.toString().trim().lowercase()
-                if (str == "true" || str == "1") true
-                else if (str == "false" || str == "0") false
-                else {
-                    val intVal = str.toIntOrNull()
-                    if (intVal != null) {
-                        intVal != 0
-                    } else {
-                        val doubleVal = str.toDoubleOrNull()
-                        if (doubleVal != null) {
-                            doubleVal.toInt() != 0
+            value as? Boolean
+                ?: if (value is Number) {
+                    value.toInt() != 0
+                } else {
+                    val str = value.toString().trim().lowercase()
+                    if (str == "true" || str == "1") true
+                    else if (str == "false" || str == "0") false
+                    else {
+                        val intVal = str.toIntOrNull()
+                        if (intVal != null) {
+                            intVal != 0
                         } else {
-                            throw Exception("Failed to convert '$value' to Boolean")
+                            val doubleVal = str.toDoubleOrNull()
+                            if (doubleVal != null) {
+                                doubleVal.toInt() != 0
+                            } else {
+                                throw Exception("Failed to convert '$value' to Boolean")
+                            }
                         }
                     }
                 }
-            }
         }
 
         PrimitiveType.LONG -> {
@@ -330,11 +330,12 @@ fun resolveFileAccess(
 
         if (currentValue.isNullOrBlank()) {
             if (!template.isNullOrEmpty()) {
-                val strParams = parameters.mapValues { (_, el) -> if (el is JsonPrimitive) el.content else "" }.toMutableMap()
+                val strParams =
+                    parameters.mapValues { (_, el) -> if (el is JsonPrimitive) el.content else "" }.toMutableMap()
                 if (sandboxPath != null) {
                     strParams["output_folder"] = sandboxPath
                 }
-                
+
                 try {
                     val resolvedPath = PathPatternResolver.resolve(template, strParams)
                     parameters[paramName] = JsonPrimitive(resolvedPath)

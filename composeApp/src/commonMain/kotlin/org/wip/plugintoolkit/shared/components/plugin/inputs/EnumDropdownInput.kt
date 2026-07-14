@@ -10,11 +10,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.api.ParameterMetadata
-import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
-
 import kotlinx.serialization.json.JsonElement
 import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.api.ParameterMetadata
+import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.settings_enum_unlock_message
 
@@ -63,7 +62,7 @@ fun EnumDropdownInput(
         }.toSet()
 
         if (options.isNotEmpty()) {
-            ExpressiveMenu<String>(
+            ExpressiveMenu(
                 options = options,
                 selectedOption = if (value in options) value else (options.firstOrNull() ?: ""),
                 onOptionSelected = { onValueChange(it) },
@@ -71,7 +70,7 @@ fun EnumDropdownInput(
                 enabled = enabled,
                 disabledOptions = disabledOptions
             )
-            
+
             if (disabledOptions.size == options.size) {
                 Text(
                     text = stringResource(Res.string.settings_enum_unlock_message),

@@ -354,8 +354,8 @@ fun PluginCard(
                     } else if (plugin.loadError != null) {
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                         ToolkitChip(
-                            text= stringResource(Res.string.plugin_broken),
-                            containerColor =  MaterialTheme.colorScheme.errorContainer,
+                            text = stringResource(Res.string.plugin_broken),
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
                             contentColor = MaterialTheme.colorScheme.onErrorContainer,
                         )
                     } else if (isLoaded) {
@@ -498,7 +498,7 @@ fun PluginCard(
                                 )
                             } else {
                                 Icon(
-                                    imageVector = if (plugin.isEnabled) androidx.compose.material.icons.Icons.Default.CheckCircle else androidx.compose.material.icons.Icons.Default.Extension,
+                                    imageVector = if (plugin.isEnabled) Icons.Default.CheckCircle else Icons.Default.Extension,
                                     contentDescription = null,
                                     modifier = Modifier.size(ToolkitTheme.dimensions.toggleButtonIconSize)
                                 )
