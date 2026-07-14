@@ -361,118 +361,108 @@ fun runMain(
     var isTrayOpen by mutableStateOf(true)
 
     application {
-        var isReady by remember { mutableStateOf(false) }
+        val viewModel = preloadedViewModel
+        val startMode = preloadedMode
+        val languageCode by viewModel.currentLanguageCode.collectAsState()
 
-        // Hide splash window once Compose is ready and starting to draw the main window
-        LaunchedEffect(Unit) {
-            delay(100) // Small delay to ensure main window is visible before destroying splash
-            isReady = true
-            splashWindow?.dispose()
+        // Sync default JVM locale synchronously before composition
+        PlatformLocalization.setApplicationLanguage(languageCode)
+
+        // Provide a root ViewModelStoreOwner for the application to prevent StackOverflow in LocalViewModelStoreOwner
+        // on some Compose Multiplatform versions where the default lookup loops.
+        val viewModelStoreOwner = remember {
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
         }
 
-        // Prevent application from exiting immediately because there are no windows initially
-        if (!isReady) {
-            Window(
-                onCloseRequest = {},
-                state = rememberWindowState(size = androidx.compose.ui.unit.DpSize(0.dp, 0.dp)),
-                undecorated = true,
-                transparent = true,
-                visible = false
-            ) { }
+        DisposableEffect(Unit) {
+            onDispose {
+                viewModelStoreOwner.viewModelStore.clear()
+            }
         }
 
-        if (isReady) {
-            val viewModel = preloadedViewModel
-            val startMode = preloadedMode
-            val languageCode by viewModel.currentLanguageCode.collectAsState()
+        val trayState = rememberTrayState()
+        var isVisible by remember { mutableStateOf(startMode != WindowStartMode.Minimized) }
 
-            // Sync default JVM locale synchronously before composition
-            PlatformLocalization.setApplicationLanguage(languageCode)
+        val windowState = rememberWindowState(
+            placement = when (startMode) {
+                WindowStartMode.Maximized -> WindowPlacement.Maximized
+                WindowStartMode.Fullscreen -> WindowPlacement.Fullscreen
+                else -> WindowPlacement.Floating
+            },
+            position = WindowPosition(Alignment.Center),
+            size = DpSize(1280.dp, 800.dp)
+        )
 
-            // Provide a root ViewModelStoreOwner for the application to prevent StackOverflow in LocalViewModelStoreOwner
-            // on some Compose Multiplatform versions where the default lookup loops.
-            val viewModelStoreOwner = remember {
-                object : ViewModelStoreOwner {
-                    override val viewModelStore = ViewModelStore()
+        key(languageCode) {
+            Tray(
+                state = trayState,
+                icon = painterResource(Res.drawable.app_logo),
+                tooltip = stringResource(Res.string.app_name),
+                onAction = { isVisible = true },
+                menu = {
+                    Item("Open", onClick = { isVisible = true })
+                    Separator()
+                    Item("Exit", onClick = { exitApplication() })
                 }
-            }
-
-            DisposableEffect(Unit) {
-                onDispose {
-                    viewModelStoreOwner.viewModelStore.clear()
-                }
-            }
-
-            val trayState = rememberTrayState()
-            var isVisible by remember { mutableStateOf(startMode != WindowStartMode.Minimized) }
-
-            val windowState = rememberWindowState(
-                placement = when (startMode) {
-                    WindowStartMode.Maximized -> WindowPlacement.Maximized
-                    WindowStartMode.Fullscreen -> WindowPlacement.Fullscreen
-                    else -> WindowPlacement.Floating
-                },
-                position = WindowPosition(Alignment.Center),
-                size = DpSize(1280.dp, 800.dp)
             )
+        }
 
-            key(languageCode) {
-                Tray(
-                    state = trayState,
-                    icon = painterResource(Res.drawable.app_logo),
-                    tooltip = stringResource(Res.string.app_name),
-                    onAction = { isVisible = true },
-                    menu = {
-                        Item("Open", onClick = { isVisible = true })
-                        Separator()
-                        Item("Exit", onClick = { exitApplication() })
+        if (isVisible) {
+            Window(
+                onCloseRequest = {
+                    if (viewModel.settings.value.general.closeToTray) {
+                        // Just hide the window, background jobs and processes continue to run
+                        isVisible = false
+                    } else {
+                        exitApplication()
                     }
-                )
-            }
+                },
+                title = stringResource(Res.string.app_name),
+                icon = painterResource(Res.drawable.app_logo),
+                state = windowState
+            ) {
+                // Set minimum window size
+                window.minimumSize = Dimension(1000, 600)
+                val notificationService = getKoin().get<NotificationService>()
 
-            if (isVisible) {
-                Window(
-                    onCloseRequest = {
-                        if (viewModel.settings.value.general.closeToTray) {
-                            // Just hide the window, background jobs and processes continue to run
-                            isVisible = false
-                        } else {
-                            exitApplication()
-                        }
-                    },
-                    title = stringResource(Res.string.app_name),
-                    icon = painterResource(Res.drawable.app_logo),
-                    state = windowState
-                ) {
-                    // Set minimum window size
-                    window.minimumSize = Dimension(1000, 600)
-                    val notificationService = getKoin().get<NotificationService>()
+                // Wait until the main Window has actually entered the composition and painted its first frame,
+                // then smoothly dispose of the splash screen.
+                LaunchedEffect(Unit) {
+                    delay(300)
+                    splashWindow?.dispose()
+                }
 
-                    LaunchedEffect(Unit) {
-                        val trayState = trayState // from application scope
-                        notificationService.events.collect { event ->
-                            if (event is NotificationEvent.System) {
-                                trayState.sendNotification(
-                                    Notification(
-                                        title = event.record.title,
-                                        message = event.record.message,
-                                        type = when (event.record.type) {
-                                            NotificationType.Info -> Notification.Type.Info
-                                            NotificationType.Warning -> Notification.Type.Warning
-                                            NotificationType.Error -> Notification.Type.Error
-                                        }
-                                    )
+                LaunchedEffect(Unit) {
+                    val trayState = trayState // from application scope
+                    notificationService.events.collect { event ->
+                        if (event is NotificationEvent.System) {
+                            trayState.sendNotification(
+                                Notification(
+                                    title = event.record.title,
+                                    message = event.record.message,
+                                    type = when (event.record.type) {
+                                        NotificationType.Info -> Notification.Type.Info
+                                        NotificationType.Warning -> Notification.Type.Warning
+                                        NotificationType.Error -> Notification.Type.Error
+                                    }
                                 )
-                            }
-                        }
-                    }
-
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
-                            App(viewModel = viewModel)
+                            )
                         }
                     }
                 }
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
+                        App(viewModel = viewModel)
+                    }
+                }
+            }
+        } else {
+            // We started minimized, dispose splash screen immediately since there's no main window to wait for
+            LaunchedEffect(Unit) {
+                splashWindow?.dispose()
             }
         }
     }
