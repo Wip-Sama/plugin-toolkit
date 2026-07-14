@@ -52,9 +52,11 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.painterResource
@@ -121,6 +123,9 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_logo
 import plugintoolkit.composeapp.generated.resources.app_name
 import java.awt.Dimension
+import javax.swing.JOptionPane
+import javax.swing.JOptionPane.showMessageDialog
+import kotlin.time.Duration.Companion.seconds
 
 
 fun main(args: Array<String>) {
@@ -128,11 +133,11 @@ fun main(args: Array<String>) {
         runMain(args)
     } catch (e: Throwable) {
         e.printStackTrace()
-        javax.swing.JOptionPane.showMessageDialog(
+        showMessageDialog(
             null,
             "Error during startup:\n${e.message}\n\nCheck logs for details.",
             "Startup Error",
-            javax.swing.JOptionPane.ERROR_MESSAGE
+            JOptionPane.ERROR_MESSAGE
         )
         System.exit(1)
     }
@@ -337,7 +342,7 @@ fun runMain(args: Array<String>) {
         var splashWindowOpen by remember { mutableStateOf(true) }
 
         LaunchedEffect(Unit) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 val (vm, mode) = performStartup(args)
                 appViewModel = vm
                 appStartMode = mode

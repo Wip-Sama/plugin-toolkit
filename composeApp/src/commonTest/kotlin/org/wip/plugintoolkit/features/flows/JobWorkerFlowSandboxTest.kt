@@ -8,6 +8,7 @@ import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
+import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
@@ -23,6 +24,8 @@ import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
+import org.wip.plugintoolkit.features.job.logic.FlowEngine
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.logic.JobWorker
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
@@ -46,7 +49,7 @@ class JobWorkerFlowSandboxTest : JobWorkerFlowTestBase() {
 
     @AfterTest
     fun tearDown() {
-        org.koin.core.context.stopKoin()
+        stopKoin()
         unmockkAll()
     }
 
@@ -130,9 +133,9 @@ class JobWorkerFlowSandboxTest : JobWorkerFlowTestBase() {
         val settingsRepo = SettingsRepository(persistence, backgroundScope)
         settingsRepo.updateSettings { persistence.settings }
         val jobManager = JobManager(backgroundScope, settingsRepo)
-        
-        org.koin.core.context.stopKoin()
-        org.koin.core.context.startKoin {
+
+        stopKoin()
+        startKoin {
             modules(org.koin.dsl.module {
                 single<SettingsPersistence> { persistence }
                 single { settingsRepo }
@@ -140,9 +143,9 @@ class JobWorkerFlowSandboxTest : JobWorkerFlowTestBase() {
             })
         }
 
-        val engine = org.wip.plugintoolkit.features.job.logic.FlowEngine(
+        val engine = FlowEngine(
             jobManager,
-            org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
+            DefaultSystemNodeExecutorRegistry(mockk(relaxed = true)),
             pluginManager,
             mockk(relaxed = true),
             backgroundScope
