@@ -128,7 +128,7 @@ object PathPatternResolver {
             if (part == "." || part.isEmpty() || (i == 0 && part == windowsRoot)) {
                 continue
             } else if (part == "..") {
-                if (resolvedParts.isEmpty() || (windowsRoot.isNotEmpty())) { //resolvedParts.size == 0 && windowsRoot.isNotEmpty()
+                if (resolvedParts.isEmpty()) {
                     throw IllegalArgumentException("Invalid path generated: escapes root directory ($pathStr)")
                 }
                 resolvedParts.removeLast()
