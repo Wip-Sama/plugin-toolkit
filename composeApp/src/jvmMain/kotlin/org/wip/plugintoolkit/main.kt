@@ -122,15 +122,28 @@ import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_logo
 import plugintoolkit.composeapp.generated.resources.app_name
+import org.wip.plugintoolkit.ui.splash.showSplashWindow
 import java.awt.Dimension
 import javax.swing.JOptionPane
 import javax.swing.JOptionPane.showMessageDialog
+import javax.swing.JWindow
 import kotlin.time.Duration.Companion.seconds
 
-
 fun main(args: Array<String>) {
+    val splashWindow = try {
+        showSplashWindow()
+    } catch (e: Throwable) {
+        e.printStackTrace()
+        null
+    }
     try {
-        runMain(args)
+        // Run startup on an IO thread while the AWT EDT freely animates the splash screen
+        val (viewModel, mode) = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) { 
+            performStartup(args) { text ->
+                splashWindow?.updateText(text)
+            }
+        }
+        runMain(args, splashWindow?.window, viewModel, mode)
     } catch (e: Throwable) {
         e.printStackTrace()
         showMessageDialog(
@@ -143,7 +156,8 @@ fun main(args: Array<String>) {
     }
 }
 
-suspend fun performStartup(args: Array<String>): Pair<SettingsViewModel, WindowStartMode> {
+suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit = {}): Pair<SettingsViewModel, WindowStartMode> {
+    updateStatus("Loading configuration...")
     // Determine initial window state based on persistence directly
     val persistence = JvmSettingsPersistence()
     val initialSettings = persistence.load() // This is now a suspend call, no runBlocking
@@ -152,6 +166,7 @@ suspend fun performStartup(args: Array<String>): Pair<SettingsViewModel, WindowS
     // but viewModel needs NotificationService which needs settings.
     var viewModelProvider: () -> SettingsViewModel? = { null }
 
+    updateStatus("Initializing Dependency Injection...")
     startKoin {
         modules(coroutineModule, module {
             single<SystemConfig> { DefaultSystemConfig() }
@@ -249,9 +264,11 @@ suspend fun performStartup(args: Array<String>): Pair<SettingsViewModel, WindowS
     val updateService = koin.get<UpdateService>()
     val appConfig = koin.get<SystemConfig>()
 
+    updateStatus("Cleaning up updates...")
     // Cleanup old updates on startup
     updateService.cleanupOldUpdates(settingsRepository.getSettingsDir())
 
+    updateStatus("Initializing plugins...")
     // Initialize registry and subsequently load plugins
     appScope.launch {
         try {
@@ -289,6 +306,7 @@ suspend fun performStartup(args: Array<String>): Pair<SettingsViewModel, WindowS
         }
     }
 
+    updateStatus("Refreshing repositories...")
     koin.get<RepoManager>() // Trigger initialization and background refresh
 
     viewModelProvider = { viewModel }
@@ -323,6 +341,7 @@ suspend fun performStartup(args: Array<String>): Pair<SettingsViewModel, WindowS
 
     Logger.i { "Application started. Logging initialized at: $logDir" }
 
+    updateStatus("Finalizing startup...")
     // Wait for the ViewModel to signal that settings persistence is fully loaded
     viewModel.isLoaded.first { it }
 
@@ -332,71 +351,39 @@ suspend fun performStartup(args: Array<String>): Pair<SettingsViewModel, WindowS
     return Pair(viewModel, startMode)
 }
 
-fun runMain(args: Array<String>) {
-    FileKit.init(appId = "org.wip.plugintoolkit")
+fun runMain(
+    args: Array<String>, 
+    splashWindow: JWindow?, 
+    preloadedViewModel: SettingsViewModel, 
+    preloadedMode: WindowStartMode
+) {
+    // Flag to handle system tray lifecycle
+    var isTrayOpen by mutableStateOf(true)
 
     application {
         var isReady by remember { mutableStateOf(false) }
-        var appViewModel by remember { mutableStateOf<SettingsViewModel?>(null) }
-        var appStartMode by remember { mutableStateOf(WindowStartMode.Normal) }
-        var splashWindowOpen by remember { mutableStateOf(true) }
 
+        // Hide splash window once Compose is ready and starting to draw the main window
         LaunchedEffect(Unit) {
-            withContext(Dispatchers.IO) {
-                val (vm, mode) = performStartup(args)
-                appViewModel = vm
-                appStartMode = mode
-                isReady = true
-                delay(100)
-                splashWindowOpen = false
-            }
+            delay(100) // Small delay to ensure main window is visible before destroying splash
+            isReady = true
+            splashWindow?.dispose()
         }
 
-        if (splashWindowOpen) {
+        // Prevent application from exiting immediately because there are no windows initially
+        if (!isReady) {
             Window(
-                onCloseRequest = ::exitApplication,
-                state = rememberWindowState(
-                    placement = WindowPlacement.Floating,
-                    position = WindowPosition(Alignment.Center),
-                    size = DpSize(400.dp, 300.dp)
-                ),
+                onCloseRequest = {},
+                state = rememberWindowState(size = androidx.compose.ui.unit.DpSize(0.dp, 0.dp)),
                 undecorated = true,
                 transparent = true,
-                resizable = false
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF1E1E1E), // Dark theme
-                    shadowElevation = 8.dp
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Image(
-                            painter = painterResource(Res.drawable.app_logo),
-                            contentDescription = "App Logo",
-                            modifier = Modifier.size(96.dp)
-                        )
-                        Spacer(modifier = Modifier.height(32.dp))
-                        CircularProgressIndicator(
-                            color = Color(0xFF64B5F6) // Light blue primary accent
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Starting Plugin Toolkit...",
-                            color = Color.White
-                        )
-                    }
-                }
-            }
+                visible = false
+            ) { }
         }
 
-        if (isReady && appViewModel != null) {
-            val viewModel = appViewModel!!
-            val startMode = appStartMode
+        if (isReady) {
+            val viewModel = preloadedViewModel
+            val startMode = preloadedMode
             val languageCode by viewModel.currentLanguageCode.collectAsState()
 
             // Sync default JVM locale synchronously before composition
