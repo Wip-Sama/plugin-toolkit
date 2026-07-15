@@ -155,6 +155,15 @@ fun checkSemanticCompatibility(source: List<SemanticType>, target: List<Semantic
     }
     for (s in source) {
         for (t in target) {
+            // Check if t is a base type that accepts s as a subtype (e.g. target `path` accepts source `path/file`)
+            val tIsBaseAcceptingS = t.namespace == null && s.namespace.equals(t.name, ignoreCase = true)
+            // Check if s is a base type that can be passed to t in lenient mode (e.g. source `path` passed to target `path/file`)
+            val sIsBasePassedToT = lenient && s.namespace == null && t.namespace.equals(s.name, ignoreCase = true)
+
+            if (tIsBaseAcceptingS || sIsBasePassedToT) {
+                return CompatibilityResult.Compatible
+            }
+
             val nsMatches = if (s.namespace == null && t.namespace == null) {
                 true
             } else {

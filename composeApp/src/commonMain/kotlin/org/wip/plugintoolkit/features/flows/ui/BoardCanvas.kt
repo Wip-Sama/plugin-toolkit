@@ -6,7 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -18,10 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,7 +49,9 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -211,13 +216,6 @@ fun BoardCanvas(
                     false
                 }
             }
-            .pointerInput(isDrawingConnection, draggingNodeFromPalette) {
-                detectTransformGestures { _, pan, _, _ ->
-                    if (!currentIsDrawingConnection && draggingNodeFromPalette == null) {
-                        currentOnPan(pan)
-                    }
-                }
-            }
             .pointerInput(flow.connections, getPortBoardPosition) {
                 detectTapGestures { tapOffset ->
                     focusRequester.requestFocus()
@@ -257,78 +255,84 @@ fun BoardCanvas(
                     }
                 }
             }
-            .pointerInput(flow.nodes, nodeSizes) {
+            .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
-                            focusRequester.requestFocus()
-                            val startPoint = event.changes.first().position
-                            selectionStart = startPoint
+                        val isPanButtonPressed = event.buttons.isSecondaryPressed || event.buttons.isTertiaryPressed
+                        if (event.type == PointerEventType.Press && isPanButtonPressed) {
+                            val change = event.changes.firstOrNull()
+                            if (change == null || change.isConsumed) continue
                             
-                            if (currentIsDrawingConnection) {
-                                event.changes.forEach { it.consume() }
-                                var lastPoint = startPoint
-                                while (true) {
-                                    val dragEvent = awaitPointerEvent()
-                                    if (!dragEvent.buttons.isSecondaryPressed) {
-                                        selectionStart = null
-                                        break
-                                    }
-                                    if (dragEvent.type == PointerEventType.Move) {
-                                        val currentPoint = dragEvent.changes.first().position
-                                        val delta = currentPoint - lastPoint
-                                        currentOnPan(delta)
-                                        lastPoint = currentPoint
-                                        dragEvent.changes.forEach { it.consume() }
-                                    }
+                            focusRequester.requestFocus()
+                            var lastPoint = change.position
+                            change.consume()
+                            
+                            while (true) {
+                                val dragEvent = awaitPointerEvent()
+                                val isStillPanning = dragEvent.buttons.isSecondaryPressed || dragEvent.buttons.isTertiaryPressed
+                                if (!isStillPanning) {
+                                    break
                                 }
-                            } else {
-                                selectionEnd = startPoint
-    
-                                event.changes.forEach { it.consume() }
-    
-                                while (true) {
-                                    val dragEvent = awaitPointerEvent()
-                                    if (!dragEvent.buttons.isSecondaryPressed) {
-                                        selectionStart = null
-                                        selectionEnd = null
-                                        break
-                                    }
-                                    if (dragEvent.type == PointerEventType.Move) {
-                                        selectionEnd = dragEvent.changes.first().position
-                                        dragEvent.changes.forEach { it.consume() }
-
-                                        val modelStart = (selectionStart!! - currentOffset) / currentScale
-                                        val modelEnd = (selectionEnd!! - currentOffset) / currentScale
-                                        val selectLeft = minOf(modelStart.x, modelEnd.x)
-                                        val selectRight = maxOf(modelStart.x, modelEnd.x)
-                                        val selectTop = minOf(modelStart.y, modelEnd.y)
-                                        val selectBottom = maxOf(modelStart.y, modelEnd.y)
-
-                                        val selectedIds = mutableSetOf<Long>()
-                                        flow.nodes.forEach { node ->
-                                            val nodeLeft = node.position.x
-                                            val nodeTop = node.position.y
-                                            val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: (300f * density.density)
-                                            val nodeHeight =
-                                                nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
-                                            val nodeRight = nodeLeft + nodeWidth
-                                            val nodeBottom = nodeTop + nodeHeight
-
-                                            if (selectLeft < nodeRight && selectRight > nodeLeft &&
-                                                selectTop < nodeBottom && selectBottom > nodeTop
-                                            ) {
-                                                selectedIds.add(node.id)
-                                            }
-                                        }
-                                        currentOnSelectNodes(selectedIds)
-                                    }
+                                if (dragEvent.type == PointerEventType.Move) {
+                                    val currentPoint = dragEvent.changes.first().position
+                                    val delta = currentPoint - lastPoint
+                                    currentOnPan(delta)
+                                    lastPoint = currentPoint
+                                    dragEvent.changes.forEach { it.consume() }
                                 }
                             }
                         }
                     }
                 }
+            }
+            .pointerInput(flow.nodes, nodeSizes, density) {
+                detectDragGestures(
+                    onDragStart = { startOffset ->
+                        if (!currentIsDrawingConnection) {
+                            focusRequester.requestFocus()
+                            selectionStart = startOffset
+                            selectionEnd = startOffset
+                        }
+                    },
+                    onDragEnd = {
+                        selectionStart = null
+                        selectionEnd = null
+                    },
+                    onDragCancel = {
+                        selectionStart = null
+                        selectionEnd = null
+                    },
+                    onDrag = { change, _ ->
+                        if (!currentIsDrawingConnection && selectionStart != null) {
+                            selectionEnd = change.position
+                            
+                            val modelStart = (selectionStart!! - currentOffset) / currentScale
+                            val modelEnd = (selectionEnd!! - currentOffset) / currentScale
+                            val selectLeft = minOf(modelStart.x, modelEnd.x)
+                            val selectRight = maxOf(modelStart.x, modelEnd.x)
+                            val selectTop = minOf(modelStart.y, modelEnd.y)
+                            val selectBottom = maxOf(modelStart.y, modelEnd.y)
+
+                            val selectedIds = mutableSetOf<Long>()
+                            flow.nodes.forEach { node ->
+                                val nodeLeft = node.position.x
+                                val nodeTop = node.position.y
+                                val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: (300f * density.density)
+                                val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
+                                val nodeRight = nodeLeft + nodeWidth
+                                val nodeBottom = nodeTop + nodeHeight
+
+                                if (selectLeft < nodeRight && selectRight > nodeLeft &&
+                                    selectTop < nodeBottom && selectBottom > nodeTop
+                                ) {
+                                    selectedIds.add(node.id)
+                                }
+                            }
+                            currentOnSelectNodes(selectedIds)
+                        }
+                    }
+                )
             }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -517,14 +521,11 @@ fun BoardCanvas(
                     }
                     val isSelected = selectedConnection == connection
                     val isHovered = hoveredConnection == connection
-                    val color = if (isSelected) {
-                        Color(0xFFFF9800)
-                    } else if (isHovered && hoveredConnectionIsSource == null) {
-                        Color(0xFFFF2D55)
-                    } else if (isInvalid) {
-                        Color.Red
-                    } else {
-                        connectionColor
+                    val color = when {
+                        isSelected -> { Color(0xFFFF9800) }
+                        isHovered && hoveredConnectionIsSource == null -> { Color(0xFFFF2D55) }
+                        isInvalid -> { Color.Red }
+                        else -> { connectionColor }
                     }.copy(alpha = connectionAlphas[connection] ?: 1f)
 
                     if (isHovered && hoveredConnectionIsSource == null) {
@@ -658,7 +659,7 @@ fun BoardCanvas(
                                 .clickable { showMenu = true },
                             contentAlignment = Alignment.Center
                         ) {
-                            androidx.compose.material3.Text(
+                            Text(
                                 text = conn.orderIndex.toString(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onBackground,
@@ -679,21 +680,21 @@ fun BoardCanvas(
                                         bounds = bounds,
                                         onDismiss = { showMenu = false }
                                     ) {
-                                        androidx.compose.material3.Card(
-                                            elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                        Card(
+                                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                                             shape = MaterialTheme.shapes.medium,
                                             modifier = Modifier.width(150.dp)
                                         ) {
                                             Column(modifier = Modifier.padding(vertical = 4.dp)) {
                                                 DropdownMenuItem(
-                                                    text = { androidx.compose.material3.Text("Move to Start") },
+                                                    text = { Text("Move to Start") },
                                                     onClick = {
                                                         onMoveConnectionFirst(conn)
                                                         showMenu = false
                                                     }
                                                 )
                                                 DropdownMenuItem(
-                                                    text = { androidx.compose.material3.Text("Move to End") },
+                                                    text = { Text("Move to End") },
                                                     onClick = {
                                                         onMoveConnectionLast(conn)
                                                         showMenu = false

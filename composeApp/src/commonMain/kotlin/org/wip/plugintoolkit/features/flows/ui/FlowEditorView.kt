@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -88,13 +89,13 @@ import kotlin.math.roundToInt
 @Composable
 fun FlowEditorView(
     viewModel: FlowEditorViewModel,
-    notificationService: org.wip.plugintoolkit.core.notification.NotificationService,
+    notificationService: NotificationService,
     onExit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
     val flow = state.flow
-    val pluginManager = org.koin.compose.koinInject<org.wip.plugintoolkit.features.plugin.logic.PluginManager>()
+    val pluginManager = koinInject<org.wip.plugintoolkit.features.plugin.logic.PluginManager>()
     val density = androidx.compose.ui.platform.LocalDensity.current
 
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
@@ -675,7 +676,7 @@ fun FlowEditorView(
                     .graphicsLayer(
                         scaleX = draggingNodeScale,
                         scaleY = draggingNodeScale,
-                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        transformOrigin = TransformOrigin(0f, 0f)
                     )
                     .alpha(0.7f)
             ) {

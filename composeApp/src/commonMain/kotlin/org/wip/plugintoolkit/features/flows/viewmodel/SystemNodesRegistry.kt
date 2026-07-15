@@ -28,13 +28,13 @@ object SystemNodesRegistry {
                     "data",
                     "Data (File Path)",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("file")
+                    semanticTypes = parseSemanticTypes("path/file")
                 ),
                 InputPort(
                     "destination_folder",
                     "Destination Folder",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("path")
+                    semanticTypes = parseSemanticTypes("path/folder")
                 ),
                 InputPort(
                     "file_name",
@@ -56,13 +56,13 @@ object SystemNodesRegistry {
                     "data",
                     "Data (Folder Path)",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("folder")
+                    semanticTypes = parseSemanticTypes("path/folder")
                 ),
                 InputPort(
                     "destination_folder",
                     "Destination Folder",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("path")
+                    semanticTypes = parseSemanticTypes("path/folder")
                 ),
                 InputPort(
                     "folder_name",
@@ -84,7 +84,7 @@ object SystemNodesRegistry {
                     id = "file_path",
                     name = "File Path",
                     dataType = DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("file"),
+                    semanticTypes = parseSemanticTypes("path/file"),
                     defaultValue = "output.txt",
                     constraints = org.wip.plugintoolkit.features.flows.model.PortConstraints(
                         extensions = listOf("txt", "json", "csv") // Add custom supported extensions here
@@ -177,7 +177,7 @@ object SystemNodesRegistry {
                     "path",
                     "Path",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("path")
+                    semanticTypes = parseSemanticTypes("path/folder")
                 ),
                 InputPort("folder_name", "Folder Name", DataType.Primitive(PrimitiveType.STRING))
             )
@@ -198,7 +198,7 @@ object SystemNodesRegistry {
                     "saved_path",
                     "Saved Path",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("file")
+                    semanticTypes = parseSemanticTypes("path/file")
                 ),
                 OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
             )
@@ -208,7 +208,7 @@ object SystemNodesRegistry {
                     "saved_path",
                     "Saved Path",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("folder")
+                    semanticTypes = parseSemanticTypes("path/folder")
                 ),
                 OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
             )
@@ -260,7 +260,7 @@ object SystemNodesRegistry {
                     "created_path",
                     "Path",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("path")
+                    semanticTypes = parseSemanticTypes("path/folder")
                 ),
                 OutputPort("success", "Success", DataType.Primitive(PrimitiveType.BOOLEAN))
             )

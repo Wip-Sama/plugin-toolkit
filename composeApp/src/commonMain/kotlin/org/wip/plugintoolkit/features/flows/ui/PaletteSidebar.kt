@@ -173,6 +173,7 @@ fun PaletteSidebar(
                     )
 
                     1 -> SystemPalette(
+                        searchQuery = searchQuery,
                         rootLayoutCoordinates = rootLayoutCoordinates,
                         onDragStart = onDragStart,
                         onDrag = onDrag,
@@ -264,6 +265,7 @@ private fun CapabilitiesPalette(
 
 @Composable
 private fun SystemPalette(
+    searchQuery: String,
     rootLayoutCoordinates: LayoutCoordinates?,
     onDragStart: (PaletteNode, Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
@@ -277,64 +279,45 @@ private fun SystemPalette(
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
-            Text(
-                "STANDARD NODES",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(
-                    horizontal = ToolkitTheme.spacing.extraSmall,
-                    vertical = ToolkitTheme.spacing.extraSmall
+            val standardNodes = listOf(
+                PaletteNode.FlowInput to "Flow Input",
+                PaletteNode.FlowOutput to "Flow Output",
+                PaletteNode.System("Error") to "Error"
+            ).filter { it.second.contains(searchQuery, ignoreCase = true) }
+
+            if (standardNodes.isNotEmpty()) {
+                Text(
+                    "STANDARD NODES",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(
+                        horizontal = ToolkitTheme.spacing.extraSmall,
+                        vertical = ToolkitTheme.spacing.extraSmall
+                    )
                 )
-            )
 
-            val flowInput = PaletteNode.FlowInput
-            PaletteItem(
-                text = "Flow Input",
-                color = MaterialTheme.colorScheme.tertiary,
-                rootLayoutCoordinates = rootLayoutCoordinates,
-                onDragStart = { pos, grabOffset -> onDragStart(flowInput, pos, grabOffset) },
-                onDrag = onDrag,
-                onDragEnd = onDragEnd,
-                onClick = { onClick(flowInput) }
-            )
-
-            val flowOutput = PaletteNode.FlowOutput
-            PaletteItem(
-                text = "Flow Output",
-                color = MaterialTheme.colorScheme.tertiary,
-                rootLayoutCoordinates = rootLayoutCoordinates,
-                onDragStart = { pos, grabOffset -> onDragStart(flowOutput, pos, grabOffset) },
-                onDrag = onDrag,
-                onDragEnd = onDragEnd,
-                onClick = { onClick(flowOutput) }
-            )
-
-            val errorNode = PaletteNode.System("Error")
-            PaletteItem(
-                text = "Error",
-                color = MaterialTheme.colorScheme.error,
-                rootLayoutCoordinates = rootLayoutCoordinates,
-                onDragStart = { pos, grabOffset -> onDragStart(errorNode, pos, grabOffset) },
-                onDrag = onDrag,
-                onDragEnd = onDragEnd,
-                onClick = { onClick(errorNode) }
-            )
+                standardNodes.forEach { (node, text) ->
+                    val color = if (node is PaletteNode.System && node.action == "Error") {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    }
+                    PaletteItem(
+                        text = text,
+                        color = color,
+                        rootLayoutCoordinates = rootLayoutCoordinates,
+                        onDragStart = { pos, grabOffset -> onDragStart(node, pos, grabOffset) },
+                        onDrag = onDrag,
+                        onDragEnd = onDragEnd,
+                        onClick = { onClick(node) }
+                    )
+                }
+            }
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
-            Text(
-                "SYSTEM ACTIONS",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(
-                    horizontal = ToolkitTheme.spacing.extraSmall,
-                    vertical = ToolkitTheme.spacing.extraSmall
-                )
-            )
-
-            listOf(
+            val systemActions = listOf(
                 "Save",
                 "save_file",
                 "save_folder",
@@ -348,17 +331,32 @@ private fun SystemPalette(
                 "For",
                 "While",
                 "create_folder"
-            ).forEach { action ->
-                val systemNode = PaletteNode.System(action)
-                PaletteItem(
-                    text = action,
-                    color = ToolkitTheme.colors.success,
-                    rootLayoutCoordinates = rootLayoutCoordinates,
-                    onDragStart = { pos, grabOffset -> onDragStart(systemNode, pos, grabOffset) },
-                    onDrag = onDrag,
-                    onDragEnd = onDragEnd,
-                    onClick = { onClick(systemNode) }
+            ).filter { it.contains(searchQuery, ignoreCase = true) }
+
+            if (systemActions.isNotEmpty()) {
+                Text(
+                    "SYSTEM ACTIONS",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(
+                        horizontal = ToolkitTheme.spacing.extraSmall,
+                        vertical = ToolkitTheme.spacing.extraSmall
+                    )
                 )
+
+                systemActions.forEach { action ->
+                    val systemNode = PaletteNode.System(action)
+                    PaletteItem(
+                        text = action,
+                        color = ToolkitTheme.colors.success,
+                        rootLayoutCoordinates = rootLayoutCoordinates,
+                        onDragStart = { pos, grabOffset -> onDragStart(systemNode, pos, grabOffset) },
+                        onDrag = onDrag,
+                        onDragEnd = onDragEnd,
+                        onClick = { onClick(systemNode) }
+                    )
+                }
             }
         }
     }
