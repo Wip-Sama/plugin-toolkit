@@ -130,9 +130,9 @@ fun FlowEditorView(
     var connectionStartPortId by remember { mutableStateOf<String?>(null) }
     var connectionStartIsOutput by remember { mutableStateOf(true) }
     var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
-    val portLayouts = remember { mutableStateMapOf<Pair<Long, String>, LayoutCoordinates>() }
-    val getPortBoardPosition = { nodeId: Long, portId: String ->
-        val coords = portLayouts[Pair(nodeId, portId)]
+    val portLayouts = remember { mutableStateMapOf<Triple<Long, String, Boolean>, LayoutCoordinates>() }
+    val getPortBoardPosition = { nodeId: Long, portId: String, isOutput: Boolean ->
+        val coords = portLayouts[Triple(nodeId, portId, isOutput)]
         val boardCoords = boardLayoutCoordinates
         if (coords != null && boardCoords != null && coords.isAttached) {
             val center = boardCoords.localBoundingBoxOf(coords, false).center
@@ -407,15 +407,15 @@ fun FlowEditorView(
                                 onToggleCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeCollapse(id)) },
                                 onToggleInputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeInputsCollapse(id)) },
                                 onToggleOutputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeOutputsCollapse(id)) },
-                                onPortPositioned = { nodeId, portId, coords ->
-                                    portLayouts[Pair(nodeId, portId)] = coords
+                                onPortPositioned = { nodeId, portId, isOutput, coords ->
+                                    portLayouts[Triple(nodeId, portId, isOutput)] = coords
                                 },
                                 onStartConnection = { nodeId, portId, isOutput ->
                                     isDrawingConnection = true
                                     connectionStartNodeId = nodeId
                                     connectionStartPortId = portId
                                     connectionStartIsOutput = isOutput
-                                    getPortBoardPosition(nodeId, portId)?.let {
+                                    getPortBoardPosition(nodeId, portId, isOutput)?.let {
                                         connectionCurrentPos = it
                                     }
                                 },
@@ -832,7 +832,7 @@ private fun findClosestPort(
     flow: Flow,
     connectionStartIsOutput: Boolean,
     scale: Float,
-    getPortBoardPosition: (Long, String) -> Offset?
+    getPortBoardPosition: (Long, String, Boolean) -> Offset?
 ): Pair<Long?, String?> {
     var closestPortId: String? = null
     var closestNodeId: Long? = null
@@ -841,7 +841,7 @@ private fun findClosestPort(
     flow.nodes.forEach { n ->
         val portsToTrack = if (connectionStartIsOutput) n.inputs else n.outputs
         portsToTrack.forEach { port ->
-            val portBoardPos = getPortBoardPosition(n.id, port.id) ?: return@forEach
+            val portBoardPos = getPortBoardPosition(n.id, port.id, !connectionStartIsOutput) ?: return@forEach
             val dist = (boardPosition - portBoardPos).getDistance()
             if (dist < minDistance) {
                 minDistance = dist

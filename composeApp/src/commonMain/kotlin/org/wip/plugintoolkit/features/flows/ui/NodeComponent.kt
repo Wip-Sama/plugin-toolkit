@@ -71,7 +71,7 @@ fun NodeComponent(
     onStartConnection: (Long, String, Boolean) -> Unit,
     onDragConnection: (Offset) -> Unit = {},
     onDropConnection: (isShiftPressed: Boolean) -> Unit = {},
-    onPortPositioned: (Long, String, LayoutCoordinates) -> Unit = { _, _, _ -> },
+    onPortPositioned: (Long, String, Boolean, LayoutCoordinates) -> Unit = { _, _, _, _ -> },
     onPress: (Long) -> Unit = {},
     onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
     onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit = { _, _, _, _, _ -> },
@@ -240,7 +240,7 @@ fun NodeComponent(
                                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                                         modifier = Modifier.onGloballyPositioned { coords ->
                                             sectionInputs.forEach { input ->
-                                                onPortPositioned(node.id, input.id, coords)
+                                                onPortPositioned(node.id, input.id, false, coords)
                                             }
                                         }
                                     )
@@ -267,7 +267,7 @@ fun NodeComponent(
                                             sectionInputs.forEach { input ->
                                                 val correspondingOutput = node.outputs.find { it.id == input.id }
                                                 if (correspondingOutput != null) {
-                                                    onPortPositioned(node.id, correspondingOutput.id, coords)
+                                                    onPortPositioned(node.id, correspondingOutput.id, true, coords)
                                                 }
                                             }
                                         }
@@ -307,7 +307,7 @@ fun NodeComponent(
                                             onDrag = { if (!isReadOnly) onDragConnection(it) },
                                             onDragEnd = { if (!isReadOnly) onDropConnection(it) },
                                             modifier = Modifier.onGloballyPositioned { coords ->
-                                                onPortPositioned(node.id, input.id, coords)
+                                                onPortPositioned(node.id, input.id, false, coords)
                                             }
                                         )
                                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
@@ -477,7 +477,7 @@ fun NodeComponent(
                                             onDrag = { if (!isReadOnly) onDragConnection(it) },
                                             onDragEnd = { if (!isReadOnly) onDropConnection(it) },
                                             modifier = Modifier.onGloballyPositioned { coords ->
-                                                onPortPositioned(node.id, correspondingOutput.id, coords)
+                                                onPortPositioned(node.id, correspondingOutput.id, true, coords)
                                             }
                                         )
                                     }
@@ -519,7 +519,7 @@ fun NodeComponent(
                                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                                         modifier = Modifier.onGloballyPositioned { coords ->
                                             node.outputs.forEach { output ->
-                                                onPortPositioned(node.id, output.id, coords)
+                                                onPortPositioned(node.id, output.id, true, coords)
                                             }
                                         }
                                     )
@@ -625,7 +625,7 @@ fun NodeComponent(
                                     onDrag = { if (!isReadOnly) onDragConnection(it) },
                                     onDragEnd = { if (!isReadOnly) onDropConnection(it) },
                                     modifier = Modifier.onGloballyPositioned { coords ->
-                                        onPortPositioned(node.id, output.id, coords)
+                                        onPortPositioned(node.id, output.id, true, coords)
                                     }
                                 )
                             }
