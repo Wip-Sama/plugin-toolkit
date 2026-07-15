@@ -71,7 +71,7 @@ fun NodeComponent(
     onStartConnection: (Long, String, Boolean) -> Unit,
     onDragConnection: (Offset) -> Unit = {},
     onDropConnection: (isShiftPressed: Boolean) -> Unit = {},
-    onPortPositioned: (Long, String, Offset) -> Unit = { _, _, _ -> },
+    onPortPositioned: (Long, String, LayoutCoordinates) -> Unit = { _, _, _ -> },
     onPress: (Long) -> Unit = {},
     onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
     onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit = { _, _, _, _, _ -> },
@@ -80,7 +80,6 @@ fun NodeComponent(
     onToggleOutputsCollapse: (Long) -> Unit = {},
     highlightedPortId: String? = null,
     highlightedPortColor: Color? = null,
-    boardLayoutCoordinates: LayoutCoordinates?,
     stateScale: Float,
     stateOffset: Offset,
     selectedNodeIds: Set<Long> = emptySet(),
@@ -240,12 +239,8 @@ fun NodeComponent(
                                         isHighlighted = false,
                                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                                         modifier = Modifier.onGloballyPositioned { coords ->
-                                            if (boardLayoutCoordinates != null) {
-                                                val center =
-                                                    boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
-                                                sectionInputs.forEach { input ->
-                                                    onPortPositioned(node.id, input.id, center)
-                                                }
+                                            sectionInputs.forEach { input ->
+                                                onPortPositioned(node.id, input.id, coords)
                                             }
                                         }
                                     )
@@ -269,14 +264,10 @@ fun NodeComponent(
                                         isHighlighted = false,
                                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                                         modifier = Modifier.onGloballyPositioned { coords ->
-                                            if (boardLayoutCoordinates != null) {
-                                                val center =
-                                                    boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
-                                                sectionInputs.forEach { input ->
-                                                    val correspondingOutput = node.outputs.find { it.id == input.id }
-                                                    if (correspondingOutput != null) {
-                                                        onPortPositioned(node.id, correspondingOutput.id, center)
-                                                    }
+                                            sectionInputs.forEach { input ->
+                                                val correspondingOutput = node.outputs.find { it.id == input.id }
+                                                if (correspondingOutput != null) {
+                                                    onPortPositioned(node.id, correspondingOutput.id, coords)
                                                 }
                                             }
                                         }
@@ -316,11 +307,7 @@ fun NodeComponent(
                                             onDrag = { if (!isReadOnly) onDragConnection(it) },
                                             onDragEnd = { if (!isReadOnly) onDropConnection(it) },
                                             modifier = Modifier.onGloballyPositioned { coords ->
-                                                if (boardLayoutCoordinates != null) {
-                                                    val center =
-                                                        boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
-                                                    onPortPositioned(node.id, input.id, center)
-                                                }
+                                                onPortPositioned(node.id, input.id, coords)
                                             }
                                         )
                                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
@@ -490,11 +477,7 @@ fun NodeComponent(
                                             onDrag = { if (!isReadOnly) onDragConnection(it) },
                                             onDragEnd = { if (!isReadOnly) onDropConnection(it) },
                                             modifier = Modifier.onGloballyPositioned { coords ->
-                                                if (boardLayoutCoordinates != null) {
-                                                    val center =
-                                                        boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
-                                                    onPortPositioned(node.id, correspondingOutput.id, center)
-                                                }
+                                                onPortPositioned(node.id, correspondingOutput.id, coords)
                                             }
                                         )
                                     }
@@ -535,12 +518,8 @@ fun NodeComponent(
                                         isHighlighted = false,
                                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                                         modifier = Modifier.onGloballyPositioned { coords ->
-                                            if (boardLayoutCoordinates != null) {
-                                                val center =
-                                                    boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
-                                                node.outputs.forEach { output ->
-                                                    onPortPositioned(node.id, output.id, center)
-                                                }
+                                            node.outputs.forEach { output ->
+                                                onPortPositioned(node.id, output.id, coords)
                                             }
                                         }
                                     )
@@ -646,10 +625,7 @@ fun NodeComponent(
                                     onDrag = { if (!isReadOnly) onDragConnection(it) },
                                     onDragEnd = { if (!isReadOnly) onDropConnection(it) },
                                     modifier = Modifier.onGloballyPositioned { coords ->
-                                        if (boardLayoutCoordinates != null) {
-                                            val center = boardLayoutCoordinates.localBoundingBoxOf(coords, false).center
-                                            onPortPositioned(node.id, output.id, center)
-                                        }
+                                        onPortPositioned(node.id, output.id, coords)
                                     }
                                 )
                             }

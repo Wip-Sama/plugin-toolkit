@@ -117,6 +117,13 @@ fun BoardCanvas(
     val currentScale by rememberUpdatedState(state.scale)
     val currentOffset by rememberUpdatedState(state.offset)
     val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
+    val currentOnConnectionDrag by rememberUpdatedState(onConnectionDrag)
+    val currentOnPan by rememberUpdatedState(onPan)
+    val currentOnZoom by rememberUpdatedState(onZoom)
+    val currentOnSelectNodes by rememberUpdatedState(onSelectNodes)
+    val currentOnClearSelection by rememberUpdatedState(onClearSelection)
+    val currentGetPortBoardPosition by rememberUpdatedState(getPortBoardPosition)
+    val currentOnConnectionDrop by rememberUpdatedState(onConnectionDrop)
 
     LaunchedEffect(flow.connections) {
         if (hoveredConnection != null && !flow.connections.contains(hoveredConnection)) {
@@ -149,9 +156,9 @@ fun BoardCanvas(
                     isCtrlModifierPressed = newCtrlPressed
                     if (hoveredConnection != null && newCtrlPressed) {
                         val sourcePortBoardPos =
-                            getPortBoardPosition(hoveredConnection!!.sourceNodeId, hoveredConnection!!.sourcePortId)
+                            currentGetPortBoardPosition(hoveredConnection!!.sourceNodeId, hoveredConnection!!.sourcePortId)
                         val targetPortBoardPos =
-                            getPortBoardPosition(hoveredConnection!!.targetNodeId, hoveredConnection!!.targetPortId)
+                            currentGetPortBoardPosition(hoveredConnection!!.targetNodeId, hoveredConnection!!.targetPortId)
                         if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                             val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                             val endPos = (targetPortBoardPos * currentScale) + currentOffset
@@ -204,8 +211,8 @@ fun BoardCanvas(
             }
             .pointerInput(isDrawingConnection, draggingNodeFromPalette) {
                 detectTransformGestures { _, pan, _, _ ->
-                    if (!isDrawingConnection && draggingNodeFromPalette == null) {
-                        onPan(pan)
+                    if (!currentIsDrawingConnection && draggingNodeFromPalette == null) {
+                        currentOnPan(pan)
                     }
                 }
             }
@@ -217,8 +224,8 @@ fun BoardCanvas(
                     if (minDistance < 15f) minDistance = 15f
 
                     flow.connections.forEach { connection ->
-                        val sourcePortBoardPos = getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
-                        val targetPortBoardPos = getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
+                        val sourcePortBoardPos = currentGetPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
+                        val targetPortBoardPos = currentGetPortBoardPosition(connection.targetNodeId, connection.targetPortId)
                         if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                             val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                             val endPos = (targetPortBoardPos * currentScale) + currentOffset
@@ -244,7 +251,7 @@ fun BoardCanvas(
                     }
                     selectedConnection = bestConnection
                     if (bestConnection == null) {
-                        onClearSelection()
+                        currentOnClearSelection()
                     }
                 }
             }
@@ -269,7 +276,7 @@ fun BoardCanvas(
                                     if (dragEvent.type == PointerEventType.Move) {
                                         val currentPoint = dragEvent.changes.first().position
                                         val delta = currentPoint - lastPoint
-                                        onPan(delta)
+                                        currentOnPan(delta)
                                         lastPoint = currentPoint
                                         dragEvent.changes.forEach { it.consume() }
                                     }
@@ -313,7 +320,7 @@ fun BoardCanvas(
                                                 selectedIds.add(node.id)
                                             }
                                         }
-                                        onSelectNodes(selectedIds)
+                                        currentOnSelectNodes(selectedIds)
                                     }
                                 }
                             }
@@ -332,13 +339,13 @@ fun BoardCanvas(
                             val delta = if (scrollDelta.y != 0f) scrollDelta.y else scrollDelta.x
                             if (delta != 0f) {
                                 val isShiftPressed = event.keyboardModifiers.isShiftPressed
-                                onZoom(-delta, position, isShiftPressed)
+                                currentOnZoom(-delta, position, isShiftPressed)
                             }
                         } else if (event.type == PointerEventType.Move) {
                             lastPointerPosition = position
                             if (currentIsDrawingConnection) {
                                 val boardPos = (position - currentOffset) / currentScale
-                                onConnectionDrag(boardPos)
+                                currentOnConnectionDrag(boardPos)
                             }
                             
                             var bestConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
@@ -351,7 +358,7 @@ fun BoardCanvas(
                             currentNodes.forEach { node ->
                                 val portsToTrack = node.inputs + node.outputs
                                 portsToTrack.forEach { port ->
-                                    val portBoardPos = getPortBoardPosition(node.id, port.id) ?: return@forEach
+                                    val portBoardPos = currentGetPortBoardPosition(node.id, port.id) ?: return@forEach
                                     val portScreenPos = (portBoardPos * currentScale) + currentOffset
                                     if ((position - portScreenPos).getDistance() < portHoverRadius) {
                                         isHoveringPort = true
@@ -362,9 +369,9 @@ fun BoardCanvas(
                             if (!isHoveringPort) {
                                 currentConnections.forEach { connection ->
                                     val sourcePortBoardPos =
-                                        getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
+                                        currentGetPortBoardPosition(connection.sourceNodeId, connection.sourcePortId)
                                     val targetPortBoardPos =
-                                        getPortBoardPosition(connection.targetNodeId, connection.targetPortId)
+                                        currentGetPortBoardPosition(connection.targetNodeId, connection.targetPortId)
                                     if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                                         val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                                         val endPos = (targetPortBoardPos * currentScale) + currentOffset
@@ -393,9 +400,9 @@ fun BoardCanvas(
                             lastPointerPosition = position
                             if (bestConnection != null && isCtrlModifierPressed) {
                                 val sourcePortBoardPos =
-                                    getPortBoardPosition(bestConnection.sourceNodeId, bestConnection.sourcePortId)
+                                    currentGetPortBoardPosition(bestConnection.sourceNodeId, bestConnection.sourcePortId)
                                 val targetPortBoardPos =
-                                    getPortBoardPosition(bestConnection.targetNodeId, bestConnection.targetPortId)
+                                    currentGetPortBoardPosition(bestConnection.targetNodeId, bestConnection.targetPortId)
                                 if (sourcePortBoardPos != null && targetPortBoardPos != null) {
                                     val startPos = (sourcePortBoardPos * currentScale) + currentOffset
                                     val endPos = (targetPortBoardPos * currentScale) + currentOffset
@@ -434,11 +441,12 @@ fun BoardCanvas(
                                         val dragEvent = awaitPointerEvent()
                                         if (dragEvent.type == PointerEventType.Move) {
                                             val screenPos = dragEvent.changes.firstOrNull()?.position ?: Offset.Zero
+                                            lastPointerPosition = screenPos
                                             val boardPos = (screenPos - currentOffset) / currentScale
-                                            onConnectionDrag(boardPos)
+                                            currentOnConnectionDrag(boardPos)
                                             dragEvent.changes.forEach { it.consume() }
                                         } else if (dragEvent.type == PointerEventType.Release) {
-                                            onConnectionDrop(dragEvent.keyboardModifiers.isShiftPressed)
+                                            currentOnConnectionDrop(dragEvent.keyboardModifiers.isShiftPressed)
                                             break
                                         }
                                     }
@@ -622,10 +630,19 @@ fun BoardCanvas(
                         Box(
                             modifier = Modifier
                                 .offset {
-                                    IntOffset(
-                                        (midPoint.x - 12.dp.toPx()).roundToInt(),
-                                        (midPoint.y - 12.dp.toPx()).roundToInt()
-                                    )
+                                    val currentSourcePortBoardPos = getPortBoardPosition(conn.sourceNodeId, conn.sourcePortId)
+                                    val currentTargetPortBoardPos = getPortBoardPosition(conn.targetNodeId, conn.targetPortId)
+                                    if (currentSourcePortBoardPos != null && currentTargetPortBoardPos != null) {
+                                        val currentStartPos = (currentSourcePortBoardPos * state.scale) + state.offset
+                                        val currentEndPos = (currentTargetPortBoardPos * state.scale) + state.offset
+                                        val currentMidPoint = BoardMathUtils.getBezierMidpoint(currentStartPos, currentEndPos)
+                                        IntOffset(
+                                            (currentMidPoint.x - 12.dp.toPx()).roundToInt(),
+                                            (currentMidPoint.y - 12.dp.toPx()).roundToInt()
+                                        )
+                                    } else {
+                                        IntOffset.Zero
+                                    }
                                 }
                                 .size(24.dp)
                                 .background(MaterialTheme.colorScheme.background, CircleShape)
@@ -703,10 +720,19 @@ fun BoardCanvas(
                     },
                     modifier = Modifier
                         .offset {
-                            IntOffset(
-                                (midPoint.x - 20.dp.toPx()).roundToInt(),
-                                (midPoint.y - 20.dp.toPx()).roundToInt()
-                            )
+                            val currentSourcePortBoardPos = getPortBoardPosition(conn.sourceNodeId, conn.sourcePortId)
+                            val currentTargetPortBoardPos = getPortBoardPosition(conn.targetNodeId, conn.targetPortId)
+                            if (currentSourcePortBoardPos != null && currentTargetPortBoardPos != null) {
+                                val currentStartPos = (currentSourcePortBoardPos * state.scale) + state.offset
+                                val currentEndPos = (currentTargetPortBoardPos * state.scale) + state.offset
+                                val currentMidPoint = BoardMathUtils.getBezierMidpoint(currentStartPos, currentEndPos)
+                                IntOffset(
+                                    (currentMidPoint.x - 20.dp.toPx()).roundToInt(),
+                                    (currentMidPoint.y - 20.dp.toPx()).roundToInt()
+                                )
+                            } else {
+                                IntOffset(-1000, -1000)
+                            }
                         }
                         .size(40.dp),
                     shape = CircleShape,

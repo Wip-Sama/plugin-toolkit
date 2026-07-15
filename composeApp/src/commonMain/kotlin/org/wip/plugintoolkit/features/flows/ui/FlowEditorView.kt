@@ -130,11 +130,16 @@ fun FlowEditorView(
     var connectionStartPortId by remember { mutableStateOf<String?>(null) }
     var connectionStartIsOutput by remember { mutableStateOf(true) }
     var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
-
-    // State for port position tracking
-    val portPositions = remember { mutableStateMapOf<Pair<Long, String>, Offset>() }
+    val portLayouts = remember { mutableStateMapOf<Pair<Long, String>, LayoutCoordinates>() }
     val getPortBoardPosition = { nodeId: Long, portId: String ->
-        portPositions[Pair(nodeId, portId)]
+        val coords = portLayouts[Pair(nodeId, portId)]
+        val boardCoords = boardLayoutCoordinates
+        if (coords != null && boardCoords != null && coords.isAttached) {
+            val center = boardCoords.localBoundingBoxOf(coords, false).center
+            (center - state.offset) / state.scale
+        } else {
+            null
+        }
     }
 
     val nodeSizes = remember { mutableStateMapOf<Long, IntSize>() }
@@ -324,7 +329,7 @@ fun FlowEditorView(
                                 hoveredConnection.sourceNodeId != node.id && 
                                 hoveredConnection.targetNodeId != node.id
                                 
-                        val targetAlpha = if (isDimmedByHover) 0.6f else 1f
+                        val targetAlpha = if (isDimmedByHover) 0.4f else 1f
                         val animatedAlpha by androidx.compose.animation.core.animateFloatAsState(
                             targetValue = targetAlpha,
                             animationSpec = androidx.compose.animation.core.tween(
@@ -402,8 +407,8 @@ fun FlowEditorView(
                                 onToggleCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeCollapse(id)) },
                                 onToggleInputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeInputsCollapse(id)) },
                                 onToggleOutputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeOutputsCollapse(id)) },
-                                onPortPositioned = { nodeId, portId, pos ->
-                                    portPositions[Pair(nodeId, portId)] = (pos - state.offset) / state.scale
+                                onPortPositioned = { nodeId, portId, coords ->
+                                    portLayouts[Pair(nodeId, portId)] = coords
                                 },
                                 onStartConnection = { nodeId, portId, isOutput ->
                                     isDrawingConnection = true
@@ -448,7 +453,6 @@ fun FlowEditorView(
                                 onPress = { id -> viewModel.onEvent(FlowEvent.BringToFront(id)) },
                                 highlightedPortId = nodeHighlightedPortId,
                                 highlightedPortColor = nodeHighlightedPortColor,
-                                boardLayoutCoordinates = boardLayoutCoordinates,
                                 stateScale = state.scale,
                                 stateOffset = state.offset,
                                 selectedNodeIds = state.selectedNodeIds,
