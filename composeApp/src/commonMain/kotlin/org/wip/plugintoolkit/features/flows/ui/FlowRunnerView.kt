@@ -85,6 +85,7 @@ enum class ParameterType {
 @Composable
 fun FlowRunnerView(
     viewModel: FlowViewModel,
+    initialFlowName: String? = null,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
@@ -105,7 +106,12 @@ fun FlowRunnerView(
     }
 
     // Using a simple selection for flows to run
-    var selectedFlowToRun by remember { mutableStateOf(executableFlows.firstOrNull()) }
+    var selectedFlowToRun by remember { 
+        mutableStateOf(
+            if (initialFlowName != null) executableFlows.find { it.name == initialFlowName } ?: executableFlows.firstOrNull()
+            else executableFlows.firstOrNull()
+        ) 
+    }
 
     LaunchedEffect(Unit) {
         // flows are reloaded automatically via flowRepository

@@ -90,7 +90,8 @@ import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_format
 
 @Composable
 fun PluginManagerView(
-    viewModel: PluginManagerViewModel = koinInject()
+    viewModel: PluginManagerViewModel = koinInject(),
+    onOpenPlugin: (String) -> Unit
 ) {
     val plugins by viewModel.sortedPlugins.collectAsState()
     val loadedPlugins by viewModel.loadedPlugins.collectAsState()
@@ -239,7 +240,8 @@ fun PluginManagerView(
                                 is PluginStatusAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
                             }
                         }
-                    }
+                    },
+                    onClick = { onOpenPlugin(plugin.pkg) }
                 )
             }
         }
@@ -310,7 +312,8 @@ fun PluginCard(
     enabled: Boolean = true,
     isToggling: Boolean = false,
     onToggle: (Boolean) -> Unit,
-    onAction: (PluginStatusAction) -> Unit
+    onAction: (PluginStatusAction) -> Unit,
+    onClick: () -> Unit
 ) {
     val statusColor = if (plugin.loadError != null) MaterialTheme.colorScheme.error
     else if (plugin.requiredAction != null) ToolkitTheme.colors.warning
@@ -319,7 +322,8 @@ fun PluginCard(
     else MaterialTheme.colorScheme.outline
 
     GlassCard(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        onClick = if (isLoaded) onClick else null
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

@@ -105,6 +105,7 @@ import plugintoolkit.composeapp.generated.resources.flow_used_in_parents
 fun FlowManagerView(
     viewModel: FlowViewModel,
     onEditFlow: (String) -> Unit,
+    onRunFlow: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
@@ -272,7 +273,7 @@ fun FlowManagerView(
                         notReadyNodes = notReadyNodes,
                         isRunning = isRunning,
                         isSelected = state.selectedFlowId == flow.name,
-                        onSelect = { viewModel.onEvent(FlowEvent.SelectFlow(flow.name)) },
+                        onSelect = { onRunFlow(flow.name) },
                         onEditMetadata = { flowToEditMetadata = flow.name },
                         onEdit = {
                             viewModel.onEvent(FlowEvent.SelectFlow(flow.name))

@@ -19,6 +19,7 @@ import org.wip.plugintoolkit.features.flows.ui.FlowRunnerView
 import org.wip.plugintoolkit.features.flows.viewmodel.ActiveFlowEditorTracker
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.job.ui.JobDashboard
 import org.wip.plugintoolkit.features.landingPage.ui.LandingPage
 import org.wip.plugintoolkit.features.navigation.model.Screen
@@ -85,12 +86,15 @@ fun AppNavigation(
             is Screen.FlowManager -> NavEntry(key) {
                 FlowManagerView(
                     viewModel = flowViewModel,
-                    onEditFlow = { flowName -> backStack.add(Screen.FlowEditor(flowName)) }
+                    onEditFlow = { flowName -> backStack.add(Screen.FlowEditor(flowName)) },
+                    onRunFlow = { flowName ->
+                        backStack.add(Screen.FlowRunner(flowName))
+                    }
                 )
             }
 
             is Screen.FlowRunner -> NavEntry(key) {
-                FlowRunnerView(viewModel = flowViewModel)
+                FlowRunnerView(viewModel = flowViewModel, initialFlowName = key.flowName)
             }
 
             is Screen.FlowEditor -> NavEntry(key) {
@@ -130,7 +134,9 @@ fun AppNavigation(
             is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
             is Screen.Plugins -> NavEntry(key) { PluginSectionScreen() }
             is Screen.Plugin -> NavEntry(key) { PluginSectionScreen(initialPluginId = key.id) }
-            is Screen.PluginManager -> NavEntry(key) { PluginManagerView() }
+            is Screen.PluginManager -> NavEntry(key) {
+                PluginManagerView(onOpenPlugin = { id -> backStack.add(Screen.Plugin(id)) })
+            }
             is Screen.PluginRepo -> NavEntry(key) { PluginRepoView() }
             else -> NavEntry(key) { }
         }

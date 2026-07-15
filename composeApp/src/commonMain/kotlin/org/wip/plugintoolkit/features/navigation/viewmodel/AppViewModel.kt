@@ -46,7 +46,7 @@ class AppViewModel(
                 SidebarElement(
                     id = Screen.Plugins, icon = Icons.Default.PlayCircle, title = "Capabilities".localized
                 ), SidebarElement(
-                    id = Screen.FlowRunner, icon = Icons.Default.PlayCircle, title = "Flows".localized
+                    id = Screen.FlowRunner(), icon = Icons.Default.PlayCircle, title = "Flows".localized
                 )
             )
         ), SidebarSectionData(

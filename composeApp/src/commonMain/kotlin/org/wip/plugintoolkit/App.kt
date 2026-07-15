@@ -132,6 +132,12 @@ private fun AppContentImpl(
     
                 val hasUnsavedChanges by activeFlowEditorTracker.hasUnsavedChanges.collectAsState()
     
+                val displayScreen = when (currentScreen) {
+                    is Screen.FlowRunner -> Screen.FlowRunner()
+                    is Screen.Plugin -> Screen.Plugins
+                    else -> currentScreen
+                }
+
                 // Render UI normally without destroying the composition tree.
                 // Recomposition is triggered reactively since the screens and localized strings
                 // read from LocalLanguage / trigger recomposition.
@@ -139,7 +145,7 @@ private fun AppContentImpl(
                     settings = settings,
                     sections = sections,
                     bottomSections = bottomSections,
-                    currentScreen = currentScreen,
+                    currentScreen = displayScreen,
                     onScreenSelected = { screen ->
                         if (currentScreen != screen) {
                             if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
