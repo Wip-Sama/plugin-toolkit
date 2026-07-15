@@ -62,7 +62,7 @@ fun EnumDropdownInput(
         }.toSet()
 
         if (options.isNotEmpty()) {
-            ExpressiveMenu(
+            ExpressiveMenu<String>(
                 options = options,
                 selectedOption = if (value in options) value else (options.firstOrNull() ?: ""),
                 onOptionSelected = { onValueChange(it) },
@@ -70,7 +70,6 @@ fun EnumDropdownInput(
                 enabled = enabled,
                 disabledOptions = disabledOptions
             )
-
             if (disabledOptions.size == options.size) {
                 Text(
                     text = stringResource(Res.string.settings_enum_unlock_message),
