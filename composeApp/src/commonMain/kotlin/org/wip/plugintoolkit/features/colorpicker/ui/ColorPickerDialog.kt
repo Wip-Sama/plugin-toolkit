@@ -36,6 +36,7 @@ import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
 import org.wip.plugintoolkit.features.colorpicker.utils.transparentBackground
 import org.wip.plugintoolkit.shared.components.SelectedButtonGroup
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
  * Color picker wrapped in a dialog.
@@ -86,10 +87,10 @@ fun ColorPickerDialog(
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 6.dp
             ) {
-                Box(modifier = Modifier.padding(32.dp)) {
+                Box(modifier = Modifier.padding(ToolkitTheme.spacing.extraLarge)) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
                     ) {
                         SelectedButtonGroup(
                             buttons = listOf("HEX", "RGB", "HSL", "CMYK"),
@@ -112,7 +113,7 @@ fun ColorPickerDialog(
                         ColorPicker(type = type, onPickedColor = { color = it })
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
                         ) {
                             Box(
                                 modifier = Modifier

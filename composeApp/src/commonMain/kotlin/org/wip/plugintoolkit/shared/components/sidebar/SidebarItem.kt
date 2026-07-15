@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun <T> SidebarItem(
@@ -78,7 +79,7 @@ fun <T> SidebarItem(
             .clip(animatedShape)
             .background(backgroundColor)
             .clickable { onClick() }
-            .padding(if (isExpanded) 12.dp else 8.dp),
+            .padding(if (isExpanded) ToolkitTheme.spacing.mediumSmall else ToolkitTheme.spacing.small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (isExpanded) Arrangement.Start else Arrangement.Center
     ) {
@@ -98,7 +99,7 @@ fun <T> SidebarItem(
         }
 
         if (isExpanded) {
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
             Text(
                 text = element.title.resolve(),
                 style = MaterialTheme.typography.titleMedium,

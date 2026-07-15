@@ -36,6 +36,7 @@ import org.wip.plugintoolkit.features.colorpicker.utils.green
 import org.wip.plugintoolkit.features.colorpicker.utils.lighten
 import org.wip.plugintoolkit.features.colorpicker.utils.red
 import kotlin.math.roundToInt
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
  * Classic square color picker with a hue slider (and optional alpha bar).
@@ -113,7 +114,7 @@ internal fun ClassicColorPicker(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
         ColorSlideBar(
             value = hueSlider,
             onValueChange = {
@@ -124,7 +125,7 @@ internal fun ClassicColorPicker(
         )
 
         if (showAlphaBar) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             ColorSlideBar(
                 value = alpha,
                 onValueChange = { alpha = it },

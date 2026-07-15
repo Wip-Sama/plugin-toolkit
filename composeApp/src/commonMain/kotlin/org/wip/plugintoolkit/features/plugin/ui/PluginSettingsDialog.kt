@@ -411,9 +411,9 @@ fun PluginSettingsDialog(
                                                             Row(
                                                                 modifier = Modifier
                                                                     .fillMaxWidth()
-                                                                    .padding(start = 16.dp, bottom = 12.dp, end = 16.dp)
+                                                                    .padding(start = ToolkitTheme.spacing.medium, bottom = ToolkitTheme.spacing.mediumSmall, end = ToolkitTheme.spacing.medium)
                                                                     .horizontalScroll(rememberScrollState()),
-                                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                                                             ) {
                                                                 meta.requiredByCapabilities.forEach { capName ->
                                                                     ToolkitChip(

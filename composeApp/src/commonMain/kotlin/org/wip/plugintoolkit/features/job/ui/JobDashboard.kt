@@ -182,7 +182,7 @@ fun JobDashboard(
         )
 
         // Detail Panel
-        Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(24.dp)) {
+        Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(ToolkitTheme.spacing.large)) {
             val titleText = when (currentKey) {
                 JobNavKey.General -> stringResource(Res.string.nav_job_general)
                 JobNavKey.Archive -> stringResource(Res.string.nav_job_archive)
@@ -199,7 +199,7 @@ fun JobDashboard(
                 color = MaterialTheme.colorScheme.primary
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.medium))
 
             Box(modifier = Modifier.weight(1f)) {
                 NavDisplay(
@@ -231,7 +231,7 @@ fun GeneralTab(viewModel: JobViewModel) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
         if (runningJobs.isNotEmpty()) {
             item {
@@ -284,7 +284,7 @@ fun ArchiveTab(viewModel: JobViewModel) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
         if (pausedJobs.isNotEmpty()) {
             item {
@@ -326,14 +326,14 @@ fun EndedTab(viewModel: JobViewModel) {
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
             ) {
                 Icon(Icons.Default.Cancel, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 Text(stringResource(Res.string.action_clear_all))
             }
         }
 
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
         ) {
             if (endedJobs.isNotEmpty()) {
                 item {
@@ -370,7 +370,7 @@ fun SchedulerTab() {
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
         Text(
             text = stringResource(Res.string.job_scheduler_soon),
             style = MaterialTheme.typography.titleMedium,
@@ -385,7 +385,7 @@ fun HistoryTab(viewModel: JobViewModel) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
     ) {
         items(history) { entry ->
             Card(
@@ -393,7 +393,7 @@ fun HistoryTab(viewModel: JobViewModel) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
             ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val icon = when (entry.event) {
@@ -522,29 +522,29 @@ fun JobCard(
                     text = stringResource(Res.string.job_error_format, job.errorMessage),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = ToolkitTheme.spacing.small)
                 )
             }
 
             if (isExpanded) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                 TerminalLogView(logs)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
 
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                 if (job.status == JobStatus.Paused) {
                     TextButton(onClick = onResume) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                         Text(stringResource(Res.string.action_resume))
                     }
                 }
                 if (job.isPausable && (job.status == JobStatus.Running || job.status == JobStatus.Queued)) {
                     TextButton(onClick = onPause) {
                         Icon(Icons.Default.Pause, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                         Text(stringResource(Res.string.action_pause))
                     }
                 }
@@ -558,7 +558,7 @@ fun JobCard(
                         }
                     ) {
                         Icon(Icons.Default.Cancel, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                         Text(if (isShiftPressed) "Force Cancel" else stringResource(Res.string.dialog_cancel))
                     }
                 }
@@ -568,7 +568,7 @@ fun JobCard(
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.outline)
                     ) {
                         Icon(Icons.Default.Cancel, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                         Text(stringResource(Res.string.action_clear))
                     }
                 }
@@ -594,7 +594,7 @@ fun TerminalLogView(logs: List<String>) {
             .heightIn(max = 200.dp) // Approx 10 rows
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFF1E1E1E))
-            .padding(8.dp)
+            .padding(ToolkitTheme.spacing.small)
     ) {
         LazyColumn(
             state = scrollState,

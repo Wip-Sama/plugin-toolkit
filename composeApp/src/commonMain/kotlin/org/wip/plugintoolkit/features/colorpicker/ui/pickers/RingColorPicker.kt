@@ -37,6 +37,7 @@ import org.wip.plugintoolkit.features.colorpicker.utils.lighten
 import org.wip.plugintoolkit.features.colorpicker.utils.red
 import kotlin.math.atan2
 import kotlin.math.roundToInt
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
  * Ring / wheel color picker with optional lightness, darkness and alpha bars.
@@ -132,7 +133,7 @@ internal fun RingColorPicker(
         }
 
         if (showLightColorBar) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             ColorSlideBar(
                 value = lightness,
                 onValueChange = { lightness = it },
@@ -140,7 +141,7 @@ internal fun RingColorPicker(
             )
         }
         if (showDarkColorBar) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             ColorSlideBar(
                 value = darkness,
                 onValueChange = { darkness = it },
@@ -148,7 +149,7 @@ internal fun RingColorPicker(
             )
         }
         if (showAlphaBar) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             ColorSlideBar(
                 value = alpha,
                 onValueChange = { alpha = it },

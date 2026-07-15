@@ -17,6 +17,7 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.shared.components.plugin.StandardTextField
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun PrimitiveInput(
@@ -59,7 +60,7 @@ fun PrimitiveInput(
                     )
                 } else {
                     val boolValue = value.toBooleanStrictOrNull() ?: false
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = if (compact) 0.dp else 8.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = if (compact) ToolkitTheme.spacing.none else ToolkitTheme.spacing.small)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             inputLabel()
                             Spacer(modifier = Modifier.weight(1f))

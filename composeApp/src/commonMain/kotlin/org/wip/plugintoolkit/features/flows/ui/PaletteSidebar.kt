@@ -90,9 +90,9 @@ fun PaletteSidebar(
     // Aligns perfectly with standard sidebars
     Surface(
         modifier = modifier.width(280.dp).fillMaxHeight(),
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected),
         border = BorderStroke(
-            1.dp,
+            ToolkitTheme.dimensions.borderUnselected,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder)
         )
     ) {
@@ -461,7 +461,7 @@ private fun PaletteItem(
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.cardBackground),
             border = BorderStroke(
-                1.dp,
+                ToolkitTheme.dimensions.borderUnselected,
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder)
             )
         ) {

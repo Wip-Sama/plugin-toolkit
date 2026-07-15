@@ -169,7 +169,7 @@ fun ChangelogView(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.small),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(currentText, style = MaterialTheme.typography.labelLarge)
@@ -274,7 +274,7 @@ fun VersionCard(
                 ) {
                     Text(
                         version.date,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -307,11 +307,11 @@ fun CategoryGroup(name: String, voices: List<String>, showHeader: Boolean = true
                 color = MaterialTheme.colorScheme.secondary,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
         }
         voices.forEach { voice ->
-            Row(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
-                Text("•", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 8.dp))
+            Row(modifier = Modifier.padding(start = ToolkitTheme.spacing.small, bottom = ToolkitTheme.spacing.extraSmall)) {
+                Text("•", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = ToolkitTheme.spacing.small))
                 MarkdownText(
                     text = voice,
                     style = MaterialTheme.typography.bodyMedium,

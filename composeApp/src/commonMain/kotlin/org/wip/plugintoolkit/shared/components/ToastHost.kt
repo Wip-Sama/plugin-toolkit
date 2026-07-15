@@ -100,9 +100,9 @@ fun ToastHost(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
+    Box(modifier = modifier.fillMaxSize().padding(ToolkitTheme.spacing.medium), contentAlignment = Alignment.BottomCenter) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.small),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -192,11 +192,11 @@ private fun ToastItem(
         tonalElevation = 4.dp,
         shadowElevation = 8.dp,
         border = androidx.compose.foundation.BorderStroke(
-            1.dp,
+            ToolkitTheme.dimensions.borderUnselected,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -206,7 +206,7 @@ private fun ToastItem(
                     text = toast.message.resolve(),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                    modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.small)
                 )
 
                 if (toast.isNotification) {
@@ -225,12 +225,12 @@ private fun ToastItem(
             }
 
             if (toast.durationMillis != Long.MAX_VALUE) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(ToolkitTheme.spacing.mediumSmall))
                 LinearProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
+                        .height(ToolkitTheme.dimensions.borderSelected)
                         .clip(CircleShape),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
@@ -256,10 +256,10 @@ private fun QueueControl(
             .alpha(alpha),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        border = androidx.compose.foundation.BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.small),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Badge(
@@ -269,7 +269,7 @@ private fun QueueControl(
                 Text(count.toString())
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(ToolkitTheme.spacing.small))
 
             Icon(
                 Icons.Default.DeleteSweep,

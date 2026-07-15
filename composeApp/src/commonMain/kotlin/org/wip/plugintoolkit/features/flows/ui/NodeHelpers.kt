@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.serialization.json.booleanOrNull
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun PortCircle(
@@ -63,7 +64,7 @@ fun PortCircle(
             .size(14.dp)
             .clip(CircleShape)
             .background(backgroundDisplayColor)
-            .border(if (isHighlighted || isMouseHovered) 3.dp else 2.dp, displayColor, CircleShape)
+            .border(if (isHighlighted || isMouseHovered) ToolkitTheme.dimensions.borderSelected else 2.dp, displayColor, CircleShape)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {

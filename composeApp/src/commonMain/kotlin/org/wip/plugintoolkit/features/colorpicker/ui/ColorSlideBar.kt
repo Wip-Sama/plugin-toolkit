@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.features.colorpicker.model.Colors
 import org.wip.plugintoolkit.features.colorpicker.utils.fromHueProgress
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
  * A horizontal color slide bar that reports progress [0f..1f] via [onValueChange].
@@ -184,8 +185,8 @@ private fun ColorSlideBarPreview() {
 
     MaterialTheme {
         Column(
-            modifier = Modifier.padding(32.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            modifier = Modifier.padding(ToolkitTheme.spacing.extraLarge),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.large)
         ) {
             Text("Material 3 Expressive Color Slider", style = MaterialTheme.typography.titleMedium)
 

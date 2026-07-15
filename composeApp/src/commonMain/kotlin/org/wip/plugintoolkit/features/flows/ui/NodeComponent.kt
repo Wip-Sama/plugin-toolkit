@@ -285,7 +285,7 @@ fun NodeComponent(
                                             (it.targetNodeId == node.id && it.targetPortId == input.id)
                                 }
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp),
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = ToolkitTheme.dimensions.pluginIcon).padding(vertical = ToolkitTheme.spacing.extraSmall),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
@@ -383,7 +383,7 @@ fun NodeComponent(
                                                 }
                                                 TooltipArea(
                                                     tooltip = {
-                                                        Column(modifier = Modifier.padding(4.dp)) {
+                                                        Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
                                                             inferredSem.forEach { sem ->
                                                                 Text(
                                                                     text = "• ${sem.canonicalId}",
@@ -531,7 +531,7 @@ fun NodeComponent(
                         visibleOutputs.forEach { output ->
 
                             Row(
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = ToolkitTheme.dimensions.pluginIcon).padding(vertical = ToolkitTheme.spacing.extraSmall),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End
                             ) {
@@ -585,7 +585,7 @@ fun NodeComponent(
                                         }
                                         TooltipArea(
                                             tooltip = {
-                                                Column(modifier = Modifier.padding(4.dp)) {
+                                                Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
                                                     inferredSem.forEach { sem ->
                                                         Text(
                                                             text = "• ${sem.canonicalId}",

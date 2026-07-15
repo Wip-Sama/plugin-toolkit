@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.features.colorpicker.model.ColorPickerType
 import org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun AccentColorControl(settings: AppSettings, onUpdate: (AppSettings) -> Unit) {
@@ -46,7 +47,7 @@ fun AccentColorControl(settings: AppSettings, onUpdate: (AppSettings) -> Unit) {
             .size(32.dp)
             .clip(CircleShape)
             .background(Color(settings.appearance.accentColor))
-            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+            .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outline, CircleShape)
             .clickable(enabled = !settings.appearance.followSystemAccent) {
                 showColorPicker = true
             }

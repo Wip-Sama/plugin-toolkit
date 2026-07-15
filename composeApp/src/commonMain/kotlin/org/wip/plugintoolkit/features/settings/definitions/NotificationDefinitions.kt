@@ -25,6 +25,7 @@ import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewModel) {
     nav(SettingNavKey.SystemSettings) {
@@ -95,7 +96,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                             FilledTonalIconButton(
                                 onClick = { viewModel.testSystemNotification(NotificationType.Info) },
                                 shape = shape,
-                                modifier = modifierSpec.size(36.dp)
+                                modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
                             ) {
                                 Icon(
                                     Icons.Default.Info,
@@ -109,7 +110,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                             FilledTonalIconButton(
                                 onClick = { viewModel.testSystemNotification(NotificationType.Warning) },
                                 shape = shape,
-                                modifier = modifierSpec.size(36.dp)
+                                modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
                             ) {
                                 Icon(
                                     Icons.Default.Warning,
@@ -123,7 +124,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                             FilledTonalIconButton(
                                 onClick = { viewModel.testSystemNotification(NotificationType.Error) },
                                 shape = shape,
-                                modifier = modifierSpec.size(36.dp)
+                                modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
                             ) {
                                 Icon(
                                     Icons.Default.Error,
@@ -137,7 +138,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                             FilledTonalIconButton(
                                 onClick = { viewModel.testToastNotification() },
                                 shape = shape,
-                                modifier = modifierSpec.size(36.dp)
+                                modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
                             ) {
                                 Icon(
                                     Icons.Default.ChatBubble,

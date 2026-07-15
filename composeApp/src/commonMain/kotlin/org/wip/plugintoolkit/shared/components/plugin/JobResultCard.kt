@@ -164,7 +164,7 @@ fun JobResultCard(
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
                     Text(
                         text = stringResource(Res.string.plugin_executing_progress, (progress * 100).toInt()),
                         style = MaterialTheme.typography.labelSmall,
@@ -327,7 +327,7 @@ fun JobResultCard(
                             .padding(ToolkitTheme.spacing.medium)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
                             logs.forEach { logLine ->
                                 Text(
                                     text = logLine,

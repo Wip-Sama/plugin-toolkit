@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.colorpicker.model
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 sealed class ColorPickerType {
     class Classic(val showAlphaBar: Boolean = true) : ColorPickerType()

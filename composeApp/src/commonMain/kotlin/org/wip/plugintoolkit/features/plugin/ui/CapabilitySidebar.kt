@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.PluginEntry
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun CapabilitySidebar(
@@ -46,17 +47,17 @@ fun CapabilitySidebar(
             .width(220.dp)
             .fillMaxHeight(),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp)
+                .padding(ToolkitTheme.spacing.mediumSmall)
         ) {
             // Plugin Info Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 24.dp, top = 8.dp)
+                modifier = Modifier.padding(bottom = ToolkitTheme.spacing.large, top = ToolkitTheme.spacing.small)
             ) {
                 Icon(
                     imageVector = Icons.Default.Extension,
@@ -64,7 +65,7 @@ fun CapabilitySidebar(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
                 Column {
                     Text(
                         manifest.plugin.name,
@@ -86,14 +87,14 @@ fun CapabilitySidebar(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                modifier = Modifier.padding(start = ToolkitTheme.spacing.extraSmall, bottom = ToolkitTheme.spacing.small)
             )
 
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
             ) {
                 manifest.capabilities.forEach { capability ->
                     val isSelected = selectedCapability == capability
@@ -114,7 +115,7 @@ fun CapabilitySidebar(
                                 modifier = Modifier.size(16.dp),
                                 tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
                             Text(
                                 capability.name,
                                 style = MaterialTheme.typography.bodyMedium,

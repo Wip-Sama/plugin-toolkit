@@ -75,7 +75,7 @@ fun ExecutionParametersCard(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 Switch(
                     checked = saveResults,
                     onCheckedChange = onSaveResultsChange,
@@ -153,10 +153,10 @@ private fun ParameterGroup(title: String, parameters: List<ExecutionParameter>) 
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
         ) {
             parameters.forEach { param ->
@@ -171,5 +171,5 @@ private fun ParameterGroup(title: String, parameters: List<ExecutionParameter>) 
             }
         }
     }
-    Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 }

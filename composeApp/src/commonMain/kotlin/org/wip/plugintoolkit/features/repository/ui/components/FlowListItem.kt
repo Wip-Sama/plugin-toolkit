@@ -95,7 +95,7 @@ fun FlowListItem(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = 2.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Check,
@@ -103,7 +103,7 @@ fun FlowListItem(
                                     modifier = Modifier.size(12.dp),
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                                 Text(
                                     "Installed",
                                     style = MaterialTheme.typography.labelSmall,

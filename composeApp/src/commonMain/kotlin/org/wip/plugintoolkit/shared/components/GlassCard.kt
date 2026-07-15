@@ -42,7 +42,7 @@ fun GlassCard(
         .then(clickableModifier)
         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
         .border(
-            width = 1.dp,
+            width = ToolkitTheme.dimensions.borderUnselected,
             brush = Brush.linearGradient(
                 listOf(
                     MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
@@ -63,7 +63,7 @@ fun GlassCard(
 @Composable
 private fun GlassCardPreview() {
     MaterialTheme {
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             GlassCard {
                 Text("This is a GlassCard", style = MaterialTheme.typography.bodyLarge)
                 Text("With some content inside", style = MaterialTheme.typography.bodySmall)

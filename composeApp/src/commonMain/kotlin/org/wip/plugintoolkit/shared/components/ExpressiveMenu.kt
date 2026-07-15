@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
  * A custom dropdown menu styled similarly to the Material 3 Expressive vertical menu.
@@ -45,7 +46,7 @@ fun <T> ExpressiveMenu(
         shadowElevation = 4.dp
     ) {
         Column(
-            modifier = Modifier.padding(8.dp)
+            modifier = Modifier.padding(ToolkitTheme.spacing.small)
         ) {
             options.forEach { option ->
                 val isSelected = option == selectedOption
@@ -59,7 +60,7 @@ fun <T> ExpressiveMenu(
                             else Color.Transparent
                         )
                         .clickable { onOptionSelected(option) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = 10.dp)
                 ) {
                     Text(
                         text = labelProvider(option),
@@ -82,7 +83,7 @@ fun <T> ExpressiveMenu(
 @Composable
 private fun ExpressiveMenuPreview() {
     MaterialTheme {
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             ExpressiveMenu(
                 options = listOf("Option 1", "Option 2", "Option 3"),
                 selectedOption = "Option 2",

@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.staticCompositionLocalOf
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 interface OverlayHost {
     fun show(bounds: Rect, onDismiss: () -> Unit, content: @Composable () -> Unit)
@@ -69,7 +70,7 @@ fun UnscaledExpressiveMenu(
             shape = MaterialTheme.shapes.medium
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -98,7 +99,7 @@ fun UnscaledExpressiveMenu(
                     shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.width(menuWidthDp)
                 ) {
-                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                    Column(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.extraSmall)) {
                         options.forEach { option ->
                             val isDisabled = disabledOptions.contains(option)
                             DropdownMenuItem(

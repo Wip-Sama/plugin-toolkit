@@ -118,7 +118,7 @@ fun PluginListItem(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = 2.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Check,
@@ -126,7 +126,7 @@ fun PluginListItem(
                                     modifier = Modifier.size(12.dp),
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                                 Text(
                                     stringResource(Res.string.repo_plugin_installed_version_format, installedVersion!!),
                                     style = MaterialTheme.typography.labelSmall,
@@ -192,11 +192,11 @@ fun PluginListItem(
                         .onPointerEvent(PointerEventType.Enter) { isHovered = true }
                         .onPointerEvent(PointerEventType.Exit) { isHovered = false }
                         .clickable { onCancel(plugin.pkg) }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.badgeHorizontal)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                     ) {
                         if (isHovered) {
                             Icon(

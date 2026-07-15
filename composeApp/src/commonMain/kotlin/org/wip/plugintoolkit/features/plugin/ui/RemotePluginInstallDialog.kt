@@ -161,7 +161,7 @@ fun RemotePluginCard(
             containerColor = if (isInstalled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             else MaterialTheme.colorScheme.surface
         ),
-        border = if (progress != null) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+        border = if (progress != null) BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary) else null
     ) {
         Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             Row(
@@ -245,7 +245,7 @@ fun RemotePluginCard(
                             progress = { progress },
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                                 .padding(ToolkitTheme.spacing.extraSmall),
-                            strokeWidth = 3.dp
+                            strokeWidth = ToolkitTheme.dimensions.borderSelected
                         )
                     } else if (!isInstalled) {
                         Button(

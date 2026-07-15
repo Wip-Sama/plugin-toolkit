@@ -54,6 +54,7 @@ import plugintoolkit.composeapp.generated.resources.plugin_mem_format
 import plugintoolkit.composeapp.generated.resources.plugin_no_parameters
 import plugintoolkit.composeapp.generated.resources.plugin_select_capability_hint
 import plugintoolkit.composeapp.generated.resources.plugin_tester_title
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun PluginContent(
@@ -82,7 +83,7 @@ fun PluginContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(32.dp)
+                    .padding(ToolkitTheme.spacing.extraLarge)
             ) {
                 // Tester Area
                 CapabilityTester(
@@ -96,14 +97,14 @@ fun PluginContent(
                     onExecute = { viewModel.executeCapability() }
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraLarge))
 
                 // History / Results Area
                 val visibleJobs = capabilityJobs
 
                 if (visibleJobs.isNotEmpty()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.medium),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -115,12 +116,12 @@ fun PluginContent(
 
                         TextButton(onClick = { viewModel.clearCapabilityHistory() }) {
                             Icon(Icons.Default.ClearAll, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(stringResource(Res.string.action_clear))
                         }
                     }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)) {
                         visibleJobs.forEach { job ->
                             JobResultCard(
                                 job = job,
@@ -155,8 +156,8 @@ fun PluginHeader(manifest: PluginManifest) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
+        Row(horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
             Badge { Text(stringResource(Res.string.plugin_id_format, manifest.plugin.id)) }
             Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
                 Text(stringResource(Res.string.plugin_mem_format, manifest.requirements.minMemoryMb))
@@ -178,9 +179,9 @@ fun CapabilityItem(
             alpha = 0.3f
         ),
         shape = RoundedCornerShape(12.dp),
-        border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+        border = if (isSelected) BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary) else null
     ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium).fillMaxWidth()) {
             Text(capability.name, fontWeight = FontWeight.Bold)
             Text(
                 capability.description,
@@ -189,10 +190,10 @@ fun CapabilityItem(
             )
 
             if (capability.semanticTypes.isNotEmpty() || capability.fileAccess?.isDestructive == true) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                 androidx.compose.foundation.layout.FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
                 ) {
                     if (capability.fileAccess?.isDestructive == true) {
                         Surface(
@@ -205,7 +206,7 @@ fun CapabilityItem(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error,
                                 fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                             )
                         }
                     }
@@ -219,7 +220,7 @@ fun CapabilityItem(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                             )
                         }
                     }
@@ -281,7 +282,7 @@ fun CapabilityTester(
         Text(stringResource(Res.string.plugin_no_parameters), style = MaterialTheme.typography.bodyMedium)
     }
 
-    Spacer(modifier = Modifier.height(24.dp))
+    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
 
     val validationErrors = remember(parameterValues.toMap(), capability.parameters) {
         org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateAllParameters(
@@ -303,7 +304,7 @@ fun CapabilityTester(
                 strokeWidth = 2.dp,
                 color = MaterialTheme.colorScheme.onPrimary
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
             Text(stringResource(Res.string.plugin_execute_capability_running, activeJobs.size))
         } else {
             Text(stringResource(Res.string.plugin_execute_capability))
@@ -314,7 +315,7 @@ fun CapabilityTester(
             text = "Fix parameter errors before executing",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(top = 4.dp)
+            modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
         )
     }
 }

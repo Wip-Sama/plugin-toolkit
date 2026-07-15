@@ -655,7 +655,7 @@ fun BoardCanvas(
                                 }
                                 .size(24.dp)
                                 .background(MaterialTheme.colorScheme.background, CircleShape)
-                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary, CircleShape)
                                 .clickable { showMenu = true },
                             contentAlignment = Alignment.Center
                         ) {
@@ -685,7 +685,7 @@ fun BoardCanvas(
                                             shape = MaterialTheme.shapes.medium,
                                             modifier = Modifier.width(150.dp)
                                         ) {
-                                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                            Column(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.extraSmall)) {
                                                 DropdownMenuItem(
                                                     text = { Text("Move to Start") },
                                                     onClick = {
@@ -754,7 +754,7 @@ fun BoardCanvas(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete Wire",
                             tint = MaterialTheme.colorScheme.onError,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                         )
                     }
                 }

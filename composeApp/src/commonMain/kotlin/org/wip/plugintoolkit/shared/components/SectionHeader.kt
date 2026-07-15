@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun SectionHeader(
@@ -34,7 +35,7 @@ fun SectionHeader(
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(20.dp)
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
@@ -51,7 +52,7 @@ private fun SectionHeaderPreview() {
         SectionHeader(
             title = "PREVIEW SECTION",
             icon = Icons.Default.Star,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(ToolkitTheme.spacing.medium)
         )
     }
 }

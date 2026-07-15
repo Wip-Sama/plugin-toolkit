@@ -809,7 +809,7 @@ private fun SegmentedButtonGroup(
             .fillMaxWidth()
             .height(40.dp),
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, outlineColor),
+        border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, outlineColor),
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(
@@ -870,7 +870,7 @@ private fun SegmentedButtonGroup(
                 if (index < options.size - 1) {
                     Spacer(
                         modifier = Modifier
-                            .width(1.dp)
+                            .width(ToolkitTheme.dimensions.borderUnselected)
                             .fillMaxHeight()
                             .background(outlineColor)
                     )

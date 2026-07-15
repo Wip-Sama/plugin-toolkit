@@ -470,7 +470,7 @@ fun FlowRunnerView(
                         text = "Fill in all required parameters before running",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
                     )
                 }
 

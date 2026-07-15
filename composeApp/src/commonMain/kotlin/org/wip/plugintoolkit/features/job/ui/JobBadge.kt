@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 // import org.koin.compose.viewmodel.koinViewModel
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun JobBadge(
@@ -37,7 +38,7 @@ fun JobBadge(
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary)
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                    .padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = 2.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

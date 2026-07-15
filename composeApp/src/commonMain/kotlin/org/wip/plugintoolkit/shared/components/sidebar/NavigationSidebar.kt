@@ -72,7 +72,7 @@ fun <T> NavigationSidebar(
             .fillMaxHeight()
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false },
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected),
         shadowElevation = if (isHovered && isNavbarCollapsed && canCollapse) ToolkitTheme.spacing.small else ToolkitTheme.spacing.none
     ) {
         Column(

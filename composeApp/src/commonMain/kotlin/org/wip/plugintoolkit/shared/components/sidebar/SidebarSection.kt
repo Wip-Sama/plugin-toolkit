@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.model.localized
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.section_general
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 @Preview
@@ -66,7 +67,7 @@ fun <T> SidebarSection(
                     .fillMaxWidth()
                     .clip(MaterialTheme.shapes.medium)
                     .clickable { isSectionCollapsed = !isSectionCollapsed }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.small),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -85,9 +86,9 @@ fun <T> SidebarSection(
                     modifier = Modifier.size(16.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
         } else {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
         }
 
         section.elements.forEachIndexed { index, element ->

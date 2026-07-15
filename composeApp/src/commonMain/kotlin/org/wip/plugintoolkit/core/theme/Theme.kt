@@ -3,6 +3,8 @@ package org.wip.plugintoolkit.core.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CornerBasedShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -73,7 +75,8 @@ data class Dimensions(
     val toggleButtonIconSize: Dp = 16.dp,
     val standardButtonHeight: Dp = 40.dp,
     val circularProgressStrokeWidth: Dp = 2.dp,
-    val circularProgressSize: Dp = 16.dp
+    val circularProgressSize: Dp = 16.dp,
+    val genericInputWidth: Dp = 100.dp
 )
 
 data class CustomColors(
@@ -110,10 +113,6 @@ val LocalSpacing = staticCompositionLocalOf { Spacing() }
 val LocalDimensions = staticCompositionLocalOf { Dimensions() }
 val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
 val LocalOpacity = staticCompositionLocalOf { Opacity() }
-
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.CornerBasedShape
-
 data class ToolkitShapes(
     val extraSmall: CornerBasedShape = RoundedCornerShape(4.dp),
     val small: CornerBasedShape = RoundedCornerShape(8.dp),

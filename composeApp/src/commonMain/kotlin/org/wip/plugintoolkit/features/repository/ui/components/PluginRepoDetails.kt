@@ -81,7 +81,7 @@ fun PluginRepoDetails(
         // Repo Details Header
         Surface(
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 1.dp,
+            tonalElevation = ToolkitTheme.dimensions.borderUnselected,
             shadowElevation = 2.dp,
             modifier = Modifier.fillMaxWidth()
         ) {

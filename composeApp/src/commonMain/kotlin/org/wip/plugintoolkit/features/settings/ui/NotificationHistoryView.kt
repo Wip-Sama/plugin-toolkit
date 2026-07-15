@@ -47,6 +47,7 @@ import plugintoolkit.composeapp.generated.resources.history_empty
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun NotificationHistoryView(viewModel: NotificationViewModel = koinInject()) {
@@ -54,7 +55,7 @@ fun NotificationHistoryView(viewModel: NotificationViewModel = koinInject()) {
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.End
+            modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.medium), horizontalArrangement = Arrangement.End
         ) {
             Button(
                 onClick = { viewModel.clearHistory() },
@@ -65,7 +66,7 @@ fun NotificationHistoryView(viewModel: NotificationViewModel = koinInject()) {
                 )
             ) {
                 Icon(Icons.Default.DeleteSweep, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(ToolkitTheme.spacing.small))
                 Text(stringResource(Res.string.history_clear_all))
             }
         }
@@ -80,7 +81,7 @@ fun NotificationHistoryView(viewModel: NotificationViewModel = koinInject()) {
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
             ) {
                 items(history, key = { it.id }) { record ->
                     NotificationItem(
@@ -109,11 +110,11 @@ private fun NotificationItem(
 
     Card(
         modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected)
         )
     ) {
         Row(
-            modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall), verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier.size(40.dp)
@@ -123,7 +124,7 @@ private fun NotificationItem(
                 Icon(typeIcon, contentDescription = null, tint = typeColor)
             }
 
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(ToolkitTheme.spacing.medium))
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -148,7 +149,7 @@ private fun NotificationItem(
                 Icon(
                     Icons.Default.Close,
                     contentDescription = "Delete",
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }

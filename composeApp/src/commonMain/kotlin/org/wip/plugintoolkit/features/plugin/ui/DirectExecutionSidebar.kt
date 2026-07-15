@@ -55,7 +55,7 @@ fun DirectExecutionSidebar(
         modifier = modifier
             .width(ToolkitTheme.dimensions.sidebarExpandedWidth)
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
+            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected))
             .clipToBounds()
     ) {
         AnimatedContent(
@@ -141,7 +141,7 @@ fun DirectExecutionSidebar(
                                     Text(
                                         text = "v${manifest.plugin.version}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = 2.dp),
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }

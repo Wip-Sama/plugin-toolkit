@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.api.ParameterMetadata
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun ParameterInputLabel(
@@ -33,7 +34,7 @@ fun ParameterInputLabel(
             )
         }
         if (metadata.semanticTypes.isNotEmpty()) {
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
             Text(
                 text = "(${metadata.semanticTypes.joinToString { it.canonicalId }.uppercase()})",
                 style = MaterialTheme.typography.labelSmall,

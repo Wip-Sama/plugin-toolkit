@@ -36,6 +36,7 @@ import org.wip.plugintoolkit.features.colorpicker.utils.lighten
 import org.wip.plugintoolkit.features.colorpicker.utils.red
 import kotlin.math.atan2
 import kotlin.math.roundToInt
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
  * Circular color picker with optional brightness and alpha bars.
@@ -114,7 +115,7 @@ internal fun CircleColorPicker(
         }
 
         if (showBrightnessBar) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             ColorSlideBar(
                 value = brightness,
                 onValueChange = { brightness = it },
@@ -126,7 +127,7 @@ internal fun CircleColorPicker(
         }
 
         if (showAlphaBar) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             ColorSlideBar(
                 value = alpha,
                 onValueChange = { alpha = it },

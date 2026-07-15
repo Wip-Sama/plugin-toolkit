@@ -114,7 +114,7 @@ fun <T> ExpressiveMenu(
                     shape = surfaceShape,
                     color = MenuDefaults.containerColor,
                     shadowElevation = ToolkitTheme.spacing.medium,
-                    modifier = Modifier.padding(bottom = if (groupIndex != groups.lastIndex) ToolkitTheme.spacing.extraSmall else 0.dp)
+                    modifier = Modifier.padding(bottom = if (groupIndex != groups.lastIndex) ToolkitTheme.spacing.extraSmall else ToolkitTheme.spacing.none)
                 ) {
                     Column(
                         modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
@@ -161,7 +161,7 @@ fun <T> ExpressiveMenu(
 @Composable
 private fun ExpressiveMenuPreview() {
     MaterialTheme {
-        Box(modifier = Modifier.padding(32.dp)) {
+        Box(modifier = Modifier.padding(ToolkitTheme.spacing.extraLarge)) {
             ExpressiveMenu(
                 options = listOf("System", "Light", "Dark", "Amoled"),
                 selectedOption = "Amoled",

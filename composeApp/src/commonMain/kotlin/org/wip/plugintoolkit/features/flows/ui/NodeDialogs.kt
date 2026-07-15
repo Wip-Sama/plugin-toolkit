@@ -179,7 +179,7 @@ fun NodeDialogs(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(Modifier.size(4.dp))
+                            Spacer(Modifier.size(ToolkitTheme.spacing.extraSmall))
                             org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu(
                                 options = typeOptions,
                                 selectedOption = selectedTypeOption,

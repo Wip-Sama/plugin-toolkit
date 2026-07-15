@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun SettingsSlider(
@@ -32,7 +33,7 @@ fun SettingsSlider(
 @Composable
 private fun SettingsSliderPreview() {
     MaterialTheme {
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             SettingsSlider(value = 0.5f, onValueChange = {})
         }
     }

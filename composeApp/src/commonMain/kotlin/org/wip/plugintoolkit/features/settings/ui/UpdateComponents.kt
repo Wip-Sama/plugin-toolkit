@@ -32,6 +32,7 @@ import plugintoolkit.composeapp.generated.resources.update_changelog_title
 import plugintoolkit.composeapp.generated.resources.update_downloading
 import plugintoolkit.composeapp.generated.resources.update_later
 import plugintoolkit.composeapp.generated.resources.update_now
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun UpdateDialog(
@@ -55,7 +56,7 @@ fun UpdateDialog(
                     stringResource(Res.string.update_changelog_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = ToolkitTheme.spacing.small)
                 )
 
                 Box(
@@ -64,7 +65,7 @@ fun UpdateDialog(
                         .weight(1f)
                         .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(12.dp)
+                        .padding(ToolkitTheme.spacing.mediumSmall)
                 ) {
                     SelectionContainer {
                         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -77,19 +78,19 @@ fun UpdateDialog(
                 }
 
                 if (isDownloading) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = stringResource(Res.string.update_downloading),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                         LinearProgressIndicator(
                             progress = { progress },
                             modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
                         Text(
                             text = "${(progress * 100).toInt()}%",
                             style = MaterialTheme.typography.labelSmall,
@@ -159,8 +160,8 @@ fun UpdateConfirmationDialog(
 @Composable
 fun TestNotificationButtons(viewModel: org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel) {
     androidx.compose.foundation.layout.Row(
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ToolkitTheme.spacing.small),
+        modifier = Modifier.fillMaxWidth().padding(top = ToolkitTheme.spacing.small)
     ) {
         Button(
             onClick = { viewModel.testSystemNotification(org.wip.plugintoolkit.core.notification.NotificationType.Info) },

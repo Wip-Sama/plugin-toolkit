@@ -40,7 +40,6 @@ import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import org.wip.plugintoolkit.core.theme.Shapes
 
 /**
  * A reusable Composable wrapper that shows a custom tooltip when the content is hovered.
@@ -181,9 +180,9 @@ fun TooltipProvider(content: @Composable () -> Unit) {
                 Box(
 
                     modifier = Modifier
-                        .shadow(4.dp, Shapes.extraSmall)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, Shapes.extraSmall)
-                        .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, Shapes.extraSmall)
+                        .shadow(4.dp, ToolkitTheme.shapes.extraSmall)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, ToolkitTheme.shapes.extraSmall)
+                        .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, ToolkitTheme.shapes.extraSmall)
                         .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                 ) {
                     Text(

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 @Composable
 fun SettingsTextInput(
@@ -35,7 +36,7 @@ fun SettingsTextInput(
             }
         },
         enabled = enabled,
-        modifier = modifier.width(100.dp).height(48.dp),
+        modifier = modifier.width(ToolkitTheme.dimensions.pluginIcon).height(ToolkitTheme.dimensions.pluginIcon),
         textStyle = MaterialTheme.typography.bodyMedium,
         singleLine = true
     )
@@ -45,7 +46,7 @@ fun SettingsTextInput(
 @Composable
 private fun SettingsTextInputPreview() {
     MaterialTheme {
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             SettingsTextInput(value = "Sample text", onValueChange = {})
         }
     }
