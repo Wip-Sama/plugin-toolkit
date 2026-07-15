@@ -75,6 +75,7 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_delete
 import plugintoolkit.composeapp.generated.resources.action_save
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
+import plugintoolkit.composeapp.generated.resources.error_invalid_version_format
 import plugintoolkit.composeapp.generated.resources.flow_metadata_edit_title
 import plugintoolkit.composeapp.generated.resources.flow_version
 import plugintoolkit.composeapp.generated.resources.flow_description
@@ -372,6 +373,7 @@ fun FlowManagerView(
         if (flow != null) {
             var version by remember { mutableStateOf(flow.version) }
             var description by remember { mutableStateOf(flow.description ?: "") }
+            val isVersionValid = remember(version) { version.matches(Regex("^\\d+\\.\\d+\\.\\d+$")) }
 
             AlertDialog(
                 onDismissRequest = { flowToEditMetadata = null },
@@ -382,7 +384,11 @@ fun FlowManagerView(
                             value = version,
                             onValueChange = { version = it },
                             label = { Text(stringResource(Res.string.flow_version)) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            isError = !isVersionValid,
+                            supportingText = if (!isVersionValid) {
+                                { Text(stringResource(Res.string.error_invalid_version_format)) }
+                            } else null
                         )
                         ToolkitTextField(
                             value = description,
@@ -393,16 +399,19 @@ fun FlowManagerView(
                     }
                 },
                 confirmButton = {
-                    Button(onClick = {
-                        viewModel.onEvent(
-                            FlowEvent.UpdateFlowMetadata(
-                                flow.name,
-                                version,
-                                description.takeIf { it.isNotBlank() }
+                    Button(
+                        onClick = {
+                            viewModel.onEvent(
+                                FlowEvent.UpdateFlowMetadata(
+                                    flow.name,
+                                    version,
+                                    description.takeIf { it.isNotBlank() }
+                                )
                             )
-                        )
-                        flowToEditMetadata = null
-                    }) {
+                            flowToEditMetadata = null
+                        },
+                        enabled = isVersionValid
+                    ) {
                         Text(stringResource(Res.string.action_save))
                     }
                 },

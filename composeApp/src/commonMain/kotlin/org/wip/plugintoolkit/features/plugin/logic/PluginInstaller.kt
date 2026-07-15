@@ -6,6 +6,7 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.readBytes
 import io.ktor.utils.io.readAvailable
+import io.ktor.http.encodeURLPathPart
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.VersionUtils
@@ -112,7 +113,7 @@ class PluginInstaller(
             val pluginsFolder = repoUrl.substringBeforeLast("/") + "/plugins"
             val baseUrl = "$pluginsFolder/${plugin.pkg}"
 
-            val pluginFileUrl = "$baseUrl/${plugin.fileName}"
+            val pluginFileUrl = "$baseUrl/${plugin.fileName.encodeURLPathPart()}"
             val destFile = "$pluginDir/${plugin.fileName}"
 
             downloadFile(pluginFileUrl, destFile, onProgress).onFailure { return Result.failure(it) }

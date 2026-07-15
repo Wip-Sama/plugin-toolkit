@@ -12,8 +12,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import org.koin.mp.KoinPlatform
+import io.ktor.http.encodeURLPathPart
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -209,7 +214,7 @@ class PluginRepoViewModel(
                 val repositories = repoManager.repositories.value
                 val repo = repositories.find { it.url == repoUrl }
                 val flowsFolder = repoUrl.substringBeforeLast("/") + "/" + (repo?.flowsFolder ?: "flows")
-                val flowFileUrl = "$flowsFolder/${flow.fileName}"
+                val flowFileUrl = "$flowsFolder/${flow.fileName.encodeURLPathPart()}"
 
                 val bytes = repoManager.fetchBytes(flowFileUrl) ?: run {
                     notificationService.toast("Failed to download flow file")
@@ -220,11 +225,11 @@ class PluginRepoViewModel(
                 if (flow.fileName.endsWith(".json")) {
                     try {
                         val flowContent = bytes.decodeToString()
-                        val parsedFlow = org.koin.mp.KoinPlatform.getKoin().get<kotlinx.serialization.json.Json>()
-                            .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(flowContent)
+                        val parsedFlow = KoinPlatform.getKoin().get<Json>()
+                            .decodeFromString<Flow>(flowContent)
 
                         val subflows =
-                            parsedFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode>()
+                            parsedFlow.nodes.filterIsInstance<Node.SubFlowNode>()
                         for (subflow in subflows) {
                             val name = subflow.flowName
                             if (!isFlowInstalled(name)) {
@@ -256,18 +261,18 @@ class PluginRepoViewModel(
         val repositories = repoManager.repositories.value
         val repo = repositories.find { it.url == repoUrl }
         val flowsFolder = repoUrl.substringBeforeLast("/") + "/" + (repo?.flowsFolder ?: "flows")
-        val flowFileUrl = "$flowsFolder/${flow.fileName}"
+        val flowFileUrl = "$flowsFolder/${flow.fileName.encodeURLPathPart()}"
 
         val bytes = repoManager.fetchBytes(flowFileUrl) ?: return
 
         if (flow.fileName.endsWith(".json")) {
             try {
                 val flowContent = bytes.decodeToString()
-                val parsedFlow = org.koin.mp.KoinPlatform.getKoin().get<kotlinx.serialization.json.Json>()
-                    .decodeFromString<org.wip.plugintoolkit.features.flows.model.Flow>(flowContent)
+                val parsedFlow = KoinPlatform.getKoin().get<Json>()
+                    .decodeFromString<Flow>(flowContent)
 
                 val subflows =
-                    parsedFlow.nodes.filterIsInstance<org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode>()
+                    parsedFlow.nodes.filterIsInstance<Node.SubFlowNode>()
                 for (subflow in subflows) {
                     val name = subflow.flowName
                     if (!isFlowInstalled(name)) {
