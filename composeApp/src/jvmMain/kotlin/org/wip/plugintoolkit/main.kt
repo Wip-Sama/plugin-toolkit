@@ -362,7 +362,6 @@ fun runMain(
 ) {
     // Flag to handle system tray lifecycle
     var isTrayOpen by mutableStateOf(true)
-
     application {
         val viewModel = preloadedViewModel
         val startMode = preloadedMode

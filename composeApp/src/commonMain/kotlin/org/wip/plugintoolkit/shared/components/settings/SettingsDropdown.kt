@@ -13,6 +13,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.safeContentPadding
@@ -115,7 +116,7 @@ fun <T> ExpressiveMenu(
                     shadowElevation = ToolkitTheme.spacing.medium,
                     modifier = Modifier.padding(bottom = if (groupIndex != groups.lastIndex) ToolkitTheme.spacing.extraSmall else 0.dp)
                 ) {
-                    androidx.compose.foundation.layout.Column(
+                    Column(
                         modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
                     ) {
@@ -178,7 +179,7 @@ private fun ExpressiveMenuPreview() {
 private fun ExpandedExpressiveMenuPreview() {
     MaterialTheme {
         Box() {
-            androidx.compose.foundation.layout.Column {
+            Column {
                 // First Menu Block
                 Surface(
                     shape = RoundedCornerShape(
@@ -191,7 +192,7 @@ private fun ExpandedExpressiveMenuPreview() {
                     shadowElevation = ToolkitTheme.spacing.medium,
                     modifier = Modifier.padding(bottom = ToolkitTheme.spacing.extraSmall)
                 ) {
-                    androidx.compose.foundation.layout.Column(
+                    Column(
                         modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
                     ) {
@@ -233,7 +234,7 @@ private fun ExpandedExpressiveMenuPreview() {
                     color = MenuDefaults.containerColor,
                     shadowElevation = ToolkitTheme.spacing.medium
                 ) {
-                    androidx.compose.foundation.layout.Column(
+                    Column(
                         modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
                     ) {

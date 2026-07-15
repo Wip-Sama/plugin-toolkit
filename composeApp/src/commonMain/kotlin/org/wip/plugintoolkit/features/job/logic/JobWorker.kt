@@ -5,16 +5,21 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.writeString
+import org.jetbrains.compose.resources.getString
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import org.koin.core.component.inject
@@ -22,13 +27,19 @@ import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PluginSignal
+import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.plugin.logic.DefaultExecutionFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.plugin_install_failed
+import kotlin.time.Duration.Companion.milliseconds
 
 class JobWorker(
     val workerId: Int,
@@ -37,7 +48,8 @@ class JobWorker(
 ) : KoinComponent {
     private val pluginManager: PluginManager by inject()
     private val lifecycleCoordinator: PluginLifecycleCoordinator by inject()
-    private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository by inject()
+    private val settingsRepository: SettingsRepository by inject()
+    private val notificationService: NotificationService by inject()
     private var isWorkerActive = true
     private val workerJob = SupervisorJob(scope.coroutineContext[kotlinx.coroutines.Job])
     private val workerScope = scope + workerJob
@@ -89,7 +101,7 @@ class JobWorker(
                 } catch (e: Exception) {
                     Logger.e(e) { "Worker $workerId encountered error in loop" }
                     // Cooling-off period on error
-                    kotlinx.coroutines.delay(1000)
+                    delay(1000.milliseconds)
                 }
             }
         }
@@ -148,7 +160,7 @@ class JobWorker(
         validateCapabilityParameters(manifest, job.capabilityName, mutableParams)
 
         val processor = plugin.getProcessor().getOrThrow()
-        val execFs = org.wip.plugintoolkit.features.plugin.logic.DefaultExecutionFileSystem(sandboxDir)
+        val execFs = DefaultExecutionFileSystem(sandboxDir)
         val context = pluginManager.createPluginContext(
             job.pluginId,
             job.id,
@@ -189,17 +201,17 @@ class JobWorker(
             while (attempt <= retries) {
                 try {
                     if (timeout == -1L) {
-                        return@async kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        return@async withContext(kotlinx.coroutines.Dispatchers.IO) {
                             processor.process(request, context)
                         }
                     } else {
-                        return@async kotlinx.coroutines.withTimeout(timeout) {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        return@async withTimeout(timeout.milliseconds) {
+                            withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 processor.process(request, context)
                             }
                         }
                     }
-                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                } catch (e: TimeoutCancellationException) {
                     lastError = e
                     attempt++
                     if (attempt <= retries) {
@@ -208,7 +220,7 @@ class JobWorker(
                             "Timeout executing capability ${job.capabilityName}, retrying ($attempt/$retries)...",
                             "WARN"
                         )
-                        kotlinx.coroutines.delay(2000)
+                        delay(2000.milliseconds)
                     }
                 } catch (e: kotlinx.io.IOException) {
                     lastError = e
@@ -219,7 +231,7 @@ class JobWorker(
                             "IO error executing capability ${job.capabilityName}, retrying ($attempt/$retries)...",
                             "WARN"
                         )
-                        kotlinx.coroutines.delay(2000)
+                        delay(2000.milliseconds)
                     }
                 } catch (e: Exception) {
                     if (e is PauseFlowException || e is CancellationException) {
@@ -249,7 +261,7 @@ class JobWorker(
 
         val result = try {
             handle.result.await()
-        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+        } catch (e: TimeoutCancellationException) {
             Logger.e(e) { "CRITICAL WARNING: Worker $workerId: Capability job ${job.id} timed out. The plugin may be hanging and could leak classloaders." }
             ExecutionResult.Error("Plugin execution timed out and may have leaked resources.", e)
         } catch (e: CancellationException) {
@@ -501,6 +513,9 @@ class JobWorker(
             val error = result.exceptionOrNull()?.message ?: "Installation failed"
             manager.tryFailJob(job.id, error)
             lifecycleCoordinator.onLifecycleJobFailed(job, error)
+            workerScope.launch {
+                notificationService.toast(getString(Res.string.plugin_install_failed, error))
+            }
         }
     }
 

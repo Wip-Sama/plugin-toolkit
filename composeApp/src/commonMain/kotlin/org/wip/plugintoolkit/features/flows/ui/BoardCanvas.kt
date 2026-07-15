@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -676,15 +678,15 @@ fun BoardCanvas(
                                             shape = MaterialTheme.shapes.medium,
                                             modifier = Modifier.width(150.dp)
                                         ) {
-                                            androidx.compose.foundation.layout.Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                                androidx.compose.material3.DropdownMenuItem(
+                                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                                DropdownMenuItem(
                                                     text = { androidx.compose.material3.Text("Move to Start") },
                                                     onClick = {
                                                         onMoveConnectionFirst(conn)
                                                         showMenu = false
                                                     }
                                                 )
-                                                androidx.compose.material3.DropdownMenuItem(
+                                                DropdownMenuItem(
                                                     text = { androidx.compose.material3.Text("Move to End") },
                                                     onClick = {
                                                         onMoveConnectionLast(conn)

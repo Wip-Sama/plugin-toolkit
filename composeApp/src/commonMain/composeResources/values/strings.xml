@@ -356,4 +356,6 @@
     <string name="setting_enable_transient_retries">Enable Transient Retries</string>
     <string name="setting_max_retries">Max Retries</string>
     <string name="error_invalid_version_format">Invalid version format (expected x.y.z)</string>
+    <string name="plugin_install_failed">Plugin installation failed: %1$s</string>
+    <string name="plugin_installed_success">Plugin installed successfully</string>
 </resources>

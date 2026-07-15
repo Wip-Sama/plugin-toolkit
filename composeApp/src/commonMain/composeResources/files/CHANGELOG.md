@@ -3,11 +3,10 @@ Date: xx-07-2026
 Changes:
 	- The splash screen is now way faster
 	- Switched to a temporary new dropdown menu for style
-	- Contextual menu (right-click) was garbage (ui) (TODO)
 Added:
 	- When hovering a node connection, the related noted to that connection will be highlighted, and the others dimmed
 	- Copying and pasting nodes and group of nodes
-	- A toast when a plugin fails to install to let the user know the reason (TODO)
+	- A toast when a plugin fails to install to let the user know the reason
 	- option to make system node input optional
 	- option to add default to system input node
 	- Padding while holding a connection in the flow editor

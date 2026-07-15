@@ -34,6 +34,9 @@ import plugintoolkit.composeapp.generated.resources.plugin_choose_install_locati
 import plugintoolkit.composeapp.generated.resources.plugin_state_change_error
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall_confirmation
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall_title
+import plugintoolkit.composeapp.generated.resources.plugin_install_failed
+import plugintoolkit.composeapp.generated.resources.plugin_installed_success
+import plugintoolkit.composeapp.generated.resources.repo_plugin_installed
 import plugintoolkit.composeapp.generated.resources.plugin_validated_success
 import plugintoolkit.composeapp.generated.resources.plugin_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_result
@@ -141,7 +144,13 @@ class PluginManagerViewModel(
             if (filePath != null) {
                 pickInstallLocation { target ->
                     viewModelScope.launch {
-                        pluginManager.installLocal(filePath, target)
+                        val result = pluginManager.installLocal(filePath, target)
+                        if (result.isFailure) {
+                            val errorMsg = result.exceptionOrNull()?.message ?: "Unknown error"
+                            notificationService.toast(getString(Res.string.plugin_install_failed, errorMsg))
+                        } else {
+                            notificationService.toast(getString(Res.string.plugin_installed_success))
+                        }
                     }
                 }
             }
