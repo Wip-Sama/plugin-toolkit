@@ -123,6 +123,11 @@ fun Modifier.tooltip(textResource: StringResource, delay: Duration = Duration.ZE
  * A modifier extension that displays a text tooltip when hovering over the component.
  */
 @OptIn(ExperimentalComposeUiApi::class)
+@Deprecated(
+    message = "Use Modifier.tooltip(StringResource) instead",
+    replaceWith = ReplaceWith("Modifier.tooltip(textResource, delay)"),
+    level = DeprecationLevel.WARNING
+)
 fun Modifier.tooltip(text: String, delay: Duration = Duration.ZERO): Modifier = composed {
     tooltipImpl(text, delay)
 }

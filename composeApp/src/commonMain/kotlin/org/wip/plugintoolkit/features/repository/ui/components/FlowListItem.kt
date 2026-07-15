@@ -113,7 +113,7 @@ fun FlowListItem(
                         }
                     } else {
                         Text(
-                            stringResource(Res.string.repo_flow_filename_version_format, flow.fileName),
+                            stringResource(Res.string.repo_flow_filename_version_format, flow.fileName, flow.version),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

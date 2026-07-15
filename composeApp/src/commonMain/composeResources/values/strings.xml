@@ -142,6 +142,7 @@
     <string name="node_parameters_section">Parameters</string>
     <string name="node_results_section">Results</string>
     <string name="auto_generated_path_format">%1$s (Auto-generated)</string>
+    <string name="pick_color">Pick Color</string>
 
     <!-- General / Common -->
     <string name="dialog_confirm">Confirm</string>
@@ -252,6 +253,8 @@
     <!-- Flows Feature -->
     <string name="flow_manager_title">Flow Manager</string>
     <string name="flow_create_new">Create New Flow</string>
+    <string name="flow_import_file">Import from file</string>
+    <string name="flow_import_clipboard">Import from clipboard</string>
     <string name="flow_search_placeholder">Search flows...</string>
     <string name="flow_no_flows">No flows created yet.</string>
     <string name="flow_no_search_results">No flows matching your search.</string>
@@ -266,6 +269,9 @@
     <string name="flow_used_in_parents">Used in %1$d parents</string>
     <string name="flow_used_in_chip">Used in: %1$s</string>
     <string name="flow_missing_chip">Missing: %1$s</string>
+    <string name="flow_metadata_edit_title">Edit Flow Properties</string>
+    <string name="flow_version">Version</string>
+    <string name="flow_description">Description</string>
 
     <!-- Flow Runner -->
     <string name="flow_select_title">Select Flow</string>

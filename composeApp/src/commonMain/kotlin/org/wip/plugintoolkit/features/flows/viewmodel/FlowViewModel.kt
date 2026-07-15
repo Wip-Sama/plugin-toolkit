@@ -23,6 +23,7 @@ import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import java.util.Base64
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -104,6 +105,14 @@ sealed interface FlowEvent {
     data class CreateFlow(val name: String) : FlowEvent
     data class RenameFlow(val oldName: String, val newName: String) : FlowEvent
     data class DeleteFlow(val name: String) : FlowEvent
+    data class ShareFlowToClipboard(val flowName: String, val onCopyReady: (String) -> Unit) : FlowEvent
+    
+    data class UpdateFlowMetadata(
+        val flowName: String,
+        val newVersion: String,
+        val newDescription: String?
+    ) : FlowEvent
+    data class TriggerImportFromClipboard(val base64String: String) : FlowEvent
     data class ExpandSubFlow(val nodeId: Long) : FlowEvent
 
     data object Save : FlowEvent
@@ -200,10 +209,13 @@ class FlowViewModel(
             is FlowEvent.CreateFlow -> flowRepository.saveFlow(Flow(event.name))
             is FlowEvent.RenameFlow -> flowRepository.renameFlow(event.oldName, event.newName)
             is FlowEvent.DeleteFlow -> handleDeleteFlow(event.name)
+            is FlowEvent.UpdateFlowMetadata -> flowRepository.updateFlowMetadata(event.flowName, event.newVersion, event.newDescription)
             is FlowEvent.TriggerImport -> handleTriggerImport()
             is FlowEvent.ResolveImportConflicts -> handleResolveImportConflicts(event.resolutions, event.customNames)
             is FlowEvent.CancelImport -> handleCancelImport()
             is FlowEvent.ExportFlow -> handleExportFlow(event.flowName)
+            is FlowEvent.ShareFlowToClipboard -> handleShareFlowToClipboard(event.flowName, event.onCopyReady)
+            is FlowEvent.TriggerImportFromClipboard -> handleTriggerImportFromClipboard(event.base64String)
             else -> {}
         }
     }
@@ -234,6 +246,32 @@ class FlowViewModel(
                 Logger.e(e) { "Failed to export flow: $flowName" }
                 withContext(Dispatchers.Main) {
                     resolvedNotificationService?.toast("Failed to export flow: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun handleShareFlowToClipboard(flowName: String, onCopyReady: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val flow = _state.value.flows.find { it.name == flowName } ?: return@launch
+
+                val dependencies = getTransitiveSubflowDependencies(flow, _state.value.flows)
+                val allExportedFlows = listOf(flow) + dependencies
+
+                val entries =
+                    allExportedFlows.associate { it.name + ".json" to json.encodeToString(Flow.serializer(), it) }
+                val zipBytes = PlatformUtils.zipEntries(entries)
+                val base64String = Base64.getEncoder().encodeToString(zipBytes)
+
+                withContext(Dispatchers.Main) {
+                    onCopyReady(base64String)
+                    resolvedNotificationService?.toast("Flow copied to clipboard successfully!")
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to share flow to clipboard $flowName" }
+                withContext(Dispatchers.Main) {
+                    resolvedNotificationService?.toast("Failed to copy flow: ${e.message}")
                 }
             }
         }
@@ -318,6 +356,25 @@ class FlowViewModel(
                 Logger.e(e) { "Failed to import flows" }
                 withContext(Dispatchers.Main) {
                     resolvedNotificationService?.toast("Failed to import flows: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun handleTriggerImportFromClipboard(base64String: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val bytes = Base64.getDecoder().decode(base64String)
+                val importedFlows = importFlowFromBytes(bytes, "clipboard.zip")
+                if (importedFlows.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        resolvedNotificationService?.toast("No valid flows found in clipboard data.")
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to decode clipboard data for flow import" }
+                withContext(Dispatchers.Main) {
+                    resolvedNotificationService?.toast("Clipboard does not contain valid flow data.")
                 }
             }
         }

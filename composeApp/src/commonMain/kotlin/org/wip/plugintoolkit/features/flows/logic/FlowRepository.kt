@@ -234,6 +234,27 @@ class FlowRepository(
         }
     }
 
+    fun updateFlowMetadata(flowName: String, newVersion: String, newDescription: String?) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val appDataDir = settingsPersistence.getSettingsDir()
+                val flowFile = getFlowPath(appDataDir, flowName)
+
+                val flow = _flows.value.find { it.name == flowName } ?: return@launch
+                val updatedFlow = flow.copy(version = newVersion, description = newDescription)
+
+                val flowContent = json.encodeToString(Flow.serializer(), updatedFlow)
+                SystemFileSystem.sink(flowFile).buffered().use { it.writeString(flowContent) }
+
+                _flows.update { current ->
+                    current.map { if (it.name == flowName) updatedFlow else it }
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to update flow metadata for $flowName" }
+            }
+        }
+    }
+
     fun triggerMigrationsForUpdatedPlugin(pluginId: String) {
         scope.launch(Dispatchers.IO) {
             val appDataDir = settingsPersistence.getSettingsDir()

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -38,6 +39,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.ConflictResolutionAction
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
@@ -66,12 +70,19 @@ import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_delete
+import plugintoolkit.composeapp.generated.resources.action_save
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
+import plugintoolkit.composeapp.generated.resources.flow_metadata_edit_title
+import plugintoolkit.composeapp.generated.resources.flow_version
+import plugintoolkit.composeapp.generated.resources.flow_description
 import plugintoolkit.composeapp.generated.resources.flow_broken_tag
 import plugintoolkit.composeapp.generated.resources.flow_create_button
 import plugintoolkit.composeapp.generated.resources.flow_create_new
+import plugintoolkit.composeapp.generated.resources.flow_import_file
+import plugintoolkit.composeapp.generated.resources.flow_import_clipboard
 import plugintoolkit.composeapp.generated.resources.flow_delete_confirm
 import plugintoolkit.composeapp.generated.resources.flow_delete_title
 import plugintoolkit.composeapp.generated.resources.flow_delete_warning_subflow
@@ -101,6 +112,10 @@ fun FlowManagerView(
     var newFlowName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
     var flowToDelete by remember { mutableStateOf<String?>(null) }
+    var flowToEditMetadata by remember { mutableStateOf<String?>(null) }
+    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
+    val textClipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
 //    LaunchedEffect(Unit) {
 //        // flows are reloaded automatically via flowRepository
@@ -137,9 +152,30 @@ fun FlowManagerView(
                         shape = shape,
                         modifier = modifierSpec
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "Import Flow")
+                        Icon(Icons.Default.Download, contentDescription = "Import from file")
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        Text("Import Flow")
+                        Text(stringResource(Res.string.flow_import_file))
+                    }
+                }
+
+                item { shape, modifierSpec ->
+                    Button(
+                        onClick = {
+                            val base64 = textClipboardManager.getText()?.text
+                            if (!base64.isNullOrBlank()) {
+                                viewModel.onEvent(FlowEvent.TriggerImportFromClipboard(base64))
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        ),
+                        shape = shape,
+                        modifier = modifierSpec
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Import from clipboard")
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        Text(stringResource(Res.string.flow_import_clipboard))
                     }
                 }
 
@@ -236,12 +272,20 @@ fun FlowManagerView(
                         isRunning = isRunning,
                         isSelected = state.selectedFlowId == flow.name,
                         onSelect = { viewModel.onEvent(FlowEvent.SelectFlow(flow.name)) },
+                        onEditMetadata = { flowToEditMetadata = flow.name },
                         onEdit = {
                             viewModel.onEvent(FlowEvent.SelectFlow(flow.name))
                             onEditFlow(flow.name)
                         },
                         onDelete = { flowToDelete = flow.name },
-                        onExport = { viewModel.onEvent(FlowEvent.ExportFlow(flow.name)) }
+                        onExport = { viewModel.onEvent(FlowEvent.ExportFlow(flow.name)) },
+                        onShareClipboard = {
+                            viewModel.onEvent(FlowEvent.ShareFlowToClipboard(flow.name) { base64 ->
+                                scope.launch {
+                                    clipboard.setClipEntry(PlatformUtils.clipEntryOf(base64))
+                                }
+                            })
+                        }
                     )
                 }
             }
@@ -321,6 +365,54 @@ fun FlowManagerView(
                 }
             }
         )
+    }
+
+    if (flowToEditMetadata != null) {
+        val flow = state.flows.find { it.name == flowToEditMetadata }
+        if (flow != null) {
+            var version by remember { mutableStateOf(flow.version) }
+            var description by remember { mutableStateOf(flow.description ?: "") }
+
+            AlertDialog(
+                onDismissRequest = { flowToEditMetadata = null },
+                title = { Text(stringResource(Res.string.flow_metadata_edit_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)) {
+                        ToolkitTextField(
+                            value = version,
+                            onValueChange = { version = it },
+                            label = { Text(stringResource(Res.string.flow_version)) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        ToolkitTextField(
+                            value = description,
+                            onValueChange = { description = it },
+                            label = { Text(stringResource(Res.string.flow_description)) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        viewModel.onEvent(
+                            FlowEvent.UpdateFlowMetadata(
+                                flow.name,
+                                version,
+                                description.takeIf { it.isNotBlank() }
+                            )
+                        )
+                        flowToEditMetadata = null
+                    }) {
+                        Text(stringResource(Res.string.action_save))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { flowToEditMetadata = null }) {
+                        Text(stringResource(Res.string.dialog_cancel))
+                    }
+                }
+            )
+        }
     }
 
     if (state.importConflicts.isNotEmpty()) {
@@ -460,9 +552,11 @@ private fun FlowItem(
     isRunning: Boolean,
     isSelected: Boolean,
     onSelect: () -> Unit,
+    onEditMetadata: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onExport: () -> Unit
+    onExport: () -> Unit,
+    onShareClipboard: () -> Unit
 ) {
     val isBroken = missingCapabilities.isNotEmpty() || notReadyNodes.isNotEmpty()
 
@@ -617,13 +711,45 @@ private fun FlowItem(
                     FilledTonalIconButton(
                         onClick = onExport,
                         shape = shape,
-                        modifier = modifierSpec.size(36.dp)
+                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Export Flow",
                             tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier
+                                .size(ToolkitTheme.dimensions.iconMediumSmall)
+                                .tooltip("Export Flow to file")
+                        )
+                    }
+                }
+                item { shape, modifierSpec ->
+                    FilledTonalIconButton(
+                        onClick = onShareClipboard,
+                        shape = shape,
+                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy to Clipboard",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .size(ToolkitTheme.dimensions.iconMediumSmall)
+                                .tooltip("Copy flow to clipboard")
+                        )
+                    }
+                }
+                item { shape, modifierSpec ->
+                    FilledTonalIconButton(
+                        onClick = onEditMetadata,
+                        shape = shape,
+                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Edit Metadata",
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                         )
                     }
                 }
@@ -631,13 +757,13 @@ private fun FlowItem(
                     FilledTonalIconButton(
                         onClick = onEdit,
                         shape = shape,
-                        modifier = modifierSpec.size(36.dp)
+                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                         )
                     }
                 }
@@ -645,13 +771,13 @@ private fun FlowItem(
                     FilledTonalIconButton(
                         onClick = onDelete,
                         shape = shape,
-                        modifier = modifierSpec.size(36.dp)
+                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete",
                             tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                         )
                     }
                 }

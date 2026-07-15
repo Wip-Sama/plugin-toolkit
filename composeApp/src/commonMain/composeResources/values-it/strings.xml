@@ -232,6 +232,8 @@
     <!-- Flows Feature -->
     <string name="flow_manager_title">Gestore Flussi</string>
     <string name="flow_create_new">Crea Nuovo Flusso</string>
+    <string name="flow_import_file">Importa da file</string>
+    <string name="flow_import_clipboard">Importa dagli appunti</string>
     <string name="flow_search_placeholder">Cerca flussi...</string>
     <string name="flow_no_flows">Nessun flusso creato ancora.</string>
     <string name="flow_no_search_results">Nessun flusso corrispondente alla tua ricerca.</string>
@@ -246,6 +248,9 @@
     <string name="flow_used_in_parents">Usato in %1$d padri</string>
     <string name="flow_used_in_chip">Usato in: %1$s</string>
     <string name="flow_missing_chip">Mancante: %1$s</string>
+    <string name="flow_metadata_edit_title">Modifica Proprietà Flusso</string>
+    <string name="flow_version">Versione</string>
+    <string name="flow_description">Descrizione</string>
 
     <!-- Flow Runner -->
     <string name="flow_select_title">Seleziona Flusso</string>
@@ -329,6 +334,7 @@
     <string name="node_parameters_section">Parametri</string>
     <string name="node_results_section">Risultati</string>
     <string name="auto_generated_path_format">%1$s (Generato automaticamente)</string>
+    <string name="pick_color">Pick Color</string>
     <string name="setting_plugin_timeout">Timeout Plugin (ms)</string>
     <string name="setting_enable_transient_retries">Abilita Tentativi Transitori</string>
     <string name="setting_max_retries">Numero Massimo Tentativi</string>
