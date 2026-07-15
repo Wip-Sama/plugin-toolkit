@@ -53,7 +53,9 @@ import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.model.LocalizedString
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.model.NotificationSettings
+import java.awt.Toolkit
 import java.util.UUID
 
 data class ToastData(
@@ -114,7 +116,7 @@ fun ToastHost(
                     Box(modifier = Modifier.alpha(0f)) {
                         QueueControl(count = toastQueue.size, onClearAll = {})
                     }
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(ToolkitTheme.spacing.mediumSmall))
                 }
             }
 
@@ -142,7 +144,7 @@ fun ToastHost(
                 exit = fadeOut()
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(ToolkitTheme.spacing.mediumSmall))
                     QueueControl(
                         count = toastQueue.size,
                         onClearAll = {

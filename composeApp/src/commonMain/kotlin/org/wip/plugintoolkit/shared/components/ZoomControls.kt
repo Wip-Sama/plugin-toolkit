@@ -56,7 +56,7 @@ private fun ZoomControlsPreview() {
             scale = 1.0f,
             onZoomIn = {},
             onZoomOut = {},
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(ToolkitTheme.spacing.medium)
         )
     }
 }

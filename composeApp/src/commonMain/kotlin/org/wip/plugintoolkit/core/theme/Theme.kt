@@ -111,6 +111,35 @@ val LocalDimensions = staticCompositionLocalOf { Dimensions() }
 val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
 val LocalOpacity = staticCompositionLocalOf { Opacity() }
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerBasedShape
+
+data class ToolkitShapes(
+    val extraSmall: CornerBasedShape = RoundedCornerShape(4.dp),
+    val small: CornerBasedShape = RoundedCornerShape(8.dp),
+    val medium: CornerBasedShape = RoundedCornerShape(12.dp),
+    val large: CornerBasedShape = RoundedCornerShape(16.dp),
+    val extraLarge: CornerBasedShape = RoundedCornerShape(24.dp),
+    val startActionRow: CornerBasedShape = RoundedCornerShape(
+        topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp
+    ),
+    val middleActionRow: CornerBasedShape = RoundedCornerShape(4.dp),
+    val endActionRow: CornerBasedShape = RoundedCornerShape(
+        topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp
+    ),
+    val standAloneActionRow: CornerBasedShape = RoundedCornerShape(16.dp)
+) {
+    val material = androidx.compose.material3.Shapes(
+        extraSmall = extraSmall,
+        small = small,
+        medium = medium,
+        large = large,
+        extraLarge = extraLarge
+    )
+}
+
+val LocalShapes = staticCompositionLocalOf { ToolkitShapes() }
+
 object ToolkitTheme {
     val spacing: Spacing
         @Composable
@@ -131,6 +160,11 @@ object ToolkitTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalOpacity.current
+
+    val shapes: ToolkitShapes
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalShapes.current
 }
 
 private val DarkColorScheme =
@@ -209,11 +243,12 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
             validated = seedColor,
             success = Color(0xFF4CAF50) //TODO: Could be tuned based on theme
         ),
-        LocalOpacity provides Opacity()
+        LocalOpacity provides Opacity(),
+        LocalShapes provides ToolkitShapes()
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            shapes = Shapes,
+            shapes = LocalShapes.current.material,
             content = content
         )
     }
