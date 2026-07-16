@@ -1,5 +1,5 @@
-Version: 2.0.0
-Date: xx-07-2026
+Version: 1.7.3
+Date: 16-07-2026
 Changes:
 	- The splash screen is now way faster
 	- Switched to a temporary new dropdown menu for style

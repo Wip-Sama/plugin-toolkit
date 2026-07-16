@@ -104,7 +104,7 @@ private fun parseMarkdown(text: String): AnnotatedString {
                         addStyle(
                             SpanStyle(
                                 fontFamily = FontFamily.Monospace,
-                                background = Color.Gray.copy(alpha = 0.15f)
+                                background = ToolkitTheme.colors.gray.copy(alpha = ToolkitTheme.opacity.buttonBackground)
                             ), start, length
                         )
                         i = end + 1
@@ -125,7 +125,7 @@ private fun parseMarkdown(text: String): AnnotatedString {
                             append(parseMarkdown(linkText))
                             addStyle(
                                 SpanStyle(
-                                    color = Color(0xFF2196F3),
+                                    color = ToolkitTheme.colors.info,
                                     textDecoration = TextDecoration.Underline
                                 ), start, length
                             )

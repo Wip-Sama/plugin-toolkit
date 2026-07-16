@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun GlassCard(
@@ -40,13 +42,13 @@ fun GlassCard(
         .animateContentSize()
         .clip(MaterialTheme.shapes.large)
         .then(clickableModifier)
-        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground))
         .border(
             width = ToolkitTheme.dimensions.borderUnselected,
             brush = Brush.linearGradient(
                 listOf(
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.05f)
+                    MaterialTheme.colorScheme.outline.copy(alpha = ToolkitTheme.opacity.borderLow),
+                    MaterialTheme.colorScheme.outline.copy(alpha = ToolkitTheme.opacity.cardBackground)
                 )
             ),
             shape = MaterialTheme.shapes.large
@@ -65,8 +67,8 @@ private fun GlassCardPreview() {
     MaterialTheme {
         Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             GlassCard {
-                Text("This is a GlassCard", style = MaterialTheme.typography.bodyLarge)
-                Text("With some content inside", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(Res.string.preview_glasscard_title), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(Res.string.preview_glasscard_subtitle), style = MaterialTheme.typography.bodySmall)
             }
         }
     }

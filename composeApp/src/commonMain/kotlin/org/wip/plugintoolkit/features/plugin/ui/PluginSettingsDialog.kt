@@ -350,7 +350,7 @@ fun PluginSettingsDialog(
                             OutlinedCard(
                                 modifier = Modifier.fillMaxSize(),
                                 colors = CardDefaults.outlinedCardColors(
-                                    containerColor = Color.Transparent
+                                    containerColor = ToolkitTheme.colors.transparent
                                 ),
                                 border = CardDefaults.outlinedCardBorder().copy(
                                     brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outlineVariant)
@@ -540,7 +540,7 @@ private fun SidebarItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else ToolkitTheme.colors.transparent
     val contentColor =
         if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
 

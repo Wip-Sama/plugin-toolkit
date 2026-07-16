@@ -54,6 +54,8 @@ import org.wip.plugintoolkit.features.plugin.utils.PluginSearchUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun RemotePluginInstallDialog(
@@ -95,12 +97,12 @@ fun RemotePluginInstallDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "Install Remote Plugins",
+                        stringResource(Res.string.plugin_install_remote_title),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.action_close))
                     }
                 }
 
@@ -111,7 +113,7 @@ fun RemotePluginInstallDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = ToolkitTheme.spacing.medium),
-                    placeholder = { Text("Search plugins...") },
+                    placeholder = { Text(stringResource(Res.string.plugin_search_placeholder)) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     singleLine = true
                 )
@@ -158,7 +160,7 @@ fun RemotePluginCard(
     Card(
         modifier = Modifier.fillMaxWidth().alpha(alpha),
         colors = CardDefaults.cardColors(
-            containerColor = if (isInstalled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = if (isInstalled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.divider)
             else MaterialTheme.colorScheme.surface
         ),
         border = if (progress != null) BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary) else null
@@ -205,7 +207,7 @@ fun RemotePluginCard(
                                 shape = MaterialTheme.shapes.extraSmall
                             ) {
                                 Text(
-                                    "Installed",
+                                    stringResource(Res.string.plugin_status_installed),
                                     modifier = Modifier.padding(
                                         horizontal = ToolkitTheme.spacing.extraSmall + 2.dp,
                                         vertical = ToolkitTheme.spacing.extraSmall / 2
@@ -235,7 +237,7 @@ fun RemotePluginCard(
                     IconButton(onClick = { showInfo = !showInfo }) {
                         Icon(
                             Icons.Default.Info,
-                            contentDescription = "Info",
+                            contentDescription = stringResource(Res.string.action_info),
                             tint = if (showInfo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -262,7 +264,7 @@ fun RemotePluginCard(
                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall + 2.dp)
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text("Install")
+                            Text(stringResource(Res.string.plugin_install_button))
                         }
                     }
                 }

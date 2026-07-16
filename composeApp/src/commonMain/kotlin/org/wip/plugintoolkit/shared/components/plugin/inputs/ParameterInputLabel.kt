@@ -38,7 +38,7 @@ fun ParameterInputLabel(
             Text(
                 text = "(${metadata.semanticTypes.joinToString { it.canonicalId }.uppercase()})",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.high)
             )
         }
     }

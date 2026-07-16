@@ -36,6 +36,7 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_install
 import plugintoolkit.composeapp.generated.resources.repo_action_update_version
 import plugintoolkit.composeapp.generated.resources.repo_flow_filename_version_format
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun FlowListItem(
@@ -105,7 +106,7 @@ fun FlowListItem(
                                 )
                                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                                 Text(
-                                    "Installed",
+                                    stringResource(Res.string.plugin_status_installed),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )

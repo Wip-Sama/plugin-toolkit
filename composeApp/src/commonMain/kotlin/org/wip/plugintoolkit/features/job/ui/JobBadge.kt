@@ -59,7 +59,7 @@ fun JobBadge(
             ) {
                 Text(
                     text = totalActive.toString(),
-                    color = Color.White,
+                    color = ToolkitTheme.colors.white,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold
                 )

@@ -100,6 +100,7 @@ import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_used_in
 import plugintoolkit.composeapp.generated.resources.flow_search_placeholder
 import plugintoolkit.composeapp.generated.resources.flow_used_in_chip
 import plugintoolkit.composeapp.generated.resources.flow_used_in_parents
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun FlowManagerView(
@@ -482,7 +483,7 @@ private fun ConflictResolutionDialog(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.divider)
                         )
                     ) {
                         Column(
@@ -663,7 +664,7 @@ private fun FlowItem(
                         Text(
                             text = "•",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.divider)
                         )
                         Text(
                             text = stringResource(Res.string.flow_used_in_parents, parentFlows.size),
@@ -785,7 +786,7 @@ private fun FlowItem(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
+                            contentDescription = stringResource(Res.string.action_delete),
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                         )
@@ -821,7 +822,7 @@ private fun SegmentedButtonGroup(
                 val containerColor = if (isSelected) {
                     MaterialTheme.colorScheme.secondaryContainer
                 } else {
-                    Color.Transparent
+                    ToolkitTheme.colors.transparent
                 }
 
                 val contentColor = if (isSelected) {

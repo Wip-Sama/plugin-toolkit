@@ -17,6 +17,7 @@ import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.settings_enum_unlock_message
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun EnumDropdownInput(
@@ -80,7 +81,7 @@ fun EnumDropdownInput(
                 )
             }
         } else {
-            Text("No options available", color = MaterialTheme.colorScheme.error)
+            Text(stringResource(Res.string.common_no_options), color = MaterialTheme.colorScheme.error)
         }
     }
 }

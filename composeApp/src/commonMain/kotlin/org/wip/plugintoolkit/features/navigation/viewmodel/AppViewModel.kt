@@ -52,7 +52,7 @@ class AppViewModel(
         ), SidebarSectionData(
             title = "Management".localized, elements = listOf(
                 SidebarElement(
-                    id = Screen.PluginManager, icon = Icons.Default.Inventory, title = "Plugin Manager".localized
+                    id = Screen.PluginManager, icon = Icons.Default.Inventory, title = Res.string.tab_plugin_manager.localized
                 ), SidebarElement(
                     id = Screen.FlowManager, icon = Icons.Default.Dashboard, title = "Flow Manager".localized
                 ), SidebarElement(

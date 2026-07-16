@@ -23,6 +23,7 @@ import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.update_check_started
 import plugintoolkit.composeapp.generated.resources.update_new_version_found
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun CheckForUpdatesControl(viewModel: SettingsViewModel) {
@@ -54,7 +55,7 @@ fun CheckForUpdatesControl(viewModel: SettingsViewModel) {
             IconButton(onClick = { viewModel.checkForUpdates(isManual = true) }) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh",
+                    contentDescription = stringResource(Res.string.action_refresh),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }

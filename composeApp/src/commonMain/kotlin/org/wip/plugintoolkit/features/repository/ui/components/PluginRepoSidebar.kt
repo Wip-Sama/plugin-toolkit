@@ -106,7 +106,7 @@ fun PluginRepoSidebar(
                         containerColor = if (isSelected) {
                             MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.cardBackground)
                         } else {
-                            Color.Transparent
+                            ToolkitTheme.colors.transparent
                         }
                     ),
                     border = BorderStroke(

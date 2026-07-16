@@ -342,7 +342,7 @@ fun BroadSearchResultsView(
 fun PlaceholderView(text: String) {
     Box(
         modifier = Modifier.fillMaxSize().background(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = MaterialTheme.shapes.medium
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground), shape = MaterialTheme.shapes.medium
         ), contentAlignment = Alignment.Center
     ) {
         Text(

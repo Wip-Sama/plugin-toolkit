@@ -240,13 +240,13 @@ fun DashboardHero() {
             Text(
                 stringResource(Res.string.landing_welcome_title),
                 style = MaterialTheme.typography.headlineMedium,
-                color = Color.White,
+                color = ToolkitTheme.colors.white,
                 fontWeight = FontWeight.ExtraBold
             )
             Text(
                 stringResource(Res.string.landing_welcome_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = ToolkitTheme.opacity.secondaryText)
+                color = ToolkitTheme.colors.white.copy(alpha = ToolkitTheme.opacity.secondaryText)
             )
         }
     }
@@ -319,7 +319,7 @@ fun QuickLinkItem(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.high)
         )
     }
 }

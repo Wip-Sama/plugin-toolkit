@@ -322,7 +322,7 @@ fun FlowEditorView(
                                                     startInferredSemantic,
                                                     targetInferredSemantic
                                                 ) !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
-                                    if (compatible) null else Color.Red
+                                    if (compatible) null else ToolkitTheme.colors.red
                                 } else null
                             } else null
 
@@ -566,7 +566,7 @@ fun FlowEditorView(
                 .align(Alignment.TopEnd)
                 .padding(ToolkitTheme.spacing.medium),
             shape = RoundedCornerShape(ToolkitTheme.spacing.large),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.almostOpaque),
             tonalElevation = ToolkitTheme.spacing.small,
             shadowElevation = ToolkitTheme.spacing.extraSmall
         ) {
@@ -780,11 +780,11 @@ private fun NodeComponentPlaceholder(node: Node, height: Dp = 120.dp) {
     Surface(
         modifier = Modifier.width(380.dp).height(height),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-        border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
+        border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.borderLow))
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(node.title, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+            Text(node.title, color = MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.disabled))
         }
     }
 }

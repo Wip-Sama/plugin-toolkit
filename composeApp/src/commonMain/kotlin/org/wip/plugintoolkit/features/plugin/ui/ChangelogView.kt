@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.api.Release
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.MarkdownText
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 enum class FilterLevel {
     Everything, Major, Minor, Patch
@@ -113,7 +115,7 @@ fun ChangelogView(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.action_close), tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -203,7 +205,7 @@ fun ChangelogView(
                 SecondaryScrollableTabRow(
                     selectedTabIndex = allCategories.indexOf(selectedCategory).coerceAtLeast(0),
                     edgePadding = 0.dp,
-                    containerColor = Color.Transparent,
+                    containerColor = ToolkitTheme.colors.transparent,
                     divider = {},
                     indicator = {
                         val index = allCategories.indexOf(selectedCategory).coerceAtLeast(0)

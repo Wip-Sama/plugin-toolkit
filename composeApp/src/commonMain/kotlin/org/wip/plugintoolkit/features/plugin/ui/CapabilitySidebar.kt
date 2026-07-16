@@ -47,7 +47,7 @@ fun CapabilitySidebar(
             .width(220.dp)
             .fillMaxHeight(),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-        border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider))
     ) {
         Column(
             modifier = Modifier
@@ -102,7 +102,7 @@ fun CapabilitySidebar(
                     Surface(
                         onClick = { onCapabilitySelected(capability) },
                         modifier = Modifier.fillMaxWidth(),
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else ToolkitTheme.colors.transparent,
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Row(

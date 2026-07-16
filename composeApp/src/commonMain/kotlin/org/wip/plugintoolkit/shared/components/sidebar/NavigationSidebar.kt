@@ -40,6 +40,8 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.navigation.model.Screen
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_name
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -90,7 +92,7 @@ fun <T> NavigationSidebar(
                     IconButton(onClick = onToggleNavbar) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = "Toggle Sidebar"
+                            contentDescription = stringResource(Res.string.action_toggle_sidebar)
                         )
                     }
                     if (isActuallyExpanded) {

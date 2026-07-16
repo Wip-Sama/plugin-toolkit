@@ -53,6 +53,7 @@ import plugintoolkit.composeapp.generated.resources.repo_search_plugins_placehol
 import plugintoolkit.composeapp.generated.resources.repo_share_link_desc
 import plugintoolkit.composeapp.generated.resources.repo_tab_flows
 import plugintoolkit.composeapp.generated.resources.repo_tab_plugins
+import plugintoolkit.composeapp.generated.resources.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,7 +145,7 @@ fun PluginRepoDetails(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    "Multiple repositories provide the same packages.",
+                                    stringResource(Res.string.plugin_repo_multiple_warning),
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }

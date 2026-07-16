@@ -68,6 +68,9 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_more_actions
 import plugintoolkit.composeapp.generated.resources.action_remove
 import plugintoolkit.composeapp.generated.resources.plugin_add_folder
+import plugintoolkit.composeapp.generated.resources.plugin_install_remote
+import plugintoolkit.composeapp.generated.resources.plugin_rerun_setup
+import plugintoolkit.composeapp.generated.resources.plugin_open_folder
 import plugintoolkit.composeapp.generated.resources.plugin_broken
 import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.plugin_default_folder_label
@@ -188,7 +191,7 @@ fun PluginManagerView(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text("Install Remote")
+                        Text(stringResource(Res.string.plugin_install_remote))
                     }
                 }
                 item { shape, modifierSpec ->
@@ -543,7 +546,7 @@ fun PluginCard(
                                     leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Rerun Setup") },
+                                    text = { Text(stringResource(Res.string.plugin_rerun_setup)) },
                                     onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
                                 )
@@ -558,7 +561,7 @@ fun PluginCard(
                                     leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Open Folder") },
+                                    text = { Text(stringResource(Res.string.plugin_open_folder)) },
                                     onClick = { onAction(PluginStatusAction.OpenFolder); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
                                 )

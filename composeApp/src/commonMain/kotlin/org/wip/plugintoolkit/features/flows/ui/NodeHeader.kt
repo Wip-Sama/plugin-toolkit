@@ -44,6 +44,8 @@ import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.tooltip
 import kotlin.time.Duration.Companion.milliseconds
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun NodeHeader(
@@ -117,7 +119,7 @@ fun NodeHeader(
             Icon(
                 imageVector = if (node is Node.CapabilityNode) Icons.Default.Cable else Icons.Default.UnfoldMore,
                 contentDescription = null,
-                tint = onHeaderColor.copy(alpha = 0.8f),
+                tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
             )
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
@@ -162,7 +164,7 @@ fun NodeHeader(
                     Icon(
                         imageVector = Icons.Default.UnfoldMore,
                         contentDescription = "Expand",
-                        tint = onHeaderColor.copy(alpha = 0.8f),
+                        tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )
                 }
@@ -176,7 +178,7 @@ fun NodeHeader(
                 Icon(
                     imageVector = if (node.isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
                     contentDescription = "Toggle Collapse",
-                    tint = onHeaderColor.copy(alpha = 0.8f),
+                    tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
                     modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                 )
             }
@@ -191,7 +193,7 @@ fun NodeHeader(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Load Node Settings",
-                        tint = onHeaderColor.copy(alpha = 0.8f),
+                        tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )
                 }
@@ -206,7 +208,7 @@ fun NodeHeader(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Edit Port",
-                        tint = onHeaderColor.copy(alpha = 0.8f),
+                        tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )
                 }
@@ -238,8 +240,8 @@ fun NodeHeader(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = onHeaderColor.copy(alpha = 0.8f),
+                        contentDescription = stringResource(Res.string.action_delete),
+                        tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )
                 }

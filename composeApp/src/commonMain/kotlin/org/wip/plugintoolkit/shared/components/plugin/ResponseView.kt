@@ -20,11 +20,13 @@ import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun ResponseView(response: PluginResponse) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(title = "Execution Result", icon = Icons.Default.CheckCircle)
+        SectionHeader(title = stringResource(Res.string.plugin_execution_result), icon = Icons.Default.CheckCircle)
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
 
         SelectionContainer {
@@ -39,7 +41,7 @@ fun ResponseView(response: PluginResponse) {
         val metadata = response.metadata
         if (!metadata.isNullOrEmpty()) {
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
-            SectionHeader(title = "Metadata", icon = Icons.Default.Info)
+            SectionHeader(title = stringResource(Res.string.plugin_metadata), icon = Icons.Default.Info)
             metadata.forEach { (k, v) ->
                 Row(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.extraSmall)) {
                     Text("${k}: ", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)

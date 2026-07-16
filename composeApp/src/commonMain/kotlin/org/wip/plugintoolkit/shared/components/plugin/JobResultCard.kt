@@ -59,6 +59,7 @@ import plugintoolkit.composeapp.generated.resources.flow_run_id_label
 import plugintoolkit.composeapp.generated.resources.flow_triggered_label
 import plugintoolkit.composeapp.generated.resources.plugin_executing_progress
 import plugintoolkit.composeapp.generated.resources.plugin_execution_id_format
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun JobResultCard(
@@ -142,7 +143,7 @@ fun JobResultCard(
                         ) {
                             Icon(
                                 imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Toggle Details",
+                                contentDescription = stringResource(Res.string.action_toggle_details),
                                 modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.outline
                             )
@@ -206,7 +207,7 @@ fun JobResultCard(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(
-                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                            MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.divider),
                                             MaterialTheme.shapes.medium
                                         )
                                         .padding(ToolkitTheme.spacing.medium)
@@ -259,7 +260,7 @@ fun JobResultCard(
                             )
                             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                             Surface(
-                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.divider),
                                 shape = MaterialTheme.shapes.medium,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -321,7 +322,7 @@ fun JobResultCard(
                             .fillMaxWidth()
                             .height(180.dp)
                             .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.high),
                                 MaterialTheme.shapes.medium
                             )
                             .padding(ToolkitTheme.spacing.medium)

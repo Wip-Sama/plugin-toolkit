@@ -31,6 +31,8 @@ import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.ui.AppNavigation
 import org.wip.plugintoolkit.ui.AppScaffold
 import org.wip.plugintoolkit.ui.AppUpdateDialogs
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun App(
@@ -112,7 +114,7 @@ private fun AppContentImpl(
                         val editorElement = SidebarElement(
                             id = editorId as Screen,
                             icon = Icons.Default.Edit,
-                            title = "Editor".localized,
+                            title = Res.string.tab_editor.localized,
                             isVisible = isEditingFlow
                         )
                         newElements.add(insertIndex, editorElement)
@@ -150,7 +152,7 @@ private fun AppContentImpl(
                         if (currentScreen != screen) {
                             if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
                                 dialogService.showConfirmation(
-                                    title = "Unsaved Changes",
+                                    title = stringResource(Res.string.dialog_unsaved_changes),
                                     message = "All the unsaved data will be lost. Are you sure you want to exit?",
                                     onConfirm = {
                                         activeFlowEditorTracker.setHasUnsavedChanges(false)

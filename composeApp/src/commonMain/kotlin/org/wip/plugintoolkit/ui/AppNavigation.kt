@@ -28,6 +28,8 @@ import org.wip.plugintoolkit.features.plugin.ui.PluginSectionScreen
 import org.wip.plugintoolkit.features.repository.ui.PluginRepoView
 import org.wip.plugintoolkit.features.settings.ui.SettingsScreen
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.core.model.localized
 
 @Composable
 fun AppNavigation(
@@ -48,7 +50,7 @@ fun AppNavigation(
         onBack = {
             if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
                 dialogService.showConfirmation(
-                    title = "Unsaved Changes",
+                    title = Res.string.dialog_unsaved_changes.localized,
                     message = "All the unsaved data will be lost. Are you sure you want to exit?",
                     onConfirm = {
                         activeFlowEditorTracker.setHasUnsavedChanges(false)
@@ -66,7 +68,7 @@ fun AppNavigation(
                     if (currentScreen != screen) {
                         if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
                             dialogService.showConfirmation(
-                                title = "Unsaved Changes",
+                                title = Res.string.dialog_unsaved_changes.localized,
                                 message = "All the unsaved data will be lost. Are you sure you want to exit?",
                                 onConfirm = {
                                     activeFlowEditorTracker.setHasUnsavedChanges(false)
@@ -106,7 +108,7 @@ fun AppNavigation(
                     onExit = {
                         if (hasUnsavedChanges) {
                             dialogService.showConfirmation(
-                                title = "Unsaved Changes",
+                                title = Res.string.dialog_unsaved_changes.localized,
                                 message = "All the unsaved data will be lost. Are you sure you want to exit?",
                                 onConfirm = {
                                     activeFlowEditorTracker.setHasUnsavedChanges(false)

@@ -25,6 +25,8 @@ import org.wip.plugintoolkit.core.utils.SemanticCategory
 import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.shared.components.plugin.StandardTextField
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun FileInput(
@@ -74,7 +76,7 @@ fun FileInput(
                         IconButton(onClick = { onValueChange("") }) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Clear selection",
+                                contentDescription = stringResource(Res.string.action_clear_selection),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }

@@ -30,10 +30,13 @@ import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
 
 data class Spacing(
     val none: Dp = 0.dp,
+    val extraExtraSmall: Dp = 2.dp,
     val extraSmall: Dp = 4.dp,
     val small: Dp = 8.dp,
+    val smallMedium: Dp = 10.dp,
     val mediumSmall: Dp = 12.dp,
     val medium: Dp = 16.dp,
+    val mediumLarge: Dp = 20.dp,
     val large: Dp = 24.dp,
     val extraLarge: Dp = 32.dp,
     val huge: Dp = 40.dp,
@@ -83,7 +86,17 @@ data class CustomColors(
     val success: Color = Color(0xFF4CAF50),
     val warning: Color = Color(0xFFFF9800),
     val info: Color = Color(0xFF2196F3),
-    val validated: Color = Color(0xFFD0BCFF)
+    val validated: Color = Color(0xFFD0BCFF),
+    val red: Color = Color.Red,
+    val green: Color = Color.Green,
+    val blue: Color = Color.Blue,
+    val yellow: Color = Color.Yellow,
+    val gray: Color = Color.Gray,
+    val cyan: Color = Color.Cyan,
+    val magenta: Color = Color.Magenta,
+    val white: Color = Color.White,
+    val black: Color = Color.Black,
+    val transparent: Color = Color.Transparent
 ) {
     val onSuccess: Color = if (success.luminance() > 0.5f) Color.Black else Color.White
     val onWarning: Color = if (warning.luminance() > 0.5f) Color.Black else Color.White
@@ -94,12 +107,15 @@ data class CustomColors(
 data class Opacity(
     val transparent: Float = 0.0f,
     val cardBackground: Float = 0.05f,
+    val subtleHighlight: Float = 0.08f,
     val borderLow: Float = 0.2f,
     val glassBackground: Float = 0.3f,
     val sidebarBackground: Float = 0.4f,
     val divider: Float = 0.5f,
     val disabled: Float = 0.6f,
+    val high: Float = 0.7f,
     val secondaryText: Float = 0.8f,
+    val almostOpaque: Float = 0.9f,
     val full: Float = 1.0f,
     val textFieldContainer: Float = 0.1f,
     val textFieldUnfocusedBorder: Float = 0.5f,

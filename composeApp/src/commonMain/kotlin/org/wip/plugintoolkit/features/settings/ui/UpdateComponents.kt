@@ -33,6 +33,7 @@ import plugintoolkit.composeapp.generated.resources.update_downloading
 import plugintoolkit.composeapp.generated.resources.update_later
 import plugintoolkit.composeapp.generated.resources.update_now
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun UpdateDialog(
@@ -64,7 +65,7 @@ fun UpdateDialog(
                         .fillMaxWidth()
                         .weight(1f)
                         .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.divider))
                         .padding(ToolkitTheme.spacing.mediumSmall)
                 ) {
                     SelectionContainer {
@@ -129,7 +130,7 @@ fun UpdateConfirmationDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                "Running Jobs Detected",
+                stringResource(Res.string.update_jobs_running),
                 style = MaterialTheme.typography.headlineSmall
             )
         },
@@ -146,12 +147,12 @@ fun UpdateConfirmationDialog(
                     androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 }
             ) {
-                Text("Stop Jobs & Update")
+                Text(stringResource(Res.string.update_stop_jobs))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Update Later")
+                Text(stringResource(Res.string.update_later))
             }
         }
     )
@@ -167,19 +168,19 @@ fun TestNotificationButtons(viewModel: org.wip.plugintoolkit.features.settings.v
             onClick = { viewModel.testSystemNotification(org.wip.plugintoolkit.core.notification.NotificationType.Info) },
             modifier = Modifier.weight(1f)
         ) {
-            Text("Test Info")
+            Text(stringResource(Res.string.test_info))
         }
         Button(
             onClick = { viewModel.testSystemNotification(org.wip.plugintoolkit.core.notification.NotificationType.Error) },
             modifier = Modifier.weight(1f)
         ) {
-            Text("Test Error")
+            Text(stringResource(Res.string.test_error))
         }
         Button(
             onClick = { viewModel.testToastNotification() },
             modifier = Modifier.weight(1f)
         ) {
-            Text("Test Toast")
+            Text(stringResource(Res.string.test_toast))
         }
     }
 }

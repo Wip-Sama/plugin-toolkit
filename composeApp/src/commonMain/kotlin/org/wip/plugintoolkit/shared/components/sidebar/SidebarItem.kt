@@ -36,24 +36,24 @@ fun <T> SidebarItem(
     position: SidebarItemPosition = SidebarItemPosition.StandAlone
 ) {
     val backgroundColor = if (isSelected)
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = ToolkitTheme.opacity.buttonBackground)
     else
-        Color.Transparent
+        ToolkitTheme.colors.transparent
 
     val contentColor = if (isSelected)
         MaterialTheme.colorScheme.primary
     else
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+        MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.secondaryText)
 
     val iconBackgroundColor = if (isSelected)
         MaterialTheme.colorScheme.primaryContainer
     else
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.high)
 
     val iconTintColor = if (isSelected)
         MaterialTheme.colorScheme.onPrimaryContainer
     else
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+        MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.high)
 
     val targetTopStart =
         if (position == SidebarItemPosition.Start || position == SidebarItemPosition.StandAlone) 16.dp else 4.dp

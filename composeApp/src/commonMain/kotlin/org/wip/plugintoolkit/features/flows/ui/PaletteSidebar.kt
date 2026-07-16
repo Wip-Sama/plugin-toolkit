@@ -498,7 +498,7 @@ fun PaletteItemPreview(node: PaletteNode) {
             if (node.action.lowercase() == "error") {
                 Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
             } else {
-                Pair(ToolkitTheme.colors.success, Color.White)
+                Pair(ToolkitTheme.colors.success, ToolkitTheme.colors.white)
             }
         }
 

@@ -52,9 +52,9 @@ fun PortCircle(
     }
 
     val backgroundDisplayColor = if (isHighlighted) {
-        color.copy(alpha = 0.4f)
+        color.copy(alpha = ToolkitTheme.opacity.sidebarBackground)
     } else if (isMouseHovered) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = ToolkitTheme.opacity.sidebarBackground)
     } else {
         MaterialTheme.colorScheme.background
     }
@@ -155,7 +155,7 @@ fun getNodeDescription(node: Node): String {
 fun parseColorString(colorStr: String): Color {
     val lastColor = colorStr.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim() ?: colorStr
     val trimmed = lastColor.trim()
-    if (trimmed.isEmpty()) return Color.Transparent
+    if (trimmed.isEmpty()) return ToolkitTheme.colors.transparent
     if (trimmed.startsWith("#")) {
         return try {
             val hex = trimmed.substring(1)
@@ -190,10 +190,10 @@ fun parseColorString(colorStr: String): Color {
                     Color(r, g, b, a)
                 }
 
-                else -> Color.Gray
+                else -> ToolkitTheme.colors.gray
             }
         } catch (e: Exception) {
-            Color.Gray
+            ToolkitTheme.colors.gray
         }
     }
     if (trimmed.startsWith("rgba", ignoreCase = true)) {
@@ -205,7 +205,7 @@ fun parseColorString(colorStr: String): Color {
             val a = parts[3].trim().toFloat()
             Color(r, g, b, a)
         } catch (e: Exception) {
-            Color.Gray
+            ToolkitTheme.colors.gray
         }
     }
     if (trimmed.startsWith("rgb", ignoreCase = true)) {
@@ -216,21 +216,21 @@ fun parseColorString(colorStr: String): Color {
             val b = parts[2].trim().toFloat() / 255f
             Color(r, g, b, 1f)
         } catch (e: Exception) {
-            Color.Gray
+            ToolkitTheme.colors.gray
         }
     }
     return when (trimmed.lowercase()) {
-        "red" -> Color.Red
-        "green" -> Color.Green
-        "blue" -> Color.Blue
-        "yellow" -> Color.Yellow
-        "cyan" -> Color.Cyan
-        "magenta" -> Color.Magenta
-        "black" -> Color.Black
-        "white" -> Color.White
-        "gray" -> Color.Gray
-        "transparent" -> Color.Transparent
-        else -> Color.Gray
+        "red" -> ToolkitTheme.colors.red
+        "green" -> ToolkitTheme.colors.green
+        "blue" -> ToolkitTheme.colors.blue
+        "yellow" -> ToolkitTheme.colors.yellow
+        "cyan" -> ToolkitTheme.colors.cyan
+        "magenta" -> ToolkitTheme.colors.magenta
+        "black" -> ToolkitTheme.colors.black
+        "white" -> ToolkitTheme.colors.white
+        "gray" -> ToolkitTheme.colors.gray
+        "transparent" -> ToolkitTheme.colors.transparent
+        else -> ToolkitTheme.colors.gray
     }
 }
 

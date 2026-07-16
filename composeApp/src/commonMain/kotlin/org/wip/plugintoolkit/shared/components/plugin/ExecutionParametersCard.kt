@@ -30,6 +30,7 @@ import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.plugin_save_results
+import plugintoolkit.composeapp.generated.resources.*
 
 data class ExecutionParameter(
     val name: String,
@@ -101,7 +102,7 @@ fun ExecutionParametersCard(
                 shape = MaterialTheme.shapes.small
             ) {
                 Text(
-                    "Warning: This operation performs destructive file operations (like overriding or deleting files).",
+                    stringResource(Res.string.plugin_destructive_warning),
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.padding(ToolkitTheme.spacing.medium),
                     style = MaterialTheme.typography.labelMedium
@@ -118,21 +119,21 @@ fun ExecutionParametersCard(
 
             if (standardParams.isNotEmpty()) {
                 ParameterGroup(
-                    title = "Execution Inputs",
+                    title = stringResource(Res.string.plugin_execution_inputs),
                     parameters = standardParams
                 )
             }
 
             if (inputParams.isNotEmpty()) {
                 ParameterGroup(
-                    title = "Input Locations",
+                    title = stringResource(Res.string.plugin_input_locations),
                     parameters = inputParams
                 )
             }
 
             if (outputParams.isNotEmpty()) {
                 ParameterGroup(
-                    title = "Output Locations",
+                    title = stringResource(Res.string.plugin_output_locations),
                     parameters = outputParams
                 )
             }

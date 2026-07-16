@@ -54,7 +54,7 @@ fun ColorPickerDialog(
     onPickedColor: (Color) -> Unit
 ) {
     var showDialog by remember(show) { mutableStateOf(show) }
-    var color by remember { mutableStateOf(Color.White) }
+    var color by remember { mutableStateOf(ToolkitTheme.colors.white) }
     var selectedFormat by remember { mutableStateOf("HEX") }
     var type by remember { mutableStateOf(initialType) }
 

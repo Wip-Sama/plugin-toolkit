@@ -48,6 +48,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun NotificationHistoryView(viewModel: NotificationViewModel = koinInject()) {
@@ -98,7 +99,7 @@ private fun NotificationItem(
 ) {
     val typeColor = when (record.type) {
         NotificationType.Info -> MaterialTheme.colorScheme.primary
-        NotificationType.Warning -> Color(0xFFFFA500)
+        NotificationType.Warning -> ToolkitTheme.colors.warning
         NotificationType.Error -> MaterialTheme.colorScheme.error
     }
 
@@ -118,7 +119,7 @@ private fun NotificationItem(
         ) {
             Box(
                 modifier = Modifier.size(40.dp)
-                    .background(typeColor.copy(alpha = 0.1f), shape = MaterialTheme.shapes.small),
+                    .background(typeColor.copy(alpha = ToolkitTheme.opacity.textFieldContainer), shape = MaterialTheme.shapes.small),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(typeIcon, contentDescription = null, tint = typeColor)
@@ -148,9 +149,9 @@ private fun NotificationItem(
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Delete",
+                    contentDescription = stringResource(Res.string.action_delete),
                     modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
                 )
             }
         }

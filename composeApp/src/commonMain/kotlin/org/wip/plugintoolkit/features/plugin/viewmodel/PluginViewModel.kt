@@ -25,6 +25,7 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
+import plugintoolkit.composeapp.generated.resources.*
 
 class PluginViewModel(
     private val jobManager: JobManager,
@@ -183,7 +184,7 @@ class PluginViewModel(
 
     fun loadPlugin() {
         if (jarPath.isBlank()) {
-            notificationService.notify(title = "Error", message = "Plugin path is empty")
+            notificationService.notify(title = Res.string.common_error.localized, message = "Plugin path is empty")
             return
         }
         viewModelScope.launch {
@@ -195,15 +196,15 @@ class PluginViewModel(
                     plugin.initialize(pluginManager.createPluginContext(pkg))
                     loadedPlugins = PluginLoader.getPlugins()
                     selectPlugin(plugin)
-                    notificationService.notify(title = "Success", message = "Plugin loaded successfully")
+                    notificationService.notify(title = Res.string.common_success.localized, message = "Plugin loaded successfully")
                 } catch (t: Throwable) {
                     val errorMsg = "Fatal error after loading plugin: ${t.message}"
                     Logger.e(t) { errorMsg }
-                    notificationService.notify(title = "Error", message = errorMsg)
+                    notificationService.notify(title = Res.string.common_error.localized, message = errorMsg)
                 }
             } else {
                 notificationService.notify(
-                    title = "Error",
+                    title = Res.string.common_error.localized,
                     message = "Failed to load plugin: ${result.exceptionOrNull()?.message}"
                 )
             }

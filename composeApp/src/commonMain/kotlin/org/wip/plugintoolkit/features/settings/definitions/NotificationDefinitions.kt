@@ -26,6 +26,8 @@ import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewModel) {
     nav(SettingNavKey.SystemSettings) {
@@ -100,7 +102,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                             ) {
                                 Icon(
                                     Icons.Default.Info,
-                                    contentDescription = "Info",
+                                    contentDescription = stringResource(Res.string.action_info),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -114,8 +116,8 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                             ) {
                                 Icon(
                                     Icons.Default.Warning,
-                                    contentDescription = "Warning",
-                                    tint = androidx.compose.ui.graphics.Color(0xFFFFA500),
+                                    contentDescription = stringResource(Res.string.common_warning),
+                                    tint = androidx.compose.ui.graphics.ToolkitTheme.colors.warning,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -128,7 +130,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                             ) {
                                 Icon(
                                     Icons.Default.Error,
-                                    contentDescription = "Error",
+                                    contentDescription = stringResource(Res.string.common_error),
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -142,7 +144,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                             ) {
                                 Icon(
                                     Icons.Default.ChatBubble,
-                                    contentDescription = "Toast",
+                                    contentDescription = stringResource(Res.string.common_toast),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }

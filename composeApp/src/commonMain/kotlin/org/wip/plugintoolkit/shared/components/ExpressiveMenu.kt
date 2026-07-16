@@ -57,7 +57,7 @@ fun <T> ExpressiveMenu(
                         .clip(RoundedCornerShape(8.dp))
                         .background(
                             if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                            else Color.Transparent
+                            else ToolkitTheme.colors.transparent
                         )
                         .clickable { onOptionSelected(option) }
                         .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = 10.dp)

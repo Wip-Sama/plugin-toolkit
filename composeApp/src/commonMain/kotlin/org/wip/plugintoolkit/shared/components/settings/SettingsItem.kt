@@ -39,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
+import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.core.model.localized
 
 @Composable
 fun SettingsItem(
@@ -102,7 +104,7 @@ fun SettingsItem(
                             .padding(end = ToolkitTheme.spacing.medium)
                             .size(ToolkitTheme.dimensions.settingsIconContainerSize)
                             .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.sidebarBackground),
                                 shape = RoundedCornerShape(ToolkitTheme.dimensions.settingsIconCornerRadius)
                             ),
                         contentAlignment = Alignment.Center
@@ -153,8 +155,8 @@ fun SettingsItemPreview() {
     MaterialTheme {
         Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             SettingsItem(
-                title = "Dark Mode",
-                subtitle = "Toggle dark theme application wide",
+                title = Res.string.setting_dark_mode.localized,
+                subtitle = Res.string.setting_dark_mode_desc.localized,
                 icon = Icons.Default.Settings,
                 control = { Switch(checked = true, onCheckedChange = {}) })
         }

@@ -35,6 +35,8 @@ import org.wip.plugintoolkit.core.model.localized
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.section_general
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 @Preview
@@ -81,7 +83,7 @@ fun <T> SidebarSection(
                 )
                 Icon(
                     imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                    contentDescription = "Toggle Section",
+                    contentDescription = stringResource(Res.string.action_toggle_section),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )

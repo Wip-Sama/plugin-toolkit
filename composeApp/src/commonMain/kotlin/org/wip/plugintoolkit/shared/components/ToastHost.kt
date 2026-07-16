@@ -57,6 +57,8 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.model.NotificationSettings
 import java.awt.Toolkit
 import java.util.UUID
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 data class ToastData(
     val id: String = UUID.randomUUID().toString(),
@@ -193,7 +195,7 @@ private fun ToastItem(
         shadowElevation = 8.dp,
         border = androidx.compose.foundation.BorderStroke(
             ToolkitTheme.dimensions.borderUnselected,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
         )
     ) {
         Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
@@ -216,7 +218,7 @@ private fun ToastItem(
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Close",
+                            contentDescription = stringResource(Res.string.action_close),
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -233,7 +235,7 @@ private fun ToastItem(
                         .height(ToolkitTheme.dimensions.borderSelected)
                         .clip(CircleShape),
                     color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.textFieldContainer)
                 )
             }
         }
@@ -255,8 +257,8 @@ private fun QueueControl(
             .hoverable(interactionSource)
             .alpha(alpha),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        border = androidx.compose.foundation.BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.divider),
+        border = androidx.compose.foundation.BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outline.copy(alpha = ToolkitTheme.opacity.borderLow))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.small),
@@ -273,7 +275,7 @@ private fun QueueControl(
 
             Icon(
                 Icons.Default.DeleteSweep,
-                contentDescription = "Clear All",
+                contentDescription = stringResource(Res.string.action_clear_all),
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.error
             )

@@ -34,6 +34,9 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsRegistry
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 import org.wip.plugintoolkit.features.settings.utils.resolve
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.core.model.localized
 
 @Composable
 fun SettingsGroup(
@@ -106,7 +109,7 @@ fun SettingsGroup(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Surface(
-                    color = androidx.compose.ui.graphics.Color.Transparent,
+                    color = androidx.compose.ui.graphics.ToolkitTheme.colors.transparent,
                     modifier = Modifier.fillMaxWidth().animateContentSize()
                 ) {
                     Column(
@@ -126,9 +129,9 @@ fun SettingsGroup(
 private fun SettingsGroupPreview() {
     MaterialTheme {
         Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-            SettingsGroup(title = "Appearance") {
-                Text("Item 1", modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall))
-                Text("Item 2", modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall))
+            SettingsGroup(title = Res.string.setting_appearance.localized) {
+                Text(stringResource(Res.string.preview_item_1), modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall))
+                Text(stringResource(Res.string.preview_item_2), modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall))
             }
         }
     }

@@ -103,7 +103,7 @@ fun DirectExecutionSidebar(
                         title = manifest.plugin.name.localized,
                         bodySections = listOf(
                             SidebarSectionData(
-                                title = "Capabilities".localized,
+                                title = Res.string.plugin_capabilities.localized,
                                 elements = capabilityElements
                             )
                         ),
@@ -135,7 +135,7 @@ fun DirectExecutionSidebar(
                                 }
                                 Spacer(modifier = Modifier.weight(1f))
                                 Surface(
-                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = ToolkitTheme.opacity.divider),
                                     shape = RoundedCornerShape(4.dp)
                                 ) {
                                     Text(

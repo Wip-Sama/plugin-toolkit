@@ -50,6 +50,7 @@ import plugintoolkit.composeapp.generated.resources.repo_action_update_version
 import plugintoolkit.composeapp.generated.resources.repo_action_updating
 import plugintoolkit.composeapp.generated.resources.repo_plugin_installed_version_format
 import plugintoolkit.composeapp.generated.resources.repo_plugin_pkg_version_format
+import plugintoolkit.composeapp.generated.resources.*
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -159,7 +160,7 @@ fun PluginListItem(
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "Available in:",
+                            stringResource(Res.string.plugin_available_in),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

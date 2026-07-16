@@ -84,7 +84,7 @@ fun StandardTextField(
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage,
-                        color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.high)
                     )
                 } else {
                     Text(description)

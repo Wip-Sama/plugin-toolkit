@@ -176,7 +176,7 @@ fun CapabilityItem(
     Surface(
         onClick = onClick,
         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(
-            alpha = 0.3f
+            alpha = ToolkitTheme.opacity.glassBackground
         ),
         shape = RoundedCornerShape(12.dp),
         border = if (isSelected) BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary) else null
@@ -197,8 +197,8 @@ fun CapabilityItem(
                 ) {
                     if (capability.fileAccess?.isDestructive == true) {
                         Surface(
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = ToolkitTheme.opacity.divider)),
                             shape = androidx.compose.foundation.shape.CircleShape
                         ) {
                             Text(
@@ -212,7 +212,7 @@ fun CapabilityItem(
                     }
                     capability.semanticTypes.forEach { type ->
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.high),
                             shape = androidx.compose.foundation.shape.CircleShape
                         ) {
                             Text(
@@ -328,7 +328,7 @@ fun EmptyState(message: String) {
                 Icons.Default.Inbox,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                tint = MaterialTheme.colorScheme.outline.copy(alpha = ToolkitTheme.opacity.divider)
             )
             Text(
                 message,

@@ -144,7 +144,7 @@ fun BoardCanvas(
     }
 
     val connectionColor = MaterialTheme.colorScheme.primary
-    val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+    val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground)
 
     Box(
         modifier = modifier
@@ -524,12 +524,12 @@ fun BoardCanvas(
                     val color = when {
                         isSelected -> { Color(0xFFFF9800) }
                         isHovered && hoveredConnectionIsSource == null -> { Color(0xFFFF2D55) }
-                        isInvalid -> { Color.Red }
+                        isInvalid -> { ToolkitTheme.colors.red }
                         else -> { connectionColor }
                     }.copy(alpha = connectionAlphas[connection] ?: 1f)
 
                     if (isHovered && hoveredConnectionIsSource == null) {
-                        drawBezierCurve(startPos, endPos, color.copy(alpha = 0.25f), strokeWidth = 9.dp.toPx())
+                        drawBezierCurve(startPos, endPos, color.copy(alpha = ToolkitTheme.opacity.settingsItemDefault), strokeWidth = 9.dp.toPx())
                     }
 
                     if (isHovered && hoveredConnectionIsSource != null) {
@@ -538,23 +538,23 @@ fun BoardCanvas(
 
                         val highlightColor = Color(0xFFFF2D55)
                         val sourceColor =
-                            if (hoveredConnectionIsSource == true) highlightColor else connectionColor.copy(alpha = 0.4f)
+                            if (hoveredConnectionIsSource == true) highlightColor else connectionColor.copy(alpha = ToolkitTheme.opacity.sidebarBackground)
                         val sourceStroke = if (hoveredConnectionIsSource == true) 5.dp.toPx() else 3.dp.toPx()
 
                         val targetColor =
-                            if (hoveredConnectionIsSource == false) highlightColor else connectionColor.copy(alpha = 0.4f)
+                            if (hoveredConnectionIsSource == false) highlightColor else connectionColor.copy(alpha = ToolkitTheme.opacity.sidebarBackground)
                         val targetStroke = if (hoveredConnectionIsSource == false) 5.dp.toPx() else 3.dp.toPx()
 
                         if (hoveredConnectionIsSource == true) {
                             drawBezierCurveSegment(
                                 sourceHalf,
-                                sourceColor.copy(alpha = 0.25f),
+                                sourceColor.copy(alpha = ToolkitTheme.opacity.settingsItemDefault),
                                 strokeWidth = 9.dp.toPx()
                             )
                         } else {
                             drawBezierCurveSegment(
                                 targetHalf,
-                                targetColor.copy(alpha = 0.25f),
+                                targetColor.copy(alpha = ToolkitTheme.opacity.settingsItemDefault),
                                 strokeWidth = 9.dp.toPx()
                             )
                         }
@@ -587,7 +587,7 @@ fun BoardCanvas(
                     drawBezierCurve(
                         (startPos * state.scale) + state.offset,
                         (endPos * state.scale) + state.offset,
-                        connectionColor.copy(alpha = 0.6f)
+                        connectionColor.copy(alpha = ToolkitTheme.opacity.disabled)
                     )
                 }
             }
@@ -605,7 +605,7 @@ fun BoardCanvas(
                 val rectBottom = maxOf(selectionStart!!.y, selectionEnd!!.y)
 
                 drawRect(
-                    color = connectionColor.copy(alpha = 0.15f),
+                    color = connectionColor.copy(alpha = ToolkitTheme.opacity.buttonBackground),
                     topLeft = Offset(rectLeft, rectTop),
                     size = androidx.compose.ui.geometry.Size(rectRight - rectLeft, rectBottom - rectTop)
                 )

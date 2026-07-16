@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Deprecated(
     message = "This is a workaround for the Material 3 Expressive Dropdown menu. Migrate to native when JetBrains drops support.",
@@ -98,7 +100,7 @@ fun <T> ExpressiveMenu(
             onDismissRequest = { expanded = false },
             shape = RoundedCornerShape(containerRadius),
             shadowElevation = 0.dp,
-            containerColor = Color.Transparent
+            containerColor = ToolkitTheme.colors.transparent
         ) {
             groups.forEachIndexed { groupIndex, group ->
                 val topRadius = if (groupIndex == 0) containerRadius else itemInnerRadius
@@ -140,7 +142,7 @@ fun <T> ExpressiveMenu(
                                     .clip(itemShape)
                                     .background(
                                         if (isSelected) MaterialTheme.colorScheme.primary
-                                        else Color.Transparent
+                                        else ToolkitTheme.colors.transparent
                                     ),
                                 colors = MenuDefaults.itemColors(
                                     textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary 
@@ -198,7 +200,7 @@ private fun ExpandedExpressiveMenuPreview() {
                     ) {
                         // 1. Normal Item
                         DropdownMenuItem(
-                            text = { Text("System") },
+                            text = { Text(stringResource(Res.string.theme_system)) },
                             onClick = {},
                             modifier = Modifier
                                 .padding(horizontal = ToolkitTheme.spacing.small)
@@ -211,13 +213,13 @@ private fun ExpandedExpressiveMenuPreview() {
                         
                         // 2. Hovered Item
                         DropdownMenuItem(
-                            text = { Text("Light") },
+                            text = { Text(stringResource(Res.string.theme_light)) },
                             onClick = {},
                             modifier = Modifier
                                 .padding(horizontal = ToolkitTheme.spacing.small)
                                 .height(ToolkitTheme.dimensions.menuItem)
                                 .clip(RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.subtleHighlight)),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                         )
                     }
@@ -240,7 +242,7 @@ private fun ExpandedExpressiveMenuPreview() {
                     ) {
                         // 3. Normal Item
                         DropdownMenuItem(
-                            text = { Text("Dark") },
+                            text = { Text(stringResource(Res.string.theme_dark)) },
                             onClick = {},
                             modifier = Modifier
                                 .padding(horizontal = ToolkitTheme.spacing.small)
@@ -251,7 +253,7 @@ private fun ExpandedExpressiveMenuPreview() {
                         
                         // 4. Selected Item
                         DropdownMenuItem(
-                            text = { Text("Amoled") },
+                            text = { Text(stringResource(Res.string.theme_amoled)) },
                             onClick = {},
                             modifier = Modifier
                                 .padding(horizontal = ToolkitTheme.spacing.small)

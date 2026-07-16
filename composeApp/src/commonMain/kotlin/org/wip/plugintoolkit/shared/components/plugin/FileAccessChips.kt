@@ -17,6 +17,8 @@ import org.wip.plugintoolkit.api.FileAccess
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun FileAccessChips(
@@ -38,7 +40,7 @@ fun FileAccessChips(
                 icon = {
                     Icon(
                         imageVector = Icons.Default.Visibility,
-                        contentDescription = "Read Files", //TODO: localize
+                        contentDescription = stringResource(Res.string.plugin_access_read), //TODO: localize
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -55,7 +57,7 @@ fun FileAccessChips(
                 icon = {
                     Icon(
                         imageVector = Icons.Default.Edit,
-                        contentDescription = "Write Files", //TODO: localize
+                        contentDescription = stringResource(Res.string.plugin_access_write), //TODO: localize
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
                         tint = MaterialTheme.colorScheme.onSecondaryContainer
                     )
@@ -72,7 +74,7 @@ fun FileAccessChips(
                 icon = {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete Files", //TODO: localize
+                        contentDescription = stringResource(Res.string.plugin_access_delete), //TODO: localize
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
                         tint = MaterialTheme.colorScheme.onErrorContainer
                     )

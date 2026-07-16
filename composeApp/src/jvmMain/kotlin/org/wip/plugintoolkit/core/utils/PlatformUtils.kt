@@ -24,6 +24,8 @@ import org.freedesktop.dbus.interfaces.DBusInterface
 import org.freedesktop.dbus.types.Variant
 import java.awt.Desktop
 import java.io.File
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
 
 actual object PlatformUtils {
     actual val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
@@ -92,13 +94,13 @@ actual object PlatformUtils {
 
     actual suspend fun pickFolder(): String? {
         return FileKit.openDirectoryPicker(
-            dialogSettings = FileKitDialogSettings(title = "Select Folder")
+            dialogSettings = FileKitDialogSettings(title = org.jetbrains.compose.resources.getString(Res.string.dialog_select_folder))
         )?.toKotlinxIoPath()?.toString()
     }
 
     actual suspend fun pickFile(): String? {
         return FileKit.openFilePicker(
-            dialogSettings = FileKitDialogSettings(title = "Select Plugin File")
+            dialogSettings = FileKitDialogSettings(title = org.jetbrains.compose.resources.getString(Res.string.dialog_select_plugin))
         )?.toKotlinxIoPath()?.toString()
     }
 
