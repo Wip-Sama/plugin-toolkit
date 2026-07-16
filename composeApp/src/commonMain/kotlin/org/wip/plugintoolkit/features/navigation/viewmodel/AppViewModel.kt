@@ -19,6 +19,7 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.nav_jobs
 import plugintoolkit.composeapp.generated.resources.nav_main
 import plugintoolkit.composeapp.generated.resources.settings
+import plugintoolkit.composeapp.generated.resources.tab_plugin_manager
 
 class AppViewModel(
     settingsRepository: SettingsRepository,

@@ -143,8 +143,13 @@ fun BoardCanvas(
         focusRequester.requestFocus()
     }
 
+    val dimensions = ToolkitTheme.dimensions
+    val opacity = ToolkitTheme.opacity
+    val customColors = ToolkitTheme.colors
+    val spacing = ToolkitTheme.spacing
+
     val connectionColor = MaterialTheme.colorScheme.primary
-    val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground)
+    val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = opacity.glassBackground)
 
     Box(
         modifier = modifier
@@ -318,7 +323,7 @@ fun BoardCanvas(
                             flow.nodes.forEach { node ->
                                 val nodeLeft = node.position.x
                                 val nodeTop = node.position.y
-                                val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: (300f * density.density)
+                                val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: dimensions.nodeWidth.toPx()
                                 val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
                                 val nodeRight = nodeLeft + nodeWidth
                                 val nodeBottom = nodeTop + nodeHeight
@@ -524,12 +529,12 @@ fun BoardCanvas(
                     val color = when {
                         isSelected -> { Color(0xFFFF9800) }
                         isHovered && hoveredConnectionIsSource == null -> { Color(0xFFFF2D55) }
-                        isInvalid -> { ToolkitTheme.colors.red }
+                        isInvalid -> { customColors.red }
                         else -> { connectionColor }
                     }.copy(alpha = connectionAlphas[connection] ?: 1f)
 
                     if (isHovered && hoveredConnectionIsSource == null) {
-                        drawBezierCurve(startPos, endPos, color.copy(alpha = ToolkitTheme.opacity.settingsItemDefault), strokeWidth = 9.dp.toPx())
+                        drawBezierCurve(startPos, endPos, color.copy(alpha = opacity.settingsItemDefault), strokeWidth = dimensions.strokeWidthMedium.toPx())
                     }
 
                     if (isHovered && hoveredConnectionIsSource != null) {
@@ -538,31 +543,31 @@ fun BoardCanvas(
 
                         val highlightColor = Color(0xFFFF2D55)
                         val sourceColor =
-                            if (hoveredConnectionIsSource == true) highlightColor else connectionColor.copy(alpha = ToolkitTheme.opacity.sidebarBackground)
-                        val sourceStroke = if (hoveredConnectionIsSource == true) 5.dp.toPx() else 3.dp.toPx()
+                            if (hoveredConnectionIsSource == true) highlightColor else connectionColor.copy(alpha = opacity.sidebarBackground)
+                        val sourceStroke = if (hoveredConnectionIsSource == true) dimensions.strokeWidthMedium.toPx() else dimensions.borderSelected.toPx()
 
                         val targetColor =
-                            if (hoveredConnectionIsSource == false) highlightColor else connectionColor.copy(alpha = ToolkitTheme.opacity.sidebarBackground)
-                        val targetStroke = if (hoveredConnectionIsSource == false) 5.dp.toPx() else 3.dp.toPx()
+                            if (hoveredConnectionIsSource == false) highlightColor else connectionColor.copy(alpha = opacity.sidebarBackground)
+                        val targetStroke = if (hoveredConnectionIsSource == false) dimensions.strokeWidthMediumSmall.toPx() else dimensions.borderSelected.toPx()
 
                         if (hoveredConnectionIsSource == true) {
                             drawBezierCurveSegment(
                                 sourceHalf,
-                                sourceColor.copy(alpha = ToolkitTheme.opacity.settingsItemDefault),
-                                strokeWidth = 9.dp.toPx()
+                                sourceColor.copy(alpha = opacity.settingsItemDefault),
+                                strokeWidth = dimensions.strokeWidthMedium.toPx()
                             )
                         } else {
                             drawBezierCurveSegment(
                                 targetHalf,
-                                targetColor.copy(alpha = ToolkitTheme.opacity.settingsItemDefault),
-                                strokeWidth = 9.dp.toPx()
+                                targetColor.copy(alpha = opacity.settingsItemDefault),
+                                strokeWidth = dimensions.strokeWidthThick.toPx()
                             )
                         }
 
                         drawBezierCurveSegment(sourceHalf, sourceColor, strokeWidth = sourceStroke)
                         drawBezierCurveSegment(targetHalf, targetColor, strokeWidth = targetStroke)
                     } else {
-                        val strokeWidth = if (isSelected || isHovered) 5.dp.toPx() else 3.dp.toPx()
+                        val strokeWidth = if (isSelected || isHovered) dimensions.strokeWidthMedium.toPx() else dimensions.strokeWidthThin.toPx()
                         drawBezierCurve(startPos, endPos, color, strokeWidth)
                     }
                 }
@@ -587,7 +592,8 @@ fun BoardCanvas(
                     drawBezierCurve(
                         (startPos * state.scale) + state.offset,
                         (endPos * state.scale) + state.offset,
-                        connectionColor.copy(alpha = ToolkitTheme.opacity.disabled)
+                        connectionColor.copy(alpha = opacity.disabled),
+                        dimensions.strokeWidthThick.toPx()
                     )
                 }
             }
@@ -605,7 +611,7 @@ fun BoardCanvas(
                 val rectBottom = maxOf(selectionStart!!.y, selectionEnd!!.y)
 
                 drawRect(
-                    color = connectionColor.copy(alpha = ToolkitTheme.opacity.buttonBackground),
+                    color = connectionColor.copy(alpha = opacity.buttonBackground),
                     topLeft = Offset(rectLeft, rectTop),
                     size = androidx.compose.ui.geometry.Size(rectRight - rectLeft, rectBottom - rectTop)
                 )
@@ -613,7 +619,7 @@ fun BoardCanvas(
                     color = connectionColor,
                     topLeft = Offset(rectLeft, rectTop),
                     size = androidx.compose.ui.geometry.Size(rectRight - rectLeft, rectBottom - rectTop),
-                    style = Stroke(width = 2.dp.toPx())
+                    style = Stroke(width = dimensions.progressIndicatorStroke.toPx())
                 )
             }
         }
@@ -646,16 +652,16 @@ fun BoardCanvas(
                                         val currentEndPos = (currentTargetPortBoardPos * state.scale) + state.offset
                                         val currentMidPoint = BoardMathUtils.getBezierMidpoint(currentStartPos, currentEndPos)
                                         IntOffset(
-                                            (currentMidPoint.x - 12.dp.toPx()).roundToInt(),
-                                            (currentMidPoint.y - 12.dp.toPx()).roundToInt()
+                                            (currentMidPoint.x - spacing.mediumSmall.toPx()).roundToInt(),
+                                            (currentMidPoint.y - spacing.mediumSmall.toPx()).roundToInt()
                                         )
                                     } else {
                                         IntOffset.Zero
                                     }
                                 }
-                                .size(24.dp)
+                                .size(dimensions.iconMedium)
                                 .background(MaterialTheme.colorScheme.background, CircleShape)
-                                .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary, CircleShape)
+                                .border(dimensions.borderUnselected, MaterialTheme.colorScheme.primary, CircleShape)
                                 .clickable { showMenu = true },
                             contentAlignment = Alignment.Center
                         ) {
@@ -681,9 +687,9 @@ fun BoardCanvas(
                                         onDismiss = { showMenu = false }
                                     ) {
                                         Card(
-                                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                            elevation = CardDefaults.cardElevation(defaultElevation = dimensions.cardElevation),
                                             shape = MaterialTheme.shapes.medium,
-                                            modifier = Modifier.width(150.dp)
+                                            modifier = Modifier.width(dimensions.widthLarge)
                                         ) {
                                             Column(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.extraSmall)) {
                                                 DropdownMenuItem(
@@ -736,25 +742,25 @@ fun BoardCanvas(
                                 val currentEndPos = (currentTargetPortBoardPos * state.scale) + state.offset
                                 val currentMidPoint = BoardMathUtils.getBezierMidpoint(currentStartPos, currentEndPos)
                                 IntOffset(
-                                    (currentMidPoint.x - 20.dp.toPx()).roundToInt(),
-                                    (currentMidPoint.y - 20.dp.toPx()).roundToInt()
+                                    (currentMidPoint.x - dimensions.offsetLarge.toPx()).roundToInt(),
+                                    (currentMidPoint.y - dimensions.offsetLarge.toPx()).roundToInt()
                                 )
                             } else {
                                 IntOffset(-1000, -1000)
                             }
                         }
-                        .size(40.dp),
+                        .size(dimensions.progressBoxSize),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.error,
-                    tonalElevation = 6.dp,
-                    shadowElevation = 6.dp
+                    tonalElevation = dimensions.elevationHigh,
+                    shadowElevation = dimensions.elevationMedium
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete Wire",
                             tint = MaterialTheme.colorScheme.onError,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                            modifier = Modifier.size(dimensions.iconMediumSmall)
                         )
                     }
                 }
@@ -776,7 +782,7 @@ fun BoardCanvas(
 
 private val sharedBezierPath = Path()
 
-private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color, strokeWidth: Float = 3.dp.toPx()) {
+private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color, strokeWidth: Float) {
     val controlPointOffset = kotlin.math.abs(end.x - start.x) / 2f
     sharedBezierPath.reset()
     sharedBezierPath.moveTo(start.x, start.y)
@@ -795,7 +801,7 @@ private fun DrawScope.drawBezierCurve(start: Offset, end: Offset, color: Color, 
 private fun DrawScope.drawBezierCurveSegment(
     curve: BoardMathUtils.CubicBezierCurve,
     color: Color,
-    strokeWidth: Float = 3.dp.toPx()
+    strokeWidth: Float
 ) {
     sharedBezierPath.reset()
     sharedBezierPath.moveTo(curve.p0.x, curve.p0.y)

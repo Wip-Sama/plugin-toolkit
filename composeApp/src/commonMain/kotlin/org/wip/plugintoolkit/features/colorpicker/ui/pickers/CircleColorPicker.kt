@@ -71,7 +71,7 @@ internal fun CircleColorPicker(
     Column(modifier = Modifier.width(IntrinsicSize.Max)) {
         Canvas(
             modifier = modifier
-                .size(200.dp)
+                .size(ToolkitTheme.dimensions.containerSizeLarge)
                 .onSizeChanged { radius = it.width / 2f }
                 .pointerInput(Unit) {
                     detectDragGestures(

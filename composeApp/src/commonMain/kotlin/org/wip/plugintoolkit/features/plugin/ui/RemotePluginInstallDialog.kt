@@ -85,7 +85,7 @@ fun RemotePluginInstallDialog(
                 .fillMaxHeight(0.85f)
                 .clip(MaterialTheme.shapes.large),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+            tonalElevation = ToolkitTheme.dimensions.elevationMediumHigh
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header

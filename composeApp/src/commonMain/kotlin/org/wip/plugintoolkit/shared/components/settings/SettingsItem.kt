@@ -34,9 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import org.wip.plugintoolkit.core.model.LocalizedString
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 import plugintoolkit.composeapp.generated.resources.*
@@ -49,9 +51,9 @@ fun SettingsItem(
     icon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(ToolkitTheme.spacing.mediumSmall),
-    extraContent: @Composable (() -> Unit)? = null,
-    control: @Composable (() -> Unit)? = null
+    shape: Shape = RoundedCornerShape(ToolkitTheme.spacing.mediumSmall),
+    extraContent: (@Composable () -> Unit)? = null,
+    control: (@Composable () -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -149,19 +151,19 @@ fun SettingsItem(
     }
 }
 
-@Preview
-@Composable
-fun SettingsItemPreview() {
-    MaterialTheme {
-        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-            SettingsItem(
-                title = Res.string.setting_dark_mode.localized,
-                subtitle = Res.string.setting_dark_mode_desc.localized,
-                icon = Icons.Default.Settings,
-                control = { Switch(checked = true, onCheckedChange = {}) })
-        }
-    }
-}
+//@Preview
+//@Composable
+//fun SettingsItemPreview() {
+//    MaterialTheme {
+//        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
+//            SettingsItem(
+//                title = Res.string.setting_dark_mode.localized,
+//                subtitle = Res.string.setting_dark_mode_desc.localized,
+//                icon = Icons.Default.Settings,
+//                control = { Switch(checked = true, onCheckedChange = {}) })
+//        }
+//    }
+//}
 
 @Composable
 fun getGroupedShape(

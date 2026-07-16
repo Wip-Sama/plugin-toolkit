@@ -109,7 +109,7 @@ fun SettingsGroup(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Surface(
-                    color = androidx.compose.ui.graphics.ToolkitTheme.colors.transparent,
+                    color = ToolkitTheme.colors.transparent,
                     modifier = Modifier.fillMaxWidth().animateContentSize()
                 ) {
                     Column(
@@ -129,7 +129,7 @@ fun SettingsGroup(
 private fun SettingsGroupPreview() {
     MaterialTheme {
         Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-            SettingsGroup(title = Res.string.setting_appearance.localized) {
+            SettingsGroup(title = stringResource(Res.string.setting_appearance)) {
                 Text(stringResource(Res.string.preview_item_1), modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall))
                 Text(stringResource(Res.string.preview_item_2), modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall))
             }

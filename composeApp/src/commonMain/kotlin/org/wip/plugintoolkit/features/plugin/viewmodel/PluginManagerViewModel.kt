@@ -36,11 +36,11 @@ import plugintoolkit.composeapp.generated.resources.plugin_uninstall_confirmatio
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall_title
 import plugintoolkit.composeapp.generated.resources.plugin_install_failed
 import plugintoolkit.composeapp.generated.resources.plugin_installed_success
-import plugintoolkit.composeapp.generated.resources.repo_plugin_installed
 import plugintoolkit.composeapp.generated.resources.plugin_validated_success
 import plugintoolkit.composeapp.generated.resources.plugin_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_result
 import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.core.model.localized
 
 class PluginManagerViewModel(
     private val pluginManager: PluginManager,
@@ -98,7 +98,7 @@ class PluginManagerViewModel(
                             pluginManager.updatePlugin(plugin.pkg) { it.copy(configurationPrompted = true) }
                         }
                         dialogService.showConfirmation(
-                            title = Res.string.plugin_config_required.localized,
+                            title = Res.string.plugin_config_required.localized.resolveNonComposable(),
                             message = "Plugin ${plugin.name} requires configuration. Would you like to configure it now?",
                             onConfirm = { openSettings(plugin.pkg) }
                         )
@@ -107,7 +107,7 @@ class PluginManagerViewModel(
                             pluginManager.updatePlugin(plugin.pkg) { it.copy(signaturePrompted = true) }
                         }
                         dialogService.showConfirmation(
-                            title = Res.string.plugin_invalid_signature.localized,
+                            title = Res.string.plugin_invalid_signature.localized.resolveNonComposable(),
                             message = "Plugin ${plugin.name} has an invalid signature. Do you want to load it anyway? If you ignore, the plugin will remain locked and unloaded.",
                             onConfirm = {
                                 viewModelScope.launch {
@@ -330,7 +330,7 @@ class PluginManagerViewModel(
 
             if (manifest != null && manifest.hasSetupHandler && !manifest.hasUpdateHandler) {
                 dialogService.showConfirmation(
-                    title = Res.string.plugin_update_warning.localized,
+                    title = Res.string.plugin_update_warning.localized.resolveNonComposable(),
                     message = "This plugin requires setup but does not support migrations. Updating will wipe all current configuration and data for this plugin. Continue?",
                     onConfirm = {
                         viewModelScope.launch {

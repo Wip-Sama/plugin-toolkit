@@ -94,7 +94,7 @@ internal fun RingColorPicker(
     Column(modifier = Modifier.width(IntrinsicSize.Max)) {
         Canvas(
             modifier = modifier
-                .size(200.dp)
+                .size(ToolkitTheme.dimensions.containerSizeLarge)
                 .onSizeChanged { radius = it.width.toFloat() / 2 }
                 .pointerInput(Unit) {
                     detectDragGestures(

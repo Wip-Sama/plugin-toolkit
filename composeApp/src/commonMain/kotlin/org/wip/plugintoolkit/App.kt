@@ -143,6 +143,7 @@ private fun AppContentImpl(
                 // Render UI normally without destroying the composition tree.
                 // Recomposition is triggered reactively since the screens and localized strings
                 // read from LocalLanguage / trigger recomposition.
+                val dialogUnsavedChangesTitle = stringResource(Res.string.dialog_unsaved_changes)
                 AppScaffold(
                     settings = settings,
                     sections = sections,
@@ -152,7 +153,7 @@ private fun AppContentImpl(
                         if (currentScreen != screen) {
                             if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
                                 dialogService.showConfirmation(
-                                    title = stringResource(Res.string.dialog_unsaved_changes),
+                                    title = dialogUnsavedChangesTitle,
                                     message = "All the unsaved data will be lost. Are you sure you want to exit?",
                                     onConfirm = {
                                         activeFlowEditorTracker.setHasUnsavedChanges(false)

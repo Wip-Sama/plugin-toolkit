@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.wip.plugintoolkit.api.Release
+import org.wip.plugintoolkit.core.model.LocalizedString
 
 class DialogService {
     private val _dialogState = MutableStateFlow<DialogData?>(null)

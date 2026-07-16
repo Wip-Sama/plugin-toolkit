@@ -92,16 +92,16 @@ fun FlowListItem(
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             shape = CircleShape,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.badgeVertical)
                             ) {
                                 Icon(
                                     Icons.Default.Check,
                                     contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))

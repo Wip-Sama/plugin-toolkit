@@ -104,7 +104,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                                     Icons.Default.Info,
                                     contentDescription = stringResource(Res.string.action_info),
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumLarge)
                                 )
                             }
                         }
@@ -117,8 +117,8 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                                 Icon(
                                     Icons.Default.Warning,
                                     contentDescription = stringResource(Res.string.common_warning),
-                                    tint = androidx.compose.ui.graphics.ToolkitTheme.colors.warning,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = ToolkitTheme.colors.warning,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumLarge)
                                 )
                             }
                         }
@@ -132,7 +132,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                                     Icons.Default.Error,
                                     contentDescription = stringResource(Res.string.common_error),
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumLarge)
                                 )
                             }
                         }
@@ -145,7 +145,7 @@ fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewM
                                 Icon(
                                     Icons.Default.ChatBubble,
                                     contentDescription = stringResource(Res.string.common_toast),
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                                 )
                             }
                         }

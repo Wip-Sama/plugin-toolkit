@@ -180,7 +180,7 @@ fun TooltipProvider(content: @Composable () -> Unit) {
                 Box(
 
                     modifier = Modifier
-                        .shadow(4.dp, ToolkitTheme.shapes.extraSmall)
+                        .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.extraSmall)
                         .background(MaterialTheme.colorScheme.surfaceVariant, ToolkitTheme.shapes.extraSmall)
                         .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, ToolkitTheme.shapes.extraSmall)
                         .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)

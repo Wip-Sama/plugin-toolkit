@@ -122,7 +122,7 @@ fun ChangelogView(
 
         // Filters Row 1: Level + Dropdown
         Surface(
-            tonalElevation = 2.dp,
+            tonalElevation = ToolkitTheme.dimensions.cardElevation,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
@@ -140,7 +140,7 @@ fun ChangelogView(
                                     Icon(
                                         Icons.Default.Check,
                                         contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                     )
                                 }
                             } else null
@@ -168,7 +168,7 @@ fun ChangelogView(
                         Box {
                             OutlinedCard(
                                 onClick = { expanded = true },
-                                shape = RoundedCornerShape(8.dp)
+                                shape = ToolkitTheme.shapes.small
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.small),
@@ -204,7 +204,7 @@ fun ChangelogView(
                 // Filters Row 2: Categories
                 SecondaryScrollableTabRow(
                     selectedTabIndex = allCategories.indexOf(selectedCategory).coerceAtLeast(0),
-                    edgePadding = 0.dp,
+                    edgePadding = ToolkitTheme.spacing.none,
                     containerColor = ToolkitTheme.colors.transparent,
                     divider = {},
                     indicator = {
@@ -256,7 +256,7 @@ fun VersionCard(
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+        shape = ToolkitTheme.shapes.large
     ) {
         Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             Row(
@@ -272,7 +272,7 @@ fun VersionCard(
                 )
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = ToolkitTheme.shapes.small
                 ) {
                     Text(
                         version.date,

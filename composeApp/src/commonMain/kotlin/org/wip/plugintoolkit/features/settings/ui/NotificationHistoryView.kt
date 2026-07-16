@@ -118,7 +118,7 @@ private fun NotificationItem(
             modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall), verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(ToolkitTheme.dimensions.progressBoxSize)
                     .background(typeColor.copy(alpha = ToolkitTheme.opacity.textFieldContainer), shape = MaterialTheme.shapes.small),
                 contentAlignment = Alignment.Center
             ) {

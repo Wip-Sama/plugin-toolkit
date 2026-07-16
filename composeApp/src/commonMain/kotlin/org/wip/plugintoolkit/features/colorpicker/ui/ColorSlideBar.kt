@@ -56,16 +56,16 @@ internal fun ColorSlideBar(
     val isSelected = isPressed || isDragged
 
     val animatedThumbWidth by animateDpAsState(
-        targetValue = if (isSelected) 2.dp else 4.dp,
+        targetValue = if (isSelected) ToolkitTheme.dimensions.progressIndicatorStroke else ToolkitTheme.dimensions.thumbWidthLarge,
         label = "ThumbWidth"
     )
 
-    val activeTrackHeight = 16.dp
-    val inactiveTrackHeight = 16.dp
-    val handleLeadingSpace = 6.dp
-    val handleTrailingSpace = 6.dp
-    val handleHeight = 44.dp
-    val innerCornerRadius = 4.dp
+    val activeTrackHeight = ToolkitTheme.dimensions.trackHeightSmall
+    val inactiveTrackHeight = ToolkitTheme.dimensions.trackHeightSmall
+    val handleLeadingSpace = ToolkitTheme.spacing.badgeHorizontal
+    val handleTrailingSpace = ToolkitTheme.spacing.badgeHorizontal
+    val handleHeight = ToolkitTheme.dimensions.handleHeightMedium
+    val innerCornerRadius = ToolkitTheme.dimensions.cornerRadiusExtraSmall
 
     LaunchedEffect(value) {
         onValueChange(value)

@@ -95,7 +95,7 @@ fun UnscaledExpressiveMenu(
             ) {
                 val menuWidthDp = with(density) { bounds!!.width.toDp() }
                 Card(
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.dimensions.cardElevation),
                     shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.width(menuWidthDp)
                 ) {

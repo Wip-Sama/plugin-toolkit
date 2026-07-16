@@ -1,5 +1,7 @@
 package org.wip.plugintoolkit.shared.components.plugin
 
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons

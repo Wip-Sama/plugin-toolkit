@@ -44,7 +44,7 @@ fun AccentColorControl(settings: AppSettings, onUpdate: (AppSettings) -> Unit) {
 
     Box(
         modifier = Modifier
-            .size(32.dp)
+            .size(ToolkitTheme.dimensions.iconLarge)
             .clip(CircleShape)
             .background(Color(settings.appearance.accentColor))
             .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outline, CircleShape)

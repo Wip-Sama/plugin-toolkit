@@ -40,6 +40,7 @@ import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.section_loaded_plugins
+import plugintoolkit.composeapp.generated.resources.plugin_capabilities
 
 @Composable
 fun DirectExecutionSidebar(

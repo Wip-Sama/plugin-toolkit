@@ -497,7 +497,7 @@ private fun ConflictResolutionDialog(
                                     imageVector = Icons.Default.Warning,
                                     contentDescription = "Conflict",
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize)
                                 )
                                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                                 Text(
@@ -808,8 +808,8 @@ private fun SegmentedButtonGroup(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(40.dp),
-        shape = RoundedCornerShape(20.dp),
+            .height(ToolkitTheme.dimensions.standardButtonHeight),
+        shape = ToolkitTheme.shapes.extraLarge,
         border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, outlineColor),
         color = MaterialTheme.colorScheme.surface
     ) {
@@ -848,7 +848,7 @@ private fun SegmentedButtonGroup(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = "Selected",
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
                                 tint = contentColor
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))

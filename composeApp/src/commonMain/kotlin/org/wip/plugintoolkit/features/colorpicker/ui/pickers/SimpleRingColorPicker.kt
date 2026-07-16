@@ -34,6 +34,7 @@ import org.wip.plugintoolkit.features.colorpicker.utils.fromHueProgress
 import org.wip.plugintoolkit.features.colorpicker.utils.green
 import org.wip.plugintoolkit.features.colorpicker.utils.red
 import kotlin.math.atan2
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
  * Concentric-ring (discrete) color picker.
@@ -48,7 +49,8 @@ internal fun SimpleRingColorPicker(
 ) {
     val density = LocalDensity.current
     val colorWidthPx = remember { with(density) { colorWidth.toPx() } }
-    val selectColorWidth = remember { with(density) { colorWidthPx + 5.dp.toPx() } }
+    val widthSmallExtra = ToolkitTheme.dimensions.widthSmallExtra
+    val selectColorWidth = remember(colorWidthPx, widthSmallExtra) { with(density) { colorWidthPx + widthSmallExtra.toPx() } }
 
     var pickerLocation by remember { mutableStateOf(IntOffset(0, 0)) }
     var radius by remember { mutableStateOf(0f) }
@@ -64,7 +66,7 @@ internal fun SimpleRingColorPicker(
 
     Canvas(
         modifier = modifier
-            .size(280.dp)
+            .size(ToolkitTheme.dimensions.containerSizeLarge)
             .aspectRatio(1f)
             .onSizeChanged { radius = it.width / 2f }
             .pointerInput(Unit) {

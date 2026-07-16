@@ -367,7 +367,7 @@ fun SchedulerTab() {
         Icon(
             imageVector = Icons.Default.Schedule,
             contentDescription = null,
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraLarge),
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground)
         )
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
@@ -591,8 +591,8 @@ fun TerminalLogView(logs: List<String>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = 200.dp) // Approx 10 rows
-            .clip(RoundedCornerShape(8.dp))
+            .heightIn(max = ToolkitTheme.dimensions.heightMaxLarge) // Approx 10 rows
+            .clip(ToolkitTheme.shapes.small)
             .background(Color(0xFF1E1E1E))
             .padding(ToolkitTheme.spacing.small)
     ) {

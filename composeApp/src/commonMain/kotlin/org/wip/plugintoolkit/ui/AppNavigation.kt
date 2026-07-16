@@ -19,7 +19,6 @@ import org.wip.plugintoolkit.features.flows.ui.FlowRunnerView
 import org.wip.plugintoolkit.features.flows.viewmodel.ActiveFlowEditorTracker
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
-import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.job.ui.JobDashboard
 import org.wip.plugintoolkit.features.landingPage.ui.LandingPage
 import org.wip.plugintoolkit.features.navigation.model.Screen
@@ -43,6 +42,7 @@ fun AppNavigation(
     modifier: Modifier = Modifier
 ) {
     val hasUnsavedChanges by activeFlowEditorTracker.hasUnsavedChanges.collectAsState()
+    val dialogUnsavedChangesTitle = org.jetbrains.compose.resources.stringResource(Res.string.dialog_unsaved_changes)
 
     NavDisplay(
         backStack = backStack,
@@ -50,7 +50,7 @@ fun AppNavigation(
         onBack = {
             if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
                 dialogService.showConfirmation(
-                    title = Res.string.dialog_unsaved_changes.localized,
+                    title = dialogUnsavedChangesTitle,
                     message = "All the unsaved data will be lost. Are you sure you want to exit?",
                     onConfirm = {
                         activeFlowEditorTracker.setHasUnsavedChanges(false)
@@ -68,7 +68,7 @@ fun AppNavigation(
                     if (currentScreen != screen) {
                         if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
                             dialogService.showConfirmation(
-                                title = Res.string.dialog_unsaved_changes.localized,
+                                title = dialogUnsavedChangesTitle,
                                 message = "All the unsaved data will be lost. Are you sure you want to exit?",
                                 onConfirm = {
                                     activeFlowEditorTracker.setHasUnsavedChanges(false)
@@ -108,7 +108,7 @@ fun AppNavigation(
                     onExit = {
                         if (hasUnsavedChanges) {
                             dialogService.showConfirmation(
-                                title = Res.string.dialog_unsaved_changes.localized,
+                                title = dialogUnsavedChangesTitle,
                                 message = "All the unsaved data will be lost. Are you sure you want to exit?",
                                 onConfirm = {
                                     activeFlowEditorTracker.setHasUnsavedChanges(false)

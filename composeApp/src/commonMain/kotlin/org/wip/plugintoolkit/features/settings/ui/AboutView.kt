@@ -99,7 +99,7 @@ fun AboutView(
             Image(
                 painter = painterResource(Res.drawable.app_logo),
                 contentDescription = stringResource(Res.string.app_name),
-                modifier = Modifier.size(128.dp)
+                modifier = Modifier.size(ToolkitTheme.dimensions.logoSizeLarge)
             )
             Text(
                 text = stringResource(Res.string.app_name),

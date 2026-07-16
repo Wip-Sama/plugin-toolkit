@@ -99,7 +99,7 @@ fun <T> ExpressiveMenu(
             modifier = Modifier,
             onDismissRequest = { expanded = false },
             shape = RoundedCornerShape(containerRadius),
-            shadowElevation = 0.dp,
+            shadowElevation = ToolkitTheme.spacing.none,
             containerColor = ToolkitTheme.colors.transparent
         ) {
             groups.forEachIndexed { groupIndex, group ->
@@ -149,7 +149,7 @@ fun <T> ExpressiveMenu(
                                                 else MaterialTheme.colorScheme.onSurface
                                 ),
                                 enabled = !isDisabled,
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.none)
                             )
                         }
                     }
@@ -206,7 +206,7 @@ private fun ExpandedExpressiveMenuPreview() {
                                 .padding(horizontal = ToolkitTheme.spacing.small)
                                 .height(ToolkitTheme.dimensions.menuItem)
                                 .clip(RoundedCornerShape(ToolkitTheme.spacing.extraSmall)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.none)
                         )
                         
                         HorizontalDivider()
@@ -220,7 +220,7 @@ private fun ExpandedExpressiveMenuPreview() {
                                 .height(ToolkitTheme.dimensions.menuItem)
                                 .clip(RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
                                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.subtleHighlight)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.none)
                         )
                     }
                 }
@@ -248,7 +248,7 @@ private fun ExpandedExpressiveMenuPreview() {
                                 .padding(horizontal = ToolkitTheme.spacing.small)
                                 .height(ToolkitTheme.dimensions.menuItem)
                                 .clip(RoundedCornerShape(ToolkitTheme.spacing.extraSmall)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.none)
                         )
                         
                         // 4. Selected Item
@@ -263,7 +263,7 @@ private fun ExpandedExpressiveMenuPreview() {
                             colors = MenuDefaults.itemColors(
                                 textColor = MaterialTheme.colorScheme.onPrimary
                             ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.none)
                         )
                     }
                 }

@@ -88,7 +88,7 @@ fun JobResultCard(
                     Icon(
                         imageVector = Icons.Default.History,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
@@ -120,12 +120,12 @@ fun JobResultCard(
 
                     IconButton(
                         onClick = onDelete,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = stringResource(Res.string.action_delete),
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
                             tint = MaterialTheme.colorScheme.outline
                         )
                     }
@@ -139,12 +139,12 @@ fun JobResultCard(
                     if (hasDetails) {
                         IconButton(
                             onClick = { expanded = !expanded },
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
                         ) {
                             Icon(
                                 imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = stringResource(Res.string.action_toggle_details),
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumLarge),
                                 tint = MaterialTheme.colorScheme.outline
                             )
                         }
@@ -160,7 +160,7 @@ fun JobResultCard(
                         progress = { progress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(8.dp)
+                            .height(ToolkitTheme.dimensions.heightSmall)
                             .clip(MaterialTheme.shapes.small),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -320,7 +320,7 @@ fun JobResultCard(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(180.dp)
+                            .height(ToolkitTheme.dimensions.containerHeightLarge)
                             .background(
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.high),
                                 MaterialTheme.shapes.medium

@@ -1,5 +1,7 @@
 package org.wip.plugintoolkit
 
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+
 import androidx.compose.foundation.ComposeFoundationFlags
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -394,7 +396,7 @@ fun runMain(
                 else -> WindowPlacement.Floating
             },
             position = WindowPosition(Alignment.Center),
-            size = DpSize(1280.dp, 800.dp)
+            size = DpSize(ToolkitTheme.dimensions.dialogMaxWidthLarge, ToolkitTheme.dimensions.dialogMaxHeight)
         )
 
         key(languageCode) {

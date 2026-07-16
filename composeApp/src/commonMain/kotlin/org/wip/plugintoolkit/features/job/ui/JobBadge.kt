@@ -38,7 +38,7 @@ fun JobBadge(
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary)
-                    .padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = 2.dp),
+                    .padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = ToolkitTheme.spacing.badgeVertical),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -51,8 +51,8 @@ fun JobBadge(
         } else {
             Box(
                 modifier = Modifier
-                    .size(14.dp)
-                    .offset(x = 4.dp, y = (-4).dp)
+                    .size(ToolkitTheme.dimensions.iconExtraSmall)
+                    .offset(x = ToolkitTheme.spacing.extraSmall, y = (-4).dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.error),
                 contentAlignment = Alignment.Center

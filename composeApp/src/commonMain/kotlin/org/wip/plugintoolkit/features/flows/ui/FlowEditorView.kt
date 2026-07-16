@@ -473,7 +473,7 @@ fun FlowEditorView(
                         nodeSizes[node.id]?.let { size ->
                             with(density) { size.height.toDp() }
                         }
-                    } ?: 120.dp
+                    } ?: ToolkitTheme.dimensions.containerHeightLarge
 
                     NodeCardContainer(
                         nodePosition = ghostPos,
@@ -776,12 +776,12 @@ fun FlowEditorView(
 }
 
 @Composable
-private fun NodeComponentPlaceholder(node: Node, height: Dp = 120.dp) {
+private fun NodeComponentPlaceholder(node: Node, height: Dp = ToolkitTheme.dimensions.heightLarge) {
     Surface(
-        modifier = Modifier.width(380.dp).height(height),
+        modifier = Modifier.width(ToolkitTheme.dimensions.containerWidthLarge).height(height),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
-        border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.borderLow))
+        border = androidx.compose.foundation.BorderStroke(ToolkitTheme.dimensions.progressIndicatorStroke, MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.borderLow))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(node.title, color = MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.disabled))

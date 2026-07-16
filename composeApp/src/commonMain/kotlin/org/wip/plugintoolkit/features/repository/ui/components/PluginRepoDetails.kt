@@ -83,7 +83,7 @@ fun PluginRepoDetails(
         Surface(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = ToolkitTheme.dimensions.borderUnselected,
-            shadowElevation = 2.dp,
+            shadowElevation = ToolkitTheme.dimensions.cardElevation,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(ToolkitTheme.spacing.large)) {
@@ -113,12 +113,12 @@ fun PluginRepoDetails(
                                 )
                             }
                         },
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                     ) {
                         Icon(
                             Icons.Default.ContentCopy,
                             contentDescription = stringResource(Res.string.repo_share_link_desc),
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }

@@ -133,7 +133,7 @@ fun LandingPage(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.large)
         ) {
-            GlassCard(modifier = Modifier.weight(1.5f).height(320.dp)) {
+            GlassCard(modifier = Modifier.weight(1.5f).height(ToolkitTheme.dimensions.cardHeightLarge)) {
                 Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                     Text(
                         stringResource(Res.string.landing_recent_activity),
@@ -177,7 +177,7 @@ fun LandingPage(
                 }
             }
 
-            GlassCard(modifier = Modifier.weight(1f).height(320.dp)) {
+            GlassCard(modifier = Modifier.weight(1f).height(ToolkitTheme.dimensions.cardHeightLarge)) {
                 Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                     Text(
                         stringResource(Res.string.landing_quick_links),

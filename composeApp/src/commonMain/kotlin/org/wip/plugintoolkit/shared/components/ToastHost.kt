@@ -188,11 +188,11 @@ private fun ToastItem(
 
     Surface(
         modifier = Modifier
-            .widthIn(min = 300.dp, max = 500.dp),
+            .widthIn(min = ToolkitTheme.dimensions.minWidthMedium, max = ToolkitTheme.dimensions.maxWidthLarge),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp,
-        shadowElevation = 8.dp,
+        tonalElevation = ToolkitTheme.dimensions.elevationHigh,
+        shadowElevation = ToolkitTheme.dimensions.elevationMedium,
         border = androidx.compose.foundation.BorderStroke(
             ToolkitTheme.dimensions.borderUnselected,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
@@ -214,12 +214,12 @@ private fun ToastItem(
                 if (toast.isNotification) {
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                     ) {
                         Icon(
                             Icons.Default.Close,
                             contentDescription = stringResource(Res.string.action_close),
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -276,7 +276,7 @@ private fun QueueControl(
             Icon(
                 Icons.Default.DeleteSweep,
                 contentDescription = stringResource(Res.string.action_clear_all),
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
                 tint = MaterialTheme.colorScheme.error
             )
         }

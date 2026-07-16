@@ -54,7 +54,7 @@ fun ColorPickerDialog(
     onPickedColor: (Color) -> Unit
 ) {
     var showDialog by remember(show) { mutableStateOf(show) }
-    var color by remember { mutableStateOf(ToolkitTheme.colors.white) }
+    var color by remember { mutableStateOf(Color.White) }
     var selectedFormat by remember { mutableStateOf("HEX") }
     var type by remember { mutableStateOf(initialType) }
 
@@ -82,10 +82,10 @@ fun ColorPickerDialog(
             }
 
             Surface(
-                modifier = Modifier.widthIn(max = 300.dp),
+                modifier = Modifier.widthIn(max = ToolkitTheme.dimensions.minWidthMedium),
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 6.dp
+                tonalElevation = ToolkitTheme.dimensions.elevationHighMedium
             ) {
                 Box(modifier = Modifier.padding(ToolkitTheme.spacing.extraLarge)) {
                     Column(
@@ -117,7 +117,7 @@ fun ColorPickerDialog(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(50.dp, 30.dp)
+                                    .size(ToolkitTheme.dimensions.containerWidthMediumLarge, ToolkitTheme.dimensions.heightMediumLarge)
                                     .clip(RoundedCornerShape(50))
                                     .transparentBackground(verticalBoxesAmount = 4)
                                     .background(color)

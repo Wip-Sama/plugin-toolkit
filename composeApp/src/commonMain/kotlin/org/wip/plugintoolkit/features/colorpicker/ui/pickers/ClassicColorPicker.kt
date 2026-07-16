@@ -50,10 +50,10 @@ internal fun ClassicColorPicker(
     var pickerLocation by remember { mutableStateOf(Offset.Zero) }
     var colorPickerSize by remember { mutableStateOf(IntSize.Zero) }
     var alpha by remember { mutableStateOf(1f) }
-    var rangeColor by remember { mutableStateOf(ToolkitTheme.colors.white) }
+    var rangeColor by remember { mutableStateOf(Color.White) }
     var hueSlider by remember { mutableStateOf(0f) }
 
-    var color by remember { mutableStateOf(ToolkitTheme.colors.white) }
+    var color by remember { mutableStateOf(Color.White) }
 
     LaunchedEffect(rangeColor, pickerLocation, colorPickerSize, alpha) {
         if (colorPickerSize.width > 0 && colorPickerSize.height > 0) {
@@ -99,15 +99,15 @@ internal fun ClassicColorPicker(
                         }
                     }
                 }
-                .size(200.dp)
+                .size(ToolkitTheme.dimensions.containerSizeLarge)
         ) {
             Canvas(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(MaterialTheme.shapes.medium)
             ) {
-                drawRect(Brush.horizontalGradient(listOf(ToolkitTheme.colors.white, rangeColor)))
-                drawRect(Brush.verticalGradient(listOf(ToolkitTheme.colors.transparent, ToolkitTheme.colors.black)))
+                drawRect(Brush.horizontalGradient(listOf(Color.White, rangeColor)))
+                drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
             }
             Canvas(modifier = Modifier.matchParentSize()) {
                 drawColorSelector(color.copy(alpha = 1f), pickerLocation)

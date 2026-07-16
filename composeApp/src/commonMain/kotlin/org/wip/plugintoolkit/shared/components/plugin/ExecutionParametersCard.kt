@@ -153,7 +153,7 @@ private fun ParameterGroup(title: String, parameters: List<ExecutionParameter>) 
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(8.dp),
+        shape = ToolkitTheme.shapes.small,
         border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(

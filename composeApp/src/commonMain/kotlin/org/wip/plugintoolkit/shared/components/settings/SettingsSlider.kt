@@ -25,7 +25,7 @@ fun SettingsSlider(
         valueRange = valueRange,
         steps = steps,
         enabled = enabled,
-        modifier = Modifier.width(150.dp)
+        modifier = Modifier.width(ToolkitTheme.dimensions.widthLarge)
     )
 }
 

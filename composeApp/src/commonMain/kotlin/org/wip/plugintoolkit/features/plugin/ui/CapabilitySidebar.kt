@@ -44,9 +44,9 @@ fun CapabilitySidebar(
 
     Surface(
         modifier = modifier
-            .width(220.dp)
+            .width(ToolkitTheme.dimensions.containerWidthLarge)
             .fillMaxHeight(),
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.cardElevation),
         border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider))
     ) {
         Column(
@@ -63,7 +63,7 @@ fun CapabilitySidebar(
                     imageVector = Icons.Default.Extension,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumLarge)
                 )
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
                 Column {
@@ -103,16 +103,16 @@ fun CapabilitySidebar(
                         onClick = { onCapabilitySelected(capability) },
                         modifier = Modifier.fillMaxWidth(),
                         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else ToolkitTheme.colors.transparent,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = ToolkitTheme.shapes.small
                     ) {
                         Row(
-                            modifier = Modifier.padding(10.dp),
+                            modifier = Modifier.padding(ToolkitTheme.spacing.smallMedium),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Bolt,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
                                 tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))

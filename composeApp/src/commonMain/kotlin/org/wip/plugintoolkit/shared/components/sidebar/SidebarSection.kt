@@ -85,7 +85,7 @@ fun <T> SidebarSection(
                     imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
                     contentDescription = stringResource(Res.string.action_toggle_section),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize)
                 )
             }
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))

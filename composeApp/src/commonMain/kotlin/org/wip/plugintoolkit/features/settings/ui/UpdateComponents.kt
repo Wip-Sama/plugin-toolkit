@@ -52,7 +52,7 @@ fun UpdateDialog(
             )
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = ToolkitTheme.dimensions.contentHeightLarge)) {
                 Text(
                     stringResource(Res.string.update_changelog_title),
                     style = MaterialTheme.typography.titleMedium,
@@ -89,7 +89,7 @@ fun UpdateDialog(
                         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                         LinearProgressIndicator(
                             progress = { progress },
-                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small)
+                            modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorHeightSmall).clip(MaterialTheme.shapes.small)
                         )
                         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
                         Text(

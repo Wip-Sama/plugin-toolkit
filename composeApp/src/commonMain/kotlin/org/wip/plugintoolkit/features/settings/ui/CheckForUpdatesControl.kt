@@ -33,7 +33,7 @@ fun CheckForUpdatesControl(viewModel: SettingsViewModel) {
         if (updateState is UpdateState.Checking) {
             CircularProgressIndicator(
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium).padding(end = ToolkitTheme.spacing.small),
-                strokeWidth = 2.dp
+                strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke
             )
             Text(
                 text = stringResource(Res.string.update_check_started),

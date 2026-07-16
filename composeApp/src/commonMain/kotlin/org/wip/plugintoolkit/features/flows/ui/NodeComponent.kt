@@ -146,14 +146,14 @@ fun NodeComponent(
 
     val isSelected = remember(node.id, selectedNodeIds) { selectedNodeIds.contains(node.id) }
     val cardBorder = if (isSelected) {
-        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        BorderStroke(ToolkitTheme.dimensions.progressIndicatorStroke, MaterialTheme.colorScheme.primary)
     } else {
         null
     }
 
     Box(
         modifier = modifier
-            .width(380.dp)
+            .width(ToolkitTheme.dimensions.nodeWidth)
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -216,7 +216,7 @@ fun NodeComponent(
                         if (index > 0) {
                             HorizontalDivider(
                                 Modifier.padding(vertical = ToolkitTheme.spacing.small),
-                                thickness = 0.5.dp,
+                                thickness = ToolkitTheme.dimensions.borderThin,
                                 color = MaterialTheme.colorScheme.outlineVariant
                             )
                         }
@@ -433,7 +433,7 @@ fun NodeComponent(
 
                                     Box(
                                         modifier = Modifier
-                                            .width(200.dp)
+                                            .width(ToolkitTheme.dimensions.widthLarge)
                                             .then(valueModifier)
                                             .onFocusChanged { if (!it.isFocused) onFocusLost() }
                                     ) {
@@ -489,7 +489,7 @@ fun NodeComponent(
                     if (node.inputs.isNotEmpty() && visibleOutputs.isNotEmpty()) {
                         HorizontalDivider(
                             Modifier,
-                            thickness = 0.5.dp,
+                            thickness = ToolkitTheme.dimensions.borderThin,
                             color = MaterialTheme.colorScheme.outlineVariant
                         )
                     }

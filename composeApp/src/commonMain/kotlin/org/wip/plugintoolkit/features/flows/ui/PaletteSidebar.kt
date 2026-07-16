@@ -89,7 +89,7 @@ fun PaletteSidebar(
 
     // Aligns perfectly with standard sidebars
     Surface(
-        modifier = modifier.width(280.dp).fillMaxHeight(),
+        modifier = modifier.width(ToolkitTheme.dimensions.sidebarExpandedWidth).fillMaxHeight(),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected),
         border = BorderStroke(
             ToolkitTheme.dimensions.borderUnselected,
@@ -508,12 +508,12 @@ fun PaletteItemPreview(node: PaletteNode) {
     }
 
     Surface(
-        modifier = Modifier.width(300.dp),
+        modifier = Modifier.width(ToolkitTheme.dimensions.containerWidthLarge),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = ToolkitTheme.spacing.small,
         shadowElevation = ToolkitTheme.spacing.mediumSmall,
-        border = BorderStroke(2.dp, color)
+        border = BorderStroke(ToolkitTheme.dimensions.progressIndicatorStroke, color)
     ) {
         Column {
             Box(
