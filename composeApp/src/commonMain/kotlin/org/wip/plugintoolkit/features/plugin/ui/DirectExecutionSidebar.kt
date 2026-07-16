@@ -128,7 +128,7 @@ fun DirectExecutionSidebar(
                                     Icon(
                                         Icons.Default.ArrowBack,
                                         contentDescription = "Back",
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                     )
                                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                                     Text("Back", style = MaterialTheme.typography.labelMedium)
@@ -136,12 +136,12 @@ fun DirectExecutionSidebar(
                                 Spacer(modifier = Modifier.weight(1f))
                                 Surface(
                                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = ToolkitTheme.opacity.divider),
-                                    shape = RoundedCornerShape(4.dp)
+                                    shape = ToolkitTheme.shapes.extraSmall
                                 ) {
                                     Text(
                                         text = "v${manifest.plugin.version}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = 2.dp),
+                                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.badgeHorizontal, vertical = ToolkitTheme.spacing.badgeVertical),
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }

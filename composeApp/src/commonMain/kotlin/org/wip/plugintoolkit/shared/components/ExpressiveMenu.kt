@@ -40,10 +40,10 @@ fun <T> ExpressiveMenu(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = ToolkitTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
+        tonalElevation = ToolkitTheme.dimensions.menuElevation,
+        shadowElevation = ToolkitTheme.dimensions.menuElevation
     ) {
         Column(
             modifier = Modifier.padding(ToolkitTheme.spacing.small)
@@ -54,13 +54,13 @@ fun <T> ExpressiveMenu(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(ToolkitTheme.shapes.small)
                         .background(
                             if (isSelected) MaterialTheme.colorScheme.secondaryContainer
                             else ToolkitTheme.colors.transparent
                         )
                         .clickable { onOptionSelected(option) }
-                        .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = 10.dp)
+                        .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.smallMedium)
                 ) {
                     Text(
                         text = labelProvider(option),
@@ -72,7 +72,7 @@ fun <T> ExpressiveMenu(
                 
                 // Add a small spacer between items if they are not the last one
                 if (option != options.last()) {
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraExtraSmall))
                 }
             }
         }

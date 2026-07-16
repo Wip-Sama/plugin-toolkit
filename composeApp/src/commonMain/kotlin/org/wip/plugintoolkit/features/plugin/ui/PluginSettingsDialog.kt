@@ -254,8 +254,8 @@ fun PluginSettingsDialog(
             modifier = Modifier
                 .fillMaxWidth(0.8f)
                 .fillMaxHeight(0.85f)
-                .widthIn(max = 1200.dp)
-                .heightIn(max = 900.dp)
+                .widthIn(max = ToolkitTheme.dimensions.dialogMaxWidth)
+                .heightIn(max = ToolkitTheme.dimensions.dialogMaxHeight)
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.large)) {
                 // Header row with title and search bar
@@ -425,7 +425,7 @@ fun PluginSettingsDialog(
                                                                             Icon(
                                                                                 Icons.Default.Lock,
                                                                                 contentDescription = null,
-                                                                                modifier = Modifier.size(14.dp)
+                                                                                modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
                                                                             )
                                                                         },
                                                                         style = ToolkitChipStyle.Tinted
@@ -443,7 +443,7 @@ fun PluginSettingsDialog(
                                                                             Icon(
                                                                                 Icons.Default.Lock,
                                                                                 contentDescription = null,
-                                                                                modifier = Modifier.size(14.dp)
+                                                                                modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
                                                                             )
                                                                         },
                                                                         style = ToolkitChipStyle.Tinted

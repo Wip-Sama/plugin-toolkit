@@ -178,7 +178,7 @@ fun CapabilityItem(
         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(
             alpha = ToolkitTheme.opacity.glassBackground
         ),
-        shape = RoundedCornerShape(12.dp),
+        shape = ToolkitTheme.shapes.medium,
         border = if (isSelected) BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary) else null
     ) {
         Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium).fillMaxWidth()) {
@@ -198,7 +198,7 @@ fun CapabilityItem(
                     if (capability.fileAccess?.isDestructive == true) {
                         Surface(
                             color = MaterialTheme.colorScheme.error.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = ToolkitTheme.opacity.divider)),
+                            border = BorderStroke(ToolkitTheme.dimensions.borderThin, MaterialTheme.colorScheme.error.copy(alpha = ToolkitTheme.opacity.divider)),
                             shape = androidx.compose.foundation.shape.CircleShape
                         ) {
                             Text(
@@ -300,8 +300,8 @@ fun CapabilityTester(
     ) {
         if (activeJobs.isNotEmpty()) {
             CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
+                modifier = Modifier.size(ToolkitTheme.dimensions.settingsIconSize),
+                strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
                 color = MaterialTheme.colorScheme.onPrimary
             )
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
@@ -327,7 +327,7 @@ fun EmptyState(message: String) {
             Icon(
                 Icons.Default.Inbox,
                 contentDescription = null,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraLarge),
                 tint = MaterialTheme.colorScheme.outline.copy(alpha = ToolkitTheme.opacity.divider)
             )
             Text(

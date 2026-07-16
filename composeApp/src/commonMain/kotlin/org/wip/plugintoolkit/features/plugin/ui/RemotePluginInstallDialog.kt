@@ -209,8 +209,8 @@ fun RemotePluginCard(
                                 Text(
                                     stringResource(Res.string.plugin_status_installed),
                                     modifier = Modifier.padding(
-                                        horizontal = ToolkitTheme.spacing.extraSmall + 2.dp,
-                                        vertical = ToolkitTheme.spacing.extraSmall / 2
+                                        horizontal = ToolkitTheme.spacing.badgeHorizontal,
+                                        vertical = ToolkitTheme.spacing.badgeVertical
                                     ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -261,7 +261,7 @@ fun RemotePluginCard(
                             Icon(
                                 Icons.Default.CloudDownload,
                                 contentDescription = null,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall + 2.dp)
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(stringResource(Res.string.plugin_install_button))
@@ -309,7 +309,7 @@ fun RemotePluginCard(
 
 @Composable
 fun InfoRow(label: String, value: String) {
-    Row(modifier = Modifier.padding(vertical = 2.dp)) {
+    Row(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)) {
         Text(
             "$label: ",
             style = MaterialTheme.typography.labelSmall,

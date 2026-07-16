@@ -115,16 +115,16 @@ fun PluginListItem(
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer,
                             shape = CircleShape,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.badgeVertical)
                             ) {
                                 Icon(
                                     Icons.Default.Check,
                                     contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
@@ -166,7 +166,7 @@ fun PluginListItem(
                         )
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
 
-                        Box(modifier = Modifier.height(24.dp)) {
+                        Box(modifier = Modifier.height(ToolkitTheme.dimensions.iconMedium)) {
                             ExpressiveMenu(
                                 options = pluginConflicts,
                                 selectedOption = pluginConflicts.firstOrNull { it.url == currentRepo.url }
@@ -214,7 +214,7 @@ fun PluginListItem(
                             CircularProgressIndicator(
                                 progress = { progress },
                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
-                                strokeWidth = 2.dp,
+                                strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))

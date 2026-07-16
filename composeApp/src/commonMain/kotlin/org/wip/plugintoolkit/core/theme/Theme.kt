@@ -58,11 +58,13 @@ data class Dimensions(
     val textFieldHeight: Dp = 56.dp,
     val borderSelected: Dp = 3.dp,
     val borderUnselected: Dp = 1.dp,
+    val borderThin: Dp = 0.5.dp,
     val iconMediumSmall: Dp = 18.dp,
     val emptyStateIconSize: Dp = 80.dp,
     val emptyStateTextWidth: Dp = 420.dp,
     val listIconSize: Dp = 54.dp,
     val listIconContentSize: Dp = 28.dp,
+    val sidebarIconSize: Dp = 22.dp,
     val progressBoxSize: Dp = 36.dp,
     val progressIndicatorStroke: Dp = 2.dp,
     val progressIndicatorStrokeMedium: Dp = 3.dp,
@@ -79,7 +81,18 @@ data class Dimensions(
     val standardButtonHeight: Dp = 40.dp,
     val circularProgressStrokeWidth: Dp = 2.dp,
     val circularProgressSize: Dp = 16.dp,
-    val genericInputWidth: Dp = 100.dp
+    val genericInputWidth: Dp = 100.dp,
+    val dialogMaxWidth: Dp = 1200.dp,
+    val dialogMaxHeight: Dp = 900.dp,
+    val iconExtraSmall: Dp = 14.dp,
+    val iconMicro: Dp = 12.dp,
+    val menuElevation: Dp = 4.dp,
+    val iconExtraLarge: Dp = 64.dp,
+    val cornerRadiusExtraSmall: Dp = 4.dp,
+    val cornerRadiusSmall: Dp = 8.dp,
+    val cornerRadiusMedium: Dp = 12.dp,
+    val cornerRadiusLarge: Dp = 16.dp,
+    val cornerRadiusExtraLarge: Dp = 24.dp
 )
 
 data class CustomColors(
@@ -130,19 +143,19 @@ val LocalDimensions = staticCompositionLocalOf { Dimensions() }
 val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
 val LocalOpacity = staticCompositionLocalOf { Opacity() }
 data class ToolkitShapes(
-    val extraSmall: CornerBasedShape = RoundedCornerShape(4.dp),
-    val small: CornerBasedShape = RoundedCornerShape(8.dp),
-    val medium: CornerBasedShape = RoundedCornerShape(12.dp),
-    val large: CornerBasedShape = RoundedCornerShape(16.dp),
-    val extraLarge: CornerBasedShape = RoundedCornerShape(24.dp),
+    val extraSmall: CornerBasedShape = RoundedCornerShape(ToolkitTheme.dimensions.cornerRadiusExtraSmall),
+    val small: CornerBasedShape = RoundedCornerShape(ToolkitTheme.dimensions.cornerRadiusSmall),
+    val medium: CornerBasedShape = RoundedCornerShape(ToolkitTheme.dimensions.cornerRadiusMedium),
+    val large: CornerBasedShape = RoundedCornerShape(ToolkitTheme.dimensions.cornerRadiusLarge),
+    val extraLarge: CornerBasedShape = RoundedCornerShape(ToolkitTheme.dimensions.cornerRadiusExtraLarge),
     val startActionRow: CornerBasedShape = RoundedCornerShape(
-        topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp
+        topStart = ToolkitTheme.dimensions.cornerRadiusLarge, topEnd = ToolkitTheme.dimensions.cornerRadiusLarge, bottomStart = ToolkitTheme.dimensions.cornerRadiusExtraSmall, bottomEnd = ToolkitTheme.dimensions.cornerRadiusExtraSmall
     ),
-    val middleActionRow: CornerBasedShape = RoundedCornerShape(4.dp),
+    val middleActionRow: CornerBasedShape = RoundedCornerShape(ToolkitTheme.dimensions.cornerRadiusExtraSmall),
     val endActionRow: CornerBasedShape = RoundedCornerShape(
-        topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp
+        topStart = ToolkitTheme.dimensions.cornerRadiusExtraSmall, topEnd = ToolkitTheme.dimensions.cornerRadiusExtraSmall, bottomStart = ToolkitTheme.dimensions.cornerRadiusLarge, bottomEnd = ToolkitTheme.dimensions.cornerRadiusLarge
     ),
-    val standAloneActionRow: CornerBasedShape = RoundedCornerShape(16.dp)
+    val standAloneActionRow: CornerBasedShape = RoundedCornerShape(ToolkitTheme.dimensions.cornerRadiusLarge)
 ) {
     val material = androidx.compose.material3.Shapes(
         extraSmall = extraSmall,

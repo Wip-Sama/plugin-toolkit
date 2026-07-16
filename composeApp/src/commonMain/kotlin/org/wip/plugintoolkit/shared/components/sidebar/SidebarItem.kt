@@ -56,9 +56,9 @@ fun <T> SidebarItem(
         MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.high)
 
     val targetTopStart =
-        if (position == SidebarItemPosition.Start || position == SidebarItemPosition.StandAlone) 16.dp else 4.dp
+        if (position == SidebarItemPosition.Start || position == SidebarItemPosition.StandAlone) ToolkitTheme.dimensions.cornerRadiusLarge else ToolkitTheme.dimensions.cornerRadiusExtraSmall
     val targetBottomStart =
-        if (position == SidebarItemPosition.End || position == SidebarItemPosition.StandAlone) 16.dp else 4.dp
+        if (position == SidebarItemPosition.End || position == SidebarItemPosition.StandAlone) ToolkitTheme.dimensions.cornerRadiusLarge else ToolkitTheme.dimensions.cornerRadiusExtraSmall
 
     val topStart by animateDpAsState(targetTopStart, animationSpec = tween(300))
     val topEnd by animateDpAsState(targetTopStart, animationSpec = tween(300))
@@ -75,7 +75,7 @@ fun <T> SidebarItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 2.dp)
+            .padding(bottom = ToolkitTheme.spacing.badgeVertical)
             .clip(animatedShape)
             .background(backgroundColor)
             .clickable { onClick() }
@@ -85,8 +85,8 @@ fun <T> SidebarItem(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .size(ToolkitTheme.dimensions.settingsIconContainerSize)
+                .clip(ToolkitTheme.shapes.medium)
                 .background(iconBackgroundColor),
             contentAlignment = Alignment.Center
         ) {
@@ -94,7 +94,7 @@ fun <T> SidebarItem(
                 imageVector = element.icon,
                 contentDescription = element.title.resolve(),
                 tint = iconTintColor,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(ToolkitTheme.dimensions.sidebarIconSize)
             )
         }
 
