@@ -125,7 +125,7 @@ fun PluginContent(
                         visibleJobs.forEach { job ->
                             JobResultCard(
                                 job = job,
-                                progress = jobProgressMap[job.id] ?: 0f,
+                                progress = jobProgressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                                 logs = emptyList(),
                                 onDelete = {
                                     if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {

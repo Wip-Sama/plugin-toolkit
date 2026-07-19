@@ -387,4 +387,7 @@
     <string name="plugin_rerun_setup">Rerun Setup</string>
     <string name="plugin_open_folder">Open Folder</string>
     <string name="tab_plugin_manager">Plugin Manager</string>
+    <string name="action_export">Export</string>
+    <string name="action_force_cancel">Force Cancel</string>
+    <string name="setting_auto_scroll">Auto scroll</string>
 </resources>

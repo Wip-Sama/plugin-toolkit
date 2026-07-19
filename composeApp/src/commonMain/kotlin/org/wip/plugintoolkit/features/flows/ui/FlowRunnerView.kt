@@ -519,7 +519,7 @@ fun FlowRunnerView(
                     Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)) {
                         flowJobs.forEach { job ->
                             val progressState = jobViewModel.jobProgress.collectAsState()
-                            val progress = progressState.value[job.id] ?: 0f
+                            val progress = progressState.value[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
 
                             val allLogs by jobViewModel.jobLogs.collectAsState()
                             val logs = allLogs[job.id] ?: emptyList()

@@ -130,6 +130,7 @@ import java.awt.Dimension
 import javax.swing.JOptionPane
 import javax.swing.JOptionPane.showMessageDialog
 import javax.swing.JWindow
+import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -157,7 +158,7 @@ fun main(args: Array<String>) {
             "Startup Error",
             JOptionPane.ERROR_MESSAGE
         )
-        System.exit(1)
+        exitProcess(1)
     }
 }
 

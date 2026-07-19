@@ -36,7 +36,7 @@ fun SettingsTextInput(
             }
         },
         enabled = enabled,
-        modifier = modifier.width(ToolkitTheme.dimensions.pluginIcon).height(ToolkitTheme.dimensions.pluginIcon),
+        modifier = modifier.width(ToolkitTheme.dimensions.genericInputWidthLarge).height(ToolkitTheme.dimensions.pluginIcon),
         textStyle = MaterialTheme.typography.bodyMedium,
         singleLine = true
     )

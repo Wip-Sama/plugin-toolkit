@@ -238,12 +238,10 @@ fun GeneralTab(viewModel: JobViewModel) {
                 SectionHeader(title = stringResource(Res.string.job_running_jobs), icon = Icons.Default.PlayArrow)
             }
             items(runningJobs) { job ->
-                JobCard(
+                org.wip.plugintoolkit.shared.components.plugin.JobResultCard(
                     job = job,
-                    progress = progressMap[job.id] ?: 0f,
+                    progress = progressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                     logs = logsMap[job.id] ?: emptyList(),
-                    isExpanded = expandedJobs[job.id] ?: false,
-                    onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
                     onCancel = { force -> viewModel.cancelJob(job.id, force) },
                     onPause = { viewModel.pauseJob(job.id) }
                 )
@@ -255,12 +253,10 @@ fun GeneralTab(viewModel: JobViewModel) {
                 SectionHeader(title = stringResource(Res.string.job_queue), icon = Icons.AutoMirrored.Filled.List)
             }
             items(queuedJobs) { job ->
-                JobCard(
+                org.wip.plugintoolkit.shared.components.plugin.JobResultCard(
                     job = job,
-                    progress = progressMap[job.id] ?: 0f,
+                    progress = progressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                     logs = logsMap[job.id] ?: emptyList(),
-                    isExpanded = expandedJobs[job.id] ?: false,
-                    onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
                     onCancel = { force -> viewModel.cancelJob(job.id, force) },
                     onPause = { viewModel.pauseJob(job.id) }
                 )
@@ -291,12 +287,10 @@ fun ArchiveTab(viewModel: JobViewModel) {
                 SectionHeader(title = stringResource(Res.string.job_paused_jobs), icon = Icons.Default.Pause)
             }
             items(pausedJobs) { job ->
-                JobCard(
+                org.wip.plugintoolkit.shared.components.plugin.JobResultCard(
                     job = job,
-                    progress = progressMap[job.id] ?: 0f,
+                    progress = progressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                     logs = logsMap[job.id] ?: emptyList(),
-                    isExpanded = expandedJobs[job.id] ?: false,
-                    onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
                     onCancel = { force -> viewModel.cancelJob(job.id, force) },
                     onResume = { viewModel.resumeJob(job.id) }
                 )
@@ -313,6 +307,7 @@ fun ArchiveTab(viewModel: JobViewModel) {
 fun EndedTab(viewModel: JobViewModel) {
     val endedJobs by viewModel.endedJobs.collectAsState()
     val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
+    val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
     val expandedJobs = remember { mutableStateMapOf<String, Boolean>() }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -340,11 +335,10 @@ fun EndedTab(viewModel: JobViewModel) {
                     SectionHeader(title = stringResource(Res.string.job_ended_jobs), icon = Icons.Default.CheckCircle)
                 }
                 items(endedJobs) { job ->
-                    JobCard(
+                    org.wip.plugintoolkit.shared.components.plugin.JobResultCard(
                         job = job,
+                        progress = progressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                         logs = logsMap[job.id] ?: emptyList(),
-                        isExpanded = expandedJobs[job.id] ?: false,
-                        onToggleExpand = { expandedJobs[job.id] = !(expandedJobs[job.id] ?: false) },
                         onClear = { viewModel.clearEndedJob(job.id) }
                     )
                 }
@@ -441,183 +435,6 @@ fun HistoryTab(viewModel: JobViewModel) {
     }
 }
 
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
-@Composable
-fun JobCard(
-    job: BackgroundJob,
-    progress: Float = 0f,
-    logs: List<String> = emptyList(),
-    isExpanded: Boolean = false,
-    onToggleExpand: () -> Unit = {},
-    onCancel: (Boolean) -> Unit = {},
-    onPause: () -> Unit = {},
-    onResume: () -> Unit = {},
-    onClear: () -> Unit = {}
-) {
-    // Ticker to force recomposition every second for running jobs
-    var ticker by remember { mutableStateOf(0) }
-    LaunchedEffect(job.id, job.status) {
-        if (job.status == JobStatus.Running) {
-            while (true) {
-                delay(1000)
-                ticker++
-            }
-        }
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(ToolkitTheme.dimensions.textFieldCornerRadius),
-        elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.dimensions.cardElevation)
-    ) {
-        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onToggleExpand) {
-                    Icon(
-                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) stringResource(Res.string.action_collapse) else stringResource(
-                            Res.string.action_expand
-                        )
-                    )
-                }
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = stringResource(Res.string.plugin_id_format, job.id),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                StatusBadge(job.status)
-            }
-
-            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
-
-            if (job.status == JobStatus.Running) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke)
-                        .clip(MaterialTheme.shapes.small),
-                    color = ProgressIndicatorDefaults.linearColor,
-                    trackColor = ProgressIndicatorDefaults.linearTrackColor,
-                    strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
-                )
-                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
-                    // Use ticker to force update
-                    val displayTime = if (ticker >= 0) {
-                        val end = job.completedAt ?: Clock.System.now()
-                        val start = job.startedAt
-                        if (start != null) (end - start).inWholeMilliseconds else 0L
-                    } else 0L
-                    Text(text = formatDuration(displayTime), style = MaterialTheme.typography.labelSmall)
-                }
-            }
-
-            if (job.errorMessage != null) {
-                Text(
-                    text = stringResource(Res.string.job_error_format, job.errorMessage),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = ToolkitTheme.spacing.small)
-                )
-            }
-
-            if (isExpanded) {
-                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-                TerminalLogView(logs)
-            }
-
-            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
-
-            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                if (job.status == JobStatus.Paused) {
-                    TextButton(onClick = onResume) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(stringResource(Res.string.action_resume))
-                    }
-                }
-                if (job.isPausable && (job.status == JobStatus.Running || job.status == JobStatus.Queued)) {
-                    TextButton(onClick = onPause) {
-                        Icon(Icons.Default.Pause, contentDescription = null)
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(stringResource(Res.string.action_pause))
-                    }
-                }
-                if (job.status != JobStatus.Completed && job.status != JobStatus.Cancelled && job.status != JobStatus.Failed) {
-                    var isShiftPressed by remember { mutableStateOf(false) }
-                    TextButton(
-                        onClick = { onCancel(isShiftPressed) },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.onPointerEvent(PointerEventType.Press) {
-                            isShiftPressed = it.keyboardModifiers.isShiftPressed
-                        }
-                    ) {
-                        Icon(Icons.Default.Cancel, contentDescription = null)
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(if (isShiftPressed) "Force Cancel" else stringResource(Res.string.dialog_cancel))
-                    }
-                }
-                if (job.status == JobStatus.Completed || job.status == JobStatus.Cancelled || job.status == JobStatus.Failed) {
-                    TextButton(
-                        onClick = onClear,
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.outline)
-                    ) {
-                        Icon(Icons.Default.Cancel, contentDescription = null)
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(stringResource(Res.string.action_clear))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TerminalLogView(logs: List<String>) {
-    val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
-
-    // Auto-scroll to bottom when new logs arrive
-    LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) {
-            scrollState.animateScrollToItem(logs.size - 1)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = ToolkitTheme.dimensions.heightMaxLarge) // Approx 10 rows
-            .clip(ToolkitTheme.shapes.small)
-            .background(Color(0xFF1E1E1E))
-            .padding(ToolkitTheme.spacing.small)
-    ) {
-        LazyColumn(
-            state = scrollState,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(logs) { log ->
-                Text(
-                    text = log,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                    ),
-                    color = when {
-                        log.contains("[ERROR]") -> MaterialTheme.colorScheme.error
-                        log.contains("[WARN]") -> MaterialTheme.colorScheme.primary
-                        log.contains("[VERBOSE]") -> MaterialTheme.colorScheme.onSurfaceVariant
-                        log.contains("[DEBUG]") -> ToolkitTheme.colors.info
-                        else -> MaterialTheme.colorScheme.onSurface
-                    }
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun StatusBadge(status: JobStatus) {
@@ -667,9 +484,3 @@ private fun formatTime(instant: Instant): String {
     }:${localDateTime.second.toString().padStart(2, '0')}"
 }
 
-private fun formatDuration(ms: Long): String {
-    val seconds = (ms / 1000) % 60
-    val minutes = (ms / (1000 * 60)) % 60
-    val hours = (ms / (1000 * 60 * 60))
-    return if (hours > 0) "${hours}h ${minutes}m ${seconds}s" else "${minutes}m ${seconds}s"
-}

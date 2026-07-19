@@ -82,6 +82,7 @@ data class Dimensions(
     val circularProgressStrokeWidth: Dp = 2.dp,
     val circularProgressSize: Dp = 16.dp,
     val genericInputWidth: Dp = 100.dp,
+    val genericInputWidthLarge: Dp = 140.dp,
     val dialogMaxWidth: Dp = 1200.dp,
     val dialogMaxHeight: Dp = 900.dp,
     val iconExtraSmall: Dp = 14.dp,

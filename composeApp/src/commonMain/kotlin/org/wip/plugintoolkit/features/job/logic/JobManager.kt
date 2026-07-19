@@ -49,8 +49,8 @@ class JobManager(
     private val _endedJobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
     val endedJobs: StateFlow<List<BackgroundJob>> = _endedJobs.asStateFlow()
 
-    private val _jobProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val jobProgress: StateFlow<Map<String, Float>> = _jobProgress.asStateFlow()
+    private val _jobProgress = MutableStateFlow<Map<String, org.wip.plugintoolkit.features.job.model.JobProgress>>(emptyMap())
+    val jobProgress: StateFlow<Map<String, org.wip.plugintoolkit.features.job.model.JobProgress>> = _jobProgress.asStateFlow()
 
     private val _history = MutableStateFlow<List<JobHistoryEntry>>(emptyList())
     val history: StateFlow<List<JobHistoryEntry>> = _history.asStateFlow()
@@ -284,9 +284,28 @@ class JobManager(
     }
 
     fun updateJobProgress(jobId: String, progress: Float) {
-        _jobProgress.update { it + (jobId to progress) }
+        _jobProgress.update { current ->
+            val currentProgress = current[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
+            current + (jobId to currentProgress.copy(mainProgress = progress))
+        }
         val progressPercent = (progress * 100).toInt()
         addJobLog(jobId, "Progress: $progressPercent%", "VERBOSE")
+    }
+
+    fun updateCapabilityProgress(jobId: String, capabilityName: String, progress: Float) {
+        _jobProgress.update { current ->
+            val currentProgress = current[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
+            val updatedCaps = currentProgress.capabilitiesProgress + (capabilityName to progress)
+            current + (jobId to currentProgress.copy(capabilitiesProgress = updatedCaps))
+        }
+    }
+
+    fun removeCapabilityProgress(jobId: String, capabilityName: String) {
+        _jobProgress.update { current ->
+            val currentProgress = current[jobId] ?: return@update current
+            val updatedCaps = currentProgress.capabilitiesProgress - capabilityName
+            current + (jobId to currentProgress.copy(capabilitiesProgress = updatedCaps))
+        }
     }
 
     fun addJobLog(jobId: String, message: String, level: String = "INFO") {
@@ -310,7 +329,9 @@ class JobManager(
 
         _jobLogs.update { currentLogs ->
             val logs = currentLogs[jobId] ?: emptyList()
-            currentLogs + (jobId to (logs + formattedLog).takeLast(100))
+            val maxLines = settingsRepository.settings.value.jobs.maxLogLines
+            val newLogs = logs + formattedLog
+            currentLogs + (jobId to if (maxLines == -1) newLogs else newLogs.takeLast(maxLines))
         }
     }
 

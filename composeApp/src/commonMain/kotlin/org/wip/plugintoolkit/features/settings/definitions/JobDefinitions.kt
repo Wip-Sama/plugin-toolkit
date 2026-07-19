@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.AvTimer
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlaylistAddCheck
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Subject
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.JobSettings
 import org.wip.plugintoolkit.features.settings.model.SettingDefinition.NumericSetting
@@ -57,6 +58,16 @@ fun SettingsRegistryBuilder.jobDefinitions() {
                 icon = Icons.Default.PlaylistAddCheck,
                 valueRange = 5..100,
                 setValue = { s, v -> s.copy(jobs = s.jobs.copy(maxEndedJobs = v)) }
+            )
+
+            SettingNumeric(
+                p1 = AppSettings::jobs,
+                p2 = JobSettings::maxLogLines,
+                title = SettingText.Raw("Max Log Lines"),
+                subtitle = SettingText.Raw("Maximum number of console log lines to keep for each job (-1 for unlimited)"),
+                icon = Icons.Default.Subject,
+                valueRange = -1..10000,
+                setValue = { s, v -> s.copy(jobs = s.jobs.copy(maxLogLines = v)) }
             )
 
             // We must map Long to Int since the Numeric UI component only accepts Ints.

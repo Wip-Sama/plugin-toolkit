@@ -304,6 +304,7 @@ class PluginLifecycleManager(
     fun createPluginContext(
         pkg: String,
         jobId: String? = null,
+        capabilityName: String? = null,
         manifest: PluginManifest? = null,
         allowedPaths: List<String> = emptyList(),
         isDestructiveAllowed: Boolean = false,
@@ -328,7 +329,13 @@ class PluginLifecycleManager(
         val pluginLogger = jobManager.getPluginLogger(pkg, jobId)
         val progressReporter = object : ProgressReporter {
             override fun report(progress: Float) {
-                if (jobId != null) jobManager.updateJobProgress(jobId, progress)
+                if (jobId != null) {
+                    if (capabilityName != null) {
+                        jobManager.updateCapabilityProgress(jobId, capabilityName, progress)
+                    } else {
+                        jobManager.updateJobProgress(jobId, progress)
+                    }
+                }
             }
         }
 

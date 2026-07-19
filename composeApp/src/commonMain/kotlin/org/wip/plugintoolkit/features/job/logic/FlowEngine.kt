@@ -48,7 +48,7 @@ class FlowEngine(
 
     suspend fun executeFlowJob(job: BackgroundJob) {
         manager.addJobLog(job.id, "Starting flow execution for '${job.capabilityName}'...")
-        manager.updateJobProgress(job.id, 0.05f)
+        manager.updateJobProgress(job.id, 0.0f)
 
         val settingsPersistence: SettingsPersistence by inject()
         val appDataDir = settingsPersistence.getSettingsDir()
@@ -299,6 +299,9 @@ class FlowEngine(
             )
         }
 
+        var completedNodesCount = executedNodeIds.size
+        val totalNodes = flow.nodes.size
+
         executionOrder.forEachIndexed { index, nodeId ->
             kotlinx.coroutines.yield()
             val node = nodesById[nodeId] ?: return@forEachIndexed
@@ -310,11 +313,6 @@ class FlowEngine(
                     manager.addJobLog(job.id, "Flow execution paused before capability: ${node.title}")
                     throw PauseFlowException(buildCurrentState())
                 }
-            }
-
-            if (isRoot) {
-                val nodeProgress = 0.1f + (index.toFloat() / flow.nodes.size.toFloat()) * 0.8f
-                manager.updateJobProgress(job.id, nodeProgress)
             }
 
             when (node) {
@@ -451,6 +449,7 @@ class FlowEngine(
                     val context = pluginManager.createPluginContext(
                         node.pluginInfo.id,
                         job.id,
+                        capabilityName = node.capability.name,
                         allowedPaths = allowedPaths,
                         isDestructiveAllowed = isDestructive,
                         executionFileSystem = execFs
@@ -536,6 +535,17 @@ class FlowEngine(
                     }
                     activeCapabilityHandle = handle
 
+                    val monitorJob = if (isRoot) {
+                        workerScope.launch {
+                            manager.jobProgress.collect { progressMap ->
+                                val p = progressMap[job.id] ?: return@collect
+                                val capProg = p.capabilitiesProgress[node.capability.name] ?: 0f
+                                val flowProgress = (completedNodesCount + capProg) / totalNodes.toFloat()
+                                manager.updateJobProgress(job.id, flowProgress)
+                            }
+                        }
+                    } else null
+
                     val result = try {
                         handle.result.await()
                     } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -549,6 +559,10 @@ class FlowEngine(
                         )
                     } finally {
                         activeCapabilityHandle = null
+                        if (isRoot) {
+                            monitorJob?.cancel()
+                            manager.removeCapabilityProgress(job.id, node.capability.name)
+                        }
                     }
 
                     when (result) {
@@ -668,6 +682,10 @@ class FlowEngine(
             }
 
             executedNodeIds.add(node.id)
+            if (isRoot) {
+                completedNodesCount++
+                manager.updateJobProgress(job.id, completedNodesCount.toFloat() / totalNodes.toFloat())
+            }
         }
 
         return flowOutputs
