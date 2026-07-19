@@ -274,39 +274,41 @@ fun JobResultCard(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.divider),
-                                            MaterialTheme.shapes.medium
-                                        )
-                                        .padding(ToolkitTheme.spacing.medium)
-                                ) {
-                                    outputsParsed.forEach { (portName, element) ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = portName,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurface
+                                SelectionContainer {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.divider),
+                                                MaterialTheme.shapes.medium
                                             )
-                                            Text(
-                                                text = when (element) {
-                                                    is JsonPrimitive -> {
-                                                        if (element.isString) element.content else element.toString()
-                                                    }
+                                            .padding(ToolkitTheme.spacing.medium)
+                                    ) {
+                                        outputsParsed.forEach { (portName, element) ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = portName,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = when (element) {
+                                                        is JsonPrimitive -> {
+                                                            if (element.isString) element.content else element.toString()
+                                                        }
 
-                                                    else -> element.toString()
-                                                },
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontFamily = FontFamily.Monospace,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                                        else -> element.toString()
+                                                    },
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
                                     }
                                 }
