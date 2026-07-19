@@ -24,6 +24,7 @@ Fixed:
 	- The color field had 2 buttons for opening a color picker, but only one worked, removed the broken one
 	- When deleting a flow installed from remote it became impossible to open the flow tab of a repo
   - Sometimes flows were parsed incorrectly when downloaded from remote
+  - Configuration changes of plugin would require a plugin reload
 ----------------------------------------------------------------------------------------------------
 Version: 1.7.2
 Date: 13-07-2026

@@ -1,4 +1,4 @@
-﻿package org.wip.plugintoolkit.features.plugin.logic
+package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CompletableDeferred
@@ -189,6 +189,16 @@ class PluginLifecycleCoordinator(
                                 }
                             } else {
                                 triggerValidationInternal(action.pkg)
+                            }
+                        }
+                    } else {
+                        // Settings were updated but plugin is not broken and doesn't require configuring settings.
+                        // We must reload the plugin if it's active so that Koin re-injects the updated settings.
+                        if (plugin.isEnabled && lifecycleManager.loadedPlugins.value.contains(action.pkg)) {
+                            try {
+                                lifecycleManager.reloadPlugin(action.pkg)
+                            } catch (e: Exception) {
+                                Logger.e(e) { "Failed to reload plugin ${action.pkg} after settings update" }
                             }
                         }
                     }
