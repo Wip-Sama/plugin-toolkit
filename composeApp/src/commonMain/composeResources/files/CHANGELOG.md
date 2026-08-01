@@ -1,5 +1,5 @@
 Version: 1.7.4
-Date: 16-07-2026
+Date: 01-08-2026
 Changes:
   - The cancel button in job operation is now disabled in non-cancelable phases
   - JobManager sandbox cleanup now has retry to cancel sandbox up to 3 times with a notification if errors occur
@@ -8,7 +8,10 @@ Changes:
   - IO operations in flows now follow Exponential Backoff logic instead of fixed retry timing
   - Callers update state instantly in memory and use a version-tracked ioMutex for disk persistence
   - Support for parallel state transitions for distinct plugins
+  - Strengthened path traversal checks
 Added:
+  - Whitelist/Blacklist folder for plugin access with additional Unrestricted mode
+  - New mekanism and dialogs for managing jar signatures
 Fixed:
   - Locks are now safely evicted from jarLocks when no active operations remain
 Planned:

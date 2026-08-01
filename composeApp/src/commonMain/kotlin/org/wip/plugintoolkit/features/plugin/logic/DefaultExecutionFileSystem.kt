@@ -23,13 +23,13 @@ class DefaultExecutionFileSystem(
         val normalized = try {
             file.canonicalPath
         } catch (e: Exception) {
-            file.absolutePath
+            throw SecurityException("Failed to resolve canonical path for '${relativePath.value}': ${e.message}")
         }
         val baseFile = java.io.File(sandboxPath)
         val baseCanonical = try {
             baseFile.canonicalPath
         } catch (e: Exception) {
-            baseFile.absolutePath
+            throw SecurityException("Failed to resolve base canonical path for '$sandboxPath': ${e.message}")
         }
 
         if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + java.io.File.separator)) {

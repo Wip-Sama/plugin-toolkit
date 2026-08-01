@@ -87,6 +87,8 @@ class PluginManagerViewModel(
 
     // Persistence flags handled via InstalledPlugin now
 
+    private val sessionAllowedUnsignedPlugins = mutableSetOf<String>()
+
     init {
         PlatformUtils.mkdirs(defaultPluginFolder)
 
@@ -103,13 +105,18 @@ class PluginManagerViewModel(
                             onConfirm = { openSettings(plugin.pkg) }
                         )
                     } else if (plugin.requiredAction == "CONFIRM_SIGNATURE" && !plugin.signaturePrompted) {
-                        viewModelScope.launch {
-                            pluginManager.updatePlugin(plugin.pkg) { it.copy(signaturePrompted = true) }
-                        }
-                        dialogService.showConfirmation(
-                            title = Res.string.plugin_invalid_signature.localized.resolveNonComposable(),
-                            message = "Plugin ${plugin.name} has an invalid signature. Do you want to load it anyway? If you ignore, the plugin will remain locked and unloaded.",
-                            onConfirm = {
+                        val strictChecking = settingsRepository.settings.value.extensions.strictSignatureChecking
+                        if (strictChecking) {
+                            viewModelScope.launch {
+                                pluginManager.updatePlugin(plugin.pkg) { it.copy(signaturePrompted = true) }
+                            }
+                            dialogService.showConfirmation(
+                                title = Res.string.plugin_invalid_signature.localized.resolveNonComposable(),
+                                message = "Plugin ${plugin.name} has an invalid or missing signature. Strict signature checking is currently enabled. Would you like to open Settings to adjust signature checking?",
+                                onConfirm = { openSettings(plugin.pkg) }
+                            )
+                        } else {
+                            if (sessionAllowedUnsignedPlugins.contains(plugin.pkg)) {
                                 viewModelScope.launch {
                                     pluginManager.updatePlugin(plugin.pkg) { p ->
                                         p.copy(
@@ -121,8 +128,30 @@ class PluginManagerViewModel(
                                     }
                                     pluginManager.reloadPlugin(plugin.pkg)
                                 }
+                            } else {
+                                viewModelScope.launch {
+                                    pluginManager.updatePlugin(plugin.pkg) { it.copy(signaturePrompted = true) }
+                                }
+                                dialogService.showConfirmation(
+                                    title = Res.string.plugin_invalid_signature.localized.resolveNonComposable(),
+                                    message = "Plugin ${plugin.name} has an invalid or missing signature. Do you want to allow loading it for this session?",
+                                    onConfirm = {
+                                        sessionAllowedUnsignedPlugins.add(plugin.pkg)
+                                        viewModelScope.launch {
+                                            pluginManager.updatePlugin(plugin.pkg) { p ->
+                                                p.copy(
+                                                    requiredAction = null,
+                                                    isEnabled = true,
+                                                    loadError = null,
+                                                    isValidated = true
+                                                )
+                                            }
+                                            pluginManager.reloadPlugin(plugin.pkg)
+                                        }
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }

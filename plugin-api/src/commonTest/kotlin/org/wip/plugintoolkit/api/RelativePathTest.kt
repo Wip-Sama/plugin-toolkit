@@ -34,6 +34,12 @@ class RelativePathTest {
         
         assertFalse("..\\foo.txt".toRelativePath().isSuccess, "Should block Windows traversal up")
         assertFalse("dir\\..\\..\\foo.txt".toRelativePath().isSuccess, "Should block Windows mid-traversal")
+
+        assertFalse("%2e%2e/foo.txt".toRelativePath().isSuccess, "Should block URL-encoded traversal up")
+        assertFalse("dir/%2e%2e/foo.txt".toRelativePath().isSuccess, "Should block URL-encoded mid-traversal")
+        assertFalse("dir%2ffoo.txt".toRelativePath().isSuccess, "Should block encoded slashes")
+        assertFalse("\u2024\u2024/foo.txt".toRelativePath().isSuccess, "Should block Unicode dot traversal")
+        assertFalse("\uFF0E\uFF0E/foo.txt".toRelativePath().isSuccess, "Should block Fullwidth dot traversal")
     }
 
     @Test

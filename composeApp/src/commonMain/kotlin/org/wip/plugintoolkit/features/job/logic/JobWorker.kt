@@ -163,7 +163,8 @@ class JobWorker(
         val mutableParams = job.parameters.toMutableMap()
         val settingsPersistence: SettingsPersistence = get()
         val sandboxDir = "${settingsPersistence.getSettingsDir()}/jobs/${job.id}/sandbox/node_0"
-        val (allowedPaths, isDestructive) = resolveFileAccess(manifest, job.capabilityName, mutableParams, sandboxDir)
+        val extSettings = try { settingsPersistence.load().extensions } catch (_: Exception) { null }
+        val (allowedPaths, isDestructive) = resolveFileAccess(manifest, job.capabilityName, mutableParams, sandboxDir, extSettings)
 
         validateCapabilityParameters(manifest, job.capabilityName, mutableParams)
 

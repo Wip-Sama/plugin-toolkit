@@ -308,11 +308,64 @@ private fun getLeafPrimitives(element: JsonElement, type: DataType): List<String
     }
 }
 
+object SystemPathSecurity {
+    val BUILTIN_BLACKLIST = listOf(
+        "C:\\Windows",
+        "C:\\Program Files",
+        "C:\\Program Files (x86)",
+        "C:\\ProgramData",
+        "/system",
+        "/etc",
+        "/usr",
+        "/boot",
+        "/dev",
+        "/proc",
+        "/sys",
+        "/var"
+    )
+
+    fun isPathAllowed(
+        pathStr: String,
+        mode: org.wip.plugintoolkit.features.settings.model.FileAccessMode = org.wip.plugintoolkit.features.settings.model.FileAccessMode.Blacklist,
+        customBlacklist: List<String> = emptyList(),
+        customWhitelist: List<String> = emptyList(),
+        sandboxPath: String? = null
+    ): Boolean {
+        val canonical = try {
+            java.io.File(pathStr).canonicalPath
+        } catch (_: Exception) {
+            return false
+        }
+
+        when (mode) {
+            org.wip.plugintoolkit.features.settings.model.FileAccessMode.Unrestricted -> return true
+            org.wip.plugintoolkit.features.settings.model.FileAccessMode.Whitelist -> {
+                val effectiveWhitelist = customWhitelist.toMutableList()
+                sandboxPath?.let { effectiveWhitelist.add(it) }
+                if (effectiveWhitelist.isEmpty()) return false
+                return effectiveWhitelist.any { allowed ->
+                    val allowedCanonical = try { java.io.File(allowed).canonicalPath } catch (_: Exception) { return@any false }
+                    canonical == allowedCanonical || canonical.startsWith(allowedCanonical + java.io.File.separator)
+                }
+            }
+            org.wip.plugintoolkit.features.settings.model.FileAccessMode.Blacklist -> {
+                val allBlacklisted = BUILTIN_BLACKLIST + customBlacklist
+                val isDenied = allBlacklisted.any { blocked ->
+                    val blockedCanonical = try { java.io.File(blocked).canonicalPath } catch (_: Exception) { return@any false }
+                    canonical == blockedCanonical || canonical.startsWith(blockedCanonical + java.io.File.separator)
+                }
+                return !isDenied
+            }
+        }
+    }
+}
+
 fun resolveFileAccess(
     manifest: PluginManifest,
     capabilityName: String,
     parameters: MutableMap<String, JsonElement>,
-    sandboxPath: String? = null
+    sandboxPath: String? = null,
+    extensionSettings: org.wip.plugintoolkit.features.settings.model.ExtensionSettings? = null
 ): Pair<List<String>, Boolean> {
     val capability = manifest.capabilities.find { it.name == capabilityName } ?: return Pair(emptyList(), false)
     val paramMetadataMap = capability.parameters ?: return Pair(emptyList(), false)
@@ -372,9 +425,17 @@ fun resolveFileAccess(
         }
     }
 
+    val mode = extensionSettings?.fileAccessMode ?: org.wip.plugintoolkit.features.settings.model.FileAccessMode.Blacklist
+    val customBlacklist = extensionSettings?.blacklistedDirectories ?: emptyList()
+    val customWhitelist = extensionSettings?.allowedDirectories ?: emptyList()
+
+    val filteredPaths = allowedPaths.filter { pathStr ->
+        SystemPathSecurity.isPathAllowed(pathStr, mode, customBlacklist, customWhitelist, sandboxPath)
+    }
+
     val isDestructive = capability.fileAccess?.isDestructive == true
 
-    return Pair(allowedPaths, isDestructive)
+    return Pair(filteredPaths, isDestructive)
 }
 
 fun deleteRecursively(path: kotlinx.io.files.Path) {

@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.features.settings.logic
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,7 +10,9 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import kotlin.time.Duration.Companion.milliseconds
 
+@OptIn(FlowPreview::class)
 class SettingsRepository(
     val persistence: SettingsPersistence,
     scope: CoroutineScope
@@ -28,7 +31,7 @@ class SettingsRepository(
             _settings.value = persistence.load()
             _isLoaded.value = true
             saveChannel.receiveAsFlow()
-                .debounce(500)
+                .debounce(500.milliseconds)
                 .collect {
                     persistence.save(it)
                 }
@@ -55,12 +58,14 @@ class SettingsRepository(
      * Legacy method for immediate access. Use [settings] Flow for reactive updates.
      * TODO: Remove / Deprecate this
      */
+    @Deprecated("Use [settings] Flow for reactive updates")
     fun loadSettings(): AppSettings = _settings.value
 
     /**
      * Legacy method. Prefer [updateSettings] for atomic updates.
      * TODO: Remove / Deprecate this
      */
+    @Deprecated("Use [updateSettings] for atomic updates")
     fun saveSettings(settings: AppSettings) {
         updateSettings { settings }
     }

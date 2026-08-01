@@ -105,12 +105,22 @@ enum class PluginUnplugBehavior {
 }
 
 @Serializable
+enum class FileAccessMode {
+    Blacklist,
+    Whitelist,
+    Unrestricted
+}
+
+@Serializable
 data class ExtensionSettings(
     val repositories: List<ExtensionRepo> = emptyList(),
     val packageSourceOverrides: Map<String, String> = emptyMap(), // pkg to repo url
     val pluginFolders: List<String> = emptyList(), // managed install locations
     val pluginUnplugBehavior: PluginUnplugBehavior = PluginUnplugBehavior.Block,
-    val strictSignatureChecking: Boolean = true
+    val strictSignatureChecking: Boolean = true,
+    val fileAccessMode: FileAccessMode = FileAccessMode.Blacklist,
+    val blacklistedDirectories: List<String> = emptyList(),
+    val allowedDirectories: List<String> = emptyList()
 )
 
 @Serializable

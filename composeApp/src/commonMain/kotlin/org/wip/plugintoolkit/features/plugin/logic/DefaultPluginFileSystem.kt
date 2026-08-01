@@ -32,13 +32,13 @@ class DefaultPluginFileSystem(
         val normalized = try {
             file.canonicalPath
         } catch (e: Exception) {
-            file.absolutePath
+            throw SecurityException("Failed to resolve canonical path for '${relativePath.value}': ${e.message}")
         }
         val baseFile = File(basePath)
         val baseCanonical = try {
             baseFile.canonicalPath
         } catch (e: Exception) {
-            baseFile.absolutePath
+            throw SecurityException("Failed to resolve base canonical path for '$basePath': ${e.message}")
         }
 
         if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + File.separator)) {
@@ -107,6 +107,10 @@ class DefaultPluginFileSystem(
     }
 
     override suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit> {
+        if (resourcePath.contains("..") || resourcePath.startsWith("/") || resourcePath.startsWith("\\") || resourcePath.contains("\u0000")) {
+            return Result.failure(SecurityException("Invalid resource path: $resourcePath"))
+        }
+
         return try {
             withContext(loomDispatcher) {
                 val jar = jarPath
@@ -162,13 +166,13 @@ class DefaultPluginFileSystem(
         val normalized = try {
             file.canonicalPath
         } catch (e: Exception) {
-            file.absolutePath
+            throw SecurityException("Failed to resolve canonical path for '${relativePath.value}': ${e.message}")
         }
         val baseFile = File(cachePath)
         val baseCanonical = try {
             baseFile.canonicalPath
         } catch (e: Exception) {
-            baseFile.absolutePath
+            throw SecurityException("Failed to resolve base canonical path for '$cachePath': ${e.message}")
         }
 
         if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + File.separator)) {

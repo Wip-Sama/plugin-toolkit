@@ -449,11 +449,13 @@ class FlowEngine(
                     val plugin = PluginLoader.getPluginById(node.pluginInfo.id)
                         ?: throw Exception("Plugin ${node.pluginInfo.id} not found")
                     val manifest = plugin.getManifest().getOrThrow()
+                    val extSettings = try { settingsRepository.settings.value.extensions } catch (_: Exception) { null }
                     val (allowedPaths, isDestructive) = resolveFileAccess(
                         manifest,
                         node.capability.name,
                         capabilityParameters,
-                        nodeSandbox
+                        nodeSandbox,
+                        extSettings
                     )
                     validateCapabilityParameters(manifest, node.capability.name, capabilityParameters)
 

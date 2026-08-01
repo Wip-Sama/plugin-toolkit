@@ -23,7 +23,7 @@ class HostFileSystemImpl(
         val normalizedPath = try {
             file.canonicalPath
         } catch (e: Exception) {
-            file.absolutePath
+            throw SecurityException("Failed to resolve canonical path for '$pathString': ${e.message}")
         }
 
         // If the path is inside any of the allowedPaths, it is allowed
@@ -32,7 +32,7 @@ class HostFileSystemImpl(
             val allowedCanonical = try {
                 allowedFile.canonicalPath
             } catch (e: Exception) {
-                allowedFile.absolutePath
+                throw SecurityException("Failed to resolve allowed canonical path for '$allowed': ${e.message}")
             }
 
             normalizedPath == allowedCanonical || normalizedPath.startsWith(allowedCanonical + File.separator)
@@ -102,7 +102,9 @@ class HostFileSystemImpl(
         val metadata = SystemFileSystem.metadataOrNull(path)
         if (metadata?.isDirectory != true) return emptyList()
 
-        return SystemFileSystem.list(path).map { it.name }
+        return SystemFileSystem.list(path)
+            .filter { isPathAllowed(it.toString()) }
+            .map { it.name }
     }
 
     override suspend fun deleteFile(absolutePath: String): Result<Unit> {
