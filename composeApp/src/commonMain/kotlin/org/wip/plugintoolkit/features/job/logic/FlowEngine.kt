@@ -47,6 +47,17 @@ class FlowEngine(
     private val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository by inject()
 
     suspend fun executeFlowJob(job: BackgroundJob) {
+        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
+        var initialPauseRequested = false
+        manager.registerJobHandle(job.id, object : JobHandle {
+            override val result: Deferred<ExecutionResult> get() = throw UnsupportedOperationException("Not used directly")
+            override fun pause() {
+                initialPauseRequested = true
+            }
+            override fun cancel(force: Boolean) {
+                jobExecution.cancel()
+            }
+        })
         manager.addJobLog(job.id, "Starting flow execution for '${job.capabilityName}'...")
         manager.updateJobProgress(job.id, 0.0f)
 
@@ -70,7 +81,7 @@ class FlowEngine(
 
         try {
             val jsonOutputs =
-                executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject, 0)
+                executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject, 0, initialPauseRequested)
             val finalJson = toJsonElement(jsonOutputs).toString()
             val outputFileStr = job.parameters["-1_flow_output_file"]?.let { param ->
                 try {
@@ -135,7 +146,8 @@ class FlowEngine(
         initialParameters: Map<String, JsonElement>,
         isRoot: Boolean,
         resumeStateOverride: JsonObject?,
-        depth: Int
+        depth: Int,
+        initialPauseRequested: Boolean = false
     ): Map<String, Any?> {
         val runtimeInferred = FlowTypeInferenceCache.getOrCreate(flow) { runRuntimeTypeInference(flow) }
         val nodesById = flow.nodes.associateBy { it.id }
@@ -216,6 +228,7 @@ class FlowEngine(
         }
         val executionOrder = mutableListOf<Long>()
         while (queue.isNotEmpty()) {
+            kotlinx.coroutines.yield()
             val nodeId = queue.removeFirst()
             executionOrder.add(nodeId)
             adj[nodeId]?.forEach { neighbor ->
@@ -232,7 +245,7 @@ class FlowEngine(
         val capabilityResumeStates = mutableMapOf<Long, JsonElement>()
 
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
-        var pauseRequested = false
+        var pauseRequested = initialPauseRequested
         var activeCapabilityHandle: JobHandle? = null
 
         if (isRoot) {

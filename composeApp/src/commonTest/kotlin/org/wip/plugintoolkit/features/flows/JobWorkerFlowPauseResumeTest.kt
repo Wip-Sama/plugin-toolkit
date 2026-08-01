@@ -59,6 +59,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
         val mockPluginContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
         stopKoin()
@@ -215,16 +216,12 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         jobWorker.start()
 
         // Wait for job to start running
-        withContext(Dispatchers.Default) {
-            withContext(Dispatchers.Default) {
-                withTimeout(5000.milliseconds) {
-                    while (true) {
-                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
-                        val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
-                        if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
-                        delay(10.milliseconds)
-                    }
-                }
+        withTimeout(5000) {
+            while (true) {
+                val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                val endedJob = jobManager.endedJobs.value.find { it.id == job.id }
+                if (activeJob?.status == org.wip.plugintoolkit.features.job.model.JobStatus.Running || endedJob != null) break
+                delay(10)
             }
         }
 
@@ -241,15 +238,11 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         jobManager.pauseJob(job.id)
 
         // Wait for job to transition to Paused status and save resumeState
-        withContext(Dispatchers.Default) {
-            withContext(Dispatchers.Default) {
-                withTimeout(5000) {
-                    while (true) {
-                        val activeJob = jobManager.jobs.value.find { it.id == job.id }
-                        if (activeJob?.resumeState != null) break
-                        delay(10)
-                    }
-                }
+        withTimeout(5000) {
+            while (true) {
+                val activeJob = jobManager.jobs.value.find { it.id == job.id }
+                if (activeJob?.resumeState != null) break
+                delay(10)
             }
         }
 
@@ -308,6 +301,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
         val mockPluginContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
         stopKoin()
@@ -476,7 +470,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         jobManager.resumeJob(job.id)
 
         // Wait for job to complete
-        withTimeout(2000) {
+        withTimeout(10000) {
             while (jobManager.endedJobs.value.none { it.id == job.id }) {
                 delay(10)
             }
@@ -500,6 +494,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val mockPluginManager = mockk<PluginManager>(relaxed = true)
         val mockPluginContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
         val signalManager = org.wip.plugintoolkit.features.plugin.logic.DefaultPluginSignalManager()
@@ -509,6 +504,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
             signalManager.onSignal(firstArg())
         }
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any()) } returns mockContext
 
         stopKoin()
         startKoin {

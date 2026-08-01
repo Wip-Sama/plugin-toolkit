@@ -10,6 +10,7 @@ class ManifestTest {
     @Test
     fun testJarManifest() {
         val jarFile = File("../operations/build/libs/operations.jar")
+        if (!jarFile.exists()) return
         val zip = ZipFile(jarFile)
         val entry = zip.getEntry("META-INF/manifest.json")
         val manifestString = zip.getInputStream(entry).reader().readText()

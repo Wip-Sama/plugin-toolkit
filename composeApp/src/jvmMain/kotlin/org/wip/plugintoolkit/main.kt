@@ -90,6 +90,7 @@ import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.logic.SandboxCleanupManager
 import org.wip.plugintoolkit.features.job.logic.SystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
@@ -227,6 +228,7 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
             single { PluginInstaller(get(), get(), get(), get(), get(), get(), get()) }
             single { PluginScanner(get(), get()) }
             single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(named("LoomScope"))) }
+            single { SandboxCleanupManager() }
             single {
                 JobManager(
                     get(named("LoomScope")),

@@ -142,7 +142,15 @@ class JobWorker(
                 val settingsPersistence: SettingsPersistence = get()
                 val appDataDir = settingsPersistence.getSettingsDir()
                 val sandboxDir = Path("$appDataDir/jobs/${job.id}/sandbox")
-                deleteRecursively(sandboxDir)
+                try {
+                    deleteRecursively(sandboxDir)
+                } catch (e: Exception) {
+                    Logger.w(e) { "Worker $workerId: Failed to delete sandbox dir $sandboxDir. Registering for deferred cleanup." }
+                    try {
+                        val cleanupManager: SandboxCleanupManager by inject()
+                        cleanupManager.registerFailedDeletion(sandboxDir.toString())
+                    } catch (_: Exception) {}
+                }
             }
         }
     }
@@ -338,7 +346,7 @@ class JobWorker(
         if (!plugin.getManifest().getOrThrow().hasSetupHandler) {
             manager.addJobLog(job.id, "No setup handler found, skipping setup phase.")
         } else {
-            val setupResult = plugin.performSetup(context)
+            val setupResult = withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.performSetup(context) }
             if (setupResult.isFailure) {
                 val error = setupResult.exceptionOrNull()?.message ?: "Setup failed"
                 manager.tryFailJob(job.id, error)
@@ -379,7 +387,7 @@ class JobWorker(
         if (!plugin.getManifest().getOrThrow().hasUpdateHandler) {
             manager.addJobLog(job.id, "No update handler found, skipping update phase.")
         } else {
-            val updateResult = plugin.performUpdate(context)
+            val updateResult = withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.performUpdate(context) }
             if (updateResult.isFailure) {
                 val error = updateResult.exceptionOrNull()?.message ?: "Update failed"
                 manager.tryFailJob(job.id, error)
@@ -417,7 +425,7 @@ class JobWorker(
         manager.updateJobProgress(job.id, 0.2f)
         manager.addJobLog(job.id, "Running validation for ${plugin.getManifest().getOrThrow().plugin.name}...")
 
-        val validationResult = plugin.validate(context)
+        val validationResult = withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.validate(context) }
         if (validationResult.isFailure) {
             val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
             manager.tryFailJob(job.id, error)
@@ -458,7 +466,7 @@ class JobWorker(
         val action = manifest.actions.find { it.functionName == job.capabilityName }
             ?: throw Exception("Action ${job.capabilityName} not found in manifest")
 
-        val result = processor.runAction(action, context)
+        val result = withContext(kotlinx.coroutines.Dispatchers.IO) { processor.runAction(action, context) }
 
         if (result.isSuccess) {
             manager.updateJobProgress(job.id, 1.0f)
@@ -521,28 +529,6 @@ class JobWorker(
 
     private suspend fun executeFlowJob(job: BackgroundJob) {
         manager.addJobLog(job.id, "Executing via FlowEngine...")
-
-        val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
-        manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: Deferred<ExecutionResult>
-                get() = throw UnsupportedOperationException("Not used for flow jobs directly")
-
-            override fun pause() {
-                workerScope.launch {
-                    val context = pluginManager.createPluginContext(job.pluginId, job.id)
-                    context.signals.sendSignal(PluginSignal.PAUSE)
-                }
-            }
-
-            override fun cancel(force: Boolean) {
-                workerScope.launch {
-                    val context = pluginManager.createPluginContext(job.pluginId, job.id)
-                    context.signals.sendSignal(PluginSignal.CANCEL)
-                }
-                jobExecution.cancel()
-            }
-        })
-
         val engine = FlowEngine(manager, executorRegistry, pluginManager, lifecycleCoordinator, workerScope)
         engine.executeFlowJob(job)
     }
