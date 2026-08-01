@@ -12,6 +12,7 @@ Changes:
 Added:
   - Whitelist/Blacklist folder for plugin access with additional Unrestricted mode
   - New mekanism and dialogs for managing jar signatures
+  - 6 previously invisible settings: animationsEnabled, compressedLogsToKeep, showInfo, showWarning, showError, strictSignatureChecking, fileAccessMode, checkOnStartup
 Fixed:
   - Locks are now safely evicted from jarLocks when no active operations remain
 Planned:

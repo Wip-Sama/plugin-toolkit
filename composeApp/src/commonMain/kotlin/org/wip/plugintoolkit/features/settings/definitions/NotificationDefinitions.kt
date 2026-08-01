@@ -15,66 +15,84 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.notification.NotificationType
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.NotificationHistorySettings
 import org.wip.plugintoolkit.features.settings.model.NotificationSettings
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
 import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
+import org.wip.plugintoolkit.features.settings.utils.bindGroup
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.*
 
+/**
+ * Registers notification preferences, toast durations, filters, and notification history settings.
+ */
 fun SettingsRegistryBuilder.notificationDefinitions(viewModel: NotificationViewModel) {
     nav(SettingNavKey.SystemSettings) {
-        section(SettingText.Raw("Notifications")) {
-            SettingSwitch(
-                p1 = AppSettings::notifications,
-                p2 = NotificationSettings::enableToasts,
-                title = SettingText.Raw("Show In-App Toasts"),
-                subtitle = SettingText.Raw("Display small popup messages within the application"),
-                icon = Icons.Default.Notifications,
-                setValue = { s, v -> s.copy(notifications = s.notifications.copy(enableToasts = v)) }
-            )
+        section(Res.string.section_notifications) {
+            bindGroup(AppSettings::notifications, { copy(notifications = it) }) {
+                switch(
+                    NotificationSettings::enableToasts,
+                    Res.string.setting_enable_toasts,
+                    Icons.Default.Notifications,
+                    subtitle = SettingText.Raw("Display small popup messages within the application")
+                ) { copy(enableToasts = it) }
 
-            SettingSwitch(
-                p1 = AppSettings::notifications,
-                p2 = NotificationSettings::toastAutoDismiss,
-                title = SettingText.Raw("Toast Auto-Dismiss"),
-                subtitle = SettingText.Raw("Automatically hide toasts after a few seconds"),
-                icon = Icons.Default.Timer,
-                enabled = { it.notifications.enableToasts },
-                setValue = { s, v -> s.copy(notifications = s.notifications.copy(toastAutoDismiss = v)) }
-            )
+                switch(
+                    NotificationSettings::toastAutoDismiss,
+                    Res.string.setting_toast_auto_dismiss,
+                    Icons.Default.Timer,
+                    subtitle = SettingText.Raw("Automatically hide toasts after a few seconds"),
+                    enabled = { it.notifications.enableToasts }
+                ) { copy(toastAutoDismiss = it) }
 
-            SettingNumeric(
-                p1 = AppSettings::notifications,
-                p2 = NotificationSettings::toastDismissTime,
-                title = SettingText.Raw("Toast Duration (Seconds)"),
-                icon = Icons.Default.Timer,
-                enabled = { it.notifications.enableToasts && it.notifications.toastAutoDismiss },
-                valueRange = 1..20,
-                setValue = { s, v -> s.copy(notifications = s.notifications.copy(toastDismissTime = v)) }
-            )
+                numeric(
+                    NotificationSettings::toastDismissTime,
+                    Res.string.setting_toast_dismiss_time,
+                    Icons.Default.Timer,
+                    range = 1..20,
+                    enabled = { it.notifications.enableToasts && it.notifications.toastAutoDismiss }
+                ) { copy(toastDismissTime = it) }
 
-            SettingSwitch(
-                p1 = AppSettings::notifications,
-                p2 = NotificationSettings::enableSystemNotifications,
-                title = SettingText.Raw("System Notifications"),
-                subtitle = SettingText.Raw("Send notifications to the operating system notification center"),
-                icon = Icons.Default.NotificationsActive,
-                setValue = { s, v -> s.copy(notifications = s.notifications.copy(enableSystemNotifications = v)) }
-            )
+                switch(
+                    NotificationSettings::enableSystemNotifications,
+                    Res.string.setting_enable_system_notifications,
+                    Icons.Default.NotificationsActive,
+                    subtitle = SettingText.Raw("Send notifications to the operating system notification center")
+                ) { copy(enableSystemNotifications = it) }
+
+                switch(
+                    NotificationSettings::showInfo,
+                    Res.string.setting_show_info,
+                    Icons.Default.Info,
+                    enabled = { it.notifications.enableSystemNotifications }
+                ) { copy(showInfo = it) }
+
+                switch(
+                    NotificationSettings::showWarning,
+                    Res.string.setting_show_warning,
+                    Icons.Default.Warning,
+                    enabled = { it.notifications.enableSystemNotifications }
+                ) { copy(showWarning = it) }
+
+                switch(
+                    NotificationSettings::showError,
+                    Res.string.setting_show_error,
+                    Icons.Default.Error,
+                    enabled = { it.notifications.enableSystemNotifications }
+                ) { copy(showError = it) }
+            }
 
             SettingNumeric(
                 p1 = AppSettings::notifications,
                 p2 = NotificationSettings::history,
                 p3 = NotificationHistorySettings::retentionDays,
-                title = SettingText.Raw("History Retention (Days)"),
+                title = Res.string.setting_history_retention,
                 subtitle = SettingText.Raw("How long to keep notification history (max 30 days)"),
                 icon = Icons.Default.History,
                 valueRange = 1..30,

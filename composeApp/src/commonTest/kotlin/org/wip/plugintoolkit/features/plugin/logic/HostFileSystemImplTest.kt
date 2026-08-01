@@ -83,6 +83,27 @@ class HostFileSystemImplTest {
     }
 
     @Test
+    fun testSystemPathSecurityCustomBlacklistRemovalOfDefaults() {
+        val userCustomBlacklist = listOf("/custom/blocked/folder")
+        assertTrue(
+            SystemPathSecurity.isPathAllowed(
+                "/etc/passwd",
+                FileAccessMode.Blacklist,
+                customBlacklist = userCustomBlacklist
+            ),
+            "Removed default blacklisted path should be allowed when user customizes blacklist"
+        )
+        assertFalse(
+            SystemPathSecurity.isPathAllowed(
+                "/custom/blocked/folder/file.txt",
+                FileAccessMode.Blacklist,
+                customBlacklist = userCustomBlacklist
+            ),
+            "User specified blacklisted path should be blocked"
+        )
+    }
+
+    @Test
     fun testSystemPathSecurityWhitelist() {
         assertFalse(SystemPathSecurity.isPathAllowed("C:\\Users\\test", FileAccessMode.Whitelist, customWhitelist = listOf(allowedDir)))
         assertTrue(SystemPathSecurity.isPathAllowed(allowedDir, FileAccessMode.Whitelist, customWhitelist = listOf(allowedDir)))

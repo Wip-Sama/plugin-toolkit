@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.compose.hot.reload)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.buildkonfig)
+    alias(libs.plugins.dokka)
 }
 
 kotlin {

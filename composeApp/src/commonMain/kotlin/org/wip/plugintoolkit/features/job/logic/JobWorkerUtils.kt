@@ -349,8 +349,8 @@ object SystemPathSecurity {
                 }
             }
             org.wip.plugintoolkit.features.settings.model.FileAccessMode.Blacklist -> {
-                val allBlacklisted = BUILTIN_BLACKLIST + customBlacklist
-                val isDenied = allBlacklisted.any { blocked ->
+                val effectiveBlacklist = if (customBlacklist.isNotEmpty()) customBlacklist else BUILTIN_BLACKLIST
+                val isDenied = effectiveBlacklist.any { blocked ->
                     val blockedCanonical = try { java.io.File(blocked).canonicalPath } catch (_: Exception) { return@any false }
                     canonical == blockedCanonical || canonical.startsWith(blockedCanonical + java.io.File.separator)
                 }

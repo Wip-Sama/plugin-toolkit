@@ -17,91 +17,91 @@ import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
 import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
+import org.wip.plugintoolkit.features.settings.utils.bindGroup
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
-import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.section_system
-import plugintoolkit.composeapp.generated.resources.setting_close_to_tray
-import plugintoolkit.composeapp.generated.resources.setting_launch_at_startup
-import plugintoolkit.composeapp.generated.resources.setting_launch_minimized_at_startup
-import plugintoolkit.composeapp.generated.resources.setting_launch_minimized_at_startup_subtitle
-import plugintoolkit.composeapp.generated.resources.setting_window_start_mode
+import plugintoolkit.composeapp.generated.resources.*
 
+/**
+ * Registers system startup, window management, flow editing, and software update settings.
+ */
 fun SettingsRegistryBuilder.systemDefinitions(viewModel: SettingsViewModel) {
     nav(SettingNavKey.SystemSettings) {
         // ── System ───────────────────────────────────────────────────
-        section(SettingText.Resource(Res.string.section_system)) {
-            SettingSwitch(
-                p1 = AppSettings::general,
-                p2 = GeneralSettings::launchAtStartup,
-                title = SettingText.Resource(Res.string.setting_launch_at_startup),
-                subtitle = SettingText.Raw("Automatically start the application when you log in"),
-                icon = Icons.Default.Launch,
-                sideEffect = { s ->
-                    StartupManager.setLaunchAtStartup(s.general.launchAtStartup, s.general.launchMinimizedAtStartup)
-                },
-                setValue = { s, v -> s.copy(general = s.general.copy(launchAtStartup = v)) }
-            )
+        section(Res.string.section_system) {
+            bindGroup(AppSettings::general, { copy(general = it) }) {
+                switch(
+                    GeneralSettings::launchAtStartup,
+                    Res.string.setting_launch_at_startup,
+                    Icons.Default.Launch,
+                    subtitle = SettingText.Resource(Res.string.setting_launch_at_startup_subtitle),
+                    sideEffect = { s ->
+                        StartupManager.setLaunchAtStartup(s.general.launchAtStartup, s.general.launchMinimizedAtStartup)
+                    }
+                ) { copy(launchAtStartup = it) }
 
-            SettingSwitch(
-                p1 = AppSettings::general,
-                p2 = GeneralSettings::launchMinimizedAtStartup,
-                title = SettingText.Resource(Res.string.setting_launch_minimized_at_startup),
-                subtitle = SettingText.Resource(Res.string.setting_launch_minimized_at_startup_subtitle),
-                icon = Icons.Default.Minimize,
-                enabled = { it.general.launchAtStartup },
-                sideEffect = { s ->
-                    StartupManager.setLaunchAtStartup(s.general.launchAtStartup, s.general.launchMinimizedAtStartup)
-                },
-                setValue = { s, v -> s.copy(general = s.general.copy(launchMinimizedAtStartup = v)) }
-            )
+                switch(
+                    GeneralSettings::launchMinimizedAtStartup,
+                    Res.string.setting_launch_minimized_at_startup,
+                    Icons.Default.Minimize,
+                    subtitle = SettingText.Resource(Res.string.setting_launch_minimized_at_startup_subtitle),
+                    enabled = { it.general.launchAtStartup },
+                    sideEffect = { s ->
+                        StartupManager.setLaunchAtStartup(s.general.launchAtStartup, s.general.launchMinimizedAtStartup)
+                    }
+                ) { copy(launchMinimizedAtStartup = it) }
 
-            SettingDropdown(
-                p1 = AppSettings::general,
-                p2 = GeneralSettings::windowStartMode,
-                title = SettingText.Resource(Res.string.setting_window_start_mode),
-                subtitle = SettingText.Raw("Select how the window should appear when opened"),
-                icon = Icons.Default.Window,
-                options = WindowStartMode.entries,
-                labelProvider = { it.name },
-                setValue = { s, v -> s.copy(general = s.general.copy(windowStartMode = v)) }
-            )
+                dropdown(
+                    GeneralSettings::windowStartMode,
+                    Res.string.setting_window_start_mode,
+                    Icons.Default.Window,
+                    options = WindowStartMode.entries,
+                    subtitle = SettingText.Resource(Res.string.setting_window_start_mode_subtitle),
+                    labelProvider = { it.name }
+                ) { copy(windowStartMode = it) }
 
-            SettingSwitch(
-                p1 = AppSettings::general,
-                p2 = GeneralSettings::closeToTray,
-                title = SettingText.Resource(Res.string.setting_close_to_tray),
-                subtitle = SettingText.Raw("Closing the main window will minimize it to the system tray"),
-                icon = Icons.Default.Close,
-                setValue = { s, v -> s.copy(general = s.general.copy(closeToTray = v)) }
-            )
+                switch(
+                    GeneralSettings::closeToTray,
+                    Res.string.setting_close_to_tray,
+                    Icons.Default.Close,
+                    subtitle = SettingText.Resource(Res.string.setting_close_to_tray_subtitle)
+                ) { copy(closeToTray = it) }
+            }
         }
 
         // ── Flows ────────────────────────────────────────────────────
-        section(SettingText.Raw("Flows")) {
-            SettingSwitch(
-                p1 = AppSettings::flows,
-                p2 = FlowSettings::autosave,
-                title = SettingText.Raw("Autosave"),
-                subtitle = SettingText.Raw("Automatically save changes when editing flows"),
-                icon = Icons.Default.Save,
-                setValue = { s, v -> s.copy(flows = s.flows.copy(autosave = v)) }
-            )
+        section(Res.string.section_flows_header) {
+            bindGroup(AppSettings::flows, { copy(flows = it) }) {
+                switch(
+                    FlowSettings::autosave,
+                    Res.string.setting_flow_autosave,
+                    Icons.Default.Save,
+                    subtitle = SettingText.Resource(Res.string.setting_flow_autosave_subtitle)
+                ) { copy(autosave = it) }
+            }
         }
 
         // ── Auto Update ──────────────────────────────────────────────
         section(SettingText.Raw("Updates")) {
-            SettingSwitch(
-                p1 = AppSettings::autoUpdate,
-                p2 = AutoUpdateSettings::enabled,
-                title = SettingText.Raw("Auto Update"),
-                subtitle = SettingText.Raw("Automatically check for and download application updates"),
-                icon = Icons.Default.SystemUpdate,
-                setValue = { s, v -> s.copy(autoUpdate = s.autoUpdate.copy(enabled = v)) }
-            )
+            bindGroup(AppSettings::autoUpdate, { copy(autoUpdate = it) }) {
+                switch(
+                    AutoUpdateSettings::enabled,
+                    Res.string.setting_enable_auto_update,
+                    Icons.Default.SystemUpdate,
+                    subtitle = SettingText.Resource(Res.string.setting_enable_auto_update_subtitle)
+                ) { copy(enabled = it) }
+
+                switch(
+                    AutoUpdateSettings::checkOnStartup,
+                    Res.string.setting_check_on_startup,
+                    Icons.Default.Refresh,
+                    subtitle = SettingText.Resource(Res.string.setting_check_on_startup_subtitle),
+                    enabled = { it.autoUpdate.enabled }
+                ) { copy(checkOnStartup = it) }
+            }
 
             SettingCustom(
                 id = "system.checkForUpdates",
-                title = SettingText.Raw("Check for Updates"),
+                title = Res.string.action_check_for_updates,
                 subtitle = SettingText.Raw("Manually check for available application updates"),
                 icon = Icons.Default.Refresh,
                 control = { _, _ ->
