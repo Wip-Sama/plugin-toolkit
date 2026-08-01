@@ -6,10 +6,15 @@ Changes:
   - Isolated all 3rd-party plugin lifecycle operations
   - Ensured long-running loops jobs react immediately to coroutine cancellation
   - IO operations in flows now follow Exponential Backoff logic instead of fixed retry timing
+  - Callers update state instantly in memory and use a version-tracked ioMutex for disk persistence
+  - Support for parallel state transitions for distinct plugins
 Added:
 Fixed:
+  - Locks are now safely evicted from jarLocks when no active operations remain
 Planned:
   - A button te clear the sandbox folder
+Note:
+  - Since PluginLoader operates synchronously on URLClassLoader and Java reflection (which are JVM-specific), standard JVM synchronization works. Replacing synchronized with Kotlin's @Synchronized or kotlinx.coroutines.sync.Mutex is cleaner for KMP but it's not a priority.
 ----------------------------------------------------------------------------------------------------
 Version: 1.7.3
 Date: 16-07-2026

@@ -32,6 +32,10 @@ class PluginRegistry(
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
 
     private val mutex = Mutex()
+    private val ioMutex = Mutex()
+    private var currentVersion = 0L
+    private var lastWrittenVersion = 0L
+
     private val json = kotlinx.serialization.json.Json {
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -98,12 +102,13 @@ class PluginRegistry(
      * Atomically updates the plugin list and saves it to disk.
      */
     suspend fun updatePlugins(transform: (List<InstalledPlugin>) -> List<InstalledPlugin>) {
+        var myVersion = 0L
         val updated = mutex.withLock {
             val current = _installedPlugins.value
             val next = transform(current)
             if (current != next) {
                 _installedPlugins.value = next
-                saveToManagedFolders(next)
+                myVersion = ++currentVersion
                 next
             } else {
                 null
@@ -111,6 +116,12 @@ class PluginRegistry(
         }
 
         if (updated != null) {
+            ioMutex.withLock {
+                if (lastWrittenVersion < myVersion) {
+                    saveToManagedFolders(_installedPlugins.value)
+                    lastWrittenVersion = currentVersion
+                }
+            }
             Logger.d { "Plugin list updated and persisted (Total: ${updated.size})" }
         }
     }

@@ -12,68 +12,115 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import kotlin.time.Clock
 
 sealed interface LifecycleAction {
-    data class OnJobCompleted(val job: BackgroundJob, val response: CompletableDeferred<Unit>) : LifecycleAction
+    val targetPkg: String
+
+    data class OnJobCompleted(val job: BackgroundJob, val response: CompletableDeferred<Unit>) : LifecycleAction {
+        override val targetPkg: String get() = job.pluginId
+    }
+
     data class OnJobFailed(val job: BackgroundJob, val error: String?, val response: CompletableDeferred<Unit>) :
-        LifecycleAction
+        LifecycleAction {
+        override val targetPkg: String get() = job.pluginId
+    }
 
     data class OnManualValidation(val pkg: String, val result: Result<Unit>, val response: CompletableDeferred<Unit>) :
-        LifecycleAction
+        LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
 
-    data class LoadPlugin(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
-    data class UnloadPlugin(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class ReloadPlugin(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class LoadPlugin(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
+
+    data class UnloadPlugin(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
+
+    data class ReloadPlugin(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
+
     data class HandlePostInstall(
         val pkg: String,
         val manifest: org.wip.plugintoolkit.api.PluginManifest,
         val response: CompletableDeferred<Unit>
-    ) : LifecycleAction
+    ) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
 
     data class HandlePostUpdate(
         val pkg: String,
         val manifest: org.wip.plugintoolkit.api.PluginManifest,
         val installer: PluginInstaller,
         val response: CompletableDeferred<Unit>
-    ) : LifecycleAction
+    ) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
 
-    data class EnqueueSetupJob(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class EnqueueUpdateJob(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
-    data class TriggerValidation(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
-    data class CheckAndResumeSetup(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction
+    data class EnqueueSetupJob(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
+
+    data class EnqueueUpdateJob(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
+
+    data class TriggerValidation(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
+
+    data class CheckAndResumeSetup(val pkg: String, val response: CompletableDeferred<Unit>) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
+
     data class RerunSetup(val pkg: String, val installer: PluginInstaller, val response: CompletableDeferred<Unit>) :
-        LifecycleAction
+        LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
 
     data class SetEnabled(val pkg: String, val enabled: Boolean, val response: CompletableDeferred<Result<Unit>>) :
-        LifecycleAction
+        LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
 
-    data class ValidatePlugin(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction
+    data class ValidatePlugin(val pkg: String, val response: CompletableDeferred<Result<Unit>>) : LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
+
     data class RunAction(val pkg: String, val action: PluginAction, val response: CompletableDeferred<Unit>) :
-        LifecycleAction
+        LifecycleAction {
+        override val targetPkg: String get() = pkg
+    }
 }
 
 /**
  * Coordinates the lifecycle state transitions for plugins.
  * Ensures plugins move through Setup -> Update -> Validation -> Loaded sequentially
- * using the Actor pattern to avoid concurrent modifications.
+ * using per-plugin Actors to avoid concurrent modifications without blocking other plugins.
  */
 class PluginLifecycleCoordinator(
     private val registry: PluginRegistry,
     private val jobManager: JobManager,
     private val lifecycleManager: PluginLifecycleManager,
     /** Injected [AppScope] for non-blocking logic and state transitions. */
-    scope: CoroutineScope
+    private val scope: CoroutineScope
 ) {
 
-    private val actorChannel = Channel<LifecycleAction>(Channel.UNLIMITED)
+    private val pluginActors = java.util.concurrent.ConcurrentHashMap<String, Channel<LifecycleAction>>()
 
-    init {
-        scope.launch {
-            for (action in actorChannel) {
-                try {
-                    processAction(action)
-                } catch (e: Exception) {
-                    Logger.e(e) { "Error processing LifecycleAction: $action" }
+    private fun getActor(pkg: String): Channel<LifecycleAction> {
+        return pluginActors.getOrPut(pkg) {
+            val channel = Channel<LifecycleAction>(Channel.UNLIMITED)
+            scope.launch {
+                for (action in channel) {
+                    try {
+                        processAction(action)
+                    } catch (e: Exception) {
+                        Logger.e(e) { "Error processing LifecycleAction: $action" }
+                    }
                 }
             }
+            channel
         }
     }
 
@@ -300,43 +347,50 @@ class PluginLifecycleCoordinator(
 
     suspend fun onLifecycleJobCompleted(job: BackgroundJob) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.OnJobCompleted(job, deferred))
+        val action = LifecycleAction.OnJobCompleted(job, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun onLifecycleJobFailed(job: BackgroundJob, error: String?) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.OnJobFailed(job, error, deferred))
+        val action = LifecycleAction.OnJobFailed(job, error, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun onManualValidationCompleted(pkg: String, result: Result<Unit>) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.OnManualValidation(pkg, result, deferred))
+        val action = LifecycleAction.OnManualValidation(pkg, result, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun loadPlugin(pkg: String): Result<Unit> {
         val deferred = CompletableDeferred<Result<Unit>>()
-        actorChannel.send(LifecycleAction.LoadPlugin(pkg, deferred))
+        val action = LifecycleAction.LoadPlugin(pkg, deferred)
+        getActor(action.targetPkg).send(action)
         return deferred.await()
     }
 
     suspend fun unloadPlugin(pkg: String) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.UnloadPlugin(pkg, deferred))
+        val action = LifecycleAction.UnloadPlugin(pkg, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun reloadPlugin(pkg: String) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.ReloadPlugin(pkg, deferred))
+        val action = LifecycleAction.ReloadPlugin(pkg, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun handlePostInstall(pkg: String, manifest: org.wip.plugintoolkit.api.PluginManifest) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.HandlePostInstall(pkg, manifest, deferred))
+        val action = LifecycleAction.HandlePostInstall(pkg, manifest, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
@@ -346,55 +400,64 @@ class PluginLifecycleCoordinator(
         installer: PluginInstaller
     ) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.HandlePostUpdate(pkg, manifest, installer, deferred))
+        val action = LifecycleAction.HandlePostUpdate(pkg, manifest, installer, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun enqueueSetupJob(pkg: String) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.EnqueueSetupJob(pkg, deferred))
+        val action = LifecycleAction.EnqueueSetupJob(pkg, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun enqueueUpdateJob(pkg: String) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.EnqueueUpdateJob(pkg, deferred))
+        val action = LifecycleAction.EnqueueUpdateJob(pkg, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun triggerValidation(pkg: String): Result<Unit> {
         val deferred = CompletableDeferred<Result<Unit>>()
-        actorChannel.send(LifecycleAction.TriggerValidation(pkg, deferred))
+        val action = LifecycleAction.TriggerValidation(pkg, deferred)
+        getActor(action.targetPkg).send(action)
         return deferred.await()
     }
 
     suspend fun checkAndResumeSetup(pkg: String) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.CheckAndResumeSetup(pkg, deferred))
+        val action = LifecycleAction.CheckAndResumeSetup(pkg, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun rerunSetup(pkg: String, installer: PluginInstaller) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.RerunSetup(pkg, installer, deferred))
+        val action = LifecycleAction.RerunSetup(pkg, installer, deferred)
+        getActor(action.targetPkg).send(action)
         deferred.await()
     }
 
     suspend fun setEnabled(pkg: String, enabled: Boolean): Result<Unit> {
         val deferred = CompletableDeferred<Result<Unit>>()
-        actorChannel.send(LifecycleAction.SetEnabled(pkg, enabled, deferred))
+        val action = LifecycleAction.SetEnabled(pkg, enabled, deferred)
+        getActor(action.targetPkg).send(action)
         return deferred.await()
     }
 
     suspend fun validatePlugin(pkg: String): Result<Unit> {
         val deferred = CompletableDeferred<Result<Unit>>()
-        actorChannel.send(LifecycleAction.ValidatePlugin(pkg, deferred))
+        val action = LifecycleAction.ValidatePlugin(pkg, deferred)
+        getActor(action.targetPkg).send(action)
         return deferred.await()
     }
 
     suspend fun runAction(pkg: String, action: PluginAction) {
         val deferred = CompletableDeferred<Unit>()
-        actorChannel.send(LifecycleAction.RunAction(pkg, action, deferred))
+        val actionObj = LifecycleAction.RunAction(pkg, action, deferred)
+        getActor(actionObj.targetPkg).send(actionObj)
         deferred.await()
     }
 

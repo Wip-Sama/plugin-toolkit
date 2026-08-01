@@ -24,9 +24,27 @@ private data class LoadedPlugin(
 object PluginLoader {
     private val loadedPlugins = ConcurrentHashMap<String, LoadedPlugin>()
     private val idToJarPath = ConcurrentHashMap<String, String>()
-    private val jarLocks = ConcurrentHashMap<String, Any>()
+    private class RefCountedLock(var count: Int = 0)
+    private val jarLocks = ConcurrentHashMap<String, RefCountedLock>()
+    private val unloadedClassLoaders = ConcurrentHashMap<String, java.lang.ref.WeakReference<ClassLoader>>()
 
-    private fun getJarLock(path: String): Any = jarLocks.getOrPut(path) { Any() }
+    private fun acquireJarLock(path: String): RefCountedLock {
+        return synchronized(jarLocks) {
+            val lock = jarLocks.getOrPut(path) { RefCountedLock() }
+            lock.count++
+            lock
+        }
+    }
+
+    private fun releaseJarLock(path: String) {
+        synchronized(jarLocks) {
+            val lock = jarLocks[path] ?: return
+            lock.count--
+            if (lock.count <= 0) {
+                jarLocks.remove(path)
+            }
+        }
+    }
 
     private fun normalizePath(path: String): String {
         return try {
@@ -43,10 +61,9 @@ object PluginLoader {
     ): Result<PluginEntry> {
         val normalizedPath = normalizePath(jarPath)
 
-        // Use per-JAR lock to prevent two threads from loading the same plugin simultaneously
-        // while allowing different plugins to load in parallel.
-        synchronized(getJarLock(normalizedPath)) {
-            try {
+        val lock = acquireJarLock(normalizedPath)
+        try {
+            synchronized(lock) {
                 val path = Path(normalizedPath)
                 val file = File(normalizedPath)
                 val currentLastModified = if (file.exists()) file.lastModified() else 0L
@@ -93,33 +110,42 @@ object PluginLoader {
                     LoadedPlugin(pluginId, normalizedPath, pluginEntry, newClassLoader, koinApp, currentLastModified)
                 loadedPlugins[normalizedPath] = loadedPlugin
                 idToJarPath[pluginId] = normalizedPath
+                unloadedClassLoaders.remove(normalizedPath)
 
                 Logger.i { "Successfully loaded plugin $pluginId from $normalizedPath (Total tracked: ${loadedPlugins.size})" }
                 return Result.success(pluginEntry)
-            } catch (e: Throwable) {
-                Logger.e(e) { "Failed to load plugin from $normalizedPath" }
-                return Result.failure(Exception(e.message, e))
             }
+        } catch (e: Throwable) {
+            Logger.e(e) { "Failed to load plugin from $normalizedPath" }
+            return Result.failure(Exception(e.message, e))
+        } finally {
+            releaseJarLock(normalizedPath)
         }
     }
 
     fun unloadPlugin(jarPath: String) {
         val normalizedPath = normalizePath(jarPath)
-        synchronized(getJarLock(normalizedPath)) {
-            loadedPlugins.remove(normalizedPath)?.let {
-                Logger.i { "Unloading plugin ${it.id}: $normalizedPath" }
-                idToJarPath.remove(it.id)
-                try {
-                    it.entry.shutdown()
-                    it.koinApp.close()
-                    it.classLoader.close()
-                    Logger.i { "Successfully unloaded, closed Koin app and classloader for $normalizedPath" }
-                } catch (e: Exception) {
-                    Logger.e(e) { "Error during shutdown of plugin at $normalizedPath" }
+        val lock = acquireJarLock(normalizedPath)
+        try {
+            synchronized(lock) {
+                loadedPlugins.remove(normalizedPath)?.let {
+                    Logger.i { "Unloading plugin ${it.id}: $normalizedPath" }
+                    idToJarPath.remove(it.id)
+                    try {
+                        it.entry.shutdown()
+                        it.koinApp.close()
+                        it.classLoader.close()
+                        unloadedClassLoaders[normalizedPath] = java.lang.ref.WeakReference(it.classLoader)
+                        Logger.i { "Successfully unloaded, closed Koin app and classloader for $normalizedPath" }
+                    } catch (e: Exception) {
+                        Logger.e(e) { "Error during shutdown of plugin at $normalizedPath" }
+                    }
+                    return
                 }
-                return@synchronized
+                Logger.w { "Attempted to unload plugin but it was not found in cache: $normalizedPath (original: $jarPath). Current keys: ${loadedPlugins.keys}" }
             }
-            Logger.w { "Attempted to unload plugin but it was not found in cache: $normalizedPath (original: $jarPath). Current keys: ${loadedPlugins.keys}" }
+        } finally {
+            releaseJarLock(normalizedPath)
         }
     }
 
