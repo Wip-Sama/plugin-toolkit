@@ -1,8 +1,10 @@
 package org.wip.plugintoolkit.features.settings.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -12,7 +14,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
@@ -22,7 +30,8 @@ import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.job.logic.SystemPathSecurity
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.FileAccessMode
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.*
 
 /**
@@ -108,7 +117,19 @@ fun FileAccessDirectoryDialog(
 
     var directoryList by remember { mutableStateOf(initialList.toMutableList()) }
     var manualPathInput by remember { mutableStateOf("") }
+    var showResetConfirmDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val lazyListState = rememberLazyListState()
+
+    val isInputPathValid = remember(manualPathInput) {
+        isValidPathFormat(manualPathInput)
+    }
+
+    val canScrollUp = lazyListState.canScrollBackward
+    val canScrollDown = lazyListState.canScrollForward
+
+    val topFadeLength = if (canScrollUp) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
+    val bottomFadeLength = if (canScrollDown) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -136,7 +157,7 @@ fun FileAccessDirectoryDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (isBlacklist) stringResource(Res.string.configure_blacklist_title)
                             else stringResource(Res.string.configure_whitelist_title),
@@ -150,76 +171,106 @@ fun FileAccessDirectoryDialog(
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
-                        // Reset to defaults button
-                        OutlinedIconButton(
-                            onClick = {
-                                directoryList = if (isBlacklist) {
-                                    SystemPathSecurity.BUILTIN_BLACKLIST.toMutableList()
-                                } else {
-                                    mutableStateListOf()
-                                }
+                    // Button group for Red Reset + Add Directory buttons
+                    ToolkitButtonGroup {
+                        item { shape, modifierSpec ->
+                            Button(
+                                onClick = { showResetConfirmDialog = true },
+                                shape = shape,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error
+                                ),
+                                modifier = modifierSpec
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                                Spacer(Modifier.width(ToolkitTheme.spacing.small))
+                                Text(stringResource(Res.string.action_reset_defaults))
                             }
-                        ) {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = stringResource(Res.string.action_reset_defaults)
-                            )
                         }
-
-                        // Add directory folder picker button
-                        FilledTonalButton(
-                            onClick = {
-                                scope.launch {
-                                    val picked = PlatformUtils.pickFolder() ?: return@launch
-                                    if (picked.isNotBlank() && !directoryList.contains(picked)) {
-                                        directoryList = (directoryList + picked).toMutableList()
+                        item { shape, modifierSpec ->
+                            FilledTonalButton(
+                                onClick = {
+                                    scope.launch {
+                                        val picked = PlatformUtils.pickFolder() ?: return@launch
+                                        if (picked.isNotBlank() && !directoryList.contains(picked)) {
+                                            directoryList = (directoryList + picked).toMutableList()
+                                        }
                                     }
-                                }
+                                },
+                                shape = shape,
+                                modifier = modifierSpec
+                            ) {
+                                Icon(
+                                    Icons.Default.FolderOpen,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                                Spacer(Modifier.width(ToolkitTheme.spacing.small))
+                                Text(stringResource(Res.string.action_add_directory))
                             }
-                        ) {
-                            Icon(
-                                Icons.Default.FolderOpen,
-                                contentDescription = null,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                            )
-                            Spacer(Modifier.width(ToolkitTheme.spacing.small))
-                            Text(stringResource(Res.string.action_add_directory))
                         }
                     }
                 }
 
-                // Add manual path input row
-                Row(
+                // Add manual path input row styled as a Button Group with matching heights & corners
+                ToolkitButtonGroup(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = ToolkitTheme.spacing.medium),
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(IntrinsicSize.Min)
+                        .padding(bottom = ToolkitTheme.spacing.medium)
                 ) {
-                    OutlinedTextField(
-                        value = manualPathInput,
-                        onValueChange = { manualPathInput = it },
-                        placeholder = { Text(stringResource(Res.string.add_path_placeholder)) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(Modifier.width(ToolkitTheme.spacing.small))
-                    IconButton(
-                        onClick = {
-                            val trimmed = manualPathInput.trim()
-                            if (trimmed.isNotEmpty() && !directoryList.contains(trimmed)) {
-                                directoryList = (directoryList + trimmed).toMutableList()
-                                manualPathInput = ""
-                            }
-                        },
-                        enabled = manualPathInput.isNotBlank()
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = stringResource(Res.string.action_add_directory))
+                    item { shape, modifierSpec ->
+                        ToolkitTextField(
+                            value = manualPathInput,
+                            onValueChange = { manualPathInput = it },
+                            placeholder = { Text(stringResource(Res.string.add_path_placeholder)) },
+                            singleLine = true,
+                            shape = shape,
+                            modifier = modifierSpec
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                    }
+
+                    item { shape, modifierSpec ->
+                        val addTooltipText = stringResource(Res.string.action_add_directory)
+                        FilledIconButton(
+                            onClick = {
+                                val trimmed = manualPathInput.trim()
+                                if (isValidPathFormat(trimmed) && !directoryList.contains(trimmed)) {
+                                    directoryList = (directoryList + trimmed).toMutableList()
+                                    manualPathInput = ""
+                                }
+                            },
+                            enabled = isInputPathValid,
+                            shape = shape,
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                    alpha = ToolkitTheme.opacity.sidebarBackground
+                                ),
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                    alpha = ToolkitTheme.opacity.settingsItemHover
+                                )
+                            ),
+                            modifier = modifierSpec.fillMaxHeight()
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = addTooltipText,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                            )
+                        }
                     }
                 }
 
-                // Directory List Scrollable Container
-                GlassCard(
+                // Directory List directly inside popup with dynamic fading edges (only active when scrollable)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -237,16 +288,24 @@ fun FileAccessDirectoryDialog(
                         }
                     } else {
                         LazyColumn(
+                            state = lazyListState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(ToolkitTheme.spacing.small),
-                            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
+                                .verticalFadingEdges(
+                                    topFadeLength = topFadeLength,
+                                    bottomFadeLength = bottomFadeLength,
+                                    almostOpaque = ToolkitTheme.opacity.almostOpaque
+                                ),
+                            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                         ) {
                             itemsIndexed(directoryList) { index, pathStr ->
                                 Card(
                                     colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                            alpha = ToolkitTheme.opacity.sidebarBackground
+                                        )
                                     ),
+                                    shape = MaterialTheme.shapes.medium,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
@@ -285,7 +344,7 @@ fun FileAccessDirectoryDialog(
                     }
                 }
 
-                Spacer(Modifier.height(ToolkitTheme.spacing.large))
+                Spacer(Modifier.height(ToolkitTheme.spacing.medium))
 
                 // Footer Actions
                 Row(
@@ -297,13 +356,101 @@ fun FileAccessDirectoryDialog(
                         Text(stringResource(Res.string.action_cancel))
                     }
                     Spacer(Modifier.width(ToolkitTheme.spacing.medium))
-                    Button(onClick = { onSave(directoryList) }) {
+                    Button(
+                        onClick = { onSave(directoryList) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
                         Text(stringResource(Res.string.action_save))
                     }
                 }
             }
         }
     }
+
+    // Reset Confirmation Dialog
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            title = {
+                Text(
+                    stringResource(Res.string.reset_confirm_title),
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            },
+            text = {
+                Text(
+                    stringResource(Res.string.reset_confirm_message),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetConfirmDialog = false
+                        directoryList = if (isBlacklist) {
+                            SystemPathSecurity.BUILTIN_BLACKLIST.toMutableList()
+                        } else {
+                            mutableStateListOf()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(stringResource(Res.string.action_reset))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirmDialog = false }) {
+                    Text(stringResource(Res.string.action_cancel))
+                }
+            }
+        )
+    }
 }
 
-private fun String?.isNullBlink(): Boolean = this == null || this.isBlank()
+/**
+ * Validates if the string is formatted as a valid directory path.
+ */
+private fun isValidPathFormat(pathStr: String): Boolean {
+    val trimmed = pathStr.trim()
+    if (trimmed.isEmpty()) return false
+    val invalidChars = listOf('<', '>', '"', '|', '?', '*')
+    return invalidChars.none { trimmed.contains(it) }
+}
+
+/**
+ * Applies vertical fading edges at the top and bottom of a scrollable container.
+ */
+private fun Modifier.verticalFadingEdges(
+    topFadeLength: Dp,
+    bottomFadeLength: Dp,
+    almostOpaque: Float
+): Modifier = this
+    .graphicsLayer { alpha = almostOpaque }
+    .drawWithContent {
+        drawContent()
+        val topFadePx = topFadeLength.toPx()
+        val bottomFadePx = bottomFadeLength.toPx()
+
+        if (topFadePx > 0f) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black),
+                    startY = 0f,
+                    endY = topFadePx
+                ),
+                blendMode = BlendMode.DstIn
+            )
+        }
+        if (bottomFadePx > 0f) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Black, Color.Transparent),
+                    startY = size.height - bottomFadePx,
+                    endY = size.height
+                ),
+                blendMode = BlendMode.DstIn
+            )
+        }
+    }
+
+

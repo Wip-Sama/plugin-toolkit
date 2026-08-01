@@ -133,6 +133,9 @@
     <string name="configure_whitelist_title">Whitelist Directories</string>
     <string name="configure_directories_empty">No directory paths configured.</string>
     <string name="action_reset_defaults">Reset to Defaults</string>
+    <string name="reset_confirm_title">Reset to Defaults?</string>
+    <string name="reset_confirm_message">This will restore the default list of directories and discard custom changes.</string>
+    <string name="action_reset">Reset</string>
     <string name="action_add_directory">Add Directory</string>
     <string name="add_path_placeholder">Enter directory path...</string>
     <string name="section_flows_header">Flows</string>

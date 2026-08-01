@@ -3,7 +3,7 @@ Date: 01-08-2026
 Changes:
   - The cancel button in job operation is now disabled in non-cancelable phases
   - JobManager sandbox cleanup now has retry to cancel sandbox up to 3 times with a notification if errors occur
-  - Isolated all 3rd-party plugin lifecycle operations
+  - Isolated all 3rd-party plugin lifecycle operationsw
   - Ensured long-running loops jobs react immediately to coroutine cancellation
   - IO operations in flows now follow Exponential Backoff logic instead of fixed retry timing
   - Callers update state instantly in memory and use a version-tracked ioMutex for disk persistence

@@ -132,6 +132,9 @@
     <string name="configure_whitelist_title">Cartelle in Whitelist</string>
     <string name="configure_directories_empty">Nessun percorso cartella configurato.</string>
     <string name="action_reset_defaults">Ripristina Predefiniti</string>
+    <string name="reset_confirm_title">Ripristinare i Predefiniti?</string>
+    <string name="reset_confirm_message">Verranno ripristinati i percorsi predefiniti e rimosse le modifiche personalizzate.</string>
+    <string name="action_reset">Ripristina</string>
     <string name="action_add_directory">Aggiungi Cartella</string>
     <string name="add_path_placeholder">Inserisci percorso cartella...</string>
     <string name="section_flows_header">Flussi</string>
