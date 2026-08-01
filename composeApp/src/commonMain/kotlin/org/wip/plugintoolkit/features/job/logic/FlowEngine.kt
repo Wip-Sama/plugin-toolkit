@@ -507,23 +507,25 @@ class FlowEngine(
                                 lastError = e
                                 attempt++
                                 if (attempt <= retries) {
+                                    val delayMs = 2000L * (1L shl (attempt - 1))
                                     manager.addJobLog(
                                         job.id,
-                                        "Timeout executing node ${node.capability.name}, retrying ($attempt/$retries)...",
+                                        "Timeout executing node ${node.capability.name}, retrying ($attempt/$retries) in ${delayMs}ms...",
                                         "WARN"
                                     )
-                                    kotlinx.coroutines.delay(2000)
+                                    kotlinx.coroutines.delay(delayMs)
                                 }
                             } catch (e: kotlinx.io.IOException) {
                                 lastError = e
                                 attempt++
                                 if (attempt <= retries) {
+                                    val delayMs = 2000L * (1L shl (attempt - 1))
                                     manager.addJobLog(
                                         job.id,
-                                        "IO error executing node ${node.capability.name}, retrying ($attempt/$retries)...",
+                                        "IO error executing node ${node.capability.name}, retrying ($attempt/$retries) in ${delayMs}ms...",
                                         "WARN"
                                     )
-                                    kotlinx.coroutines.delay(2000)
+                                    kotlinx.coroutines.delay(delayMs)
                                 }
                             } catch (e: Exception) {
                                 // If it's a PauseFlowException or CancellationException, let it bubble up immediately

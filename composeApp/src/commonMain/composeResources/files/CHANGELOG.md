@@ -5,6 +5,7 @@ Changes:
   - JobManager sandbox cleanup now has retry to cancel sandbox up to 3 times with a notification if errors occur
   - Isolated all 3rd-party plugin lifecycle operations
   - Ensured long-running loops jobs react immediately to coroutine cancellation
+  - IO operations in flows now follow Exponential Backoff logic instead of fixed retry timing
 Added:
 Fixed:
 Planned:

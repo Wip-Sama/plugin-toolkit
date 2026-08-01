@@ -223,23 +223,25 @@ class JobWorker(
                     lastError = e
                     attempt++
                     if (attempt <= retries) {
+                        val delayMs = 2000L * (1L shl (attempt - 1))
                         manager.addJobLog(
                             job.id,
-                            "Timeout executing capability ${job.capabilityName}, retrying ($attempt/$retries)...",
+                            "Timeout executing capability ${job.capabilityName}, retrying ($attempt/$retries) in ${delayMs}ms...",
                             "WARN"
                         )
-                        delay(2000.milliseconds)
+                        delay(delayMs.milliseconds)
                     }
                 } catch (e: kotlinx.io.IOException) {
                     lastError = e
                     attempt++
                     if (attempt <= retries) {
+                        val delayMs = 2000L * (1L shl (attempt - 1))
                         manager.addJobLog(
                             job.id,
-                            "IO error executing capability ${job.capabilityName}, retrying ($attempt/$retries)...",
+                            "IO error executing capability ${job.capabilityName}, retrying ($attempt/$retries) in ${delayMs}ms...",
                             "WARN"
                         )
-                        delay(2000.milliseconds)
+                        delay(delayMs.milliseconds)
                     }
                 } catch (e: Exception) {
                     if (e is PauseFlowException || e is CancellationException) {
