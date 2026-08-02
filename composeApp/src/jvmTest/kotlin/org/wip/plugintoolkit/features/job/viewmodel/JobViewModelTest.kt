@@ -62,18 +62,21 @@ class JobViewModelTest {
                 capabilityName = "cap-1"
             )
 
-            jobManager.enqueueJob(runningJob)
-            jobManager.enqueueJob(pausedJob)
+            var runningList = emptyList<BackgroundJob>()
+            var pausedList = emptyList<BackgroundJob>()
 
-            // Subscribe to state flows to activate WhileSubscribed
-            val collectorRunning = backgroundScope.launch { viewModel.runningJobs.collect() }
-            val collectorPaused = backgroundScope.launch { viewModel.pausedJobs.collect() }
-
+            val collectorRunning = backgroundScope.launch { viewModel.runningJobs.collect { runningList = it } }
+            val collectorPaused = backgroundScope.launch { viewModel.pausedJobs.collect { pausedList = it } }
             testScheduler.advanceUntilIdle()
 
-            assertTrue(viewModel.runningJobs.value.any { it.id == "job-running" })
-            assertEquals(1, viewModel.pausedJobs.value.size)
-            assertEquals("job-paused", viewModel.pausedJobs.value[0].id)
+            jobManager.enqueueJob(runningJob)
+            jobManager.enqueueJob(pausedJob)
+            kotlinx.coroutines.delay(200)
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(runningList.any { it.id == "job-running" })
+            assertEquals(1, pausedList.size)
+            assertEquals("job-paused", pausedList[0].id)
 
             collectorRunning.cancel()
             collectorPaused.cancel()

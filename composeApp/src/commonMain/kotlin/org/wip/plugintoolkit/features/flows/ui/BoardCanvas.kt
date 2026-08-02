@@ -295,9 +295,20 @@ fun BoardCanvas(
                 detectDragGestures(
                     onDragStart = { startOffset ->
                         if (!currentIsDrawingConnection) {
-                            focusRequester.requestFocus()
-                            selectionStart = startOffset
-                            selectionEnd = startOffset
+                            val modelPoint = (startOffset - currentOffset) / currentScale
+                            val isOverNode = flow.nodes.any { node ->
+                                val nodeLeft = node.position.x
+                                val nodeTop = node.position.y
+                                val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: dimensions.nodeWidth.toPx()
+                                val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
+                                modelPoint.x >= nodeLeft && modelPoint.x <= nodeLeft + nodeWidth &&
+                                        modelPoint.y >= nodeTop && modelPoint.y <= nodeTop + nodeHeight
+                            }
+                            if (!isOverNode) {
+                                focusRequester.requestFocus()
+                                selectionStart = startOffset
+                                selectionEnd = startOffset
+                            }
                         }
                     },
                     onDragEnd = {

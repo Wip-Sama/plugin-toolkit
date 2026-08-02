@@ -1,7 +1,12 @@
 package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,14 +30,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.Job
@@ -54,6 +63,7 @@ fun NodeHeader(
     onHeaderColor: Color,
     isReady: Boolean,
     isReadOnly: Boolean,
+    stateScale: Float,
     onPress: (Long) -> Unit,
     onMove: (Long, Offset, Boolean, Boolean) -> Unit,
     onEndMove: (Long) -> Unit,
@@ -68,10 +78,18 @@ fun NodeHeader(
     var tooltipJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
 
+    val currentOnPress by rememberUpdatedState(onPress)
+    val currentOnMove by rememberUpdatedState(onMove)
+    val currentOnEndMove by rememberUpdatedState(onEndMove)
+    val currentStateScale by rememberUpdatedState(stateScale)
+
+    var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(headerColor)
+            .onGloballyPositioned { layoutCoordinates = it }
             .pointerInput(node.id) {
                 awaitPointerEventScope {
                     while (true) {
@@ -89,26 +107,39 @@ fun NodeHeader(
                     }
                 }
             }
-            .pointerInput(Unit) {
+            .pointerInput(node.id, isReadOnly) {
+                if (!isReadOnly) {
+                    var lastWindowPos = Offset.Zero
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            currentOnPress(node.id)
+                            lastWindowPos = layoutCoordinates?.localToWindow(offset) ?: offset
+                        },
+                        onDragEnd = {
+                            currentOnEndMove(node.id)
+                        },
+                        onDragCancel = {
+                            currentOnEndMove(node.id)
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val currentWindowPos = layoutCoordinates?.localToWindow(change.position) ?: change.position
+                            val winDelta = currentWindowPos - lastWindowPos
+                            val scaledDelta = winDelta / currentStateScale
+                            currentOnMove(node.id, scaledDelta, false, true)
+                            lastWindowPos = currentWindowPos
+                        }
+                    )
+                }
+            }
+            .pointerInput(node.id) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Press) {
-                            onPress(node.id)
+                        if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
+                            currentOnPress(node.id)
                         }
                     }
-                }
-            }
-            .pointerInput(Unit) {
-                if (!isReadOnly) {
-                    detectDragGestures(
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            onMove(node.id, dragAmount, false, true)
-                        },
-                        onDragEnd = { onEndMove(node.id) },
-                        onDragCancel = { onEndMove(node.id) }
-                    )
                 }
             }
             .padding(ToolkitTheme.spacing.mediumSmall),
