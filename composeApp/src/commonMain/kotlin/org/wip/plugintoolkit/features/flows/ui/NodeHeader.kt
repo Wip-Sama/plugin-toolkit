@@ -64,6 +64,7 @@ fun NodeHeader(
     isReady: Boolean,
     isReadOnly: Boolean,
     stateScale: Float,
+    boardOffset: Offset,
     onPress: (Long) -> Unit,
     onMove: (Long, Offset, Boolean, Boolean) -> Unit,
     onEndMove: (Long) -> Unit,
@@ -82,6 +83,7 @@ fun NodeHeader(
     val currentOnMove by rememberUpdatedState(onMove)
     val currentOnEndMove by rememberUpdatedState(onEndMove)
     val currentStateScale by rememberUpdatedState(stateScale)
+    val currentBoardOffset by rememberUpdatedState(boardOffset)
 
     var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
@@ -110,10 +112,13 @@ fun NodeHeader(
             .pointerInput(node.id, isReadOnly) {
                 if (!isReadOnly) {
                     var lastWindowPos = Offset.Zero
+                    var lastBoardOffset = Offset.Zero
+
                     detectDragGestures(
                         onDragStart = { offset ->
                             currentOnPress(node.id)
                             lastWindowPos = layoutCoordinates?.localToWindow(offset) ?: offset
+                            lastBoardOffset = currentBoardOffset
                         },
                         onDragEnd = {
                             currentOnEndMove(node.id)
@@ -123,11 +128,17 @@ fun NodeHeader(
                         },
                         onDrag = { change, _ ->
                             change.consume()
-                            val currentWindowPos = layoutCoordinates?.localToWindow(change.position) ?: change.position
-                            val winDelta = currentWindowPos - lastWindowPos
-                            val scaledDelta = winDelta / currentStateScale
+                            val nowWindowPos = layoutCoordinates?.localToWindow(change.position) ?: change.position
+                            val nowBoardOffset = currentBoardOffset
+
+                            val winDelta = nowWindowPos - lastWindowPos
+                            val panDelta = nowBoardOffset - lastBoardOffset
+
+                            val scaledDelta = (winDelta - panDelta) / currentStateScale
                             currentOnMove(node.id, scaledDelta, false, true)
-                            lastWindowPos = currentWindowPos
+
+                            lastWindowPos = nowWindowPos
+                            lastBoardOffset = nowBoardOffset
                         }
                     )
                 }

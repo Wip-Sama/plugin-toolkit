@@ -174,6 +174,7 @@ fun NodeComponent(
                     isReady = isReady,
                     isReadOnly = isReadOnly,
                     stateScale = stateScale,
+                    boardOffset = stateOffset,
                     onPress = currentOnPress,
                     onMove = currentOnMove,
                     onEndMove = currentOnEndMove,
