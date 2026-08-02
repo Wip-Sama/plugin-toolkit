@@ -151,18 +151,20 @@ fun JobDashboard(
     val backStack = rememberNavBackStack(JobNavConfig, JobNavKey.General as JobNavKey)
     val currentKey = backStack.lastOrNull() ?: JobNavKey.General
 
-    val sections = listOf(
-        SidebarSectionData(
-            title = Res.string.nav_jobs.localized,
-            elements = listOf(
-                SidebarElement(JobNavKey.General, Icons.Default.Dashboard, Res.string.nav_job_general.localized),
-                SidebarElement(JobNavKey.Archive, Icons.Default.Archive, Res.string.nav_job_archive.localized),
-                SidebarElement(JobNavKey.Ended, Icons.Default.CheckCircle, Res.string.nav_job_ended.localized),
-                SidebarElement(JobNavKey.Scheduler, Icons.Default.Schedule, Res.string.nav_job_scheduler.localized),
-                SidebarElement(JobNavKey.History, Icons.Default.History, Res.string.nav_job_history.localized),
+    val sections = remember {
+        listOf(
+            SidebarSectionData(
+                title = Res.string.nav_jobs.localized,
+                elements = listOf(
+                    SidebarElement(JobNavKey.General, Icons.Default.Dashboard, Res.string.nav_job_general.localized),
+                    SidebarElement(JobNavKey.Archive, Icons.Default.Archive, Res.string.nav_job_archive.localized),
+                    SidebarElement(JobNavKey.Ended, Icons.Default.CheckCircle, Res.string.nav_job_ended.localized),
+                    SidebarElement(JobNavKey.Scheduler, Icons.Default.Schedule, Res.string.nav_job_scheduler.localized),
+                    SidebarElement(JobNavKey.History, Icons.Default.History, Res.string.nav_job_history.localized),
+                )
             )
         )
-    )
+    }
 
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Internal Sidebar
@@ -227,7 +229,6 @@ fun GeneralTab(viewModel: JobViewModel) {
     val queuedJobs by viewModel.queuedJobs.collectAsState()
     val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
     val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
-    val expandedJobs = remember { mutableStateMapOf<String, Boolean>() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -276,7 +277,6 @@ fun ArchiveTab(viewModel: JobViewModel) {
     val pausedJobs by viewModel.pausedJobs.collectAsState()
     val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
     val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
-    val expandedJobs = remember { mutableStateMapOf<String, Boolean>() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -308,7 +308,6 @@ fun EndedTab(viewModel: JobViewModel) {
     val endedJobs by viewModel.endedJobs.collectAsState()
     val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
     val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
-    val expandedJobs = remember { mutableStateMapOf<String, Boolean>() }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(

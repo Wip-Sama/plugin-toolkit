@@ -6,7 +6,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -93,31 +95,34 @@ class PluginManagerViewModel(
         PlatformUtils.mkdirs(defaultPluginFolder)
 
         viewModelScope.launch {
-            installedPlugins.collect { plugins ->
-                plugins.forEach { plugin ->
-                    if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !plugin.configurationPrompted) {
-                        viewModelScope.launch {
+            installedPlugins
+                .map { plugins ->
+                    plugins.filter { plugin ->
+                        (plugin.requiredAction == "CONFIGURE_SETTINGS" && !plugin.configurationPrompted) ||
+                                (plugin.requiredAction == "CONFIRM_SIGNATURE" && !plugin.signaturePrompted)
+                    }
+                }
+                .distinctUntilChanged()
+                .collectLatest { unpromptedPlugins ->
+                    unpromptedPlugins.forEach { plugin ->
+                        if (plugin.requiredAction == "CONFIGURE_SETTINGS" && !plugin.configurationPrompted) {
                             pluginManager.updatePlugin(plugin.pkg) { it.copy(configurationPrompted = true) }
-                        }
-                        dialogService.showConfirmation(
-                            title = Res.string.plugin_config_required.localized.resolveNonComposable(),
-                            message = "Plugin ${plugin.name} requires configuration. Would you like to configure it now?",
-                            onConfirm = { openSettings(plugin.pkg) }
-                        )
-                    } else if (plugin.requiredAction == "CONFIRM_SIGNATURE" && !plugin.signaturePrompted) {
-                        val strictChecking = settingsRepository.settings.value.extensions.strictSignatureChecking
-                        if (strictChecking) {
-                            viewModelScope.launch {
-                                pluginManager.updatePlugin(plugin.pkg) { it.copy(signaturePrompted = true) }
-                            }
                             dialogService.showConfirmation(
-                                title = Res.string.plugin_invalid_signature.localized.resolveNonComposable(),
-                                message = "Plugin ${plugin.name} has an invalid or missing signature. Strict signature checking is currently enabled. Would you like to open Settings to adjust signature checking?",
+                                title = Res.string.plugin_config_required.localized.resolveNonComposable(),
+                                message = "Plugin ${plugin.name} requires configuration. Would you like to configure it now?",
                                 onConfirm = { openSettings(plugin.pkg) }
                             )
-                        } else {
-                            if (sessionAllowedUnsignedPlugins.contains(plugin.pkg)) {
-                                viewModelScope.launch {
+                        } else if (plugin.requiredAction == "CONFIRM_SIGNATURE" && !plugin.signaturePrompted) {
+                            val strictChecking = settingsRepository.settings.value.extensions.strictSignatureChecking
+                            if (strictChecking) {
+                                pluginManager.updatePlugin(plugin.pkg) { it.copy(signaturePrompted = true) }
+                                dialogService.showConfirmation(
+                                    title = Res.string.plugin_invalid_signature.localized.resolveNonComposable(),
+                                    message = "Plugin ${plugin.name} has an invalid or missing signature. Strict signature checking is currently enabled. Would you like to open Settings to adjust signature checking?",
+                                    onConfirm = { openSettings(plugin.pkg) }
+                                )
+                            } else {
+                                if (sessionAllowedUnsignedPlugins.contains(plugin.pkg)) {
                                     pluginManager.updatePlugin(plugin.pkg) { p ->
                                         p.copy(
                                             requiredAction = null,
@@ -127,34 +132,31 @@ class PluginManagerViewModel(
                                         )
                                     }
                                     pluginManager.reloadPlugin(plugin.pkg)
-                                }
-                            } else {
-                                viewModelScope.launch {
+                                } else {
                                     pluginManager.updatePlugin(plugin.pkg) { it.copy(signaturePrompted = true) }
-                                }
-                                dialogService.showConfirmation(
-                                    title = Res.string.plugin_invalid_signature.localized.resolveNonComposable(),
-                                    message = "Plugin ${plugin.name} has an invalid or missing signature. Do you want to allow loading it for this session?",
-                                    onConfirm = {
-                                        sessionAllowedUnsignedPlugins.add(plugin.pkg)
-                                        viewModelScope.launch {
-                                            pluginManager.updatePlugin(plugin.pkg) { p ->
-                                                p.copy(
-                                                    requiredAction = null,
-                                                    isEnabled = true,
-                                                    loadError = null,
-                                                    isValidated = true
-                                                )
+                                    dialogService.showConfirmation(
+                                        title = Res.string.plugin_invalid_signature.localized.resolveNonComposable(),
+                                        message = "Plugin ${plugin.name} has an invalid or missing signature. Do you want to allow loading it for this session?",
+                                        onConfirm = {
+                                            sessionAllowedUnsignedPlugins.add(plugin.pkg)
+                                            viewModelScope.launch {
+                                                pluginManager.updatePlugin(plugin.pkg) { p ->
+                                                    p.copy(
+                                                        requiredAction = null,
+                                                        isEnabled = true,
+                                                        loadError = null,
+                                                        isValidated = true
+                                                    )
+                                                }
+                                                pluginManager.reloadPlugin(plugin.pkg)
                                             }
-                                            pluginManager.reloadPlugin(plugin.pkg)
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
         }
     }
 

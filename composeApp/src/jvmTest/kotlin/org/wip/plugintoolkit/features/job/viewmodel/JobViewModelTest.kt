@@ -1,0 +1,83 @@
+package org.wip.plugintoolkit.features.job.viewmodel
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+class JobViewModelTest {
+
+    private class FakeSettingsPersistence : SettingsPersistence {
+        var settings = AppSettings()
+        override suspend fun load(): AppSettings = settings
+        override suspend fun save(settings: AppSettings) {
+            this.settings = settings
+        }
+
+        override fun getSettingsDir(): String = "/tmp"
+        override fun getJobsDir(): String = "/tmp/jobs"
+        override fun openLogFolder() {}
+        override fun openLatestLog() {}
+    }
+
+    @Test
+    fun testJobViewModelDerivedFlows() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val persistence = FakeSettingsPersistence()
+            val settingsRepo = SettingsRepository(persistence, backgroundScope)
+            val jobManager = JobManager(backgroundScope, settingsRepo)
+            val viewModel = JobViewModel(jobManager)
+
+            val runningJob = BackgroundJob(
+                id = "job-running",
+                name = "Running Job",
+                type = JobType.Capability,
+                status = JobStatus.Running,
+                pluginId = "plugin-1",
+                capabilityName = "cap-1"
+            )
+            val pausedJob = BackgroundJob(
+                id = "job-paused",
+                name = "Paused Job",
+                type = JobType.Capability,
+                status = JobStatus.Paused,
+                pluginId = "plugin-1",
+                capabilityName = "cap-1"
+            )
+
+            jobManager.enqueueJob(runningJob)
+            jobManager.enqueueJob(pausedJob)
+
+            // Subscribe to state flows to activate WhileSubscribed
+            val collectorRunning = backgroundScope.launch { viewModel.runningJobs.collect() }
+            val collectorPaused = backgroundScope.launch { viewModel.pausedJobs.collect() }
+
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(viewModel.runningJobs.value.any { it.id == "job-running" })
+            assertEquals(1, viewModel.pausedJobs.value.size)
+            assertEquals("job-paused", viewModel.pausedJobs.value[0].id)
+
+            collectorRunning.cancel()
+            collectorPaused.cancel()
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+}

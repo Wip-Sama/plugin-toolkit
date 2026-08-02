@@ -44,7 +44,7 @@ class JobManager(
 
     val activeJobIds: StateFlow<Set<String>> = _jobs.map { list ->
         list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running }.map { it.id }.toSet()
-    }.stateIn(scope, SharingStarted.Eagerly, emptySet())
+    }.stateIn(scope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     private val _endedJobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
     val endedJobs: StateFlow<List<BackgroundJob>> = _endedJobs.asStateFlow()

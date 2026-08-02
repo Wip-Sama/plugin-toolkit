@@ -10,6 +10,7 @@ Changes:
   - Support for parallel state transitions for distinct plugins
   - Strengthened path traversal checks
   - Extended future backwards compatibility with plugins in some cases
+  - Minor UI optimizations
 Added:
   - Whitelist/Blacklist folder for plugin access with additional Unrestricted mode
   - New mechanism and dialogs for managing jar signatures

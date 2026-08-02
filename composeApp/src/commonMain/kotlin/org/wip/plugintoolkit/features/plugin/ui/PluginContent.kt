@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,18 +124,20 @@ fun PluginContent(
 
                     Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)) {
                         visibleJobs.forEach { job ->
-                            JobResultCard(
-                                job = job,
-                                progress = jobProgressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
-                                logs = emptyList(),
-                                onDelete = {
-                                    if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
-                                        viewModel.removeEndedJob(job.id)
-                                    } else {
-                                        viewModel.removeJob(job.id)
+                            key(job.id) {
+                                JobResultCard(
+                                    job = job,
+                                    progress = jobProgressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
+                                    logs = emptyList(),
+                                    onDelete = {
+                                        if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
+                                            viewModel.removeEndedJob(job.id)
+                                        } else {
+                                            viewModel.removeJob(job.id)
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }

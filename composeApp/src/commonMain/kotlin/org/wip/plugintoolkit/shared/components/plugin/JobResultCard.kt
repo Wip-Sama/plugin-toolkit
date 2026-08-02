@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.shared.components.plugin
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,24 +17,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
-import androidx.compose.ui.input.pointer.isShiftPressed
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,29 +35,40 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import org.wip.plugintoolkit.core.utils.PlatformUtils
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isShiftPressed
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -93,17 +98,6 @@ fun JobResultCard(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var ticker by remember { mutableStateOf(0) }
-
-    androidx.compose.runtime.LaunchedEffect(job.id, job.status) {
-        if (job.status == JobStatus.Running) {
-            while (true) {
-                kotlinx.coroutines.delay(1000)
-                ticker++
-            }
-        }
-    }
-
     var logHeight by remember { mutableStateOf(150.dp) }
     val scrollState = rememberScrollState()
     var autoScroll by remember { mutableStateOf(true) }
@@ -218,12 +212,7 @@ fun JobResultCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        val displayTime = if (ticker >= 0) {
-                            val end = job.completedAt ?: kotlin.time.Clock.System.now()
-                            val start = job.startedAt
-                            if (start != null) (end - start).inWholeMilliseconds else 0L
-                        } else 0L
-                        Text(text = formatDuration(displayTime), style = MaterialTheme.typography.labelSmall)
+                        ElapsedTimeText(job = job)
                     }
                     
                     progress.capabilitiesProgress.forEach { (capName, capProg) ->
@@ -471,7 +460,7 @@ fun JobResultCard(
                 ) {
                     if (expanded) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.material3.Switch(
+                            Switch(
                                 checked = autoScroll,
                                 onCheckedChange = { autoScroll = it }
                             )
@@ -488,7 +477,7 @@ fun JobResultCard(
 
                     Row(horizontalArrangement = Arrangement.End) {
                     if (logs.isNotEmpty()) {
-                        androidx.compose.material3.TextButton(
+                        TextButton(
                             onClick = {
                                 coroutineScope.launch {
                                     val dateStr = job.enqueuedAt.toString().take(19).replace(":", "-").replace("T", "_")
@@ -503,14 +492,14 @@ fun JobResultCard(
                         }
                     }
                     if (job.status == JobStatus.Paused && onResume != null) {
-                        androidx.compose.material3.TextButton(onClick = onResume) {
+                        TextButton(onClick = onResume) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null)
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(stringResource(Res.string.action_resume))
                         }
                     }
                     if (job.isPausable && (job.status == JobStatus.Running || job.status == JobStatus.Queued) && onPause != null) {
-                        androidx.compose.material3.TextButton(onClick = onPause) {
+                        TextButton(onClick = onPause) {
                             Icon(Icons.Default.Pause, contentDescription = null)
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(stringResource(Res.string.action_pause))
@@ -519,9 +508,9 @@ fun JobResultCard(
                     if (job.status != JobStatus.Completed && job.status != JobStatus.Cancelled && job.status != JobStatus.Failed && onCancel != null) {
                         @OptIn(ExperimentalComposeUiApi::class)
                         var isShiftPressed by remember { mutableStateOf(false) }
-                        androidx.compose.material3.TextButton(
+                        TextButton(
                             onClick = { onCancel(isShiftPressed) },
-                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             modifier = Modifier.onPointerEvent(PointerEventType.Press) {
                                 isShiftPressed = it.keyboardModifiers.isShiftPressed
                             }
@@ -532,9 +521,9 @@ fun JobResultCard(
                         }
                     }
                     if ((job.status == JobStatus.Completed || job.status == JobStatus.Cancelled || job.status == JobStatus.Failed) && onClear != null) {
-                        androidx.compose.material3.TextButton(
+                        TextButton(
                             onClick = onClear,
-                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.outline)
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.outline)
                         ) {
                             Icon(Icons.Default.Cancel, contentDescription = null)
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
@@ -546,6 +535,25 @@ fun JobResultCard(
         }
         }
     }
+}
+
+@Composable
+private fun ElapsedTimeText(job: BackgroundJob) {
+    var ticker by remember { mutableStateOf(0) }
+    LaunchedEffect(job.id, job.status) {
+        if (job.status == JobStatus.Running) {
+            while (true) {
+                delay(1000)
+                ticker++
+            }
+        }
+    }
+    val displayTime = if (ticker >= 0) {
+        val end = job.completedAt ?: Clock.System.now()
+        val start = job.startedAt
+        if (start != null) (end - start).inWholeMilliseconds else 0L
+    } else 0L
+    Text(text = formatDuration(displayTime), style = MaterialTheme.typography.labelSmall)
 }
 
 private fun formatDuration(ms: Long): String {

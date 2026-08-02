@@ -221,11 +221,17 @@ fun PluginManagerView(
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
         ) {
             items(plugins, key = { it.pkg }) { plugin ->
+                val hasUpdate = remember(plugin.pkg, plugin.version) {
+                    viewModel.getUpdate(plugin.pkg) != null
+                }
+                val customActions = remember(plugin.pkg, plugin.version) {
+                    viewModel.getActions(plugin.pkg)
+                }
                 PluginCard(
                     plugin = plugin,
                     isLoaded = loadedPlugins.contains(plugin.pkg),
-                    hasUpdate = viewModel.getUpdate(plugin.pkg) != null,
-                    customActions = viewModel.getActions(plugin.pkg),
+                    hasUpdate = hasUpdate,
+                    customActions = customActions,
                     enabled = isReady,
                     isToggling = togglingPlugins.contains(plugin.pkg),
                     onToggle = { if (isReady) viewModel.toggleEnabled(plugin.pkg, it) },
