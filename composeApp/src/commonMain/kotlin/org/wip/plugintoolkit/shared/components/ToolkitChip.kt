@@ -35,14 +35,14 @@ fun ToolkitChip(
 ) {
     val backgroundColor = when (style) {
         ToolkitChipStyle.Filled -> containerColor
-        ToolkitChipStyle.Tinted -> containerColor.copy(alpha = ToolkitTheme.opacity.divider)
-        ToolkitChipStyle.Outlined -> containerColor.copy(alpha = ToolkitTheme.opacity.textFieldContainer)
+        ToolkitChipStyle.Tinted -> containerColor.copy(alpha = ToolkitTheme.opacity.chipTintedBackground)
+        ToolkitChipStyle.Outlined -> containerColor.copy(alpha = ToolkitTheme.opacity.chipOutlinedBackground)
     }
 
     val border = if (style == ToolkitChipStyle.Outlined) {
         BorderStroke(
             ToolkitTheme.dimensions.borderUnselected,
-            containerColor.copy(alpha = ToolkitTheme.opacity.divider)
+            containerColor.copy(alpha = ToolkitTheme.opacity.chipTintedBackground)
         )
     } else {
         null

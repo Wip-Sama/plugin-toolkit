@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,30 +35,16 @@ fun ToolkitButtonGroup(
         verticalAlignment = Alignment.CenterVertically
     ) {
         children.forEachIndexed { index, childContent ->
-            val isFirst = index == 0
-            val isLast = index == children.size - 1
-
             // Subtract padding from outer corner radius so the inner button corners run parallel to container corners
             val buttonOuterCorner = (outerCorner - containerPadding).coerceAtLeast(ToolkitTheme.spacing.none)
 
-            val shape = when {
-                children.size == 1 -> RoundedCornerShape(buttonOuterCorner)
-                isFirst -> RoundedCornerShape(
-                    topStart = buttonOuterCorner,
-                    bottomStart = buttonOuterCorner,
-                    topEnd = innerCorner,
-                    bottomEnd = innerCorner
-                )
-
-                isLast -> RoundedCornerShape(
-                    topStart = innerCorner,
-                    bottomStart = innerCorner,
-                    topEnd = buttonOuterCorner,
-                    bottomEnd = buttonOuterCorner
-                )
-
-                else -> RoundedCornerShape(innerCorner)
-            }
+            val shape = computeGroupedShape(
+                index = index,
+                totalCount = children.size,
+                outerCorner = buttonOuterCorner,
+                innerCorner = innerCorner,
+                orientation = GroupOrientation.Horizontal
+            )
 
             childContent(shape, Modifier.clip(shape))
         }

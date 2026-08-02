@@ -361,4 +361,11 @@
     <string name="setting_enable_transient_retries">Abilita Tentativi Transitori</string>
     <string name="setting_max_retries">Numero Massimo Tentativi</string>
     <string name="error_invalid_version_format">Formato versione non valido (atteso x.y.z)</string>
+    <string name="action_zoom_in">Ingrandisci</string>
+    <string name="action_zoom_out">Riduci ingrandimento</string>
+    <string name="action_zoom_level">Livello ingrandimento: %1$d%%</string>
+    <string name="action_expand_menu">Espandi menu</string>
+    <string name="action_collapse_menu">Comprimi menu</string>
+    <string name="zoom_minus">Meno</string>
+    <string name="zoom_plus">Più</string>
 </resources>

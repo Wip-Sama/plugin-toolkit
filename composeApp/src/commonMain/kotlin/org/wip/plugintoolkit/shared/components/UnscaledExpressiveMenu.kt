@@ -29,10 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.staticCompositionLocalOf
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import plugintoolkit.composeapp.generated.resources.*
 
 interface OverlayHost {
     fun show(bounds: Rect, onDismiss: () -> Unit, content: @Composable () -> Unit)
@@ -42,13 +43,13 @@ interface OverlayHost {
 val LocalOverlayHost = staticCompositionLocalOf<OverlayHost?> { null }
 
 @Composable
-fun UnscaledExpressiveMenu(
-    options: List<String>,
-    selectedOption: String,
-    onOptionSelected: (String) -> Unit,
-    labelProvider: (String) -> String,
+fun <T> UnscaledExpressiveMenu(
+    options: List<T>,
+    selectedOption: T,
+    onOptionSelected: (T) -> Unit,
+    labelProvider: (T) -> String,
     enabled: Boolean = true,
-    disabledOptions: Set<String> = emptySet()
+    disabledOptions: Set<T> = emptySet()
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     var bounds by remember { mutableStateOf<Rect?>(null) }
@@ -81,7 +82,10 @@ fun UnscaledExpressiveMenu(
                 )
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null
+                    contentDescription = stringResource(
+                        if (isExpanded) Res.string.action_collapse_menu
+                        else Res.string.action_expand_menu
+                    )
                 )
             }
         }

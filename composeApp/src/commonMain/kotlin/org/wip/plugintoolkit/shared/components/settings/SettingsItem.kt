@@ -39,10 +39,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import org.wip.plugintoolkit.core.model.LocalizedString
+import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
+import org.wip.plugintoolkit.shared.components.GroupOrientation
+import org.wip.plugintoolkit.shared.components.rememberGroupedShape
 import plugintoolkit.composeapp.generated.resources.*
-import org.wip.plugintoolkit.core.model.localized
 
 @Composable
 fun SettingsItem(
@@ -98,7 +100,7 @@ fun SettingsItem(
                 )
                 .padding(ToolkitTheme.spacing.small), verticalAlignment = Alignment.CenterVertically
         ) {
-            val alpha = if (enabled) 1f else 0.5f
+            val alpha = if (enabled) ToolkitTheme.opacity.full else ToolkitTheme.opacity.disabledContent
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)) {
                 if (icon != null) {
                     Box(
@@ -113,7 +115,7 @@ fun SettingsItem(
                     ) {
                         Icon(
                             imageVector = icon,
-                            contentDescription = null,
+                            contentDescription = title,
                             tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
                             modifier = Modifier.size(ToolkitTheme.dimensions.settingsIconSize)
                         )
@@ -169,28 +171,9 @@ fun SettingsItem(
 fun getGroupedShape(
     index: Int,
     totalCount: Int
-): androidx.compose.ui.graphics.Shape {
-    val outer = ToolkitTheme.dimensions.buttonGroupOuterCorner
-    val inner = ToolkitTheme.dimensions.buttonGroupInnerCorner
-    return remember(index, totalCount, outer, inner) {
-        when {
-            totalCount <= 1 -> RoundedCornerShape(outer)
-            index == 0 -> RoundedCornerShape(
-                topStart = outer,
-                topEnd = outer,
-                bottomStart = inner,
-                bottomEnd = inner
-            )
-
-            index == totalCount - 1 -> RoundedCornerShape(
-                topStart = inner,
-                topEnd = inner,
-                bottomStart = outer,
-                bottomEnd = outer
-            )
-
-            else -> RoundedCornerShape(inner)
-        }
-    }
-}
+): androidx.compose.ui.graphics.Shape = rememberGroupedShape(
+    index = index,
+    totalCount = totalCount,
+    orientation = GroupOrientation.Vertical
+)
 

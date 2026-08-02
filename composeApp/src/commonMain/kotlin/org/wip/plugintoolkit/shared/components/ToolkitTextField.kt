@@ -37,7 +37,11 @@ fun ToolkitTextField(
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder),
         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
-        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.textFieldContainer)
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
+        errorBorderColor = MaterialTheme.colorScheme.error,
+        errorContainerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
+        errorLabelColor = MaterialTheme.colorScheme.error,
+        errorSupportingTextColor = MaterialTheme.colorScheme.error
     )
 ) {
     OutlinedTextField(

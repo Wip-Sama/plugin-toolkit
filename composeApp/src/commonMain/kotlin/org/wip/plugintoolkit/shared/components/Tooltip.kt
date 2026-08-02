@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,11 +22,11 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -91,15 +90,15 @@ fun TooltipArea(
             ) {
                 Box(
                     modifier = Modifier
-                        .shadow(ToolkitTheme.spacing.small, RoundedCornerShape(ToolkitTheme.spacing.extraSmall))
+                        .shadow(ToolkitTheme.spacing.small, ToolkitTheme.shapes.extraSmall)
                         .background(
                             MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(ToolkitTheme.spacing.extraSmall)
+                            ToolkitTheme.shapes.extraSmall
                         )
                         .border(
                             ToolkitTheme.dimensions.borderUnselected,
                             MaterialTheme.colorScheme.outlineVariant,
-                            RoundedCornerShape(ToolkitTheme.spacing.extraSmall)
+                            ToolkitTheme.shapes.extraSmall
                         )
                         .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
                 ) {
@@ -146,6 +145,8 @@ val LocalTooltipState = staticCompositionLocalOf<TooltipState?> { null }
 @Composable
 fun TooltipProvider(content: @Composable () -> Unit) {
     val tooltipState = remember { TooltipState() }
+    val density = LocalDensity.current
+    val verticalOffsetDp = ToolkitTheme.dimensions.tooltipVerticalOffset
     
     CompositionLocalProvider(LocalTooltipState provides tooltipState) {
         content()
@@ -161,9 +162,10 @@ fun TooltipProvider(content: @Composable () -> Unit) {
                     ): IntOffset {
                         val position = data.coordinates.positionInWindow()
                         val size = data.coordinates.size
+                        val verticalOffsetPx = with(density) { verticalOffsetDp.roundToPx() }
                         
                         val x = (position.x + size.width / 2f - popupContentSize.width / 2f).toInt()
-                        val y = (position.y - popupContentSize.height - 8).toInt() // 8px offset
+                        val y = (position.y - popupContentSize.height - verticalOffsetPx).toInt()
                         
                         val adjustedX = x.coerceIn(0, maxOf(0, windowSize.width - popupContentSize.width))
                         val adjustedY = y.coerceIn(0, maxOf(0, windowSize.height - popupContentSize.height))

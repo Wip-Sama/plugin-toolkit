@@ -48,8 +48,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.model.LocalizedString
 import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService
@@ -208,7 +210,10 @@ private fun ToastItem(
                     text = toast.message.resolve(),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.small)
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = ToolkitTheme.spacing.small)
+                        .semantics { liveRegion = LiveRegionMode.Polite }
                 )
 
                 if (toast.isNotification) {

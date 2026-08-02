@@ -486,21 +486,21 @@ fun JobResultCard(
                                 }
                             }
                         ) {
-                            Icon(Icons.Default.Download, contentDescription = null)
+                            Icon(Icons.Default.Download, contentDescription = stringResource(Res.string.action_export))
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(stringResource(Res.string.action_export))
                         }
                     }
                     if (job.status == JobStatus.Paused && onResume != null) {
                         TextButton(onClick = onResume) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Icon(Icons.Default.PlayArrow, contentDescription = stringResource(Res.string.action_resume))
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(stringResource(Res.string.action_resume))
                         }
                     }
                     if (job.isPausable && (job.status == JobStatus.Running || job.status == JobStatus.Queued) && onPause != null) {
                         TextButton(onClick = onPause) {
-                            Icon(Icons.Default.Pause, contentDescription = null)
+                            Icon(Icons.Default.Pause, contentDescription = stringResource(Res.string.action_pause))
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(stringResource(Res.string.action_pause))
                         }
@@ -515,7 +515,7 @@ fun JobResultCard(
                                 isShiftPressed = it.keyboardModifiers.isShiftPressed
                             }
                         ) {
-                            Icon(Icons.Default.Cancel, contentDescription = null)
+                            Icon(Icons.Default.Cancel, contentDescription = if (isShiftPressed) stringResource(Res.string.action_force_cancel) else stringResource(Res.string.dialog_cancel))
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(if (isShiftPressed) stringResource(Res.string.action_force_cancel) else stringResource(Res.string.dialog_cancel))
                         }
@@ -525,7 +525,7 @@ fun JobResultCard(
                             onClick = onClear,
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.outline)
                         ) {
-                            Icon(Icons.Default.Cancel, contentDescription = null)
+                            Icon(Icons.Default.Cancel, contentDescription = stringResource(Res.string.action_clear))
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(stringResource(Res.string.action_clear))
                         }

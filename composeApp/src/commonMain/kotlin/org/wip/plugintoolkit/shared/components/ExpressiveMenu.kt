@@ -4,23 +4,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import org.wip.plugintoolkit.core.theme.AppTheme
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
 
 /**
  * A custom dropdown menu styled similarly to the Material 3 Expressive vertical menu.
@@ -60,6 +61,10 @@ fun <T> ExpressiveMenu(
                             else ToolkitTheme.colors.transparent
                         )
                         .clickable { onOptionSelected(option) }
+                        .semantics {
+                            role = Role.Tab
+                            selected = isSelected
+                        }
                         .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.smallMedium)
                 ) {
                     Text(
@@ -82,7 +87,7 @@ fun <T> ExpressiveMenu(
 @Preview
 @Composable
 private fun ExpressiveMenuPreview() {
-    MaterialTheme {
+    AppTheme(appearance = AppearanceSettings()) {
         Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             ExpressiveMenu(
                 options = listOf("Option 1", "Option 2", "Option 3"),

@@ -129,7 +129,8 @@ data class Dimensions(
     val cornerRadiusSmall: Dp = 8.dp,
     val cornerRadiusMedium: Dp = 12.dp,
     val cornerRadiusLarge: Dp = 16.dp,
-    val cornerRadiusExtraLarge: Dp = 24.dp
+    val cornerRadiusExtraLarge: Dp = 24.dp,
+    val tooltipVerticalOffset: Dp = 8.dp
 )
 
 data class CustomColors(
@@ -172,7 +173,10 @@ data class Opacity(
     val buttonBackground: Float = 0.15f,
     val settingsItemDefault: Float = 0.25f,
     val settingsItemHover: Float = 0.38f,
-    val settingsItemPressed: Float = 0.55f
+    val settingsItemPressed: Float = 0.55f,
+    val chipTintedBackground: Float = 0.5f,
+    val chipOutlinedBackground: Float = 0.1f,
+    val disabledContent: Float = 0.5f
 )
 
 val LocalSpacing = staticCompositionLocalOf { Spacing() }

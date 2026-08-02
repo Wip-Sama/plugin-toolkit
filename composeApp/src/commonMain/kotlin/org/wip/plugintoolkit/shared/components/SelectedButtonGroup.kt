@@ -20,6 +20,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import org.wip.plugintoolkit.core.theme.AppTheme
+import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -61,7 +63,7 @@ fun SelectedButtonGroup(
 @Preview
 @Composable
 private fun SelectedButtonGroupPreview() {
-    MaterialTheme {
+    AppTheme(appearance = AppearanceSettings()) {
         SelectedButtonGroup(
             buttons = listOf("Option A", "Option B", "Option C"),
             startingIndex = 1
