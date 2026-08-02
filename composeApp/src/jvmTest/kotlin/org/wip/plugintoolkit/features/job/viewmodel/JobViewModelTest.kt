@@ -41,6 +41,7 @@ class JobViewModelTest {
         try {
             val persistence = FakeSettingsPersistence()
             val settingsRepo = SettingsRepository(persistence, backgroundScope)
+            testScheduler.advanceUntilIdle()
             val jobManager = JobManager(backgroundScope, settingsRepo)
             val viewModel = JobViewModel(jobManager)
 

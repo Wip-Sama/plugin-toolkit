@@ -25,14 +25,52 @@ class ExtensibilityAndSerializationTest {
     }
 
     @Test
+    fun testDataTypeFlexibleDeserialization() {
+        // Test FQCN discriminator
+        val fqcnJson = """{"type": "org.wip.plugintoolkit.api.DataType.Primitive", "primitiveType": "STRING"}"""
+        val fqcnType = json.decodeFromString<DataType>(fqcnJson)
+        assertTrue(fqcnType is DataType.Primitive)
+        assertEquals(PrimitiveType.STRING, fqcnType.primitiveType)
+
+        // Test Capitalized discriminator
+        val capJson = """{"type": "Primitive", "primitiveType": "string"}"""
+        val capType = json.decodeFromString<DataType>(capJson)
+        assertTrue(capType is DataType.Primitive)
+        assertEquals(PrimitiveType.STRING, capType.primitiveType)
+
+        // Test Primitive String direct encoding
+        val primStringJson = "\"STRING\""
+        val primStringType = json.decodeFromString<DataType>(primStringJson)
+        assertTrue(primStringType is DataType.Primitive)
+        assertEquals(PrimitiveType.STRING, primStringType.primitiveType)
+
+        // Test Structural inspection when "type" discriminator is missing entirely
+        val missingTypeJson = """{"primitiveType": "STRING"}"""
+        val missingTypeResult = json.decodeFromString<DataType>(missingTypeJson)
+        assertTrue(missingTypeResult is DataType.Primitive)
+        assertEquals(PrimitiveType.STRING, missingTypeResult.primitiveType)
+
+        val arrayMissingTypeJson = """{"items": {"primitiveType": "INT"}}"""
+        val arrayMissingTypeResult = json.decodeFromString<DataType>(arrayMissingTypeJson)
+        assertTrue(arrayMissingTypeResult is DataType.Array)
+        assertTrue(arrayMissingTypeResult.items is DataType.Primitive)
+    }
+
+    @Test
     fun testEnumSafeFallback() {
         assertEquals(OS.UNKNOWN, json.decodeFromString<OS>("\"ANDROID\""))
         assertEquals(PrimitiveType.UNKNOWN, json.decodeFromString<PrimitiveType>("\"COMPLEX_NUMBER\""))
         assertEquals(ParameterRole.UNKNOWN, json.decodeFromString<ParameterRole>("\"FUTURE_ROLE\""))
         assertEquals(CapabilityContext.UNKNOWN, json.decodeFromString<CapabilityContext>("\"CLOUD_ONLY\""))
 
+        // Case-insensitive tests
         assertEquals(OS.WINDOWS, json.decodeFromString<OS>("\"WINDOWS\""))
+        assertEquals(OS.WINDOWS, json.decodeFromString<OS>("\"Windows\""))
+        assertEquals(OS.WINDOWS, json.decodeFromString<OS>("\"windows\""))
+
         assertEquals(PrimitiveType.STRING, json.decodeFromString<PrimitiveType>("\"STRING\""))
+        assertEquals(PrimitiveType.STRING, json.decodeFromString<PrimitiveType>("\"String\""))
+        assertEquals(PrimitiveType.STRING, json.decodeFromString<PrimitiveType>("\"string\""))
     }
 
     @Test

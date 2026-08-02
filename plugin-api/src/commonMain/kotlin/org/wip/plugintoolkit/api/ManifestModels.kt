@@ -35,24 +35,51 @@ inline fun <reified T : Enum<T>> createSafeEnumSerializer(
 
     override fun deserialize(decoder: Decoder): T {
         val name = decoder.decodeString()
-        return try {
-            enumValueOf<T>(name)
-        } catch (e: Exception) {
-            fallback
-        }
+        return enumValues<T>().firstOrNull { it.name.equals(name, ignoreCase = true) } ?: fallback
+    }
+}
+
+object DataTypePrimitiveFromStringSerializer : KSerializer<DataType.Primitive> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DataType.PrimitiveFromString", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: DataType.Primitive) {
+        encoder.encodeString(value.primitiveType.name)
+    }
+
+    override fun deserialize(decoder: Decoder): DataType.Primitive {
+        val str = decoder.decodeString()
+        val prim = enumValues<PrimitiveType>().firstOrNull { it.name.equals(str, ignoreCase = true) } ?: PrimitiveType.UNKNOWN
+        return DataType.Primitive(prim)
     }
 }
 
 object DataTypeSerializer : JsonContentPolymorphicSerializer<DataType>(DataType::class) {
     override fun selectDeserializer(element: JsonElement): KSerializer<out DataType> {
-        val type = (element as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull
-        return when (type) {
-            "primitive" -> DataType.Primitive.serializer()
-            "array" -> DataType.Array.serializer()
-            "object" -> DataType.Object.serializer()
-            "enum" -> DataType.Enum.serializer()
-            "map" -> DataType.MapType.serializer()
-            "unknown" -> DataType.Unknown.serializer()
+        if (element is JsonPrimitive) {
+            return DataTypePrimitiveFromStringSerializer
+        }
+        val jsonObj = element as? JsonObject ?: return DataType.Unknown.serializer()
+        val type = jsonObj["type"]?.jsonPrimitive?.contentOrNull?.lowercase()
+
+        if (type != null) {
+            when {
+                type == "primitive" || type.endsWith(".primitive") -> return DataType.Primitive.serializer()
+                type == "array" || type.endsWith(".array") -> return DataType.Array.serializer()
+                type == "object" || type.endsWith(".object") -> return DataType.Object.serializer()
+                type == "enum" || type.endsWith(".enum") -> return DataType.Enum.serializer()
+                type == "map" || type == "maptype" || type.endsWith(".maptype") || type.endsWith(".map") -> return DataType.MapType.serializer()
+                type == "unknown" || type.endsWith(".unknown") -> return DataType.Unknown.serializer()
+            }
+        }
+
+        // Structural fallbacks when "type" discriminator is missing or unrecognized
+        return when {
+            "primitiveType" in jsonObj -> DataType.Primitive.serializer()
+            "items" in jsonObj -> DataType.Array.serializer()
+            "options" in jsonObj -> DataType.Enum.serializer()
+            "valueType" in jsonObj -> DataType.MapType.serializer()
+            "className" in jsonObj || "properties" in jsonObj -> DataType.Object.serializer()
+            "rawType" in jsonObj -> DataType.Unknown.serializer()
             else -> DataType.Unknown.serializer()
         }
     }
