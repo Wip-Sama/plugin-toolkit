@@ -1,6 +1,8 @@
 package org.wip.plugintoolkit.api
 
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.JsonElement
 import org.koin.core.module.Module
 
@@ -69,7 +71,7 @@ interface PluginEntry {
     /**
      * Clean up resources.
      */
-    fun shutdown()
+    fun shutdown() {}
 }
 
 /**
@@ -105,6 +107,51 @@ interface ScopedFileSystem {
      * Get the absolute base path of the managed file area.
      */
     fun getBasePath(): String
+
+    /**
+     * Read file content as a stream of byte chunks.
+     */
+    suspend fun readStream(relativePath: RelativePath): Flow<ByteArray> = flow {
+        val bytes = readFile(relativePath) ?: return@flow
+        emit(bytes)
+    }
+
+    /**
+     * Write a stream of byte chunks to a file.
+     */
+    suspend fun writeStream(relativePath: RelativePath, stream: Flow<ByteArray>): Result<Unit> = try {
+        val byteArrayOutputStream = mutableListOf<Byte>()
+        stream.collect { chunk ->
+            chunk.forEach { byteArrayOutputStream.add(it) }
+        }
+        writeFile(relativePath, byteArrayOutputStream.toByteArray())
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    /**
+     * Copy a file from source relative path to destination relative path.
+     */
+    suspend fun copyFile(source: RelativePath, destination: RelativePath): Result<Unit> = try {
+        val content = readFile(source) ?: return Result.failure(IllegalArgumentException("Source file does not exist"))
+        writeFile(destination, content)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    /**
+     * Move a file from source relative path to destination relative path.
+     */
+    suspend fun moveFile(source: RelativePath, destination: RelativePath): Result<Unit> = try {
+        val copyResult = copyFile(source, destination)
+        if (copyResult.isFailure) {
+            copyResult
+        } else {
+            deleteFile(source)
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 }
 
 /**
@@ -139,6 +186,51 @@ interface HostFileSystem {
     suspend fun listFiles(absolutePath: String): List<String>
     suspend fun deleteFile(absolutePath: String): Result<Unit>
     suspend fun createDirectory(absolutePath: String): Result<Unit>
+
+    /**
+     * Read file content as a stream of byte chunks.
+     */
+    suspend fun readStream(absolutePath: String): Flow<ByteArray> = flow {
+        val bytes = readFile(absolutePath) ?: return@flow
+        emit(bytes)
+    }
+
+    /**
+     * Write a stream of byte chunks to a file.
+     */
+    suspend fun writeStream(absolutePath: String, stream: Flow<ByteArray>): Result<Unit> = try {
+        val byteArrayOutputStream = mutableListOf<Byte>()
+        stream.collect { chunk ->
+            chunk.forEach { byteArrayOutputStream.add(it) }
+        }
+        writeFile(absolutePath, byteArrayOutputStream.toByteArray())
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    /**
+     * Copy a file from source absolute path to destination absolute path.
+     */
+    suspend fun copyFile(sourceAbsolutePath: String, destinationAbsolutePath: String): Result<Unit> = try {
+        val content = readFile(sourceAbsolutePath) ?: return Result.failure(IllegalArgumentException("Source file does not exist"))
+        writeFile(destinationAbsolutePath, content)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    /**
+     * Move a file from source absolute path to destination absolute path.
+     */
+    suspend fun moveFile(sourceAbsolutePath: String, destinationAbsolutePath: String): Result<Unit> = try {
+        val copyResult = copyFile(sourceAbsolutePath, destinationAbsolutePath)
+        if (copyResult.isFailure) {
+            copyResult
+        } else {
+            deleteFile(sourceAbsolutePath)
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 }
 
 /**

@@ -179,6 +179,12 @@ object GeneratorUtils {
                     )
                 }
             }
+
+            is DataType.Unknown -> com.squareup.kotlinpoet.CodeBlock.of(
+                "%T(%S)",
+                cnDataType.nestedClass("Unknown"),
+                dataType.rawType
+            )
         }
     }
 

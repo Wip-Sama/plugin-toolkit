@@ -4,10 +4,14 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -15,14 +19,66 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+inline fun <reified T : Enum<T>> createSafeEnumSerializer(
+    serialName: String,
+    fallback: T
+): KSerializer<T> = object : KSerializer<T> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(serialName, PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: T) {
+        encoder.encodeString(value.name)
+    }
+
+    override fun deserialize(decoder: Decoder): T {
+        val name = decoder.decodeString()
+        return try {
+            enumValueOf<T>(name)
+        } catch (e: Exception) {
+            fallback
+        }
+    }
+}
+
+object DataTypeSerializer : JsonContentPolymorphicSerializer<DataType>(DataType::class) {
+    override fun selectDeserializer(element: JsonElement): KSerializer<out DataType> {
+        val type = (element as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull
+        return when (type) {
+            "primitive" -> DataType.Primitive.serializer()
+            "array" -> DataType.Array.serializer()
+            "object" -> DataType.Object.serializer()
+            "enum" -> DataType.Enum.serializer()
+            "map" -> DataType.MapType.serializer()
+            "unknown" -> DataType.Unknown.serializer()
+            else -> DataType.Unknown.serializer()
+        }
+    }
+}
+
+object DataTypeUnknownSerializer : KSerializer<DataType.Unknown> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("DataType.Unknown")
+
+    override fun serialize(encoder: Encoder, value: DataType.Unknown) {
+        val composite = encoder.beginStructure(descriptor)
+        composite.encodeStringElement(descriptor, 0, value.rawType)
+        composite.endStructure(descriptor)
+    }
+
+    override fun deserialize(decoder: Decoder): DataType.Unknown {
+        val input = decoder as? JsonDecoder ?: return DataType.Unknown("unknown")
+        val element = input.decodeJsonElement()
+        val rawType = (element as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull ?: "unknown"
+        return DataType.Unknown(rawType)
+    }
+}
 
 /**
  * Represents the type of data exchanged between the host and the plugin.
  */
-@Serializable
+@Serializable(with = DataTypeSerializer::class)
 sealed class DataType {
     /**
      * Checks if a value is "provided" for this data type.
@@ -121,11 +177,22 @@ sealed class DataType {
             return (value as? JsonObject)?.isNotEmpty() ?: true
         }
     }
+
+    /**
+     * An unknown data type sent by a newer host/plugin.
+     */
+    @Serializable(with = DataTypeUnknownSerializer::class)
+    @SerialName("unknown")
+    data class Unknown(val rawType: String = "unknown") : DataType() {
+        override fun isProvided(value: JsonElement?): Boolean = false
+    }
 }
 
-@Serializable
+object PrimitiveTypeSerializer : KSerializer<PrimitiveType> by createSafeEnumSerializer("PrimitiveType", PrimitiveType.UNKNOWN)
+
+@Serializable(with = PrimitiveTypeSerializer::class)
 enum class PrimitiveType {
-    DOUBLE, FLOAT, LONG, INT, SHORT, BYTE, STRING, BOOLEAN, UNIT, ANY
+    DOUBLE, FLOAT, LONG, INT, SHORT, BYTE, STRING, BOOLEAN, UNIT, ANY, UNKNOWN
 }
 
 
@@ -231,9 +298,11 @@ data class Release(
     val categories: Map<String, List<String>>
 )
 
-@Serializable
+object OSSerializer : KSerializer<OS> by createSafeEnumSerializer("OS", OS.UNKNOWN)
+
+@Serializable(with = OSSerializer::class)
 enum class OS {
-    LINUX, WINDOWS, MACOS
+    LINUX, WINDOWS, MACOS, UNKNOWN
 }
 
 @Serializable
@@ -252,9 +321,11 @@ data class Requirements(
     val targetAppVersion: String? = null
 )
 
-@Serializable
+object ParameterRoleSerializer : KSerializer<ParameterRole> by createSafeEnumSerializer("ParameterRole", ParameterRole.UNKNOWN)
+
+@Serializable(with = ParameterRoleSerializer::class)
 enum class ParameterRole {
-    STANDARD, INPUT_LOCATION, OUTPUT_LOCATION
+    STANDARD, INPUT_LOCATION, OUTPUT_LOCATION, UNKNOWN
 }
 
 /**
@@ -402,9 +473,11 @@ private class OutputMetadataSurrogate(
     val semanticTypes: List<SemanticType> = emptyList()
 )
 
-@Serializable
+object CapabilityContextSerializer : KSerializer<CapabilityContext> by createSafeEnumSerializer("CapabilityContext", CapabilityContext.UNKNOWN)
+
+@Serializable(with = CapabilityContextSerializer::class)
 enum class CapabilityContext {
-    ANY, FLOW_ONLY, STANDALONE_ONLY
+    ANY, FLOW_ONLY, STANDALONE_ONLY, UNKNOWN
 }
 
 @Serializable

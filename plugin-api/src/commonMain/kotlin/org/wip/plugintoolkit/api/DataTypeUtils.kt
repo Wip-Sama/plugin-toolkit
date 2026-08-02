@@ -142,6 +142,8 @@ fun DataType.isCompatibleWith(other: DataType): Boolean {
         is DataType.Enum -> {
             other is DataType.Enum && this.className == other.className
         }
+
+        is DataType.Unknown -> false
     }
 }
 
@@ -218,6 +220,7 @@ fun DataType.format(): String {
         is DataType.MapType -> "Map<String, ${this.valueType.format()}>"
         is DataType.Object -> this.className.substringAfterLast('.')
         is DataType.Enum -> this.className.substringAfterLast('.')
+        is DataType.Unknown -> "Unknown(${this.rawType})"
     }
 }
 
