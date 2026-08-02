@@ -21,6 +21,7 @@ expect object PlatformUtils {
     fun readFile(path: String): String?
     fun writeFile(path: String, content: String)
     fun readFileFromZip(zipPath: String, fileName: String): String?
+    fun readBytesFromZip(zipPath: String, fileName: String): ByteArray?
     fun installUpdate(path: String)
     suspend fun saveFile(baseName: String, extension: String, bytes: ByteArray): String?
     suspend fun pickFile(title: String, allowedExtensions: List<String>): String?

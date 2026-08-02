@@ -7,35 +7,28 @@ import kotlinx.io.readByteArray
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import org.wip.plugintoolkit.api.HostFileSystem
-import java.io.File
 
 class HostFileSystemImpl(
     private val allowedPaths: List<String>,
     private val isDestructiveAllowed: Boolean
 ) : HostFileSystem {
 
+    private fun normalizePath(pathString: String): String {
+        return Path(pathString).toString().replace('\\', '/')
+    }
+
     private fun isPathAllowed(pathString: String): Boolean {
         // If allowedPaths is empty, it means the capability doesn't have any allowed paths configured
         // (perhaps it wasn't supposed to read/write files based on its parameters)
         if (allowedPaths.isEmpty()) return false
 
-        val file = File(pathString)
-        val normalizedPath = try {
-            file.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve canonical path for '$pathString': ${e.message}")
-        }
+        val normalizedPath = normalizePath(pathString)
 
         // If the path is inside any of the allowedPaths, it is allowed
         return allowedPaths.any { allowed ->
-            val allowedFile = File(allowed)
-            val allowedCanonical = try {
-                allowedFile.canonicalPath
-            } catch (e: Exception) {
-                throw SecurityException("Failed to resolve allowed canonical path for '$allowed': ${e.message}")
-            }
+            val allowedCanonical = normalizePath(allowed)
 
-            normalizedPath == allowedCanonical || normalizedPath.startsWith(allowedCanonical + File.separator)
+            normalizedPath == allowedCanonical || normalizedPath.startsWith(if (allowedCanonical.endsWith("/")) allowedCanonical else "$allowedCanonical/")
         }
     }
 

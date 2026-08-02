@@ -10,8 +10,6 @@ import kotlinx.io.writeString
 import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.RelativePath
 import org.wip.plugintoolkit.core.loomDispatcher
-import java.io.File
-import java.util.jar.JarFile
 
 class DefaultPluginFileSystem(
     pluginInstallPath: String,
@@ -25,23 +23,12 @@ class DefaultPluginFileSystem(
         SystemFileSystem.createDirectories(Path(cachePath))
     }
 
-    //TODO: need to check better if this should be implemented in platform specific FileSystem like it is for PlatformUtils
     private fun resolvePath(relativePath: RelativePath): Path {
         val resolved = Path(basePath, relativePath.value)
-        val file = File(resolved.toString())
-        val normalized = try {
-            file.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve canonical path for '${relativePath.value}': ${e.message}")
-        }
-        val baseFile = File(basePath)
-        val baseCanonical = try {
-            baseFile.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve base canonical path for '$basePath': ${e.message}")
-        }
+        val normalized = resolved.toString().replace('\\', '/')
+        val baseCanonical = Path(basePath).toString().replace('\\', '/')
 
-        if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + File.separator)) {
+        if (normalized != baseCanonical && !normalized.startsWith(if (baseCanonical.endsWith("/")) baseCanonical else "$baseCanonical/")) {
             throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin files directory.")
         }
         return resolved
@@ -115,13 +102,9 @@ class DefaultPluginFileSystem(
             withContext(loomDispatcher) {
                 val jar = jarPath
                     ?: return@withContext Result.failure(Exception("No JAR path configured for resource extraction"))
-                val jarFile = JarFile(File(jar))
 
-                val entry = jarFile.getJarEntry(resourcePath)
+                val data = org.wip.plugintoolkit.core.utils.PlatformUtils.readBytesFromZip(jar, resourcePath)
                     ?: return@withContext Result.failure(Exception("Resource not found in JAR: $resourcePath"))
-
-                val data = jarFile.getInputStream(entry).use { it.readBytes() }
-                jarFile.close()
 
                 writeFile(targetRelativePath, data)
             }
@@ -162,20 +145,10 @@ class DefaultPluginFileSystem(
 
     private fun resolveCachePath(relativePath: RelativePath): Path {
         val resolved = Path(cachePath, relativePath.value)
-        val file = File(resolved.toString())
-        val normalized = try {
-            file.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve canonical path for '${relativePath.value}': ${e.message}")
-        }
-        val baseFile = File(cachePath)
-        val baseCanonical = try {
-            baseFile.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve base canonical path for '$cachePath': ${e.message}")
-        }
+        val normalized = resolved.toString().replace('\\', '/')
+        val baseCanonical = Path(cachePath).toString().replace('\\', '/')
 
-        if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + File.separator)) {
+        if (normalized != baseCanonical && !normalized.startsWith(if (baseCanonical.endsWith("/")) baseCanonical else "$baseCanonical/")) {
             throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin cache directory.")
         }
         return resolved

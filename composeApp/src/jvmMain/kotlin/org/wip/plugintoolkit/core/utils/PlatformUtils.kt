@@ -259,6 +259,20 @@ actual object PlatformUtils {
         }
     }
 
+    actual fun readBytesFromZip(zipPath: String, fileName: String): ByteArray? {
+        return try {
+            java.util.zip.ZipFile(zipPath).use { zip ->
+                val entry = zip.getEntry(fileName) ?: zip.entries().asSequence()
+                    .find { it.name.equals(fileName, ignoreCase = true) }
+                ?: return null
+                zip.getInputStream(entry).use { it.readBytes() }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Error reading bytes for $fileName from $zipPath" }
+            null
+        }
+    }
+
     private fun getCurrentInstallDir(): String? {
         return try {
             val exePath = ProcessHandle.current().info().command().orElse(null) ?: return null

@@ -23,7 +23,9 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
-import java.util.concurrent.ConcurrentHashMap
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.update
+import kotlinx.collections.immutable.persistentMapOf
 
 /**
  * Manages the runtime lifecycle of plugins (loading, unloading, context creation).
@@ -39,7 +41,7 @@ class PluginLifecycleManager(
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
 
     // Cache for decrypted plugin settings to avoid redundant IO and decryption
-    private val settingsCache = ConcurrentHashMap<String, PluginSettingsStore>()
+    private val settingsCache = atomic(persistentMapOf<String, PluginSettingsStore>())
 
     private val json = kotlinx.serialization.json.Json {
         prettyPrint = true
@@ -47,8 +49,15 @@ class PluginLifecycleManager(
         encodeDefaults = true
     }
 
-    private val pluginLocks = ConcurrentHashMap<String, Mutex>()
-    private fun getPluginLock(pkg: String) = pluginLocks.getOrPut(pkg) { Mutex() }
+    private val pluginLocks = atomic(persistentMapOf<String, Mutex>())
+    private fun getPluginLock(pkg: String): Mutex {
+        pluginLocks.value[pkg]?.let { return it }
+        val newMutex = Mutex()
+        pluginLocks.update { map ->
+            if (map.containsKey(pkg)) map else map.put(pkg, newMutex)
+        }
+        return pluginLocks.value.getValue(pkg)
+    }
 
     /**
      * Loads a plugin into the JVM and initializes it.
@@ -234,7 +243,7 @@ class PluginLifecycleManager(
 
     fun loadPluginSettings(pkg: String): PluginSettingsStore {
         // Return from cache if available
-        settingsCache[pkg]?.let { return it }
+        settingsCache.value[pkg]?.let { return it }
 
         val plugin = registry.getPlugin(pkg) ?: return PluginSettingsStore()
         val settingsFile = "${plugin.installPath}/settings.json"
@@ -272,7 +281,7 @@ class PluginLifecycleManager(
         }
 
         val decryptedStore = store.copy(settings = decryptedSettings)
-        settingsCache[pkg] = decryptedStore
+        settingsCache.update { it.put(pkg, decryptedStore) }
         return decryptedStore
     }
 
@@ -295,7 +304,7 @@ class PluginLifecycleManager(
         try {
             fileSystem.writeFile(settingsFile, json.encodeToString(storeToSave))
             // Update cache with the decrypted store
-            settingsCache[pkg] = store
+            settingsCache.update { it.put(pkg, store) }
         } catch (t: Throwable) {
             Logger.e(t) { "Failed to save settings for $pkg" }
         }

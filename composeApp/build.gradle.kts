@@ -43,6 +43,8 @@ kotlin {
             implementation(libs.filekit.dialogs.compose)
             implementation(libs.filekit.coil)
             implementation(libs.kotlinx.io.core)
+            implementation(libs.kotlinx.atomicfu)
+            implementation(libs.kotlinx.collections.immutable)
             implementation(project(":plugin-api"))
         }
         commonTest.dependencies {

@@ -23,7 +23,6 @@ import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.utils.PlatformUtils
-import java.util.Base64
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -33,6 +32,8 @@ import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 
 enum class ConflictResolutionAction {
@@ -262,7 +263,8 @@ class FlowViewModel(
                 val entries =
                     allExportedFlows.associate { it.name + ".json" to json.encodeToString(Flow.serializer(), it) }
                 val zipBytes = PlatformUtils.zipEntries(entries)
-                val base64String = Base64.getEncoder().encodeToString(zipBytes)
+                @OptIn(ExperimentalEncodingApi::class)
+                val base64String = Base64.encode(zipBytes)
 
                 withContext(Dispatchers.Main) {
                     onCopyReady(base64String)
@@ -364,7 +366,8 @@ class FlowViewModel(
     private fun handleTriggerImportFromClipboard(base64String: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val bytes = Base64.getDecoder().decode(base64String)
+                @OptIn(ExperimentalEncodingApi::class)
+                val bytes = Base64.decode(base64String)
                 val importedFlows = importFlowFromBytes(bytes, "clipboard.zip")
                 if (importedFlows.isEmpty()) {
                     withContext(Dispatchers.Main) {

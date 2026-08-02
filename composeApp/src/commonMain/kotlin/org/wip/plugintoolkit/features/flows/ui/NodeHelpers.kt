@@ -108,6 +108,7 @@ fun formatDataType(type: DataType): String {
         is DataType.MapType -> "Map<String, ${formatDataType(type.valueType)}>"
         is DataType.Enum -> type.className.substringAfterLast('.')
         is DataType.Object -> type.className.substringAfterLast('.')
+        is DataType.Unknown -> type.rawType
     }
 }
 

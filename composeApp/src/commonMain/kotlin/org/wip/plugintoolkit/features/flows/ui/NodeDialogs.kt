@@ -113,6 +113,7 @@ fun NodeDialogs(
 
                         is DataType.Object -> "Object"
                         is DataType.Array -> "Array"
+                        is DataType.Unknown -> "Unknown"
                         is DataType.Enum -> "Enum"
                         is DataType.MapType -> "Map"
                     }

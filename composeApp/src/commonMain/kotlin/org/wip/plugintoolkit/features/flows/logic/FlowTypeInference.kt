@@ -290,5 +290,6 @@ fun DataType.format(): String {
         is DataType.MapType -> "Map<String, ${this.valueType.format()}>"
         is DataType.Enum -> this.className.substringAfterLast('.')
         is DataType.Object -> this.className.substringAfterLast('.')
+        is DataType.Unknown -> this.rawType
     }
 }

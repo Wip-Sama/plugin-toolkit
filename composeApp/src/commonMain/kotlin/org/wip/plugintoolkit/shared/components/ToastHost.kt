@@ -55,13 +55,13 @@ import org.wip.plugintoolkit.core.notification.NotificationEvent
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.model.NotificationSettings
-import java.awt.Toolkit
-import java.util.UUID
+import kotlin.uuid.Uuid
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.*
 
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 data class ToastData(
-    val id: String = UUID.randomUUID().toString(),
+    val id: String = Uuid.random().toString(),
     val message: LocalizedString,
     val isNotification: Boolean,
     val durationMillis: Long

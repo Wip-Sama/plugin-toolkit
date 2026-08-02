@@ -44,9 +44,9 @@ import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.history_clear_all
 import plugintoolkit.composeapp.generated.resources.history_empty
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import plugintoolkit.composeapp.generated.resources.*
 
@@ -159,6 +159,12 @@ private fun NotificationItem(
 }
 
 private fun formatTimestamp(timestamp: Long): String {
-    val formatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm:ss")
-    return Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).format(formatter)
+    val instant = Instant.fromEpochMilliseconds(timestamp)
+    val localDateTime = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+    val monthStr = localDateTime.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+    val dayStr = localDateTime.dayOfMonth.toString().padStart(2, '0')
+    val hourStr = localDateTime.hour.toString().padStart(2, '0')
+    val minStr = localDateTime.minute.toString().padStart(2, '0')
+    val secStr = localDateTime.second.toString().padStart(2, '0')
+    return "$monthStr $dayStr, $hourStr:$minStr:$secStr"
 }

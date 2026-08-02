@@ -1,8 +1,8 @@
 package org.wip.plugintoolkit.features.settings.utils
 
-import java.time.ZoneId
+import kotlinx.datetime.TimeZone
 
 object TimezoneUtils {
-    fun getAvailableZoneIds(): List<String> = ZoneId.getAvailableZoneIds().toList().sorted()
-    fun getSystemDefaultId(): String = ZoneId.systemDefault().id
+    fun getAvailableZoneIds(): List<String> = TimeZone.availableZoneIds.toList().sorted()
+    fun getSystemDefaultId(): String = TimeZone.currentSystemDefault().id
 }

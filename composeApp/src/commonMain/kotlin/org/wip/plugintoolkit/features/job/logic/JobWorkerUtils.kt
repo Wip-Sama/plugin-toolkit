@@ -122,6 +122,7 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
     val targetPrimitive = targetType.primitiveType
     return when (targetPrimitive) {
         PrimitiveType.STRING -> value.toString()
+        PrimitiveType.UNKNOWN -> value.toString()
         PrimitiveType.INT -> {
             if (value is Number) value.toInt()
             else {
