@@ -269,4 +269,16 @@ class FlowNodeManager {
         return currentState.copy(flow = currentState.flow.copy(nodes = updatedNodes), hasUnsavedChanges = true)
     }
 
+    fun handlePan(currentState: FlowEditorState, delta: Offset): FlowEditorState {
+        val newOffset = currentState.offset + delta
+        return if (currentState.draggedNodeId != null) {
+            val dragCorrection = delta / currentState.scale
+            currentState.copy(
+                offset = newOffset,
+                currentDragOffset = currentState.currentDragOffset - dragCorrection
+            )
+        } else {
+            currentState.copy(offset = newOffset)
+        }
+    }
 }

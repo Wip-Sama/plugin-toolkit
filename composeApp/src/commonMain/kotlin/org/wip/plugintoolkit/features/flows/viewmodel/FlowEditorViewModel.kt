@@ -685,7 +685,7 @@ class FlowEditorViewModel(
 
     private fun handlePan(delta: Offset) {
         _state.update { currentState ->
-            currentState.copy(offset = currentState.offset + delta)
+            nodeManager.handlePan(currentState, delta)
         }
     }
 

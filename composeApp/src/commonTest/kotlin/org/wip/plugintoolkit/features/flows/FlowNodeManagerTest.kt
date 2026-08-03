@@ -62,6 +62,29 @@ class FlowNodeManagerTest {
     }
 
     @Test
+    fun testPanningWhileDraggingNodeMaintainsScreenPosition() {
+        val node = createTestNode(1L, Offset(100f, 100f))
+        val initialState = FlowEditorState(
+            flow = Flow("test", nodes = listOf(node)),
+            offset = Offset(0f, 0f),
+            scale = 1.0f
+        )
+
+        // 1. Start moving node 1L by delta = (10, 10)
+        val stateAfterMove = manager.handleMoveNode(initialState, 1L, Offset(10f, 10f), snap = false, showGhost = true)
+        val initialScreenPos = (node.position + stateAfterMove.currentDragOffset) * stateAfterMove.scale + stateAfterMove.offset
+        assertEquals(Offset(110f, 110f), initialScreenPos)
+
+        // 2. Pan canvas by panDelta = (50, 50) while node is being dragged (draggedNodeId = 1L)
+        val panDelta = Offset(50f, 50f)
+        val stateAfterPan = manager.handlePan(stateAfterMove, panDelta)
+
+        // Rendered position on screen MUST remain (110, 110) under the cursor!
+        val screenPosAfterPan = (node.position + stateAfterPan.currentDragOffset) * stateAfterPan.scale + stateAfterPan.offset
+        assertEquals(initialScreenPos, screenPosAfterPan)
+    }
+
+    @Test
     fun testEndMoveNodeSnapsPositionAndResetsDragState() {
         val node = createTestNode(1L, Offset(100f, 100f))
         val initialState = FlowEditorState(
