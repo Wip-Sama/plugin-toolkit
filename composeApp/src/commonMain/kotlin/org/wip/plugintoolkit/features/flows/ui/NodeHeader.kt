@@ -1,12 +1,8 @@
 package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.drag
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,13 +34,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -63,8 +60,6 @@ fun NodeHeader(
     onHeaderColor: Color,
     isReady: Boolean,
     isReadOnly: Boolean,
-    stateScale: Float,
-    boardOffset: Offset,
     onPress: (Long) -> Unit,
     onMove: (Long, Offset, Boolean, Boolean) -> Unit,
     onEndMove: (Long) -> Unit,
@@ -82,73 +77,40 @@ fun NodeHeader(
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnMove by rememberUpdatedState(onMove)
     val currentOnEndMove by rememberUpdatedState(onEndMove)
-    val currentStateScale by rememberUpdatedState(stateScale)
-    val currentBoardOffset by rememberUpdatedState(boardOffset)
-
-    var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(headerColor)
-            .onGloballyPositioned { layoutCoordinates = it }
-            .pointerInput(node.id) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Enter) {
-                            tooltipJob?.cancel()
-                            tooltipJob = scope.launch {
-                                delay(2000.milliseconds)
-                                showTooltip = true
-                            }
-                        } else if (event.type == PointerEventType.Exit) {
-                            tooltipJob?.cancel()
-                            showTooltip = false
-                        }
-                    }
-                }
-            }
+            .testTag("node_header_${node.id}")
             .pointerInput(node.id, isReadOnly) {
                 if (!isReadOnly) {
-                    var lastWindowPos = Offset.Zero
-                    var lastBoardOffset = Offset.Zero
-
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            currentOnPress(node.id)
-                            lastWindowPos = layoutCoordinates?.localToWindow(offset) ?: offset
-                            lastBoardOffset = currentBoardOffset
-                        },
-                        onDragEnd = {
-                            currentOnEndMove(node.id)
-                        },
-                        onDragCancel = {
-                            currentOnEndMove(node.id)
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            val nowWindowPos = layoutCoordinates?.localToWindow(change.position) ?: change.position
-                            val nowBoardOffset = currentBoardOffset
-
-                            val winDelta = nowWindowPos - lastWindowPos
-                            val panDelta = nowBoardOffset - lastBoardOffset
-
-                            val scaledDelta = (winDelta - panDelta) / currentStateScale
-                            currentOnMove(node.id, scaledDelta, false, true)
-
-                            lastWindowPos = nowWindowPos
-                            lastBoardOffset = nowBoardOffset
+                    coroutineScope {
+                        launch {
+                            detectDragGestures(
+                                onDragStart = {
+                                    currentOnPress(node.id)
+                                },
+                                onDragEnd = {
+                                    currentOnEndMove(node.id)
+                                },
+                                onDragCancel = {
+                                    currentOnEndMove(node.id)
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    if (dragAmount != Offset.Zero) {
+                                        currentOnMove(node.id, dragAmount, false, true)
+                                    }
+                                }
+                            )
                         }
-                    )
-                }
-            }
-            .pointerInput(node.id) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
-                            currentOnPress(node.id)
+                        launch {
+                            detectTapGestures(
+                                onTap = {
+                                    currentOnPress(node.id)
+                                }
+                            )
                         }
                     }
                 }
@@ -201,7 +163,9 @@ fun NodeHeader(
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 IconButton(
                     onClick = { onExpand(node.id) },
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                    modifier = Modifier
+                        .size(ToolkitTheme.dimensions.iconMedium)
+                        .testTag("expand_button_${node.id}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.UnfoldMore,
@@ -215,7 +179,9 @@ fun NodeHeader(
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
             IconButton(
                 onClick = { onToggleCollapse(node.id) },
-                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                modifier = Modifier
+                    .size(ToolkitTheme.dimensions.iconMedium)
+                    .testTag("collapse_button_${node.id}")
             ) {
                 Icon(
                     imageVector = if (node.isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
@@ -230,7 +196,9 @@ fun NodeHeader(
             if (node is Node.SystemNode && node.systemAction.lowercase() == "load" && !isReadOnly) {
                 IconButton(
                     onClick = { onShowLoadSettings() },
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                    modifier = Modifier
+                        .size(ToolkitTheme.dimensions.iconMedium)
+                        .testTag("settings_button_${node.id}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
@@ -245,7 +213,9 @@ fun NodeHeader(
             if ((node is Node.FlowInputNode || node is Node.FlowOutputNode) && !isReadOnly) {
                 IconButton(
                     onClick = { onShowEditBoundary() },
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                    modifier = Modifier
+                        .size(ToolkitTheme.dimensions.iconMedium)
+                        .testTag("settings_button_${node.id}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
@@ -269,6 +239,7 @@ fun NodeHeader(
                     },
                     modifier = Modifier
                         .size(ToolkitTheme.dimensions.iconMedium)
+                        .testTag("delete_button_${node.id}")
                         .pointerInput(node.id) {
                             awaitPointerEventScope {
                                 while (true) {

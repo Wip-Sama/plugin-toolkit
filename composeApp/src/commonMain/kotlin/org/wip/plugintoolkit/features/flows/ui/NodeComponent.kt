@@ -1,63 +1,44 @@
 package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.ParameterRole
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.PortConstraints
+import org.wip.plugintoolkit.features.flows.ui.node.InputSectionType
+import org.wip.plugintoolkit.features.flows.ui.node.NodeInputSection
+import org.wip.plugintoolkit.features.flows.ui.node.NodeOutputSection
 import org.wip.plugintoolkit.features.flows.viewmodel.ValidationError
-import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
-import org.wip.plugintoolkit.shared.components.TooltipArea
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.node_parameters_section
-import plugintoolkit.composeapp.generated.resources.node_results_section
 
 @Composable
 fun NodeComponent(
@@ -100,8 +81,6 @@ fun NodeComponent(
     val currentOnEndMove by rememberUpdatedState(onEndMove)
     val currentOnPress by rememberUpdatedState(onPress)
 
-
-    val scope = rememberCoroutineScope()
     var showColorPicker by remember { mutableStateOf(false) }
     var activeColorInputId by remember { mutableStateOf<String?>(null) }
     var inputLocationsCollapsed by remember(node.id) { mutableStateOf(node.isCollapsed) }
@@ -120,8 +99,6 @@ fun NodeComponent(
             emptyMap()
         }
     }
-
-
 
     val (headerColor, onHeaderColor) = when (node) {
         is Node.CapabilityNode -> {
@@ -157,6 +134,7 @@ fun NodeComponent(
     Box(
         modifier = modifier
             .width(ToolkitTheme.dimensions.nodeWidth)
+            .testTag("node_card_${node.id}")
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -173,8 +151,6 @@ fun NodeComponent(
                     onHeaderColor = onHeaderColor,
                     isReady = isReady,
                     isReadOnly = isReadOnly,
-                    stateScale = stateScale,
-                    boardOffset = stateOffset,
                     onPress = currentOnPress,
                     onMove = currentOnMove,
                     onEndMove = currentOnEndMove,
@@ -187,7 +163,6 @@ fun NodeComponent(
                 )
 
                 // Body
-                // Body
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -196,26 +171,26 @@ fun NodeComponent(
                 ) {
                     val capNode = node as? Node.CapabilityNode
                     val visibleOutputs = node.outputs.filter { output ->
-                        capNode?.capability?.parameters?.get(output.id)?.role != org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
+                        capNode?.capability?.parameters?.get(output.id)?.role != ParameterRole.OUTPUT_LOCATION
                     }
                     val parameters =
-                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role.let { r -> r == null || r == org.wip.plugintoolkit.api.ParameterRole.STANDARD } }
+                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role.let { r -> r == null || r == ParameterRole.STANDARD } }
                     val inputLocations =
-                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION }
+                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == ParameterRole.INPUT_LOCATION }
                     val outputLocations =
-                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }
+                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == ParameterRole.OUTPUT_LOCATION }
 
                     val inputSections = listOf(
-                        stringResource(Res.string.node_parameters_section) to parameters,
-                        "Input Locations" to inputLocations, //TODO: localize
-                        "Output Locations" to outputLocations //TODO: localize
-                    ).filter { it.second.isNotEmpty() }
+                        Triple(InputSectionType.PARAMETERS, stringResource(Res.string.node_parameters_section), parameters),
+                        Triple(InputSectionType.INPUT_LOCATIONS, "Input Locations", inputLocations),
+                        Triple(InputSectionType.OUTPUT_LOCATIONS, "Output Locations", outputLocations)
+                    ).filter { it.third.isNotEmpty() }
 
-                    inputSections.forEachIndexed { index, (title, sectionInputs) ->
-                        val isSectionCollapsed = when (title) {
-                            "Input Locations" -> inputLocationsCollapsed
-                            "Output Locations" -> outputLocationsCollapsed
-                            else -> node.isInputsCollapsed
+                    inputSections.forEachIndexed { index, (sectionType, title, sectionInputs) ->
+                        val isSectionCollapsed = when (sectionType) {
+                            InputSectionType.INPUT_LOCATIONS -> inputLocationsCollapsed
+                            InputSectionType.OUTPUT_LOCATIONS -> outputLocationsCollapsed
+                            InputSectionType.PARAMETERS -> node.isInputsCollapsed
                         }
 
                         if (index > 0) {
@@ -226,269 +201,35 @@ fun NodeComponent(
                             )
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                when (title) {
-                                    "Input Locations" -> inputLocationsCollapsed = !inputLocationsCollapsed
-                                    "Output Locations" -> outputLocationsCollapsed = !outputLocationsCollapsed
-                                    else -> onToggleInputsCollapse(node.id)
+                        NodeInputSection(
+                            sectionType = sectionType,
+                            title = title,
+                            inputs = sectionInputs,
+                            isSectionCollapsed = isSectionCollapsed,
+                            onToggleCollapse = {
+                                when (sectionType) {
+                                    InputSectionType.INPUT_LOCATIONS -> inputLocationsCollapsed = !inputLocationsCollapsed
+                                    InputSectionType.OUTPUT_LOCATIONS -> outputLocationsCollapsed = !outputLocationsCollapsed
+                                    InputSectionType.PARAMETERS -> onToggleInputsCollapse(node.id)
                                 }
                             },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (isSectionCollapsed) {
-                                    PortCircle(
-                                        color = headerColor,
-                                        isHighlighted = false,
-                                        onDragStart = {}, onDrag = {}, onDragEnd = {},
-                                        modifier = Modifier.onGloballyPositioned { coords ->
-                                            sectionInputs.forEach { input ->
-                                                onPortPositioned(node.id, input.id, false, coords)
-                                            }
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                }
-                                Text(
-                                    title,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Toggle $title"
-                                )
-                                if (isSectionCollapsed && title == "Output Locations") {
-                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                    PortCircle(
-                                        color = headerColor,
-                                        isHighlighted = false,
-                                        onDragStart = {}, onDrag = {}, onDragEnd = {},
-                                        modifier = Modifier.onGloballyPositioned { coords ->
-                                            sectionInputs.forEach { input ->
-                                                val correspondingOutput = node.outputs.find { it.id == input.id }
-                                                if (correspondingOutput != null) {
-                                                    onPortPositioned(node.id, correspondingOutput.id, true, coords)
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        if (!isSectionCollapsed) {
-                            sectionInputs.forEach { input ->
-
-                                val currentPortValue = input.value ?: input.defaultValue
-                                val portErrors = validationErrors.filter {
-                                    (it.sourceNodeId == node.id && it.sourcePortId == input.id) ||
-                                            (it.targetNodeId == node.id && it.targetPortId == input.id)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = ToolkitTheme.dimensions.pluginIcon).padding(vertical = ToolkitTheme.spacing.extraSmall),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        PortCircle(
-                                            color = if (highlightedPortId == input.id) (highlightedPortColor
-                                                ?: headerColor) else headerColor,
-                                            isHighlighted = highlightedPortId == input.id,
-                                            onDragStart = {
-                                                if (!isReadOnly) onStartConnection(
-                                                    node.id,
-                                                    input.id,
-                                                    false
-                                                )
-                                            },
-                                            onDrag = { if (!isReadOnly) onDragConnection(it) },
-                                            onDragEnd = { if (!isReadOnly) onDropConnection(it) },
-                                            modifier = Modifier.onGloballyPositioned { coords ->
-                                                onPortPositioned(node.id, input.id, false, coords)
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            val capNode = node as? Node.CapabilityNode
-                                            val paramMetadata = capNode?.capability?.parameters?.get(input.id)
-                                            val canBeAutogenerated = paramMetadata?.autogeneratedPattern != null &&
-                                                    PathPatternResolver.canResolve(paramMetadata.autogeneratedPattern!!, capNode?.capability?.parameters?.keys ?: emptySet())
-                                            val isRequired = if (capNode != null) {
-                                                paramMetadata?.required == true && !canBeAutogenerated
-                                            } else {
-                                                input.isRequired
-                                            }
-                                            val displaySuffix = when {
-                                                isRequired -> " *"
-                                                else -> ""
-                                            }
-                                            val displayName = "${input.name}$displaySuffix"
-                                            val labelColor = if (canBeAutogenerated) {
-                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurface
-                                            }
-                                            
-                                            if (!input.description.isNullOrBlank()) {
-                                                TooltipArea(
-                                                    delayMillis = 3000,
-                                                    tooltip = {
-                                                        Text(
-                                                            text = input.description,
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-                                                ) {
-                                                    Text(
-                                                        text = displayName,
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = labelColor
-                                                    )
-                                                }
-                                            } else {
-                                                Text(
-                                                    text = displayName,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = labelColor
-                                                )
-                                            }
-                                            val inferredType = inferredTypes[Pair(node.id, input.id)] ?: input.dataType
-                                            val typeLabel =
-                                                if (input.dataType is DataType.Primitive && input.dataType.primitiveType == PrimitiveType.ANY &&
-                                                    !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)
-                                                ) {
-                                                    "${formatDataType(inferredType)} (Implied)"
-                                                } else {
-                                                    formatDataType(input.dataType)
-                                                }
-                                            Text(
-                                                text = typeLabel,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
-                                            )
-                                            val inferredSem =
-                                                inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes
-                                            if (inferredSem.isNotEmpty()) {
-                                                val first = inferredSem.first().canonicalId
-                                                val semText = if (inferredSem.size > 1) {
-                                                    "$first (+${inferredSem.size - 1} more)"
-                                                } else {
-                                                    first
-                                                }
-                                                TooltipArea(
-                                                    tooltip = {
-                                                        Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
-                                                            inferredSem.forEach { sem ->
-                                                                Text(
-                                                                    text = "• ${sem.canonicalId}",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                ) {
-                                                    Text(
-                                                        text = semText,
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                            if (portErrors.isNotEmpty()) {
-                                                Text(
-                                                    text = portErrors.first().message,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.error,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Default Value Editor
-                                    val isConnected = connectedInputPortIds.contains(input.id)
-                                    val valueModifier = if (isConnected) Modifier.alpha(0.5f) else Modifier
-
-                                    val metadata = (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)
-                                        ?: org.wip.plugintoolkit.api.ParameterMetadata(
-                                            type = input.dataType,
-                                            semanticTypes = inferredSemanticTypes[Pair(node.id, input.id)]
-                                                ?: input.semanticTypes,
-                                            description = input.description ?: "",
-                                            required = input.isRequired,
-                                            defaultValue = input.defaultValue?.let {
-                                                org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(
-                                                    it
-                                                )
-                                            }
-                                        )
-
-                                    Box(
-                                        modifier = Modifier
-                                            .width(ToolkitTheme.dimensions.widthLarge)
-                                            .then(valueModifier)
-                                            .onFocusChanged { if (!it.isFocused) onFocusLost() }
-                                    ) {
-                                        org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput(
-                                            name = "",
-                                            metadata = metadata,
-                                            value = getPortValueString(currentPortValue, input.dataType),
-                                            onValueChange = { newValue ->
-                                                onUpdateValue(
-                                                    node.id,
-                                                    input.id,
-                                                    org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(
-                                                        newValue,
-                                                        input.dataType
-                                                    )
-                                                )
-                                            },
-                                            enabled = !isConnected && !isReadOnly,
-                                            isAutoGenerated = metadata.autogeneratedPattern != null,
-                                            providedSettings = providedSettings,
-                                            compact = true
-                                        )
-                                    }
-
-                                    val correspondingOutput = node.outputs.find { it.id == input.id }
-                                    val isOutputLocation =
-                                        (node as? Node.CapabilityNode)?.capability?.parameters?.get(input.id)?.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION
-                                    if (isOutputLocation && correspondingOutput != null) {
-                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                        PortCircle(
-                                            color = if (highlightedPortId == correspondingOutput.id) (highlightedPortColor
-                                                ?: headerColor) else headerColor,
-                                            isHighlighted = highlightedPortId == correspondingOutput.id,
-                                            onDragStart = {
-                                                if (!isReadOnly) onStartConnection(
-                                                    node.id,
-                                                    correspondingOutput.id,
-                                                    true
-                                                )
-                                            },
-                                            onDrag = { if (!isReadOnly) onDragConnection(it) },
-                                            onDragEnd = { if (!isReadOnly) onDropConnection(it) },
-                                            modifier = Modifier.onGloballyPositioned { coords ->
-                                                onPortPositioned(node.id, correspondingOutput.id, true, coords)
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                            node = node,
+                            headerColor = headerColor,
+                            connectedInputPortIds = connectedInputPortIds,
+                            inferredTypes = inferredTypes,
+                            inferredSemanticTypes = inferredSemanticTypes,
+                            validationErrors = validationErrors,
+                            providedSettings = providedSettings,
+                            highlightedPortId = highlightedPortId,
+                            highlightedPortColor = highlightedPortColor,
+                            isReadOnly = isReadOnly,
+                            onStartConnection = onStartConnection,
+                            onDragConnection = onDragConnection,
+                            onDropConnection = onDropConnection,
+                            onPortPositioned = onPortPositioned,
+                            onUpdateValue = onUpdateValue,
+                            onFocusLost = onFocusLost
+                        )
                     }
 
                     if (node.inputs.isNotEmpty() && visibleOutputs.isNotEmpty()) {
@@ -500,146 +241,26 @@ fun NodeComponent(
                     }
 
                     // Outputs Section
-                    if (visibleOutputs.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable { onToggleOutputsCollapse(node.id) },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                stringResource(Res.string.node_results_section),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (node.isOutputsCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Toggle Outputs" //TODO: localize
-                                )
-                                if (node.isOutputsCollapsed) {
-                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                    PortCircle(
-                                        color = headerColor,
-                                        isHighlighted = false,
-                                        onDragStart = {}, onDrag = {}, onDragEnd = {},
-                                        modifier = Modifier.onGloballyPositioned { coords ->
-                                            node.outputs.forEach { output ->
-                                                onPortPositioned(node.id, output.id, true, coords)
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    if (!node.isOutputsCollapsed) {
-                        visibleOutputs.forEach { output ->
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth().heightIn(min = ToolkitTheme.dimensions.pluginIcon).padding(vertical = ToolkitTheme.spacing.extraSmall),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
-                                    if (!output.description.isNullOrBlank()) {
-                                        TooltipArea(
-                                            delayMillis = 3000,
-                                            tooltip = {
-                                                Text(
-                                                    text = output.description,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        ) {
-                                            Text(
-                                                output.name,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    } else {
-                                        Text(
-                                            output.name,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                    val inferredType = inferredTypes[Pair(node.id, output.id)] ?: output.dataType
-                                    val typeLabel =
-                                        if (output.dataType is DataType.Primitive && output.dataType.primitiveType == PrimitiveType.ANY &&
-                                            !(inferredType is DataType.Primitive && inferredType.primitiveType == PrimitiveType.ANY)
-                                        ) {
-                                            "${formatDataType(inferredType)} (Implied)"
-                                        } else {
-                                            formatDataType(output.dataType)
-                                        }
-                                    Text(
-                                        text = typeLabel,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
-                                    )
-                                    val inferredSem =
-                                        inferredSemanticTypes[Pair(node.id, output.id)] ?: output.semanticTypes
-                                    if (inferredSem.isNotEmpty()) {
-                                        val first = inferredSem.first().canonicalId
-                                        val semText = if (inferredSem.size > 1) {
-                                            "$first (+${inferredSem.size - 1} more)"
-                                        } else {
-                                            first
-                                        }
-                                        TooltipArea(
-                                            tooltip = {
-                                                Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
-                                                    inferredSem.forEach { sem ->
-                                                        Text(
-                                                            text = "• ${sem.canonicalId}",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        ) {
-                                            Text(
-                                                text = semText,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                    val portErrors = validationErrors.filter {
-                                        (it.sourceNodeId == node.id && it.sourcePortId == output.id) ||
-                                                (it.targetNodeId == node.id && it.targetPortId == output.id)
-                                    }
-                                    if (portErrors.isNotEmpty()) {
-                                        Text(
-                                            text = portErrors.first().message,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                                PortCircle(
-                                    color = if (highlightedPortId == output.id) (highlightedPortColor
-                                        ?: headerColor) else headerColor,
-                                    isHighlighted = highlightedPortId == output.id,
-                                    onDragStart = { if (!isReadOnly) onStartConnection(node.id, output.id, true) },
-                                    onDrag = { if (!isReadOnly) onDragConnection(it) },
-                                    onDragEnd = { if (!isReadOnly) onDropConnection(it) },
-                                    modifier = Modifier.onGloballyPositioned { coords ->
-                                        onPortPositioned(node.id, output.id, true, coords)
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    NodeOutputSection(
+                        outputs = visibleOutputs,
+                        isOutputsCollapsed = node.isOutputsCollapsed,
+                        onToggleOutputsCollapse = { onToggleOutputsCollapse(node.id) },
+                        node = node,
+                        headerColor = headerColor,
+                        inferredTypes = inferredTypes,
+                        inferredSemanticTypes = inferredSemanticTypes,
+                        validationErrors = validationErrors,
+                        highlightedPortId = highlightedPortId,
+                        highlightedPortColor = highlightedPortColor,
+                        isReadOnly = isReadOnly,
+                        onStartConnection = onStartConnection,
+                        onDragConnection = onDragConnection,
+                        onDropConnection = onDropConnection,
+                        onPortPositioned = onPortPositioned
+                    )
                 }
             }
         }
-
     }
 
     NodeDialogs(
@@ -660,5 +281,3 @@ fun NodeComponent(
         onUpdateSystemNodeSettings = onUpdateSystemNodeSettings
     )
 }
-
-

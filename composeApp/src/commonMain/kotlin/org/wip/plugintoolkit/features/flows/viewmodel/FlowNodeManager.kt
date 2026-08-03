@@ -58,10 +58,13 @@ class FlowNodeManager {
             if (newPos != n.position) n.copyWithPosition(newPos) else n
         }
 
-        val newFlow = currentState.flow.copy(nodes = updatedNodes)
+        val reorderedNodes = updatedNodes.filter { !nodesToMove.contains(it.id) } + updatedNodes.filter { nodesToMove.contains(it.id) }
+        val newFlow = currentState.flow.copy(nodes = reorderedNodes)
+        val newSelection = if (isSelectedGroupMove) currentState.selectedNodeIds else setOf(id)
 
         return currentState.copy(
             flow = newFlow,
+            selectedNodeIds = newSelection,
             hasUnsavedChanges = true,
             draggedNodeId = null,
             currentDragOffset = Offset.Zero,

@@ -28,8 +28,8 @@ class JobViewModelTest {
             this.settings = settings
         }
 
-        override fun getSettingsDir(): String = "/tmp"
-        override fun getJobsDir(): String = "/tmp/jobs"
+        override fun getSettingsDir(): String = System.getProperty("java.io.tmpdir")
+        override fun getJobsDir(): String = System.getProperty("java.io.tmpdir") + "/jobs"
         override fun openLogFolder() {}
         override fun openLatestLog() {}
     }

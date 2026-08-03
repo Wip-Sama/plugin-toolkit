@@ -63,6 +63,8 @@ kotlin {
             implementation(libs.ktor.client.cio)
             implementation(libs.slf4j.simple)
             implementation(libs.kotlinx.datetime)
+        }
+        jvmTest.dependencies {
             implementation(libs.compose.ui.test.junit4)
         }
     }

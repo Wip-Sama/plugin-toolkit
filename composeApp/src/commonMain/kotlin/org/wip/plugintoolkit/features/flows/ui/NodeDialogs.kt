@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
@@ -76,6 +77,7 @@ fun NodeDialogs(
 ) {
     if (showDeleteConfirmation) {
         AlertDialog(
+            modifier = Modifier.testTag("delete_confirm_dialog"),
             onDismissRequest = onDismissDelete,
             title = { Text(stringResource(Res.string.node_delete_title)) },
             text = { Text(stringResource(Res.string.node_delete_confirm, node.title)) },
