@@ -65,12 +65,15 @@ class CompleteExampleTest {
     }
 
     @Test
-    fun testPluginValidationSuccess() {
-        val settings = CompleteExampleSettings(secretToken = "valid_token")
+    fun testLifecycleHooks() {
+        val settings = CompleteExampleSettings()
         val plugin = CompleteExamplePlugin(settings)
-        val context = TestPluginContext()
-        val result = plugin.validate(context.logger, context)
-        assertTrue(result.isSuccess)
+        val logger = FakePluginLogger()
+        val context = TestPluginContext(logger = logger)
+
+        assertTrue(plugin.onLoad(logger).isSuccess)
+        assertTrue(plugin.validate(logger, context).isSuccess)
+        assertTrue(plugin.onUpdate(logger, context).isSuccess)
     }
 
     @Test
@@ -121,6 +124,32 @@ class CompleteExampleTest {
             tempInput.delete()
             tempOutput.delete()
         }
+    }
+
+    @Test
+    fun testCapabilityWithFileDefaults() {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+
+        val result = plugin.capabilityWithFileDefaults()
+        assertTrue(result.contains("default_input.txt"))
+        assertTrue(result.contains("default_output.txt"))
+    }
+
+    @Test
+    fun testCapabilityWithComplexObjectsAndSemanticTypes() {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+        val inputPacket = UserDataPacket("pkt_001", 85.0, listOf("v1", "test"))
+
+        val paletteResult = plugin.capabilityWithComplexObjectsAndSemanticTypes(
+            packet = inputPacket,
+            baseColor = "rgb(100, 150, 200)"
+        )
+
+        assertEquals("rgb(100, 150, 200)", paletteResult.primaryColor)
+        assertEquals("rgb(255, 255, 255)", paletteResult.accentColor)
+        assertEquals(95.0, paletteResult.packet.score)
     }
 
     @Test

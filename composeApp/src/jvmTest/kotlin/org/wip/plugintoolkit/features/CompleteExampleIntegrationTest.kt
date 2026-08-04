@@ -27,6 +27,12 @@ class CompleteExampleIntegrationTest {
         assertEquals("org.wip.complete", manifest.plugin.id)
         assertEquals("Complete Example Plugin", manifest.plugin.name)
 
+        // Verify lifecycle handlers and changelog/migrations presence in manifest
+        assertTrue(manifest.hasSetupHandler, "hasSetupHandler should be true")
+        assertTrue(manifest.hasUpdateHandler, "hasUpdateHandler should be true")
+        assertTrue(manifest.hasMigrations, "hasMigrations should be true")
+        assertNotNull(manifest.changelog, "changelog should be present in manifest")
+
         // Verify capability with flow context
         val flowCap = manifest.capabilities.find { it.name == "capabilityWithFlowContext" }
         assertNotNull(flowCap, "capabilityWithFlowContext should be present in manifest")
@@ -35,5 +41,13 @@ class CompleteExampleIntegrationTest {
         val pauseCap = manifest.capabilities.find { it.name == "capabilityWithPauseResume" }
         assertNotNull(pauseCap, "capabilityWithPauseResume should be present in manifest")
         assertTrue(pauseCap.isPausable, "capabilityWithPauseResume must support pause")
+
+        // Verify capability with file defaults
+        val fileDefCap = manifest.capabilities.find { it.name == "capabilityWithFileDefaults" }
+        assertNotNull(fileDefCap, "capabilityWithFileDefaults should be present in manifest")
+
+        // Verify capability with complex objects and semantic types
+        val complexCap = manifest.capabilities.find { it.name == "capabilityWithComplexObjectsAndSemanticTypes" }
+        assertNotNull(complexCap, "capabilityWithComplexObjectsAndSemanticTypes should be present in manifest")
     }
 }

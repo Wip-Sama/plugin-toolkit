@@ -1,0 +1,21 @@
+{
+  "migrations": [
+    {
+      "fromVersion": "0.9.0",
+      "toVersion": "1.0.0",
+      "capabilityMigrations": [
+        {
+          "oldName": "legacy_process",
+          "newName": "capabilityWithFileAccess",
+          "isDropInReplacement": true
+        }
+      ],
+      "settingMigrations": [
+        {
+          "oldName": "legacy_api_key",
+          "newName": "apiKey"
+        }
+      ]
+    }
+  ]
+}
