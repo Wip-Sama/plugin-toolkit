@@ -113,7 +113,8 @@ class PluginLifecycleManagerTest {
                 name = "Test",
                 version = "1.0.0",
                 installPath = "/tmp/test.plugin",
-                isEnabled = true
+                isEnabled = true,
+                targetAppVersion = "2.0.0"
             )
         )
 

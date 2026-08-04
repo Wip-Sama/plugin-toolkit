@@ -421,7 +421,14 @@ fun PluginCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (plugin.loadError != null) {
+                if (!plugin.isCompatible && plugin.compatibilityError != null) {
+                    Text(
+                        plugin.compatibilityError,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
+                    )
+                } else if (plugin.loadError != null) {
                     Text(
                         plugin.loadError,
                         style = MaterialTheme.typography.labelSmall,

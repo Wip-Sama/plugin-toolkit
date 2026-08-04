@@ -23,6 +23,7 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
+import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.persistentMapOf
@@ -78,10 +79,11 @@ class PluginLifecycleManager(
             return Result.success(Unit)
         }
 
-        if (!plugin.isCompatible) {
-            val errorMsg = plugin.compatibilityError ?: "Plugin is incompatible with the current app version"
+        val (isComp, compError) = PluginCompatibilityUtils.checkCompatibility(plugin)
+        if (!isComp || !plugin.isCompatible) {
+            val errorMsg = compError ?: plugin.compatibilityError ?: "Plugin is incompatible with the current app version"
             Logger.w { "Cannot load plugin $pkg: $errorMsg" }
-            updateLoadError(pkg, errorMsg)
+            registry.updatePlugin(pkg) { it.copy(isCompatible = false, compatibilityError = compError ?: it.compatibilityError) }
             return Result.failure(Exception(errorMsg))
         }
 

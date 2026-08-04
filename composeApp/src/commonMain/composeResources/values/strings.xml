@@ -328,6 +328,9 @@
     <string name="node_semantic_type_label">Semantic Type / Mimetype (optional)</string>
     <string name="node_semantic_type_placeholder">e.g. image/png</string>
     <string name="palette_search_placeholder">Search nodes...</string>
+    <string name="search_capabilities_placeholder">Search capabilities...</string>
+    <string name="search_plugins_placeholder">Search plugins...</string>
+    <string name="action_back">Back</string>
     <string name="palette_tab_plugins">Plugins</string>
     <string name="palette_tab_system">System</string>
     <string name="palette_tab_flows">Flows</string>

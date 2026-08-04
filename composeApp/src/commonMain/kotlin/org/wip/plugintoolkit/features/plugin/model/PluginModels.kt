@@ -19,7 +19,8 @@ data class InstalledPlugin(
     val requiredAction: String? = null,
     val configurationPrompted: Boolean = false,
     val signaturePrompted: Boolean = false,
-    val supportedOs: List<org.wip.plugintoolkit.api.OS> = emptyList()
+    val supportedOs: List<org.wip.plugintoolkit.api.OS> = emptyList(),
+    val targetAppVersion: String? = null
 )
 
 sealed class InstallationSource {

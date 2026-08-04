@@ -330,6 +330,9 @@
 
     <!-- Palette Sidebar -->
     <string name="palette_search_placeholder">Cerca nodi...</string>
+    <string name="search_capabilities_placeholder">Cerca funzionalità...</string>
+    <string name="search_plugins_placeholder">Cerca plugin...</string>
+    <string name="action_back">Indietro</string>
     <string name="palette_tab_plugins">Plugin</string>
     <string name="palette_tab_system">Sistema</string>
     <string name="palette_tab_flows">Flussi</string>

@@ -65,13 +65,11 @@ class JobViewModelTest {
             var runningList = emptyList<BackgroundJob>()
             var pausedList = emptyList<BackgroundJob>()
 
-            val collectorRunning = backgroundScope.launch { viewModel.runningJobs.collect { runningList = it } }
-            val collectorPaused = backgroundScope.launch { viewModel.pausedJobs.collect { pausedList = it } }
-            testScheduler.advanceUntilIdle()
+            val collectorRunning = backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) { viewModel.runningJobs.collect { runningList = it } }
+            val collectorPaused = backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) { viewModel.pausedJobs.collect { pausedList = it } }
 
             jobManager.enqueueJob(runningJob)
             jobManager.enqueueJob(pausedJob)
-            kotlinx.coroutines.delay(200)
             testScheduler.advanceUntilIdle()
 
             assertTrue(runningList.any { it.id == "job-running" })

@@ -14,6 +14,8 @@ Changes:
   - PluginStorage to give plugins a way to have custom persistent data
   - Actions can have parameters
   - Dynamic locks to expand on how a plugin unlocks its features 
+  - Plugin Capabilities are now scrollable and searchable
+  - Enforced minAppVersion on local installations too
 Added:
   - Whitelist/Blacklist folder for plugin access with additional Unrestricted mode
   - New mechanism and dialogs for managing jar signatures

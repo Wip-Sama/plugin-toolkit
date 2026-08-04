@@ -82,7 +82,8 @@ class PluginScanner(
                                         description = manifest.plugin.description,
                                         isCompatible = isCompatible,
                                         compatibilityError = compError,
-                                        supportedOs = manifest.plugin.supportedOs
+                                        supportedOs = manifest.plugin.supportedOs,
+                                        targetAppVersion = manifest.requirements.targetAppVersion
                                     )
                                 } else {
                                     folderChanged = true
@@ -95,7 +96,8 @@ class PluginScanner(
                                         description = manifest.plugin.description,
                                         isCompatible = isCompatible,
                                         compatibilityError = compError,
-                                        supportedOs = manifest.plugin.supportedOs
+                                        supportedOs = manifest.plugin.supportedOs,
+                                        targetAppVersion = manifest.requirements.targetAppVersion
                                     )
                                 }
                                 folderPlugins.add(updatedPlugin)

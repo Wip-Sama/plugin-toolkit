@@ -69,7 +69,8 @@ class PluginInstaller(
                 isValidated = false,
                 isCompatible = isCompatible,
                 compatibilityError = compError,
-                supportedOs = manifest?.plugin?.supportedOs ?: emptyList()
+                supportedOs = manifest?.plugin?.supportedOs ?: emptyList(),
+                targetAppVersion = manifest?.requirements?.targetAppVersion
             )
 
             registry.addOrUpdatePlugin(newPlugin)
@@ -160,7 +161,8 @@ class PluginInstaller(
                 compatibilityError = compError,
                 requiredAction = if (!isSignatureValid) "CONFIRM_SIGNATURE" else null,
                 loadError = if (!isSignatureValid) "Invalid Signature" else null,
-                supportedOs = manifest?.plugin?.supportedOs ?: emptyList()
+                supportedOs = manifest?.plugin?.supportedOs ?: emptyList(),
+                targetAppVersion = manifest?.requirements?.targetAppVersion ?: plugin.minAppVersion
             )
             registry.addOrUpdatePlugin(newPlugin)
             Logger.i { "Successfully installed remote plugin: ${plugin.pkg}" }

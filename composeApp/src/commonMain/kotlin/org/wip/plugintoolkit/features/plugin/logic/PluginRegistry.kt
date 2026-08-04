@@ -12,7 +12,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 
 /**
@@ -82,19 +84,56 @@ class PluginRegistry(
      */
     suspend fun loadFromManagedFolders() = withContext(loomDispatcher) {
         val allPlugins = mutableListOf<InstalledPlugin>()
+        var diskUpdateNeeded = false
+
         getManagedFolders().forEach { folderPath ->
             val file = "${normalizePath(folderPath)}/${appConfig.INSTALLED_PLUGINS_FILE_NAME}"
             val content = PlatformUtils.readFile(file)
             if (content != null) {
                 try {
                     val folderPlugins = json.decodeFromString<List<InstalledPlugin>>(content)
-                    allPlugins.addAll(folderPlugins)
+                    val validatedPlugins = folderPlugins.map { plugin ->
+                        val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
+                        val jarFile = "${plugin.installPath}/$jarFileName"
+
+                        val manifest = if (plugin.targetAppVersion == null && PlatformUtils.exists(jarFile)) {
+                            val manifestContent = PlatformUtils.readFileFromZip(jarFile, "manifest.json")
+                                ?: PlatformUtils.readFileFromZip(jarFile, "META-INF/manifest.json")
+                            manifestContent?.let {
+                                try { json.decodeFromString<PluginManifest>(it) } catch (e: Exception) { null }
+                            }
+                        } else null
+
+                        val updatedTargetAppVersion = plugin.targetAppVersion ?: manifest?.requirements?.targetAppVersion
+                        val updatedSupportedOs = if (plugin.supportedOs.isEmpty() && manifest != null) manifest.plugin.supportedOs else plugin.supportedOs
+
+                        val (isComp, compError) = PluginCompatibilityUtils.checkCompatibility(
+                            plugin.copy(targetAppVersion = updatedTargetAppVersion, supportedOs = updatedSupportedOs),
+                            manifest
+                        )
+
+                        if (plugin.isCompatible != isComp || plugin.compatibilityError != compError || plugin.targetAppVersion != updatedTargetAppVersion) {
+                            diskUpdateNeeded = true
+                            plugin.copy(
+                                isCompatible = isComp,
+                                compatibilityError = compError,
+                                targetAppVersion = updatedTargetAppVersion,
+                                supportedOs = updatedSupportedOs
+                            )
+                        } else {
+                            plugin
+                        }
+                    }
+                    allPlugins.addAll(validatedPlugins)
                 } catch (t: Throwable) {
                     Logger.e(t) { "Failed to parse $file" }
                 }
             }
         }
         _installedPlugins.update { allPlugins }
+        if (diskUpdateNeeded) {
+            saveToManagedFolders(allPlugins)
+        }
         Logger.d { "Loaded ${_installedPlugins.value.size} plugins from managed folders" }
     }
 
