@@ -184,7 +184,8 @@ sealed class DataType {
         val className: String,
         val options: List<String>,
         val namespace: String? = null,
-        val optionRequirements: Map<String, List<String>> = emptyMap()
+        val optionRequirements: Map<String, List<String>> = emptyMap(),
+        val optionLockRequirements: Map<String, List<String>> = emptyMap()
     ) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
             if (value == null || value is JsonNull) return false
@@ -529,6 +530,7 @@ data class Capability(
     val isCancellable: Boolean = true,
     val context: CapabilityContext = CapabilityContext.ANY,
     val requiresSettings: List<String> = emptyList(),
+    val requiredLocks: List<String> = emptyList(),
     val fileAccess: FileAccess? = null
 ) {
     /**
@@ -560,6 +562,7 @@ object CapabilitySerializer : KSerializer<Capability> {
             isCancellable = value.isCancellable,
             context = value.context,
             requiresSettings = value.requiresSettings,
+            requiredLocks = value.requiredLocks,
             fileAccess = value.fileAccess
         )
         encoder.encodeSerializableValue(CapabilitySurrogate.serializer(), surrogate)
@@ -594,6 +597,7 @@ object CapabilitySerializer : KSerializer<Capability> {
             isCancellable = surrogate.isCancellable,
             context = surrogate.context,
             requiresSettings = surrogate.requiresSettings,
+            requiredLocks = surrogate.requiredLocks,
             fileAccess = surrogate.fileAccess
         )
     }
@@ -612,6 +616,7 @@ private class CapabilitySurrogate(
     val isCancellable: Boolean = true,
     val context: CapabilityContext = CapabilityContext.ANY,
     val requiresSettings: List<String> = emptyList(),
+    val requiredLocks: List<String> = emptyList(),
     val fileAccess: FileAccess? = null
 )
 
@@ -622,6 +627,7 @@ private class CapabilitySurrogate(
 data class PluginAction(
     val name: String,
     val description: String,
-    val functionName: String
+    val functionName: String,
+    val parameters: Map<String, ParameterMetadata>? = null
 )
 

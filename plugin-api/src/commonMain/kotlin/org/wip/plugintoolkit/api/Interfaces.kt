@@ -167,6 +167,17 @@ interface PluginFileSystem : ScopedFileSystem {
 }
 
 /**
+ * Interface for key-value plugin data storage.
+ * Allows plugins to persist internal data without exposing it as user-configurable settings.
+ */
+interface PluginStorage {
+    suspend fun get(key: String): JsonElement?
+    suspend fun put(key: String, value: JsonElement)
+    suspend fun getAll(): Map<String, JsonElement>
+    suspend fun remove(key: String)
+}
+
+/**
  * File system interface for temporary execution storage (e.g. job sandboxes).
  */
 interface ExecutionFileSystem : ScopedFileSystem
@@ -341,6 +352,7 @@ interface PluginContext {
     val executionFileSystem: ExecutionFileSystem
     val hostFileSystem: HostFileSystem
     val settings: Map<String, JsonElement>
+    val storage: PluginStorage
     val signals: PluginSignalManager
 
     /**
@@ -431,9 +443,23 @@ interface DataProcessor {
     /**
      * Run a custom action.
      * @param action The metadata of the action to call.
+     * @param parameters The map of parameters provided for this action execution.
      * @param context The execution context.
      */
-    suspend fun runAction(action: PluginAction, context: PluginContext): Result<Unit> {
+    suspend fun runAction(
+        action: PluginAction,
+        parameters: Map<String, JsonElement> = emptyMap(),
+        context: PluginContext
+    ): Result<Unit> {
         return Result.failure(NotImplementedError("runAction not implemented"))
+    }
+
+    /**
+     * Evaluate custom lock/unlock conditions defined by the plugin.
+     * @param context The execution context.
+     * @return Map of lock keys to boolean state (true = unlocked/satisfied, false = locked).
+     */
+    suspend fun checkLocks(context: PluginContext): Map<String, Boolean> {
+        return emptyMap()
     }
 }

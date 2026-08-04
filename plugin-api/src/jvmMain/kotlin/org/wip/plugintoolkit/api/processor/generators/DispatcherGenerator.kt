@@ -37,7 +37,8 @@ object DispatcherGenerator {
         packageName: String,
         baseClassName: String,
         functions: List<KSFunctionDeclaration>,
-        actions: List<KSFunctionDeclaration>
+        actions: List<KSFunctionDeclaration>,
+        classDeclaration: com.google.devtools.ksp.symbol.KSClassDeclaration
     ): TypeSpec {
         val dispatcherType = TypeSpec.classBuilder(dispatcherName)
             .addSuperinterface(CN_DATA_PROCESSOR)
@@ -248,10 +249,12 @@ object DispatcherGenerator {
         dispatcherType.addFunction(processFunc.build())
 
         // RunAction
+        val jsonElementType = ClassName("kotlinx.serialization.json", "JsonElement")
+        val paramsMapType = CN_MAP.parameterizedBy(String::class.asClassName(), jsonElementType)
         val actionMapType = CN_MAP.parameterizedBy(
             String::class.asClassName(),
             LambdaTypeName.get(
-                parameters = listOf(ParameterSpec.unnamed(CN_PLUGIN_CONTEXT)),
+                parameters = listOf(ParameterSpec.unnamed(paramsMapType), ParameterSpec.unnamed(CN_PLUGIN_CONTEXT)),
                 returnType = CN_RESULT.parameterizedBy(Unit::class.asClassName())
             ).copy(suspending = true)
         )
@@ -261,10 +264,11 @@ object DispatcherGenerator {
         actionMapCode.indent()
         actions.forEachIndexed { index, func ->
             val methodName = func.simpleName.asString()
-            actionMapCode.add("%S to { context ->\n", methodName.lowercase())
+            actionMapCode.add("%S to { actionParams, context ->\n", methodName.lowercase())
             actionMapCode.indent()
             val actParams = func.parameters
             val actArgs = actParams.joinToString(", ") { param ->
+                val paramName = param.name?.asString() ?: ""
                 val paramType = param.type.resolve().toTypeName()
                 when (paramType) {
                     CN_PLUGIN_FILESYSTEM -> "context.fileSystem"
@@ -273,7 +277,7 @@ object DispatcherGenerator {
                     CN_PLUGIN_LOGGER -> "context.logger"
                     CN_PROGRESS_REPORTER -> "context.progress"
                     CN_PLUGIN_CONTEXT -> "context"
-                    else -> param.name?.asString() ?: ""
+                    else -> "actionParams[\"$paramName\"]?.let { %T.decodeFromJsonElement(it) } as %T".format(CN_JSON, paramType)
                 }
             }
             actionMapCode.add("runCatching { processor.%L($actArgs) }\n", methodName)
@@ -294,6 +298,7 @@ object DispatcherGenerator {
         val runActionFunc = FunSpec.builder("runAction")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("action", CN_PLUGIN_ACTION)
+            .addParameter("parameters", paramsMapType)
             .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(CN_RESULT.parameterizedBy(Unit::class.asClassName()))
             .addStatement(
@@ -301,9 +306,25 @@ object DispatcherGenerator {
                 CN_RESULT,
                 CN_ILLEGAL_ARGUMENT_EXCEPTION
             )
-            .addStatement("return handler(context)")
+            .addStatement("return handler(parameters, context)")
 
         dispatcherType.addFunction(runActionFunc.build())
+
+        val checkLocksFunction = classDeclaration.getAllFunctions()
+            .find { it.simpleName.asString() == "checkLocks" }
+
+        val checkLocksFunc = FunSpec.builder("checkLocks")
+            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+            .addParameter("context", CN_PLUGIN_CONTEXT)
+            .returns(CN_MAP.parameterizedBy(String::class.asClassName(), Boolean::class.asClassName()))
+
+        if (checkLocksFunction != null) {
+            checkLocksFunc.addStatement("return processor.%L(context)", checkLocksFunction.simpleName.asString())
+        } else {
+            checkLocksFunc.addStatement("return emptyMap()")
+        }
+
+        dispatcherType.addFunction(checkLocksFunc.build())
 
         return dispatcherType.build()
     }

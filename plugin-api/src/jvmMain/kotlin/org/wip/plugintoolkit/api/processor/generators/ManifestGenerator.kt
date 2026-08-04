@@ -362,13 +362,53 @@ object ManifestGenerator {
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
 
-            actionsCode.add(
-                "%T(name = %S, description = %S, functionName = %S)",
-                CN_PLUGIN_ACTION,
-                actName,
-                actDesc,
-                func.simpleName.asString()
-            )
+            val nonInfraParams = func.parameters.filter { param ->
+                val paramType = param.type.resolve().toTypeName()
+                INFRASTRUCTURE_TYPES.none { it == paramType }
+            }
+
+            if (nonInfraParams.isEmpty()) {
+                actionsCode.add(
+                    "%T(name = %S, description = %S, functionName = %S)",
+                    CN_PLUGIN_ACTION,
+                    actName,
+                    actDesc,
+                    func.simpleName.asString()
+                )
+            } else {
+                val actionParamsCode = CodeBlock.builder()
+                actionParamsCode.add("mapOf(\n")
+                actionParamsCode.indent()
+                nonInfraParams.forEachIndexed { pIndex, param ->
+                    val paramNameStr = param.name?.asString() ?: ""
+                    val paramType = param.type.resolve().toTypeName()
+                    val isNullable = param.type.resolve().isMarkedNullable
+                    val hasDefault = param.hasDefault
+                    val required = !isNullable && !hasDefault
+
+                    actionParamsCode.add(
+                        "%S to %T(description = %S, type = %M<%T>(), required = %L)",
+                        paramNameStr,
+                        CN_PARAMETER_METADATA,
+                        "",
+                        MN_GET_DATA_TYPE,
+                        paramType,
+                        required
+                    )
+                    if (pIndex < nonInfraParams.size - 1) actionParamsCode.add(",\n") else actionParamsCode.add("\n")
+                }
+                actionParamsCode.unindent()
+                actionParamsCode.add(")")
+
+                actionsCode.add(
+                    "%T(name = %S, description = %S, functionName = %S, parameters = %L)",
+                    CN_PLUGIN_ACTION,
+                    actName,
+                    actDesc,
+                    func.simpleName.asString(),
+                    actionParamsCode.build()
+                )
+            }
             if (index < actions.size - 1) actionsCode.add(",\n") else actionsCode.add("\n")
         }
         actionsCode.unindent()

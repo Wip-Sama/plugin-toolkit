@@ -56,7 +56,7 @@ object KotlinGenerator {
 
         // 2. Generate Dispatcher Class
         val dispatcherType = DispatcherGenerator.generateDispatcherClass(
-            dispatcherName, packageName, baseClassName, functions, actions
+            dispatcherName, packageName, baseClassName, functions, actions, classDeclaration
         )
         fileSpec.addType(dispatcherType)
 

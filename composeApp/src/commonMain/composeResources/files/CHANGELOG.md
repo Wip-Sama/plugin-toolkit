@@ -1,4 +1,4 @@
-Version: 1.7.4
+Version: 2.0.0
 Date: 01-08-2026
 Changes:
   - The cancel button in job operation is now disabled in non-cancelable phases
@@ -10,7 +10,10 @@ Changes:
   - Support for parallel state transitions for distinct plugins
   - Strengthened path traversal checks
   - Extended future backwards compatibility with plugins in some cases
-  - Minor UI optimizations
+  - Minor GUI optimizations
+  - PluginStorage to give plugins a way to have custom persistent data
+  - Actions can have parameters
+  - Dynamic locks to expand on how a plugin unlocks its features 
 Added:
   - Whitelist/Blacklist folder for plugin access with additional Unrestricted mode
   - New mechanism and dialogs for managing jar signatures

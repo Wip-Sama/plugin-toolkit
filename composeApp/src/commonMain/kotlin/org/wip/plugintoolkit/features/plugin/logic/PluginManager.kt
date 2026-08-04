@@ -25,6 +25,7 @@ class PluginManager(
     val installedPlugins: StateFlow<List<InstalledPlugin>> = registry.installedPlugins
     val loadedPlugins: StateFlow<Set<String>> = lifecycleManager.loadedPlugins
     val isRegistryReady: StateFlow<Boolean> = registry.isReady
+    val pluginLocksState: StateFlow<Map<String, Map<String, Boolean>>> = lifecycleManager.pluginLocksState
 
     init {
         Logger.i { "Initializing PluginManager facade" }
@@ -145,7 +146,11 @@ class PluginManager(
 
     suspend fun rerunSetup(pkg: String) = coordinator.rerunSetup(pkg, installer)
 
-    suspend fun runAction(pkg: String, action: PluginAction) = coordinator.runAction(pkg, action)
+    suspend fun runAction(
+        pkg: String,
+        action: PluginAction,
+        parameters: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap()
+    ) = coordinator.runAction(pkg, action, parameters)
 
     suspend fun enqueueUpdateJob(pkg: String) = coordinator.enqueueUpdateJob(pkg)
 

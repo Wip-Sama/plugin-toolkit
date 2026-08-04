@@ -24,11 +24,18 @@ class PluginSettingsViewModel(
 
     val manifest = pluginManager.getManifest(pkg)
 
+    val locks = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+
     init {
         viewModelScope.launch {
             jobManager.jobs.collect { jobs ->
                 val busy = jobs.any { it.pluginId == pkg && it.status == JobStatus.Running }
                 _isBusy.value = busy
+            }
+        }
+        viewModelScope.launch {
+            pluginManager.pluginLocksState.collect { map ->
+                locks.value = map[pkg] ?: emptyMap()
             }
         }
     }
@@ -56,11 +63,11 @@ class PluginSettingsViewModel(
         }
     }
 
-    fun runAction(actionName: String) {
+    fun runAction(actionName: String, parameters: Map<String, JsonElement> = emptyMap()) {
         viewModelScope.launch {
             val action = manifest?.actions?.find { it.functionName == actionName || it.name == actionName }
             if (action != null) {
-                pluginManager.runAction(pkg, action)
+                pluginManager.runAction(pkg, action, parameters)
             }
         }
     }

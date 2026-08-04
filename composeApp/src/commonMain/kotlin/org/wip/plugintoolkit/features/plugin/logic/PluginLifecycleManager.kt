@@ -40,6 +40,9 @@ class PluginLifecycleManager(
     private val _loadedPlugins = MutableStateFlow<Set<String>>(emptySet())
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
 
+    private val _pluginLocksState = MutableStateFlow<Map<String, Map<String, Boolean>>>(emptyMap())
+    val pluginLocksState: StateFlow<Map<String, Map<String, Boolean>>> = _pluginLocksState.asStateFlow()
+
     // Cache for decrypted plugin settings to avoid redundant IO and decryption
     private val settingsCache = atomic(persistentMapOf<String, PluginSettingsStore>())
 
@@ -356,6 +359,7 @@ class PluginLifecycleManager(
             executionFileSystem = executionFileSystem ?: DefaultExecutionFileSystem("${installPath}/temp_execution"),
             hostFileSystem = HostFileSystemImpl(allowedPaths, isDestructiveAllowed),
             settings = mergedSettings,
+            storage = DefaultPluginStorage(installPath, fileSystem),
             onRequiredActionChange = { actionName ->
                 registry.scope.launch {
                     registry.updatePlugin(pkg) { it.copy(requiredAction = actionName) }
@@ -400,6 +404,20 @@ class PluginLifecycleManager(
         } ?: emptyList()
     }
 
+    suspend fun refreshLocks(pkg: String) {
+        val entry = PluginLoader.getPluginById(pkg) ?: return
+        val processor = entry.getProcessor().getOrNull() ?: return
+        val context = createPluginContext(pkg)
+        try {
+            val locks = processor.checkLocks(context)
+            _pluginLocksState.update { current ->
+                current + (pkg to locks)
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to evaluate checkLocks for $pkg" }
+        }
+    }
+
 }
 
 /**
@@ -428,6 +446,7 @@ class DefaultPluginContext(
     override val executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem,
     override val hostFileSystem: org.wip.plugintoolkit.api.HostFileSystem,
     override val settings: Map<String, JsonElement>,
+    override val storage: org.wip.plugintoolkit.api.PluginStorage,
     override val signals: PluginSignalManager = DefaultPluginSignalManager(),
     private val onRequiredActionChange: (String?) -> Unit = {}
 ) : PluginContext {

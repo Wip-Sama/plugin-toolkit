@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -87,10 +89,12 @@ fun PluginSettingsDialog(
 ) {
     val store by viewModel.store.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
+    val locks by viewModel.locks.collectAsState()
     val manifest = viewModel.manifest ?: return
 
     var searchQuery by remember { mutableStateOf("") }
     var searchBySection by remember { mutableStateOf(false) }
+    var selectedActionForParams by remember { mutableStateOf<org.wip.plugintoolkit.api.PluginAction?>(null) }
 
     val lazyListState = rememberLazyListState()
     val sidebarListState = rememberLazyListState()
@@ -362,13 +366,20 @@ fun PluginSettingsDialog(
                                         item {
                                             SettingsGroup(title = actionsTitle) {
                                                 actions.forEachIndexed { index, action ->
+                                                    val hasParams = !action.parameters.isNullOrEmpty()
                                                     SettingsItem(
-                                                        title = action.name,
+                                                        title = action.name + if (hasParams) " *" else "",
                                                         subtitle = action.description,
                                                         icon = Icons.Default.PlayArrow,
                                                         enabled = !isBusy,
                                                         shape = getGroupedShape(index, actions.size),
-                                                        onClick = { viewModel.runAction(action.functionName) }
+                                                        onClick = {
+                                                            if (hasParams) {
+                                                                selectedActionForParams = action
+                                                            } else {
+                                                                viewModel.runAction(action.functionName)
+                                                            }
+                                                        }
                                                     )
                                                 }
                                             }
@@ -398,7 +409,8 @@ fun PluginSettingsDialog(
                                                                 )
                                                             },
                                                             enabled = !isBusy,
-                                                            providedSettings = store.settings
+                                                            providedSettings = store.settings,
+                                                            providedLocks = locks
                                                         )
 
                                                         val lockedOptionsForSetting =
@@ -527,6 +539,17 @@ fun PluginSettingsDialog(
                     }
                 }
             }
+
+            selectedActionForParams?.let { action ->
+                ActionParametersDialog(
+                    action = action,
+                    onDismiss = { selectedActionForParams = null },
+                    onConfirm = { params ->
+                        selectedActionForParams = null
+                        viewModel.runAction(action.functionName, params)
+                    }
+                )
+            }
         }
     }
 }
@@ -555,5 +578,88 @@ private fun SidebarItem(
             style = MaterialTheme.typography.labelLarge,
             color = contentColor
         )
+    }
+}
+
+@Composable
+private fun ActionParametersDialog(
+    action: org.wip.plugintoolkit.api.PluginAction,
+    onDismiss: () -> Unit,
+    onConfirm: (Map<String, kotlinx.serialization.json.JsonElement>) -> Unit
+) {
+    val paramState = remember(action) {
+        val initialMap = mutableStateMapOf<String, String>()
+        action.parameters?.forEach { (key, meta) ->
+            initialMap[key] = SettingsUtils.jsonToString(meta.defaultValue, meta.type)
+        }
+        initialMap
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .padding(ToolkitTheme.spacing.large)
+                .widthIn(max = ToolkitTheme.dimensions.dialogMaxWidth)
+        ) {
+            Column(modifier = Modifier.padding(ToolkitTheme.spacing.large)) {
+                Text(
+                    text = action.name,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+                if (action.description.isNotEmpty()) {
+                    Text(
+                        text = action.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small)
+                    )
+                }
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+
+                action.parameters?.forEach { (key, meta) ->
+                    DynamicParameterInput(
+                        name = key,
+                        metadata = meta,
+                        value = paramState[key] ?: "",
+                        onValueChange = { paramState[key] = it }
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = ToolkitTheme.spacing.large),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
+                    ) {
+                        Text(stringResource(Res.string.action_cancel))
+                    }
+                    Button(
+                        onClick = {
+                            val jsonMap = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                            paramState.entries.forEach { entry ->
+                                val key = entry.key
+                                val strVal = entry.value
+                                val meta = action.parameters?.get(key)
+                                if (meta != null) {
+                                    jsonMap[key] = SettingsUtils.stringToJson(strVal, meta.type)
+                                }
+                            }
+                            onConfirm(jsonMap)
+                        }
+                    ) {
+                        Text("Run")
+                    }
+                }
+            }
+        }
     }
 }

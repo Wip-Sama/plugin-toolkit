@@ -18,6 +18,7 @@ import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PluginSignalManager
+import org.wip.plugintoolkit.api.PluginStorage
 import org.wip.plugintoolkit.api.ProgressReporter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,6 +38,7 @@ class MathOperationsTest {
         override val executionFileSystem: ExecutionFileSystem get() = throw UnsupportedOperationException()
         override val hostFileSystem: HostFileSystem get() = throw UnsupportedOperationException()
         override val settings: Map<String, JsonElement> get() = emptyMap()
+        override val storage: PluginStorage get() = throw UnsupportedOperationException()
         override fun setRequiredAction(actionName: String?) {}
     }
 

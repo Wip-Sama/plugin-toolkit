@@ -469,7 +469,7 @@ class JobWorker(
         val action = manifest.actions.find { it.functionName == job.capabilityName }
             ?: throw Exception("Action ${job.capabilityName} not found in manifest")
 
-        val result = withContext(kotlinx.coroutines.Dispatchers.IO) { processor.runAction(action, context) }
+        val result = withContext(kotlinx.coroutines.Dispatchers.IO) { processor.runAction(action, job.parameters, context) }
 
         if (result.isSuccess) {
             manager.updateJobProgress(job.id, 1.0f)

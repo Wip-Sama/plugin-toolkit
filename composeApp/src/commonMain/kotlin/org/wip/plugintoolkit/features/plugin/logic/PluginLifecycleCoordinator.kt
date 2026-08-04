@@ -87,8 +87,12 @@ sealed interface LifecycleAction {
         override val targetPkg: String get() = pkg
     }
 
-    data class RunAction(val pkg: String, val action: PluginAction, val response: CompletableDeferred<Unit>) :
-        LifecycleAction {
+    data class RunAction(
+        val pkg: String,
+        val action: PluginAction,
+        val parameters: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
+        val response: CompletableDeferred<Unit>
+    ) : LifecycleAction {
         override val targetPkg: String get() = pkg
     }
 }
@@ -135,6 +139,7 @@ class PluginLifecycleCoordinator(
                     JobType.PluginAction -> clearRequiredAction(job.pluginId)
                     else -> {}
                 }
+                lifecycleManager.refreshLocks(job.pluginId)
                 action.response.complete(Unit)
             }
 
@@ -157,7 +162,11 @@ class PluginLifecycleCoordinator(
             }
 
             is LifecycleAction.LoadPlugin -> {
-                action.response.complete(lifecycleManager.loadPlugin(action.pkg))
+                val res = lifecycleManager.loadPlugin(action.pkg)
+                if (res.isSuccess) {
+                    lifecycleManager.refreshLocks(action.pkg)
+                }
+                action.response.complete(res)
             }
 
             is LifecycleAction.UnloadPlugin -> {
@@ -249,6 +258,7 @@ class PluginLifecycleCoordinator(
                             }
                         }
                     }
+                    lifecycleManager.refreshLocks(action.pkg)
                 }
                 action.response.complete(Unit)
             }
@@ -333,6 +343,7 @@ class PluginLifecycleCoordinator(
                             type = JobType.PluginAction,
                             pluginId = action.pkg,
                             capabilityName = action.action.functionName,
+                            parameters = action.parameters,
                             keepResult = false
                         )
                         jobManager.enqueueJob(job)
@@ -454,9 +465,13 @@ class PluginLifecycleCoordinator(
         return deferred.await()
     }
 
-    suspend fun runAction(pkg: String, action: PluginAction) {
+    suspend fun runAction(
+        pkg: String,
+        action: PluginAction,
+        parameters: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap()
+    ) {
         val deferred = CompletableDeferred<Unit>()
-        val actionObj = LifecycleAction.RunAction(pkg, action, deferred)
+        val actionObj = LifecycleAction.RunAction(pkg, action, parameters, deferred)
         getActor(actionObj.targetPkg).send(actionObj)
         deferred.await()
     }
