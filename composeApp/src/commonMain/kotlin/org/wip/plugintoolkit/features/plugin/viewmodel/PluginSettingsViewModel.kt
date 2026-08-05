@@ -28,6 +28,9 @@ class PluginSettingsViewModel(
 
     init {
         viewModelScope.launch {
+            pluginManager.refreshLocks(pkg)
+        }
+        viewModelScope.launch {
             jobManager.jobs.collect { jobs ->
                 val busy = jobs.any { it.pluginId == pkg && it.status == JobStatus.Running }
                 _isBusy.value = busy

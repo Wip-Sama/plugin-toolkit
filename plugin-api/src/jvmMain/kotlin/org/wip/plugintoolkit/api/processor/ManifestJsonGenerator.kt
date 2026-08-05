@@ -35,6 +35,7 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNO
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETUP_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_UPDATE_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.INFRASTRUCTURE_TYPES
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.REQUIRES_SETTING_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
@@ -99,9 +100,10 @@ object ManifestJsonGenerator {
                     try {
                         Json.parseToJsonElement(defaultValue)
                     } catch (e: Exception) {
-                        null
+                        kotlinx.serialization.json.JsonPrimitive(defaultValue)
                     }
                 } else null
+
 
                 val minValue =
                     paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
@@ -212,6 +214,9 @@ object ManifestJsonGenerator {
                 )
             }
 
+            val reqLockAnn = func.annotations.find { it.hasQualifiedName(ProcessorConstants.REQUIRES_LOCK_ANNOTATION) }
+            val requiredLocksList = (reqLockAnn?.arguments?.find { it.name?.asString() == "locks" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+
             Capability(
                 name = capName,
                 description = capDesc,
@@ -223,6 +228,7 @@ object ManifestJsonGenerator {
                 isCancellable = supportsCancel,
                 context = context,
                 requiresSettings = requiresSettingsList,
+                requiredLocks = requiredLocksList,
                 fileAccess = fileAccess
             )
         }
@@ -248,9 +254,7 @@ object ManifestJsonGenerator {
             
             // Collect capabilities that require this setting
             val requiredBy = manifestCapabilities.filter { it.requiresSettings.contains(propName) }.map { it.name }
-            val isRequiredByEnum = enumRequiredSettings.contains(propName)
-            
-            val required = explicitRequired && requiredBy.isEmpty() && !isRequiredByEnum
+            val required = explicitRequired
             
             if (!required && !isNullable) {
                 logger.error("Optional setting to non nullable field: '$propName'. Please make the field nullable (e.g., add '?') or mark it as required=true.", prop)
@@ -262,9 +266,10 @@ object ManifestJsonGenerator {
                 try {
                     Json.parseToJsonElement(defaultVal)
                 } catch (e: Exception) {
-                    null
+                    kotlinx.serialization.json.JsonPrimitive(defaultVal)
                 }
             } else null
+
 
             val minValue = ann.arguments.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
             val maxValue = ann.arguments.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
@@ -307,10 +312,38 @@ object ManifestJsonGenerator {
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
 
+            val nonInfraParams = func.parameters.filter { param ->
+                val paramType = param.type.resolve().toTypeName()
+                INFRASTRUCTURE_TYPES.none { it == paramType }
+            }
+
+            val paramsMap = if (nonInfraParams.isNotEmpty()) {
+                nonInfraParams.associate { param ->
+                    val paramNameStr = param.name?.asString() ?: ""
+                    val ksType = param.type.resolve()
+                    val isNullable = ksType.isMarkedNullable
+                    val hasDefault = param.hasDefault
+                    val required = !isNullable && !hasDefault
+                    val dataType = GeneratorUtils.mapKSTypeToDataType(ksType)
+
+                    val paramAnn = param.annotations.find {
+                        it.hasQualifiedName(CAPABILITY_PARAM_ANNOTATION)
+                    }
+                    val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
+
+                    paramNameStr to ParameterMetadata(
+                        description = paramDesc,
+                        type = dataType,
+                        required = required
+                    )
+                }
+            } else null
+
             PluginAction(
                 name = actName,
                 description = actDesc,
-                functionName = func.simpleName.asString()
+                functionName = func.simpleName.asString(),
+                parameters = paramsMap
             )
         }
 

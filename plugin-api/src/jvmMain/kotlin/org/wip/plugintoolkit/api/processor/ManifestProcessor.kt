@@ -8,6 +8,7 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSClassifierReference
 import com.google.devtools.ksp.symbol.KSDeclaration
@@ -113,39 +114,58 @@ class ManifestProcessor(
             it.annotations.any { ann -> ann.hasQualifiedName(CAPABILITY_ANNOTATION) }
         }.toList()
 
-        // Validate semantic types on functions
+        val settingsProperties = settingsClasses.flatMap { clazz ->
+            clazz.getAllProperties().filter { prop ->
+                prop.annotations.any { it.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
+            }
+        }
+
+        val settingsUnlockedByDefault = settingsProperties.associate { prop ->
+            val ann = prop.annotations.first { it.hasQualifiedName(PLUGIN_SETTING_ANNOTATION) }
+            val defaultVal = ann.arguments.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
+            val explicitRequired = ann.arguments.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
+            val propName = prop.simpleName.asString()
+            propName to (explicitRequired || defaultVal.isNotBlank())
+        }
+
+        // Validate Enum default options are unlocked by default
         functions.forEach { func ->
             func.parameters.forEach { param ->
-                val paramAnn =
-                    param.annotations.find { it.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION) }
-                val sem =
-                    (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
-                validateSemanticTypes(sem, param)
-            }
+                val ksType = param.type.resolve()
+                val declaration = ksType.declaration
+                if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
+                    val enumEntries = declaration.declarations
+                        .filterIsInstance<KSClassDeclaration>()
+                        .filter { it.classKind == ClassKind.ENUM_ENTRY }
+                        .toList()
 
-            // Validate outputs
-            val returnTypeKS = func.returnType?.resolve()
-            if (returnTypeKS != null && returnTypeKS.toTypeName().toString() != "kotlin.Unit") {
-                val funcOutputAnn = func.annotations.find {
-                    it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput")
-                }
-                if (funcOutputAnn != null) {
-                    val sem =
-                        (funcOutputAnn.arguments.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
-                    validateSemanticTypes(sem, func)
-                } else {
-                    val declaration = returnTypeKS.declaration
-                    val isDataClass =
-                        declaration is KSClassDeclaration && declaration.modifiers.contains(com.google.devtools.ksp.symbol.Modifier.DATA)
-                    if (isDataClass) {
-                        val classDecl = declaration as KSClassDeclaration
-                        classDecl.getAllProperties().forEach { prop ->
-                            val propAnn = prop.annotations.find {
-                                it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.CapabilityOutput")
+                    if (enumEntries.isNotEmpty()) {
+                        val paramAnn = param.annotations.find {
+                            it.hasQualifiedName(ProcessorConstants.CAPABILITY_PARAM_ANNOTATION)
+                        }
+                        val paramDefaultValue = paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
+
+                        val defaultEntry = if (paramDefaultValue.isNotBlank()) {
+                            enumEntries.find { it.simpleName.asString() == paramDefaultValue } ?: enumEntries.first()
+                        } else {
+                            enumEntries.first()
+                        }
+
+                        val reqAnn = defaultEntry.annotations.find {
+                            it.hasQualifiedName(ProcessorConstants.REQUIRES_SETTING_ANNOTATION)
+                        }
+                        val reqSettings = (reqAnn?.arguments?.find { it.name?.asString() == "settings" }?.value as? List<*>)
+                            ?.filterIsInstance<String>() ?: emptyList()
+
+                        reqSettings.forEach { reqSetting ->
+                            if (settingsUnlockedByDefault[reqSetting] != true) {
+                                logger.error(
+                                    "Default option '${defaultEntry.simpleName.asString()}' of enum '${declaration.simpleName.asString()}' " +
+                                    "(parameter '${param.name?.asString()}') requires setting '$reqSetting' which is optional (required = false) and has no defaultValue. " +
+                                    "Default enum options must be unlocked by default or required by plugin settings.",
+                                    param
+                                )
                             }
-                            val sem =
-                                (propAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
-                            validateSemanticTypes(sem, prop)
                         }
                     }
                 }

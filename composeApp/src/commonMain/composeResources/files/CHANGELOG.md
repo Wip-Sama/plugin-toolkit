@@ -11,8 +11,6 @@ Changes:
   - Strengthened path traversal checks
   - Extended future backwards compatibility with plugins in some cases
   - Minor GUI optimizations
-  - PluginStorage to give plugins a way to have custom persistent data
-  - Actions can have parameters
   - Dynamic locks to expand on how a plugin unlocks its features 
   - Plugin Capabilities are now scrollable and searchable
   - Enforced minAppVersion on local installations too
@@ -21,9 +19,14 @@ Added:
   - New mechanism and dialogs for managing jar signatures
   - 6 previously invisible settings: animationsEnabled, compressedLogsToKeep, showInfo, showWarning, showError, strictSignatureChecking, fileAccessMode, checkOnStartup
   - Support for read/write stream in PluginFileSystem
-  - Support for portable installations
+  - Support for portable installations (TODO)
+  - Local repository (TODO)
+  - Custom locks for enums/capabilities (TODO)
+  - Parameters to plugin actions
+  - PluginStorage to give plugins a way to have custom persistent data
 Fixed:
   - Locks are now safely evicted from jarLocks when no active operations remain
+  - Switch would need to be toggled on/off to be able to be used in the default state (TODO)
 Planned:
   - A button to clear the sandbox folder
 Note:

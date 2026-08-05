@@ -61,13 +61,21 @@ object GeneratorUtils {
                     val options = enumEntries.map { it.simpleName.asString() }
                     val optionRequirements = enumEntries.associate { entry ->
                         val reqAnn =
-                            entry.annotations.find { it.hasQualifiedName("org.wip.plugintoolkit.api.annotations.RequiresSetting") }
+                            entry.annotations.find { it.hasQualifiedName(ProcessorConstants.REQUIRES_SETTING_ANNOTATION) }
                         val settings =
                             (reqAnn?.arguments?.find { it.name?.asString() == "settings" }?.value as? List<*>)?.filterIsInstance<String>()
                                 ?: emptyList()
                         entry.simpleName.asString() to settings
                     }.filter { it.value.isNotEmpty() }
-                    DataType.Enum(qualifiedName, options, null, optionRequirements)
+                    val optionLockRequirements = enumEntries.associate { entry ->
+                        val lockAnn =
+                            entry.annotations.find { it.hasQualifiedName(ProcessorConstants.REQUIRES_LOCK_ANNOTATION) }
+                        val locks =
+                            (lockAnn?.arguments?.find { it.name?.asString() == "locks" }?.value as? List<*>)?.filterIsInstance<String>()
+                                ?: emptyList()
+                        entry.simpleName.asString() to locks
+                    }.filter { it.value.isNotEmpty() }
+                    DataType.Enum(qualifiedName, options, null, optionRequirements, optionLockRequirements)
                 } else {
                     if (visited.contains(qualifiedName)) {
                         DataType.Object(qualifiedName)
@@ -126,7 +134,7 @@ object GeneratorUtils {
 
             is DataType.Enum -> {
                 val optionsList = dataType.options.joinToString { "\"$it\"" }
-                if (dataType.optionRequirements.isEmpty()) {
+                if (dataType.optionRequirements.isEmpty() && dataType.optionLockRequirements.isEmpty()) {
                     com.squareup.kotlinpoet.CodeBlock.of(
                         "%T(%S, listOf(%L))",
                         cnDataType.nestedClass("Enum"),
@@ -134,15 +142,25 @@ object GeneratorUtils {
                         optionsList
                     )
                 } else {
-                    val reqMapStr = dataType.optionRequirements.entries.joinToString(", ") { entry ->
-                        "\"${entry.key}\" to listOf(${entry.value.joinToString { "\"$it\"" }})"
-                    }
+                    val reqMapStr = if (dataType.optionRequirements.isNotEmpty()) {
+                        "mapOf(" + dataType.optionRequirements.entries.joinToString(", ") { entry ->
+                            "\"${entry.key}\" to listOf(${entry.value.joinToString { "\"$it\"" }})"
+                        } + ")"
+                    } else "emptyMap()"
+                    
+                    val lockReqMapStr = if (dataType.optionLockRequirements.isNotEmpty()) {
+                        "mapOf(" + dataType.optionLockRequirements.entries.joinToString(", ") { entry ->
+                            "\"${entry.key}\" to listOf(${entry.value.joinToString { "\"$it\"" }})"
+                        } + ")"
+                    } else "emptyMap()"
+
                     com.squareup.kotlinpoet.CodeBlock.of(
-                        "%T(%S, listOf(%L), null, mapOf(%L))",
+                        "%T(%S, listOf(%L), null, %L, %L)",
                         cnDataType.nestedClass("Enum"),
                         dataType.className,
                         optionsList,
-                        reqMapStr
+                        reqMapStr,
+                        lockReqMapStr
                     )
                 }
             }

@@ -29,13 +29,16 @@ class NodeComponentGUITest {
 
     @Before
     fun setUp() {
+        val mockManager = io.mockk.mockk<PluginManager>(relaxed = true)
+        io.mockk.every { mockManager.pluginLocksState } returns kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
         startKoin {
             modules(module {
-                single { io.mockk.mockk<PluginManager>(relaxed = true) }
+                single { mockManager }
                 single { io.mockk.mockk<SemanticRegistry>(relaxed = true) }
             })
         }
     }
+
 
     @After
     fun tearDown() {

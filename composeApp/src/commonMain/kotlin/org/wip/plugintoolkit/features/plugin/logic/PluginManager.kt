@@ -115,7 +115,14 @@ class PluginManager(
 
     fun loadPluginSettings(pkg: String) = lifecycleManager.loadPluginSettings(pkg)
 
-    fun savePluginSettings(pkg: String, store: PluginSettingsStore) = lifecycleManager.savePluginSettings(pkg, store)
+    fun savePluginSettings(pkg: String, store: PluginSettingsStore) {
+        lifecycleManager.savePluginSettings(pkg, store)
+        scope.launch {
+            lifecycleManager.refreshLocks(pkg)
+        }
+    }
+
+    suspend fun refreshLocks(pkg: String) = lifecycleManager.refreshLocks(pkg)
 
     fun getManifest(pkg: String): PluginManifest? = lifecycleManager.getManifest(pkg)
 

@@ -43,6 +43,11 @@ import plugintoolkit.composeapp.generated.resources.plugin_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_result
 import plugintoolkit.composeapp.generated.resources.*
 import org.wip.plugintoolkit.core.model.localized
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import org.wip.plugintoolkit.features.navigation.model.Screen
+
 
 class PluginManagerViewModel(
     private val pluginManager: PluginManager,
@@ -55,7 +60,11 @@ class PluginManagerViewModel(
     private val notificationService: NotificationService
 ) : ViewModel() {
 
+    private val _navigationEvent = MutableSharedFlow<Screen>()
+    val navigationEvent: SharedFlow<Screen> = _navigationEvent.asSharedFlow()
+
     val installedPlugins = pluginManager.installedPlugins
+
     val loadedPlugins = pluginManager.loadedPlugins
     val isRegistryReady = pluginManager.isRegistryReady
 
@@ -443,7 +452,11 @@ class PluginManagerViewModel(
 
     fun openSettings(pkg: String) {
         _settingsPkg.value = pkg
+        viewModelScope.launch {
+            _navigationEvent.emit(Screen.PluginManager)
+        }
     }
+
 
     fun closeSettings() {
         _settingsPkg.value = null

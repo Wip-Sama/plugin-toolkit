@@ -409,7 +409,7 @@ fun PluginSettingsDialog(
                                                                 )
                                                             },
                                                             enabled = !isBusy,
-                                                            providedSettings = store.settings,
+                                                            providedSettings = (manifest.settings?.mapValues { it.value.defaultValue }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement> + store.settings,
                                                             providedLocks = locks
                                                         )
 
@@ -442,9 +442,9 @@ fun PluginSettingsDialog(
                                                                 }
                                                                 if (lockedOptionsForSetting.isNotEmpty()) {
                                                                     ToolkitChip(
-                                                                        text = "Locked Enum Options",
+                                                                        text = "Unlocks Enum Options",
                                                                         modifier = Modifier.tooltip(
-                                                                            text = "Locked values:\n" + lockedOptionsForSetting.joinToString(
+                                                                            text = "Unlocks values:\n" + lockedOptionsForSetting.joinToString(
                                                                                 "\n"
                                                                             ),
                                                                         ),

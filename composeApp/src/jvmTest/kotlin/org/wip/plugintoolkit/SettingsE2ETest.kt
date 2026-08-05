@@ -61,7 +61,12 @@ class SettingsE2ETest {
                 io.mockk.every { mockJobManager.jobs } returns kotlinx.coroutines.flow.MutableStateFlow(emptyList())
                 io.mockk.every { mockJobManager.endedJobs } returns kotlinx.coroutines.flow.MutableStateFlow(emptyList())
                 single { mockJobManager }
+
+                val mockPluginManagerVM = mockk<org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel>(relaxed = true)
+                io.mockk.every { mockPluginManagerVM.navigationEvent } returns kotlinx.coroutines.flow.MutableSharedFlow()
+                single { mockPluginManagerVM }
             })
+
         }
 
         composeTestRule.setContent {

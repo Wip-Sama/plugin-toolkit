@@ -266,21 +266,70 @@ object DispatcherGenerator {
             val methodName = func.simpleName.asString()
             actionMapCode.add("%S to { actionParams, context ->\n", methodName.lowercase())
             actionMapCode.indent()
-            val actParams = func.parameters
-            val actArgs = actParams.joinToString(", ") { param ->
+            actionMapCode.add("runCatching {\n")
+            actionMapCode.indent()
+
+            val argExprs = mutableListOf<CodeBlock>()
+            func.parameters.forEach { param ->
                 val paramName = param.name?.asString() ?: ""
                 val paramType = param.type.resolve().toTypeName()
+                val isNullable = param.type.resolve().isMarkedNullable
+                val hasDefault = param.hasDefault
+
                 when (paramType) {
-                    CN_PLUGIN_FILESYSTEM -> "context.fileSystem"
-                    org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_HOST_FILESYSTEM -> "context.hostFileSystem"
-                    org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_FILESYSTEM -> "context.executionFileSystem"
-                    CN_PLUGIN_LOGGER -> "context.logger"
-                    CN_PROGRESS_REPORTER -> "context.progress"
-                    CN_PLUGIN_CONTEXT -> "context"
-                    else -> "actionParams[\"$paramName\"]?.let { %T.decodeFromJsonElement(it) } as %T".format(CN_JSON, paramType)
+                    CN_PLUGIN_FILESYSTEM -> argExprs.add(CodeBlock.of("context.fileSystem"))
+                    org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_HOST_FILESYSTEM -> argExprs.add(CodeBlock.of("context.hostFileSystem"))
+                    org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_FILESYSTEM -> argExprs.add(CodeBlock.of("context.executionFileSystem"))
+                    CN_PLUGIN_LOGGER -> argExprs.add(CodeBlock.of("context.logger"))
+                    CN_PROGRESS_REPORTER -> argExprs.add(CodeBlock.of("context.progress"))
+                    CN_PLUGIN_CONTEXT -> argExprs.add(CodeBlock.of("context"))
+                    else -> {
+                        if (isNullable) {
+                            argExprs.add(
+                                CodeBlock.of(
+                                    "actionParams[%S]?.let { %T.%M<%T>(it) }",
+                                    paramName,
+                                    CN_JSON,
+                                    MN_DECODE_FROM_JSON_ELEMENT,
+                                    paramType
+                                )
+                            )
+                        } else if (hasDefault) {
+                            argExprs.add(
+                                CodeBlock.of(
+                                    "actionParams[%S]?.let { %T.%M<%T>(it) }",
+                                    paramName,
+                                    CN_JSON,
+                                    MN_DECODE_FROM_JSON_ELEMENT,
+                                    paramType.copy(nullable = false)
+                                )
+                            )
+                        } else {
+                            argExprs.add(
+                                CodeBlock.of(
+                                    "actionParams[%S]?.let { %T.%M<%T>(it) } ?: throw %T(%S)",
+                                    paramName,
+                                    CN_JSON,
+                                    MN_DECODE_FROM_JSON_ELEMENT,
+                                    paramType,
+                                    CN_ILLEGAL_ARGUMENT_EXCEPTION,
+                                    "Missing required action parameter: $paramName"
+                                )
+                            )
+                        }
+                    }
                 }
             }
-            actionMapCode.add("runCatching { processor.%L($actArgs) }\n", methodName)
+
+            val argsBlock = CodeBlock.builder()
+            argExprs.forEachIndexed { aIdx, expr ->
+                argsBlock.add(expr)
+                if (aIdx < argExprs.size - 1) argsBlock.add(", ")
+            }
+
+            actionMapCode.add("processor.%L(%L)\n", methodName, argsBlock.build())
+            actionMapCode.unindent()
+            actionMapCode.add("}\n")
             actionMapCode.unindent()
             actionMapCode.add("}")
             if (index < actions.size - 1) actionMapCode.add(",\n") else actionMapCode.add("\n")
@@ -311,9 +360,9 @@ object DispatcherGenerator {
         dispatcherType.addFunction(runActionFunc.build())
 
         val checkLocksFunction = classDeclaration.getAllFunctions()
-            .find { it.simpleName.asString() == "checkLocks" }
+            .find { func -> func.annotations.any { it.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_LOCKS_ANNOTATION) } }
 
-        val checkLocksFunc = FunSpec.builder("checkLocks")
+        val checkLocksFunc = FunSpec.builder("refreshLocks")
             .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
             .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(CN_MAP.parameterizedBy(String::class.asClassName(), Boolean::class.asClassName()))

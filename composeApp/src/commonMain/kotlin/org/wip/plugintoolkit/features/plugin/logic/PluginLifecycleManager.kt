@@ -406,17 +406,19 @@ class PluginLifecycleManager(
         } ?: emptyList()
     }
 
-    suspend fun refreshLocks(pkg: String) {
-        val entry = PluginLoader.getPluginById(pkg) ?: return
-        val processor = entry.getProcessor().getOrNull() ?: return
+    suspend fun refreshLocks(pkg: String): Map<String, Boolean> {
+        val entry = PluginLoader.getPluginById(pkg) ?: return emptyMap()
+        val processor = entry.getProcessor().getOrNull() ?: return emptyMap()
         val context = createPluginContext(pkg)
-        try {
-            val locks = processor.checkLocks(context)
+        return try {
+            val locks = processor.refreshLocks(context)
             _pluginLocksState.update { current ->
                 current + (pkg to locks)
             }
+            locks
         } catch (e: Exception) {
             Logger.e(e) { "Failed to evaluate checkLocks for $pkg" }
+            emptyMap()
         }
     }
 

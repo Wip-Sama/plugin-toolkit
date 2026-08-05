@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -77,6 +78,30 @@ fun PluginContent(
                 .sortedByDescending { it.enqueuedAt }
         }
 
+        val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = org.koin.compose.koinInject()
+        val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
+        val pluginId = viewModel.selectedPlugin?.getManifest()?.getOrNull()?.plugin?.id
+
+        LaunchedEffect(pluginId) {
+            if (pluginId != null) {
+                pluginManager.refreshLocks(pluginId)
+            }
+        }
+
+        val providedLocks = remember(pluginId, pluginLocksState) {
+            if (pluginId != null) {
+                pluginLocksState[pluginId] ?: pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
+            } else {
+                emptyMap()
+            }
+        }
+        val settingsStore = if (pluginId != null) pluginManager.loadPluginSettings(pluginId) else null
+        val providedSettings = remember(pluginId, settingsStore) {
+            (settingsStore?.settings ?: emptyMap()) + (settingsStore?.globalParams ?: emptyMap())
+        }
+
+
+
         if (selectedCapability == null) {
             EmptyState(stringResource(Res.string.plugin_select_capability_hint))
         } else {
@@ -95,6 +120,8 @@ fun PluginContent(
                     saveResults = viewModel.saveResults,
                     onSaveResultsChange = { viewModel.saveResults = it },
                     activeJobs = capabilityJobs.filter { it.status == JobStatus.Running || it.status == JobStatus.Queued },
+                    providedLocks = providedLocks,
+                    providedSettings = providedSettings,
                     onExecute = { viewModel.executeCapability() }
                 )
 
@@ -242,6 +269,8 @@ fun CapabilityTester(
     saveResults: Boolean,
     onSaveResultsChange: (Boolean) -> Unit,
     activeJobs: List<BackgroundJob>,
+    providedLocks: Map<String, Boolean> = emptyMap(),
+    providedSettings: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
     onExecute: () -> Unit
 ) {
     val capabilityParameters = capability.parameters ?: emptyMap()
@@ -276,10 +305,10 @@ fun CapabilityTester(
         isDestructive = capability.fileAccess?.isDestructive == true || allParams.values.any { it.isDestructive },
         saveResults = saveResults,
         onSaveResultsChange = onSaveResultsChange,
-        parameters = executionParameters
+        parameters = executionParameters,
+        providedSettings = providedSettings,
+        providedLocks = providedLocks
     )
-
-
 
     if (capability.parameters.isNullOrEmpty()) {
         Text(stringResource(Res.string.plugin_no_parameters), style = MaterialTheme.typography.bodyMedium)
@@ -293,7 +322,14 @@ fun CapabilityTester(
             parameters = capability.parameters
         )
     }
-    val isValid = validationErrors.isEmpty()
+    val requirementError = remember(capability, providedLocks, providedSettings) {
+        org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateCapabilityLocksAndSettings(
+            capability = capability,
+            providedLocks = providedLocks,
+            providedSettings = providedSettings
+        )
+    }
+    val isValid = validationErrors.isEmpty() && requirementError == null
 
     Button(
         onClick = onExecute,
@@ -313,7 +349,14 @@ fun CapabilityTester(
             Text(stringResource(Res.string.plugin_execute_capability))
         }
     }
-    if (!isValid) {
+    if (requirementError != null) {
+        Text(
+            text = requirementError,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
+        )
+    } else if (validationErrors.isNotEmpty()) {
         Text(
             text = "Fix parameter errors before executing",
             style = MaterialTheme.typography.labelSmall,

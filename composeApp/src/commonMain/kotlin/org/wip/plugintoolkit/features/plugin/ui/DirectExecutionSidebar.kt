@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -150,6 +152,11 @@ fun DirectExecutionSidebar(
                 val plugin = loadedPlugins.find { it.getManifest().getOrNull()?.plugin?.id == pluginId }
                 if (plugin != null) {
                     val manifest = plugin.getManifest().getOrThrow()
+                    val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = org.koin.compose.koinInject()
+                    val settingsStore = pluginManager.loadPluginSettings(pluginId)
+                    val settings = settingsStore.settings + settingsStore.globalParams
+                    val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
+                    val locks = pluginLocksState[pluginId] ?: pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
 
                     val filteredCapabilities = manifest.capabilities.filter { capability ->
                         capability.name.contains(capabilitySearchQuery, ignoreCase = true) ||
@@ -157,9 +164,15 @@ fun DirectExecutionSidebar(
                     }
 
                     val capabilityElements = filteredCapabilities.map { capability ->
+                        val isLockMissing = capability.requiredLocks.any { locks[it] != true }
+                        val isSettingMissing = capability.requiresSettings.any { settingKey ->
+                            val v = settings[settingKey]
+                            v == null || v is kotlinx.serialization.json.JsonNull || v.toString().replace("\"", "").isBlank()
+                        }
+                        val isLocked = isLockMissing || isSettingMissing
                         SidebarElement(
                             id = capability,
-                            icon = Icons.Default.Bolt,
+                            icon = if (isLocked) Icons.Default.Lock else Icons.Default.Bolt,
                             title = capability.name.localized
                         )
                     }

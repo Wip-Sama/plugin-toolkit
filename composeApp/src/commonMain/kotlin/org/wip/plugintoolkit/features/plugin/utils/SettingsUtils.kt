@@ -235,6 +235,25 @@ object SettingsUtils {
         return errors
     }
 
+    fun validateCapabilityLocksAndSettings(
+        capability: org.wip.plugintoolkit.api.Capability,
+        providedLocks: Map<String, Boolean>,
+        providedSettings: Map<String, JsonElement>
+    ): String? {
+        for (lockKey in capability.requiredLocks) {
+            if (providedLocks[lockKey] != true) {
+                return "Requires lock: $lockKey"
+            }
+        }
+        for (settingKey in capability.requiresSettings) {
+            val settingValue = providedSettings[settingKey]
+            if (settingValue == null || settingValue is JsonNull || settingValue.toString().replace("\"", "").isBlank()) {
+                return "Requires setting: $settingKey"
+            }
+        }
+        return null
+    }
+
     fun jsonToString(element: JsonElement?, type: DataType): String {
         if (element == null || element is JsonNull) return ""
         return when (type) {

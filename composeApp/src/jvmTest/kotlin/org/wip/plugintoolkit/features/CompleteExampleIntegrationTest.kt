@@ -49,5 +49,35 @@ class CompleteExampleIntegrationTest {
         // Verify capability with complex objects and semantic types
         val complexCap = manifest.capabilities.find { it.name == "capabilityWithComplexObjectsAndSemanticTypes" }
         assertNotNull(complexCap, "capabilityWithComplexObjectsAndSemanticTypes should be present in manifest")
+
+        // Verify action with parameters
+        val toggleAction = manifest.actions.find { it.functionName == "toggleFeatureLock" }
+        assertNotNull(toggleAction, "toggleFeatureLock action should be present in manifest")
+        assertNotNull(toggleAction.parameters, "toggleFeatureLock action should have parameters metadata")
+        assertTrue(toggleAction.parameters!!.containsKey("unlocked"), "toggleFeatureLock should take 'unlocked' parameter")
+
+        // Verify capability with required locks
+        val lockCap = manifest.capabilities.find { it.name == "capabilityWithLockRequirement" }
+        assertNotNull(lockCap, "capabilityWithLockRequirement should be present in manifest")
+        assertTrue(lockCap.requiredLocks.contains("feature_unlocked"), "capabilityWithLockRequirement should require 'feature_unlocked'")
     }
+
+    @Test
+    fun testLoadCompleteExamplePlugin() {
+        val jarFile = File("../completeExample/build/libs/completeExample.jar")
+        assertTrue(jarFile.exists(), "completeExample.jar should exist at ${jarFile.absolutePath}")
+
+        val result = org.wip.plugintoolkit.features.plugin.logic.PluginLoader.loadPlugin(
+            jarFile.absolutePath,
+            mapOf(
+                "secretToken" to kotlinx.serialization.json.JsonPrimitive("secret-12345"),
+                "userId" to kotlinx.serialization.json.JsonPrimitive("user_123")
+            )
+        )
+        assertTrue(result.isSuccess, "Failed to load completeExample: ${result.exceptionOrNull()}")
+    }
+
+
+
 }
+

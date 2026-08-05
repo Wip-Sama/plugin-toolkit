@@ -97,6 +97,14 @@ private fun AppContentImpl(
             TooltipProvider {
                 val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
                 val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
+
+                val pluginManagerViewModel: org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel = koinInject()
+                androidx.compose.runtime.LaunchedEffect(pluginManagerViewModel) {
+                    pluginManagerViewModel.navigationEvent.collect { targetScreen ->
+                        backStack.clear()
+                        backStack.add(targetScreen)
+                    }
+                }
     
                 val baseSections = appViewModel.sections
                 val sections = remember(baseSections, currentScreen) {

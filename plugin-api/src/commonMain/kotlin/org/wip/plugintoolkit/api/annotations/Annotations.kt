@@ -76,6 +76,17 @@ annotation class RequiresSetting(
 )
 
 /**
+ * Indicates that the annotated element requires specific plugin lock states (from checkLocks) to be true before it can be used.
+ * Can be applied to enum entries or capability parameters/functions.
+ */
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class RequiresLock(
+    val locks: Array<String>
+)
+
+
+/**
  * Provides metadata for a capability parameter.
  *
  * This information is used by the host application to generate appropriate UI controls
@@ -189,6 +200,14 @@ annotation class PluginSetup
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.SOURCE)
 annotation class PluginValidate
+
+/**
+ * Marks a function that evaluates custom lock/unlock conditions defined by the plugin.
+ * The function must be a suspend function and return Map<String, Boolean>.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class PluginLocks
 
 /**
  * Marks a function to be called during the plugin's load phase.

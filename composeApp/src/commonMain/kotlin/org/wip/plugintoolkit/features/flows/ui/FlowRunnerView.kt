@@ -90,6 +90,11 @@ fun FlowRunnerView(
 ) {
     val state by viewModel.state.collectAsState()
     val jobViewModel: JobViewModel = koinInject()
+    val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = koinInject()
+    val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
+    val providedLocks = remember(pluginLocksState) {
+        pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
+    }
 
     val activeCapabilities = remember(state.flows) {
         org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
@@ -372,8 +377,10 @@ fun FlowRunnerView(
                     isDestructive = currentFlow.isDestructive(),
                     saveResults = viewModel.saveResults,
                     onSaveResultsChange = { viewModel.saveResults = it },
-                    parameters = executionParameters
+                    parameters = executionParameters,
+                    providedLocks = providedLocks
                 )
+
 
                 // Expected Outputs (including SAVE node outputs)
                 if (outputs.isNotEmpty()) {

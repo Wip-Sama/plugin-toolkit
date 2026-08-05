@@ -28,6 +28,9 @@ import org.wip.plugintoolkit.api.annotations.PluginSetting
 import org.wip.plugintoolkit.api.annotations.PluginSetup
 import org.wip.plugintoolkit.api.annotations.PluginUpdate
 import org.wip.plugintoolkit.api.annotations.PluginValidate
+import org.wip.plugintoolkit.api.annotations.PluginLocks
+import kotlinx.serialization.json.booleanOrNull
+import org.wip.plugintoolkit.api.annotations.RequiresLock
 import org.wip.plugintoolkit.api.annotations.RequiresSetting
 import org.wip.plugintoolkit.api.annotations.ResumeState
 import org.wip.plugintoolkit.api.annotations.ComplexObject as ComplexObjectAnnotation
@@ -57,6 +60,13 @@ data class ExampleProgressState(
     val totalSteps: Int,
     val accumulatedValue: String
 )
+
+enum class RestrictedFeatureEnum {
+    STANDARD,
+    
+    @RequiresLock(["feature_unlocked"])
+    EXPERIMENTAL
+}
 
 @ComplexObjectAnnotation(
     id = "org.wip.complete.UserDataPacket",
@@ -94,6 +104,9 @@ enum class FeatureMode {
 
     @RequiresSetting(["secretToken"])
     SECURE,
+
+    @RequiresLock(["feature_unlocked"])
+    EXPERIMENTAL,
     LOCAL
 }
 
@@ -287,5 +300,39 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
             accentColor = "rgb(255, 255, 255)",
             packet = packet.copy(score = packet.score + 10.0)
         )
+    }
+
+    @PluginLocks
+    suspend fun checkLocks(context: PluginContext): Map<String, Boolean> {
+        val isUnlocked = context.storage.get("feature_unlocked")?.let {
+            (it as? JsonPrimitive)?.booleanOrNull
+        } ?: false
+        return mapOf("feature_unlocked" to isUnlocked)
+    }
+
+    @PluginAction(
+        name = "Toggle Feature Lock",
+        description = "Writes a boolean flag to storage to lock or unlock restricted plugin features."
+    )
+    suspend fun toggleFeatureLock(
+        @CapabilityParam(description = "True to unlock features, false to lock") unlocked: Boolean,
+        context: PluginContext
+    ) {
+        context.logger.info("Setting feature lock state in storage: unlocked=$unlocked")
+        context.storage.put("feature_unlocked", JsonPrimitive(unlocked))
+    }
+
+    @Capability(
+        name = "capabilityWithLockRequirement",
+        description = "Showcase of a capability restricted by a dynamic lock flag stored in plugin storage."
+    )
+    @RequiresLock(["feature_unlocked"])
+    suspend fun capabilityWithLockRequirement(
+        @CapabilityParam(description = "Select a feature to run") feature: RestrictedFeatureEnum?,
+        context: PluginContext
+    ): String {
+        val storageValue = context.storage.get("feature_unlocked")
+        val isUnlocked = (storageValue as? JsonPrimitive)?.booleanOrNull
+        return "Feature is unlocked and operational! storageValue=$storageValue, isUnlocked=$isUnlocked, feature=$feature"
     }
 }

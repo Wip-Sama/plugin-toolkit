@@ -459,7 +459,7 @@ interface DataProcessor {
      * @param context The execution context.
      * @return Map of lock keys to boolean state (true = unlocked/satisfied, false = locked).
      */
-    suspend fun checkLocks(context: PluginContext): Map<String, Boolean> {
+    suspend fun refreshLocks(context: PluginContext): Map<String, Boolean> {
         return emptyMap()
     }
 }

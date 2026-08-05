@@ -3,7 +3,11 @@ package org.wip.complete
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.wip.plugintoolkit.api.ExecutionFileSystem
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.HostFileSystem
@@ -170,4 +174,39 @@ class CompleteExampleTest {
         assertTrue(response.contains("LOCAL"))
         assertTrue(response.contains("user_123"))
     }
+
+    @Test
+    fun testManifestSettingsRequiredFlag() {
+        val manifestStream = javaClass.classLoader.getResourceAsStream("META-INF/manifest.json")
+        kotlin.test.assertNotNull(manifestStream, "META-INF/manifest.json resource should exist")
+        val content = manifestStream.bufferedReader().readText()
+        val jsonElement = Json.parseToJsonElement(content)
+        val settingsObj = jsonElement.jsonObject["settings"]?.jsonObject
+        val secretTokenObj = settingsObj?.get("secretToken")?.jsonObject
+        val isRequired = secretTokenObj?.get("required")?.jsonPrimitive?.booleanOrNull
+        assertEquals(true, isRequired, "secretToken should have required=true in manifest.json")
+    }
+
+    @Test
+    fun testToggleFeatureLockActionAndCausality() = runTest {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+        val context = TestPluginContext()
+
+        val initialLocks = plugin.checkLocks(context)
+        assertEquals(false, initialLocks["feature_unlocked"])
+
+        plugin.toggleFeatureLock(unlocked = true, context = context)
+
+        val updatedLocks = plugin.checkLocks(context)
+        assertEquals(true, updatedLocks["feature_unlocked"])
+
+        val result = plugin.capabilityWithLockRequirement(feature = RestrictedFeatureEnum.STANDARD, context = context)
+        assertTrue(result.startsWith("Feature is unlocked and operational!"))
+
+        plugin.toggleFeatureLock(unlocked = false, context = context)
+        val relockedLocks = plugin.checkLocks(context)
+        assertEquals(false, relockedLocks["feature_unlocked"])
+    }
 }
+

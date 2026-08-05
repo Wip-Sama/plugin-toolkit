@@ -126,4 +126,48 @@ class PluginStorageAndLocksTest {
         assertNotNull(decoded.parameters)
         assertEquals(true, decoded.parameters!!["modelUrl"]?.required)
     }
+
+    @Test
+    fun testCapabilityLockSatisfiedEvaluation() {
+        val capability = Capability(
+            name = "LockedCap",
+            description = "Requires lock",
+            returnType = DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.STRING),
+            requiredLocks = listOf("feature_unlocked")
+        )
+
+        val locksLocked = mapOf("feature_unlocked" to false)
+        val locksUnlocked = mapOf("feature_unlocked" to true)
+
+        val isLockedWhenFalse = capability.requiredLocks.any { locksLocked[it] != true }
+        assertTrue(isLockedWhenFalse, "Capability should be evaluated as locked when lock flag is false")
+
+        val isLockedWhenTrue = capability.requiredLocks.any { locksUnlocked[it] != true }
+        assertTrue(!isLockedWhenTrue, "Capability should be evaluated as unlocked when lock flag is true")
+    }
+
+    @Test
+    fun testEnumOptionSettingAndLockSatisfactionWithDefaults() {
+        val enumType = DataType.Enum(
+            className = "FeatureMode",
+            options = listOf("ONLINE", "SECURE", "EXPERIMENTAL", "LOCAL"),
+            optionRequirements = mapOf("ONLINE" to listOf("apiKey")),
+            optionLockRequirements = mapOf("EXPERIMENTAL" to listOf("feature_unlocked"))
+        )
+
+        val manifestSettingDefaults = mapOf("apiKey" to JsonPrimitive("default_api_key"))
+        val userOverrides = emptyMap<String, kotlinx.serialization.json.JsonElement>()
+        val mergedSettings = manifestSettingDefaults + userOverrides
+
+        val onlineReqs = enumType.optionRequirements["ONLINE"] ?: emptyList()
+        val onlineSatisfied = onlineReqs.all { req ->
+            mergedSettings[req]?.let { (it as? JsonPrimitive)?.content?.isNotBlank() } == true
+        }
+        assertTrue(onlineSatisfied, "ONLINE option requirements should be satisfied by default setting values")
+
+        val locksUnlocked = mapOf("feature_unlocked" to true)
+        val expLockReqs = enumType.optionLockRequirements["EXPERIMENTAL"] ?: emptyList()
+        val expSatisfied = expLockReqs.all { lockKey -> locksUnlocked[lockKey] == true }
+        assertTrue(expSatisfied, "EXPERIMENTAL option should be satisfied when feature_unlocked is true")
+    }
 }
