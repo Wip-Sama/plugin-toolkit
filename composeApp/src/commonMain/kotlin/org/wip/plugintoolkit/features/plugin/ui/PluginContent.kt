@@ -80,6 +80,7 @@ fun PluginContent(
 
         val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = org.koin.compose.koinInject()
         val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
+        val pluginSettingsState by pluginManager.pluginSettingsState.collectAsState()
         val pluginId = viewModel.selectedPlugin?.getManifest()?.getOrNull()?.plugin?.id
 
         LaunchedEffect(pluginId) {
@@ -95,9 +96,9 @@ fun PluginContent(
                 emptyMap()
             }
         }
-        val settingsStore = if (pluginId != null) pluginManager.loadPluginSettings(pluginId) else null
-        val providedSettings = remember(pluginId, settingsStore) {
-            (settingsStore?.settings ?: emptyMap()) + (settingsStore?.globalParams ?: emptyMap())
+        val providedSettings = remember(pluginId, pluginSettingsState) {
+            val store = if (pluginId != null) pluginSettingsState[pluginId] ?: pluginManager.loadPluginSettings(pluginId) else null
+            (store?.settings ?: emptyMap()) + (store?.globalParams ?: emptyMap())
         }
 
 

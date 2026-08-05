@@ -26,6 +26,7 @@ class PluginManager(
     val loadedPlugins: StateFlow<Set<String>> = lifecycleManager.loadedPlugins
     val isRegistryReady: StateFlow<Boolean> = registry.isReady
     val pluginLocksState: StateFlow<Map<String, Map<String, Boolean>>> = lifecycleManager.pluginLocksState
+    val pluginSettingsState: StateFlow<Map<String, PluginSettingsStore>> = lifecycleManager.pluginSettingsState
 
     init {
         Logger.i { "Initializing PluginManager facade" }

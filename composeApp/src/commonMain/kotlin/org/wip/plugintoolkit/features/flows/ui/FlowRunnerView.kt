@@ -92,6 +92,7 @@ fun FlowRunnerView(
     val jobViewModel: JobViewModel = koinInject()
     val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = koinInject()
     val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
+    val pluginSettingsState by pluginManager.pluginSettingsState.collectAsState()
     val providedLocks = remember(pluginLocksState) {
         pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
     }
@@ -369,6 +370,17 @@ fun FlowRunnerView(
                     )
                 }
 
+                val providedSettings = remember(currentFlow, pluginSettingsState) {
+                    val pluginIds = currentFlow?.nodes?.filterIsInstance<Node.CapabilityNode>()?.map { it.pluginInfo.id }?.distinct() ?: emptyList()
+                    val merged = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+                    pluginIds.forEach { pkg ->
+                        val store = pluginSettingsState[pkg] ?: pluginManager.loadPluginSettings(pkg)
+                        merged.putAll(store.settings)
+                        merged.putAll(store.globalParams)
+                    }
+                    merged
+                }
+
                 org.wip.plugintoolkit.shared.components.plugin.ExecutionParametersCard(
                     title = stringResource(Res.string.flow_run_title, currentFlow.name),
                     icon = Icons.Default.PlayArrow,
@@ -378,6 +390,7 @@ fun FlowRunnerView(
                     saveResults = viewModel.saveResults,
                     onSaveResultsChange = { viewModel.saveResults = it },
                     parameters = executionParameters,
+                    providedSettings = providedSettings,
                     providedLocks = providedLocks
                 )
 

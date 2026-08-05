@@ -45,6 +45,7 @@ class LockBugReproductionGUITest {
         mockNotificationService = io.mockk.mockk<NotificationService>(relaxed = true)
 
         io.mockk.every { mockManager.pluginLocksState } returns MutableStateFlow(emptyMap())
+        io.mockk.every { mockManager.pluginSettingsState } returns MutableStateFlow(emptyMap())
         io.mockk.every { mockManager.loadedPlugins } returns MutableStateFlow(setOf("org.wip.complete"))
         io.mockk.every { mockJobManager.jobs } returns MutableStateFlow(emptyList())
 
@@ -134,11 +135,14 @@ class LockBugReproductionGUITest {
 
         val mockEntry = io.mockk.mockk<PluginEntry>(relaxed = true)
         io.mockk.every { mockEntry.getManifest() } returns Result.success(manifest)
-        // PluginSettingsStore has apiKey and secretToken saved in settings!
-        io.mockk.every { mockManager.loadPluginSettings("org.wip.complete") } returns PluginSettingsStore(
-            settings = mapOf(
-                "apiKey" to JsonPrimitive("key123"),
-                "secretToken" to JsonPrimitive("token123")
+        io.mockk.every { mockManager.pluginSettingsState } returns MutableStateFlow(
+            mapOf(
+                "org.wip.complete" to PluginSettingsStore(
+                    settings = mapOf(
+                        "apiKey" to JsonPrimitive("key123"),
+                        "secretToken" to JsonPrimitive("token123")
+                    )
+                )
             )
         )
 
@@ -224,9 +228,11 @@ class LockBugReproductionGUITest {
         val mockEntry = io.mockk.mockk<PluginEntry>(relaxed = true)
         io.mockk.every { mockEntry.getManifest() } returns Result.success(manifest)
 
-        // Mock loadPluginSettings to return PluginSettingsStore with settings (where user entered userId)
-        io.mockk.every { mockManager.loadPluginSettings("org.wip.complete") } returns PluginSettingsStore(
-            settings = mapOf("userId" to JsonPrimitive("1234123412"))
+        // Mock pluginSettingsState to return PluginSettingsStore with settings (where user entered userId)
+        io.mockk.every { mockManager.pluginSettingsState } returns MutableStateFlow(
+            mapOf("org.wip.complete" to PluginSettingsStore(
+                settings = mapOf("userId" to JsonPrimitive("1234123412"))
+            ))
         )
 
         val viewModel = PluginViewModel(mockJobManager, mockNotificationService, mockManager)

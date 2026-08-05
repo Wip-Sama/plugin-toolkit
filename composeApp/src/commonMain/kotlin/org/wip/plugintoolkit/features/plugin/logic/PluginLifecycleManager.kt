@@ -45,7 +45,8 @@ class PluginLifecycleManager(
     val pluginLocksState: StateFlow<Map<String, Map<String, Boolean>>> = _pluginLocksState.asStateFlow()
 
     // Cache for decrypted plugin settings to avoid redundant IO and decryption
-    private val settingsCache = atomic(persistentMapOf<String, PluginSettingsStore>())
+    private val _pluginSettingsState = MutableStateFlow<Map<String, PluginSettingsStore>>(emptyMap())
+    val pluginSettingsState: StateFlow<Map<String, PluginSettingsStore>> = _pluginSettingsState.asStateFlow()
 
     private val json = kotlinx.serialization.json.Json {
         prettyPrint = true
@@ -248,7 +249,7 @@ class PluginLifecycleManager(
 
     fun loadPluginSettings(pkg: String): PluginSettingsStore {
         // Return from cache if available
-        settingsCache.value[pkg]?.let { return it }
+        _pluginSettingsState.value[pkg]?.let { return it }
 
         val plugin = registry.getPlugin(pkg) ?: return PluginSettingsStore()
         val settingsFile = "${plugin.installPath}/settings.json"
@@ -286,7 +287,7 @@ class PluginLifecycleManager(
         }
 
         val decryptedStore = store.copy(settings = decryptedSettings)
-        settingsCache.update { it.put(pkg, decryptedStore) }
+        _pluginSettingsState.update { it + (pkg to decryptedStore) }
         return decryptedStore
     }
 
@@ -309,7 +310,7 @@ class PluginLifecycleManager(
         try {
             fileSystem.writeFile(settingsFile, json.encodeToString(storeToSave))
             // Update cache with the decrypted store
-            settingsCache.update { it.put(pkg, store) }
+            _pluginSettingsState.update { it + (pkg to store) }
         } catch (t: Throwable) {
             Logger.e(t) { "Failed to save settings for $pkg" }
         }
