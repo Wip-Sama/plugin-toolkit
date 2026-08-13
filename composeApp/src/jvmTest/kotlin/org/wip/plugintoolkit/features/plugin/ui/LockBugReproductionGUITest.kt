@@ -3,8 +3,10 @@ package org.wip.plugintoolkit.features.plugin.ui
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.JsonPrimitive
@@ -246,5 +248,75 @@ class LockBugReproductionGUITest {
         // When userId setting IS provided in PluginSettingsStore.settings,
         // PluginContent passes it down so "Requires setting: userId" DOES NOT exist.
         onNodeWithText("Requires setting: userId").assertDoesNotExist()
+    }
+
+    /**
+     * Bug 1d Test:
+     * When a setting is updated in PluginSettingsViewModel (in PluginSettingsDialog),
+     * locks MUST be refreshed dynamically for the updated store in real-time.
+     */
+    @Test
+    fun testBug1d_pluginSettingsViewModelRefreshesLocksOnSettingUpdate() = runDesktopComposeUiTest {
+        val enumType = DataType.Enum(
+            className = "org.wip.complete.FeatureMode",
+            options = listOf("ONLINE", "SECURE", "EXPERIMENTAL"),
+            optionLockRequirements = mapOf("EXPERIMENTAL" to listOf("feature_unlocked"))
+        )
+        val cap = Capability(
+            name = "cap1",
+            description = "Cap 1",
+            returnType = DataType.Primitive(PrimitiveType.UNIT),
+            parameters = mapOf("mode" to ParameterMetadata(description = "Mode", type = enumType))
+        )
+        val manifest = PluginManifest(
+            manifestVersion = "1.0",
+            plugin = PluginInfo("org.wip.complete", "Complete Plugin", "1.0", "Description"),
+            requirements = Requirements(512, 5000),
+            settings = mapOf("secretToken" to SettingMetadata(description = "Secret Token", type = DataType.Primitive(PrimitiveType.STRING))),
+            capabilities = listOf(cap)
+        )
+
+        val locksFlow = MutableStateFlow(mapOf("org.wip.complete" to mapOf("feature_unlocked" to false)))
+
+        io.mockk.coEvery { mockManager.refreshLocks("org.wip.complete", any()) } answers {
+            val store = secondArg<PluginSettingsStore?>()
+            val unlocked = store?.settings?.get("secretToken")?.let { (it as? JsonPrimitive)?.content?.isNotBlank() } == true
+            val locks = mapOf("feature_unlocked" to unlocked)
+            locksFlow.value = mapOf("org.wip.complete" to locks)
+            locks
+        }
+        io.mockk.every { mockManager.getManifest("org.wip.complete") } returns manifest
+        io.mockk.every { mockManager.loadPluginSettings("org.wip.complete") } returns PluginSettingsStore()
+        io.mockk.every { mockManager.pluginLocksState } returns locksFlow
+
+        val viewModel = PluginSettingsViewModel("org.wip.complete", mockManager, mockJobManager)
+
+        setContent {
+            PluginSettingsDialog(
+                pkg = "org.wip.complete",
+                onDismiss = {},
+                viewModel = viewModel
+            )
+        }
+
+        // Open dropdown menu
+        onAllNodesWithText("ONLINE")[0].performClick()
+        // Before updating setting, EXPERIMENTAL option is disabled
+        onNodeWithText("EXPERIMENTAL").assertIsNotEnabled()
+        // Close dropdown menu
+        onAllNodesWithText("ONLINE")[0].performClick()
+
+        // Update setting in memory
+        viewModel.updateSetting("secretToken", JsonPrimitive("token123"))
+
+        // Allow background coroutines to process lock calculations
+        Thread.sleep(200)
+        waitForIdle()
+
+        // Re-open dropdown menu to inspect updated state
+        onAllNodesWithText("ONLINE")[0].performClick()
+
+        // EXPERIMENTAL option MUST be enabled now!
+        onNodeWithText("EXPERIMENTAL").assertIsEnabled()
     }
 }

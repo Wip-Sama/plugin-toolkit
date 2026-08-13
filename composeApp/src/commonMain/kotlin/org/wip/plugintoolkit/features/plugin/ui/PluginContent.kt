@@ -38,6 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.serialization.json.JsonPrimitive
+import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PrimitiveType
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.ParameterRole
@@ -98,7 +101,13 @@ fun PluginContent(
         }
         val providedSettings = remember(pluginId, pluginSettingsState) {
             val store = if (pluginId != null) pluginSettingsState[pluginId] ?: pluginManager.loadPluginSettings(pluginId) else null
-            (store?.settings ?: emptyMap()) + (store?.globalParams ?: emptyMap())
+            val manifest = viewModel.selectedPlugin?.getManifest()?.getOrNull()
+            val manifestDefaults = (manifest?.settings?.mapValues { (_, meta) ->
+                meta.defaultValue ?: if (meta.type is DataType.Primitive && (meta.type as DataType.Primitive).primitiveType == PrimitiveType.BOOLEAN) {
+                    JsonPrimitive(false)
+                } else null
+            }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement>
+            manifestDefaults + (store?.settings ?: emptyMap()) + (store?.globalParams ?: emptyMap())
         }
 
 

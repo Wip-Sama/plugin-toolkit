@@ -55,4 +55,21 @@ class SettingsUtilsTest {
         val result = SettingsUtils.validateCapabilityLocksAndSettings(capability, locks, settings)
         assertEquals("Requires setting: apiKey", result)
     }
+
+    @Test
+    fun testStringToJsonAndJsonToStringForPrimitiveBooleanDefaults() {
+        val booleanType = DataType.Primitive(PrimitiveType.BOOLEAN)
+
+        val jsonFromEmpty = SettingsUtils.stringToJson("", booleanType)
+        assertEquals(kotlinx.serialization.json.JsonPrimitive(false), jsonFromEmpty, "Empty string for Primitive BOOLEAN must convert to JsonPrimitive(false)")
+
+        val jsonFromNullStr = SettingsUtils.stringToJson("null", booleanType)
+        assertEquals(kotlinx.serialization.json.JsonPrimitive(false), jsonFromNullStr, "String 'null' for Primitive BOOLEAN must convert to JsonPrimitive(false)")
+
+        val stringFromNullJson = SettingsUtils.jsonToString(kotlinx.serialization.json.JsonNull, booleanType)
+        assertEquals("false", stringFromNullJson, "JsonNull for Primitive BOOLEAN must convert to 'false'")
+
+        val stringFromNullElement = SettingsUtils.jsonToString(null, booleanType)
+        assertEquals("false", stringFromNullElement, "null JsonElement for Primitive BOOLEAN must convert to 'false'")
+    }
 }

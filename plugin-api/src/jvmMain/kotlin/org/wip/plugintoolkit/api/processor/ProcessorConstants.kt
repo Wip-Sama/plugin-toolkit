@@ -88,6 +88,8 @@ object ProcessorConstants {
     // Functions and Members
     val MN_GET_DATA_TYPE = MemberName(API_PACKAGE, "getDataType")
     val CN_JSON = Json::class.asClassName()
+    val CN_JSON_NULL = ClassName("kotlinx.serialization.json", "JsonNull")
+    val CN_BOOLEAN = Boolean::class.asClassName()
     val MN_DECODE_FROM_JSON_ELEMENT = MemberName("kotlinx.serialization.json", "decodeFromJsonElement")
     val MN_ENCODE_FROM_JSON_ELEMENT = MemberName("kotlinx.serialization.json", "encodeToJsonElement")
 

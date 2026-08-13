@@ -122,7 +122,9 @@ sealed class DataType {
     @SerialName("primitive")
     data class Primitive(val primitiveType: PrimitiveType) : DataType() {
         override fun isProvided(value: JsonElement?): Boolean {
-            if (value == null || value is JsonNull) return false
+            if (value == null || value is JsonNull) {
+                return primitiveType == PrimitiveType.BOOLEAN
+            }
             return when (primitiveType) {
                 PrimitiveType.STRING -> (value as? JsonPrimitive)?.content?.isNotBlank() ?: false
                 else -> true // Other primitives are provided if they exist

@@ -123,7 +123,8 @@ class PluginManager(
         }
     }
 
-    suspend fun refreshLocks(pkg: String) = lifecycleManager.refreshLocks(pkg)
+    suspend fun refreshLocks(pkg: String, overriddenSettings: org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore? = null) =
+        lifecycleManager.refreshLocks(pkg, overriddenSettings)
 
     fun getManifest(pkg: String): PluginManifest? = lifecycleManager.getManifest(pkg)
 

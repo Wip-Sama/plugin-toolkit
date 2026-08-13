@@ -55,8 +55,10 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
+import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
+import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
@@ -357,6 +359,17 @@ fun PluginSettingsDialog(
                                     brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outlineVariant)
                                 )
                             ) {
+                                val manifestDefaults = remember(manifest) {
+                                    (manifest.settings?.mapValues { (_, meta) ->
+                                        meta.defaultValue ?: if (meta.type is DataType.Primitive && (meta.type as DataType.Primitive).primitiveType == PrimitiveType.BOOLEAN) {
+                                            JsonPrimitive(false)
+                                        } else null
+                                    }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement>
+                                }
+                                val providedSettings = remember(manifestDefaults, store.settings) {
+                                    manifestDefaults + store.settings
+                                }
+
                                 LazyColumn(
                                     state = lazyListState,
                                     modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.medium),
@@ -409,7 +422,7 @@ fun PluginSettingsDialog(
                                                                 )
                                                             },
                                                             enabled = !isBusy,
-                                                            providedSettings = (manifest.settings?.mapValues { it.value.defaultValue }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement> + store.settings,
+                                                            providedSettings = providedSettings,
                                                             providedLocks = locks
                                                         )
 
@@ -455,7 +468,7 @@ fun PluginSettingsDialog(
                                                                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
                                                                             )
                                                                         },
-                                                                        style = ToolkitChipStyle.Tinted
+                                                                        style = ToolkitChipStyle.Outlined
                                                                     )
                                                                 }
                                                             }
@@ -482,7 +495,7 @@ fun PluginSettingsDialog(
                                                             )
                                                         },
                                                         enabled = !isBusy,
-                                                        providedSettings = store.settings
+                                                        providedSettings = providedSettings
                                                     )
                                                 }
                                             }
@@ -508,7 +521,8 @@ fun PluginSettingsDialog(
                                                             )
                                                         },
                                                         enabled = !isBusy,
-                                                        providedSettings = store.settings
+                                                        providedSettings = providedSettings,
+                                                        providedLocks = locks
                                                     )
                                                 }
                                             }

@@ -35,6 +35,16 @@ class DataTypeTest {
     }
 
     @Test
+    fun testPrimitiveBooleanImplicitDefault() {
+        val type = DataType.Primitive(PrimitiveType.BOOLEAN)
+
+        assertTrue(type.isProvided(JsonPrimitive(true)), "Should be provided for true")
+        assertTrue(type.isProvided(JsonPrimitive(false)), "Should be provided for false")
+        assertTrue(type.isProvided(null), "Should be provided for null as implicit false default")
+        assertTrue(type.isProvided(JsonNull), "Should be provided for JsonNull as implicit false default")
+    }
+
+    @Test
     fun testArray() {
         val type = DataType.Array(DataType.Primitive(PrimitiveType.STRING))
 

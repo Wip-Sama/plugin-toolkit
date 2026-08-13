@@ -255,7 +255,12 @@ object SettingsUtils {
     }
 
     fun jsonToString(element: JsonElement?, type: DataType): String {
-        if (element == null || element is JsonNull) return ""
+        if (element == null || element is JsonNull) {
+            if (type is DataType.Primitive && type.primitiveType == PrimitiveType.BOOLEAN) {
+                return "false"
+            }
+            return ""
+        }
         return when (type) {
             is DataType.Primitive -> {
                 if (element is JsonPrimitive) {
@@ -291,13 +296,16 @@ object SettingsUtils {
     }
 
     fun stringToJson(value: String, type: DataType): JsonElement {
-        if (value.isEmpty()) {
+        if (value.isEmpty() || value.equals("null", ignoreCase = true)) {
             return when (type) {
                 is DataType.Primitive -> {
-                    if (type.primitiveType == PrimitiveType.STRING) {
-                        JsonPrimitive("")
-                    } else {
-                        JsonNull
+                    when (type.primitiveType) {
+                        PrimitiveType.STRING -> JsonPrimitive("")
+                        PrimitiveType.BOOLEAN -> JsonPrimitive(false)
+                        PrimitiveType.INT -> JsonPrimitive(0)
+                        PrimitiveType.DOUBLE -> JsonPrimitive(0.0)
+                        PrimitiveType.LONG -> JsonPrimitive(0L)
+                        else -> JsonNull
                     }
                 }
 

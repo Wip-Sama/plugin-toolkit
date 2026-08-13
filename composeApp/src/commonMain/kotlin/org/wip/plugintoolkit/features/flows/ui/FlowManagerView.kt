@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import co.touchlab.kermit.Logger
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -274,7 +275,12 @@ fun FlowManagerView(
                         notReadyNodes = notReadyNodes,
                         isRunning = isRunning,
                         isSelected = state.selectedFlowId == flow.name,
-                        onSelect = { onRunFlow(flow.name) },
+                        onSelect = {
+                            if (missingCapabilities.isNotEmpty() || notReadyNodes.isNotEmpty()) {
+                                Logger.w { "Cannot run flow '${flow.name}': Flow is not ready (missingCapabilities: $missingCapabilities, notReadyNodes: $notReadyNodes)" }
+                            }
+                            onRunFlow(flow.name)
+                        },
                         onEditMetadata = { flowToEditMetadata = flow.name },
                         onEdit = {
                             viewModel.onEvent(FlowEvent.SelectFlow(flow.name))

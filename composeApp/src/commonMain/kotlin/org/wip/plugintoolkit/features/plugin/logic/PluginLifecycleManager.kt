@@ -323,13 +323,14 @@ class PluginLifecycleManager(
         manifest: PluginManifest? = null,
         allowedPaths: List<String> = emptyList(),
         isDestructiveAllowed: Boolean = false,
-        executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null
+        executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null,
+        overriddenSettings: PluginSettingsStore? = null
     ): PluginContext {
         val plugin = registry.getPlugin(pkg)
         val installPath = plugin?.installPath ?: ""
         val jarFullPath = plugin?.let { "${it.installPath}/${it.jarFileName}" }
 
-        val storedSettings = loadPluginSettings(pkg)
+        val storedSettings = overriddenSettings ?: loadPluginSettings(pkg)
         val actualManifest = manifest ?: getManifest(pkg)
         val mergedSettings = mutableMapOf<String, JsonElement>()
 
@@ -407,10 +408,13 @@ class PluginLifecycleManager(
         } ?: emptyList()
     }
 
-    suspend fun refreshLocks(pkg: String): Map<String, Boolean> {
+    suspend fun refreshLocks(
+        pkg: String,
+        overriddenSettings: PluginSettingsStore? = null
+    ): Map<String, Boolean> {
         val entry = PluginLoader.getPluginById(pkg) ?: return emptyMap()
         val processor = entry.getProcessor().getOrNull() ?: return emptyMap()
-        val context = createPluginContext(pkg)
+        val context = createPluginContext(pkg, overriddenSettings = overriddenSettings)
         return try {
             val locks = processor.refreshLocks(context)
             _pluginLocksState.update { current ->

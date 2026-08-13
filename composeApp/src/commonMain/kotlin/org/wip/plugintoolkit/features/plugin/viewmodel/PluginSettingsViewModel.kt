@@ -38,25 +38,46 @@ class PluginSettingsViewModel(
         }
         viewModelScope.launch {
             pluginManager.pluginLocksState.collect { map ->
-                locks.value = map[pkg] ?: emptyMap()
+                map[pkg]?.let { locks.value = it }
             }
         }
     }
 
     fun updateSetting(key: String, value: JsonElement) {
-        _store.update { it.copy(settings = it.settings + (key to value)) }
+        _store.update { current ->
+            val updated = current.copy(settings = current.settings + (key to value))
+            viewModelScope.launch {
+                val newLocks = pluginManager.refreshLocks(pkg, updated)
+                locks.value = newLocks
+            }
+            updated
+        }
     }
 
     fun updateGlobalParam(key: String, value: JsonElement) {
-        _store.update { it.copy(globalParams = it.globalParams + (key to value)) }
+        _store.update { current ->
+            val updated = current.copy(globalParams = current.globalParams + (key to value))
+            viewModelScope.launch {
+                val newLocks = pluginManager.refreshLocks(pkg, updated)
+                locks.value = newLocks
+            }
+            updated
+        }
     }
 
     fun updateCapabilityParam(capability: String, key: String, value: JsonElement) {
-        val currentCaps = _store.value.capabilityParams.toMutableMap()
-        val capParams = currentCaps[capability]?.toMutableMap() ?: mutableMapOf()
-        capParams[key] = value
-        currentCaps[capability] = capParams
-        _store.update { it.copy(capabilityParams = currentCaps) }
+        _store.update { current ->
+            val currentCaps = current.capabilityParams.toMutableMap()
+            val capParams = currentCaps[capability]?.toMutableMap() ?: mutableMapOf()
+            capParams[key] = value
+            currentCaps[capability] = capParams
+            val updated = current.copy(capabilityParams = currentCaps)
+            viewModelScope.launch {
+                val newLocks = pluginManager.refreshLocks(pkg, updated)
+                locks.value = newLocks
+            }
+            updated
+        }
     }
 
     fun save() {

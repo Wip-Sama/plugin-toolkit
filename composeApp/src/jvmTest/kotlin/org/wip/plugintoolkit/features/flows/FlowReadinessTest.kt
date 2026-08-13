@@ -96,4 +96,31 @@ class FlowReadinessTest {
 
         assertFalse(readyFlow.isBroken(setOf("TestCap")), "Flow should not be broken if all nodes are ready")
     }
+
+    @Test
+    fun testNodeReadinessWithImplicitBooleanDefault() {
+        val pluginInfo = PluginInfo("test.plugin", "Test Plugin", "1.0", "Test")
+        val boolParam = ParameterMetadata(
+            description = "Bool Param",
+            type = DataType.Primitive(PrimitiveType.BOOLEAN),
+            required = true
+        )
+        val capability = Capability(
+            name = "TestCapBool",
+            description = "Desc",
+            parameters = mapOf("boolPort" to boolParam),
+            returnType = DataType.Primitive(PrimitiveType.UNIT)
+        )
+        val boolInput = InputPort("boolPort", "Bool Port", DataType.Primitive(PrimitiveType.BOOLEAN), value = null, defaultValue = null)
+        val node = Node.CapabilityNode(
+            id = 1L,
+            position = Offset.Zero,
+            pluginInfo = pluginInfo,
+            capability = capability,
+            inputs = listOf(boolInput),
+            outputs = emptyList()
+        )
+
+        assertTrue(node.isReady(emptyList()), "Node should be ready even when boolean parameter is untouched (implicit default false)")
+    }
 }

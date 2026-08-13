@@ -14,10 +14,12 @@ import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_BOOLEAN
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DATA_PROCESSOR
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_RESULT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_ILLEGAL_ARGUMENT_EXCEPTION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON_NULL
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_MAP
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ACTION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_CONTEXT
@@ -96,7 +98,6 @@ object DispatcherGenerator {
                 val paramName = param.name?.asString() ?: ""
                 val paramType = param.type.resolve().toTypeName()
                 val isNullable = param.type.resolve().isMarkedNullable
-                val hasDefault = param.hasDefault
 
                 when {
                     paramType == CN_PLUGIN_LOGGER -> {
@@ -132,21 +133,22 @@ object DispatcherGenerator {
                         )
                     }
 
-                    hasDefault -> {
+                    isNullable -> {
                         mapCode.add(
-                            "if (request.parameters.containsKey(%S)) %T.%M<%T>(request.parameters[%S]!!) else null",
+                            "request.parameters[%S]?.takeIf { it !is %T }?.let { %T.%M<%T>(it) }",
                             paramName,
+                            CN_JSON_NULL,
                             CN_JSON,
                             MN_DECODE_FROM_JSON_ELEMENT,
-                            paramType.copy(nullable = false),
-                            paramName
+                            paramType
                         )
                     }
 
-                    isNullable -> {
+                    paramType == CN_BOOLEAN -> {
                         mapCode.add(
-                            "request.parameters[%S]?.let { %T.%M<%T>(it) }",
+                            "request.parameters[%S]?.takeIf { it !is %T }?.let { %T.%M<%T>(it) } ?: false",
                             paramName,
+                            CN_JSON_NULL,
                             CN_JSON,
                             MN_DECODE_FROM_JSON_ELEMENT,
                             paramType
@@ -155,11 +157,12 @@ object DispatcherGenerator {
 
                     else -> {
                         mapCode.add(
-                            "%T.%M<%T>(request.parameters[%S] ?: throw %T(%S))",
+                            "request.parameters[%S]?.takeIf { it !is %T }?.let { %T.%M<%T>(it) } ?: throw %T(%S)",
+                            paramName,
+                            CN_JSON_NULL,
                             CN_JSON,
                             MN_DECODE_FROM_JSON_ELEMENT,
                             paramType,
-                            paramName,
                             CN_ILLEGAL_ARGUMENT_EXCEPTION,
                             "Missing mandatory parameter: $paramName"
                         )
@@ -287,8 +290,9 @@ object DispatcherGenerator {
                         if (isNullable) {
                             argExprs.add(
                                 CodeBlock.of(
-                                    "actionParams[%S]?.let { %T.%M<%T>(it) }",
+                                    "actionParams[%S]?.takeIf { it !is %T }?.let { %T.%M<%T>(it) }",
                                     paramName,
+                                    CN_JSON_NULL,
                                     CN_JSON,
                                     MN_DECODE_FROM_JSON_ELEMENT,
                                     paramType
@@ -297,18 +301,31 @@ object DispatcherGenerator {
                         } else if (hasDefault) {
                             argExprs.add(
                                 CodeBlock.of(
-                                    "actionParams[%S]?.let { %T.%M<%T>(it) }",
+                                    "actionParams[%S]?.takeIf { it !is %T }?.let { %T.%M<%T>(it) }",
                                     paramName,
+                                    CN_JSON_NULL,
                                     CN_JSON,
                                     MN_DECODE_FROM_JSON_ELEMENT,
                                     paramType.copy(nullable = false)
                                 )
                             )
+                        } else if (paramType == CN_BOOLEAN) {
+                            argExprs.add(
+                                CodeBlock.of(
+                                    "actionParams[%S]?.takeIf { it !is %T }?.let { %T.%M<%T>(it) } ?: false",
+                                    paramName,
+                                    CN_JSON_NULL,
+                                    CN_JSON,
+                                    MN_DECODE_FROM_JSON_ELEMENT,
+                                    paramType
+                                )
+                            )
                         } else {
                             argExprs.add(
                                 CodeBlock.of(
-                                    "actionParams[%S]?.let { %T.%M<%T>(it) } ?: throw %T(%S)",
+                                    "actionParams[%S]?.takeIf { it !is %T }?.let { %T.%M<%T>(it) } ?: throw %T(%S)",
                                     paramName,
+                                    CN_JSON_NULL,
                                     CN_JSON,
                                     MN_DECODE_FROM_JSON_ELEMENT,
                                     paramType,
@@ -351,9 +368,10 @@ object DispatcherGenerator {
             .addParameter("context", CN_PLUGIN_CONTEXT)
             .returns(CN_RESULT.parameterizedBy(Unit::class.asClassName()))
             .addStatement(
-                "val handler = actionHandlers[action.functionName.lowercase()] ?: return %T.failure(%T(\"Unknown action: \${action.functionName}\"))",
+                "val handler = actionHandlers[action.functionName.lowercase()] ?: return %T.failure(%T(%S))",
                 CN_RESULT,
-                CN_ILLEGAL_ARGUMENT_EXCEPTION
+                CN_ILLEGAL_ARGUMENT_EXCEPTION,
+                "Unknown action: \${action.functionName}"
             )
             .addStatement("return handler(parameters, context)")
 

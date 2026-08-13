@@ -557,6 +557,17 @@ class FlowViewModel(
     }
 
     fun executeFlow(flow: Flow, parameterValues: Map<String, String>) {
+        val activeCapabilities = org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
+            .mapNotNull { it.getManifest().getOrNull() }
+            .flatMap { it.capabilities }
+            .map { it.name }
+            .toSet()
+
+        if (flow.isBroken(activeCapabilities)) {
+            Logger.e { "Failed to execute flow '${flow.name}': Flow contains broken or unready nodes." }
+            return
+        }
+
         viewModelScope.launch {
             try {
                 val jobManager = getKoin().get<JobManager>()

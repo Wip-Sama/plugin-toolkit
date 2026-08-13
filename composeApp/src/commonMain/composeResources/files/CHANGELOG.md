@@ -21,12 +21,12 @@ Added:
   - Support for read/write stream in PluginFileSystem
   - Support for portable installations (TODO)
   - Local repository (TODO)
-  - Custom locks for enums/capabilities (TODO)
+  - Custom locks for enums/capabilities
   - Parameters to plugin actions
   - PluginStorage to give plugins a way to have custom persistent data
 Fixed:
   - Locks are now safely evicted from jarLocks when no active operations remain
-  - Switch would need to be toggled on/off to be able to be used in the default state (TODO)
+  - Switch would need to be toggled on/off to be able to be used in the default state
 Planned:
   - A button to clear the sandbox folder
 Note:
