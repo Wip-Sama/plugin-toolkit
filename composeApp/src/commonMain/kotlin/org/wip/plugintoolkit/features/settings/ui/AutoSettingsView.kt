@@ -117,9 +117,18 @@ private fun RenderSettingDefinition(
                 shape = shape,
                 control = {
                     SettingsSwitch(
-                        checked = definition.getValue(settings), onCheckedChange = { checked ->
-                            onUpdate(definition.setValue(settings, checked))
-                        })
+                        checked = definition.getValue(settings),
+                        onCheckedChange = { checked ->
+                            val beforeChange = definition.onBeforeChange
+                            if (beforeChange != null) {
+                                beforeChange(checked) {
+                                    onUpdate(definition.setValue(settings, checked))
+                                }
+                            } else {
+                                onUpdate(definition.setValue(settings, checked))
+                            }
+                        }
+                    )
                 })
         }
 

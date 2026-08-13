@@ -20,7 +20,7 @@ interface SystemConfig {
     val LINUX_DESKTOP_FILENAME: String
 }
 
-class DefaultSystemConfig : SystemConfig {
+open class DefaultSystemConfig : SystemConfig {
     override val APP_DATA_DIR_NAME = "PluginToolkit"
     override val LEGACY_SETTINGS_DIR_NAME = ".plugintoolkit"
     override val SETTINGS_FILE_NAME = "settings.json"
@@ -35,3 +35,9 @@ class DefaultSystemConfig : SystemConfig {
     override val LINUX_AUTOSTART_DIR = ".config/autostart"
     override val LINUX_DESKTOP_FILENAME = "${STARTUP_APP_NAME.lowercase()}.desktop"
 }
+
+/**
+ * This needs to have it's setting configured for teh portavle installation
+ * We alsdo need to have some things disbale for portable installation like "launch at startup" Sicne we need to chaneg as little as possible of the host machine
+ */
+class PortableSystemConfig : DefaultSystemConfig()

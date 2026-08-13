@@ -52,6 +52,7 @@ sealed class SettingDefinition {
         override val sectionTitle: SettingText,
         override val navKey: SettingNavKey,
         override val enabled: (AppSettings) -> Boolean = { true },
+        val onBeforeChange: ((checked: Boolean, onProceed: () -> Unit) -> Unit)? = null,
         val getValue: (AppSettings) -> Boolean,
         val setValue: (AppSettings, Boolean) -> AppSettings
     ) : SettingDefinition()

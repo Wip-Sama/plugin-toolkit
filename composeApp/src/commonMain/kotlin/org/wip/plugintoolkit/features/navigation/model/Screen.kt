@@ -30,10 +30,10 @@ sealed interface Screen : NavKey {
     data object Plugins : Screen
 
     @Serializable
-    data class Plugin(val id: String) : Screen
+    data class Plugin(val id: String, val scrollToSetting: String? = null) : Screen
 
     @Serializable
-    data object PluginManager : Screen
+    data class PluginManager(val pluginId: String? = null, val scrollToSetting: String? = null) : Screen
 
     @Serializable
     data object PluginRepo : Screen

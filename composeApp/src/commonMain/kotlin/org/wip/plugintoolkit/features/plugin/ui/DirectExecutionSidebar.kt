@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,8 +39,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isShiftPressed
+import androidx.compose.ui.input.pointer.onPointerEvent
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.PluginEntry
@@ -52,10 +57,13 @@ import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_back
 import plugintoolkit.composeapp.generated.resources.plugin_capabilities
+import plugintoolkit.composeapp.generated.resources.plugin_settings
 import plugintoolkit.composeapp.generated.resources.search_capabilities_placeholder
 import plugintoolkit.composeapp.generated.resources.search_plugins_placeholder
 import plugintoolkit.composeapp.generated.resources.section_loaded_plugins
+import plugintoolkit.composeapp.generated.resources.settings
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun DirectExecutionSidebar(
     loadedPlugins: List<PluginEntry>,
@@ -64,10 +72,12 @@ fun DirectExecutionSidebar(
     onBackToPlugins: () -> Unit,
     selectedCapability: Capability?,
     onCapabilitySelected: (Capability) -> Unit,
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var pluginSearchQuery by remember { mutableStateOf("") }
     var capabilitySearchQuery by remember { mutableStateOf("") }
+    var isShiftPressed by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -75,6 +85,9 @@ fun DirectExecutionSidebar(
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected))
             .clipToBounds()
+            .onPointerEvent(PointerEventType.Press) { event ->
+                isShiftPressed = event.keyboardModifiers.isShiftPressed
+            }
     ) {
         AnimatedContent(
             targetState = selectedPluginId,
@@ -164,12 +177,8 @@ fun DirectExecutionSidebar(
                     }
 
                     val capabilityElements = filteredCapabilities.map { capability ->
-                        val isLockMissing = capability.requiredLocks.any { locks[it] != true }
-                        val isSettingMissing = capability.requiresSettings.any { settingKey ->
-                            val v = settings[settingKey]
-                            v == null || v is kotlinx.serialization.json.JsonNull || v.toString().replace("\"", "").isBlank()
-                        }
-                        val isLocked = isLockMissing || isSettingMissing
+                        val lockStatus = org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils.checkCapabilityLockStatus(capability, locks, settings)
+                        val isLocked = lockStatus is org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus.Locked
                         SidebarElement(
                             id = capability,
                             icon = if (isLocked) Icons.Default.Lock else Icons.Default.Bolt,
@@ -186,7 +195,22 @@ fun DirectExecutionSidebar(
                             )
                         ),
                         currentScreen = selectedCapability,
-                        onScreenSelected = { capability -> capability?.let(onCapabilitySelected) },
+                        onScreenSelected = { capability ->
+                            capability?.let { cap ->
+                                val lockStatus = org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils.checkCapabilityLockStatus(cap, locks, settings)
+                                val isLocked = lockStatus is org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus.Locked
+
+                                if (isLocked && onNavigateToPluginSetting != null) {
+                                    val targetSettingKey = when (lockStatus) {
+                                        is org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus.Locked -> lockStatus.missingLocks.firstOrNull() ?: lockStatus.missingSettings.firstOrNull() ?: ""
+                                        else -> cap.requiredLocks.firstOrNull() ?: cap.requiresSettings.firstOrNull() ?: ""
+                                    }
+                                    onNavigateToPluginSetting(manifest.plugin.id, targetSettingKey)
+                                } else {
+                                    onCapabilitySelected(cap)
+                                }
+                            }
+                        },
                         isNavbarCollapsed = false,
                         onToggleNavbar = {},
                         canCollapse = false,

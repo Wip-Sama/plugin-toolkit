@@ -91,6 +91,7 @@ fun FlowEditorView(
     viewModel: FlowEditorViewModel,
     notificationService: NotificationService,
     onExit: () -> Unit,
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
@@ -556,7 +557,9 @@ fun FlowEditorView(
                     }
                     draggingNodeFromPalette = null
                 },
-                onClick = handlePaletteClick
+                onClick = handlePaletteClick,
+                hasUnsavedChanges = state.hasUnsavedChanges,
+                onNavigateToPluginSetting = onNavigateToPluginSetting
             )
         }
 

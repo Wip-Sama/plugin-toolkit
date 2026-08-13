@@ -94,6 +94,8 @@ import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_format
 @Composable
 fun PluginManagerView(
     viewModel: PluginManagerViewModel = koinInject(),
+    initialPluginId: String? = null,
+    initialScrollToSetting: String? = null,
     onOpenPlugin: (String) -> Unit
 ) {
     val plugins by viewModel.sortedPlugins.collectAsState()
@@ -102,10 +104,23 @@ fun PluginManagerView(
     val settingsPkg by viewModel.settingsPkg.collectAsState()
     val togglingPlugins by viewModel.togglingPlugins.collectAsState()
 
+    var activeScrollToSetting by remember { mutableStateOf(initialScrollToSetting) }
+
+    androidx.compose.runtime.LaunchedEffect(initialPluginId, initialScrollToSetting) {
+        if (initialPluginId != null) {
+            activeScrollToSetting = initialScrollToSetting
+            viewModel.openSettings(initialPluginId)
+        }
+    }
+
     if (settingsPkg != null) {
         PluginSettingsDialog(
             pkg = settingsPkg!!,
-            onDismiss = { viewModel.closeSettings() }
+            scrollToSetting = activeScrollToSetting,
+            onDismiss = {
+                viewModel.closeSettings()
+                activeScrollToSetting = null
+            }
         )
     }
 

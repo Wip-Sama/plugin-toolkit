@@ -371,4 +371,9 @@
     <string name="action_collapse_menu">Comprimi menu</string>
     <string name="zoom_minus">Meno</string>
     <string name="zoom_plus">Più</string>
+    <string name="setting_plugin_settings_in_place">Popup Impostazioni Sul Posto</string>
+    <string name="setting_plugin_settings_in_place_subtitle">Apri le impostazioni del plugin in un popup invece di navigare via</string>
+    <string name="dialog_plugin_settings_in_place_warning_title">Attenzione: Impostazioni Sul Posto</string>
+    <string name="dialog_plugin_settings_in_place_warning_message">L\'apertura delle impostazioni sul posto potrebbe causare il mancato aggiornamento dello stato di sblocco di alcuni componenti fino al ricaricamento. Sei sicuro di voler abilitare questa modalità?</string>
+    <string name="plugin_settings_by_section">Per Sezione</string>
 </resources>

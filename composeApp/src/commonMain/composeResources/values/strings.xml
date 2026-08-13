@@ -422,4 +422,9 @@
     <string name="action_collapse_menu">Collapse menu</string>
     <string name="zoom_minus">Minus</string>
     <string name="zoom_plus">Plus</string>
+    <string name="setting_plugin_settings_in_place">In-Place Settings Popup</string>
+    <string name="setting_plugin_settings_in_place_subtitle">Open plugin settings in an overlay popup instead of navigating away</string>
+    <string name="dialog_plugin_settings_in_place_warning_title">Warning: In-Place Settings</string>
+    <string name="dialog_plugin_settings_in_place_warning_message">Opening settings in-place may cause some components to not update their unlocked states until reloaded. Are you sure you want to enable this mode?</string>
+    <string name="plugin_settings_by_section">By Section</string>
 </resources>

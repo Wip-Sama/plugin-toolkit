@@ -74,7 +74,8 @@ data class FlowParameter(
     val dataType: DataType,
     val defaultValue: String,
     val semanticTypes: List<SemanticType> = emptyList(),
-    val role: org.wip.plugintoolkit.api.ParameterRole = org.wip.plugintoolkit.api.ParameterRole.STANDARD
+    val role: org.wip.plugintoolkit.api.ParameterRole = org.wip.plugintoolkit.api.ParameterRole.STANDARD,
+    val pluginId: String = ""
 )
 
 enum class ParameterType {
@@ -176,13 +177,16 @@ fun FlowRunnerView(
                                     val inferredType =
                                         currentFlow.getInferredDataTypeForOutput(node.id, outPort.id, outPort.dataType)
 
+                                    val connection =
+                                        currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
+                                    val targetNode = currentFlow.nodes.find { it.id == connection?.targetNodeId }
+
                                     val inferredSemanticTypes = outPort.semanticTypes.ifEmpty {
-                                        val connection =
-                                            currentFlow.connections.find { it.sourceNodeId == node.id && it.sourcePortId == outPort.id }
-                                        val targetNode = currentFlow.nodes.find { it.id == connection?.targetNodeId }
                                         val targetPort = targetNode?.inputs?.find { it.id == connection?.targetPortId }
                                         targetPort?.semanticTypes ?: emptyList()
                                     }
+
+                                    val paramPluginId = (targetNode as? Node.CapabilityNode)?.pluginInfo?.id ?: ""
 
                                     listOf(
                                         FlowParameter(
@@ -192,7 +196,8 @@ fun FlowRunnerView(
                                             portId = outPort.id,
                                             dataType = inferredType,
                                             defaultValue = "",
-                                            semanticTypes = inferredSemanticTypes
+                                            semanticTypes = inferredSemanticTypes,
+                                            pluginId = paramPluginId
                                         )
                                     )
                                 } else emptyList()
@@ -366,7 +371,8 @@ fun FlowRunnerView(
                         metadata = metadata,
                         onValueChange = { newValue ->
                             parameterValues["${param.nodeId}_${param.portId}"] = newValue
-                        }
+                        },
+                        pluginId = param.pluginId
                     )
                 }
 
@@ -391,7 +397,8 @@ fun FlowRunnerView(
                     onSaveResultsChange = { viewModel.saveResults = it },
                     parameters = executionParameters,
                     providedSettings = providedSettings,
-                    providedLocks = providedLocks
+                    providedLocks = providedLocks,
+                    onNavigateToPluginSetting = org.wip.plugintoolkit.features.plugin.ui.LocalNavigateToPluginSetting.current
                 )
 
 

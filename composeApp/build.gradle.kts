@@ -94,7 +94,7 @@ compose.desktop {
         mainClass = "org.wip.plugintoolkit.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe, TargetFormat.AppImage)
             packageName = "PluginToolkit"
             packageVersion = libs.versions.app.get()
             vendor = "Wip-Sama"

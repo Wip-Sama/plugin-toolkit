@@ -452,9 +452,6 @@ class PluginManagerViewModel(
 
     fun openSettings(pkg: String) {
         _settingsPkg.value = pkg
-        viewModelScope.launch {
-            _navigationEvent.emit(Screen.PluginManager)
-        }
     }
 
 

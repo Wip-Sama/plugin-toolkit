@@ -199,7 +199,7 @@ fun LandingPage(
                         QuickLinkItem(
                             title = stringResource(Res.string.landing_link_plugins),
                             icon = Icons.Default.SettingsInputComponent,
-                            onClick = { onNavigate(Screen.PluginManager) }
+                            onClick = { onNavigate(Screen.PluginManager()) }
                         )
                         QuickLinkItem(
                             title = stringResource(Res.string.landing_link_settings),

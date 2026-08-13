@@ -27,20 +27,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.features.plugin.ui.lockedClickInterceptor
 
 @Deprecated(
     message = "This is a workaround for the Material 3 Expressive Dropdown menu. Migrate to native when JetBrains drops support.",
     level = DeprecationLevel.WARNING
 )
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun <T> ExpressiveMenu(
     options: List<T>,
@@ -49,6 +53,10 @@ fun <T> ExpressiveMenu(
     labelProvider: @Composable (T) -> String,
     enabled: Boolean = true,
     disabledOptions: Set<T> = emptySet(),
+    disabledOptionTargetKey: (T) -> String = { "" },
+    hasUnsavedChanges: Boolean = false,
+    pluginId: String = "",
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     gapAfter: (T) -> Boolean = { false }
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -125,9 +133,11 @@ fun <T> ExpressiveMenu(
                         group.forEachIndexed { index, option ->
                             val isDisabled = option in disabledOptions
                             val isSelected = option == selectedOption
-                            
+                            val itemSettingKey = disabledOptionTargetKey(option)
+
                             val itemShape = RoundedCornerShape(itemNormalRadius)
-            
+                            var isHovered by remember { mutableStateOf(false) }
+
                             DropdownMenuItem(
                                 text = { Text(labelProvider(option)) },
                                 onClick = {
@@ -141,11 +151,27 @@ fun <T> ExpressiveMenu(
                                     .height(ToolkitTheme.dimensions.menuItem)
                                     .clip(itemShape)
                                     .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else ToolkitTheme.colors.transparent
+                                        when {
+                                            isSelected -> MaterialTheme.colorScheme.primary
+                                            isHovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
+                                            else -> ToolkitTheme.colors.transparent
+                                        }
+                                    )
+                                    .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+                                    .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+                                    .lockedClickInterceptor(
+                                        isLocked = isDisabled,
+                                        pluginId = pluginId,
+                                        targetSettingKey = itemSettingKey,
+                                        hasUnsavedChanges = hasUnsavedChanges,
+                                        onNavigateToPluginSetting = if (onNavigateToPluginSetting != null) { pid, key ->
+                                            expanded = false
+                                            onNavigateToPluginSetting(pid, key)
+                                        } else null
                                     ),
                                 colors = MenuDefaults.itemColors(
-                                    textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary 
+                                    textColor = if (isDisabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                                else if (isSelected) MaterialTheme.colorScheme.onPrimary
                                                 else MaterialTheme.colorScheme.onSurface
                                 ),
                                 enabled = !isDisabled,

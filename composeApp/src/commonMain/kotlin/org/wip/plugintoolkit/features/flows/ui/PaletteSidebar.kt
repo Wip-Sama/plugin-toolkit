@@ -53,6 +53,7 @@ import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.ui.lockedClickInterceptor
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.palette_search_placeholder
@@ -82,6 +83,8 @@ fun PaletteSidebar(
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onClick: (PaletteNode) -> Unit,
+    hasUnsavedChanges: Boolean = false,
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(0) }
@@ -169,7 +172,9 @@ fun PaletteSidebar(
                         onDragStart = onDragStart,
                         onDrag = onDrag,
                         onDragEnd = onDragEnd,
-                        onClick = onClick
+                        onClick = onClick,
+                        hasUnsavedChanges = hasUnsavedChanges,
+                        onNavigateToPluginSetting = onNavigateToPluginSetting
                     )
 
                     1 -> SystemPalette(
@@ -204,7 +209,9 @@ private fun CapabilitiesPalette(
     onDragStart: (PaletteNode, Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
-    onClick: (PaletteNode) -> Unit
+    onClick: (PaletteNode) -> Unit,
+    hasUnsavedChanges: Boolean = false,
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null
 ) {
     val pluginManager = koinInject<PluginManager>()
 
@@ -245,12 +252,20 @@ private fun CapabilitiesPalette(
                         cap.isReady(settingsStore.settings, manifest?.settings)
                     }
 
+                    val targetSettingKey = cap.requiredLocks.firstOrNull()
+                        ?: cap.requiresSettings.firstOrNull()
+                        ?: ""
+
                     val paletteNode = PaletteNode.Capability(plugin, cap)
                     PaletteItem(
                         text = cap.name,
                         color = MaterialTheme.colorScheme.primary,
                         enabled = isReady,
                         tooltip = if (!isReady) "Configuration required" else null,
+                        targetSettingKey = targetSettingKey,
+                        pluginId = plugin.id,
+                        hasUnsavedChanges = hasUnsavedChanges,
+                        onNavigateToPluginSetting = onNavigateToPluginSetting,
                         rootLayoutCoordinates = rootLayoutCoordinates,
                         onDragStart = { pos, grabOffset -> onDragStart(paletteNode, pos, grabOffset) },
                         onDrag = onDrag,
@@ -398,11 +413,15 @@ private fun FlowsPalette(
 }
 
 @Composable
-private fun PaletteItem(
+fun PaletteItem(
     text: String,
     color: Color = MaterialTheme.colorScheme.primary,
     enabled: Boolean = true,
     tooltip: String? = null,
+    targetSettingKey: String = "",
+    pluginId: String = "",
+    hasUnsavedChanges: Boolean = false,
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     rootLayoutCoordinates: LayoutCoordinates?,
     onDragStart: (Offset, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
@@ -432,6 +451,13 @@ private fun PaletteItem(
             onClick = { if (enabled) onClick() },
             modifier = Modifier
                 .fillMaxWidth()
+                .lockedClickInterceptor(
+                    isLocked = !enabled,
+                    pluginId = pluginId,
+                    targetSettingKey = targetSettingKey,
+                    hasUnsavedChanges = hasUnsavedChanges,
+                    onNavigateToPluginSetting = onNavigateToPluginSetting
+                )
                 .pointerInput(enabled) {
                     if (enabled) {
                         detectDragGestures(

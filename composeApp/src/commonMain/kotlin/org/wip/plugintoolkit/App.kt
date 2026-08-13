@@ -145,6 +145,7 @@ private fun AppContentImpl(
                 val displayScreen = when (currentScreen) {
                     is Screen.FlowRunner -> Screen.FlowRunner()
                     is Screen.Plugin -> Screen.Plugins
+                    is Screen.PluginManager -> Screen.PluginManager()
                     else -> currentScreen
                 }
 

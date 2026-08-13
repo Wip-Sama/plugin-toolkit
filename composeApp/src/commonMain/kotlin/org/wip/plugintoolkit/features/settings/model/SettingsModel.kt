@@ -186,7 +186,8 @@ data class ExtensionSettings(
     val strictSignatureChecking: Boolean = true,
     val fileAccessMode: FileAccessMode = FileAccessMode.Blacklist,
     val blacklistedDirectories: List<String> = emptyList(),
-    val allowedDirectories: List<String> = emptyList()
+    val allowedDirectories: List<String> = emptyList(),
+    val pluginSettingsInPlace: Boolean = false
 )
 
 /**

@@ -34,6 +34,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +66,8 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 @Composable
 fun PluginContent(
     viewModel: PluginViewModel,
+    scrollToSetting: String? = null,
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxHeight()) {
@@ -85,6 +89,21 @@ fun PluginContent(
         val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
         val pluginSettingsState by pluginManager.pluginSettingsState.collectAsState()
         val pluginId = viewModel.selectedPlugin?.getManifest()?.getOrNull()?.plugin?.id
+
+        var settingsDialogPkg by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(pluginId, scrollToSetting) {
+            if (pluginId != null && scrollToSetting != null) {
+                settingsDialogPkg = pluginId
+            }
+        }
+        val currentSettingsPkg = settingsDialogPkg
+        if (currentSettingsPkg != null) {
+            PluginSettingsDialog(
+                pkg = currentSettingsPkg,
+                scrollToSetting = scrollToSetting,
+                onDismiss = { settingsDialogPkg = null }
+            )
+        }
 
         LaunchedEffect(pluginId) {
             if (pluginId != null) {
@@ -110,8 +129,6 @@ fun PluginContent(
             manifestDefaults + (store?.settings ?: emptyMap()) + (store?.globalParams ?: emptyMap())
         }
 
-
-
         if (selectedCapability == null) {
             EmptyState(stringResource(Res.string.plugin_select_capability_hint))
         } else {
@@ -132,6 +149,8 @@ fun PluginContent(
                     activeJobs = capabilityJobs.filter { it.status == JobStatus.Running || it.status == JobStatus.Queued },
                     providedLocks = providedLocks,
                     providedSettings = providedSettings,
+                    pluginId = pluginId ?: "",
+                    onNavigateToPluginSetting = onNavigateToPluginSetting,
                     onExecute = { viewModel.executeCapability() }
                 )
 
@@ -281,6 +300,8 @@ fun CapabilityTester(
     activeJobs: List<BackgroundJob>,
     providedLocks: Map<String, Boolean> = emptyMap(),
     providedSettings: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
+    pluginId: String = "",
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     onExecute: () -> Unit
 ) {
     val capabilityParameters = capability.parameters ?: emptyMap()
@@ -317,7 +338,9 @@ fun CapabilityTester(
         onSaveResultsChange = onSaveResultsChange,
         parameters = executionParameters,
         providedSettings = providedSettings,
-        providedLocks = providedLocks
+        providedLocks = providedLocks,
+        pluginId = pluginId,
+        onNavigateToPluginSetting = onNavigateToPluginSetting
     )
 
     if (capability.parameters.isNullOrEmpty()) {
@@ -341,9 +364,18 @@ fun CapabilityTester(
     }
     val isValid = validationErrors.isEmpty() && requirementError == null
 
+    val targetSetting = capability.requiredLocks.firstOrNull() ?: capability.requiresSettings.firstOrNull() ?: ""
+
     Button(
         onClick = onExecute,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .lockedClickInterceptor(
+                isLocked = requirementError != null,
+                pluginId = pluginId,
+                targetSettingKey = targetSetting,
+                onNavigateToPluginSetting = onNavigateToPluginSetting
+            ),
         shape = MaterialTheme.shapes.medium,
         enabled = isValid
     ) {
@@ -360,12 +392,25 @@ fun CapabilityTester(
         }
     }
     if (requirementError != null) {
-        Text(
-            text = requirementError,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .padding(top = ToolkitTheme.spacing.extraSmall)
+                .lockedClickInterceptor(
+                    isLocked = true,
+                    pluginId = pluginId,
+                    targetSettingKey = targetSetting,
+                    onNavigateToPluginSetting = onNavigateToPluginSetting
+                )
+        ) {
+            LockedCapabilityIcon(modifier = Modifier.size(ToolkitTheme.dimensions.settingsIconSize))
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+            Text(
+                text = requirementError,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
     } else if (validationErrors.isNotEmpty()) {
         Text(
             text = "Fix parameter errors before executing",

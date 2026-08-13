@@ -43,7 +43,8 @@ import org.wip.plugintoolkit.features.navigation.model.Screen
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_name
 import org.jetbrains.compose.resources.stringResource
-import plugintoolkit.composeapp.generated.resources.*
+import plugintoolkit.composeapp.generated.resources.action_toggle_sidebar
+import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -83,35 +84,39 @@ fun <T> NavigationSidebar(
             modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.mediumSmall)
         ) {
             // Header / toggle (TOP SECTION)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = ToolkitTheme.spacing.medium),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = if (isActuallyExpanded) Arrangement.Start else Arrangement.Center
-            ) {
-                if (canCollapse) {
-                    IconButton(onClick = onToggleNavbar) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = stringResource(Res.string.action_toggle_sidebar)
+            val resolvedTitle = title.resolve()
+            val showHeaderRow = canCollapse || resolvedTitle.isNotBlank()
+            if (showHeaderRow) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = ToolkitTheme.spacing.medium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = if (isActuallyExpanded) Arrangement.Start else Arrangement.Center
+                ) {
+                    if (canCollapse) {
+                        IconButton(onClick = onToggleNavbar) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = stringResource(Res.string.action_toggle_sidebar)
+                            )
+                        }
+                        if (isActuallyExpanded && resolvedTitle.isNotBlank()) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
+                        }
+                    }
+
+                    if (isActuallyExpanded && resolvedTitle.isNotBlank()) {
+                        Text(
+                            text = resolvedTitle,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip
                         )
                     }
-                    if (isActuallyExpanded) {
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
-                    }
-                }
-
-                if (isActuallyExpanded) {
-                    Text(
-                        text = title.resolve(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip
-                    )
                 }
             }
 
@@ -119,12 +124,21 @@ fun <T> NavigationSidebar(
                 headerContent()
             }
 
+            val bodyScrollState = rememberScrollState()
+            val topSidebarFade = if (bodyScrollState.canScrollBackward) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
+            val bottomSidebarFade = if (bodyScrollState.canScrollForward) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
+
             // Nav sections (BODY SECTION - Scrollable)
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .verticalFadingEdges(
+                        topFadeLength = topSidebarFade,
+                        bottomFadeLength = bottomSidebarFade,
+                        almostOpaque = ToolkitTheme.opacity.almostOpaque
+                    )
+                    .verticalScroll(bodyScrollState)
             ) {
                 bodySections.forEach { section ->
                     SidebarSection(

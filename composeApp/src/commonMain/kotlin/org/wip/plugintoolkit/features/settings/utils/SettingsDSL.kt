@@ -87,6 +87,7 @@ class SectionBuilder(
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
         sideEffect: (suspend (AppSettings) -> Unit)? = null,
+        onBeforeChange: ((Boolean, () -> Unit) -> Unit)? = null,
         setValue: (AppSettings, Boolean) -> AppSettings
     ) {
         val id = generateId(p1, p2)
@@ -98,6 +99,7 @@ class SectionBuilder(
             sectionTitle = sectionTitle,
             navKey = navKey,
             enabled = enabled,
+            onBeforeChange = onBeforeChange,
             getValue = { settings -> p2.get(p1.get(settings)) },
             setValue = setValue
         )
@@ -113,8 +115,9 @@ class SectionBuilder(
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
         sideEffect: (suspend (AppSettings) -> Unit)? = null,
+        onBeforeChange: ((Boolean, () -> Unit) -> Unit)? = null,
         setValue: (AppSettings, Boolean) -> AppSettings
-    ) = SettingSwitch(p1, p2, SettingText.Resource(title), icon, subtitle, enabled, sideEffect, setValue)
+    ) = SettingSwitch(p1, p2, SettingText.Resource(title), icon, subtitle, enabled, sideEffect, onBeforeChange, setValue)
 
     fun <T, V> SettingSwitch(
         p1: KProperty1<AppSettings, T>,
@@ -454,6 +457,7 @@ class GroupSectionBuilder<G>(
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
         sideEffect: (suspend (AppSettings) -> Unit)? = null,
+        onBeforeChange: ((Boolean, () -> Unit) -> Unit)? = null,
         update: G.(Boolean) -> G
     ) {
         sectionBuilder.SettingSwitch(
@@ -464,6 +468,7 @@ class GroupSectionBuilder<G>(
             subtitle = subtitle,
             enabled = enabled,
             sideEffect = sideEffect,
+            onBeforeChange = onBeforeChange,
             setValue = { s, v ->
                 val group = groupProp.get(s)
                 val updatedGroup = group.update(v)
@@ -479,8 +484,9 @@ class GroupSectionBuilder<G>(
         subtitle: SettingText? = null,
         enabled: (AppSettings) -> Boolean = { true },
         sideEffect: (suspend (AppSettings) -> Unit)? = null,
+        onBeforeChange: ((Boolean, () -> Unit) -> Unit)? = null,
         update: G.(Boolean) -> G
-    ) = switch(prop, SettingText.Resource(title), icon, subtitle, enabled, sideEffect, update)
+    ) = switch(prop, SettingText.Resource(title), icon, subtitle, enabled, sideEffect, onBeforeChange, update)
 
     /**
      * Declares a dropdown menu setting for an options property in group [G].

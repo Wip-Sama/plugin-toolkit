@@ -24,9 +24,11 @@ Added:
   - Custom locks for enums/capabilities
   - Parameters to plugin actions
   - PluginStorage to give plugins a way to have custom persistent data
+  - PluginSetting navigation when pressing on locked components
+  - Changelog now supports named updates
 Fixed:
   - Locks are now safely evicted from jarLocks when no active operations remain
-  - Switch would need to be toggled on/off to be able to be used in the default state
+  - Fixed an issue where switches required a manual toggle to activate from their default state
 Planned:
   - A button to clear the sandbox folder
 Note:

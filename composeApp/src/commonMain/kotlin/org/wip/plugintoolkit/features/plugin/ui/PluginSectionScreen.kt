@@ -9,6 +9,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
@@ -32,7 +36,7 @@ sealed interface PluginNavKey : NavKey {
     data object PluginList : PluginNavKey
 
     @Serializable
-    data class PluginDetail(val id: String) : PluginNavKey
+    data class PluginDetail(val id: String, val scrollToSetting: String? = null) : PluginNavKey
 }
 
 val PluginNavConfig = SavedStateConfiguration {
@@ -47,10 +51,11 @@ val PluginNavConfig = SavedStateConfiguration {
 @Composable
 fun PluginSectionScreen(
     initialPluginId: String? = null,
+    initialScrollToSetting: String? = null,
     viewModel: PluginViewModel = koinInject()
 ) {
     val startDestination = if (initialPluginId != null) {
-        PluginNavKey.PluginDetail(initialPluginId)
+        PluginNavKey.PluginDetail(initialPluginId, initialScrollToSetting)
     } else {
         PluginNavKey.PluginList
     }
@@ -58,6 +63,8 @@ fun PluginSectionScreen(
     val backStack = rememberNavBackStack(PluginNavConfig, startDestination)
     val currentKey = backStack.lastOrNull() ?: PluginNavKey.PluginList
     val loadedPlugins = viewModel.loadedPlugins
+
+    val globalNav = LocalNavigateToPluginSetting.current
 
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Nested Navigation Sidebar for Plugins
@@ -79,7 +86,8 @@ fun PluginSectionScreen(
                 }
             },
             selectedCapability = viewModel.selectedCapability,
-            onCapabilitySelected = { viewModel.selectCapability(it) }
+            onCapabilitySelected = { viewModel.selectCapability(it) },
+            onNavigateToPluginSetting = globalNav
         )
 
         // Detail Content Area
@@ -106,7 +114,11 @@ fun PluginSectionScreen(
                             LaunchedEffect(key.id) {
                                 viewModel.selectPlugin(plugin)
                             }
-                            PluginContent(viewModel = viewModel)
+                            PluginContent(
+                                viewModel = viewModel,
+                                scrollToSetting = key.scrollToSetting,
+                                onNavigateToPluginSetting = globalNav
+                            )
                         } else {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(
