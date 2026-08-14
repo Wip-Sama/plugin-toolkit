@@ -34,3 +34,5 @@ dependencies {
 tasks.withType<ProcessResources> {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
+
+apply(from = rootProject.file("scripts/standalone-plugin.gradle.kts"))

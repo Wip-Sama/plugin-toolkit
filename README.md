@@ -34,3 +34,19 @@ The internal job execution engine (`FlowEngine` and `JobWorker`) enforces strict
 - **Configurable Capabilities Policies**: Transient network execution failures in plugins automatically back off and retry up to `maxRetries` (configurable in app settings). Executions are also bound by a strict `pluginTimeoutMs` to prevent hung plugins.
 
 Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+
+## Standalone plugin JARs
+
+JVM plugin modules can build a self-contained executable artifact by applying the bundled script:
+
+```kotlin
+apply(from = rootProject.file("scripts/standalone-plugin.gradle.kts"))
+```
+
+Run `./gradlew :yourPlugin:standaloneJar`, then inspect the plugin without the desktop host:
+
+```shell
+java -jar yourPlugin/build/libs/yourPlugin-version-standalone.jar --info
+```
+
+The generated JAR contains runtime dependencies and preserves `ServiceLoader` plugin discovery.
