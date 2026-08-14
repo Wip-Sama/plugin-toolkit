@@ -18,49 +18,57 @@ class ScheduleRepository(private val settingsPersistence: SettingsPersistence) {
     private fun file(): Path {
         val jobsDir = Path(settingsPersistence.getJobsDir())
         if (!SystemFileSystem.exists(jobsDir)) SystemFileSystem.createDirectories(jobsDir)
+        check(SystemFileSystem.metadataOrNull(jobsDir)?.isDirectory == true) {
+            "Schedule storage path is not a directory: $jobsDir"
+        }
         return Path("$jobsDir/schedules.json")
     }
 
     suspend fun load(): Result<List<ScheduledJob>> = withContext(Dispatchers.IO) {
-        val primary = file()
-        val backup = Path("$primary.bak")
-        if (!SystemFileSystem.exists(primary) && !SystemFileSystem.exists(backup)) {
-            return@withContext Result.success(emptyList())
+        runCatching {
+            val primary = file()
+            val backup = Path("$primary.bak")
+            if (!SystemFileSystem.exists(primary) && !SystemFileSystem.exists(backup)) {
+                return@runCatching emptyList()
+            }
+
+            try {
+                read(primary)
+            } catch (primaryError: Exception) {
+                Logger.e(primaryError) { "Failed to load schedules; trying backup" }
+                if (!SystemFileSystem.exists(backup)) throw primaryError
+                try {
+                    read(backup).also { Logger.w { "Recovered schedules from backup" } }
+                } catch (backupError: Exception) {
+                    Logger.e(backupError) { "Failed to load schedule backup" }
+                    throw backupError
+                }
+            }
         }
-
-        val primaryResult = runCatching { read(primary) }
-        if (primaryResult.isSuccess) return@withContext primaryResult
-
-        Logger.e(primaryResult.exceptionOrNull()) { "Failed to load schedules; trying backup" }
-        if (!SystemFileSystem.exists(backup)) return@withContext primaryResult
-
-        runCatching { read(backup) }
-            .onSuccess { Logger.w { "Recovered schedules from backup" } }
-            .onFailure { Logger.e(it) { "Failed to load schedule backup" } }
     }
 
     suspend fun save(schedules: List<ScheduledJob>): Result<Unit> = withContext(Dispatchers.IO) {
-        val primary = file()
-        val temporary = Path("$primary.tmp")
-        val backup = Path("$primary.bak")
-        val backupTemporary = Path("$primary.bak.tmp")
-
+        var temporary: Path? = null
+        var backupTemporary: Path? = null
         runCatching {
-            write(temporary, schedules)
+            val primary = file()
+            temporary = Path("$primary.tmp")
+            val backup = Path("$primary.bak")
+            backupTemporary = Path("$primary.bak.tmp")
+            write(temporary!!, schedules)
 
             // Never replace a known-good backup with a corrupt/partial primary.
             if (SystemFileSystem.exists(primary)) {
                 runCatching { read(primary) }.getOrNull()?.let { previous ->
-                    write(backupTemporary, previous)
-                    SystemFileSystem.atomicMove(backupTemporary, backup)
+                    write(backupTemporary!!, previous)
+                    SystemFileSystem.atomicMove(backupTemporary!!, backup)
                 }
             }
-
-            SystemFileSystem.atomicMove(temporary, primary)
+            SystemFileSystem.atomicMove(temporary!!, primary)
         }.onFailure { Logger.e(it) { "Failed to save schedules atomically" } }
             .also {
-                runCatching { if (SystemFileSystem.exists(temporary)) SystemFileSystem.delete(temporary) }
-                runCatching { if (SystemFileSystem.exists(backupTemporary)) SystemFileSystem.delete(backupTemporary) }
+                temporary?.let { path -> runCatching { if (SystemFileSystem.exists(path)) SystemFileSystem.delete(path) } }
+                backupTemporary?.let { path -> runCatching { if (SystemFileSystem.exists(path)) SystemFileSystem.delete(path) } }
             }
     }
 

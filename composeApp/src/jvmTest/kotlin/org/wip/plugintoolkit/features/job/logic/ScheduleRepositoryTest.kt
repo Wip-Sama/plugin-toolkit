@@ -170,6 +170,22 @@ class ScheduleRepositoryTest {
         }
     }
 
+    @Test
+    fun `jobs path failures stay inside the repository result contract`() = runTest {
+        withTempPersistence { persistence, root ->
+            Files.writeString(root.resolve("jobs"), "not a directory")
+
+            assertTrue(ScheduleRepository(persistence).load().isFailure)
+            assertTrue(ScheduleRepository(persistence).save(emptyList()).isFailure)
+
+            val settings = SettingsRepository(persistence, backgroundScope)
+            testScheduler.advanceUntilIdle()
+            val manager = JobManager(backgroundScope, settings)
+            assertFalse(manager.startScheduler())
+            assertTrue(manager.scheduleLoadFailed.value)
+        }
+    }
+
     private suspend fun withTempPersistence(
         block: suspend (TempPersistence, Path) -> Unit
     ) {

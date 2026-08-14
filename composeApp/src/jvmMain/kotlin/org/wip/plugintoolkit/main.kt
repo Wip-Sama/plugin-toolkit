@@ -298,6 +298,11 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     updateStatus("Initializing plugins...")
     // Initialize registry and subsequently load plugins
     appScope.launch {
+        // Scheduling is a host service: a blocked or broken third-party plugin must not disable it globally.
+        if (!koin.get<JobManager>().startScheduler()) {
+            Logger.e { "Startup: Scheduler state could not be loaded safely; background retries are active" }
+        }
+
         try {
             registry.initialize()
         } catch (e: Throwable) {
@@ -333,10 +338,6 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
             }
         }
         pluginStartupJobs.joinAll()
-
-        if (!koin.get<JobManager>().startScheduler()) {
-            Logger.e { "Startup: Scheduler was not started because its state could not be loaded safely" }
-        }
     }
 
     updateStatus("Refreshing repositories...")

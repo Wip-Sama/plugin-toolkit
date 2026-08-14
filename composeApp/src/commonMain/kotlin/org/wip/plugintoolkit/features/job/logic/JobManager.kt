@@ -234,7 +234,10 @@ class JobManager(
             return false
         }
         val supported = loaded.filter { it.jobTemplate.type.canBeScheduled() }
-        if (supported != loaded && !persistSchedules(supported)) return false
+        if (supported != loaded && !persistSchedules(supported)) {
+            _scheduleLoadFailed.value = true
+            return false
+        }
         _schedules.value = supported
         schedulesLoaded = true
         _scheduleLoadFailed.value = false
