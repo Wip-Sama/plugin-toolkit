@@ -242,6 +242,41 @@ class FlowConnectionManager(
         )
     }
 
+    /**
+     * Replaces one endpoint without exposing an intermediate disconnected state. If the new
+     * endpoints are invalid, incompatible, or cyclic, the original connection is preserved.
+     */
+    fun handleRewireConnection(
+        currentState: FlowEditorState,
+        original: Connection,
+        sourceNodeId: Long,
+        sourcePortId: String,
+        targetNodeId: Long,
+        targetPortId: String
+    ): FlowEditorState {
+        if (original !in currentState.flow.connections) return currentState
+        if (
+            original.sourceNodeId == sourceNodeId && original.sourcePortId == sourcePortId &&
+            original.targetNodeId == targetNodeId && original.targetPortId == targetPortId
+        ) return currentState
+
+        val withoutOriginal = currentState.copy(
+            flow = currentState.flow.copy(connections = currentState.flow.connections - original)
+        )
+        val rewired = handleConnectPorts(
+            withoutOriginal,
+            sourceNodeId,
+            sourcePortId,
+            targetNodeId,
+            targetPortId
+        )
+        val replacementCreated = rewired.flow.connections.any {
+            it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId &&
+                it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+        }
+        return if (replacementCreated) rewired else currentState
+    }
+
     fun handleUpdateConnectionOrder(
         currentState: FlowEditorState,
         connection: Connection,
