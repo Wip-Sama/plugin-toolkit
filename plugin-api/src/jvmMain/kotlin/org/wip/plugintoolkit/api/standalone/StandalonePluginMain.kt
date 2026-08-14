@@ -1,10 +1,7 @@
 package org.wip.plugintoolkit.api.standalone
 
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
-import org.wip.plugintoolkit.api.PluginEntry
-import org.wip.plugintoolkit.api.PluginModuleProvider
-import java.util.ServiceLoader
+import org.wip.plugintoolkit.api.ManifestLoader
+import org.wip.plugintoolkit.api.PluginManifest
 import kotlin.system.exitProcess
 
 /** Entry point embedded in standalone plugin JARs. */
@@ -17,7 +14,7 @@ internal fun runStandalone(
     args: Array<String>,
     output: (String) -> Unit,
     error: (String) -> Unit,
-    loadPlugins: () -> List<PluginEntry> = ::loadStandalonePlugins
+    loadManifest: () -> Result<PluginManifest> = ::loadStandaloneManifest
 ): Int {
     when (args.firstOrNull()) {
         "--help", "-h" -> {
@@ -31,40 +28,23 @@ internal fun runStandalone(
         }
     }
 
-    val plugins = loadPlugins()
-    if (plugins.isEmpty()) {
-        error("No PluginEntry service was found in this JAR.")
+    val manifest = loadManifest().getOrElse { failure ->
+        error("Plugin manifest could not be loaded: ${failure.message ?: failure::class.simpleName}")
         return 2
     }
 
-    output(describeStandalonePlugins(plugins))
+    output(describeStandaloneManifest(manifest))
     return 0
 }
 
-private fun loadStandalonePlugins(): List<PluginEntry> {
-    val directEntries = ServiceLoader.load(PluginEntry::class.java).toList()
-    if (directEntries.isNotEmpty()) return directEntries
-
-    val providers = ServiceLoader.load(PluginModuleProvider::class.java).toList()
-    if (providers.isEmpty()) return emptyList()
-
-    stopKoin()
-    val application = startKoin {
-        modules(providers.map { it.getKoinModule(emptyMap()) })
-    }
-    return application.koin.getAll()
+private fun loadStandaloneManifest(): Result<PluginManifest> = runCatching {
+    // Inspection must never instantiate third-party plugin code or synthesize missing settings.
+    ManifestLoader.loadFromResources(PluginManifest::class.java)
 }
 
-internal fun describeStandalonePlugins(plugins: List<PluginEntry>): String = plugins.joinToString("\n\n") { entry ->
-    entry.getManifest().fold(
-        onSuccess = { manifest ->
-            buildString {
-                appendLine("${manifest.plugin.name} ${manifest.plugin.version}")
-                appendLine(manifest.plugin.description)
-                append("Capabilities: ")
-                append(manifest.capabilities.joinToString { it.name }.ifBlank { "none" })
-            }
-        },
-        onFailure = { error -> "Invalid plugin manifest: ${error.message ?: error::class.simpleName}" }
-    )
+internal fun describeStandaloneManifest(manifest: PluginManifest): String = buildString {
+    appendLine("${manifest.plugin.name} ${manifest.plugin.version}")
+    appendLine(manifest.plugin.description)
+    append("Capabilities: ")
+    append(manifest.capabilities.joinToString { it.name }.ifBlank { "none" })
 }
