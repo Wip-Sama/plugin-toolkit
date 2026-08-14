@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -51,6 +53,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,6 +75,7 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.SettingMetadata
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
@@ -103,6 +107,11 @@ import plugintoolkit.composeapp.generated.resources.settings_no_results
 import plugintoolkit.composeapp.generated.resources.settings_search_placeholder
 
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
+
+internal fun partitionSettings(
+    settings: Map<String, SettingMetadata>
+): Pair<Map<String, SettingMetadata>, Map<String, SettingMetadata>> =
+    settings.filterValues { it.required } to settings.filterValues { !it.required }
 
 @Composable
 fun PluginSettingsContent(
@@ -177,6 +186,10 @@ fun PluginSettingsContent(
     val hasGlobalParams = globalParams.isNotEmpty()
     val hasCapabilities = capabilities.isNotEmpty()
     val hasAnyResults = hasActions || hasCustomSettings || hasGlobalParams || hasCapabilities
+    val (requiredSettings, optionalSettings) = remember(customSettings) { partitionSettings(customSettings) }
+    val customSettingRequesters = remember(customSettings.keys) {
+        customSettings.keys.associateWith { BringIntoViewRequester() }
+    }
 
     val lockedEnumOptions = remember(manifest) {
         val result = mutableMapOf<String, MutableList<String>>()
@@ -250,7 +263,8 @@ fun PluginSettingsContent(
     // Auto-scroll to requested setting or section
     LaunchedEffect(scrollToSetting, sectionIndices, customSettings) {
         if (scrollToSetting != null) {
-            val targetKey = if (customSettings.containsKey(scrollToSetting)) {
+            val isCustomSetting = customSettings.containsKey(scrollToSetting)
+            val targetKey = if (isCustomSetting) {
                 "section_custom"
             } else if (capabilities.any { it.parameters?.containsKey(scrollToSetting) == true }) {
                 val cap = capabilities.first { it.parameters?.containsKey(scrollToSetting) == true }
@@ -264,6 +278,10 @@ fun PluginSettingsContent(
             val targetIndex = targetKey?.let { sectionIndices[it] }
             if (targetIndex != null) {
                 lazyListState.animateScrollToItem(targetIndex)
+                if (isCustomSetting) {
+                    withFrameNanos { }
+                    customSettingRequesters[scrollToSetting]?.bringIntoView()
+                }
             }
         }
     }
@@ -479,14 +497,18 @@ fun PluginSettingsContent(
                                     verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
                                 ) {
                                     listOf(
-                                        requiredTitle to customSettings.filterValues { it.required },
-                                        optionalTitle to customSettings.filterValues { !it.required }
+                                        requiredTitle to requiredSettings,
+                                        optionalTitle to optionalSettings
                                     ).forEach { (groupTitle, groupSettings) ->
                                         if (groupSettings.isNotEmpty()) {
                                             PluginSettingGroupHeader(groupTitle, groupSettings.size)
                                         }
                                         groupSettings.forEach { (key, meta) ->
-                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .bringIntoViewRequester(customSettingRequesters.getValue(key))
+                                            ) {
                                                 val value = store.settings[key] ?: meta.defaultValue
                                                 DynamicParameterInput(
                                                     name = key,
