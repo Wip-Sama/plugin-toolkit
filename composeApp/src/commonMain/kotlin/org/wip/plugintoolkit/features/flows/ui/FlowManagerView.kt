@@ -61,6 +61,8 @@ import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.CapabilityIdentity
+import org.wip.plugintoolkit.features.flows.model.capabilityIdentities
 import org.wip.plugintoolkit.features.flows.viewmodel.ConflictResolutionAction
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
@@ -112,6 +114,8 @@ fun FlowManagerView(
 ) {
     val state by viewModel.state.collectAsState()
     val pluginManager = org.koin.compose.koinInject<org.wip.plugintoolkit.features.plugin.logic.PluginManager>()
+    val loadedPlugins by pluginManager.loadedPlugins.collectAsState()
+    val installedPlugins by pluginManager.installedPlugins.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFlowName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
@@ -125,8 +129,10 @@ fun FlowManagerView(
 //        // flows are reloaded automatically via flowRepository
 //    }
 
-    val activeCapabilities = remember(state.flows) {
-        PluginLoader.getPlugins().flatMap { it.getManifest().getOrThrow().capabilities.map { cap -> cap.name } }.toSet()
+    val activeCapabilities = remember(loadedPlugins, installedPlugins) {
+        PluginLoader.getPlugins()
+            .mapNotNull { it.getManifest().getOrNull() }
+            .capabilityIdentities()
     }
 
     val filteredFlows = remember(state.flows, searchQuery) {
@@ -250,8 +256,9 @@ fun FlowManagerView(
 
                     val missingCapabilities = remember(flow, activeCapabilities) {
                         flow.nodes.filterIsInstance<Node.CapabilityNode>()
-                            .map { it.capability.name }
+                            .map { CapabilityIdentity(it.pluginInfo.id, it.capability.name) }
                             .filter { it !in activeCapabilities }
+                            .map { it.capabilityName }
                             .distinct()
                     }
 

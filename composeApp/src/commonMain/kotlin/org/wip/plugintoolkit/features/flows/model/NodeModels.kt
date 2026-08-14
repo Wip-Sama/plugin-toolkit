@@ -25,6 +25,7 @@ import kotlinx.serialization.json.put
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginInfo
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.parseSemanticTypes
 import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
@@ -525,6 +526,13 @@ data class Flow(
 
 /** Stable, collision-free identity for a capability installed in the host. */
 data class CapabilityIdentity(val pluginId: String, val capabilityName: String)
+
+fun Iterable<PluginManifest>.capabilityIdentities(): Set<CapabilityIdentity> =
+    flatMap { manifest ->
+        manifest.capabilities.map { capability ->
+            CapabilityIdentity(manifest.plugin.id, capability.name)
+        }
+    }.toSet()
 
 @Serializable
 data class PortConstraints(

@@ -45,7 +45,7 @@ import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
-import org.wip.plugintoolkit.features.flows.model.CapabilityIdentity
+import org.wip.plugintoolkit.features.flows.model.capabilityIdentities
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -95,19 +95,16 @@ fun FlowRunnerView(
     val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = koinInject()
     val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
     val pluginSettingsState by pluginManager.pluginSettingsState.collectAsState()
+    val loadedPlugins by pluginManager.loadedPlugins.collectAsState()
+    val installedPlugins by pluginManager.installedPlugins.collectAsState()
     val providedLocks = remember(pluginLocksState) {
         pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
     }
 
-    val activeCapabilities = remember(state.flows) {
+    val activeCapabilities = remember(loadedPlugins, installedPlugins) {
         org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
             .mapNotNull { it.getManifest().getOrNull() }
-            .flatMap { manifest ->
-                manifest.capabilities.map { capability ->
-                    CapabilityIdentity(manifest.plugin.id, capability.name)
-                }
-            }
-            .toSet()
+            .capabilityIdentities()
     }
 
     val executableFlows = remember(state.flows, activeCapabilities) {
