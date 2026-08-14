@@ -34,6 +34,6 @@ plugins {
 
 include(":composeApp")
 include(":plugin-api")
+include(":plugin-processor")
 include(":minimalExample")
 include(":completeExample")
-

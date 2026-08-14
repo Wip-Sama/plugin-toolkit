@@ -1,5 +1,23 @@
 This is a Kotlin Multiplatform project targeting Desktop (JVM).
 
+## Plugin-defined pages
+
+Plugins can organize capabilities into pages rendered by the host, without bundling Compose UI binaries:
+
+```kotlin
+@PluginUiPage(
+    id = "convert",
+    title = "Convert media",
+    description = "Choose an operation to begin.",
+    capabilityNames = ["Convert image", "Convert video"]
+)
+@PluginInfo(/* ... */)
+class MediaPlugin
+```
+
+Unknown capability names are ignored. The declarative contract stays usable across host UI upgrades and
+can also be interpreted by future web or command-line front ends.
+
 * [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
   It contains several subfolders:
   - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
@@ -22,6 +40,19 @@ in your IDE’s toolbar or run it directly from the terminal:
   .\gradlew.bat :composeApp:run
   ```
 
+### Command-line interface
+
+The desktop distribution can also run without opening a window:
+
+```shell
+plugintoolkit status
+plugintoolkit plugins list
+plugintoolkit flows list
+plugintoolkit --version
+```
+
+Use `plugintoolkit --help` for the complete command summary.
+
 ---
 
 ## Execution Engine & Concurrency (PluginToolkit)
@@ -34,3 +65,20 @@ The internal job execution engine (`FlowEngine` and `JobWorker`) enforces strict
 - **Configurable Capabilities Policies**: Transient network execution failures in plugins automatically back off and retry up to `maxRetries` (configurable in app settings). Executions are also bound by a strict `pluginTimeoutMs` to prevent hung plugins.
 
 Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+
+## Standalone plugin JARs
+
+JVM plugin modules can build a self-contained executable artifact by applying the bundled script:
+
+```kotlin
+apply(from = rootProject.file("scripts/standalone-plugin.gradle.kts"))
+```
+
+Run `./gradlew :yourPlugin:standaloneJar`, then inspect the plugin without the desktop host:
+
+```shell
+java -jar yourPlugin/build/libs/yourPlugin-version-standalone.jar --info
+```
+
+The generated JAR contains runtime dependencies, merges `META-INF/services` providers, and leaves KSP/compiler
+dependencies in the separate `plugin-processor` build-time artifact.

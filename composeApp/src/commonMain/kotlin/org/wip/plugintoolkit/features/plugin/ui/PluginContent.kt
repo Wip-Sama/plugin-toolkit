@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,15 +41,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.serialization.json.JsonPrimitive
-import org.wip.plugintoolkit.api.DataType
-import org.wip.plugintoolkit.api.PrimitiveType
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.ParameterRole
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.plugin.model.resolveProvidedValues
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
 import plugintoolkit.composeapp.generated.resources.Res
@@ -118,19 +117,24 @@ fun PluginContent(
                 emptyMap()
             }
         }
-        val providedSettings = remember(pluginId, pluginSettingsState) {
+        val selectedManifest = remember(pluginId, viewModel.selectedPlugin) {
+            viewModel.selectedPlugin?.getManifest()?.getOrNull()
+        }
+        val providedSettings = remember(pluginId, pluginSettingsState, selectedManifest) {
             val store = if (pluginId != null) pluginSettingsState[pluginId] ?: pluginManager.loadPluginSettings(pluginId) else null
-            val manifest = viewModel.selectedPlugin?.getManifest()?.getOrNull()
-            val manifestDefaults = (manifest?.settings?.mapValues { (_, meta) ->
-                meta.defaultValue ?: if (meta.type is DataType.Primitive && (meta.type as DataType.Primitive).primitiveType == PrimitiveType.BOOLEAN) {
-                    JsonPrimitive(false)
-                } else null
-            }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement>
-            manifestDefaults + (store?.settings ?: emptyMap()) + (store?.globalParams ?: emptyMap())
+            (store ?: org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore())
+                .resolveProvidedValues(selectedManifest)
         }
 
         if (selectedCapability == null) {
-            EmptyState(stringResource(Res.string.plugin_select_capability_hint))
+            if (selectedManifest != null && selectedManifest.uiPages.isNotEmpty()) {
+                PluginDefinedPages(
+                    manifest = selectedManifest,
+                    onCapabilitySelected = viewModel::selectCapability
+                )
+            } else {
+                EmptyState(stringResource(Res.string.plugin_select_capability_hint))
+            }
         } else {
             Column(
                 modifier = Modifier
@@ -197,6 +201,51 @@ fun PluginContent(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PluginDefinedPages(
+    manifest: PluginManifest,
+    onCapabilitySelected: (Capability) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(ToolkitTheme.spacing.extraLarge),
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraLarge)
+    ) {
+        manifest.uiPages.forEach { page ->
+            key(page.id) {
+            val capabilities = page.capabilityNames.mapNotNull { name ->
+                manifest.capabilities.firstOrNull { it.name == name }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
+                Text(page.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                if (page.description.isNotBlank()) {
+                    Text(
+                        page.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                capabilities.forEach { capability ->
+                    OutlinedButton(
+                        onClick = { onCapabilitySelected(capability) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(capability.name, style = MaterialTheme.typography.titleMedium)
+                            capability.description?.takeIf { it.isNotBlank() }?.let { description ->
+                                Text(description, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
             }
         }
     }

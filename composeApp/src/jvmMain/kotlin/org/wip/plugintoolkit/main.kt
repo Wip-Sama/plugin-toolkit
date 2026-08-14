@@ -134,9 +134,24 @@ import javax.swing.JOptionPane.showMessageDialog
 import javax.swing.JWindow
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.seconds
+import org.wip.plugintoolkit.cli.parseToolkitCliInvocation
+import org.wip.plugintoolkit.cli.runToolkitCli
+import org.wip.plugintoolkit.cli.ToolkitCliInvocation
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun main(args: Array<String>) {
+    when (val invocation = parseToolkitCliInvocation(args)) {
+        is ToolkitCliInvocation.Command -> {
+            val exitCode = kotlinx.coroutines.runBlocking { runToolkitCli(invocation.command) }
+            exitProcess(exitCode)
+        }
+        is ToolkitCliInvocation.Invalid -> {
+            System.err.println("Unknown command: ${invocation.arguments.joinToString(" ")}. Use --help.")
+            exitProcess(2)
+        }
+        ToolkitCliInvocation.Desktop -> Unit
+    }
+
     ComposeFoundationFlags.isNewContextMenuEnabled = true
     val splashWindow = try {
         showSplashWindow()

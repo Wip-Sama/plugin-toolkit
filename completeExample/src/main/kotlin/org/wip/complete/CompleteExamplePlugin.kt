@@ -23,6 +23,7 @@ import org.wip.plugintoolkit.api.annotations.CapabilityParam
 import org.wip.plugintoolkit.api.annotations.CapabilityResult
 import org.wip.plugintoolkit.api.annotations.PluginAction
 import org.wip.plugintoolkit.api.annotations.PluginInfo
+import org.wip.plugintoolkit.api.annotations.PluginUiPage
 import org.wip.plugintoolkit.api.annotations.PluginLoad
 import org.wip.plugintoolkit.api.annotations.PluginSetting
 import org.wip.plugintoolkit.api.annotations.PluginSetup
@@ -39,7 +40,9 @@ import java.io.File
 data class CompleteExampleSettings(
     @PluginSetting(
         description = "Public configuration value example",
-        defaultValue = "default_api_key"
+        defaultValue = "default_api_key",
+        minLength = 8,
+        semanticTypes = ["text/plain"]
     ) val apiKey: String? = "default_api_key",
 
     @PluginSetting(
@@ -116,6 +119,17 @@ enum class FeatureMode {
     version = "1.0.0",
     description = "Complete showcase of plugin API features including settings, validation, signals, storage, file system, lifecycle hooks, and flow contexts.",
     supportedOs = [OS.WINDOWS, OS.LINUX, OS.MACOS]
+)
+@PluginUiPage(
+    id = "essentials",
+    title = "Essential capabilities",
+    description = "Common storage and file operations.",
+    capabilityNames = ["capabilityWithFileAccess", "capabilityWithDataStorage"]
+)
+@PluginUiPage(
+    id = "advanced",
+    title = "Advanced capabilities",
+    capabilityNames = ["capabilityWithPauseResume", "capabilityWithComplexObjectsAndSemanticTypes"]
 )
 class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
 
