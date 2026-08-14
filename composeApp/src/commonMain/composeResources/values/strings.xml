@@ -195,6 +195,8 @@
     <string name="plugin_settings_actions">Actions</string>
     <string name="plugin_settings_custom">Custom Settings</string>
     <string name="plugin_settings_global_defaults">Global Parameter Defaults</string>
+    <string name="plugin_settings_required">Required</string>
+    <string name="plugin_settings_optional">Optional</string>
     <string name="plugin_settings_capability">Capability: %1$s</string>
     <string name="settings_enum_unlock_message">Configure required settings to unlock options</string>
     <string name="settings_locked_capability">Locked capability: %1$s</string>

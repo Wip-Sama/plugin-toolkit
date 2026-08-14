@@ -169,6 +169,8 @@ annotation class CapabilityOutput(
  * @property defaultValue The default value for the setting (as a string).
  * @property required Whether the setting is mandatory for the plugin to function.
  * @property secret Whether the setting contains sensitive information (e.g., API keys).
+ * @property semanticTypes Semantic hints used to select a specialized editor (for example `color/rgb`).
+ * @property pathTemplate Optional template used to derive this setting from other values.
  */
 @Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.SOURCE)
@@ -184,7 +186,9 @@ annotation class PluginSetting(
     val regex: String = "",
     val multiSelect: Boolean = false,
     val minChoices: Int = -1,
-    val maxChoices: Int = -1
+    val maxChoices: Int = -1,
+    val semanticTypes: Array<String> = [],
+    val pathTemplate: String = ""
 )
 
 /**

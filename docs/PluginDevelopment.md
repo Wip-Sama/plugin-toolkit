@@ -37,7 +37,8 @@ The `@PluginSetting` annotation supports identical validation constraints to tho
 data class MyAdvancedSettings(
     @PluginSetting(
         description = "Service Endpoint",
-        regex = "^https?://.*"
+        regex = "^https?://.*",
+        semanticTypes = ["text/uri"]
     ) val endpoint: String,
     
     @PluginSetting(
@@ -47,6 +48,8 @@ data class MyAdvancedSettings(
     ) val timeoutSeconds: Int
 )
 ```
+
+Settings also accept `semanticTypes` and `pathTemplate`, matching capability parameters. Semantic types select specialized controls such as color or file inputs; a path template derives a value from other configured fields.
 
 ### 2. Capabilities
 
