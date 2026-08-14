@@ -57,7 +57,9 @@ class ScheduleRepositoryTest {
         withTempPersistence { persistence, _ ->
             val settings = SettingsRepository(persistence, backgroundScope)
             testScheduler.advanceUntilIdle()
-            val manager = JobManager(backgroundScope, settings)
+            val manager = JobManager(backgroundScope, settings).apply {
+                scheduleReadinessOverride = { true }
+            }
             val schedule = manager.scheduleJob(template, intervalMinutes = 1)!!
             val dueNow = schedule.nextRunAt + 1.minutes
 
@@ -84,6 +86,22 @@ class ScheduleRepositoryTest {
             assertNotEquals(first.id, second.id)
             assertNull(manager.scheduleJob(setup, 5))
             assertEquals(2, manager.schedules.value.size)
+        }
+    }
+
+    @Test
+    fun `due occurrence waits until its plugin is loaded`() = runTest {
+        withTempPersistence { persistence, _ ->
+            val settings = SettingsRepository(persistence, backgroundScope)
+            testScheduler.advanceUntilIdle()
+            val manager = JobManager(backgroundScope, settings)
+            val schedule = manager.scheduleJob(template, intervalMinutes = 1)!!
+            val dueNow = schedule.nextRunAt + 1.minutes
+
+            manager.runDueSchedules(dueNow)
+
+            assertEquals(schedule.nextRunAt, manager.schedules.value.single().nextRunAt)
+            assertFalse(manager.history.value.any { it.event == "Enqueued" })
         }
     }
 

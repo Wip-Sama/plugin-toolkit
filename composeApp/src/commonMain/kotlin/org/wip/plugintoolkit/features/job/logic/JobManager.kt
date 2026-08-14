@@ -15,6 +15,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readString
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
@@ -30,6 +34,8 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.ScheduledJob
 import org.wip.plugintoolkit.features.job.model.canBeScheduled
 import org.wip.plugintoolkit.features.job.model.normalizedScheduleInterval
+import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -43,6 +49,8 @@ class JobManager(
     private val scope: CoroutineScope,
     private val settingsRepository: SettingsRepository
 ) {
+    internal var scheduleReadinessOverride: ((BackgroundJob) -> Boolean)? = null
+    private val scheduleFlowJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val maxConcurrentJobs get() = settingsRepository.settings.value.jobs.maxConcurrentJobs
     private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
     private val maxHistoryLength get() = settingsRepository.settings.value.jobs.maxHistoryLength
@@ -197,13 +205,46 @@ class JobManager(
     internal suspend fun runDueSchedules(now: kotlin.time.Instant) = scheduleMutex.withLock {
         if (!hydrateSchedulesLocked()) return@withLock
         val current = _schedules.value
-        val due = current.filter { it.isDue(now) }
+        // Do not consume an occurrence until all plugin code needed by the job is available.
+        // A failed/hung plugin startup therefore cannot make other schedules miss their run.
+        val due = current.filter {
+            it.isDue(now) && (scheduleReadinessOverride?.invoke(it.jobTemplate) ?: isScheduledJobReady(it.jobTemplate))
+        }
         if (due.isNotEmpty()) {
             val dueIds = due.mapTo(mutableSetOf()) { it.id }
             val updated = current.map { if (it.id in dueIds) it.afterRun(now) else it }
             // Persist the next occurrence first. A crash can skip a run, but cannot replay it twice.
             if (!replaceSchedules(updated)) return@withLock
             due.forEach { enqueueJob(it.jobTemplate.asFreshRun(now)) }
+        }
+    }
+
+    private fun isScheduledJobReady(job: BackgroundJob): Boolean = when (job.type) {
+        org.wip.plugintoolkit.features.job.model.JobType.Capability ->
+            PluginLoader.getPluginById(job.pluginId) != null
+        org.wip.plugintoolkit.features.job.model.JobType.Flow ->
+            isStoredFlowReady(job.capabilityName, mutableSetOf())
+        else -> false
+    }
+
+    private fun isStoredFlowReady(flowName: String, visited: MutableSet<String>): Boolean {
+        if (!visited.add(flowName)) return true
+        return runCatching {
+            val safeName = flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            val flowPath = Path("${settingsPersistence.getSettingsDir()}/flows/$safeName.json")
+            if (!SystemFileSystem.exists(flowPath)) return@runCatching false
+            val content = SystemFileSystem.source(flowPath).buffered().use { it.readString() }
+            val flow = scheduleFlowJson.decodeFromString<Flow>(content)
+            flow.nodes.all { node ->
+                when (node) {
+                    is Node.CapabilityNode -> PluginLoader.getPluginById(node.pluginInfo.id) != null
+                    is Node.SubFlowNode -> isStoredFlowReady(node.flowName, visited)
+                    else -> true
+                }
+            }
+        }.getOrElse { error ->
+            Logger.w(error) { "Scheduled flow '$flowName' is not ready for execution" }
+            false
         }
     }
 
