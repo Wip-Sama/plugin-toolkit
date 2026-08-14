@@ -69,3 +69,12 @@ java -jar yourPlugin/build/libs/yourPlugin-version-standalone.jar --info
 
 The generated JAR contains runtime dependencies, merges `META-INF/services` providers, and leaves KSP/compiler
 dependencies in the separate `plugin-processor` build-time artifact.
+
+External plugin builds need both artifacts at the same toolkit version:
+
+```kotlin
+dependencies {
+    implementation("org.wip.plugintoolkit:plugin-api:<toolkit-version>")
+    ksp("org.wip.plugintoolkit:plugin-processor:<toolkit-version>")
+}
+```
