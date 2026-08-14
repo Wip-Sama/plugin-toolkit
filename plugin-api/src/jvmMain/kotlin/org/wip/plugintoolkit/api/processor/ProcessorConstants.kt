@@ -20,6 +20,7 @@ import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PluginUiPage
 import org.wip.plugintoolkit.api.PluginModuleProvider
 import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PluginResponse
@@ -34,6 +35,7 @@ object ProcessorConstants {
 
     // Annotations
     const val PLUGIN_INFO_ANNOTATION = "$ANNOTATION_PACKAGE.PluginInfo"
+    const val PLUGIN_UI_PAGE_ANNOTATION = "$ANNOTATION_PACKAGE.PluginUiPage"
     const val CAPABILITY_ANNOTATION = "$ANNOTATION_PACKAGE.Capability"
     const val CAPABILITY_PARAM_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityParam"
     const val CAPABILITY_INPUT_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityInput"
@@ -53,6 +55,7 @@ object ProcessorConstants {
 
     // API Classes
     val CN_PLUGIN_MANIFEST = PluginManifest::class.asClassName()
+    val CN_PLUGIN_UI_PAGE = PluginUiPage::class.asClassName()
     val CN_PLUGIN_INFO = PluginInfo::class.asClassName()
     val CN_REQUIREMENTS = Requirements::class.asClassName()
     val CN_CAPABILITY = Capability::class.asClassName()
