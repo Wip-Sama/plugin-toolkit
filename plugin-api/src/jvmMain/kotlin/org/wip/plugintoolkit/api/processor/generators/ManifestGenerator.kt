@@ -160,16 +160,12 @@ object ManifestGenerator {
             if (requiresSettingsList.isEmpty()) {
                 capabilitiesCode.add("requiresSettings = emptyList(),\n")
             } else {
-                capabilitiesCode.add(
-                    "requiresSettings = listOf(%L),\n",
-                    requiresSettingsList.joinToString { "\"$it\"" })
+                capabilitiesCode.add("requiresSettings = %L,\n", stringListCodeBlock(requiresSettingsList))
             }
             if (requiredLocksList.isEmpty()) {
                 capabilitiesCode.add("requiredLocks = emptyList(),\n")
             } else {
-                capabilitiesCode.add(
-                    "requiredLocks = listOf(%L),\n",
-                    requiredLocksList.joinToString { "\"$it\"" })
+                capabilitiesCode.add("requiredLocks = %L,\n", stringListCodeBlock(requiredLocksList))
             }
             capabilitiesCode.add("parameters = mapOf(\n")
             capabilitiesCode.indent()
@@ -417,10 +413,7 @@ object ManifestGenerator {
             val requiredByCapabilitiesCode = if (requiredByCapabilities.isEmpty()) {
                 CodeBlock.of("emptyList()")
             } else {
-                CodeBlock.of(
-                    "listOf(%L)",
-                    requiredByCapabilities.joinToString { "\"$it\"" }
-                )
+                stringListCodeBlock(requiredByCapabilities)
             }
 
 
@@ -571,4 +564,13 @@ object ManifestGenerator {
         )
         return manifestType.build()
     }
+}
+
+internal fun stringListCodeBlock(values: List<String>): CodeBlock {
+    val result = CodeBlock.builder().add("listOf(")
+    values.forEachIndexed { index, value ->
+        if (index > 0) result.add(", ")
+        result.add("%S", value)
+    }
+    return result.add(")").build()
 }

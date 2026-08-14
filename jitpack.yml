@@ -3,4 +3,4 @@ jdk:
 before_install:
   - chmod +x gradlew
 install:
-  - ./gradlew :plugin-api:publishToMavenLocal -Dmaven.repo.local=$HOME/.m2/repository
+  - ./gradlew :plugin-api:publishToMavenLocal :plugin-processor:publishToMavenLocal -Dmaven.repo.local=$HOME/.m2/repository
