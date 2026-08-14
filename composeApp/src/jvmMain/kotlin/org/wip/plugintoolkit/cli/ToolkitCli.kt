@@ -43,7 +43,14 @@ fun parseToolkitCliInvocation(args: Array<String>): ToolkitCliInvocation {
     if (args.isEmpty() || args.all { it == DefaultSystemConfig().STARTUP_FLAG_BACKGROUND || it.startsWith("-psn_") }) {
         return ToolkitCliInvocation.Desktop
     }
-    return ToolkitCliInvocation.Invalid(args.toList())
+    val knownCommandRoots = setOf("--help", "-h", "help", "--version", "version", "status", "plugins", "flows")
+    return if (args.first() in knownCommandRoots) {
+        ToolkitCliInvocation.Invalid(args.toList())
+    } else {
+        // Desktop launchers and future file associations may inject their own arguments.
+        // Preserve the pre-CLI behavior unless the user clearly attempted a toolkit command.
+        ToolkitCliInvocation.Desktop
+    }
 }
 
 internal data class ToolkitCliData(
