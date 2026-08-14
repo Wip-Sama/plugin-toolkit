@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -45,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -103,7 +105,6 @@ import plugintoolkit.composeapp.generated.resources.job_no_ended
 import plugintoolkit.composeapp.generated.resources.job_paused_jobs
 import plugintoolkit.composeapp.generated.resources.job_queue
 import plugintoolkit.composeapp.generated.resources.job_running_jobs
-import plugintoolkit.composeapp.generated.resources.job_scheduler_soon
 import plugintoolkit.composeapp.generated.resources.nav_job_archive
 import plugintoolkit.composeapp.generated.resources.nav_job_ended
 import plugintoolkit.composeapp.generated.resources.nav_job_general
@@ -213,7 +214,7 @@ fun JobDashboard(
                         is JobNavKey.General -> NavEntry(key) { GeneralTab(viewModel) }
                         is JobNavKey.Archive -> NavEntry(key) { ArchiveTab(viewModel) }
                         is JobNavKey.Ended -> NavEntry(key) { EndedTab(viewModel) }
-                        is JobNavKey.Scheduler -> NavEntry(key) { SchedulerTab() }
+                        is JobNavKey.Scheduler -> NavEntry(key) { SchedulerTab(viewModel) }
                         is JobNavKey.History -> NavEntry(key) { HistoryTab(viewModel) }
                         else -> NavEntry(key) { }
                     }
@@ -338,7 +339,8 @@ fun EndedTab(viewModel: JobViewModel) {
                         job = job,
                         progress = progressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                         logs = logsMap[job.id] ?: emptyList(),
-                        onClear = { viewModel.clearEndedJob(job.id) }
+                        onClear = { viewModel.clearEndedJob(job.id) },
+                        onSchedule = { viewModel.scheduleDaily(job) }
                     )
                 }
             } else {
@@ -351,24 +353,51 @@ fun EndedTab(viewModel: JobViewModel) {
 }
 
 @Composable
-fun SchedulerTab() {
-    Column(
+fun SchedulerTab(viewModel: JobViewModel) {
+    val schedules by viewModel.schedules.collectAsState()
+
+    if (schedules.isEmpty()) {
+        EmptyState("Schedule a completed job to run it every day.", Icons.Default.Schedule)
+        return
+    }
+
+    LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
-        Icon(
-            imageVector = Icons.Default.Schedule,
-            contentDescription = null,
-            modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraLarge),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground)
-        )
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-        Text(
-            text = stringResource(Res.string.job_scheduler_soon),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        items(schedules, key = { it.id }) { schedule ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(schedule.jobTemplate.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Every ${schedule.intervalMinutes} minutes · next ${formatTime(schedule.nextRunAt)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = schedule.enabled,
+                        onCheckedChange = { viewModel.setScheduleEnabled(schedule.id, it) }
+                    )
+                    IconButton(onClick = { viewModel.runScheduleNow(schedule.id) }) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Run now")
+                    }
+                    IconButton(onClick = { viewModel.removeSchedule(schedule.id) }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete schedule")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -482,4 +511,3 @@ private fun formatTime(instant: Instant): String {
         localDateTime.minute.toString().padStart(2, '0')
     }:${localDateTime.second.toString().padStart(2, '0')}"
 }
-

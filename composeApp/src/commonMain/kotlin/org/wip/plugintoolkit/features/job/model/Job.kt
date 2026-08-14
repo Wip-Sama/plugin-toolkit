@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlin.time.Duration.Companion.minutes
 
 @Serializable
 enum class JobStatus {
@@ -56,3 +57,21 @@ data class JobHistoryEntry(
     val event: String, // "Started", "Stopped", "Failed", etc.
     val details: String? = null
 )
+
+@Serializable
+data class ScheduledJob(
+    val id: String,
+    val jobTemplate: BackgroundJob,
+    val intervalMinutes: Long,
+    val nextRunAt: Instant,
+    val enabled: Boolean = true,
+    val lastRunAt: Instant? = null
+) {
+    fun isDue(now: Instant): Boolean = enabled && nextRunAt <= now
+
+    /** Reschedule from the actual run time so missed intervals never create a catch-up burst. */
+    fun afterRun(now: Instant): ScheduledJob = copy(
+        lastRunAt = now,
+        nextRunAt = now + intervalMinutes.coerceAtLeast(1).minutes
+    )
+}

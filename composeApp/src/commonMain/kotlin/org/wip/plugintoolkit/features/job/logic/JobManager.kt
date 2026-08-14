@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.TimeZone
@@ -25,10 +27,12 @@ import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.ScheduledJob
 import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 
 class JobManager(
     /** Injected [AppScope] for managing job lifecycles and worker coordination. */
@@ -55,6 +59,9 @@ class JobManager(
     private val _history = MutableStateFlow<List<JobHistoryEntry>>(emptyList())
     val history: StateFlow<List<JobHistoryEntry>> = _history.asStateFlow()
 
+    private val _schedules = MutableStateFlow<List<ScheduledJob>>(emptyList())
+    val schedules: StateFlow<List<ScheduledJob>> = _schedules.asStateFlow()
+
     private val _jobLogs = MutableStateFlow<Map<String, List<String>>>(emptyMap())
     val jobLogs: StateFlow<Map<String, List<String>>> = _jobLogs.asStateFlow()
 
@@ -71,6 +78,8 @@ class JobManager(
     private val settingsPersistence: org.wip.plugintoolkit.features.settings.logic.SettingsPersistence =
         settingsRepository.persistence
     private val jobRepository = JobRepository(settingsPersistence)
+    private val scheduleRepository = ScheduleRepository(settingsPersistence)
+    private val scheduleMutex = Mutex()
 
     init {
         scope.launch {
@@ -100,7 +109,67 @@ class JobManager(
                 }
             }
         }
+        scope.launch {
+            val savedSchedules = scheduleRepository.load()
+            _schedules.update { current ->
+                savedSchedules.filterNot { saved -> current.any { it.id == saved.id } } + current
+            }
+            launch { _schedules.collect(scheduleRepository::save) }
+            while (isActive) {
+                runDueSchedules(Clock.System.now())
+                delay(1_000)
+            }
+        }
     }
+
+    fun scheduleJob(job: BackgroundJob, intervalMinutes: Long = 24 * 60L): ScheduledJob {
+        val now = Clock.System.now()
+        val schedule = ScheduledJob(
+            id = "schedule-${now.toEpochMilliseconds()}-${job.id}",
+            jobTemplate = job.asFreshRun(now),
+            intervalMinutes = intervalMinutes.coerceAtLeast(1),
+            nextRunAt = now + intervalMinutes.coerceAtLeast(1).minutes
+        )
+        _schedules.update { it + schedule }
+        return schedule
+    }
+
+    fun removeSchedule(id: String) {
+        _schedules.update { schedules -> schedules.filterNot { it.id == id } }
+    }
+
+    fun setScheduleEnabled(id: String, enabled: Boolean) {
+        _schedules.update { schedules -> schedules.map { if (it.id == id) it.copy(enabled = enabled) else it } }
+    }
+
+    suspend fun runScheduleNow(id: String) = scheduleMutex.withLock {
+        val now = Clock.System.now()
+        val schedule = _schedules.value.firstOrNull { it.id == id } ?: return@withLock
+        enqueueJob(schedule.jobTemplate.asFreshRun(now))
+        _schedules.update { schedules -> schedules.map { if (it.id == id) schedule.afterRun(now) else it } }
+    }
+
+    internal suspend fun runDueSchedules(now: kotlin.time.Instant) = scheduleMutex.withLock {
+        val due = _schedules.value.filter { it.isDue(now) }
+        due.forEach { enqueueJob(it.jobTemplate.asFreshRun(now)) }
+        if (due.isNotEmpty()) {
+            val dueIds = due.mapTo(mutableSetOf()) { it.id }
+            _schedules.update { schedules ->
+                schedules.map { if (it.id in dueIds) it.afterRun(now) else it }
+            }
+        }
+    }
+
+    private fun BackgroundJob.asFreshRun(now: kotlin.time.Instant): BackgroundJob = copy(
+        id = "$id-${now.toEpochMilliseconds()}",
+        status = JobStatus.Queued,
+        enqueuedAt = now,
+        startedAt = null,
+        completedAt = null,
+        errorMessage = null,
+        result = null,
+        resumeState = null
+    )
 
     private fun startWorkers() {
         repeat(maxConcurrentJobs) {
@@ -563,4 +632,3 @@ class JobManager(
         }
     }
 }
-

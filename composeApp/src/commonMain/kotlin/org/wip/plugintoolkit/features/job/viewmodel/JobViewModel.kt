@@ -18,6 +18,7 @@ class JobViewModel(
     val jobLogs = jobManager.jobLogs
     val history = jobManager.history
     val endedJobs = jobManager.endedJobs
+    val schedules = jobManager.schedules
 
     val runningJobs = jobs.map { list ->
         list.filter { it.status == JobStatus.Running }
@@ -71,5 +72,17 @@ class JobViewModel(
         viewModelScope.launch {
             jobManager.clearAllEndedJobs()
         }
+    }
+
+    fun scheduleDaily(job: BackgroundJob) {
+        jobManager.scheduleJob(job)
+    }
+
+    fun removeSchedule(id: String) = jobManager.removeSchedule(id)
+
+    fun setScheduleEnabled(id: String, enabled: Boolean) = jobManager.setScheduleEnabled(id, enabled)
+
+    fun runScheduleNow(id: String) {
+        viewModelScope.launch { jobManager.runScheduleNow(id) }
     }
 }
