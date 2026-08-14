@@ -26,7 +26,7 @@ dependencies {
     implementation(libs.koin.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(project(":plugin-api"))
-    ksp(project(":plugin-api"))
+    ksp(project(":plugin-processor"))
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
 }

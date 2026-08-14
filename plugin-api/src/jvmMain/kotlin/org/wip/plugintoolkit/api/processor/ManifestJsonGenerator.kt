@@ -364,7 +364,7 @@ object ManifestJsonGenerator {
             requirements = Requirements(
                 minMemoryMb = minMemoryMb,
                 minExecutionTimeMs = minExecutionTimeMs,
-                targetAppVersion = org.wip.plugintoolkit.api.ApiConfig.VERSION
+                targetAppVersion = org.wip.plugintoolkit.api.PLUGIN_API_VERSION
             ),
             capabilities = manifestCapabilities,
             actions = manifestActions,

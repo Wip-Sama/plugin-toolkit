@@ -5,20 +5,40 @@ import org.koin.core.context.stopKoin
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginModuleProvider
 import java.util.ServiceLoader
+import kotlin.system.exitProcess
 
 /** Entry point embedded in standalone plugin JARs. */
 fun main(args: Array<String>) {
-    val plugins = loadStandalonePlugins()
-    if (plugins.isEmpty()) {
-        System.err.println("No PluginEntry service was found in this JAR.")
-        return
+    val exitCode = runStandalone(args, System.out::println, System.err::println)
+    if (exitCode != 0) exitProcess(exitCode)
+}
+
+internal fun runStandalone(
+    args: Array<String>,
+    output: (String) -> Unit,
+    error: (String) -> Unit,
+    loadPlugins: () -> List<PluginEntry> = ::loadStandalonePlugins
+): Int {
+    when (args.firstOrNull()) {
+        "--help", "-h" -> {
+            output("Usage: java -jar <plugin>-standalone.jar [--info|--help]")
+            return 0
+        }
+        null, "--info" -> Unit
+        else -> {
+            error("Unknown option '${args.first()}'. Use --help.")
+            return 2
+        }
     }
 
-    when (args.firstOrNull()) {
-        null, "--info" -> println(describeStandalonePlugins(plugins))
-        "--help", "-h" -> println("Usage: java -jar <plugin>-standalone.jar [--info|--help]")
-        else -> System.err.println("Unknown option '${args.first()}'. Use --help.")
+    val plugins = loadPlugins()
+    if (plugins.isEmpty()) {
+        error("No PluginEntry service was found in this JAR.")
+        return 2
     }
+
+    output(describeStandalonePlugins(plugins))
+    return 0
 }
 
 private fun loadStandalonePlugins(): List<PluginEntry> {

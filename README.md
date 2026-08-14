@@ -49,4 +49,5 @@ Run `./gradlew :yourPlugin:standaloneJar`, then inspect the plugin without the d
 java -jar yourPlugin/build/libs/yourPlugin-version-standalone.jar --info
 ```
 
-The generated JAR contains runtime dependencies and preserves `ServiceLoader` plugin discovery.
+The generated JAR contains runtime dependencies, merges `META-INF/services` providers, and leaves KSP/compiler
+dependencies in the separate `plugin-processor` build-time artifact.

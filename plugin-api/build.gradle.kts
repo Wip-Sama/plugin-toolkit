@@ -40,13 +40,17 @@ kotlin {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
-
-            // Processor dependencies
-            implementation(libs.ksp.api)
-            implementation(libs.kotlinpoet)
-            implementation(libs.kotlinpoet.ksp)
+            // KSP implementation is compiled and published by :plugin-processor.
         }
     }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    exclude("org/wip/plugintoolkit/api/processor/**")
+}
+
+tasks.withType<ProcessResources>().configureEach {
+    exclude("META-INF/services/com.google.devtools.ksp.processing.SymbolProcessorProvider")
 }
 
 publishing {
