@@ -12,7 +12,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.navigation3.runtime.NavKey
 import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.features.navigation.GlobalRouter
+import org.wip.plugintoolkit.features.navigation.LocalGlobalRouter
+import org.wip.plugintoolkit.features.navigation.model.Screen
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
 import plugintoolkit.composeapp.generated.resources.dialog_unsaved_changes
@@ -20,6 +24,10 @@ import plugintoolkit.composeapp.generated.resources.dialog_unsaved_changes
 /**
  * CompositionLocal providing global navigation to a plugin setting page across the application.
  */
+@Deprecated(
+    message = "Stai usando LocalNavigateToPluginSetting. Migra a LocalGlobalRouter.",
+    replaceWith = ReplaceWith("LocalGlobalRouter", "org.wip.plugintoolkit.features.navigation.LocalGlobalRouter")
+)
 val LocalNavigateToPluginSetting = staticCompositionLocalOf<((pluginId: String, settingKey: String) -> Unit)?> { null }
 
 /**
@@ -28,24 +36,21 @@ val LocalNavigateToPluginSetting = staticCompositionLocalOf<((pluginId: String, 
  *
  * Intercepts events during [PointerEventPass.Initial] to capture tap events before disabled children swallow them:
  * 1. If [hasUnsavedChanges] is true, shows a warning confirmation dialog first.
- * 2. Calls [onNavigateToPluginSetting] (or [LocalNavigateToPluginSetting]) with ([pluginId], [targetSettingKey]) once confirmed or directly if no unsaved data.
+ * 2. Calls [currentRouter].navigateTo([targetScreen]) once confirmed or directly if no unsaved data.
  *
  * @param isLocked Whether the element is locked and should intercept clicks.
- * @param pluginId The plugin ID to navigate to.
- * @param targetSettingKey The specific setting key to deep-link to inside the plugin settings.
+ * @param targetScreen The type-safe [NavKey] destination (e.g. [Screen.PluginManager]) to navigate to.
  * @param hasUnsavedChanges Whether there are unsaved changes that should warn the user first.
- * @param onNavigateToPluginSetting Navigation callback invoked with (pluginId, settingKey).
- *        If null, falls back to [LocalNavigateToPluginSetting].
+ * @param router Explicit [GlobalRouter] instance. If null, falls back to [LocalGlobalRouter].
  */
 fun Modifier.lockedClickInterceptor(
     isLocked: Boolean,
-    pluginId: String = "",
-    targetSettingKey: String = "",
+    targetScreen: NavKey? = null,
     hasUnsavedChanges: Boolean = false,
-    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null
+    router: GlobalRouter? = null
 ): Modifier = composed {
-    val navCallback = onNavigateToPluginSetting ?: LocalNavigateToPluginSetting.current
-    if (!isLocked || navCallback == null) return@composed this
+    val currentRouter = router ?: LocalGlobalRouter.current
+    if (!isLocked || targetScreen == null) return@composed this
 
     var showDialog by remember { mutableStateOf(false) }
 
@@ -58,7 +63,7 @@ fun Modifier.lockedClickInterceptor(
                 TextButton(
                     onClick = {
                         showDialog = false
-                        navCallback(pluginId, targetSettingKey)
+                        currentRouter.navigateTo(targetScreen)
                     }
                 ) {
                     Text("Confirm")
@@ -72,7 +77,7 @@ fun Modifier.lockedClickInterceptor(
         )
     }
 
-    this.pointerInput(isLocked, hasUnsavedChanges, pluginId, targetSettingKey, navCallback) {
+    this.pointerInput(isLocked, hasUnsavedChanges, targetScreen, currentRouter) {
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -82,10 +87,88 @@ fun Modifier.lockedClickInterceptor(
                     if (hasUnsavedChanges) {
                         showDialog = true
                     } else {
-                        navCallback(pluginId, targetSettingKey)
+                        currentRouter.navigateTo(targetScreen)
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Deprecated overload to support legacy code while guiding developers toward type-safe navigation.
+ */
+@Deprecated(
+    message = "Stai usando parametri multipli (pluginId, targetSettingKey). Migra a targetScreen usando oggetti Type-Safe @Serializable.",
+    replaceWith = ReplaceWith(
+        "lockedClickInterceptor(isLocked = isLocked, targetScreen = Screen.PluginManager(pluginId = pluginId, scrollToSetting = targetSettingKey), hasUnsavedChanges = hasUnsavedChanges)",
+        "org.wip.plugintoolkit.features.navigation.model.Screen"
+    )
+)
+fun Modifier.lockedClickInterceptor(
+    isLocked: Boolean,
+    pluginId: String = "",
+    targetSettingKey: String = "",
+    hasUnsavedChanges: Boolean = false,
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null
+): Modifier = composed {
+    val legacyCallback = onNavigateToPluginSetting ?: LocalNavigateToPluginSetting.current
+    if (legacyCallback != null) {
+        if (!isLocked) return@composed this
+
+        var showDialog by remember { mutableStateOf(false) }
+
+        if (showDialog) {
+            AlertDialog(
+                onDismissRequest = { showDialog = false },
+                title = { Text(stringResource(Res.string.dialog_unsaved_changes)) },
+                text = { Text("All the unsaved data will be lost. Are you sure you want to exit?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDialog = false
+                            legacyCallback(pluginId, targetSettingKey)
+                        }
+                    ) {
+                        Text("Confirm")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDialog = false }) {
+                        Text(stringResource(Res.string.dialog_cancel))
+                    }
+                }
+            )
+        }
+
+        this.pointerInput(isLocked, hasUnsavedChanges, pluginId, targetSettingKey, legacyCallback) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull()
+                    if (change != null && change.pressed) {
+                        change.consume()
+                        if (hasUnsavedChanges) {
+                            showDialog = true
+                        } else {
+                            legacyCallback(pluginId, targetSettingKey)
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        val targetScreen = if (pluginId.isNotEmpty() || targetSettingKey.isNotEmpty()) {
+            Screen.PluginManager(pluginId = pluginId.ifEmpty { null }, scrollToSetting = targetSettingKey.ifEmpty { null })
+        } else {
+            null
+        }
+        this.then(
+            Modifier.lockedClickInterceptor(
+                isLocked = isLocked,
+                targetScreen = targetScreen,
+                hasUnsavedChanges = hasUnsavedChanges
+            )
+        )
     }
 }

@@ -9,10 +9,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
@@ -64,8 +60,6 @@ fun PluginSectionScreen(
     val currentKey = backStack.lastOrNull() ?: PluginNavKey.PluginList
     val loadedPlugins = viewModel.loadedPlugins
 
-    val globalNav = LocalNavigateToPluginSetting.current
-
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Nested Navigation Sidebar for Plugins
         DirectExecutionSidebar(
@@ -86,8 +80,7 @@ fun PluginSectionScreen(
                 }
             },
             selectedCapability = viewModel.selectedCapability,
-            onCapabilitySelected = { viewModel.selectCapability(it) },
-            onNavigateToPluginSetting = globalNav
+            onCapabilitySelected = { viewModel.selectCapability(it) }
         )
 
         // Detail Content Area
@@ -116,8 +109,7 @@ fun PluginSectionScreen(
                             }
                             PluginContent(
                                 viewModel = viewModel,
-                                scrollToSetting = key.scrollToSetting,
-                                onNavigateToPluginSetting = globalNav
+                                scrollToSetting = key.scrollToSetting
                             )
                         } else {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
