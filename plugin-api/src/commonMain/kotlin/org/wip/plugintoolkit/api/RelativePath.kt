@@ -41,18 +41,22 @@ value class RelativePath private constructor(val value: String) {
                 return Result.failure(SecurityException("Path traversal attempt detected: $normalized"))
             }
 
-            val sanitized = normalized
-                .replace("\u2024", ".")
-                .replace("\uFF0E", ".")
-                .replace("\u3002", ".")
-                .replace("%2e", ".", ignoreCase = true)
-                .replace('\\', '/')
-
-            val segments = sanitized.split('/').filter { it.isNotEmpty() && it != "." }
-            if (segments.any { it == ".." || it.contains(Regex("%25(?:2e|2f|5c)", RegexOption.IGNORE_CASE)) }) {
+            val segments = normalized.replace('\\', '/').split('/').filter { it.isNotEmpty() && it != "." }
+            val validationSegments = segments.map { segment ->
+                segment
+                    .replace("\u2024", ".")
+                    .replace("\uFF0E", ".")
+                    .replace("\u3002", ".")
+                    .replace("%2e", ".", ignoreCase = true)
+            }
+            if (validationSegments.any {
+                    it == ".." || it.contains(Regex("%25(?:2e|2f|5c)", RegexOption.IGNORE_CASE))
+                }
+            ) {
                 return Result.failure(SecurityException("Path traversal attempt detected: $normalized"))
             }
 
+            // Validation uses a security-normalized view, but the filename itself is not decoded or rewritten.
             return Result.success(RelativePath(segments.joinToString("/")))
         }
     }

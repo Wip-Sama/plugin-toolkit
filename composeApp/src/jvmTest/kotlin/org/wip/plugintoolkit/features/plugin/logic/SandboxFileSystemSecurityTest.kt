@@ -8,10 +8,13 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.jar.JarEntry
+import java.util.jar.JarOutputStream
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SandboxFileSystemSecurityTest {
@@ -80,6 +83,25 @@ class SandboxFileSystemSecurityTest {
         val fileSystem = DefaultPluginFileSystem.createCacheOnly(install.toString())
 
         verifySymlinkIsContained(fileSystem, install.resolve("cache"), outside)
+    }
+
+    @Test
+    fun cacheOnlyVariantListsAndExtractsResourcesInsideCache() = runTest {
+        val install = testRoot.resolve("plugin")
+        Files.createDirectories(install)
+        val jar = install.resolve("plugin.jar")
+        JarOutputStream(Files.newOutputStream(jar)).use { output ->
+            output.putNextEntry(JarEntry("assets/example.txt"))
+            output.write("resource".encodeToByteArray())
+            output.closeEntry()
+        }
+        val fileSystem = DefaultPluginFileSystem.createCacheOnly(install.toString(), jar.toString())
+        val target = RelativePath.from("nested/example.txt").getOrThrow()
+
+        assertTrue(fileSystem.extractResource("assets/example.txt", target).isSuccess)
+        assertEquals("resource", fileSystem.readTextFile(target))
+        assertEquals(listOf("example.txt"), fileSystem.listFiles(RelativePath.from("nested").getOrThrow()))
+        assertTrue(Files.notExists(install.resolve("files/nested/example.txt")))
     }
 
     private fun createOutsideSecret(): Path {

@@ -121,8 +121,8 @@ class DefaultPluginFileSystem(
     override fun getBasePath(): String = basePath
 
     companion object {
-        fun createCacheOnly(pluginInstallPath: String): PluginFileSystem {
-            return DefaultPluginFileSystem(pluginInstallPath).let { fs ->
+        fun createCacheOnly(pluginInstallPath: String, jarPath: String? = null): PluginFileSystem {
+            return DefaultPluginFileSystem(pluginInstallPath, jarPath).let { fs ->
                 // Create a variant that uses cachePath as basePath
                 object : PluginFileSystem by fs {
                     override fun getBasePath(): String = fs.cachePath
@@ -141,6 +141,13 @@ class DefaultPluginFileSystem(
                     override suspend fun exists(relativePath: RelativePath): Boolean =
                         SystemFileSystem.exists(fs.resolveCachePath(relativePath))
 
+                    override suspend fun listFiles(relativePath: RelativePath): List<String> {
+                        val path = fs.resolveCachePath(relativePath)
+                        if (!SystemFileSystem.exists(path)) return emptyList()
+                        if (SystemFileSystem.metadataOrNull(path)?.isDirectory != true) return emptyList()
+                        return SystemFileSystem.list(path).map { it.name }
+                    }
+
                     override suspend fun deleteFile(relativePath: RelativePath): Result<Unit> =
                         fs.deleteFromCache(relativePath)
 
@@ -153,6 +160,11 @@ class DefaultPluginFileSystem(
                             require(relativePath.value.isNotEmpty()) { "The plugin cache root cannot be deleted" }
                             fs.cacheOperations.deleteDirectory(fs.resolveCachePath(relativePath), recursive)
                         }
+
+                    override suspend fun extractResource(
+                        resourcePath: String,
+                        targetRelativePath: RelativePath
+                    ): Result<Unit> = fs.extractResourceToCache(resourcePath, targetRelativePath)
                 }
             }
         }
@@ -205,6 +217,24 @@ class DefaultPluginFileSystem(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    private suspend fun extractResourceToCache(
+        resourcePath: String,
+        targetRelativePath: RelativePath
+    ): Result<Unit> {
+        if (resourcePath.contains("..") || resourcePath.startsWith("/") ||
+            resourcePath.startsWith("\\") || resourcePath.contains("\u0000")) {
+            return Result.failure(SecurityException("Invalid resource path: $resourcePath"))
+        }
+        return runCatching {
+            withContext(loomDispatcher) {
+                val jar = jarPath ?: error("No JAR path configured for resource extraction")
+                val data = org.wip.plugintoolkit.core.utils.PlatformUtils.readBytesFromZip(jar, resourcePath)
+                    ?: error("Resource not found in JAR: $resourcePath")
+                writeToCache(targetRelativePath, data).getOrThrow()
+            }
         }
     }
 }

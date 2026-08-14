@@ -359,7 +359,7 @@ class PluginLifecycleManager(
             logger = pluginLogger,
             progress = progressReporter,
             fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
-            cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath),
+            cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath, jarFullPath),
             executionFileSystem = executionFileSystem ?: DefaultExecutionFileSystem("${installPath}/temp_execution"),
             hostFileSystem = HostFileSystemImpl(allowedPaths, isDestructiveAllowed),
             settings = mergedSettings,
