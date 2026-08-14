@@ -17,6 +17,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class ScheduleRepositoryTest {
@@ -102,6 +103,28 @@ class ScheduleRepositoryTest {
 
             assertEquals(schedule.nextRunAt, manager.schedules.value.single().nextRunAt)
             assertFalse(manager.history.value.any { it.event == "Enqueued" })
+        }
+    }
+
+    @Test
+    fun `unready schedule backs off without delaying its next eligible probe`() = runTest {
+        withTempPersistence { persistence, _ ->
+            val settings = SettingsRepository(persistence, backgroundScope)
+            testScheduler.advanceUntilIdle()
+            var pluginReady = false
+            val manager = JobManager(backgroundScope, settings).apply {
+                schedulePluginReadiness = { pluginReady }
+            }
+            val schedule = manager.scheduleJob(template, intervalMinutes = 1)!!
+            val dueNow = schedule.nextRunAt + 1.minutes
+
+            manager.runDueSchedules(dueNow)
+            pluginReady = true
+            manager.runDueSchedules(dueNow + 1.seconds)
+            assertFalse(manager.history.value.any { it.event == "Enqueued" })
+
+            manager.runDueSchedules(dueNow + 31.seconds)
+            assertTrue(manager.history.value.any { it.event == "Enqueued" })
         }
     }
 

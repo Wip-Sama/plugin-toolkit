@@ -102,6 +102,7 @@ class JobManager(
     private var schedulesLoaded = false
     private var consecutiveSchedulePersistenceFailures = 0
     private var scheduleRetryNotBefore: kotlin.time.Instant? = null
+    private val scheduleReadinessRetryNotBefore = mutableMapOf<String, kotlin.time.Instant>()
 
     init {
         scope.launch {
@@ -209,7 +210,23 @@ class JobManager(
         val current = _schedules.value
         // Do not consume an occurrence until all plugin code needed by the job is available.
         // A failed/hung plugin startup therefore cannot make other schedules miss their run.
-        val due = current.filter { it.isDue(now) && isScheduledJobReady(it.jobTemplate) }
+        scheduleReadinessRetryNotBefore.keys.retainAll(current.mapTo(mutableSetOf()) { it.id })
+        val due = current.filter { schedule ->
+            if (!schedule.isDue(now)) return@filter false
+            val retryAt = scheduleReadinessRetryNotBefore[schedule.id]
+            if (retryAt != null && now < retryAt) return@filter false
+            if (isScheduledJobReady(schedule.jobTemplate)) {
+                scheduleReadinessRetryNotBefore.remove(schedule.id)
+                true
+            } else {
+                // Missing flows and disabled plugins can be permanent. Probe each affected
+                // schedule independently so one broken flow neither spins at 1 Hz nor delays
+                // unrelated schedules.
+                scheduleReadinessRetryNotBefore[schedule.id] =
+                    now + SCHEDULE_READINESS_RETRY_MS.milliseconds
+                false
+            }
+        }
         if (due.isNotEmpty()) {
             val dueIds = due.mapTo(mutableSetOf()) { it.id }
             val updated = current.map { if (it.id in dueIds) it.afterRun(now) else it }
@@ -305,7 +322,13 @@ class JobManager(
     private fun nextSchedulerWaitMillis(now: kotlin.time.Instant): Long {
         val dueWait = _schedules.value.asSequence()
             .filter { it.enabled }
-            .map { (it.nextRunAt - now).inWholeMilliseconds }
+            .map { schedule ->
+                val effectiveRunAt = maxOf(
+                    schedule.nextRunAt,
+                    scheduleReadinessRetryNotBefore[schedule.id] ?: schedule.nextRunAt
+                )
+                (effectiveRunAt - now).inWholeMilliseconds
+            }
             .minOrNull()
             ?.coerceIn(MIN_SCHEDULER_WAIT_MS, MAX_SCHEDULER_WAIT_MS)
             ?: MAX_SCHEDULER_WAIT_MS
@@ -781,3 +804,4 @@ private const val MIN_SCHEDULER_WAIT_MS = 1_000L
 private const val MAX_SCHEDULER_WAIT_MS = 60_000L
 private const val SCHEDULER_RETRY_BASE_MS = 5_000L
 private const val SCHEDULE_LOAD_RETRY_MS = 30_000L
+private const val SCHEDULE_READINESS_RETRY_MS = 30_000L
