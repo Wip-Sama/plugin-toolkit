@@ -271,7 +271,21 @@ data class PluginManifest(
     val changelog: Changelog? = null,
     val hasUpdateHandler: Boolean = false,
     val hasSetupHandler: Boolean = false,
-    val hasMigrations: Boolean = false
+    val hasMigrations: Boolean = false,
+    /** Optional declarative pages rendered by the host. Unknown capability names are ignored. */
+    val uiPages: List<PluginUiPage> = emptyList()
+)
+
+/**
+ * A host-rendered plugin page. Keeping this declarative avoids coupling plugin JARs to a
+ * particular Compose version while still allowing plugins to shape their user experience.
+ */
+@Serializable
+data class PluginUiPage(
+    val id: String,
+    val title: String,
+    val description: String = "",
+    val capabilityNames: List<String> = emptyList()
 )
 
 @Serializable
@@ -632,4 +646,3 @@ data class PluginAction(
     val functionName: String,
     val parameters: Map<String, ParameterMetadata>? = null
 )
-

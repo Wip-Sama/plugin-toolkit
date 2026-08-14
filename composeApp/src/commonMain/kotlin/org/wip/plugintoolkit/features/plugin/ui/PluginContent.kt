@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -130,7 +131,15 @@ fun PluginContent(
         }
 
         if (selectedCapability == null) {
-            EmptyState(stringResource(Res.string.plugin_select_capability_hint))
+            val manifest = viewModel.selectedPlugin?.getManifest()?.getOrNull()
+            if (manifest != null && manifest.uiPages.isNotEmpty()) {
+                PluginDefinedPages(
+                    manifest = manifest,
+                    onCapabilitySelected = viewModel::selectCapability
+                )
+            } else {
+                EmptyState(stringResource(Res.string.plugin_select_capability_hint))
+            }
         } else {
             Column(
                 modifier = Modifier
@@ -193,6 +202,49 @@ fun PluginContent(
                                         }
                                     }
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PluginDefinedPages(
+    manifest: PluginManifest,
+    onCapabilitySelected: (Capability) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(ToolkitTheme.spacing.extraLarge),
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraLarge)
+    ) {
+        manifest.uiPages.forEach { page ->
+            val capabilities = page.capabilityNames.mapNotNull { name ->
+                manifest.capabilities.firstOrNull { it.name == name }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
+                Text(page.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                if (page.description.isNotBlank()) {
+                    Text(
+                        page.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                capabilities.forEach { capability ->
+                    OutlinedButton(
+                        onClick = { onCapabilitySelected(capability) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(capability.name, style = MaterialTheme.typography.titleMedium)
+                            capability.description?.takeIf { it.isNotBlank() }?.let { description ->
+                                Text(description, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
