@@ -274,7 +274,35 @@ data class PluginManifest(
     val hasMigrations: Boolean = false,
     /** Optional declarative pages rendered by the host. Unknown capability names are ignored. */
     val uiPages: List<PluginUiPage> = emptyList()
-)
+) {
+    @Deprecated("Binary compatibility constructor", level = DeprecationLevel.HIDDEN)
+    constructor(
+        manifestVersion: String,
+        plugin: PluginInfo,
+        requirements: Requirements,
+        defaultParameters: Map<String, ParameterMetadata>? = null,
+        capabilities: List<Capability> = emptyList(),
+        actions: List<PluginAction> = emptyList(),
+        settings: Map<String, SettingMetadata>? = null,
+        changelog: Changelog? = null,
+        hasUpdateHandler: Boolean = false,
+        hasSetupHandler: Boolean = false,
+        hasMigrations: Boolean = false
+    ) : this(
+        manifestVersion = manifestVersion,
+        plugin = plugin,
+        requirements = requirements,
+        defaultParameters = defaultParameters,
+        capabilities = capabilities,
+        actions = actions,
+        settings = settings,
+        changelog = changelog,
+        hasUpdateHandler = hasUpdateHandler,
+        hasSetupHandler = hasSetupHandler,
+        hasMigrations = hasMigrations,
+        uiPages = emptyList()
+    )
+}
 
 /**
  * A host-rendered plugin page. Keeping this declarative avoids coupling plugin JARs to a

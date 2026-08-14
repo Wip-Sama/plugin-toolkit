@@ -10,6 +10,7 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.PluginUiPage
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.parseSemanticTypes
 
@@ -108,6 +109,21 @@ object GeneratorUtils {
     fun KSAnnotation.hasQualifiedName(name: String): Boolean {
         return this.annotationType.resolve().declaration.qualifiedName?.asString() == name
     }
+
+    fun extractUiPages(classDeclaration: KSClassDeclaration): List<PluginUiPage> =
+        classDeclaration.annotations
+            .filter { it.hasQualifiedName(ProcessorConstants.PLUGIN_UI_PAGE_ANNOTATION) }
+            .map { annotation ->
+                PluginUiPage(
+                    id = annotation.arguments.first { it.name?.asString() == "id" }.value as String,
+                    title = annotation.arguments.first { it.name?.asString() == "title" }.value as String,
+                    description = annotation.arguments.find { it.name?.asString() == "description" }?.value as? String ?: "",
+                    capabilityNames = (annotation.arguments.find { it.name?.asString() == "capabilityNames" }?.value as? List<*>)
+                        ?.filterIsInstance<String>()
+                        ?: emptyList()
+                )
+            }
+            .toList()
 
     fun generateDataTypeCode(dataType: DataType): com.squareup.kotlinpoet.CodeBlock {
         val cnDataType = com.squareup.kotlinpoet.ClassName("org.wip.plugintoolkit.api", "DataType")

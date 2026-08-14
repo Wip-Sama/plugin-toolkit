@@ -14,6 +14,17 @@ annotation class PluginInfo(
     val supportedOs: Array<OS> = []
 )
 
+/** Declares a host-rendered page grouping capabilities without bundling UI code. */
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.SOURCE)
+@Repeatable
+annotation class PluginUiPage(
+    val id: String,
+    val title: String,
+    val description: String = "",
+    val capabilityNames: Array<String> = []
+)
+
 /**
  * Provides metadata for a capability result.
  * Can be applied to a single-return capability function or to properties of a custom data class return type.

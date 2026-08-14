@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.api.processor.generators
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
@@ -62,7 +63,8 @@ object ManifestGenerator {
         settingsProperties: List<KSPropertyDeclaration>,
         actions: List<KSFunctionDeclaration>,
         hasUpdateHandler: Boolean,
-        hasSetupHandler: Boolean
+        hasSetupHandler: Boolean,
+        classDeclaration: KSClassDeclaration
     ): TypeSpec {
         val manifestType = TypeSpec.objectBuilder(manifestName)
 
@@ -451,6 +453,27 @@ object ManifestGenerator {
         }
         supportedOsCode.add(")")
 
+        val uiPagesCode = CodeBlock.builder().add("listOf(\n").indent()
+        val uiPages = GeneratorUtils.extractUiPages(classDeclaration)
+        uiPages.forEachIndexed { index, page ->
+            val capabilityNamesCode = CodeBlock.builder().add("listOf(")
+            page.capabilityNames.forEachIndexed { capabilityIndex, capabilityName ->
+                capabilityNamesCode.add("%S", capabilityName)
+                if (capabilityIndex < page.capabilityNames.lastIndex) capabilityNamesCode.add(", ")
+            }
+            capabilityNamesCode.add(")")
+            uiPagesCode.add(
+                "%T(id = %S, title = %S, description = %S, capabilityNames = %L)",
+                ProcessorConstants.CN_PLUGIN_UI_PAGE,
+                page.id,
+                page.title,
+                page.description,
+                capabilityNamesCode.build()
+            )
+            if (index < uiPages.lastIndex) uiPagesCode.add(",\n") else uiPagesCode.add("\n")
+        }
+        uiPagesCode.unindent().add(")")
+
         manifestType.addProperty(
             PropertySpec.builder("manifest", CN_PLUGIN_MANIFEST)
                 .initializer(
@@ -479,7 +502,8 @@ object ManifestGenerator {
                         .add(actionsCode.build())
                         .add(",\nsettings = ")
                         .add(settingsCode.build())
-                        .add(",\nhasUpdateHandler = %L,\nhasSetupHandler = %L\n", hasUpdateHandler, hasSetupHandler)
+                        .add(",\nhasUpdateHandler = %L,\nhasSetupHandler = %L,\n", hasUpdateHandler, hasSetupHandler)
+                        .add("uiPages = %L\n", uiPagesCode.build())
                         .unindent()
                         .add(")")
                         .build()

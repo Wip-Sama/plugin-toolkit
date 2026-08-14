@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -119,10 +120,12 @@ fun PluginContent(
                 emptyMap()
             }
         }
-        val providedSettings = remember(pluginId, pluginSettingsState) {
+        val selectedManifest = remember(pluginId, viewModel.selectedPlugin) {
+            viewModel.selectedPlugin?.getManifest()?.getOrNull()
+        }
+        val providedSettings = remember(pluginId, pluginSettingsState, selectedManifest) {
             val store = if (pluginId != null) pluginSettingsState[pluginId] ?: pluginManager.loadPluginSettings(pluginId) else null
-            val manifest = viewModel.selectedPlugin?.getManifest()?.getOrNull()
-            val manifestDefaults = (manifest?.settings?.mapValues { (_, meta) ->
+            val manifestDefaults = (selectedManifest?.settings?.mapValues { (_, meta) ->
                 meta.defaultValue ?: if (meta.type is DataType.Primitive && (meta.type as DataType.Primitive).primitiveType == PrimitiveType.BOOLEAN) {
                     JsonPrimitive(false)
                 } else null
@@ -131,10 +134,9 @@ fun PluginContent(
         }
 
         if (selectedCapability == null) {
-            val manifest = viewModel.selectedPlugin?.getManifest()?.getOrNull()
-            if (manifest != null && manifest.uiPages.isNotEmpty()) {
+            if (selectedManifest != null && selectedManifest.uiPages.isNotEmpty()) {
                 PluginDefinedPages(
-                    manifest = manifest,
+                    manifest = selectedManifest,
                     onCapabilitySelected = viewModel::selectCapability
                 )
             } else {
@@ -224,6 +226,7 @@ private fun PluginDefinedPages(
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraLarge)
     ) {
         manifest.uiPages.forEach { page ->
+            key(page.id) {
             val capabilities = page.capabilityNames.mapNotNull { name ->
                 manifest.capabilities.firstOrNull { it.name == name }
             }
@@ -249,6 +252,7 @@ private fun PluginDefinedPages(
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -5,17 +5,14 @@ This is a Kotlin Multiplatform project targeting Desktop (JVM).
 Plugins can organize capabilities into pages rendered by the host, without bundling Compose UI binaries:
 
 ```kotlin
-PluginManifest(
-    // ...
-    uiPages = listOf(
-        PluginUiPage(
-            id = "convert",
-            title = "Convert media",
-            description = "Choose an operation to begin.",
-            capabilityNames = listOf("Convert image", "Convert video")
-        )
-    )
+@PluginUiPage(
+    id = "convert",
+    title = "Convert media",
+    description = "Choose an operation to begin.",
+    capabilityNames = ["Convert image", "Convert video"]
 )
+@PluginInfo(/* ... */)
+class MediaPlugin
 ```
 
 Unknown capability names are ignored. The declarative contract stays usable across host UI upgrades and

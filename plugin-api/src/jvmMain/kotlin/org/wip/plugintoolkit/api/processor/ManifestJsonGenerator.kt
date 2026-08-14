@@ -372,7 +372,8 @@ object ManifestJsonGenerator {
             changelog = changelogObj,
             hasUpdateHandler = updateFunction != null,
             hasSetupHandler = setupFunction != null,
-            hasMigrations = hasMigrations
+            hasMigrations = hasMigrations,
+            uiPages = GeneratorUtils.extractUiPages(classDeclaration)
         )
 
         val json = Json { 
