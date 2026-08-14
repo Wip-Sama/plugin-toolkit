@@ -18,10 +18,13 @@ fun parseHexColor(value: String): Color? {
 
 /** Detects alpha-bearing legacy and current color representations without changing their format. */
 fun colorStringHasAlpha(value: String): Boolean {
+    val trimmed = value.trim()
+    if (trimmed.startsWith("rgba(", ignoreCase = true) || trimmed.startsWith("hsla(", ignoreCase = true)) {
+        return true
+    }
     val candidate = value.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim().orEmpty()
     val digits = candidate.removePrefix("#")
-    return candidate.startsWith("rgba", ignoreCase = true) ||
-        (candidate.startsWith("#") && digits.length == 4 && digits.toLongOrNull(16) != null) ||
+    return (candidate.startsWith("#") && digits.length == 4 && digits.toLongOrNull(16) != null) ||
         (digits.length == 8 && digits.toLongOrNull(16) != null)
 }
 

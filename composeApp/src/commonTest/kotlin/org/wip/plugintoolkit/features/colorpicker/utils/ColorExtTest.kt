@@ -25,6 +25,13 @@ class ColorExtTest {
     }
 
     @Test
+    fun `functional alpha colors are detected before component splitting`() {
+        assertEquals(true, colorStringHasAlpha("rgba(10, 20, 30, 0.5)"))
+        assertEquals(true, colorStringHasAlpha("HSLA(120, 50%, 50%, 0.25)"))
+        assertEquals(false, colorStringHasAlpha("rgb(10, 20, 30)"))
+    }
+
+    @Test
     fun `hex parser rejects malformed values`() {
         assertNull(parseHexColor("#12345"))
         assertNull(parseHexColor("#GG3366"))
