@@ -7,6 +7,7 @@ import org.wip.plugintoolkit.features.job.model.ScheduledJob
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.JobSettings
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -19,7 +20,7 @@ import kotlin.time.Instant
 
 class ScheduleRepositoryTest {
     private class TempPersistence(private val root: Path) : SettingsPersistence {
-        override suspend fun load(): AppSettings = AppSettings()
+        override suspend fun load(): AppSettings = AppSettings(jobs = JobSettings(maxConcurrentJobs = 0))
         override suspend fun save(settings: AppSettings) = Unit
         override fun getSettingsDir(): String = root.toString()
         override fun getJobsDir(): String = root.resolve("jobs").toString()
