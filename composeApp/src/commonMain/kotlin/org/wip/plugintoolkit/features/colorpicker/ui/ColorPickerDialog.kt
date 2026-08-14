@@ -9,12 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,119 +27,103 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import org.wip.plugintoolkit.features.colorpicker.model.ColorPickerType
-import org.wip.plugintoolkit.features.colorpicker.utils.toCMYK
-import org.wip.plugintoolkit.features.colorpicker.utils.toHSL
-import org.wip.plugintoolkit.features.colorpicker.utils.toHex
-import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
-import org.wip.plugintoolkit.features.colorpicker.utils.transparentBackground
-import org.wip.plugintoolkit.shared.components.SelectedButtonGroup
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.colorpicker.model.ColorPickerType
+import org.wip.plugintoolkit.features.colorpicker.utils.parseHexColor
+import org.wip.plugintoolkit.features.colorpicker.utils.toHex
+import org.wip.plugintoolkit.features.colorpicker.utils.transparentBackground
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_cancel
+import plugintoolkit.composeapp.generated.resources.color_picker_apply
+import plugintoolkit.composeapp.generated.resources.color_picker_hex
+import plugintoolkit.composeapp.generated.resources.color_picker_hex_hint
+import plugintoolkit.composeapp.generated.resources.color_picker_title
 
-/**
- * Color picker wrapped in a dialog.
- *
- * @param show            Whether the dialog is visible.
- * @param onDismissRequest Called when the user tries to dismiss the dialog.
- * @param initialType            The picker style — defaults to [ColorPickerType.Classic].
- * @param onPickedColor   Callback invoked when the user confirms a color selection.
- */
+/** A focused, editable color picker dialog with explicit cancel/apply actions. */
 @Composable
 fun ColorPickerDialog(
     show: Boolean,
     onDismissRequest: () -> Unit,
-    initialType: ColorPickerType = ColorPickerType.Classic(),
+    initialColor: Color = Color.White,
+    showAlpha: Boolean = false,
     onPickedColor: (Color) -> Unit
 ) {
-    var showDialog by remember(show) { mutableStateOf(show) }
-    var color by remember { mutableStateOf(Color.White) }
-    var selectedFormat by remember { mutableStateOf("HEX") }
-    var type by remember { mutableStateOf(initialType) }
+    if (!show) return
 
-    if (showDialog) {
-        Dialog(
-            onDismissRequest = {
-                onDismissRequest()
-                showDialog = false
-            }) {
-            val includeAlpha = when (type) {
-                is ColorPickerType.Circle -> (type as ColorPickerType.Circle).showAlphaBar
-                is ColorPickerType.Classic -> (type as ColorPickerType.Classic).showAlphaBar
-                is ColorPickerType.Ring -> (type as ColorPickerType.Ring).showAlphaBar
-                else -> false
-            }
+    var color by remember(initialColor) { mutableStateOf(initialColor) }
+    var hexInput by remember(initialColor, showAlpha) {
+        mutableStateOf(initialColor.toHex(hexPrefix = true, includeAlpha = showAlpha).uppercase())
+    }
+    val parsedHex = remember(hexInput) { parseHexColor(hexInput) }
 
-            val colorCode = remember(color, selectedFormat) {
-                when (selectedFormat) {
-                    "HEX" -> color.toHex(hexPrefix = true, includeAlpha = includeAlpha)
-                    "RGB" -> color.toRGB(rgbPrefix = true, includeAlpha = includeAlpha)
-                    "HSL" -> color.toHSL(hslPrefix = true, includeAlpha = includeAlpha)
-                    "CMYK" -> color.toCMYK(cmykPrefix = true, includeAlpha = includeAlpha)
-                    else -> color.toHex(hexPrefix = true, includeAlpha = includeAlpha)
-                }
-            }
-
-            Surface(
-                modifier = Modifier.widthIn(max = ToolkitTheme.dimensions.minWidthMedium),
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = ToolkitTheme.dimensions.elevationHighMedium
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            modifier = Modifier.widthIn(max = ToolkitTheme.dimensions.minWidthMedium),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = ToolkitTheme.dimensions.elevationHighMedium
+        ) {
+            Column(
+                modifier = Modifier.padding(ToolkitTheme.spacing.extraLarge),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
-                Box(modifier = Modifier.padding(ToolkitTheme.spacing.extraLarge)) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                Text(
+                    text = stringResource(Res.string.color_picker_title),
+                    style = MaterialTheme.typography.headlineSmall
+                )
+
+                ColorPicker(
+                    type = ColorPickerType.Classic(showAlphaBar = showAlpha),
+                    initialColor = initialColor,
+                    onPickedColor = {
+                        color = it
+                        hexInput = it.toHex(hexPrefix = true, includeAlpha = showAlpha).uppercase()
+                    }
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(ToolkitTheme.dimensions.heightMediumLarge)
+                            .clip(RoundedCornerShape(ToolkitTheme.spacing.small))
+                            .transparentBackground(verticalBoxesAmount = 4)
+                            .background(parsedHex ?: color)
+                    )
+                    OutlinedTextField(
+                        value = hexInput,
+                        onValueChange = { input ->
+                            hexInput = input.take(9)
+                            parseHexColor(hexInput)?.let { color = it }
+                        },
+                        modifier = Modifier.weight(1f),
+                        label = { Text(stringResource(Res.string.color_picker_hex)) },
+                        supportingText = if (parsedHex == null) {
+                            { Text(stringResource(Res.string.color_picker_hex_hint)) }
+                        } else null,
+                        isError = parsedHex == null,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismissRequest) {
+                        Text(stringResource(Res.string.action_cancel))
+                    }
+                    Button(
+                        onClick = { parsedHex?.let(onPickedColor) },
+                        enabled = parsedHex != null
                     ) {
-                        SelectedButtonGroup(
-                            buttons = listOf("HEX", "RGB", "HSL", "CMYK"),
-                            startingIndex = 0,
-                            onButtonSelected = { selectedFormat = it }
-                        )
-                        SelectedButtonGroup(
-                            buttons = listOf("Classic", "Circle", "Ring", "Simple"),
-                            startingIndex = 0,
-                            onButtonSelected = {
-                                type = when (it) {
-                                    "Classic" -> ColorPickerType.Classic()
-                                    "Circle" -> ColorPickerType.Circle()
-                                    "Ring" -> ColorPickerType.Ring()
-                                    "Simple" -> ColorPickerType.SimpleRing()
-                                    else -> ColorPickerType.Classic()
-                                }
-                            }
-                        )
-                        ColorPicker(type = type, onPickedColor = { color = it })
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(ToolkitTheme.dimensions.containerWidthMediumLarge, ToolkitTheme.dimensions.heightMediumLarge)
-                                    .clip(RoundedCornerShape(50))
-                                    .transparentBackground(verticalBoxesAmount = 4)
-                                    .background(color)
-                            )
-                            Text(
-                                text = colorCode,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 14.sp,
-                                fontFamily = FontFamily.Monospace,
-                            )
-                        }
-                        Button(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = {
-                                onPickedColor(color)
-                                showDialog = false
-                            },
-                            shape = CircleShape
-                        ) {
-                            Text(text = "Select")
-                        }
+                        Text(stringResource(Res.string.color_picker_apply))
                     }
                 }
             }
@@ -150,11 +135,6 @@ fun ColorPickerDialog(
 @Composable
 private fun ColorPickerDialogPreview() {
     MaterialTheme {
-        ColorPickerDialog(
-            show = true,
-            onDismissRequest = {},
-            onPickedColor = {}
-        )
+        ColorPickerDialog(show = true, onDismissRequest = {}, onPickedColor = {})
     }
 }
-
