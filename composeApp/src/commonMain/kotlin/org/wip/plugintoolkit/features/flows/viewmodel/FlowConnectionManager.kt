@@ -58,7 +58,7 @@ class FlowConnectionManager(
             notificationService?.toast("Warning: ${semanticCheck.message}")
         }
 
-        val isList = targetPort.dataType is DataType.Array
+        val isList = targetType is DataType.Array
         val filteredConnections = if (isList) {
             currentState.flow.connections
         } else {
@@ -204,7 +204,7 @@ class FlowConnectionManager(
         ) return currentState
 
         val baseState = originalConnection?.let { handleDeleteConnection(currentState, it) } ?: currentState
-        val isListTarget = targetPort.dataType is DataType.Array
+        val isListTarget = targetType is DataType.Array
         val filteredConnections = if (isListTarget) {
             baseState.flow.connections
         } else {
@@ -343,7 +343,7 @@ class FlowConnectionManager(
             }
             if (matchingAfter != matchingBefore + 1) return currentState
 
-            if (targetPort.dataType is DataType.Array &&
+            if (targetType is DataType.Array &&
                 original.targetNodeId == targetNodeId && original.targetPortId == targetPortId
             ) {
                 val replacement = rewired.flow.connections.lastOrNull {

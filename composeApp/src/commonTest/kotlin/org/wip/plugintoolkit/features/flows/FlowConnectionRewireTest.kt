@@ -207,6 +207,31 @@ class FlowConnectionRewireTest {
     }
 
     @Test
+    fun `direct connect uses inferred array target when preserving existing edges`() {
+        val arrayType = DataType.Array(stringType)
+        val anyType = DataType.Primitive(PrimitiveType.ANY)
+        val existing = Connection(1, "out", 3, "in", orderIndex = 0)
+        val state = FlowEditorState(
+            flow = Flow(
+                "Flow",
+                nodes = listOf(
+                    node(1, outputType = arrayType),
+                    node(2, outputType = arrayType),
+                    node(3, inputType = anyType)
+                ),
+                connections = listOf(existing)
+            ),
+            inferredTypes = mapOf((3L to "in") to arrayType)
+        )
+
+        val result = manager.handleConnectPorts(state, 2, "out", 3, "in")
+
+        assertEquals(2, result.flow.connections.size)
+        assertEquals(setOf(1L, 2L), result.flow.connections.map { it.sourceNodeId }.toSet())
+        assertEquals(listOf(0, 1), result.flow.connections.sortedBy { it.orderIndex }.map { it.orderIndex })
+    }
+
+    @Test
     fun `cyclic rewire preserves the original`() {
         val original = Connection(4, "out", 1, "in")
         val state = FlowEditorState(
