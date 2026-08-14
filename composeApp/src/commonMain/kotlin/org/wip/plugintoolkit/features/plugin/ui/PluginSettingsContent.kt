@@ -78,6 +78,7 @@ import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.SettingMetadata
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.plugin.model.resolveCustomSettings
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitChip
@@ -435,15 +436,8 @@ fun PluginSettingsContent(
                         )
                     }
                 } else {
-                    val manifestDefaults = remember(manifest) {
-                        (manifest.settings?.mapValues { (_, meta) ->
-                            meta.defaultValue ?: if (meta.type is DataType.Primitive && (meta.type as DataType.Primitive).primitiveType == PrimitiveType.BOOLEAN) {
-                                JsonPrimitive(false)
-                            } else null
-                        }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement>
-                    }
-                    val providedSettings = remember(manifestDefaults, store.settings) {
-                        manifestDefaults + store.settings
+                    val providedSettings = remember(manifest, store.settings) {
+                        store.resolveCustomSettings(manifest)
                     }
 
                     LazyColumn(
