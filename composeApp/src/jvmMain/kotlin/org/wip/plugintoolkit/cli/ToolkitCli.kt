@@ -1,19 +1,19 @@
 package org.wip.plugintoolkit.cli
 
-import co.touchlab.kermit.Logger
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readString
+import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.core.DefaultSystemConfig
-import org.wip.plugintoolkit.core.loomDispatcher
-import org.wip.plugintoolkit.features.flows.logic.FlowRepository
-import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
+import org.wip.plugintoolkit.core.SystemConfig
+import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence
-import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 
 sealed interface ToolkitCliCommand {
     data object Help : ToolkitCliCommand
@@ -55,7 +55,7 @@ internal suspend fun runToolkitCli(
     command: ToolkitCliCommand,
     output: (String) -> Unit = ::println,
     error: (String) -> Unit = System.err::println,
-    dataLoader: suspend (ToolkitCliCommand) -> ToolkitCliData = ::loadToolkitCliData
+    dataLoader: suspend (ToolkitCliCommand) -> ToolkitCliData = { loadToolkitCliData(it) }
 ): Int {
     when (command) {
         ToolkitCliCommand.Help -> {
@@ -70,8 +70,6 @@ internal suspend fun runToolkitCli(
     }
 
     return try {
-        // The CLI owns the process and emits only its data on stdout.
-        Logger.setLogWriters()
         val data = withTimeout(CLI_STARTUP_TIMEOUT_MS) { dataLoader(command) }
         when (command) {
             ToolkitCliCommand.Status -> {
@@ -93,7 +91,7 @@ internal suspend fun runToolkitCli(
             ToolkitCliCommand.Flows -> {
                 if (data.flowNames.isEmpty()) output("No flows saved.") else data.flowNames.sorted().forEach(output)
             }
-            else -> Unit
+            ToolkitCliCommand.Help, ToolkitCliCommand.Version -> Unit
         }
         0
     } catch (exception: Throwable) {
@@ -102,25 +100,55 @@ internal suspend fun runToolkitCli(
     }
 }
 
-private suspend fun loadToolkitCliData(command: ToolkitCliCommand): ToolkitCliData {
-    val appConfig = DefaultSystemConfig()
-    val persistence = JvmSettingsPersistence(appConfig)
-    if (command == ToolkitCliCommand.Flows) {
-        return ToolkitCliData(
-            flowNames = FlowRepository.loadStoredFlows(persistence, appConfig).map { it.name }
-        )
+internal suspend fun loadToolkitCliData(
+    command: ToolkitCliCommand,
+    appConfig: SystemConfig = DefaultSystemConfig(),
+    settingsDir: String? = null
+): ToolkitCliData = withContext(Dispatchers.IO) {
+    val persistence = JvmSettingsPersistence(appConfig, settingsDir)
+    when (command) {
+        ToolkitCliCommand.Flows -> ToolkitCliData(flowNames = loadFlowNamesReadOnly(persistence.getSettingsDir(), appConfig))
+        ToolkitCliCommand.Status, ToolkitCliCommand.Plugins -> {
+            val settings = persistence.load()
+            val defaultFolder = "${persistence.getSettingsDir()}/${appConfig.PLUGINS_DIR_NAME}"
+            val folders = (listOf(defaultFolder) + settings.extensions.pluginFolders).distinct()
+            ToolkitCliData(plugins = folders.flatMap { loadPluginsReadOnly(it, appConfig) })
+        }
+        else -> ToolkitCliData()
+    }
+}
+
+private val storageJson = Json { ignoreUnknownKeys = true }
+
+private fun loadFlowNamesReadOnly(settingsDir: String, appConfig: SystemConfig): List<String> {
+    val flows = mutableListOf<Flow>()
+    val flowsDir = Path("$settingsDir/flows")
+    if (SystemFileSystem.exists(flowsDir)) {
+        SystemFileSystem.list(flowsDir)
+            .filter { it.name.endsWith(".json") }
+            .mapNotNullTo(flows) { file ->
+                runCatching {
+                    val content = SystemFileSystem.source(file).buffered().use { it.readString() }
+                    storageJson.decodeFromString<Flow>(content)
+                }.getOrNull()
+            }
     }
 
-    val scope = CoroutineScope(SupervisorJob() + loomDispatcher)
-    return try {
-        val settingsRepository = SettingsRepository(persistence, scope)
-        settingsRepository.isLoaded.first { it }
-        val registry = PluginRegistry(settingsRepository, scope, loomDispatcher, appConfig)
-        registry.initialize()
-        ToolkitCliData(plugins = registry.installedPlugins.value)
-    } finally {
-        scope.cancel()
+    val legacyFile = Path("$settingsDir/${appConfig.FLOWS_FILE_NAME}")
+    if (SystemFileSystem.exists(legacyFile)) {
+        runCatching {
+            val content = SystemFileSystem.source(legacyFile).buffered().use { it.readString() }
+            if (content.isNotBlank()) storageJson.decodeFromString<List<Flow>>(content) else emptyList()
+        }.getOrDefault(emptyList()).forEach(flows::add)
     }
+    return flows.distinctBy { it.name }.map { it.name }
+}
+
+private fun loadPluginsReadOnly(folder: String, appConfig: SystemConfig): List<InstalledPlugin> {
+    val registryFile = Path("${folder.replace('\\', '/').removeSuffix("/")}/${appConfig.INSTALLED_PLUGINS_FILE_NAME}")
+    if (!SystemFileSystem.exists(registryFile)) return emptyList()
+    val content = SystemFileSystem.source(registryFile).buffered().use { it.readString() }
+    return storageJson.decodeFromString<List<InstalledPlugin>>(content)
 }
 
 private const val CLI_STARTUP_TIMEOUT_MS = 15_000L
