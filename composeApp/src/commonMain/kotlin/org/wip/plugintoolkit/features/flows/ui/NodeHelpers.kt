@@ -184,10 +184,10 @@ fun parseColorString(colorStr: String): Color {
                 }
 
                 8 -> {
-                    val r = hex.substring(0, 2).toInt(16) / 255f
-                    val g = hex.substring(2, 4).toInt(16) / 255f
-                    val b = hex.substring(4, 6).toInt(16) / 255f
-                    val a = hex.substring(6, 8).toInt(16) / 255f
+                    val a = hex.substring(0, 2).toInt(16) / 255f
+                    val r = hex.substring(2, 4).toInt(16) / 255f
+                    val g = hex.substring(4, 6).toInt(16) / 255f
+                    val b = hex.substring(6, 8).toInt(16) / 255f
                     Color(r, g, b, a)
                 }
 

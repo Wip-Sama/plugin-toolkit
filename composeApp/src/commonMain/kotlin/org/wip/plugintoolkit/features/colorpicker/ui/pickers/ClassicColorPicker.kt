@@ -35,9 +35,8 @@ import org.wip.plugintoolkit.features.colorpicker.utils.fromHueProgress
 import org.wip.plugintoolkit.features.colorpicker.utils.green
 import org.wip.plugintoolkit.features.colorpicker.utils.lighten
 import org.wip.plugintoolkit.features.colorpicker.utils.red
+import org.wip.plugintoolkit.features.colorpicker.utils.saturationAndValue
 import org.wip.plugintoolkit.features.colorpicker.utils.toHueProgress
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
@@ -53,9 +52,9 @@ internal fun ClassicColorPicker(
 ) {
     val initialSaturationAndValue = remember(initialColor) { initialColor.saturationAndValue() }
     val initialHue = remember(initialColor) { initialColor.toHueProgress() }
-    var pickerLocation by remember { mutableStateOf(Offset.Zero) }
+    var pickerLocation by remember(initialColor) { mutableStateOf(Offset.Zero) }
     var colorPickerSize by remember { mutableStateOf(IntSize.Zero) }
-    var pickerInitialized by remember { mutableStateOf(false) }
+    var pickerInitialized by remember(initialColor) { mutableStateOf(false) }
     var alpha by remember(initialColor) { mutableStateOf(initialColor.alpha) }
     var rangeColor by remember(initialColor) { mutableStateOf(Color.fromHueProgress(initialHue)) }
     var hueSlider by remember(initialColor) { mutableStateOf(initialHue) }
@@ -66,7 +65,7 @@ internal fun ClassicColorPicker(
         if (colorPickerSize.width > 0 && colorPickerSize.height > 0 && !pickerInitialized) {
             val (saturation, value) = initialSaturationAndValue
             pickerLocation = Offset(
-                x = (1f - saturation) * colorPickerSize.width,
+                x = saturation * colorPickerSize.width,
                 y = (1f - value) * colorPickerSize.height
             )
             pickerInitialized = true
@@ -151,16 +150,6 @@ internal fun ClassicColorPicker(
             )
         }
     }
-}
-
-private fun Color.saturationAndValue(): Pair<Float, Float> {
-    val red = red() / 255f
-    val green = green() / 255f
-    val blue = blue() / 255f
-    val maximum = max(red, max(green, blue))
-    val minimum = min(red, min(green, blue))
-    val saturation = if (maximum == 0f) 0f else (maximum - minimum) / maximum
-    return saturation to maximum
 }
 
 @Composable

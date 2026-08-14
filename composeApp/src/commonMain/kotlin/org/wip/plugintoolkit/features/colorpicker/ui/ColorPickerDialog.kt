@@ -28,11 +28,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.colorpicker.model.ColorPickerType
 import org.wip.plugintoolkit.features.colorpicker.utils.parseHexColor
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.colorpicker.utils.transparentBackground
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_cancel
+import plugintoolkit.composeapp.generated.resources.color_picker_apply
+import plugintoolkit.composeapp.generated.resources.color_picker_hex
+import plugintoolkit.composeapp.generated.resources.color_picker_hex_hint
+import plugintoolkit.composeapp.generated.resources.color_picker_title
 
 /** A focused, editable color picker dialog with explicit cancel/apply actions. */
 @Composable
@@ -40,13 +47,14 @@ fun ColorPickerDialog(
     show: Boolean,
     onDismissRequest: () -> Unit,
     initialColor: Color = Color.White,
+    showAlpha: Boolean = false,
     onPickedColor: (Color) -> Unit
 ) {
     if (!show) return
 
     var color by remember(initialColor) { mutableStateOf(initialColor) }
-    var hexInput by remember(initialColor) {
-        mutableStateOf(initialColor.toHex(hexPrefix = true, includeAlpha = false).uppercase())
+    var hexInput by remember(initialColor, showAlpha) {
+        mutableStateOf(initialColor.toHex(hexPrefix = true, includeAlpha = showAlpha).uppercase())
     }
     val parsedHex = remember(hexInput) { parseHexColor(hexInput) }
 
@@ -62,16 +70,16 @@ fun ColorPickerDialog(
                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
                 Text(
-                    text = "Choose a color",
+                    text = stringResource(Res.string.color_picker_title),
                     style = MaterialTheme.typography.headlineSmall
                 )
 
                 ColorPicker(
-                    type = ColorPickerType.Classic(showAlphaBar = false),
+                    type = ColorPickerType.Classic(showAlphaBar = showAlpha),
                     initialColor = initialColor,
                     onPickedColor = {
                         color = it
-                        hexInput = it.toHex(hexPrefix = true, includeAlpha = false).uppercase()
+                        hexInput = it.toHex(hexPrefix = true, includeAlpha = showAlpha).uppercase()
                     }
                 )
 
@@ -94,9 +102,9 @@ fun ColorPickerDialog(
                             parseHexColor(hexInput)?.let { color = it }
                         },
                         modifier = Modifier.weight(1f),
-                        label = { Text("Hex") },
+                        label = { Text(stringResource(Res.string.color_picker_hex)) },
                         supportingText = if (parsedHex == null) {
-                            { Text("Use #RRGGBB") }
+                            { Text(stringResource(Res.string.color_picker_hex_hint)) }
                         } else null,
                         isError = parsedHex == null,
                         singleLine = true,
@@ -109,13 +117,13 @@ fun ColorPickerDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismissRequest) {
-                        Text("Cancel")
+                        Text(stringResource(Res.string.action_cancel))
                     }
                     Button(
                         onClick = { parsedHex?.let(onPickedColor) },
                         enabled = parsedHex != null
                     ) {
-                        Text("Apply")
+                        Text(stringResource(Res.string.color_picker_apply))
                     }
                 }
             }

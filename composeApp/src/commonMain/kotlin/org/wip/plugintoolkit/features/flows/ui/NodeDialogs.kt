@@ -307,8 +307,11 @@ fun NodeDialogs(
         val input = node.inputs.firstOrNull { it.id == activeColorInputId }
         val inferredSem = input?.let { inferredSemanticTypes[Pair(node.id, it.id)] ?: it.semanticTypes } ?: emptyList()
         val hasAlpha = inferredSem.any { it.variant?.contains("rgba", ignoreCase = true) == true }
+        val existingValue = input?.let { getPortValueString(it.value ?: it.defaultValue, it.dataType) } ?: ""
         org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog(
             show = showColorPicker,
+            initialColor = parseColorString(existingValue),
+            showAlpha = hasAlpha,
             onDismissRequest = onDismissColorPicker,
             onPickedColor = { color ->
                 activeColorInputId.let { inputId ->
@@ -323,8 +326,6 @@ fun NodeDialogs(
                         color.toHex(hexPrefix = true, includeAlpha = hasAlpha)
                     }
                     val isArray = input?.dataType is DataType.Array
-                    val existingValue =
-                        input?.let { getPortValueString(it.value ?: it.defaultValue, it.dataType) } ?: ""
                     val newValue = appendPickedValue(existingValue, formatted, isArray)
                     onUpdateValue(node.id, inputId, newValue)
                 }

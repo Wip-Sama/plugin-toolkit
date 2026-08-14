@@ -52,6 +52,8 @@ fun ColorInput(
     var showColorPicker by remember { mutableStateOf(false) }
     val parsedColor = remember(value) { parseColorString(value) }
     val isArray = metadata.type is DataType.Array
+    val isRgba = metadata.semanticTypes.any { it.canonicalId.contains("rgba", ignoreCase = true) }
+    val isRgb = metadata.semanticTypes.any { it.canonicalId.contains("rgb", ignoreCase = true) }
 
     Column(modifier = Modifier
         .fillMaxWidth()
@@ -101,17 +103,16 @@ fun ColorInput(
         if (showColorPicker && enabled) {
             ColorPickerDialog(
                 show = showColorPicker,
+                initialColor = parsedColor,
+                showAlpha = isRgba,
                 onDismissRequest = { showColorPicker = false },
 
                 onPickedColor = { color ->
                     showColorPicker = false
-                    val formatted = if (metadata.semanticTypes.any {
-                            it.canonicalId.contains("rgb", ignoreCase = true)
-                        }
-                    ) {
-                        color.toRGB()
+                    val formatted = if (isRgb) {
+                        color.toRGB(rgbPrefix = true, includeAlpha = isRgba)
                     } else {
-                        color.toHex()
+                        color.toHex(hexPrefix = true, includeAlpha = isRgba)
                     }
                     onValueChange(formatted)
                 }

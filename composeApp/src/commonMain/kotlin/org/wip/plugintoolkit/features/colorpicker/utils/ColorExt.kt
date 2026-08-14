@@ -244,5 +244,15 @@ internal fun Color.toHueProgress(): Float {
     hue *= 60
     if (hue < 0) hue += 360
 
-    return hue
+    return hue / 360f
+}
+
+internal fun Color.saturationAndValue(): Pair<Float, Float> {
+    val red = red() / 255f
+    val green = green() / 255f
+    val blue = blue() / 255f
+    val maximum = max(red, max(green, blue))
+    val minimum = min(red, min(green, blue))
+    val saturation = if (maximum == 0f) 0f else (maximum - minimum) / maximum
+    return saturation to maximum
 }
