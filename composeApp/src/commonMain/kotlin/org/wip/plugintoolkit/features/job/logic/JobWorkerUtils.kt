@@ -370,13 +370,18 @@ object SystemPathSecurity {
 
     private fun comparablePath(path: String): ComparablePath? {
         val slashNormalized = path.replace('\\', '/')
-        val windowsStyle = Regex("^[A-Za-z]:/").containsMatchIn(slashNormalized)
+        val inputUsesWindowsDrive = Regex("^[A-Za-z]:/").containsMatchIn(slashNormalized)
+        val nativeWindows = java.io.File.separatorChar == '\\'
         return try {
-            val value = if (windowsStyle) {
+            // Native paths must always be canonicalized so junctions/symlinks cannot bypass an
+            // access root. Lexical parsing is only for a foreign Windows path on a Unix host,
+            // where java.io.File would otherwise prefix the current directory to `C:\\...`.
+            val value = if (inputUsesWindowsDrive && !nativeWindows) {
                 normalizeWindowsPath(slashNormalized)
             } else {
                 java.io.File(path).canonicalPath.replace('\\', '/')
             }
+            val windowsStyle = Regex("^[A-Za-z]:/").containsMatchIn(value)
             ComparablePath(value.trimEnd('/'), windowsStyle)
         } catch (_: Exception) {
             null
