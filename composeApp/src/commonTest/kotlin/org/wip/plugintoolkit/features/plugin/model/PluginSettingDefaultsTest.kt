@@ -1,15 +1,19 @@
 package org.wip.plugintoolkit.features.plugin.model
 
 import kotlinx.serialization.json.JsonPrimitive
+import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.Requirements
 import org.wip.plugintoolkit.api.SettingMetadata
+import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus
+import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PluginSettingDefaultsTest {
     private val manifest = PluginManifest(
@@ -61,5 +65,22 @@ class PluginSettingDefaultsTest {
 
         assertEquals(JsonPrimitive("https://custom.test"), store.resolveCustomSettings(manifest)["endpoint"])
         assertEquals(JsonPrimitive("global-collision"), store.resolveProvidedValues(manifest)["endpoint"])
+    }
+
+    @Test
+    fun `manifest defaults unlock capability gates before settings are persisted`() {
+        val capability = Capability(
+            name = "call",
+            description = "Call the configured endpoint",
+            returnType = DataType.Primitive(PrimitiveType.STRING),
+            requiresSettings = listOf("endpoint")
+        )
+        val provided = PluginSettingsStore().resolveProvidedValues(manifest)
+
+        assertTrue(capability.isReady(provided, manifest.settings))
+        assertTrue(
+            CapabilityLockUtils.checkCapabilityLockStatus(capability, emptyMap(), provided) is
+                CapabilityLockStatus.Unlocked
+        )
     }
 }

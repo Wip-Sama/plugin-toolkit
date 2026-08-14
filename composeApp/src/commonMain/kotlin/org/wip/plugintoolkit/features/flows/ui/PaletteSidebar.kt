@@ -53,6 +53,7 @@ import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.model.resolveProvidedValues
 import org.wip.plugintoolkit.features.plugin.ui.lockedClickInterceptor
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
@@ -248,8 +249,9 @@ private fun CapabilitiesPalette(
                     )
                 )
                 caps.forEach { cap ->
-                    val isReady = remember(cap, settingsStore.settings, manifest?.settings) {
-                        cap.isReady(settingsStore.settings, manifest?.settings)
+                    val providedSettings = settingsStore.resolveProvidedValues(manifest)
+                    val isReady = remember(cap, providedSettings, manifest?.settings) {
+                        cap.isReady(providedSettings, manifest?.settings)
                     }
 
                     val targetSettingKey = cap.requiredLocks.firstOrNull()
