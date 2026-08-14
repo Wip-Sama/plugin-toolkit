@@ -436,4 +436,5 @@
     <string name="job_schedule_next_format">Every %1$d minutes · next %2$s</string>
     <string name="job_schedule_run_now">Run schedule now</string>
     <string name="job_schedule_delete">Delete schedule</string>
+    <string name="job_schedule_save_failed">The schedule change could not be saved. Nothing was changed; check storage access and try again.</string>
 </resources>

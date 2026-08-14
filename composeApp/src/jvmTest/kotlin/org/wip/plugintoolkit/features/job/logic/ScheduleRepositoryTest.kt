@@ -107,6 +107,31 @@ class ScheduleRepositoryTest {
         }
     }
 
+    @Test
+    fun `mutation before scheduler startup preserves schedules already on disk`() = runTest {
+        withTempPersistence { persistence, _ ->
+            val persisted = ScheduledJob(
+                id = "persisted",
+                jobTemplate = template,
+                intervalMinutes = 15,
+                nextRunAt = Instant.fromEpochMilliseconds(1_000)
+            )
+            ScheduleRepository(persistence).save(listOf(persisted)).getOrThrow()
+            val settings = SettingsRepository(persistence, backgroundScope)
+            testScheduler.advanceUntilIdle()
+            val manager = JobManager(backgroundScope, settings)
+
+            val added = manager.scheduleJob(template.copy(id = "new"), 30)
+
+            assertTrue(added != null)
+            assertEquals(setOf("persisted", added.id), manager.schedules.value.map { it.id }.toSet())
+            assertEquals(
+                setOf("persisted", added.id),
+                ScheduleRepository(persistence).load().getOrThrow().map { it.id }.toSet()
+            )
+        }
+    }
+
     private suspend fun withTempPersistence(
         block: suspend (TempPersistence, Path) -> Unit
     ) {

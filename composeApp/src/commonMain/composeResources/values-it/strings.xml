@@ -385,4 +385,5 @@
     <string name="job_schedule_next_format">Ogni %1$d minuti · prossima %2$s</string>
     <string name="job_schedule_run_now">Esegui ora la pianificazione</string>
     <string name="job_schedule_delete">Elimina pianificazione</string>
+    <string name="job_schedule_save_failed">Impossibile salvare la modifica. Non è stato cambiato nulla; verifica l’accesso allo spazio di archiviazione e riprova.</string>
 </resources>

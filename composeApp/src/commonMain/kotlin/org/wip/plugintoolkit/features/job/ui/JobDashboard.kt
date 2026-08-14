@@ -112,6 +112,7 @@ import plugintoolkit.composeapp.generated.resources.job_running_jobs
 import plugintoolkit.composeapp.generated.resources.job_schedule_create
 import plugintoolkit.composeapp.generated.resources.job_schedule_delete
 import plugintoolkit.composeapp.generated.resources.job_schedule_empty
+import plugintoolkit.composeapp.generated.resources.job_schedule_save_failed
 import plugintoolkit.composeapp.generated.resources.job_schedule_interval_label
 import plugintoolkit.composeapp.generated.resources.job_schedule_next_format
 import plugintoolkit.composeapp.generated.resources.job_schedule_run_now
@@ -320,6 +321,7 @@ fun EndedTab(viewModel: JobViewModel) {
     val endedJobs by viewModel.endedJobs.collectAsState()
     val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
     val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
+    val scheduleOperationFailed by viewModel.scheduleOperationFailed.collectAsState()
     var jobToSchedule by remember { mutableStateOf<BackgroundJob?>(null) }
     var intervalText by remember { mutableStateOf(DEFAULT_SCHEDULE_INTERVAL_MINUTES.toString()) }
 
@@ -329,19 +331,29 @@ fun EndedTab(viewModel: JobViewModel) {
             onDismissRequest = { jobToSchedule = null },
             title = { Text(stringResource(Res.string.job_schedule_title)) },
             text = {
-                OutlinedTextField(
-                    value = intervalText,
-                    onValueChange = { value -> intervalText = value.filter(Char::isDigit) },
-                    label = { Text(stringResource(Res.string.job_schedule_interval_label)) },
-                    singleLine = true
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
+                    OutlinedTextField(
+                        value = intervalText,
+                        onValueChange = { value -> intervalText = value.filter(Char::isDigit) },
+                        label = { Text(stringResource(Res.string.job_schedule_interval_label)) },
+                        singleLine = true
+                    )
+                    if (scheduleOperationFailed) {
+                        Text(
+                            stringResource(Res.string.job_schedule_save_failed),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     enabled = interval != null,
                     onClick = {
-                        viewModel.scheduleRecurring(job, interval!!)
-                        jobToSchedule = null
+                        viewModel.scheduleRecurring(job, interval!!) { succeeded ->
+                            if (succeeded) jobToSchedule = null
+                        }
                     }
                 ) { Text(stringResource(Res.string.job_schedule_create)) }
             },
@@ -385,6 +397,7 @@ fun EndedTab(viewModel: JobViewModel) {
                         onClear = { viewModel.clearEndedJob(job.id) },
                         onSchedule = if (job.type.canBeScheduled()) {
                             {
+                                viewModel.clearScheduleError()
                                 intervalText = DEFAULT_SCHEDULE_INTERVAL_MINUTES.toString()
                                 jobToSchedule = job
                             }
@@ -403,8 +416,9 @@ fun EndedTab(viewModel: JobViewModel) {
 @Composable
 fun SchedulerTab(viewModel: JobViewModel) {
     val schedules by viewModel.schedules.collectAsState()
+    val scheduleOperationFailed by viewModel.scheduleOperationFailed.collectAsState()
 
-    if (schedules.isEmpty()) {
+    if (schedules.isEmpty() && !scheduleOperationFailed) {
         EmptyState(stringResource(Res.string.job_schedule_empty), Icons.Default.Schedule)
         return
     }
@@ -413,6 +427,17 @@ fun SchedulerTab(viewModel: JobViewModel) {
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
+        if (scheduleOperationFailed) {
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Text(
+                        stringResource(Res.string.job_schedule_save_failed),
+                        modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
         items(schedules, key = { it.id }) { schedule ->
             Card(
                 modifier = Modifier.fillMaxWidth(),

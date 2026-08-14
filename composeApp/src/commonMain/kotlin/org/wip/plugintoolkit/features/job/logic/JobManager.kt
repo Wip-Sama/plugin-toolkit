@@ -35,6 +35,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
 
 class JobManager(
@@ -86,6 +87,9 @@ class JobManager(
     private val scheduleStartMutex = Mutex()
     private val scheduleSignal = Channel<Unit>(Channel.CONFLATED)
     private var schedulerStarted = false
+    private var schedulesLoaded = false
+    private var consecutiveSchedulePersistenceFailures = 0
+    private var scheduleRetryNotBefore: kotlin.time.Instant? = null
 
     init {
         scope.launch {
@@ -115,27 +119,18 @@ class JobManager(
                 }
             }
         }
+        // Hydrate schedule state eagerly so the Scheduler UI never presents an empty,
+        // mutable snapshot while startup is still loading plugins.
+        scope.launch {
+            scheduleMutex.withLock { hydrateSchedulesLocked() }
+        }
     }
 
     /** Starts recurring execution after startup has finished loading plugins. Safe to call more than once. */
     suspend fun startScheduler(): Boolean = scheduleStartMutex.withLock start@{
         if (schedulerStarted) return@start true
 
-        val loadedSchedules = scheduleRepository.load().getOrElse { error ->
-            Logger.e(error) { "Scheduler disabled because persisted schedules could not be recovered" }
-            return@start false
-        }
-        val savedSchedules = loadedSchedules.filter { it.jobTemplate.type.canBeScheduled() }
-        val initialized = scheduleMutex.withLock initialize@{
-            val current = _schedules.value
-            val merged = savedSchedules.filterNot { saved -> current.any { it.id == saved.id } } + current
-            val needsSanitization = savedSchedules.size != loadedSchedules.size
-            if ((needsSanitization || merged != savedSchedules) && !persistSchedules(merged)) {
-                return@initialize false
-            }
-            _schedules.value = merged
-            true
-        }
+        val initialized = scheduleMutex.withLock { hydrateSchedulesLocked() }
         if (!initialized) return@start false
 
         schedulerStarted = true
@@ -152,6 +147,7 @@ class JobManager(
 
     @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
     suspend fun scheduleJob(job: BackgroundJob, intervalMinutes: Long = 24 * 60L): ScheduledJob? = scheduleMutex.withLock {
+        if (!hydrateSchedulesLocked()) return@withLock null
         if (!job.type.canBeScheduled()) {
             Logger.w { "Refusing to schedule unsupported job type ${job.type}" }
             return@withLock null
@@ -169,25 +165,30 @@ class JobManager(
     }
 
     suspend fun removeSchedule(id: String): Boolean = scheduleMutex.withLock {
+        if (!hydrateSchedulesLocked()) return@withLock false
         val updated = _schedules.value.filterNot { it.id == id }
         updated != _schedules.value && replaceSchedules(updated)
     }
 
     suspend fun setScheduleEnabled(id: String, enabled: Boolean): Boolean = scheduleMutex.withLock {
+        if (!hydrateSchedulesLocked()) return@withLock false
         val updated = _schedules.value.map { if (it.id == id) it.copy(enabled = enabled) else it }
         updated != _schedules.value && replaceSchedules(updated)
     }
 
-    suspend fun runScheduleNow(id: String) = scheduleMutex.withLock {
+    suspend fun runScheduleNow(id: String): Boolean = scheduleMutex.withLock {
+        if (!hydrateSchedulesLocked()) return@withLock false
         val now = Clock.System.now()
         val current = _schedules.value
-        val schedule = current.firstOrNull { it.id == id } ?: return@withLock
+        val schedule = current.firstOrNull { it.id == id } ?: return@withLock false
         val updated = current.map { if (it.id == id) it.afterRun(now) else it }
-        if (!replaceSchedules(updated)) return@withLock
+        if (!replaceSchedules(updated)) return@withLock false
         enqueueJob(schedule.jobTemplate.asFreshRun(now))
+        true
     }
 
     internal suspend fun runDueSchedules(now: kotlin.time.Instant) = scheduleMutex.withLock {
+        if (!hydrateSchedulesLocked()) return@withLock
         val current = _schedules.value
         val due = current.filter { it.isDue(now) }
         if (due.isNotEmpty()) {
@@ -218,22 +219,48 @@ class JobManager(
         return true
     }
 
+    private suspend fun hydrateSchedulesLocked(): Boolean {
+        if (schedulesLoaded) return true
+        val loaded = scheduleRepository.load().getOrElse { error ->
+            Logger.e(error) { "Schedules could not be recovered from persistent storage" }
+            return false
+        }
+        val supported = loaded.filter { it.jobTemplate.type.canBeScheduled() }
+        if (supported != loaded && !persistSchedules(supported)) return false
+        _schedules.value = supported
+        schedulesLoaded = true
+        return true
+    }
+
     private suspend fun persistSchedules(updated: List<ScheduledJob>): Boolean =
         scheduleRepository.save(updated).fold(
-            onSuccess = { true },
+            onSuccess = {
+                consecutiveSchedulePersistenceFailures = 0
+                scheduleRetryNotBefore = null
+                true
+            },
             onFailure = {
+                consecutiveSchedulePersistenceFailures++
+                val multiplier = 1L shl (consecutiveSchedulePersistenceFailures - 1).coerceAtMost(4)
+                val retryDelay = (SCHEDULER_RETRY_BASE_MS * multiplier).coerceAtMost(MAX_SCHEDULER_WAIT_MS)
+                scheduleRetryNotBefore = Clock.System.now() + retryDelay.milliseconds
                 Logger.e(it) { "Schedule change was not applied because persistence failed" }
                 false
             }
         )
 
-    private fun nextSchedulerWaitMillis(now: kotlin.time.Instant): Long =
-        _schedules.value.asSequence()
+    private fun nextSchedulerWaitMillis(now: kotlin.time.Instant): Long {
+        val dueWait = _schedules.value.asSequence()
             .filter { it.enabled }
             .map { (it.nextRunAt - now).inWholeMilliseconds }
             .minOrNull()
             ?.coerceIn(MIN_SCHEDULER_WAIT_MS, MAX_SCHEDULER_WAIT_MS)
             ?: MAX_SCHEDULER_WAIT_MS
+        val retryWait = scheduleRetryNotBefore
+            ?.let { (it - now).inWholeMilliseconds.coerceAtLeast(0) }
+            ?: 0L
+        return maxOf(dueWait, retryWait).coerceAtMost(MAX_SCHEDULER_WAIT_MS)
+    }
 
     private fun startWorkers() {
         repeat(maxConcurrentJobs) {
@@ -699,3 +726,4 @@ class JobManager(
 
 private const val MIN_SCHEDULER_WAIT_MS = 1_000L
 private const val MAX_SCHEDULER_WAIT_MS = 60_000L
+private const val SCHEDULER_RETRY_BASE_MS = 5_000L

@@ -3,6 +3,8 @@ package org.wip.plugintoolkit.features.job.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -19,6 +21,8 @@ class JobViewModel(
     val history = jobManager.history
     val endedJobs = jobManager.endedJobs
     val schedules = jobManager.schedules
+    private val _scheduleOperationFailed = MutableStateFlow(false)
+    val scheduleOperationFailed = _scheduleOperationFailed.asStateFlow()
 
     val runningJobs = jobs.map { list ->
         list.filter { it.status == JobStatus.Running }
@@ -74,19 +78,25 @@ class JobViewModel(
         }
     }
 
-    fun scheduleRecurring(job: BackgroundJob, intervalMinutes: Long) {
-        viewModelScope.launch { jobManager.scheduleJob(job, intervalMinutes) }
+    fun scheduleRecurring(job: BackgroundJob, intervalMinutes: Long, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val succeeded = jobManager.scheduleJob(job, intervalMinutes) != null
+            _scheduleOperationFailed.value = !succeeded
+            onResult(succeeded)
+        }
     }
 
     fun removeSchedule(id: String) {
-        viewModelScope.launch { jobManager.removeSchedule(id) }
+        viewModelScope.launch { _scheduleOperationFailed.value = !jobManager.removeSchedule(id) }
     }
 
     fun setScheduleEnabled(id: String, enabled: Boolean) {
-        viewModelScope.launch { jobManager.setScheduleEnabled(id, enabled) }
+        viewModelScope.launch { _scheduleOperationFailed.value = !jobManager.setScheduleEnabled(id, enabled) }
     }
 
     fun runScheduleNow(id: String) {
-        viewModelScope.launch { jobManager.runScheduleNow(id) }
+        viewModelScope.launch { _scheduleOperationFailed.value = !jobManager.runScheduleNow(id) }
     }
+
+    fun clearScheduleError() { _scheduleOperationFailed.value = false }
 }
