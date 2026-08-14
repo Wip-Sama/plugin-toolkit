@@ -20,6 +20,7 @@ import kotlin.test.assertTrue
 class FlowConnectionRewireTest {
     private val stringType = DataType.Primitive(PrimitiveType.STRING)
     private val intType = DataType.Primitive(PrimitiveType.INT)
+    private val anyType = DataType.Primitive(PrimitiveType.ANY)
     private val incompatibleType = DataType.Object("example.Payload")
 
     private fun node(id: Long, outputType: DataType? = null, inputType: DataType? = null) = Node.SystemNode(
@@ -66,6 +67,27 @@ class FlowConnectionRewireTest {
 
         assertEquals(state, result)
         assertEquals(original, result.flow.connections.single())
+    }
+
+    @Test
+    fun `rewire recalculates wildcard inference without the original edge`() {
+        val original = Connection(1, "out", 3, "in")
+        val state = FlowEditorState(
+            flow = Flow(
+                "Flow",
+                nodes = listOf(
+                    node(1, outputType = stringType),
+                    node(2, outputType = incompatibleType),
+                    node(3, inputType = anyType)
+                ),
+                connections = listOf(original)
+            ),
+            inferredTypes = mapOf((3L to "in") to stringType)
+        )
+
+        val result = manager.handleRewireConnection(state, original, 2, "out", 3, "in", false)
+
+        assertEquals(listOf(Connection(2, "out", 3, "in")), result.flow.connections)
     }
 
     @Test
@@ -209,7 +231,6 @@ class FlowConnectionRewireTest {
     @Test
     fun `direct connect uses inferred array target when preserving existing edges`() {
         val arrayType = DataType.Array(stringType)
-        val anyType = DataType.Primitive(PrimitiveType.ANY)
         val existing = Connection(1, "out", 3, "in", orderIndex = 0)
         val state = FlowEditorState(
             flow = Flow(

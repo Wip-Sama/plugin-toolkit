@@ -184,8 +184,12 @@ class FlowConnectionManager(
         if (sourceNodeId == targetNodeId) return currentState
         if (originalConnection != null && originalConnection !in currentState.flow.connections) return currentState
 
-        val sourceNode = currentState.flow.nodes.find { it.id == sourceNodeId }
-        val targetNode = currentState.flow.nodes.find { it.id == targetNodeId }
+        val validationState = originalConnection?.let {
+            prepareRewireBaseState(currentState, it, targetNodeId, targetPortId)
+        } ?: currentState
+
+        val sourceNode = validationState.flow.nodes.find { it.id == sourceNodeId }
+        val targetNode = validationState.flow.nodes.find { it.id == targetNodeId }
 
         if (sourceNode == null || targetNode == null) return currentState
 
@@ -194,16 +198,16 @@ class FlowConnectionManager(
 
         if (sourcePort == null || targetPort == null) return currentState
 
-        val sourceType = currentState.inferredTypes[sourceNodeId to sourcePortId] ?: sourcePort.dataType
-        val targetType = currentState.inferredTypes[targetNodeId to targetPortId] ?: targetPort.dataType
-        val sourceSemantics = currentState.inferredSemanticTypes[sourceNodeId to sourcePortId] ?: sourcePort.semanticTypes
-        val targetSemantics = currentState.inferredSemanticTypes[targetNodeId to targetPortId] ?: targetPort.semanticTypes
+        val sourceType = validationState.inferredTypes[sourceNodeId to sourcePortId] ?: sourcePort.dataType
+        val targetType = validationState.inferredTypes[targetNodeId to targetPortId] ?: targetPort.dataType
+        val sourceSemantics = validationState.inferredSemanticTypes[sourceNodeId to sourcePortId] ?: sourcePort.semanticTypes
+        val targetSemantics = validationState.inferredSemanticTypes[targetNodeId to targetPortId] ?: targetPort.semanticTypes
         if (!sourceType.canConvert(targetType)) return currentState
         if (org.wip.plugintoolkit.api.checkSemanticCompatibility(sourceSemantics, targetSemantics)
             is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
         ) return currentState
 
-        val baseState = originalConnection?.let { handleDeleteConnection(currentState, it) } ?: currentState
+        val baseState = validationState
         val isListTarget = targetType is DataType.Array
         val filteredConnections = if (isListTarget) {
             baseState.flow.connections
@@ -312,28 +316,28 @@ class FlowConnectionManager(
             return currentState
         }
 
-        val sourceNode = currentState.flow.nodes.find { it.id == sourceNodeId } ?: return currentState
-        val targetNode = currentState.flow.nodes.find { it.id == targetNodeId } ?: return currentState
+        val validationState = prepareRewireBaseState(currentState, original, targetNodeId, targetPortId)
+        val sourceNode = validationState.flow.nodes.find { it.id == sourceNodeId } ?: return currentState
+        val targetNode = validationState.flow.nodes.find { it.id == targetNodeId } ?: return currentState
         val sourcePort = sourceNode.outputs.find { it.id == sourcePortId } ?: return currentState
         val targetPort = targetNode.inputs.find { it.id == targetPortId } ?: return currentState
-        val sourceType = currentState.inferredTypes[sourceNodeId to sourcePortId] ?: sourcePort.dataType
-        val targetType = currentState.inferredTypes[targetNodeId to targetPortId] ?: targetPort.dataType
-        val sourceSemantics = currentState.inferredSemanticTypes[sourceNodeId to sourcePortId] ?: sourcePort.semanticTypes
-        val targetSemantics = currentState.inferredSemanticTypes[targetNodeId to targetPortId] ?: targetPort.semanticTypes
+        val sourceType = validationState.inferredTypes[sourceNodeId to sourcePortId] ?: sourcePort.dataType
+        val targetType = validationState.inferredTypes[targetNodeId to targetPortId] ?: targetPort.dataType
+        val sourceSemantics = validationState.inferredSemanticTypes[sourceNodeId to sourcePortId] ?: sourcePort.semanticTypes
+        val targetSemantics = validationState.inferredSemanticTypes[targetNodeId to targetPortId] ?: targetPort.semanticTypes
         val semantics = org.wip.plugintoolkit.api.checkSemanticCompatibility(sourceSemantics, targetSemantics)
 
         if (sourceType.isCompatibleWith(targetType) &&
             semantics !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
         ) {
-            val withoutOriginal = handleDeleteConnection(currentState, original)
             var rewired = handleConnectPorts(
-                withoutOriginal,
+                validationState,
                 sourceNodeId,
                 sourcePortId,
                 targetNodeId,
                 targetPortId
             )
-            val matchingBefore = withoutOriginal.flow.connections.count {
+            val matchingBefore = validationState.flow.connections.count {
                 it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId &&
                     it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
             }
@@ -409,6 +413,41 @@ class FlowConnectionManager(
             notificationService?.toast(message)
         }
         return currentState
+    }
+
+    /**
+     * Builds the graph that will exist immediately before a rewired edge is attached, then
+     * recalculates inference from that graph. This prevents wildcard ports from retaining types
+     * or semantics contributed by the edge being replaced (or by an occupied scalar target).
+     */
+    private fun prepareRewireBaseState(
+        currentState: FlowEditorState,
+        original: Connection,
+        targetNodeId: Long,
+        targetPortId: String
+    ): FlowEditorState {
+        val withoutOriginal = handleDeleteConnection(currentState, original)
+        val targetPort = currentState.flow.nodes.find { it.id == targetNodeId }
+            ?.inputs
+            ?.find { it.id == targetPortId }
+            ?: return withoutOriginal
+        val currentTargetType = currentState.inferredTypes[targetNodeId to targetPortId] ?: targetPort.dataType
+        val candidate = if (currentTargetType is DataType.Array) {
+            withoutOriginal
+        } else {
+            withoutOriginal.copy(
+                flow = withoutOriginal.flow.copy(
+                    connections = withoutOriginal.flow.connections.filterNot {
+                        it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+                    }
+                )
+            )
+        }
+        val inference = org.wip.plugintoolkit.features.flows.logic.FlowTypeInference.runTypeInference(candidate.flow)
+        return candidate.copy(
+            inferredTypes = inference.inferredTypes,
+            inferredSemanticTypes = inference.inferredSemanticTypes
+        )
     }
 
     fun handleUpdateConnectionOrder(
