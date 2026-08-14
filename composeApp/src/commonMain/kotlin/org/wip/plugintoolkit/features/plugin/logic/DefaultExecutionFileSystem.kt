@@ -17,25 +17,10 @@ class DefaultExecutionFileSystem(
         SystemFileSystem.createDirectories(Path(sandboxPath))
     }
 
-    private fun resolvePath(relativePath: RelativePath): Path {
-        val resolved = Path(sandboxPath, relativePath.value)
-        val file = java.io.File(resolved.toString())
-        val normalized = try {
-            file.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve canonical path for '${relativePath.value}': ${e.message}")
-        }
-        val baseFile = java.io.File(sandboxPath)
-        val baseCanonical = try {
-            baseFile.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve base canonical path for '$sandboxPath': ${e.message}")
-        }
+    private val sandboxOperations = SandboxFileOperations(sandboxPath)
 
-        if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + java.io.File.separator)) {
-            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the sandbox.")
-        }
-        return resolved
+    private fun resolvePath(relativePath: RelativePath): Path {
+        return sandboxOperations.resolve(relativePath)
     }
 
     override suspend fun readFile(relativePath: RelativePath): ByteArray? {
@@ -102,22 +87,8 @@ class DefaultExecutionFileSystem(
     }
 
     override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> = runCatching {
-        require(relativePath != RelativePath.ROOT) { "The execution sandbox root cannot be deleted" }
-        deleteDirectory(resolvePath(relativePath), recursive)
-    }
-
-    private fun deleteDirectory(path: Path, recursive: Boolean) {
-        if (!SystemFileSystem.exists(path)) return
-        require(SystemFileSystem.metadataOrNull(path)?.isDirectory == true) { "Path is not a directory: $path" }
-        val children = SystemFileSystem.list(path)
-        require(recursive || children.isEmpty()) { "Directory is not empty: $path" }
-        if (recursive) {
-            children.forEach { child ->
-                if (SystemFileSystem.metadataOrNull(child)?.isDirectory == true) deleteDirectory(child, true)
-                else SystemFileSystem.delete(child)
-            }
-        }
-        SystemFileSystem.delete(path)
+        require(relativePath.value.isNotEmpty()) { "The execution sandbox root cannot be deleted" }
+        sandboxOperations.deleteDirectory(resolvePath(relativePath), recursive)
     }
 
     override fun getBasePath(): String = sandboxPath

@@ -23,15 +23,11 @@ class DefaultPluginFileSystem(
         SystemFileSystem.createDirectories(Path(cachePath))
     }
 
-    private fun resolvePath(relativePath: RelativePath): Path {
-        val resolved = Path(basePath, relativePath.value)
-        val normalized = resolved.toString().replace('\\', '/')
-        val baseCanonical = Path(basePath).toString().replace('\\', '/')
+    private val filesOperations = SandboxFileOperations(basePath)
+    private val cacheOperations = SandboxFileOperations(cachePath)
 
-        if (normalized != baseCanonical && !normalized.startsWith(if (baseCanonical.endsWith("/")) baseCanonical else "$baseCanonical/")) {
-            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin files directory.")
-        }
-        return resolved
+    private fun resolvePath(relativePath: RelativePath): Path {
+        return filesOperations.resolve(relativePath)
     }
 
     override suspend fun readFile(relativePath: RelativePath): ByteArray? {
@@ -98,8 +94,8 @@ class DefaultPluginFileSystem(
     }
 
     override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> = runCatching {
-        require(relativePath != RelativePath.ROOT) { "The plugin files root cannot be deleted" }
-        deleteDirectory(resolvePath(relativePath), recursive)
+        require(relativePath.value.isNotEmpty()) { "The plugin files root cannot be deleted" }
+        filesOperations.deleteDirectory(resolvePath(relativePath), recursive)
     }
 
     override suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit> {
@@ -154,37 +150,16 @@ class DefaultPluginFileSystem(
 
                     override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> =
                         runCatching {
-                            require(relativePath != RelativePath.ROOT) { "The plugin cache root cannot be deleted" }
-                            fs.deleteDirectory(fs.resolveCachePath(relativePath), recursive)
+                            require(relativePath.value.isNotEmpty()) { "The plugin cache root cannot be deleted" }
+                            fs.cacheOperations.deleteDirectory(fs.resolveCachePath(relativePath), recursive)
                         }
                 }
             }
         }
     }
 
-    private fun deleteDirectory(path: Path, recursive: Boolean) {
-        if (!SystemFileSystem.exists(path)) return
-        require(SystemFileSystem.metadataOrNull(path)?.isDirectory == true) { "Path is not a directory: $path" }
-        val children = SystemFileSystem.list(path)
-        require(recursive || children.isEmpty()) { "Directory is not empty: $path" }
-        if (recursive) {
-            children.forEach { child ->
-                if (SystemFileSystem.metadataOrNull(child)?.isDirectory == true) deleteDirectory(child, true)
-                else SystemFileSystem.delete(child)
-            }
-        }
-        SystemFileSystem.delete(path)
-    }
-
     private fun resolveCachePath(relativePath: RelativePath): Path {
-        val resolved = Path(cachePath, relativePath.value)
-        val normalized = resolved.toString().replace('\\', '/')
-        val baseCanonical = Path(cachePath).toString().replace('\\', '/')
-
-        if (normalized != baseCanonical && !normalized.startsWith(if (baseCanonical.endsWith("/")) baseCanonical else "$baseCanonical/")) {
-            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin cache directory.")
-        }
-        return resolved
+        return cacheOperations.resolve(relativePath)
     }
 
     private suspend fun readFromCache(relativePath: RelativePath): ByteArray? {
