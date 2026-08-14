@@ -142,6 +142,8 @@ import org.wip.plugintoolkit.cli.ToolkitCliInvocation
 fun main(args: Array<String>) {
     when (val invocation = parseToolkitCliInvocation(args)) {
         is ToolkitCliInvocation.Command -> {
+            // Keep command output machine-readable; desktop logging is configured only below.
+            Logger.setLogWriters()
             val exitCode = kotlinx.coroutines.runBlocking { runToolkitCli(invocation.command) }
             exitProcess(exitCode)
         }

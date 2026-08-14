@@ -13,6 +13,7 @@ import org.gradle.jvm.tasks.Jar
 import java.util.LinkedHashMap
 import java.util.LinkedHashSet
 import java.util.zip.ZipFile
+import java.util.jar.Manifest
 
 @CacheableTask
 abstract class MergeStandaloneServices : DefaultTask() {
@@ -78,6 +79,12 @@ abstract class VerifyStandaloneJar : DefaultTask() {
             check("org/wip/plugintoolkit/api/standalone/StandalonePluginMainKt.class" in names) {
                 "Standalone launcher is missing"
             }
+            val manifestEntry = zip.getEntry("META-INF/MANIFEST.MF") ?: error("JAR manifest is missing")
+            val manifest = zip.getInputStream(manifestEntry).use(::Manifest)
+            check(
+                manifest.mainAttributes.getValue("Main-Class") ==
+                    "org.wip.plugintoolkit.api.standalone.StandalonePluginMainKt"
+            ) { "Standalone JAR has an invalid Main-Class" }
             check(names.none {
                 it.startsWith("org/wip/plugintoolkit/api/processor/") ||
                     it.startsWith("com/google/devtools/ksp/") ||
@@ -121,6 +128,7 @@ val standaloneJar = tasks.register<Jar>("standaloneJar") {
         }
     }) {
         exclude("META-INF/services/**")
+        exclude("META-INF/MANIFEST.MF", "module-info.class", "META-INF/versions/**/module-info.class")
         exclude("org/wip/plugintoolkit/api/processor/**")
     }
     from(standaloneServicesDir)
