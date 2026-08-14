@@ -10,7 +10,7 @@ Changes:
   - Support for parallel state transitions for distinct plugins
   - Strengthened path traversal checks
   - Extended future backwards compatibility with plugins in some cases
-  - Minor GUI optimizations
+  - Minor GUI optimizations and changes
   - Dynamic locks to expand on how a plugin unlocks its features 
   - Plugin Capabilities are now scrollable and searchable
   - Enforced minAppVersion on local installations too
@@ -19,7 +19,7 @@ Added:
   - New mechanism and dialogs for managing jar signatures
   - 6 previously invisible settings: animationsEnabled, compressedLogsToKeep, showInfo, showWarning, showError, strictSignatureChecking, fileAccessMode, checkOnStartup
   - Support for portable installations with self-contained data directory, cache management options, and host-isolation
-  - Local repository (TODO)
+  - Local repositories
   - Custom locks for enums/capabilities
   - Parameters to plugin actions
   - PluginStorage to give plugins a way to have custom persistent data
