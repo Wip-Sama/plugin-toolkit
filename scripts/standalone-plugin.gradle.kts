@@ -79,6 +79,7 @@ abstract class VerifyStandaloneJar : DefaultTask() {
             check("org/wip/plugintoolkit/api/standalone/StandalonePluginMainKt.class" in names) {
                 "Standalone launcher is missing"
             }
+            check("META-INF/manifest.json" in names) { "Plugin manifest is missing" }
             val manifestEntry = zip.getEntry("META-INF/MANIFEST.MF") ?: error("JAR manifest is missing")
             val manifest = zip.getInputStream(manifestEntry).use(::Manifest)
             check(
