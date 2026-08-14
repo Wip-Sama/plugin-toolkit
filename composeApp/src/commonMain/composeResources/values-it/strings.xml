@@ -374,6 +374,11 @@
     <string name="setting_plugin_settings_in_place">Popup Impostazioni Sul Posto</string>
     <string name="setting_plugin_settings_in_place_subtitle">Apri le impostazioni del plugin in un popup invece di navigare via</string>
     <string name="dialog_plugin_settings_in_place_warning_title">Attenzione: Impostazioni Sul Posto</string>
-    <string name="dialog_plugin_settings_in_place_warning_message">L\'apertura delle impostazioni sul posto potrebbe causare il mancato aggiornamento dello stato di sblocco di alcuni componenti fino al ricaricamento. Sei sicuro di voler abilitare questa modalità?</string>
     <string name="plugin_settings_by_section">Per Sezione</string>
+    <string name="setting_launch_at_startup_disabled_portable_subtitle">Questa funzione non è disponibile nella versione portatile dell\'applicazione</string>
+    <string name="setting_cache_management">Posizione Cache</string>
+    <string name="setting_cache_management_subtitle">Scegli dove archiviare la cache e i file temporanei dell\'applicazione</string>
+    <string name="cache_mode_system">Gestito dal Sistema</string>
+    <string name="cache_mode_application">Gestito dall\'Applicazione</string>
+    <string name="setting_auto_update_disabled_portable">Gli aggiornamenti sono disabilitati in modalità portatile</string>
 </resources>

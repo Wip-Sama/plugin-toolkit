@@ -425,6 +425,11 @@
     <string name="setting_plugin_settings_in_place">In-Place Settings Popup</string>
     <string name="setting_plugin_settings_in_place_subtitle">Open plugin settings in an overlay popup instead of navigating away</string>
     <string name="dialog_plugin_settings_in_place_warning_title">Warning: In-Place Settings</string>
-    <string name="dialog_plugin_settings_in_place_warning_message">Opening settings in-place may cause some components to not update their unlocked states until reloaded. Are you sure you want to enable this mode?</string>
     <string name="plugin_settings_by_section">By Section</string>
+    <string name="setting_launch_at_startup_disabled_portable_subtitle">This feature is not available in the portable version of the application</string>
+    <string name="setting_cache_management">Cache Location</string>
+    <string name="setting_cache_management_subtitle">Choose where application cache and temporary files are stored</string>
+    <string name="cache_mode_system">System Managed</string>
+    <string name="cache_mode_application">Application Managed</string>
+    <string name="setting_auto_update_disabled_portable">Updates are disabled in portable mode</string>
 </resources>

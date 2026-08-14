@@ -18,8 +18,7 @@ Added:
   - Whitelist/Blacklist folder for plugin access with additional Unrestricted mode
   - New mechanism and dialogs for managing jar signatures
   - 6 previously invisible settings: animationsEnabled, compressedLogsToKeep, showInfo, showWarning, showError, strictSignatureChecking, fileAccessMode, checkOnStartup
-  - Support for read/write stream in PluginFileSystem
-  - Support for portable installations (TODO)
+  - Support for portable installations with self-contained data directory, cache management options, and host-isolation
   - Local repository (TODO)
   - Custom locks for enums/capabilities
   - Parameters to plugin actions
