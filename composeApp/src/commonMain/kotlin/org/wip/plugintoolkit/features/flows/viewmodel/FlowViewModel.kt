@@ -27,6 +27,7 @@ import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.CapabilityIdentity
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -559,8 +560,11 @@ class FlowViewModel(
     fun executeFlow(flow: Flow, parameterValues: Map<String, String>) {
         val activeCapabilities = org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
             .mapNotNull { it.getManifest().getOrNull() }
-            .flatMap { it.capabilities }
-            .map { it.name }
+            .flatMap { manifest ->
+                manifest.capabilities.map { capability ->
+                    CapabilityIdentity(manifest.plugin.id, capability.name)
+                }
+            }
             .toSet()
 
         if (flow.isBroken(activeCapabilities)) {

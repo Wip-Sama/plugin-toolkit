@@ -45,6 +45,7 @@ import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.CapabilityIdentity
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -101,8 +102,11 @@ fun FlowRunnerView(
     val activeCapabilities = remember(state.flows) {
         org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
             .mapNotNull { it.getManifest().getOrNull() }
-            .flatMap { it.capabilities }
-            .map { it.name }
+            .flatMap { manifest ->
+                manifest.capabilities.map { capability ->
+                    CapabilityIdentity(manifest.plugin.id, capability.name)
+                }
+            }
             .toSet()
     }
 
