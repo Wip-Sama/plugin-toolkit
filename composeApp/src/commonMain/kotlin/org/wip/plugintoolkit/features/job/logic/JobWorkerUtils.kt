@@ -332,11 +332,7 @@ object SystemPathSecurity {
         customWhitelist: List<String> = emptyList(),
         sandboxPath: String? = null
     ): Boolean {
-        val canonical = try {
-            java.io.File(pathStr).canonicalPath
-        } catch (_: Exception) {
-            return false
-        }
+        val canonical = comparablePath(pathStr) ?: return false
 
         when (mode) {
             org.wip.plugintoolkit.features.settings.model.FileAccessMode.Unrestricted -> return true
@@ -345,19 +341,59 @@ object SystemPathSecurity {
                 sandboxPath?.let { effectiveWhitelist.add(it) }
                 if (effectiveWhitelist.isEmpty()) return false
                 return effectiveWhitelist.any { allowed ->
-                    val allowedCanonical = try { java.io.File(allowed).canonicalPath } catch (_: Exception) { return@any false }
-                    canonical == allowedCanonical || canonical.startsWith(allowedCanonical + java.io.File.separator)
+                    val allowedCanonical = comparablePath(allowed) ?: return@any false
+                    canonical.isInside(allowedCanonical)
                 }
             }
             org.wip.plugintoolkit.features.settings.model.FileAccessMode.Blacklist -> {
                 val effectiveBlacklist = if (customBlacklist.isNotEmpty()) customBlacklist else BUILTIN_BLACKLIST
                 val isDenied = effectiveBlacklist.any { blocked ->
-                    val blockedCanonical = try { java.io.File(blocked).canonicalPath } catch (_: Exception) { return@any false }
-                    canonical == blockedCanonical || canonical.startsWith(blockedCanonical + java.io.File.separator)
+                    val blockedCanonical = comparablePath(blocked) ?: return@any false
+                    canonical.isInside(blockedCanonical)
                 }
                 return !isDenied
             }
         }
+    }
+
+    private data class ComparablePath(val value: String, val windowsStyle: Boolean) {
+        fun isInside(root: ComparablePath): Boolean {
+            if (windowsStyle != root.windowsStyle) return false
+            return if (windowsStyle) {
+                value.equals(root.value, ignoreCase = true) ||
+                    value.startsWith(root.value.trimEnd('/') + "/", ignoreCase = true)
+            } else {
+                value == root.value || value.startsWith(root.value.trimEnd('/') + "/")
+            }
+        }
+    }
+
+    private fun comparablePath(path: String): ComparablePath? {
+        val slashNormalized = path.replace('\\', '/')
+        val windowsStyle = Regex("^[A-Za-z]:/").containsMatchIn(slashNormalized)
+        return try {
+            val value = if (windowsStyle) {
+                normalizeWindowsPath(slashNormalized)
+            } else {
+                java.io.File(path).canonicalPath.replace('\\', '/')
+            }
+            ComparablePath(value.trimEnd('/'), windowsStyle)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun normalizeWindowsPath(path: String): String {
+        val root = path.take(2)
+        val segments = mutableListOf<String>()
+        path.drop(2).split('/').forEach { segment ->
+            when (segment) {
+                "", "." -> Unit
+                ".." -> if (segments.isNotEmpty()) segments.removeLast()
+                else -> segments += segment
+            }
+        }
+        return "$root/${segments.joinToString("/")}".trimEnd('/')
     }
 }
 
@@ -454,4 +490,3 @@ fun deleteRecursively(path: kotlinx.io.files.Path) {
         }
     }
 }
-

@@ -14,6 +14,7 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
@@ -151,8 +152,13 @@ class FlowCycleTest {
 
         // 2. Add Flow B as a subflow in Flow A
         viewModelA.onEvent(FlowEvent.AddSubFlowNode("Flow B", Offset(100f, 100f)))
-        viewModelA.onEvent(FlowEvent.Save)
-        delay(50) // Wait for save to disk to finish
+        val flowAWithB = viewModelA.state.value.flow
+        assertTrue(flowAWithB.nodes.filterIsInstance<Node.SubFlowNode>().any { it.flowName == "Flow B" })
+        // Persist the captured state synchronously. Calling Add then Save as separate events races
+        // the repository collector, which may re-emit the previous disk snapshot between them.
+        SystemFileSystem.sink(Path("$appDataDir/flows/Flow_A.json")).buffered().use {
+            it.writeString(json.encodeToString(Flow.serializer(), flowAWithB))
+        }
 
         // 3. Load Flow B
         val persistenceB = MockSettingsPersistence()
@@ -178,8 +184,11 @@ class FlowCycleTest {
 
         // 4. Add Flow C as a subflow in Flow B
         viewModelB.onEvent(FlowEvent.AddSubFlowNode("Flow C", Offset(100f, 100f)))
-        viewModelB.onEvent(FlowEvent.Save)
-        delay(50)
+        val flowBWithC = viewModelB.state.value.flow
+        assertTrue(flowBWithC.nodes.filterIsInstance<Node.SubFlowNode>().any { it.flowName == "Flow C" })
+        SystemFileSystem.sink(Path("$appDataDir/flows/Flow_B.json")).buffered().use {
+            it.writeString(json.encodeToString(Flow.serializer(), flowBWithC))
+        }
 
         // 5. Load Flow C
         val persistenceC = MockSettingsPersistence()
@@ -202,6 +211,24 @@ class FlowCycleTest {
             delay(10)
         }
         assertTrue(loadedC, "Flows failed to load in Flow C editor")
+
+        // Repository loading and saves both run on Dispatchers.IO. Wait for the actual dependency
+        // graph, not merely the initial list of filenames, before asserting cycle prevention.
+        var dependencyGraphLoaded = false
+        for (i in 1..100) {
+            val flows = viewModelC.state.value.flows
+            val aReferencesB = flows.find { it.name == "Flow A" }
+                ?.nodes?.filterIsInstance<Node.SubFlowNode>()?.any { it.flowName == "Flow B" } == true
+            val bReferencesC = flows.find { it.name == "Flow B" }
+                ?.nodes?.filterIsInstance<Node.SubFlowNode>()?.any { it.flowName == "Flow C" } == true
+            if (aReferencesB && bReferencesC) {
+                dependencyGraphLoaded = true
+                break
+            }
+            realFlowRepoC.reloadFlows()
+            delay(10)
+        }
+        assertTrue(dependencyGraphLoaded, "Nested flow dependency graph failed to load")
 
         // 6. Try to add Flow A as a subflow inside Flow C - This should form a cycle: A -> B -> C -> A
         val initialNodesCount = viewModelC.state.value.flow.nodes.size
