@@ -21,6 +21,7 @@ class JobViewModel(
     val history = jobManager.history
     val endedJobs = jobManager.endedJobs
     val schedules = jobManager.schedules
+    val scheduleLoadFailed = jobManager.scheduleLoadFailed
     private val _scheduleOperationFailed = MutableStateFlow(false)
     val scheduleOperationFailed = _scheduleOperationFailed.asStateFlow()
 

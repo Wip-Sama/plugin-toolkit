@@ -437,4 +437,5 @@
     <string name="job_schedule_run_now">Run schedule now</string>
     <string name="job_schedule_delete">Delete schedule</string>
     <string name="job_schedule_save_failed">The schedule change could not be saved. Nothing was changed; check storage access and try again.</string>
+    <string name="job_schedule_load_failed">Saved schedules could not be loaded. They will not run until storage recovers; the scheduler will retry automatically.</string>
 </resources>

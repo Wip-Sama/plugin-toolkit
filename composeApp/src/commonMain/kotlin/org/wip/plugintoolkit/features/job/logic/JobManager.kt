@@ -65,6 +65,8 @@ class JobManager(
 
     private val _schedules = MutableStateFlow<List<ScheduledJob>>(emptyList())
     val schedules: StateFlow<List<ScheduledJob>> = _schedules.asStateFlow()
+    private val _scheduleLoadFailed = MutableStateFlow(false)
+    val scheduleLoadFailed: StateFlow<Boolean> = _scheduleLoadFailed.asStateFlow()
 
     private val _jobLogs = MutableStateFlow<Map<String, List<String>>>(emptyMap())
     val jobLogs: StateFlow<Map<String, List<String>>> = _jobLogs.asStateFlow()
@@ -128,21 +130,24 @@ class JobManager(
 
     /** Starts recurring execution after startup has finished loading plugins. Safe to call more than once. */
     suspend fun startScheduler(): Boolean = scheduleStartMutex.withLock start@{
-        if (schedulerStarted) return@start true
-
         val initialized = scheduleMutex.withLock { hydrateSchedulesLocked() }
-        if (!initialized) return@start false
+        if (schedulerStarted) return@start initialized
 
         schedulerStarted = true
         scope.launch {
             while (isActive) {
+                val hydrated = scheduleMutex.withLock { hydrateSchedulesLocked() }
+                if (!hydrated) {
+                    withTimeoutOrNull(SCHEDULE_LOAD_RETRY_MS) { scheduleSignal.receive() }
+                    continue
+                }
                 val now = Clock.System.now()
                 runDueSchedules(now)
                 val waitMillis = nextSchedulerWaitMillis(Clock.System.now())
                 withTimeoutOrNull(waitMillis) { scheduleSignal.receive() }
             }
         }
-        true
+        initialized
     }
 
     @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
@@ -167,13 +172,15 @@ class JobManager(
     suspend fun removeSchedule(id: String): Boolean = scheduleMutex.withLock {
         if (!hydrateSchedulesLocked()) return@withLock false
         val updated = _schedules.value.filterNot { it.id == id }
-        updated != _schedules.value && replaceSchedules(updated)
+        if (updated == _schedules.value) return@withLock true
+        replaceSchedules(updated)
     }
 
     suspend fun setScheduleEnabled(id: String, enabled: Boolean): Boolean = scheduleMutex.withLock {
         if (!hydrateSchedulesLocked()) return@withLock false
         val updated = _schedules.value.map { if (it.id == id) it.copy(enabled = enabled) else it }
-        updated != _schedules.value && replaceSchedules(updated)
+        if (updated == _schedules.value) return@withLock true
+        replaceSchedules(updated)
     }
 
     suspend fun runScheduleNow(id: String): Boolean = scheduleMutex.withLock {
@@ -222,6 +229,7 @@ class JobManager(
     private suspend fun hydrateSchedulesLocked(): Boolean {
         if (schedulesLoaded) return true
         val loaded = scheduleRepository.load().getOrElse { error ->
+            _scheduleLoadFailed.value = true
             Logger.e(error) { "Schedules could not be recovered from persistent storage" }
             return false
         }
@@ -229,6 +237,7 @@ class JobManager(
         if (supported != loaded && !persistSchedules(supported)) return false
         _schedules.value = supported
         schedulesLoaded = true
+        _scheduleLoadFailed.value = false
         return true
     }
 
@@ -727,3 +736,4 @@ class JobManager(
 private const val MIN_SCHEDULER_WAIT_MS = 1_000L
 private const val MAX_SCHEDULER_WAIT_MS = 60_000L
 private const val SCHEDULER_RETRY_BASE_MS = 5_000L
+private const val SCHEDULE_LOAD_RETRY_MS = 30_000L

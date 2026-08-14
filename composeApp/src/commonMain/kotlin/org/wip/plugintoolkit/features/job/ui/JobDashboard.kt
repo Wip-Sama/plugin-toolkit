@@ -112,6 +112,7 @@ import plugintoolkit.composeapp.generated.resources.job_running_jobs
 import plugintoolkit.composeapp.generated.resources.job_schedule_create
 import plugintoolkit.composeapp.generated.resources.job_schedule_delete
 import plugintoolkit.composeapp.generated.resources.job_schedule_empty
+import plugintoolkit.composeapp.generated.resources.job_schedule_load_failed
 import plugintoolkit.composeapp.generated.resources.job_schedule_save_failed
 import plugintoolkit.composeapp.generated.resources.job_schedule_interval_label
 import plugintoolkit.composeapp.generated.resources.job_schedule_next_format
@@ -417,8 +418,9 @@ fun EndedTab(viewModel: JobViewModel) {
 fun SchedulerTab(viewModel: JobViewModel) {
     val schedules by viewModel.schedules.collectAsState()
     val scheduleOperationFailed by viewModel.scheduleOperationFailed.collectAsState()
+    val scheduleLoadFailed by viewModel.scheduleLoadFailed.collectAsState()
 
-    if (schedules.isEmpty() && !scheduleOperationFailed) {
+    if (schedules.isEmpty() && !scheduleOperationFailed && !scheduleLoadFailed) {
         EmptyState(stringResource(Res.string.job_schedule_empty), Icons.Default.Schedule)
         return
     }
@@ -427,6 +429,17 @@ fun SchedulerTab(viewModel: JobViewModel) {
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
+        if (scheduleLoadFailed) {
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Text(
+                        stringResource(Res.string.job_schedule_load_failed),
+                        modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
         if (scheduleOperationFailed) {
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {

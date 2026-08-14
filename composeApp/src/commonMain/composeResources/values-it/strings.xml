@@ -386,4 +386,5 @@
     <string name="job_schedule_run_now">Esegui ora la pianificazione</string>
     <string name="job_schedule_delete">Elimina pianificazione</string>
     <string name="job_schedule_save_failed">Impossibile salvare la modifica. Non è stato cambiato nulla; verifica l’accesso allo spazio di archiviazione e riprova.</string>
+    <string name="job_schedule_load_failed">Impossibile caricare le pianificazioni salvate. Non verranno eseguite finché l’archiviazione non sarà di nuovo disponibile; il scheduler riproverà automaticamente.</string>
 </resources>

@@ -12,6 +12,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -129,6 +130,43 @@ class ScheduleRepositoryTest {
                 setOf("persisted", added.id),
                 ScheduleRepository(persistence).load().getOrThrow().map { it.id }.toSet()
             )
+        }
+    }
+
+    @Test
+    fun `corrupt schedule storage is surfaced and can recover on retry`() = runTest {
+        withTempPersistence { persistence, root ->
+            val jobsDir = Files.createDirectories(root.resolve("jobs"))
+            Files.writeString(jobsDir.resolve("schedules.json"), "{")
+            Files.writeString(jobsDir.resolve("schedules.json.bak"), "{")
+            val settings = SettingsRepository(persistence, backgroundScope)
+            testScheduler.advanceUntilIdle()
+            val manager = JobManager(backgroundScope, settings)
+            testScheduler.runCurrent()
+
+            assertFalse(manager.startScheduler())
+            assertTrue(manager.scheduleLoadFailed.value)
+
+            val recovered = listOf(ScheduledJob("recovered", template, 10, Instant.fromEpochMilliseconds(1_000)))
+            ScheduleRepository(persistence).save(recovered).getOrThrow()
+
+            assertTrue(manager.startScheduler())
+            assertFalse(manager.scheduleLoadFailed.value)
+            assertEquals(recovered, manager.schedules.value)
+        }
+    }
+
+    @Test
+    fun `idempotent schedule mutations are successful no ops`() = runTest {
+        withTempPersistence { persistence, _ ->
+            val settings = SettingsRepository(persistence, backgroundScope)
+            testScheduler.advanceUntilIdle()
+            val manager = JobManager(backgroundScope, settings)
+            val schedule = manager.scheduleJob(template, 10)!!
+
+            assertTrue(manager.removeSchedule(schedule.id))
+            assertTrue(manager.removeSchedule(schedule.id))
+            assertTrue(manager.setScheduleEnabled(schedule.id, enabled = false))
         }
     }
 
