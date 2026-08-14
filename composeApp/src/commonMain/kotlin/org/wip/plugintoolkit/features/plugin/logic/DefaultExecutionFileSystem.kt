@@ -24,13 +24,13 @@ class DefaultExecutionFileSystem(
     }
 
     override suspend fun readFile(relativePath: RelativePath): ByteArray? {
-        val path = resolvePath(relativePath)
+        val path = sandboxOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
     override suspend fun readTextFile(relativePath: RelativePath): String? {
-        val path = resolvePath(relativePath)
+        val path = sandboxOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
@@ -58,11 +58,12 @@ class DefaultExecutionFileSystem(
     }
 
     override suspend fun exists(relativePath: RelativePath): Boolean {
-        return SystemFileSystem.exists(resolvePath(relativePath))
+        val path = sandboxOperations.resolveIfRootExists(relativePath) ?: return false
+        return SystemFileSystem.exists(path)
     }
 
     override suspend fun listFiles(relativePath: RelativePath): List<String> {
-        val path = resolvePath(relativePath)
+        val path = sandboxOperations.resolveIfRootExists(relativePath) ?: return emptyList()
         if (!SystemFileSystem.exists(path)) return emptyList()
         val metadata = SystemFileSystem.metadataOrNull(path)
         if (metadata?.isDirectory != true) return emptyList()

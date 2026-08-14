@@ -5,6 +5,7 @@ import org.wip.plugintoolkit.api.RelativePath
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path as NioPath
 import java.nio.file.Paths
 import java.nio.file.SimpleFileVisitor
@@ -34,6 +35,12 @@ internal class SandboxFileOperations(root: String) {
             }
         }
         return Path(candidate.toString())
+    }
+
+    fun resolveIfRootExists(relativePath: RelativePath): Path? = try {
+        resolve(relativePath)
+    } catch (_: NoSuchFileException) {
+        null
     }
 
     fun deleteDirectory(path: Path, recursive: Boolean) {

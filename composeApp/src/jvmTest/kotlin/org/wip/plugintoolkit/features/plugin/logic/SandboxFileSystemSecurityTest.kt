@@ -15,6 +15,8 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SandboxFileSystemSecurityTest {
@@ -102,6 +104,20 @@ class SandboxFileSystemSecurityTest {
         assertEquals("resource", fileSystem.readTextFile(target))
         assertEquals(listOf("example.txt"), fileSystem.listFiles(RelativePath.from("nested").getOrThrow()))
         assertTrue(Files.notExists(install.resolve("files/nested/example.txt")))
+    }
+
+    @Test
+    fun missingSandboxRootUsesReadSemanticsAndRejectsWrites() = runTest {
+        val install = testRoot.resolve("plugin")
+        val fileSystem = DefaultPluginFileSystem(install.toString())
+        val file = RelativePath.from("missing.txt").getOrThrow()
+        Files.delete(install.resolve("files"))
+
+        assertNull(fileSystem.readFile(file))
+        assertNull(fileSystem.readTextFile(file))
+        assertFalse(fileSystem.exists(file))
+        assertEquals(emptyList(), fileSystem.listFiles())
+        assertTrue(fileSystem.writeTextFile(file, "data").isFailure)
     }
 
     private fun createOutsideSecret(): Path {

@@ -31,13 +31,13 @@ class DefaultPluginFileSystem(
     }
 
     override suspend fun readFile(relativePath: RelativePath): ByteArray? {
-        val path = resolvePath(relativePath)
+        val path = filesOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
     override suspend fun readTextFile(relativePath: RelativePath): String? {
-        val path = resolvePath(relativePath)
+        val path = filesOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
@@ -65,11 +65,12 @@ class DefaultPluginFileSystem(
     }
 
     override suspend fun exists(relativePath: RelativePath): Boolean {
-        return SystemFileSystem.exists(resolvePath(relativePath))
+        val path = filesOperations.resolveIfRootExists(relativePath) ?: return false
+        return SystemFileSystem.exists(path)
     }
 
     override suspend fun listFiles(relativePath: RelativePath): List<String> {
-        val path = resolvePath(relativePath)
+        val path = filesOperations.resolveIfRootExists(relativePath) ?: return emptyList()
         if (!SystemFileSystem.exists(path)) return emptyList()
         val metadata = SystemFileSystem.metadataOrNull(path)
         if (metadata?.isDirectory != true) return emptyList()
@@ -139,10 +140,10 @@ class DefaultPluginFileSystem(
                         fs.writeTextToCache(relativePath, text)
 
                     override suspend fun exists(relativePath: RelativePath): Boolean =
-                        SystemFileSystem.exists(fs.resolveCachePath(relativePath))
+                        fs.cacheOperations.resolveIfRootExists(relativePath)?.let(SystemFileSystem::exists) ?: false
 
                     override suspend fun listFiles(relativePath: RelativePath): List<String> {
-                        val path = fs.resolveCachePath(relativePath)
+                        val path = fs.cacheOperations.resolveIfRootExists(relativePath) ?: return emptyList()
                         if (!SystemFileSystem.exists(path)) return emptyList()
                         if (SystemFileSystem.metadataOrNull(path)?.isDirectory != true) return emptyList()
                         return SystemFileSystem.list(path).map { it.name }
@@ -175,13 +176,13 @@ class DefaultPluginFileSystem(
     }
 
     private suspend fun readFromCache(relativePath: RelativePath): ByteArray? {
-        val path = resolveCachePath(relativePath)
+        val path = cacheOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
     private suspend fun readTextFromCache(relativePath: RelativePath): String? {
-        val path = resolveCachePath(relativePath)
+        val path = cacheOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
