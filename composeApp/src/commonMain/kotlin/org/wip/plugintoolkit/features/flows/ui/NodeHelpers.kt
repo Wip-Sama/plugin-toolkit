@@ -26,6 +26,7 @@ import kotlinx.serialization.json.booleanOrNull
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.colorpicker.utils.parseHexColor
 
 @Composable
 fun PortCircle(
@@ -157,6 +158,7 @@ fun parseColorString(colorStr: String): Color {
     val lastColor = colorStr.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim() ?: colorStr
     val trimmed = lastColor.trim()
     if (trimmed.isEmpty()) return Color.Transparent
+    parseHexColor(trimmed)?.let { return it }
     if (trimmed.startsWith("#")) {
         return try {
             val hex = trimmed.substring(1)

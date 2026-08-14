@@ -10,7 +10,18 @@ class ColorExtTest {
     @Test
     fun `hex parser accepts rgb and argb values`() {
         assertEquals(Color(0xFF336699.toInt()), parseHexColor("#336699"))
+        assertEquals(Color(0xFF336699.toInt()), parseHexColor("336699"))
         assertEquals(Color(0x80336699.toInt()), parseHexColor("80336699"))
+        assertEquals(true, colorStringHasAlpha("#80336699"))
+        assertEquals(true, colorStringHasAlpha("80336699"))
+    }
+
+    @Test
+    fun `ARGB values round trip without losing alpha`() {
+        val original = "80336699"
+        val parsed = parseHexColor(original)!!
+
+        assertEquals(original.lowercase(), parsed.toHex(includeAlpha = colorStringHasAlpha(original)))
     }
 
     @Test

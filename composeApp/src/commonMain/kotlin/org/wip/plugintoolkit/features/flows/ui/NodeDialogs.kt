@@ -40,6 +40,7 @@ import org.wip.plugintoolkit.api.parseSemanticTypes
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
+import org.wip.plugintoolkit.features.colorpicker.utils.colorStringHasAlpha
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
@@ -306,8 +307,9 @@ fun NodeDialogs(
     if (showColorPicker && activeColorInputId != null) {
         val input = node.inputs.firstOrNull { it.id == activeColorInputId }
         val inferredSem = input?.let { inferredSemanticTypes[Pair(node.id, it.id)] ?: it.semanticTypes } ?: emptyList()
-        val hasAlpha = inferredSem.any { it.variant?.contains("rgba", ignoreCase = true) == true }
         val existingValue = input?.let { getPortValueString(it.value ?: it.defaultValue, it.dataType) } ?: ""
+        val hasAlpha = inferredSem.any { it.variant?.contains("rgba", ignoreCase = true) == true } ||
+            colorStringHasAlpha(existingValue)
         org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog(
             show = showColorPicker,
             initialColor = parseColorString(existingValue),
