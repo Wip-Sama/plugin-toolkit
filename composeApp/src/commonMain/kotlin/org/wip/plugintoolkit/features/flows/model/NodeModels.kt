@@ -25,6 +25,7 @@ import kotlinx.serialization.json.put
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginInfo
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.parseSemanticTypes
 import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
@@ -492,10 +493,12 @@ data class Flow(
         return fallbackType
     }
 
-    fun isBroken(activeCapabilities: Set<String>): Boolean {
+    fun isBroken(activeCapabilities: Set<CapabilityIdentity>): Boolean {
         val hasBrokenNode = this.nodes.any { it is Node.CapabilityNode && it.isBroken }
         val hasMissingCapability =
-            this.nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.name !in activeCapabilities }
+            this.nodes.filterIsInstance<Node.CapabilityNode>().any {
+                CapabilityIdentity(it.pluginInfo.id, it.capability.name) !in activeCapabilities
+            }
         val hasNotReadyNode = this.nodes.any { !it.isReady(connections) }
         return hasBrokenNode || hasMissingCapability || hasNotReadyNode
     }
@@ -522,6 +525,16 @@ data class Flow(
         )
     }
 }
+
+/** Stable, collision-free identity for a capability installed in the host. */
+data class CapabilityIdentity(val pluginId: String, val capabilityName: String)
+
+fun Iterable<PluginManifest>.capabilityIdentities(): Set<CapabilityIdentity> =
+    flatMap { manifest ->
+        manifest.capabilities.map { capability ->
+            CapabilityIdentity(manifest.plugin.id, capability.name)
+        }
+    }.toSet()
 
 @Serializable
 data class PortConstraints(
