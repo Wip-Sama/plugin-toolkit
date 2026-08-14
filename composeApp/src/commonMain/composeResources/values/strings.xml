@@ -180,6 +180,10 @@
     <string name="action_pause">Pause</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
+    <string name="color_picker_title">Choose a color</string>
+    <string name="color_picker_hex">Hex</string>
+    <string name="color_picker_hex_hint">Use #RRGGBB or #AARRGGBB</string>
+    <string name="color_picker_apply">Apply</string>
     <string name="action_expand">Expand</string>
     <string name="action_collapse">Collapse</string>
     <string name="plugin_settings_title">Settings: %1$s</string>

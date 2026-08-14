@@ -21,12 +21,14 @@ import org.wip.plugintoolkit.features.colorpicker.ui.pickers.SimpleRingColorPick
 fun ColorPicker(
     modifier: Modifier = Modifier,
     type: ColorPickerType = ColorPickerType.Classic(),
+    initialColor: Color = Color.White,
     onPickedColor: (Color) -> Unit
 ) {
     Box(modifier = modifier) {
         when (type) {
             is ColorPickerType.Classic -> ClassicColorPicker(
                 showAlphaBar = type.showAlphaBar,
+                initialColor = initialColor,
                 onPickedColor = onPickedColor,
             )
 
@@ -62,4 +64,3 @@ fun ColorPicker(
 private fun ColorPickerPreview() {
     ColorPicker(onPickedColor = {})
 }
-

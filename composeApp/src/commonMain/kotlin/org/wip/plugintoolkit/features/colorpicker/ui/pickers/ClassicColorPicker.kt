@@ -35,6 +35,8 @@ import org.wip.plugintoolkit.features.colorpicker.utils.fromHueProgress
 import org.wip.plugintoolkit.features.colorpicker.utils.green
 import org.wip.plugintoolkit.features.colorpicker.utils.lighten
 import org.wip.plugintoolkit.features.colorpicker.utils.red
+import org.wip.plugintoolkit.features.colorpicker.utils.saturationAndValue
+import org.wip.plugintoolkit.features.colorpicker.utils.toHueProgress
 import kotlin.math.roundToInt
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
@@ -45,18 +47,33 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 internal fun ClassicColorPicker(
     modifier: Modifier = Modifier,
     showAlphaBar: Boolean,
+    initialColor: Color = Color.White,
     onPickedColor: (Color) -> Unit
 ) {
-    var pickerLocation by remember { mutableStateOf(Offset.Zero) }
+    val initialSaturationAndValue = remember(initialColor) { initialColor.saturationAndValue() }
+    val initialHue = remember(initialColor) { initialColor.toHueProgress() }
+    var pickerLocation by remember(initialColor) { mutableStateOf(Offset.Zero) }
     var colorPickerSize by remember { mutableStateOf(IntSize.Zero) }
-    var alpha by remember { mutableStateOf(1f) }
-    var rangeColor by remember { mutableStateOf(Color.White) }
-    var hueSlider by remember { mutableStateOf(0f) }
+    var pickerInitialized by remember(initialColor) { mutableStateOf(false) }
+    var alpha by remember(initialColor) { mutableStateOf(initialColor.alpha) }
+    var rangeColor by remember(initialColor) { mutableStateOf(Color.fromHueProgress(initialHue)) }
+    var hueSlider by remember(initialColor) { mutableStateOf(initialHue) }
 
-    var color by remember { mutableStateOf(Color.White) }
+    var color by remember(initialColor) { mutableStateOf(initialColor) }
 
-    LaunchedEffect(rangeColor, pickerLocation, colorPickerSize, alpha) {
-        if (colorPickerSize.width > 0 && colorPickerSize.height > 0) {
+    LaunchedEffect(colorPickerSize, initialColor) {
+        if (colorPickerSize.width > 0 && colorPickerSize.height > 0 && !pickerInitialized) {
+            val (saturation, value) = initialSaturationAndValue
+            pickerLocation = Offset(
+                x = saturation * colorPickerSize.width,
+                y = (1f - value) * colorPickerSize.height
+            )
+            pickerInitialized = true
+        }
+    }
+
+    LaunchedEffect(rangeColor, pickerLocation, colorPickerSize, alpha, pickerInitialized) {
+        if (pickerInitialized && colorPickerSize.width > 0 && colorPickerSize.height > 0) {
             val xProgress = if (colorPickerSize.width > 0) {
                 (1 - (pickerLocation.x / colorPickerSize.width)).coerceIn(0f, 1f)
             } else 0f
@@ -142,4 +159,3 @@ private fun ClassicColorPickerPreview() {
         ClassicColorPicker(showAlphaBar = true, onPickedColor = {})
     }
 }
-

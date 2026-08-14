@@ -17,7 +17,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.features.colorpicker.model.ColorPickerType
 import org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -28,7 +27,7 @@ fun AccentColorControl(settings: AppSettings, onUpdate: (AppSettings) -> Unit) {
 
     ColorPickerDialog(
         show = showColorPicker,
-        initialType = ColorPickerType.Classic(),
+        initialColor = Color(settings.appearance.accentColor),
         onDismissRequest = { showColorPicker = false },
         onPickedColor = { color ->
             onUpdate(
