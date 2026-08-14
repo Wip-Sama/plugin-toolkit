@@ -16,9 +16,11 @@ class ToolkitCliTest {
     }
 
     @Test
-    fun `desktop flags and unknown commands are distinguished`() {
+    fun `desktop flags and launcher arguments do not abort GUI startup`() {
         assertEquals(ToolkitCliInvocation.Desktop, parseToolkitCliInvocation(arrayOf("--background")))
-        assertIs<ToolkitCliInvocation.Invalid>(parseToolkitCliInvocation(arrayOf("unknown")))
+        assertEquals(ToolkitCliInvocation.Desktop, parseToolkitCliInvocation(arrayOf("--launcher-token")))
+        assertEquals(ToolkitCliInvocation.Desktop, parseToolkitCliInvocation(arrayOf("document.toolkit")))
+        assertIs<ToolkitCliInvocation.Invalid>(parseToolkitCliInvocation(arrayOf("plugins", "unknown")))
     }
 
     @Test
