@@ -99,6 +99,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginFolderManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginInstaller
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleManager
+import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginLockProvider
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
@@ -302,7 +303,14 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
         // occurrence is held until the plugins required by that job are actually available.
         launch {
             val jobManager = koin.get<JobManager>().apply {
-                schedulePluginReadiness = { pkg -> pkg in pluginManager.loadedPlugins.value }
+                scheduleCapabilityReadiness = { pkg, capabilityName ->
+                    pkg in pluginManager.loadedPlugins.value &&
+                        PluginLoader.getPluginById(pkg)
+                            ?.getManifest()
+                            ?.getOrNull()
+                            ?.capabilities
+                            ?.any { it.name == capabilityName } == true
+                }
             }
             if (!jobManager.startScheduler()) {
                 Logger.e { "Startup: Scheduler state could not be loaded safely; background retries are active" }

@@ -49,9 +49,10 @@ class JobManager(
     private val scope: CoroutineScope,
     private val settingsRepository: SettingsRepository
 ) {
-    // Wired to PluginLifecycleManager.loadedPlugins during host startup. Defaulting to false
-    // is fail-safe for tests and alternate hosts that have not connected the lifecycle signal.
-    internal var schedulePluginReadiness: (String) -> Boolean = { false }
+    // Wired to the active plugin manifests during host startup. Checking both the plugin and
+    // capability keeps persisted schedules safe across plugin capability renames/removals.
+    // Defaulting to false is fail-safe for tests and alternate hosts without this signal.
+    internal var scheduleCapabilityReadiness: (String, String) -> Boolean = { _, _ -> false }
     private val scheduleFlowJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val maxConcurrentJobs get() = settingsRepository.settings.value.jobs.maxConcurrentJobs
     private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
@@ -238,7 +239,7 @@ class JobManager(
 
     private fun isScheduledJobReady(job: BackgroundJob): Boolean = when (job.type) {
         org.wip.plugintoolkit.features.job.model.JobType.Capability ->
-            schedulePluginReadiness(job.pluginId)
+            scheduleCapabilityReadiness(job.pluginId, job.capabilityName)
         org.wip.plugintoolkit.features.job.model.JobType.Flow ->
             isStoredFlowReady(job.capabilityName, mutableSetOf())
         else -> false
@@ -254,7 +255,8 @@ class JobManager(
             val flow = scheduleFlowJson.decodeFromString<Flow>(content)
             flow.nodes.all { node ->
                 when (node) {
-                    is Node.CapabilityNode -> schedulePluginReadiness(node.pluginInfo.id)
+                    is Node.CapabilityNode ->
+                        scheduleCapabilityReadiness(node.pluginInfo.id, node.capability.name)
                     is Node.SubFlowNode -> isStoredFlowReady(node.flowName, visited)
                     else -> true
                 }

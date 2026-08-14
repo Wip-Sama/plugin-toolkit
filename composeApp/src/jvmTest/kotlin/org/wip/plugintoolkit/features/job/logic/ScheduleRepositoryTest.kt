@@ -59,7 +59,7 @@ class ScheduleRepositoryTest {
             val settings = SettingsRepository(persistence, backgroundScope)
             testScheduler.advanceUntilIdle()
             val manager = JobManager(backgroundScope, settings).apply {
-                schedulePluginReadiness = { true }
+                scheduleCapabilityReadiness = { _, _ -> true }
             }
             val schedule = manager.scheduleJob(template, intervalMinutes = 1)!!
             val dueNow = schedule.nextRunAt + 1.minutes
@@ -113,7 +113,7 @@ class ScheduleRepositoryTest {
             testScheduler.advanceUntilIdle()
             var pluginReady = false
             val manager = JobManager(backgroundScope, settings).apply {
-                schedulePluginReadiness = { pluginReady }
+                scheduleCapabilityReadiness = { _, _ -> pluginReady }
             }
             val schedule = manager.scheduleJob(template, intervalMinutes = 1)!!
             val dueNow = schedule.nextRunAt + 1.minutes
@@ -125,6 +125,29 @@ class ScheduleRepositoryTest {
 
             manager.runDueSchedules(dueNow + 31.seconds)
             assertTrue(manager.history.value.any { it.event == "Enqueued" })
+        }
+    }
+
+    @Test
+    fun `due occurrence waits when its capability no longer exists`() = runTest {
+        withTempPersistence { persistence, _ ->
+            val settings = SettingsRepository(persistence, backgroundScope)
+            testScheduler.advanceUntilIdle()
+            val readinessChecks = mutableListOf<Pair<String, String>>()
+            val manager = JobManager(backgroundScope, settings).apply {
+                scheduleCapabilityReadiness = { pluginId, capabilityName ->
+                    readinessChecks += pluginId to capabilityName
+                    false
+                }
+            }
+            val schedule = manager.scheduleJob(template, intervalMinutes = 1)!!
+            val dueNow = schedule.nextRunAt + 1.minutes
+
+            manager.runDueSchedules(dueNow)
+
+            assertEquals(listOf("plugin" to "run"), readinessChecks)
+            assertEquals(schedule.nextRunAt, manager.schedules.value.single().nextRunAt)
+            assertFalse(manager.history.value.any { it.event == "Enqueued" })
         }
     }
 
