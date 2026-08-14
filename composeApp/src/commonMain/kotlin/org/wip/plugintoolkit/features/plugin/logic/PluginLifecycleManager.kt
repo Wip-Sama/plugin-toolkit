@@ -21,6 +21,7 @@ import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
+import org.wip.plugintoolkit.features.plugin.model.resolveCustomSettings
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
 import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
@@ -332,15 +333,7 @@ class PluginLifecycleManager(
 
         val storedSettings = overriddenSettings ?: loadPluginSettings(pkg)
         val actualManifest = manifest ?: getManifest(pkg)
-        val mergedSettings = mutableMapOf<String, JsonElement>()
-
-        // 1. Manifest defaults
-        actualManifest?.settings?.forEach { (key, meta) ->
-            meta.defaultValue?.let { mergedSettings[key] = it }
-        }
-
-        // 2. User overrides
-        mergedSettings.putAll(storedSettings.settings)
+        val mergedSettings = storedSettings.resolveCustomSettings(actualManifest)
 
         val pluginLogger = jobManager.getPluginLogger(pkg, jobId)
         val progressReporter = object : ProgressReporter {

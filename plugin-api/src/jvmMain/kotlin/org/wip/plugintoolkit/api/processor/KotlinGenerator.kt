@@ -50,7 +50,7 @@ object KotlinGenerator {
                 it.getAllProperties()
                     .filter { p -> p.annotations.any { a -> a.hasQualifiedName(org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION) } }
             }.toList(),
-            actions, updateFunction != null, setupFunction != null
+            actions, updateFunction != null, setupFunction != null, classDeclaration
         )
         fileSpec.addType(manifestType)
 
