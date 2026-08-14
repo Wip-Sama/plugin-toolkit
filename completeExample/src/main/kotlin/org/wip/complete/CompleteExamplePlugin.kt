@@ -40,7 +40,9 @@ import java.io.File
 data class CompleteExampleSettings(
     @PluginSetting(
         description = "Public configuration value example",
-        defaultValue = "default_api_key"
+        defaultValue = "default_api_key",
+        minLength = 8,
+        semanticTypes = ["text/plain"]
     ) val apiKey: String? = "default_api_key",
 
     @PluginSetting(
