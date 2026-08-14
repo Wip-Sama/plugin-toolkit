@@ -78,3 +78,7 @@ dependencies {
     ksp("org.wip.plugintoolkit:plugin-processor:<toolkit-version>")
 }
 ```
+
+> **2.0 migration:** replace any previous `ksp("org.wip.plugintoolkit:plugin-api:…")` dependency with
+> `plugin-processor`. The old coordinate no longer contains a KSP provider, so leaving it unchanged can produce
+> a successful build with no generated manifest or plugin entry point.
