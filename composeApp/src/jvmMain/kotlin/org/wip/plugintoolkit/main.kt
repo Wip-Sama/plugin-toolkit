@@ -133,9 +133,16 @@ import javax.swing.JOptionPane.showMessageDialog
 import javax.swing.JWindow
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.seconds
+import org.wip.plugintoolkit.cli.parseToolkitCliCommand
+import org.wip.plugintoolkit.cli.runToolkitCli
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun main(args: Array<String>) {
+    parseToolkitCliCommand(args)?.let { command ->
+        val exitCode = kotlinx.coroutines.runBlocking { runToolkitCli(command) }
+        exitProcess(exitCode)
+    }
+
     ComposeFoundationFlags.isNewContextMenuEnabled = true
     val splashWindow = try {
         showSplashWindow()

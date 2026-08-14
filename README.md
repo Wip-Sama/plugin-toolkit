@@ -22,6 +22,19 @@ in your IDE’s toolbar or run it directly from the terminal:
   .\gradlew.bat :composeApp:run
   ```
 
+### Command-line interface
+
+The desktop distribution can also run without opening a window:
+
+```shell
+plugintoolkit status
+plugintoolkit plugins list
+plugintoolkit flows list
+plugintoolkit --version
+```
+
+Use `plugintoolkit --help` for the complete command summary.
+
 ---
 
 ## Execution Engine & Concurrency (PluginToolkit)
