@@ -301,7 +301,10 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
         // Scheduling is a host service: storage hydration runs independently, while each due
         // occurrence is held until the plugins required by that job are actually available.
         launch {
-            if (!koin.get<JobManager>().startScheduler()) {
+            val jobManager = koin.get<JobManager>().apply {
+                schedulePluginReadiness = { pkg -> pkg in pluginManager.loadedPlugins.value }
+            }
+            if (!jobManager.startScheduler()) {
                 Logger.e { "Startup: Scheduler state could not be loaded safely; background retries are active" }
             }
         }

@@ -58,7 +58,7 @@ class ScheduleRepositoryTest {
             val settings = SettingsRepository(persistence, backgroundScope)
             testScheduler.advanceUntilIdle()
             val manager = JobManager(backgroundScope, settings).apply {
-                scheduleReadinessOverride = { true }
+                schedulePluginReadiness = { true }
             }
             val schedule = manager.scheduleJob(template, intervalMinutes = 1)!!
             val dueNow = schedule.nextRunAt + 1.minutes

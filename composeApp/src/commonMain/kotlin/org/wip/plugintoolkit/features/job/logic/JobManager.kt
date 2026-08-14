@@ -49,7 +49,9 @@ class JobManager(
     private val scope: CoroutineScope,
     private val settingsRepository: SettingsRepository
 ) {
-    internal var scheduleReadinessOverride: ((BackgroundJob) -> Boolean)? = null
+    // Wired to PluginLifecycleManager.loadedPlugins during host startup. Defaulting to false
+    // is fail-safe for tests and alternate hosts that have not connected the lifecycle signal.
+    internal var schedulePluginReadiness: (String) -> Boolean = { false }
     private val scheduleFlowJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val maxConcurrentJobs get() = settingsRepository.settings.value.jobs.maxConcurrentJobs
     private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
@@ -207,9 +209,7 @@ class JobManager(
         val current = _schedules.value
         // Do not consume an occurrence until all plugin code needed by the job is available.
         // A failed/hung plugin startup therefore cannot make other schedules miss their run.
-        val due = current.filter {
-            it.isDue(now) && (scheduleReadinessOverride?.invoke(it.jobTemplate) ?: isScheduledJobReady(it.jobTemplate))
-        }
+        val due = current.filter { it.isDue(now) && isScheduledJobReady(it.jobTemplate) }
         if (due.isNotEmpty()) {
             val dueIds = due.mapTo(mutableSetOf()) { it.id }
             val updated = current.map { if (it.id in dueIds) it.afterRun(now) else it }
@@ -221,7 +221,7 @@ class JobManager(
 
     private fun isScheduledJobReady(job: BackgroundJob): Boolean = when (job.type) {
         org.wip.plugintoolkit.features.job.model.JobType.Capability ->
-            PluginLoader.getPluginById(job.pluginId) != null
+            schedulePluginReadiness(job.pluginId)
         org.wip.plugintoolkit.features.job.model.JobType.Flow ->
             isStoredFlowReady(job.capabilityName, mutableSetOf())
         else -> false
@@ -237,7 +237,7 @@ class JobManager(
             val flow = scheduleFlowJson.decodeFromString<Flow>(content)
             flow.nodes.all { node ->
                 when (node) {
-                    is Node.CapabilityNode -> PluginLoader.getPluginById(node.pluginInfo.id) != null
+                    is Node.CapabilityNode -> schedulePluginReadiness(node.pluginInfo.id)
                     is Node.SubFlowNode -> isStoredFlowReady(node.flowName, visited)
                     else -> true
                 }
