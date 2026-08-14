@@ -8,6 +8,14 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+/** Parses #RRGGBB or #AARRGGBB using the same ARGB order emitted by [toHex]. */
+fun parseHexColor(value: String): Color? {
+    val digits = value.trim().removePrefix("#")
+    if (digits.length != 6 && digits.length != 8) return null
+    val argb = (if (digits.length == 6) "FF$digits" else digits).toLongOrNull(16) ?: return null
+    return Color(argb.toInt())
+}
+
 /**
  * Returns an integer array for all color channels value.
  */
