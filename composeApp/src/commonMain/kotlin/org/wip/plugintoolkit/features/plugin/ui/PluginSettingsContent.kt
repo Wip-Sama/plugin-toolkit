@@ -95,6 +95,8 @@ import plugintoolkit.composeapp.generated.resources.plugin_settings_by_section
 import plugintoolkit.composeapp.generated.resources.plugin_settings_capability
 import plugintoolkit.composeapp.generated.resources.plugin_settings_custom
 import plugintoolkit.composeapp.generated.resources.plugin_settings_global_defaults
+import plugintoolkit.composeapp.generated.resources.plugin_settings_optional
+import plugintoolkit.composeapp.generated.resources.plugin_settings_required
 import plugintoolkit.composeapp.generated.resources.settings
 import plugintoolkit.composeapp.generated.resources.settings_locked_capability
 import plugintoolkit.composeapp.generated.resources.settings_no_results
@@ -125,6 +127,8 @@ fun PluginSettingsContent(
     val actionsTitle = stringResource(Res.string.plugin_settings_actions)
     val customTitle = stringResource(Res.string.plugin_settings_custom)
     val globalTitle = stringResource(Res.string.plugin_settings_global_defaults)
+    val requiredTitle = stringResource(Res.string.plugin_settings_required)
+    val optionalTitle = stringResource(Res.string.plugin_settings_optional)
 
     val capabilityTitles = manifest.capabilities.associate {
         it.name to stringResource(Res.string.plugin_settings_capability, it.name)
@@ -474,75 +478,83 @@ fun PluginSettingsContent(
                                     modifier = Modifier.fillMaxWidth().padding(top = ToolkitTheme.spacing.small),
                                     verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
                                 ) {
-                                    customSettings.forEach { (key, meta) ->
-                                        Column(modifier = Modifier.fillMaxWidth()) {
-                                            val value = store.settings[key] ?: meta.defaultValue
-                                            DynamicParameterInput(
-                                                name = key,
-                                                metadata = ParameterMetadata(
-                                                    description = meta.description,
-                                                    type = meta.type,
-                                                    defaultValue = meta.defaultValue,
-                                                    required = meta.required,
-                                                    secret = meta.secret
-                                                ),
-                                                value = SettingsUtils.jsonToString(value, meta.type),
-                                                onValueChange = {
-                                                    viewModel.updateSetting(
-                                                        key,
-                                                        SettingsUtils.stringToJson(it, meta.type)
-                                                    )
-                                                },
-                                                enabled = !isBusy,
-                                                providedSettings = providedSettings,
-                                                providedLocks = locks
-                                            )
+                                    listOf(
+                                        requiredTitle to customSettings.filterValues { it.required },
+                                        optionalTitle to customSettings.filterValues { !it.required }
+                                    ).forEach { (groupTitle, groupSettings) ->
+                                        if (groupSettings.isNotEmpty()) {
+                                            PluginSettingGroupHeader(groupTitle, groupSettings.size)
+                                        }
+                                        groupSettings.forEach { (key, meta) ->
+                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                                val value = store.settings[key] ?: meta.defaultValue
+                                                DynamicParameterInput(
+                                                    name = key,
+                                                    metadata = ParameterMetadata(
+                                                        description = meta.description,
+                                                        type = meta.type,
+                                                        defaultValue = meta.defaultValue,
+                                                        required = meta.required,
+                                                        secret = meta.secret
+                                                    ),
+                                                    value = SettingsUtils.jsonToString(value, meta.type),
+                                                    onValueChange = {
+                                                        viewModel.updateSetting(
+                                                            key,
+                                                            SettingsUtils.stringToJson(it, meta.type)
+                                                        )
+                                                    },
+                                                    enabled = !isBusy,
+                                                    providedSettings = providedSettings,
+                                                    providedLocks = locks
+                                                )
 
-                                            val lockedOptionsForSetting = lockedEnumOptions[key]?.distinct() ?: emptyList()
+                                                val lockedOptionsForSetting = lockedEnumOptions[key]?.distinct() ?: emptyList()
 
-                                            if (meta.requiredByCapabilities.isNotEmpty() || lockedOptionsForSetting.isNotEmpty()) {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(
-                                                            start = ToolkitTheme.spacing.medium,
-                                                            bottom = ToolkitTheme.spacing.mediumSmall,
-                                                            end = ToolkitTheme.spacing.medium
-                                                        )
-                                                        .horizontalScroll(rememberScrollState()),
-                                                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-                                                ) {
-                                                    meta.requiredByCapabilities.forEach { capName ->
-                                                        ToolkitChip(
-                                                            text = stringResource(
-                                                                Res.string.settings_locked_capability,
-                                                                capName
-                                                            ),
-                                                            icon = {
-                                                                Icon(
-                                                                    Icons.Default.Lock,
-                                                                    contentDescription = null,
-                                                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
-                                                                )
-                                                            },
-                                                            style = ToolkitChipStyle.Tinted
-                                                        )
-                                                    }
-                                                    if (lockedOptionsForSetting.isNotEmpty()) {
-                                                        ToolkitChip(
-                                                            text = "Unlocks Enum Options",
-                                                            modifier = Modifier.tooltip(
-                                                                text = "Unlocks values:\n" + lockedOptionsForSetting.joinToString("\n"),
-                                                            ),
-                                                            icon = {
-                                                                Icon(
-                                                                    Icons.Default.Lock,
-                                                                    contentDescription = null,
-                                                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
-                                                                )
-                                                            },
-                                                            style = ToolkitChipStyle.Outlined
-                                                        )
+                                                if (meta.requiredByCapabilities.isNotEmpty() || lockedOptionsForSetting.isNotEmpty()) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(
+                                                                start = ToolkitTheme.spacing.medium,
+                                                                bottom = ToolkitTheme.spacing.mediumSmall,
+                                                                end = ToolkitTheme.spacing.medium
+                                                            )
+                                                            .horizontalScroll(rememberScrollState()),
+                                                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                                                    ) {
+                                                        meta.requiredByCapabilities.forEach { capName ->
+                                                            ToolkitChip(
+                                                                text = stringResource(
+                                                                    Res.string.settings_locked_capability,
+                                                                    capName
+                                                                ),
+                                                                icon = {
+                                                                    Icon(
+                                                                        Icons.Default.Lock,
+                                                                        contentDescription = null,
+                                                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
+                                                                    )
+                                                                },
+                                                                style = ToolkitChipStyle.Tinted
+                                                            )
+                                                        }
+                                                        if (lockedOptionsForSetting.isNotEmpty()) {
+                                                            ToolkitChip(
+                                                                text = "Unlocks Enum Options",
+                                                                modifier = Modifier.tooltip(
+                                                                    text = "Unlocks values:\n" + lockedOptionsForSetting.joinToString("\n"),
+                                                                ),
+                                                                icon = {
+                                                                    Icon(
+                                                                        Icons.Default.Lock,
+                                                                        contentDescription = null,
+                                                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
+                                                                    )
+                                                                },
+                                                                style = ToolkitChipStyle.Outlined
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
@@ -671,6 +683,21 @@ private fun PluginSectionHeader(title: String) {
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall, bottom = ToolkitTheme.spacing.extraSmall)
+    )
+}
+
+@Composable
+private fun PluginSettingGroupHeader(title: String, count: Int) {
+    Text(
+        text = "$title ($count)",
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            start = ToolkitTheme.spacing.medium,
+            top = ToolkitTheme.spacing.small,
+            bottom = ToolkitTheme.spacing.extraSmall
+        )
     )
 }
 
