@@ -74,7 +74,7 @@ import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.features.plugin.model.resolveProvidedValues
+import org.wip.plugintoolkit.features.plugin.model.resolveCustomSettings
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitChip
@@ -414,8 +414,8 @@ fun PluginSettingsContent(
                         )
                     }
                 } else {
-                    val providedSettings = remember(manifest, store.settings, store.globalParams) {
-                        store.resolveProvidedValues(manifest)
+                    val providedSettings = remember(manifest, store.settings) {
+                        store.resolveCustomSettings(manifest)
                     }
 
                     LazyColumn(

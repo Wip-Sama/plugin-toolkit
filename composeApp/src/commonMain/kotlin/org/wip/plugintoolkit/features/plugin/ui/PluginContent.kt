@@ -119,7 +119,8 @@ fun PluginContent(
         val providedSettings = remember(pluginId, pluginSettingsState) {
             val store = if (pluginId != null) pluginSettingsState[pluginId] ?: pluginManager.loadPluginSettings(pluginId) else null
             val manifest = viewModel.selectedPlugin?.getManifest()?.getOrNull()
-            store?.resolveProvidedValues(manifest) ?: emptyMap()
+            (store ?: org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore())
+                .resolveProvidedValues(manifest)
         }
 
         if (selectedCapability == null) {

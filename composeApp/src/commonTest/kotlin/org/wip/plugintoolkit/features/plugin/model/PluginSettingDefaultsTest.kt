@@ -9,6 +9,7 @@ import org.wip.plugintoolkit.api.Requirements
 import org.wip.plugintoolkit.api.SettingMetadata
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class PluginSettingDefaultsTest {
     private val manifest = PluginManifest(
@@ -33,7 +34,7 @@ class PluginSettingDefaultsTest {
         val resolved = PluginSettingsStore().resolveCustomSettings(manifest)
 
         assertEquals(JsonPrimitive("https://example.test"), resolved["endpoint"])
-        assertEquals(JsonPrimitive(false), resolved["enabled"])
+        assertFalse(resolved.containsKey("enabled"))
     }
 
     @Test
@@ -47,7 +48,18 @@ class PluginSettingDefaultsTest {
         val provided = store.resolveProvidedValues(manifest)
 
         assertEquals(JsonPrimitive("https://custom.test"), custom["endpoint"])
-        assertEquals(JsonPrimitive(false), custom["enabled"])
+        assertFalse(custom.containsKey("enabled"))
         assertEquals(JsonPrimitive("eu"), provided["region"])
+    }
+
+    @Test
+    fun `global parameters cannot shadow custom settings in custom setting resolution`() {
+        val store = PluginSettingsStore(
+            settings = mapOf("endpoint" to JsonPrimitive("https://custom.test")),
+            globalParams = mapOf("endpoint" to JsonPrimitive("global-collision"))
+        )
+
+        assertEquals(JsonPrimitive("https://custom.test"), store.resolveCustomSettings(manifest)["endpoint"])
+        assertEquals(JsonPrimitive("global-collision"), store.resolveProvidedValues(manifest)["endpoint"])
     }
 }

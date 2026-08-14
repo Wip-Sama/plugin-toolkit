@@ -2,10 +2,7 @@ package org.wip.plugintoolkit.features.plugin.model
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginManifest
-import org.wip.plugintoolkit.api.PrimitiveType
 
 @Serializable
 data class PluginSettingsStore(
@@ -15,11 +12,7 @@ data class PluginSettingsStore(
 )
 
 fun PluginManifest.defaultCustomSettings(): Map<String, JsonElement> = settings.orEmpty().mapNotNull { (key, metadata) ->
-    val type = metadata.type
-    val value = metadata.defaultValue ?: if (
-        type is DataType.Primitive && type.primitiveType == PrimitiveType.BOOLEAN
-    ) JsonPrimitive(false) else null
-    value?.let { key to it }
+    metadata.defaultValue?.let { key to it }
 }.toMap()
 
 /** Manifest defaults with persisted user values taking precedence. */
