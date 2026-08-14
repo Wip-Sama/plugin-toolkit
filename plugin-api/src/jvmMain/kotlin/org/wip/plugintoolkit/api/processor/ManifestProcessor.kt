@@ -176,7 +176,9 @@ class ManifestProcessor(
             it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
         }.toList()
 
-        val uiPages = org.wip.plugintoolkit.api.processor.GeneratorUtils.extractUiPages(classDeclaration)
+        val uiPages = org.wip.plugintoolkit.api.processor.GeneratorUtils.extractUiPages(classDeclaration) { message ->
+            logger.error(message, classDeclaration)
+        }
         uiPages.filter { it.id.isBlank() }.forEach {
             logger.error("@PluginUiPage.id must not be blank", classDeclaration)
         }

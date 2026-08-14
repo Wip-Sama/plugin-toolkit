@@ -110,17 +110,36 @@ object GeneratorUtils {
         return this.annotationType.resolve().declaration.qualifiedName?.asString() == name
     }
 
-    fun extractUiPages(classDeclaration: KSClassDeclaration): List<PluginUiPage> =
+    fun extractUiPages(
+        classDeclaration: KSClassDeclaration,
+        reportError: (String) -> Unit = {}
+    ): List<PluginUiPage> =
         classDeclaration.annotations
             .filter { it.hasQualifiedName(ProcessorConstants.PLUGIN_UI_PAGE_ANNOTATION) }
-            .map { annotation ->
+            .mapNotNull { annotation ->
+                val id = annotation.arguments.find { it.name?.asString() == "id" }?.value as? String
+                val title = annotation.arguments.find { it.name?.asString() == "title" }?.value as? String
+                if (id == null || title == null) {
+                    reportError("@PluginUiPage requires string 'id' and 'title' arguments")
+                    return@mapNotNull null
+                }
+                val rawCapabilities = annotation.arguments
+                    .find { it.name?.asString() == "capabilityNames" }
+                    ?.value
+                if (rawCapabilities != null && rawCapabilities !is List<*>) {
+                    reportError("@PluginUiPage.capabilityNames must be a string array")
+                    return@mapNotNull null
+                }
+                val capabilityNames = (rawCapabilities as? List<*>)?.filterIsInstance<String>().orEmpty()
+                if ((rawCapabilities as? List<*>)?.size != capabilityNames.size) {
+                    reportError("@PluginUiPage.capabilityNames must contain only strings")
+                    return@mapNotNull null
+                }
                 PluginUiPage(
-                    id = annotation.arguments.first { it.name?.asString() == "id" }.value as String,
-                    title = annotation.arguments.first { it.name?.asString() == "title" }.value as String,
+                    id = id,
+                    title = title,
                     description = annotation.arguments.find { it.name?.asString() == "description" }?.value as? String ?: "",
-                    capabilityNames = (annotation.arguments.find { it.name?.asString() == "capabilityNames" }?.value as? List<*>)
-                        ?.filterIsInstance<String>()
-                        ?: emptyList()
+                    capabilityNames = capabilityNames
                 )
             }
             .toList()
