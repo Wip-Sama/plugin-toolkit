@@ -25,7 +25,7 @@ import plugintoolkit.composeapp.generated.resources.dialog_unsaved_changes
  * CompositionLocal providing global navigation to a plugin setting page across the application.
  */
 @Deprecated(
-    message = "Stai usando LocalNavigateToPluginSetting. Migra a LocalGlobalRouter.",
+    message = "You're using LocalNavigateToPluginSetting. Migarate to LocalGlobalRouter.",
     replaceWith = ReplaceWith("LocalGlobalRouter", "org.wip.plugintoolkit.features.navigation.LocalGlobalRouter")
 )
 val LocalNavigateToPluginSetting = staticCompositionLocalOf<((pluginId: String, settingKey: String) -> Unit)?> { null }
@@ -99,7 +99,7 @@ fun Modifier.lockedClickInterceptor(
  * Deprecated overload to support legacy code while guiding developers toward type-safe navigation.
  */
 @Deprecated(
-    message = "Stai usando parametri multipli (pluginId, targetSettingKey). Migra a targetScreen usando oggetti Type-Safe @Serializable.",
+    message = "You're using multiple parameters (pluginId, targetSettingKey). Migrate to targetScreen using Type-Safe @Serializable objects.",
     replaceWith = ReplaceWith(
         "lockedClickInterceptor(isLocked = isLocked, targetScreen = Screen.PluginManager(pluginId = pluginId, scrollToSetting = targetSettingKey), hasUnsavedChanges = hasUnsavedChanges)",
         "org.wip.plugintoolkit.features.navigation.model.Screen"
