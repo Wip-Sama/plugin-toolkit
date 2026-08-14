@@ -1,17 +1,19 @@
 package org.wip.plugintoolkit.cli
 
+import co.touchlab.kermit.Logger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
-import org.koin.core.context.stopKoin
-import org.koin.mp.KoinPlatform.getKoin
+import kotlinx.coroutines.withTimeout
 import org.wip.plugintoolkit.AppConfig
+import org.wip.plugintoolkit.core.DefaultSystemConfig
+import org.wip.plugintoolkit.core.loomDispatcher
+import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
-import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
-import org.wip.plugintoolkit.performStartup
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.io.path.extension
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.nameWithoutExtension
+import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 
 sealed interface ToolkitCliCommand {
     data object Help : ToolkitCliCommand
@@ -19,6 +21,12 @@ sealed interface ToolkitCliCommand {
     data object Status : ToolkitCliCommand
     data object Plugins : ToolkitCliCommand
     data object Flows : ToolkitCliCommand
+}
+
+sealed interface ToolkitCliInvocation {
+    data object Desktop : ToolkitCliInvocation
+    data class Command(val command: ToolkitCliCommand) : ToolkitCliInvocation
+    data class Invalid(val arguments: List<String>) : ToolkitCliInvocation
 }
 
 fun parseToolkitCliCommand(args: Array<String>): ToolkitCliCommand? = when (args.toList()) {
@@ -30,10 +38,24 @@ fun parseToolkitCliCommand(args: Array<String>): ToolkitCliCommand? = when (args
     else -> null
 }
 
-suspend fun runToolkitCli(
+fun parseToolkitCliInvocation(args: Array<String>): ToolkitCliInvocation {
+    parseToolkitCliCommand(args)?.let { return ToolkitCliInvocation.Command(it) }
+    if (args.isEmpty() || args.all { it == DefaultSystemConfig().STARTUP_FLAG_BACKGROUND || it.startsWith("-psn_") }) {
+        return ToolkitCliInvocation.Desktop
+    }
+    return ToolkitCliInvocation.Invalid(args.toList())
+}
+
+internal data class ToolkitCliData(
+    val plugins: List<InstalledPlugin> = emptyList(),
+    val flowNames: List<String> = emptyList()
+)
+
+internal suspend fun runToolkitCli(
     command: ToolkitCliCommand,
     output: (String) -> Unit = ::println,
-    error: (String) -> Unit = System.err::println
+    error: (String) -> Unit = System.err::println,
+    dataLoader: suspend (ToolkitCliCommand) -> ToolkitCliData = ::loadToolkitCliData
 ): Int {
     when (command) {
         ToolkitCliCommand.Help -> {
@@ -48,21 +70,17 @@ suspend fun runToolkitCli(
     }
 
     return try {
-        performStartup(emptyArray())
-        val koin = getKoin()
-        val registry = koin.get<PluginRegistry>()
-        registry.isReady.first { it }
-
+        // The CLI owns the process and emits only its data on stdout.
+        Logger.setLogWriters()
+        val data = withTimeout(CLI_STARTUP_TIMEOUT_MS) { dataLoader(command) }
         when (command) {
             ToolkitCliCommand.Status -> {
-                val plugins = registry.installedPlugins.value
                 output("PluginToolkit ${AppConfig.VERSION}")
-                output("Plugins: ${plugins.size} installed, ${plugins.count { it.isEnabled }} enabled")
+                output("Plugins: ${data.plugins.size} installed, ${data.plugins.count { it.isEnabled }} enabled")
             }
             ToolkitCliCommand.Plugins -> {
-                val plugins = registry.installedPlugins.value
-                if (plugins.isEmpty()) output("No plugins installed.")
-                plugins.forEach { plugin ->
+                if (data.plugins.isEmpty()) output("No plugins installed.")
+                data.plugins.forEach { plugin ->
                     val state = when {
                         !plugin.isCompatible -> "incompatible"
                         !plugin.isEnabled -> "disabled"
@@ -73,28 +91,39 @@ suspend fun runToolkitCli(
                 }
             }
             ToolkitCliCommand.Flows -> {
-                val settingsDir = koin.get<SettingsPersistence>().getSettingsDir()
-                val flowsDir = Path.of(settingsDir, "flows")
-                val flows = if (Files.isDirectory(flowsDir)) {
-                    Files.list(flowsDir).use { paths ->
-                        paths.filter { it.isRegularFile() && it.extension == "json" }
-                            .map { it.nameWithoutExtension }
-                            .sorted()
-                            .toList()
-                    }
-                } else emptyList()
-                if (flows.isEmpty()) output("No flows saved.") else flows.forEach(output)
+                if (data.flowNames.isEmpty()) output("No flows saved.") else data.flowNames.sorted().forEach(output)
             }
             else -> Unit
         }
-        stopKoin()
         0
     } catch (exception: Throwable) {
         error("CLI error: ${exception.message ?: exception::class.simpleName}")
-        stopKoin()
         1
     }
 }
+
+private suspend fun loadToolkitCliData(command: ToolkitCliCommand): ToolkitCliData {
+    val appConfig = DefaultSystemConfig()
+    val persistence = JvmSettingsPersistence(appConfig)
+    if (command == ToolkitCliCommand.Flows) {
+        return ToolkitCliData(
+            flowNames = FlowRepository.loadStoredFlows(persistence, appConfig).map { it.name }
+        )
+    }
+
+    val scope = CoroutineScope(SupervisorJob() + loomDispatcher)
+    return try {
+        val settingsRepository = SettingsRepository(persistence, scope)
+        settingsRepository.isLoaded.first { it }
+        val registry = PluginRegistry(settingsRepository, scope, loomDispatcher, appConfig)
+        registry.initialize()
+        ToolkitCliData(plugins = registry.installedPlugins.value)
+    } finally {
+        scope.cancel()
+    }
+}
+
+private const val CLI_STARTUP_TIMEOUT_MS = 15_000L
 
 private val CLI_HELP = """
     PluginToolkit ${AppConfig.VERSION}

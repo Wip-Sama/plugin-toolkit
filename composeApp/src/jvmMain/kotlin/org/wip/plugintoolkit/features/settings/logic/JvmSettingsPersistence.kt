@@ -15,8 +15,11 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 
-class JvmSettingsPersistence : SettingsPersistence, KoinComponent {
-    private val appConfig: SystemConfig by inject()
+class JvmSettingsPersistence(
+    private val configuredAppConfig: SystemConfig? = null
+) : SettingsPersistence, KoinComponent {
+    private val injectedAppConfig: SystemConfig by inject()
+    private val appConfig: SystemConfig get() = configuredAppConfig ?: injectedAppConfig
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true

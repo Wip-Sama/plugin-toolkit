@@ -8,12 +8,47 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
+import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.core.DefaultSystemConfig
+import kotlinx.serialization.json.Json
+import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class FlowRepositoryTest {
+
+    @Test
+    fun `stored flows are decoded by content and corrupt files are skipped`() = runBlocking {
+        val root = Files.createTempDirectory("plugin-toolkit-flows-")
+        try {
+            val flowsDir = Files.createDirectories(root.resolve("flows"))
+            Files.writeString(
+                flowsDir.resolve("A_B.json"),
+                Json.encodeToString(Flow.serializer(), Flow(name = "A/B"))
+            )
+            Files.writeString(flowsDir.resolve("partial.json"), "{")
+
+            val persistence = object : SettingsPersistence {
+                override suspend fun load(): AppSettings = AppSettings()
+                override suspend fun save(settings: AppSettings) = Unit
+                override fun getSettingsDir(): String = root.toString()
+                override fun getJobsDir(): String = root.resolve("jobs").toString()
+                override fun openLogFolder() = Unit
+                override fun openLatestLog() = Unit
+            }
+
+            val flows = FlowRepository.loadStoredFlows(persistence, DefaultSystemConfig())
+
+            assertEquals(listOf("A/B"), flows.map { it.name })
+        } finally {
+            root.toFile().deleteRecursively()
+        }
+    }
 
     @Test
     fun testReloadFlowsOnPluginChange() = runBlocking {
