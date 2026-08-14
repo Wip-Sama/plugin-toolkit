@@ -91,7 +91,8 @@ sealed interface FlowEvent {
         val sourceNodeId: Long,
         val sourcePortId: String,
         val targetNodeId: Long,
-        val targetPortId: String
+        val targetPortId: String,
+        val originalConnection: Connection? = null
     ) : FlowEvent
 
     data class DeleteConnection(val connection: Connection) : FlowEvent
@@ -100,7 +101,8 @@ sealed interface FlowEvent {
         val sourceNodeId: Long,
         val sourcePortId: String,
         val targetNodeId: Long,
-        val targetPortId: String
+        val targetPortId: String,
+        val isShiftPressed: Boolean
     ) : FlowEvent
 
     data class Pan(val delta: Offset) : FlowEvent

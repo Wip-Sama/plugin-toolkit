@@ -38,6 +38,7 @@ fun RenderTestBoardCanvas(
             onDetachConnection = { _, _, _ -> },
             onConnectionDrag = {},
             onConnectionDrop = {},
+            onConnectionCancel = {},
             onMoveConnectionFirst = {},
             onMoveConnectionLast = {},
             selectedNodeIds = selectedNodeIds,

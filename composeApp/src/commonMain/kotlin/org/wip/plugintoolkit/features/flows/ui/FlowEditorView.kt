@@ -255,7 +255,8 @@ fun FlowEditorView(
                                 sourceNodeId,
                                 sourcePortId,
                                 targetNodeId,
-                                targetPortId
+                                targetPortId,
+                                isShiftPressed
                             )
                         } else {
                             FlowEvent.TryConnectPorts(
@@ -268,6 +269,14 @@ fun FlowEditorView(
                         }
                     )
                 }
+                isDrawingConnection = false
+                connectionBeingRewired = null
+                connectionStartNodeId = null
+                connectionStartPortId = null
+                highlightedPortId = null
+                highlightedNodeId = null
+            },
+            onConnectionCancel = {
                 isDrawingConnection = false
                 connectionBeingRewired = null
                 connectionStartNodeId = null
@@ -722,7 +731,8 @@ fun FlowEditorView(
                                     pendingConn.sourceNodeId,
                                     pendingConn.sourcePortId,
                                     pendingConn.targetNodeId,
-                                    pendingConn.targetPortId
+                                    pendingConn.targetPortId,
+                                    pendingConn.originalConnection
                                 )
                             )
                             viewModel.onEvent(FlowEvent.CancelPendingConnection)

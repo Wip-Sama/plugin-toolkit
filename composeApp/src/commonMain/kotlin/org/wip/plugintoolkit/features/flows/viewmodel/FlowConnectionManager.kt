@@ -41,14 +41,17 @@ class FlowConnectionManager(
 
         if (sourcePort == null || targetPort == null) return currentState
 
-        val isTypeAllowed = sourcePort.dataType.isCompatibleWith(targetPort.dataType) ||
-                sourcePort.dataType.canConvert(targetPort.dataType)
+        val sourceType = currentState.inferredTypes[sourceNodeId to sourcePortId] ?: sourcePort.dataType
+        val targetType = currentState.inferredTypes[targetNodeId to targetPortId] ?: targetPort.dataType
+        val isTypeAllowed = sourceType.isCompatibleWith(targetType)
         if (!isTypeAllowed) {
             return currentState
         }
 
+        val sourceSemantics = currentState.inferredSemanticTypes[sourceNodeId to sourcePortId] ?: sourcePort.semanticTypes
+        val targetSemantics = currentState.inferredSemanticTypes[targetNodeId to targetPortId] ?: targetPort.semanticTypes
         val semanticCheck =
-            org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, targetPort.semanticTypes)
+            org.wip.plugintoolkit.api.checkSemanticCompatibility(sourceSemantics, targetSemantics)
         if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
             return currentState
         } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
@@ -175,9 +178,11 @@ class FlowConnectionManager(
         sourceNodeId: Long,
         sourcePortId: String,
         targetNodeId: Long,
-        targetPortId: String
+        targetPortId: String,
+        originalConnection: Connection? = null
     ): FlowEditorState {
         if (sourceNodeId == targetNodeId) return currentState
+        if (originalConnection != null && originalConnection !in currentState.flow.connections) return currentState
 
         val sourceNode = currentState.flow.nodes.find { it.id == sourceNodeId }
         val targetNode = currentState.flow.nodes.find { it.id == targetNodeId }
@@ -188,6 +193,31 @@ class FlowConnectionManager(
         val targetPort = targetNode.inputs.find { it.id == targetPortId }
 
         if (sourcePort == null || targetPort == null) return currentState
+
+        val sourceType = currentState.inferredTypes[sourceNodeId to sourcePortId] ?: sourcePort.dataType
+        val targetType = currentState.inferredTypes[targetNodeId to targetPortId] ?: targetPort.dataType
+        val sourceSemantics = currentState.inferredSemanticTypes[sourceNodeId to sourcePortId] ?: sourcePort.semanticTypes
+        val targetSemantics = currentState.inferredSemanticTypes[targetNodeId to targetPortId] ?: targetPort.semanticTypes
+        if (!sourceType.canConvert(targetType)) return currentState
+        if (org.wip.plugintoolkit.api.checkSemanticCompatibility(sourceSemantics, targetSemantics)
+            is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
+        ) return currentState
+
+        val baseState = originalConnection?.let { handleDeleteConnection(currentState, it) } ?: currentState
+        val isListTarget = targetPort.dataType is DataType.Array
+        val filteredConnections = if (isListTarget) {
+            baseState.flow.connections
+        } else {
+            baseState.flow.connections.filterNot {
+                it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+            }
+        }
+        if (org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector.wouldCreateCycle(
+                sourceNodeId,
+                targetNodeId,
+                filteredConnections
+            )
+        ) return currentState
 
         var midPosition = Offset(
             (sourceNode.position.x + targetNode.position.x) / 2f,
@@ -209,15 +239,29 @@ class FlowConnectionManager(
         )
 
         val conn1 = Connection(sourceNodeId, sourcePortId, convertNode.id, "input_data")
-        val conn2 = Connection(convertNode.id, "output_data", targetNodeId, targetPortId)
-
-        val filteredConnections = currentState.flow.connections.filterNot {
-            it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
-        }
+        val preferredOrder = originalConnection
+            ?.takeIf { it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }
+            ?.orderIndex
+        val targetOrder = if (isListTarget) {
+            preferredOrder?.coerceIn(0, filteredConnections.count {
+                it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+            }) ?: filteredConnections.count {
+                it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+            }
+        } else null
+        val shiftedConnections = if (isListTarget && preferredOrder != null) {
+            val insertionOrder = targetOrder ?: 0
+            filteredConnections.map { connection ->
+                if (connection.targetNodeId == targetNodeId && connection.targetPortId == targetPortId &&
+                    (connection.orderIndex ?: 0) >= insertionOrder
+                ) connection.copy(orderIndex = (connection.orderIndex ?: 0) + 1) else connection
+            }
+        } else filteredConnections
+        val conn2 = Connection(convertNode.id, "output_data", targetNodeId, targetPortId, targetOrder)
 
         val newFlow = currentState.flow.copy(
-            nodes = currentState.flow.nodes + convertNode,
-            connections = filteredConnections + conn1 + conn2
+            nodes = baseState.flow.nodes + convertNode,
+            connections = shiftedConnections + conn1 + conn2
         )
         return currentState.copy(
             flow = newFlow,
@@ -252,7 +296,8 @@ class FlowConnectionManager(
         sourceNodeId: Long,
         sourcePortId: String,
         targetNodeId: Long,
-        targetPortId: String
+        targetPortId: String,
+        isShiftPressed: Boolean
     ): FlowEditorState {
         if (original !in currentState.flow.connections) return currentState
         if (
@@ -260,21 +305,110 @@ class FlowConnectionManager(
             original.targetNodeId == targetNodeId && original.targetPortId == targetPortId
         ) return currentState
 
-        val withoutOriginal = currentState.copy(
-            flow = currentState.flow.copy(connections = currentState.flow.connections - original)
-        )
-        val rewired = handleConnectPorts(
-            withoutOriginal,
-            sourceNodeId,
-            sourcePortId,
-            targetNodeId,
-            targetPortId
-        )
-        val replacementCreated = rewired.flow.connections.any {
-            it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId &&
-                it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+        if (sourceNodeId == targetNodeId) {
+            viewModelScope.launch {
+                notificationService?.toast(getString(Res.string.flow_editor_same_node_warning))
+            }
+            return currentState
         }
-        return if (replacementCreated) rewired else currentState
+
+        val sourceNode = currentState.flow.nodes.find { it.id == sourceNodeId } ?: return currentState
+        val targetNode = currentState.flow.nodes.find { it.id == targetNodeId } ?: return currentState
+        val sourcePort = sourceNode.outputs.find { it.id == sourcePortId } ?: return currentState
+        val targetPort = targetNode.inputs.find { it.id == targetPortId } ?: return currentState
+        val sourceType = currentState.inferredTypes[sourceNodeId to sourcePortId] ?: sourcePort.dataType
+        val targetType = currentState.inferredTypes[targetNodeId to targetPortId] ?: targetPort.dataType
+        val sourceSemantics = currentState.inferredSemanticTypes[sourceNodeId to sourcePortId] ?: sourcePort.semanticTypes
+        val targetSemantics = currentState.inferredSemanticTypes[targetNodeId to targetPortId] ?: targetPort.semanticTypes
+        val semantics = org.wip.plugintoolkit.api.checkSemanticCompatibility(sourceSemantics, targetSemantics)
+
+        if (sourceType.isCompatibleWith(targetType) &&
+            semantics !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
+        ) {
+            val withoutOriginal = handleDeleteConnection(currentState, original)
+            var rewired = handleConnectPorts(
+                withoutOriginal,
+                sourceNodeId,
+                sourcePortId,
+                targetNodeId,
+                targetPortId
+            )
+            val matchingBefore = withoutOriginal.flow.connections.count {
+                it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId &&
+                    it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+            }
+            val matchingAfter = rewired.flow.connections.count {
+                it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId &&
+                    it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+            }
+            if (matchingAfter != matchingBefore + 1) return currentState
+
+            if (targetPort.dataType is DataType.Array &&
+                original.targetNodeId == targetNodeId && original.targetPortId == targetPortId
+            ) {
+                val replacement = rewired.flow.connections.lastOrNull {
+                    it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId &&
+                        it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+                } ?: return currentState
+                rewired = handleUpdateConnectionOrder(
+                    rewired,
+                    replacement,
+                    (original.orderIndex ?: 0).coerceIn(
+                        0,
+                        rewired.flow.connections.count {
+                            it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+                        } - 1
+                    )
+                )
+            }
+            return rewired
+        }
+
+        if (semantics !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible &&
+            sourceType.canConvert(targetType)
+        ) {
+            return if (isShiftPressed) {
+                handleAutoConvertAndConnect(
+                    currentState,
+                    sourceNodeId,
+                    sourcePortId,
+                    targetNodeId,
+                    targetPortId,
+                    original
+                )
+            } else {
+                currentState.copy(
+                    pendingConnection = PendingConnection(
+                        sourceNodeId,
+                        sourcePortId,
+                        targetNodeId,
+                        targetPortId,
+                        sourceType,
+                        targetType,
+                        original
+                    )
+                )
+            }
+        }
+
+        viewModelScope.launch {
+            val message = if (!sourceType.isCompatibleWith(targetType)) {
+                org.wip.plugintoolkit.core.model.LocalizedString.ResourceWithArgs(
+                    Res.string.flow_editor_incompatible_types,
+                    listOf(sourceType.format(), targetType.format())
+                )
+            } else {
+                org.wip.plugintoolkit.core.model.LocalizedString.ResourceWithArgs(
+                    Res.string.flow_editor_incompatible_semantics,
+                    listOf(
+                        sourceSemantics.joinToString { it.canonicalId },
+                        targetSemantics.joinToString { it.canonicalId }
+                    )
+                )
+            }
+            notificationService?.toast(message)
+        }
+        return currentState
     }
 
     fun handleUpdateConnectionOrder(

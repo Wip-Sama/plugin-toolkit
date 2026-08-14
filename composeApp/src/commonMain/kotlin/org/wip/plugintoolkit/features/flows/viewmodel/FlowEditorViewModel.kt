@@ -494,7 +494,8 @@ class FlowEditorViewModel(
                     event.sourceNodeId,
                     event.sourcePortId,
                     event.targetNodeId,
-                    event.targetPortId
+                    event.targetPortId,
+                    event.originalConnection
                 )
             }
 
@@ -513,7 +514,8 @@ class FlowEditorViewModel(
                     event.sourceNodeId,
                     event.sourcePortId,
                     event.targetNodeId,
-                    event.targetPortId
+                    event.targetPortId,
+                    event.isShiftPressed
                 )
             }
 

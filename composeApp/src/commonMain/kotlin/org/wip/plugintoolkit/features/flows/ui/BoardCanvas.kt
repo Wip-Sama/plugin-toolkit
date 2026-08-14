@@ -80,6 +80,7 @@ fun BoardCanvas(
     onDetachConnection: (Connection, Boolean, Offset) -> Unit,
     onConnectionDrag: (Offset) -> Unit,
     onConnectionDrop: (Boolean) -> Unit,
+    onConnectionCancel: () -> Unit,
     onMoveConnectionFirst: (Connection) -> Unit,
     onMoveConnectionLast: (Connection) -> Unit,
     selectedNodeIds: Set<Long>,
@@ -173,6 +174,7 @@ fun BoardCanvas(
                 onZoom = onZoom,
                 onConnectionDrag = onConnectionDrag,
                 onConnectionDrop = onConnectionDrop,
+                onConnectionCancel = onConnectionCancel,
                 onDeleteConnection = onDeleteConnection,
                 onDetachConnection = onDetachConnection
             )

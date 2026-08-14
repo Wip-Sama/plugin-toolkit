@@ -19,7 +19,8 @@ data class PendingConnection(
     val targetNodeId: Long,
     val targetPortId: String,
     val sourceType: DataType,
-    val targetType: DataType
+    val targetType: DataType,
+    val originalConnection: org.wip.plugintoolkit.features.flows.model.Connection? = null
 )
 
 enum class ReadOnlyReason {
