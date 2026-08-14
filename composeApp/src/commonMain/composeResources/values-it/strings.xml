@@ -185,7 +185,6 @@
     <string name="job_no_archived">Nessun lavoro archiviato</string>
     <string name="job_ended_jobs">Lavori Terminati</string>
     <string name="job_no_ended">Nessun lavoro terminato registrato ancora</string>
-    <string name="job_scheduler_soon">Pianificatore disponibile presto</string>
     <string name="job_error_format">Errore: %1$s</string>
 
     <!-- Plugin Manager -->
@@ -376,4 +375,12 @@
     <string name="dialog_plugin_settings_in_place_warning_title">Attenzione: Impostazioni Sul Posto</string>
     <string name="dialog_plugin_settings_in_place_warning_message">L\'apertura delle impostazioni sul posto potrebbe causare il mancato aggiornamento dello stato di sblocco di alcuni componenti fino al ricaricamento. Sei sicuro di voler abilitare questa modalità?</string>
     <string name="plugin_settings_by_section">Per Sezione</string>
+    <string name="job_schedule_action">Pianifica esecuzione ricorrente</string>
+    <string name="job_schedule_title">Crea pianificazione ricorrente</string>
+    <string name="job_schedule_interval_label">Intervallo (minuti)</string>
+    <string name="job_schedule_create">Pianifica</string>
+    <string name="job_schedule_empty">Pianifica una capability o un flow completato con un intervallo ricorrente.</string>
+    <string name="job_schedule_next_format">Ogni %1$d minuti · prossima %2$s</string>
+    <string name="job_schedule_run_now">Esegui ora la pianificazione</string>
+    <string name="job_schedule_delete">Elimina pianificazione</string>
 </resources>

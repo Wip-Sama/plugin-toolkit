@@ -74,13 +74,17 @@ class JobViewModel(
         }
     }
 
-    fun scheduleDaily(job: BackgroundJob) {
-        jobManager.scheduleJob(job)
+    fun scheduleRecurring(job: BackgroundJob, intervalMinutes: Long) {
+        viewModelScope.launch { jobManager.scheduleJob(job, intervalMinutes) }
     }
 
-    fun removeSchedule(id: String) = jobManager.removeSchedule(id)
+    fun removeSchedule(id: String) {
+        viewModelScope.launch { jobManager.removeSchedule(id) }
+    }
 
-    fun setScheduleEnabled(id: String, enabled: Boolean) = jobManager.setScheduleEnabled(id, enabled)
+    fun setScheduleEnabled(id: String, enabled: Boolean) {
+        viewModelScope.launch { jobManager.setScheduleEnabled(id, enabled) }
+    }
 
     fun runScheduleNow(id: String) {
         viewModelScope.launch { jobManager.runScheduleNow(id) }

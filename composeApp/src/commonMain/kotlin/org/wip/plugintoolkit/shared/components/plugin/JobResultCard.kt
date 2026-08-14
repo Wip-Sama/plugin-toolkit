@@ -160,7 +160,10 @@ fun JobResultCard(
 
                     if (onSchedule != null) {
                         IconButton(onClick = onSchedule) {
-                            Icon(Icons.Default.Schedule, contentDescription = "Schedule daily")
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = stringResource(Res.string.job_schedule_action)
+                            )
                         }
                     }
 

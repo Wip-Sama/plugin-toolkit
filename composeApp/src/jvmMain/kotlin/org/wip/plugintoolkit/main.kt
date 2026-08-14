@@ -59,6 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
@@ -284,12 +285,13 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
             registry.initialize()
         } catch (e: Throwable) {
             Logger.e(e) { "Startup: Failed to initialize PluginRegistry" }
+            return@launch
         }
 
         val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
         Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
 
-        pluginsToLoad.forEach { plugin ->
+        val pluginStartupJobs = pluginsToLoad.map { plugin ->
             if (plugin.isValidated) {
                 Logger.d { "Startup: Launching load for validated plugin ${plugin.pkg}" }
                 launch {
@@ -312,6 +314,11 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
                     }
                 }
             }
+        }
+        pluginStartupJobs.joinAll()
+
+        if (!koin.get<JobManager>().startScheduler()) {
+            Logger.e { "Startup: Scheduler was not started because its state could not be loaded safely" }
         }
     }
 

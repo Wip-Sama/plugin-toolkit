@@ -27,6 +27,12 @@ enum class JobType {
     PluginInstallation
 }
 
+fun JobType.canBeScheduled(): Boolean = this == JobType.Capability || this == JobType.Flow
+
+const val MAX_SCHEDULE_INTERVAL_MINUTES = 10L * 365L * 24L * 60L
+
+fun Long.normalizedScheduleInterval(): Long = coerceIn(1L, MAX_SCHEDULE_INTERVAL_MINUTES)
+
 @Serializable
 data class BackgroundJob(
     val id: String,
@@ -72,6 +78,7 @@ data class ScheduledJob(
     /** Reschedule from the actual run time so missed intervals never create a catch-up burst. */
     fun afterRun(now: Instant): ScheduledJob = copy(
         lastRunAt = now,
-        nextRunAt = now + intervalMinutes.coerceAtLeast(1).minutes
+        intervalMinutes = intervalMinutes.normalizedScheduleInterval(),
+        nextRunAt = now + intervalMinutes.normalizedScheduleInterval().minutes
     )
 }

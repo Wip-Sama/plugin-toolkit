@@ -201,7 +201,6 @@
     <string name="job_no_archived">No archived jobs</string>
     <string name="job_ended_jobs">Ended Jobs</string>
     <string name="job_no_ended">No ended jobs recorded yet</string>
-    <string name="job_scheduler_soon">Scheduler coming soon</string>
     <string name="job_error_format">Error: %1$s</string>
     <string name="plugin_choose_install_location">Choose Install Location</string>
     <string name="plugin_action_blocked">Action Blocked</string>
@@ -427,4 +426,12 @@
     <string name="dialog_plugin_settings_in_place_warning_title">Warning: In-Place Settings</string>
     <string name="dialog_plugin_settings_in_place_warning_message">Opening settings in-place may cause some components to not update their unlocked states until reloaded. Are you sure you want to enable this mode?</string>
     <string name="plugin_settings_by_section">By Section</string>
+    <string name="job_schedule_action">Schedule recurring run</string>
+    <string name="job_schedule_title">Create recurring schedule</string>
+    <string name="job_schedule_interval_label">Interval (minutes)</string>
+    <string name="job_schedule_create">Schedule</string>
+    <string name="job_schedule_empty">Schedule a completed capability or flow to run at a recurring interval.</string>
+    <string name="job_schedule_next_format">Every %1$d minutes · next %2$s</string>
+    <string name="job_schedule_run_now">Run schedule now</string>
+    <string name="job_schedule_delete">Delete schedule</string>
 </resources>

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,6 +84,8 @@ import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.MAX_SCHEDULE_INTERVAL_MINUTES
+import org.wip.plugintoolkit.features.job.model.canBeScheduled
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import org.wip.plugintoolkit.shared.components.ToolkitChip
@@ -105,6 +109,13 @@ import plugintoolkit.composeapp.generated.resources.job_no_ended
 import plugintoolkit.composeapp.generated.resources.job_paused_jobs
 import plugintoolkit.composeapp.generated.resources.job_queue
 import plugintoolkit.composeapp.generated.resources.job_running_jobs
+import plugintoolkit.composeapp.generated.resources.job_schedule_create
+import plugintoolkit.composeapp.generated.resources.job_schedule_delete
+import plugintoolkit.composeapp.generated.resources.job_schedule_empty
+import plugintoolkit.composeapp.generated.resources.job_schedule_interval_label
+import plugintoolkit.composeapp.generated.resources.job_schedule_next_format
+import plugintoolkit.composeapp.generated.resources.job_schedule_run_now
+import plugintoolkit.composeapp.generated.resources.job_schedule_title
 import plugintoolkit.composeapp.generated.resources.nav_job_archive
 import plugintoolkit.composeapp.generated.resources.nav_job_ended
 import plugintoolkit.composeapp.generated.resources.nav_job_general
@@ -309,6 +320,38 @@ fun EndedTab(viewModel: JobViewModel) {
     val endedJobs by viewModel.endedJobs.collectAsState()
     val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
     val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
+    var jobToSchedule by remember { mutableStateOf<BackgroundJob?>(null) }
+    var intervalText by remember { mutableStateOf(DEFAULT_SCHEDULE_INTERVAL_MINUTES.toString()) }
+
+    jobToSchedule?.let { job ->
+        val interval = intervalText.toLongOrNull()?.takeIf { it in 1..MAX_SCHEDULE_INTERVAL_MINUTES }
+        AlertDialog(
+            onDismissRequest = { jobToSchedule = null },
+            title = { Text(stringResource(Res.string.job_schedule_title)) },
+            text = {
+                OutlinedTextField(
+                    value = intervalText,
+                    onValueChange = { value -> intervalText = value.filter(Char::isDigit) },
+                    label = { Text(stringResource(Res.string.job_schedule_interval_label)) },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = interval != null,
+                    onClick = {
+                        viewModel.scheduleRecurring(job, interval!!)
+                        jobToSchedule = null
+                    }
+                ) { Text(stringResource(Res.string.job_schedule_create)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { jobToSchedule = null }) {
+                    Text(stringResource(Res.string.dialog_cancel))
+                }
+            }
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -340,7 +383,12 @@ fun EndedTab(viewModel: JobViewModel) {
                         progress = progressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                         logs = logsMap[job.id] ?: emptyList(),
                         onClear = { viewModel.clearEndedJob(job.id) },
-                        onSchedule = { viewModel.scheduleDaily(job) }
+                        onSchedule = if (job.type.canBeScheduled()) {
+                            {
+                                intervalText = DEFAULT_SCHEDULE_INTERVAL_MINUTES.toString()
+                                jobToSchedule = job
+                            }
+                        } else null
                     )
                 }
             } else {
@@ -357,7 +405,7 @@ fun SchedulerTab(viewModel: JobViewModel) {
     val schedules by viewModel.schedules.collectAsState()
 
     if (schedules.isEmpty()) {
-        EmptyState("Schedule a completed job to run it every day.", Icons.Default.Schedule)
+        EmptyState(stringResource(Res.string.job_schedule_empty), Icons.Default.Schedule)
         return
     }
 
@@ -380,7 +428,11 @@ fun SchedulerTab(viewModel: JobViewModel) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(schedule.jobTemplate.name, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Every ${schedule.intervalMinutes} minutes · next ${formatTime(schedule.nextRunAt)}",
+                            stringResource(
+                                Res.string.job_schedule_next_format,
+                                schedule.intervalMinutes,
+                                formatTime(schedule.nextRunAt)
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -390,16 +442,18 @@ fun SchedulerTab(viewModel: JobViewModel) {
                         onCheckedChange = { viewModel.setScheduleEnabled(schedule.id, it) }
                     )
                     IconButton(onClick = { viewModel.runScheduleNow(schedule.id) }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Run now")
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(Res.string.job_schedule_run_now))
                     }
                     IconButton(onClick = { viewModel.removeSchedule(schedule.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete schedule")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(Res.string.job_schedule_delete))
                     }
                 }
             }
         }
     }
 }
+
+private const val DEFAULT_SCHEDULE_INTERVAL_MINUTES = 24L * 60L
 
 @Composable
 fun HistoryTab(viewModel: JobViewModel) {
