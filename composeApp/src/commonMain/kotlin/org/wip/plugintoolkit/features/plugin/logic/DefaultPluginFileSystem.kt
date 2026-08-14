@@ -93,6 +93,15 @@ class DefaultPluginFileSystem(
         }
     }
 
+    override suspend fun createDirectory(relativePath: RelativePath): Result<Unit> = runCatching {
+        SystemFileSystem.createDirectories(resolvePath(relativePath))
+    }
+
+    override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> = runCatching {
+        require(relativePath != RelativePath.ROOT) { "The plugin files root cannot be deleted" }
+        deleteDirectory(resolvePath(relativePath), recursive)
+    }
+
     override suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit> {
         if (resourcePath.contains("..") || resourcePath.startsWith("/") || resourcePath.startsWith("\\") || resourcePath.contains("\u0000")) {
             return Result.failure(SecurityException("Invalid resource path: $resourcePath"))
@@ -138,9 +147,33 @@ class DefaultPluginFileSystem(
 
                     override suspend fun deleteFile(relativePath: RelativePath): Result<Unit> =
                         fs.deleteFromCache(relativePath)
+
+                    override suspend fun createDirectory(relativePath: RelativePath): Result<Unit> = runCatching {
+                        SystemFileSystem.createDirectories(fs.resolveCachePath(relativePath))
+                    }
+
+                    override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> =
+                        runCatching {
+                            require(relativePath != RelativePath.ROOT) { "The plugin cache root cannot be deleted" }
+                            fs.deleteDirectory(fs.resolveCachePath(relativePath), recursive)
+                        }
                 }
             }
         }
+    }
+
+    private fun deleteDirectory(path: Path, recursive: Boolean) {
+        if (!SystemFileSystem.exists(path)) return
+        require(SystemFileSystem.metadataOrNull(path)?.isDirectory == true) { "Path is not a directory: $path" }
+        val children = SystemFileSystem.list(path)
+        require(recursive || children.isEmpty()) { "Directory is not empty: $path" }
+        if (recursive) {
+            children.forEach { child ->
+                if (SystemFileSystem.metadataOrNull(child)?.isDirectory == true) deleteDirectory(child, true)
+                else SystemFileSystem.delete(child)
+            }
+        }
+        SystemFileSystem.delete(path)
     }
 
     private fun resolveCachePath(relativePath: RelativePath): Path {

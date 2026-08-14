@@ -97,5 +97,28 @@ class DefaultExecutionFileSystem(
         }
     }
 
+    override suspend fun createDirectory(relativePath: RelativePath): Result<Unit> = runCatching {
+        SystemFileSystem.createDirectories(resolvePath(relativePath))
+    }
+
+    override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> = runCatching {
+        require(relativePath != RelativePath.ROOT) { "The execution sandbox root cannot be deleted" }
+        deleteDirectory(resolvePath(relativePath), recursive)
+    }
+
+    private fun deleteDirectory(path: Path, recursive: Boolean) {
+        if (!SystemFileSystem.exists(path)) return
+        require(SystemFileSystem.metadataOrNull(path)?.isDirectory == true) { "Path is not a directory: $path" }
+        val children = SystemFileSystem.list(path)
+        require(recursive || children.isEmpty()) { "Directory is not empty: $path" }
+        if (recursive) {
+            children.forEach { child ->
+                if (SystemFileSystem.metadataOrNull(child)?.isDirectory == true) deleteDirectory(child, true)
+                else SystemFileSystem.delete(child)
+            }
+        }
+        SystemFileSystem.delete(path)
+    }
+
     override fun getBasePath(): String = sandboxPath
 }
