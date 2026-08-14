@@ -155,7 +155,14 @@ fun getNodeDescription(node: Node): String {
 }
 
 fun parseColorString(colorStr: String): Color {
-    val lastColor = colorStr.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim() ?: colorStr
+    val completeValue = colorStr.trim()
+    val isFunctionalColor = completeValue.startsWith("rgb(", ignoreCase = true) ||
+        completeValue.startsWith("rgba(", ignoreCase = true)
+    val lastColor = if (isFunctionalColor) {
+        completeValue
+    } else {
+        colorStr.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim() ?: colorStr
+    }
     val trimmed = lastColor.trim()
     if (trimmed.isEmpty()) return Color.Transparent
     parseHexColor(trimmed)?.let { return it }

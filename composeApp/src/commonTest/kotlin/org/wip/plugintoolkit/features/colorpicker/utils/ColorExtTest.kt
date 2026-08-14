@@ -14,6 +14,7 @@ class ColorExtTest {
         assertEquals(Color(0x80336699.toInt()), parseHexColor("80336699"))
         assertEquals(true, colorStringHasAlpha("#80336699"))
         assertEquals(true, colorStringHasAlpha("80336699"))
+        assertEquals(Color(0xAAFF0000.toInt()), parseHexColor("#F00A"))
     }
 
     @Test

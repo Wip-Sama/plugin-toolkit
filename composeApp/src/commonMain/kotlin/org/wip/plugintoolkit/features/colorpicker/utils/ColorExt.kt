@@ -8,11 +8,22 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Parses #RRGGBB or #AARRGGBB using the same ARGB order emitted by [toHex]. */
+/** Parses #RGBA, #RRGGBB or #AARRGGBB; long alpha values match the ARGB order emitted by [toHex]. */
 fun parseHexColor(value: String): Color? {
     val digits = value.trim().removePrefix("#")
-    if (digits.length != 6 && digits.length != 8) return null
-    val argb = (if (digits.length == 6) "FF$digits" else digits).toLongOrNull(16) ?: return null
+    val normalized = when (digits.length) {
+        4 -> {
+            val red = digits[0].toString().repeat(2)
+            val green = digits[1].toString().repeat(2)
+            val blue = digits[2].toString().repeat(2)
+            val alpha = digits[3].toString().repeat(2)
+            "$alpha$red$green$blue"
+        }
+        6 -> "FF$digits"
+        8 -> digits
+        else -> return null
+    }
+    val argb = normalized.toLongOrNull(16) ?: return null
     return Color(argb.toInt())
 }
 
