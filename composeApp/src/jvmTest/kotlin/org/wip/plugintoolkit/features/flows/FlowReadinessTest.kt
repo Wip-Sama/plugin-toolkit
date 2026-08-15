@@ -8,6 +8,7 @@ import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.CapabilityIdentity
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import kotlin.test.Test
@@ -89,12 +90,13 @@ class FlowReadinessTest {
 
         val flow = Flow(name = "Test Flow", nodes = listOf(node))
 
-        assertTrue(flow.isBroken(setOf("TestCap")), "Flow should be broken if a node is not ready")
+        val activeCapabilities = setOf(CapabilityIdentity(pluginInfo.id, "TestCap"))
+        assertTrue(flow.isBroken(activeCapabilities), "Flow should be broken if a node is not ready")
 
         val valueNode = node.copyWithUpdatedInput("reqPort", kotlinx.serialization.json.JsonPrimitive("value"))
         val readyFlow = Flow(name = "Test Flow", nodes = listOf(valueNode))
 
-        assertFalse(readyFlow.isBroken(setOf("TestCap")), "Flow should not be broken if all nodes are ready")
+        assertFalse(readyFlow.isBroken(activeCapabilities), "Flow should not be broken if all nodes are ready")
     }
 
     @Test

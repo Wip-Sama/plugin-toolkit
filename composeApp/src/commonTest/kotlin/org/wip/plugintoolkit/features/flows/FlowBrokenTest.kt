@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.CapabilityIdentity
 import org.wip.plugintoolkit.features.flows.model.Node
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -52,7 +53,10 @@ class FlowBrokenTest {
             )
         )
 
-        val activeCapabilities = setOf("Capability A", "Capability B")
+        val activeCapabilities = setOf(
+            CapabilityIdentity("test.plugin", "Capability A"),
+            CapabilityIdentity("test.plugin", "Capability B")
+        )
         assertFalse(flow.isBroken(activeCapabilities), "Flow should not be broken")
     }
 
@@ -67,7 +71,7 @@ class FlowBrokenTest {
         )
 
         // Only Capability A is active, meaning Capability B is missing
-        val activeCapabilities = setOf("Capability A")
+        val activeCapabilities = setOf(CapabilityIdentity("test.plugin", "Capability A"))
         assertTrue(flow.isBroken(activeCapabilities), "Flow should be broken due to missing capability B")
     }
 
@@ -80,7 +84,7 @@ class FlowBrokenTest {
             )
         )
 
-        val activeCapabilities = setOf("Capability A")
+        val activeCapabilities = setOf(CapabilityIdentity("test.plugin", "Capability A"))
         assertTrue(
             flow.isBroken(activeCapabilities),
             "Flow should be broken because the node is explicitly marked as broken"
@@ -94,7 +98,19 @@ class FlowBrokenTest {
             nodes = emptyList()
         )
 
-        val activeCapabilities = setOf("Capability A")
+        val activeCapabilities = setOf(CapabilityIdentity("test.plugin", "Capability A"))
         assertFalse(flow.isBroken(activeCapabilities), "Empty flow should not be broken")
+    }
+
+    @Test
+    fun `capabilities with the same name from another plugin do not make a flow executable`() {
+        val flow = Flow(
+            name = "Namespaced Flow",
+            nodes = listOf(createCapabilityNode(capabilityA))
+        )
+
+        val activeCapabilities = setOf(CapabilityIdentity("another.plugin", "Capability A"))
+
+        assertTrue(flow.isBroken(activeCapabilities), "Capability identity must include the plugin id")
     }
 }

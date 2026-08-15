@@ -2,6 +2,12 @@
 
 The CMP Desktop Application includes a powerful visual Flow Editor that allows you to orchestrate capabilities, system nodes, subflows, and inputs/outputs into cohesive workflows. This document details some of the advanced features available in the flow editor UI to manage complex diagrams effectively.
 
+## Readiness and broken flows
+
+A capability node is ready when every required input has a direct value, a default, or an incoming connection. Optional inputs may remain empty. Nodes whose plugin or capability cannot be resolved stay broken even when their fields are populated.
+
+The editor marks unready nodes and required fields, while the runner excludes any flow containing a broken or unready node. Long flow and capability names remain available through their tooltips.
+
 ## Collapsible Nodes
 
 To keep large flows readable, you can collapse nodes or individual sections of nodes. 
