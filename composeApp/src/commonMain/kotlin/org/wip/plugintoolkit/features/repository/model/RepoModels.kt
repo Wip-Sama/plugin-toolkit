@@ -6,13 +6,37 @@ import org.wip.plugintoolkit.api.PluginManifest
 @Serializable
 data class ExtensionRepo(
     val name: String,
-    val url: String, // index.json url
+    val url: String, // index.json url or local file path
     val schemaVersion: Int = 1,
     val signPublicKey: String? = null,
     val signAlgorithm: String = "SHA256",
     val pluginsFolder: String? = null,
     val flowsFolder: String? = null
-)
+) {
+    val isLocal: Boolean
+        get() = !url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)
+
+    val isRemote: Boolean
+        get() = !isLocal
+
+    fun getBaseLocation(): String {
+        val normalized = url.replace('\\', '/')
+        return if (normalized.contains('/')) normalized.substringBeforeLast("/") else normalized
+    }
+}
+
+sealed class RepoValidationResult {
+    object Idle : RepoValidationResult()
+    object Checking : RepoValidationResult()
+    data class Valid(
+        val name: String,
+        val pluginCount: Int,
+        val flowCount: Int,
+        val index: RepoIndex,
+        val isLocal: Boolean
+    ) : RepoValidationResult()
+    data class Invalid(val reason: String) : RepoValidationResult()
+}
 
 @Serializable
 data class RepoIndex(

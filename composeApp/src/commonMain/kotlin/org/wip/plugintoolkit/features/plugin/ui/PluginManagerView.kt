@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -44,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +66,7 @@ import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
+import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_more_actions
 import plugintoolkit.composeapp.generated.resources.action_remove
@@ -104,9 +107,11 @@ fun PluginManagerView(
     val settingsPkg by viewModel.settingsPkg.collectAsState()
     val togglingPlugins by viewModel.togglingPlugins.collectAsState()
 
+    val lazyListState = rememberLazyListState()
+
     var activeScrollToSetting by remember { mutableStateOf(initialScrollToSetting) }
 
-    androidx.compose.runtime.LaunchedEffect(initialPluginId, initialScrollToSetting) {
+    LaunchedEffect(initialPluginId, initialScrollToSetting) {
         if (initialPluginId != null) {
             activeScrollToSetting = initialScrollToSetting
             viewModel.openSettings(initialPluginId)
@@ -139,7 +144,10 @@ fun PluginManagerView(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(ToolkitTheme.spacing.extraLarge)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(ToolkitTheme.spacing.extraLarge)
+    ) {
         if (!isReady) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(ToolkitTheme.spacing.extraSmall),
@@ -226,9 +234,18 @@ fun PluginManagerView(
 
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
+        val lazyListState = rememberLazyListState()
+
         // Plugin List
         LazyColumn(
-            modifier = Modifier.weight(1f),
+            state = lazyListState,
+            modifier = Modifier
+                .verticalFadingEdges(
+                    lazyListState = lazyListState,
+                    topFadeLength = ToolkitTheme.spacing.medium,
+                    bottomFadeLength = ToolkitTheme.spacing.medium
+                )
+                .weight(1f),
             contentPadding = PaddingValues(
                 horizontal = ToolkitTheme.spacing.medium,
                 vertical = ToolkitTheme.spacing.small

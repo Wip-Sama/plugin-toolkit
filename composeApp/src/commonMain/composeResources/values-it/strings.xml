@@ -1,3 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="plugin_settings_required">Obbligatorie</string>
     <string name="plugin_settings_optional">Facoltative</string>
@@ -38,40 +39,40 @@
     <string name="setting_adaptive_color">Colore Adattivo</string>
     <string name="setting_timezone">Fuso Orario</string>
     <string name="section_system">Sistema</string>
-    <string name="setting_launch_at_startup">Avvia all\'Avvio</string>
+    <string name="setting_launch_at_startup">Avvia all\'Accensione</string>
     <string name="setting_launch_at_startup_subtitle">Avvia automaticamente l\'applicazione all\'accesso</string>
-    <string name="setting_launch_minimized_at_startup">Minimizzato all\'Avvio</string>
-    <string name="setting_launch_minimized_at_startup_subtitle">Nascondi la finestra quando l\'app viene avviata dal sistema</string>
-    <string name="setting_window_start_mode">Modalità di Avvio Finestra</string>
-    <string name="setting_window_start_mode_subtitle">Seleziona come la finestra dell\'applicazione deve apparire all\'avvio</string>
-    <string name="setting_close_to_tray">Chiudi nel Vassoio</string>
-    <string name="setting_close_to_tray_subtitle">Chiudi l\'applicazione nel vassoio di sistema</string>
-    <string name="section_logging">Registrazione</string>
-    <string name="setting_log_level">Livello Log</string>
-    <string name="setting_log_level_subtitle">Seleziona il livello di gravità minimo da registrare</string>
-    <string name="setting_logs_to_keep">Log da Mantenere</string>
-    <string name="setting_logs_to_keep_subtitle">Numero di giorni per mantenere i file di log non compressi</string>
-    <string name="setting_compress_old_logs">Comprimi Log Vecchi</string>
-    <string name="setting_compress_old_logs_subtitle">Comprimi i log invece di eliminarli immediatamente</string>
-    <string name="setting_compressed_logs_to_keep">Log Compressi da Mantenere</string>
-    <string name="setting_compressed_logs_to_keep_subtitle">Numero di file di log compressi da conservare</string>
-    <string name="setting_open_log_folder">Apri Cartella Log</string>
-    <string name="setting_open_log_folder_subtitle">Apri la cartella in cui sono archiviati i file di log</string>
-    <string name="setting_open_latest_log">Apri Log Più Recente</string>
-    <string name="setting_open_latest_log_subtitle">Apri il file di log del giorno attuale</string>
+    <string name="setting_launch_minimized_at_startup">Riduci a Icona all\'Avvio</string>
+    <string name="setting_launch_minimized_at_startup_subtitle">Nascondi la finestra all\'avvio del sistema</string>
+    <string name="setting_window_start_mode">Modalità Avvio Finestra</string>
+    <string name="setting_window_start_mode_subtitle">Scegli come deve apparire la finestra all\'avvio</string>
+    <string name="setting_close_to_tray">Chiudi nella Barra di Sistema</string>
+    <string name="setting_close_to_tray_subtitle">Chiudi l\'applicazione nella barra delle applicazioni</string>
+    <string name="section_logging">Registri (Log)</string>
+    <string name="setting_log_level">Livello Registri</string>
+    <string name="setting_log_level_subtitle">Seleziona il livello minimo di gravità per i registri</string>
+    <string name="setting_logs_to_keep">Giorni di Conservazione</string>
+    <string name="setting_logs_to_keep_subtitle">Numero di giorni per cui conservare i registri non compressi</string>
+    <string name="setting_compress_old_logs">Comprimi Vecchi Registri</string>
+    <string name="setting_compress_old_logs_subtitle">Comprimi i registri invece di eliminarli immediatamente</string>
+    <string name="setting_compressed_logs_to_keep">Registri Compressi da Conservare</string>
+    <string name="setting_compressed_logs_to_keep_subtitle">Numero di file di registro compressi da mantenere</string>
+    <string name="setting_open_log_folder">Apri cartella registri</string>
+    <string name="setting_open_log_folder_subtitle">Apri la cartella in cui sono memorizzati i file di registro</string>
+    <string name="setting_open_latest_log">Apri ultimo registro</string>
+    <string name="setting_open_latest_log_subtitle">Apri il file di registro della giornata corrente</string>
     <string name="section_notifications">Notifiche</string>
-    <string name="section_toasts">Toast in-App</string>
-    <string name="setting_enable_toasts">Abilita Toast</string>
-    <string name="setting_toast_auto_dismiss">Chiudi Automaticamente Toast</string>
+    <string name="section_toasts">Avvisi Interni (Toast)</string>
+    <string name="setting_enable_toasts">Abilita Avvisi Interni</string>
+    <string name="setting_toast_auto_dismiss">Chiusura Automatica Avvisi</string>
     <string name="setting_toast_dismiss_time">Tempo di Chiusura (secondi)</string>
     <string name="setting_enable_system_notifications">Notifiche di Sistema</string>
-    <string name="setting_show_info">Mostra Notifiche Info</string>
-    <string name="setting_show_warning">Mostra Notifiche Avvertenza</string>
-    <string name="setting_show_error">Mostra Notifiche Errore</string>
+    <string name="setting_show_info">Mostra Notifiche Informative</string>
+    <string name="setting_show_warning">Mostra Notifiche di Avviso</string>
+    <string name="setting_show_error">Mostra Notifiche di Errore</string>
     <string name="setting_history_retention">Conservazione Cronologia (giorni)</string>
     <string name="nav_notification_history">Cronologia Notifiche</string>
     <string name="history_clear_all">Cancella Tutto</string>
-    <string name="history_empty">Nessuna notifica registrata ancora.</string>
+    <string name="history_empty">Nessuna notifica registrata finora.</string>
     <string name="repo_add_title">Aggiungi Repository</string>
     <string name="repo_url_label">URL Repository</string>
     <string name="repo_add_button">Aggiungi</string>
@@ -79,25 +80,25 @@
     <string name="repo_conflicts_subtitle">Seleziona repository di origine per questo pacchetto</string>
     <string name="repo_managed_title">Repository Gestiti</string>
     <string name="repo_refresh_all">Aggiorna Tutto</string>
-    <string name="repo_empty_list">Nessun repository aggiunto ancora.</string>
-    <string name="plugin_manager_title">Gestione Plugin</string>
+    <string name="repo_empty_list">Nessun repository aggiunto finora.</string>
+    <string name="plugin_manager_title">Gestore Plugin</string>
     <string name="plugin_refresh_list">Aggiorna Elenco</string>
-    <string name="plugin_rescan">Riscannerizza Cartella</string>
+    <string name="plugin_rescan">Riscansiona Cartella</string>
     <string name="plugin_reload_all">Ricarica Tutto</string>
     <string name="plugin_install_local">Installa Locale</string>
     <string name="plugin_managed_folders">Cartelle Gestite</string>
     <string name="plugin_add_folder">Aggiungi Cartella</string>
     <string name="plugin_uninstall">Rimuovi</string>
     <string name="plugin_reload">Ricarica</string>
-    <string name="plugin_changelog">Registro Modifiche</string>
+    <string name="plugin_changelog">Novità</string>
     <string name="plugin_settings">Impostazioni</string>
     <string name="plugin_update">Aggiorna</string>
-    <string name="plugin_validate">Convalida</string>
+    <string name="plugin_validate">Valida</string>
     <string name="plugin_enabled">Abilitato</string>
     <string name="plugin_loaded">Caricato</string>
-    <string name="plugin_validated">Convalidato</string>
+    <string name="plugin_validated">Validato</string>
     <string name="plugin_validation_pending">Configurazione in Sospeso</string>
-    <string name="plugin_broken">Rotto</string>
+    <string name="plugin_broken">Non Funzionante</string>
     <string name="nav_jobs">Lavori</string>
     <string name="nav_job_general">Generale</string>
     <string name="nav_job_archive">Archivio</string>
@@ -105,37 +106,37 @@
     <string name="nav_job_history">Cronologia</string>
     <string name="nav_job_ended">Terminati</string>
     <string name="section_jobs">Lavori</string>
-    <string name="setting_plugin_unplug_behavior">Comportamento Rimozione Plugin</string>
-    <string name="setting_plugin_unplug_behavior_subtitle">Cosa fare quando si disabilita o disinstalla un plugin con lavori attivi</string>
-    <string name="setting_plugin_unplug_behavior_block">Impedisci la rimozione durante il lavoro</string>
-    <string name="setting_plugin_unplug_behavior_stop">Ferma tutto e rimuovi</string>
-    <string name="setting_max_concurrent_jobs">Lavori Simultanei Massimi</string>
-    <string name="setting_max_concurrent_jobs_subtitle">Numero di worker disponibili per eseguire attività di background</string>
+    <string name="setting_plugin_unplug_behavior">Comportamento Scollegamento Plugin</string>
+    <string name="setting_plugin_unplug_behavior_subtitle">Cosa fare alla disattivazione/disinstallazione di un plugin con lavori attivi</string>
+    <string name="setting_plugin_unplug_behavior_block">Impedisci scollegamento durante il lavoro</string>
+    <string name="setting_plugin_unplug_behavior_stop">Ferma tutto e scollega</string>
+    <string name="setting_max_concurrent_jobs">Max Lavori Simultanei</string>
+    <string name="setting_max_concurrent_jobs_subtitle">Numero di worker disponibili per le attività in background</string>
     <string name="setting_save_job_history">Salva Cronologia Lavori</string>
-    <string name="setting_save_job_history_subtitle">Mantieni un registro di tutti i lavori eseguiti e dei loro risultati</string>
-    <string name="setting_max_history_length">Lunghezza Cronologia Massima</string>
-    <string name="setting_max_history_length_subtitle">Numero massimo di eventi da mantenere nel registro della cronologia</string>
-    <string name="setting_max_ended_jobs">Lavori Terminati Massimi da Mantenere</string>
-    <string name="setting_max_ended_jobs_subtitle">Numero di lavori completati da mantenere nella scheda Terminati</string>
+    <string name="setting_save_job_history_subtitle">Conserva un registro di tutti i lavori eseguiti e dei loro risultati</string>
+    <string name="setting_max_history_length">Lunghezza Massima Cronologia</string>
+    <string name="setting_max_history_length_subtitle">Numero massimo di eventi da conservare nel registro</string>
+    <string name="setting_max_ended_jobs">Max Lavori Terminati da Conservare</string>
+    <string name="setting_max_ended_jobs_subtitle">Numero di lavori terminati da conservare nella scheda Terminati</string>
     <string name="section_auto_update">Aggiornamento Automatico</string>
-    <string name="setting_enable_auto_update">Controlla Aggiornamenti Automaticamente</string>
-    <string name="setting_enable_auto_update_subtitle">L\'applicazione cercherà nuove versioni all\'avvio</string>
+    <string name="setting_enable_auto_update">Verifica Aggiornamenti Automaticamente</string>
+    <string name="setting_enable_auto_update_subtitle">L\'applicazione verificherà la presenza di nuove versioni all\'avvio</string>
     <string name="setting_check_on_startup">Controlla Aggiornamenti all\'Avvio</string>
-    <string name="setting_check_on_startup_subtitle">Cerca automaticamente aggiornamenti all\'apertura dell\'app</string>
+    <string name="setting_check_on_startup_subtitle">Cerca automaticamente gli aggiornamenti all\'apertura dell\'app</string>
     <string name="setting_animations_enabled">Abilita Animazioni UI</string>
-    <string name="setting_animations_enabled_subtitle">Riproduci animazioni ed effetti di transizione visiva</string>
-    <string name="setting_strict_signature_checking">Controllo Firma Rigido</string>
-    <string name="setting_strict_signature_checking_subtitle">Richiedi verifica firma valida per i plugin</string>
+    <string name="setting_animations_enabled_subtitle">Riproduci animazioni ed effetti visivi di transizione</string>
+    <string name="setting_strict_signature_checking">Controllo Rigoroso Firma</string>
+    <string name="setting_strict_signature_checking_subtitle">Richiedi una firma valida per i plugin</string>
     <string name="setting_file_access_mode">Modalità Accesso File</string>
-    <string name="setting_file_access_mode_subtitle">Regole di sandbox per l\'accesso ai file dei plugin</string>
+    <string name="setting_file_access_mode_subtitle">Regole di isolamento (sandbox) dell\'accesso ai file per i plugin</string>
     <string name="setting_configure_directories">Configura Cartelle</string>
-    <string name="setting_configure_directories_subtitle">Gestisci i percorsi consentiti o limitati</string>
+    <string name="setting_configure_directories_subtitle">Gestisci percorsi di cartelle consentiti o con restrizioni</string>
     <string name="configure_blacklist_title">Cartelle in Blacklist</string>
     <string name="configure_whitelist_title">Cartelle in Whitelist</string>
-    <string name="configure_directories_empty">Nessun percorso cartella configurato.</string>
+    <string name="configure_directories_empty">Nessuna cartella configurata.</string>
     <string name="action_reset_defaults">Ripristina Predefiniti</string>
     <string name="reset_confirm_title">Ripristinare i Predefiniti?</string>
-    <string name="reset_confirm_message">Verranno ripristinati i percorsi predefiniti e rimosse le modifiche personalizzate.</string>
+    <string name="reset_confirm_message">Questo ripristinerà l\'elenco predefinito delle cartelle e annullerà le modifiche personalizzate.</string>
     <string name="action_reset">Ripristina</string>
     <string name="action_add_directory">Aggiungi Cartella</string>
     <string name="add_path_placeholder">Inserisci percorso cartella...</string>
@@ -144,25 +145,37 @@
     <string name="setting_flow_autosave_subtitle">Salva automaticamente le modifiche durante la modifica dei flussi</string>
     <string name="update_available_title">Aggiornamento Disponibile: %1$s</string>
     <string name="update_now">Aggiorna Ora</string>
-    <string name="update_later">Aggiorna Dopo</string>
-    <string name="update_downloading">Download Aggiornamento...</string>
-    <string name="update_ready_to_install">Aggiornamento scaricato. Avvio programma di installazione...</string>
-    <string name="update_changelog_title">Novità</string>
-    <string name="update_check_failed">Controllo aggiornamenti fallito</string>
-    <string name="update_no_updates">Stai già usando l\'ultima versione</string>
-    <string name="update_check_started">Ricerca aggiornamenti in corso...</string>
+    <string name="update_later">Aggiorna Più Tardi</string>
+    <string name="update_downloading">Download Aggiornamento in corso...</string>
+    <string name="update_ready_to_install">Aggiornamento scaricato. Avvio dell\'installer...</string>
+    <string name="update_changelog_title">Cosa c\'è di nuovo</string>
+    <string name="update_check_failed">Impossibile verificare la presenza di aggiornamenti</string>
+    <string name="update_no_updates">Stai utilizzando la versione più recente</string>
+    <string name="update_check_started">Controllo aggiornamenti in corso...</string>
     <string name="update_new_version_found">Nuova versione disponibile: %1$s</string>
-    <string name="action_check_for_updates">Controlla Aggiornamenti</string>
-
-    <!-- General / Common -->
+    <string name="action_check_for_updates">Verifica Aggiornamenti</string>
+    <string name="insert_array_of_array_placeholder">Inserisci liste nidificate racchiuse tra parentesi, es. (1,2), (3,4)</string>
+    <string name="insert_array_placeholder">Inserisci liste nidificate racchiuse tra parentesi, es. (1,2), (3,4)</string>
+    <string name="updater_title">Aggiornamento Software</string>
+    <string name="updater_checking">Verifica aggiornamenti in corso...</string>
+    <string name="updater_available_title">Aggiornamento Disponibile</string>
+    <string name="updater_available_message">È disponibile una nuova versione (%1$s). Desideri scaricarla e installarla?</string>
+    <string name="updater_no_update_title">Aggiornato</string>
+    <string name="updater_no_update_message">Stai utilizzando l\'ultima versione disponibile.</string>
+    <string name="updater_error_title">Errore Aggiornamento</string>
+    <string name="updater_error_message">Si è verificato un errore durante la verifica degli aggiornamenti: %1$s</string>
+    <string name="node_parameters_section">Parametri</string>
+    <string name="node_results_section">Risultati</string>
+    <string name="auto_generated_path_format">%1$s (Generato automaticamente)</string>
+    <string name="pick_color">Scegli Colore</string>
     <string name="dialog_confirm">Conferma</string>
     <string name="dialog_cancel">Annulla</string>
     <string name="dialog_proceed_anyway">Procedi Comunque</string>
     <string name="action_delete">Elimina</string>
     <string name="action_remove">Rimuovi</string>
-    <string name="action_clear">Cancella</string>
+    <string name="action_clear">Pulisci</string>
     <string name="action_clear_all">Cancella Tutto</string>
-    <string name="action_more_actions">Altre Azioni</string>
+    <string name="action_more_actions">Altre azioni</string>
     <string name="action_refresh">Aggiorna</string>
     <string name="action_install">Installa</string>
     <string name="action_resume">Riprendi</string>
@@ -171,26 +184,27 @@
     <string name="action_cancel">Annulla</string>
     <string name="action_expand">Espandi</string>
     <string name="action_collapse">Comprimi</string>
-
-    <!-- Settings -->
     <string name="plugin_settings_title">Impostazioni: %1$s</string>
     <string name="settings_search_placeholder">Cerca impostazioni...</string>
-    <string name="settings_no_results">Nessun risultato trovato in %1$s</string>
+    <string name="settings_search_by_section">Per Sezione</string>
+    <string name="settings_no_results">Nessun risultato trovato</string>
     <string name="settings_search_whole">Cerca in tutte le impostazioni</string>
     <string name="settings_feature_placeholder">Il contenuto per %1$s apparirà qui.</string>
-
-    <!-- Jobs -->
+    <string name="plugin_settings_actions">Azioni</string>
+    <string name="plugin_settings_custom">Impostazioni Personalizzate</string>
+    <string name="plugin_settings_global_defaults">Predefiniti Parametri Globali</string>
+    <string name="plugin_settings_capability">Funzionalità: %1$s</string>
+    <string name="settings_enum_unlock_message">Configura le impostazioni richieste per sbloccare le opzioni</string>
+    <string name="settings_locked_capability">Funzionalità bloccata: %1$s</string>
     <string name="job_running_jobs">Lavori in Esecuzione</string>
     <string name="job_queue">Coda</string>
     <string name="job_paused_jobs">Lavori in Pausa</string>
     <string name="job_no_active">Nessun lavoro attivo o in coda</string>
     <string name="job_no_archived">Nessun lavoro archiviato</string>
     <string name="job_ended_jobs">Lavori Terminati</string>
-    <string name="job_no_ended">Nessun lavoro terminato registrato ancora</string>
-    <string name="job_scheduler_soon">Pianificatore disponibile presto</string>
+    <string name="job_no_ended">Nessun lavoro terminato registrato finora</string>
+    <string name="job_scheduler_soon">Pianificatore presto disponibile</string>
     <string name="job_error_format">Errore: %1$s</string>
-
-    <!-- Plugin Manager -->
     <string name="plugin_choose_install_location">Scegli Posizione di Installazione</string>
     <string name="plugin_action_blocked">Azione Bloccata</string>
     <string name="plugin_state_change_error">Impossibile cambiare lo stato del plugin</string>
@@ -211,8 +225,6 @@
     <string name="plugin_installed_label">Installato</string>
     <string name="plugin_not_found_unloaded">Plugin non trovato o non caricato</string>
     <string name="plugin_selection_hint">Seleziona un plugin dalla barra laterale per vederne le capacità</string>
-
-    <!-- Plugin Content / Tester -->
     <string name="plugin_select_capability_hint">Seleziona una capacità per iniziare a testare</string>
     <string name="plugin_execution_results">Risultati Esecuzione</string>
     <string name="plugin_id_format">ID: %1$s</string>
@@ -224,8 +236,6 @@
     <string name="plugin_execute_capability_running">Esegui Capacità (%d in esecuzione)</string>
     <string name="plugin_execution_id_format">Esecuzione %1$s</string>
     <string name="plugin_executing_progress">Esecuzione... %1$d%%</string>
-
-    <!-- Repositories -->
     <string name="repo_add_success">Repository aggiunto con successo</string>
     <string name="repo_already_added">Repository già aggiunto</string>
     <string name="repo_add_error">Errore nell\'aggiunta del repository: %s</string>
@@ -237,8 +247,6 @@
     <string name="repo_install_failed">Impossibile installare %1$s: %2$s</string>
     <string name="repo_url_placeholder">https://.../index.json</string>
     <string name="repo_link_copied">Link del repository copiato negli appunti</string>
-
-    <!-- Landing Page -->
     <string name="landing_system_overview">Panoramica di Sistema</string>
     <string name="landing_loaded_plugins">Plugin Caricati</string>
     <string name="landing_active_jobs">Lavori Attivi</string>
@@ -252,8 +260,6 @@
     <string name="landing_link_docs">Documentazione</string>
     <string name="landing_welcome_title">Benvenuto in WOToolkit</string>
     <string name="landing_welcome_subtitle">Il tuo hub centrale per l\'orchestrazione e l\'automazione dei plugin.</string>
-
-    <!-- Flows Feature -->
     <string name="flow_manager_title">Gestore Flussi</string>
     <string name="flow_create_new">Crea Nuovo Flusso</string>
     <string name="flow_import_file">Importa da file</string>
@@ -275,8 +281,6 @@
     <string name="flow_metadata_edit_title">Modifica Proprietà Flusso</string>
     <string name="flow_version">Versione</string>
     <string name="flow_description">Descrizione</string>
-
-    <!-- Flow Runner -->
     <string name="flow_select_title">Seleziona Flusso</string>
     <string name="flow_select_hint">Seleziona un flusso per vedere le opzioni</string>
     <string name="flow_run_title">Esegui Flusso: %1$s</string>
@@ -293,8 +297,6 @@
     <string name="flow_output_results_title">Risultati Output</string>
     <string name="flow_console_logs_title">Output Log Consola</string>
     <string name="flow_no_console_logs">Nessun output della consola registrato.</string>
-
-    <!-- Flow Editor -->
     <string name="flow_editor_incompatible_title">Tipi Incompatibili - Converti Automaticamente?</string>
     <string name="flow_editor_incompatible_message">Il tipo di porta di origine (%1$s) e il tipo di porta di destinazione (%2$s) sono diversi ma convertibili.\n\nVuoi inserire automaticamente un nodo Converti tra i due?</string>
     <string name="flow_editor_convert_connect">Converti e Connetti</string>
@@ -313,8 +315,6 @@
     <string name="flow_editor_incompatible_types">Impossibile connettere: tipi incompatibili. Impossibile connettere %1$s a %2$s.</string>
     <string name="flow_editor_incompatible_semantics">Impossibile connettere: tipi semantici incompatibili. \'%1$s\' non può connettersi a \'%2$s\'.</string>
     <string name="flow_editor_btn_exit">Esci</string>
-
-    <!-- Node Component -->
     <string name="node_expand">Espandi</string>
     <string name="node_edit_port">Modifica Porta</string>
     <string name="node_delete">Elimina</string>
@@ -329,8 +329,6 @@
     <string name="node_class_name_label">Nome Classe (es. org.wip.MyData)</string>
     <string name="node_semantic_type_label">Tipo Semantico / Mimetype (opzionale)</string>
     <string name="node_semantic_type_placeholder">es. image/png</string>
-
-    <!-- Palette Sidebar -->
     <string name="palette_search_placeholder">Cerca nodi...</string>
     <string name="search_capabilities_placeholder">Cerca funzionalità...</string>
     <string name="search_plugins_placeholder">Cerca plugin...</string>
@@ -338,8 +336,6 @@
     <string name="palette_tab_plugins">Plugin</string>
     <string name="palette_tab_system">Sistema</string>
     <string name="palette_tab_flows">Flussi</string>
-
-    <!-- PluginRepoView additions -->
     <string name="repo_share_link_desc">Condividi link repository</string>
     <string name="repo_no_repo_selected">Nessun Repository Selezionato</string>
     <string name="repo_no_repo_selected_desc">Seleziona un repository dal pannello sinistro, o aggiungi un nuovo URL di repository in alto per esplorare i suoi plugin e flussi.</string>
@@ -358,14 +354,69 @@
     <string name="repo_action_cancel_update">Annulla</string>
     <string name="cancel_update_title">Annulla Aggiornamento</string>
     <string name="cancel_update_desc">Sei sicuro di voler annullare l\'aggiornamento del plugin?</string>
-    <string name="node_parameters_section">Parametri</string>
-    <string name="node_results_section">Risultati</string>
-    <string name="auto_generated_path_format">%1$s (Generato automaticamente)</string>
-    <string name="pick_color">Pick Color</string>
     <string name="setting_plugin_timeout">Timeout Plugin (ms)</string>
     <string name="setting_enable_transient_retries">Abilita Tentativi Transitori</string>
     <string name="setting_max_retries">Numero Massimo Tentativi</string>
     <string name="error_invalid_version_format">Formato versione non valido (atteso x.y.z)</string>
+    <string name="plugin_install_failed">Installazione del plugin non riuscita: %1$s</string>
+    <string name="plugin_installed_success">Plugin installato con successo</string>
+    <string name="plugin_search_placeholder">Cerca plugin...</string>
+    <string name="plugin_install_remote_title">Installa Plugin Remoti</string>
+    <string name="plugin_status_installed">Installato</string>
+    <string name="plugin_install_button">Installa</string>
+    <string name="action_close">Chiudi</string>
+    <string name="action_info">Info</string>
+    <string name="plugin_config_required">Configurazione Richiesta</string>
+    <string name="plugin_invalid_signature">Firma Non Valida</string>
+    <string name="plugin_update_warning">Avviso di Aggiornamento</string>
+    <string name="common_error">Errore</string>
+    <string name="common_success">Successo</string>
+    <string name="plugin_available_in">Disponibile in:</string>
+    <string name="plugin_repo_multiple_warning">Più repository forniscono gli stessi pacchetti.</string>
+    <string name="common_warning">Avviso</string>
+    <string name="common_toast">Avviso</string>
+    <string name="update_jobs_running">Rilevati Lavori in Esecuzione</string>
+    <string name="update_stop_jobs">Arresta Lavori &amp; Aggiorna</string>
+    <string name="test_info">Info Test</string>
+    <string name="test_error">Errore Test</string>
+    <string name="test_toast">Toast Test</string>
+    <string name="preview_glasscard_title">Questa è una GlassCard</string>
+    <string name="preview_glasscard_subtitle">Con del contenuto all\'interno</string>
+    <string name="preview_section">SEZIONE ANTEPRIMA</string>
+    <string name="plugin_destructive_warning">Avviso: Questa operazione esegue operazioni distruttive sui file (come sovrascrivere o eliminare file).</string>
+    <string name="plugin_execution_inputs">Input Esecuzione</string>
+    <string name="plugin_input_locations">Posizioni di Input</string>
+    <string name="plugin_output_locations">Posizioni di Output</string>
+    <string name="plugin_access_read">Leggi File</string>
+    <string name="plugin_access_write">Scrivi File</string>
+    <string name="plugin_access_delete">Elimina File</string>
+    <string name="action_toggle_details">Mostra/Nascondi Dettagli</string>
+    <string name="plugin_execution_result">Risultato Esecuzione</string>
+    <string name="plugin_metadata">Metadati</string>
+    <string name="common_no_options">Nessuna opzione disponibile</string>
+    <string name="action_clear_selection">Cancella selezione</string>
+    <string name="theme_system">Sistema</string>
+    <string name="theme_light">Chiaro</string>
+    <string name="theme_dark">Scuro</string>
+    <string name="theme_amoled">Amoled</string>
+    <string name="preview_item_1">Elemento 1</string>
+    <string name="preview_item_2">Elemento 2</string>
+    <string name="setting_dark_mode">Modalità Scura</string>
+    <string name="setting_dark_mode_desc">Attiva/disattiva tema scuro in tutta l\'applicazione</string>
+    <string name="action_toggle_sidebar">Attiva/Disattiva Barra Laterale</string>
+    <string name="action_toggle_section">Attiva/Disattiva Sezione</string>
+    <string name="dialog_unsaved_changes">Modifiche non Salvate</string>
+    <string name="dialog_select_folder">Seleziona Cartella</string>
+    <string name="dialog_select_plugin">Seleziona File Plugin</string>
+    <string name="tab_editor">Editor</string>
+    <string name="plugin_capabilities">Funzionalità</string>
+    <string name="plugin_install_remote">Installa Remoto</string>
+    <string name="plugin_rerun_setup">Esegui di Nuovo Setup</string>
+    <string name="plugin_open_folder">Apri Cartella</string>
+    <string name="tab_plugin_manager">Gestore Plugin</string>
+    <string name="action_export">Esporta</string>
+    <string name="action_force_cancel">Forza Annullamento</string>
+    <string name="setting_auto_scroll">Scorrimento automatico</string>
     <string name="action_zoom_in">Ingrandisci</string>
     <string name="action_zoom_out">Riduci ingrandimento</string>
     <string name="action_zoom_level">Livello ingrandimento: %1$d%%</string>
@@ -376,6 +427,53 @@
     <string name="setting_plugin_settings_in_place">Popup Impostazioni Sul Posto</string>
     <string name="setting_plugin_settings_in_place_subtitle">Apri le impostazioni del plugin in un popup invece di navigare via</string>
     <string name="dialog_plugin_settings_in_place_warning_title">Attenzione: Impostazioni Sul Posto</string>
-    <string name="dialog_plugin_settings_in_place_warning_message">L\'apertura delle impostazioni sul posto potrebbe causare il mancato aggiornamento dello stato di sblocco di alcuni componenti fino al ricaricamento. Sei sicuro di voler abilitare questa modalità?</string>
     <string name="plugin_settings_by_section">Per Sezione</string>
+    <string name="setting_launch_at_startup_disabled_portable_subtitle">Questa funzione non è disponibile nella versione portatile dell\'applicazione</string>
+    <string name="setting_cache_management">Posizione Cache</string>
+    <string name="setting_cache_management_subtitle">Scegli dove archiviare la cache e i file temporanei dell\'applicazione</string>
+    <string name="cache_mode_system">Gestito dal Sistema</string>
+    <string name="cache_mode_application">Gestito dall\'Applicazione</string>
+    <string name="setting_auto_update_disabled_portable">Gli aggiornamenti sono disabilitati in modalità portatile</string>
+    <string name="repo_tab_all">Tutti (%1$d)</string>
+    <string name="repo_tab_remote">Remoti (%1$d)</string>
+    <string name="repo_tab_local">Locali (%1$d)</string>
+    <string name="repo_filter_repositories_placeholder">Filtra repository...</string>
+    <string name="repo_btn_add_remote">Aggiungi Remoto</string>
+    <string name="repo_btn_add_local">Aggiungi Locale</string>
+    <string name="repo_btn_add_repository">Aggiungi Repository</string>
+    <string name="repo_add_remote_title">Aggiungi Repository Remoto</string>
+    <string name="repo_add_local_title">Aggiungi Repository Locale</string>
+    <string name="repo_add_remote_desc">Fornisci un URL HTTP/HTTPS che punta al manifest index.json del repository.</string>
+    <string name="repo_add_local_desc">Seleziona un file manifest index.json locale dal tuo dispositivo.</string>
+    <string name="repo_remote_url_label">URL Repository (.json)</string>
+    <string name="repo_local_path_label">Percorso File Index Locale (.json)</string>
+    <string name="repo_btn_browse">Sfoglia</string>
+    <string name="repo_btn_verify">Verifica</string>
+    <string name="repo_val_valid_title">Repository Verificato con Successo</string>
+    <string name="repo_val_valid_desc">Rilevato: \"%1$s\" contenente %2$d plugin compatibili e %3$d flussi.</string>
+    <string name="repo_val_invalid_title">Verifica Fallita</string>
+    <string name="repo_val_checking_title">Verifica Repository in corso...</string>
+    <string name="repo_val_ready_title">Pronto per la Verifica</string>
+    <string name="repo_val_ready_desc">Clicca su \"Verifica\" per controllare l\'accessibilità del repository.</string>
+    <string name="repo_sort_name_asc">Nome (A → Z)</string>
+    <string name="repo_sort_name_desc">Nome (Z → A)</string>
+    <string name="repo_sort_status">Stato (Installati prima)</string>
+    <string name="repo_sort_version">Versione più recente</string>
+    <string name="repo_filter_chip_all">Tutti</string>
+    <string name="repo_filter_chip_installed">Installati</string>
+    <string name="repo_filter_chip_update">Aggiornamento Disponibile</string>
+    <string name="repo_filter_chip_available">Non Installati</string>
+    <string name="repo_filter_chip_incompatible">Incompatibili</string>
+    <string name="repo_incompatible_badge">Incompatibile</string>
+    <string name="repo_status_all">Tutti</string>
+    <string name="repo_status_synced">Sincronizzati</string>
+    <string name="repo_status_dev_drafts">Dev / Bozze</string>
+    <string name="repo_status_has_updates">Ha Aggiornamenti</string>
+    <string name="repo_action_open_folder">Apri Cartella</string>
+    <string name="repo_reinstall_version">Reinstalla %1$s</string>
+    <string name="repo_downgrade_version">Ripristina versione %1$s</string>
+    <string name="repo_install_version">Installa %1$s</string>
+    <string name="repo_filter_label">Filtra:</string>
+    <string name="repo_sort_label">Ordina:</string>
+    <string name="repo_sync_all">Sincronizza tutti</string>
 </resources>

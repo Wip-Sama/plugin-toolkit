@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayCircle
@@ -29,14 +30,16 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowState
+import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.shared.components.GlassCard
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_install
+import plugintoolkit.composeapp.generated.resources.plugin_status_installed
 import plugintoolkit.composeapp.generated.resources.repo_action_update_version
 import plugintoolkit.composeapp.generated.resources.repo_flow_filename_version_format
-import plugintoolkit.composeapp.generated.resources.*
+import plugintoolkit.composeapp.generated.resources.repo_incompatible_badge
 
 @Composable
 fun FlowListItem(
@@ -48,8 +51,8 @@ fun FlowListItem(
 ) {
     val installedFlow = flowState.flows.find { it.name == flow.name }
     val isInstalled = installedFlow != null
-    // We don't have versioning for flows in the same way, but we could check signature/hash
-    val hasUpdate = false // Simplification for flows for now
+    val hasUpdate = false
+    val (isCompatible, _) = PluginCompatibilityUtils.checkCompatibility(flow)
 
     GlassCard(
         modifier = Modifier.fillMaxWidth()
@@ -88,7 +91,35 @@ fun FlowListItem(
 
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
 
-                    if (isInstalled) {
+                    if (!isCompatible) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = CircleShape,
+                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.badgeVertical
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Block,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    stringResource(Res.string.repo_incompatible_badge),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    } else if (isInstalled) {
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             shape = CircleShape,
@@ -139,7 +170,8 @@ fun FlowListItem(
             if (hasUpdate) {
                 Button(
                     onClick = { onInstall(flow) },
-                    enabled = !isRefreshing,
+                    enabled = !isRefreshing && isCompatible,
+                    shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer
@@ -156,7 +188,12 @@ fun FlowListItem(
             } else if (!isInstalled) {
                 Button(
                     onClick = { onInstall(flow) },
-                    enabled = !isRefreshing
+                    enabled = !isRefreshing && isCompatible,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 ) {
                     Icon(
                         Icons.Default.Download,

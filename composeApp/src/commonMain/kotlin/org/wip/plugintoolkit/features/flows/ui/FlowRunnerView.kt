@@ -397,8 +397,7 @@ fun FlowRunnerView(
                     onSaveResultsChange = { viewModel.saveResults = it },
                     parameters = executionParameters,
                     providedSettings = providedSettings,
-                    providedLocks = providedLocks,
-                    onNavigateToPluginSetting = org.wip.plugintoolkit.features.plugin.ui.LocalNavigateToPluginSetting.current
+                    providedLocks = providedLocks
                 )
 
 

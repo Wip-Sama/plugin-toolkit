@@ -35,8 +35,8 @@ jobs:
         run: .\gradlew test :composeApp:jvmTest :plugin-api:jvmTest
 
       - name: Build Release Distribution
-        run: .\gradlew packageDistributionForCurrentOS packageUberJarForCurrentOS
-        # run: .\gradlew packageReleaseDistributionForCurrentOS packageReleaseUberJarForCurrentOS
+        run: .\gradlew packageDistributionForCurrentOS packageUberJarForCurrentOS packagePortableZip
+        # run: .\gradlew packageReleaseDistributionForCurrentOS packageReleaseUberJarForCurrentOS packagePortableZip
 
       - name: Publish Plugin API and Processor
         run: .\gradlew :plugin-api:publish :plugin-processor:publish

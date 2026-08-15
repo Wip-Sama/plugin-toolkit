@@ -22,6 +22,7 @@ actual object StartupManager : KoinComponent {
     private val backgroundFlag get() = appConfig.STARTUP_FLAG_BACKGROUND
 
     actual suspend fun setLaunchAtStartup(enabled: Boolean, minimized: Boolean) {
+        if (appConfig.isPortable) return
         withContext(Dispatchers.IO) {
             if (isWindows) {
                 setWindowsStartup(enabled, minimized)
@@ -32,6 +33,7 @@ actual object StartupManager : KoinComponent {
     }
 
     actual suspend fun isLaunchAtStartupEnabled(): Boolean {
+        if (appConfig.isPortable) return false
         return withContext(Dispatchers.IO) {
             if (isWindows) {
                 isWindowsStartupEnabled()
@@ -53,13 +55,14 @@ actual object StartupManager : KoinComponent {
     }
 
     private fun setWindowsStartup(enabled: Boolean, minimized: Boolean) {
+        val registryPath = appConfig.WINDOWS_STARTUP_REGISTRY_PATH ?: return
         val exePath = getExecutablePath() ?: return
         val commandLine = if (minimized) "\"$exePath\" $backgroundFlag" else "\"$exePath\""
         val command = if (enabled) {
             arrayOf(
                 "reg",
                 "add",
-                appConfig.WINDOWS_STARTUP_REGISTRY_PATH,
+                registryPath,
                 "/v",
                 appName,
                 "/t",
@@ -69,7 +72,7 @@ actual object StartupManager : KoinComponent {
                 "/f"
             )
         } else {
-            arrayOf("reg", "delete", appConfig.WINDOWS_STARTUP_REGISTRY_PATH, "/v", appName, "/f")
+            arrayOf("reg", "delete", registryPath, "/v", appName, "/f")
         }
 
         try {
@@ -80,8 +83,9 @@ actual object StartupManager : KoinComponent {
     }
 
     private fun isWindowsStartupEnabled(): Boolean {
+        val registryPath = appConfig.WINDOWS_STARTUP_REGISTRY_PATH ?: return false
         try {
-            val process = ProcessBuilder("reg", "query", appConfig.WINDOWS_STARTUP_REGISTRY_PATH, "/v", appName).start()
+            val process = ProcessBuilder("reg", "query", registryPath, "/v", appName).start()
             return process.waitFor() == 0
         } catch (e: Exception) {
             return false
@@ -89,13 +93,15 @@ actual object StartupManager : KoinComponent {
     }
 
     private fun setLinuxStartup(enabled: Boolean, minimized: Boolean) {
+        val autostartDirName = appConfig.LINUX_AUTOSTART_DIR ?: return
+        val desktopFilename = appConfig.LINUX_DESKTOP_FILENAME ?: return
         val exePath = getExecutablePath() ?: return
-        val autostartDirPath = "${System.getProperty("user.home")}/${appConfig.LINUX_AUTOSTART_DIR}"
+        val autostartDirPath = "${System.getProperty("user.home")}/$autostartDirName"
         val autostartDir = Path(autostartDirPath)
         if (!SystemFileSystem.exists(autostartDir)) {
             SystemFileSystem.createDirectories(autostartDir)
         }
-        val desktopFile = Path("$autostartDirPath/${appConfig.LINUX_DESKTOP_FILENAME}")
+        val desktopFile = Path("$autostartDirPath/$desktopFilename")
 
         if (enabled) {
             val execCommand = if (minimized) "$exePath $backgroundFlag" else exePath
@@ -118,8 +124,10 @@ actual object StartupManager : KoinComponent {
     }
 
     private fun isLinuxStartupEnabled(): Boolean {
-        val autostartDirPath = "${System.getProperty("user.home")}/${appConfig.LINUX_AUTOSTART_DIR}"
-        val desktopFile = Path("$autostartDirPath/${appConfig.LINUX_DESKTOP_FILENAME}")
+        val autostartDirName = appConfig.LINUX_AUTOSTART_DIR ?: return false
+        val desktopFilename = appConfig.LINUX_DESKTOP_FILENAME ?: return false
+        val autostartDirPath = "${System.getProperty("user.home")}/$autostartDirName"
+        val desktopFile = Path("$autostartDirPath/$desktopFilename")
         return SystemFileSystem.exists(desktopFile)
     }
 }

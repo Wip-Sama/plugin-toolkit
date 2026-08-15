@@ -96,6 +96,15 @@ enum class AppLanguage(val label: String) {
 }
 
 /**
+ * Storage location strategy for application cache and temporary files.
+ */
+@Serializable
+enum class CacheManagementMode {
+    SystemManaged,
+    ApplicationManaged
+}
+
+/**
  * General application layout, animation, and startup behavior.
  */
 @Serializable
@@ -105,7 +114,8 @@ data class GeneralSettings(
     val launchAtStartup: Boolean = false,
     val launchMinimizedAtStartup: Boolean = true,
     val windowStartMode: WindowStartMode = WindowStartMode.Normal,
-    val closeToTray: Boolean = false
+    val closeToTray: Boolean = false,
+    val cacheManagement: CacheManagementMode = CacheManagementMode.SystemManaged
 )
 
 /**

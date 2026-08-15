@@ -46,23 +46,16 @@ fun GlassCard(
 
     val finalModifier = modifier
         .animateContentSize()
-        .clip(MaterialTheme.shapes.large)
+        .clip(MaterialTheme.shapes.medium)
         .then(clickableModifier)
-        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground))
-        .border(
-            width = ToolkitTheme.dimensions.borderUnselected,
-            brush = Brush.linearGradient(
-                listOf(
-                    MaterialTheme.colorScheme.outline.copy(alpha = ToolkitTheme.opacity.borderLow),
-                    MaterialTheme.colorScheme.outline.copy(alpha = ToolkitTheme.opacity.cardBackground)
-                )
-            ),
-            shape = MaterialTheme.shapes.large
-        )
+        .background(MaterialTheme.colorScheme.surfaceVariant)
 
     Column(
         modifier = finalModifier
-            .padding(ToolkitTheme.spacing.medium),
+            .padding(
+                horizontal = ToolkitTheme.spacing.mediumLarge,
+                vertical = ToolkitTheme.spacing.mediumSmall
+            ),
         content = content
     )
 }
