@@ -59,6 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
@@ -99,6 +100,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginFolderManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginInstaller
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleManager
+import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginLockProvider
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
@@ -134,6 +136,9 @@ import javax.swing.JOptionPane.showMessageDialog
 import javax.swing.JWindow
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.seconds
+import org.wip.plugintoolkit.cli.parseToolkitCliInvocation
+import org.wip.plugintoolkit.cli.runToolkitCli
+import org.wip.plugintoolkit.cli.ToolkitCliInvocation
 
 fun detectSystemConfig(): SystemConfig {
     val userDir = java.io.File(System.getProperty("user.dir"))
@@ -169,6 +174,20 @@ fun detectSystemConfig(): SystemConfig {
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun main(args: Array<String>) {
+    when (val invocation = parseToolkitCliInvocation(args)) {
+        is ToolkitCliInvocation.Command -> {
+            // Keep command output machine-readable; desktop logging is configured only below.
+            Logger.setLogWriters()
+            val exitCode = kotlinx.coroutines.runBlocking { runToolkitCli(invocation.command) }
+            exitProcess(exitCode)
+        }
+        is ToolkitCliInvocation.Invalid -> {
+            System.err.println("Unknown command: ${invocation.arguments.joinToString(" ")}. Use --help.")
+            exitProcess(2)
+        }
+        ToolkitCliInvocation.Desktop -> Unit
+    }
+
     ComposeFoundationFlags.isNewContextMenuEnabled = true
     val splashWindow = try {
         showSplashWindow()
@@ -315,16 +334,35 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     updateStatus("Initializing plugins...")
     // Initialize registry and subsequently load plugins
     appScope.launch {
+        // Scheduling is a host service: storage hydration runs independently, while each due
+        // occurrence is held until the plugins required by that job are actually available.
+        launch {
+            val jobManager = koin.get<JobManager>().apply {
+                scheduleCapabilityReadiness = { pkg, capabilityName ->
+                    pkg in pluginManager.loadedPlugins.value &&
+                        PluginLoader.getPluginById(pkg)
+                            ?.getManifest()
+                            ?.getOrNull()
+                            ?.capabilities
+                            ?.any { it.name == capabilityName } == true
+                }
+            }
+            if (!jobManager.startScheduler()) {
+                Logger.e { "Startup: Scheduler state could not be loaded safely; background retries are active" }
+            }
+        }
+
         try {
             registry.initialize()
         } catch (e: Throwable) {
             Logger.e(e) { "Startup: Failed to initialize PluginRegistry" }
+            return@launch
         }
 
         val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
         Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
 
-        pluginsToLoad.forEach { plugin ->
+        val pluginStartupJobs = pluginsToLoad.map { plugin ->
             if (plugin.isValidated) {
                 Logger.d { "Startup: Launching load for validated plugin ${plugin.pkg}" }
                 launch {
@@ -348,6 +386,7 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
                 }
             }
         }
+        pluginStartupJobs.joinAll()
     }
 
     updateStatus("Refreshing repositories...")

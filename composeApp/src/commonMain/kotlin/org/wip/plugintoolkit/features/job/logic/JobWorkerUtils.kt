@@ -332,11 +332,7 @@ object SystemPathSecurity {
         customWhitelist: List<String> = emptyList(),
         sandboxPath: String? = null
     ): Boolean {
-        val canonical = try {
-            java.io.File(pathStr).canonicalPath
-        } catch (_: Exception) {
-            return false
-        }
+        val canonical = comparablePath(pathStr) ?: return false
 
         when (mode) {
             org.wip.plugintoolkit.features.settings.model.FileAccessMode.Unrestricted -> return true
@@ -345,19 +341,68 @@ object SystemPathSecurity {
                 sandboxPath?.let { effectiveWhitelist.add(it) }
                 if (effectiveWhitelist.isEmpty()) return false
                 return effectiveWhitelist.any { allowed ->
-                    val allowedCanonical = try { java.io.File(allowed).canonicalPath } catch (_: Exception) { return@any false }
-                    canonical == allowedCanonical || canonical.startsWith(allowedCanonical + java.io.File.separator)
+                    val allowedCanonical = comparablePath(allowed) ?: return@any false
+                    canonical.isInside(allowedCanonical)
                 }
             }
             org.wip.plugintoolkit.features.settings.model.FileAccessMode.Blacklist -> {
                 val effectiveBlacklist = if (customBlacklist.isNotEmpty()) customBlacklist else BUILTIN_BLACKLIST
                 val isDenied = effectiveBlacklist.any { blocked ->
-                    val blockedCanonical = try { java.io.File(blocked).canonicalPath } catch (_: Exception) { return@any false }
-                    canonical == blockedCanonical || canonical.startsWith(blockedCanonical + java.io.File.separator)
+                    val blockedCanonical = comparablePath(blocked) ?: return@any false
+                    canonical.isInside(blockedCanonical)
                 }
                 return !isDenied
             }
         }
+    }
+
+    private data class ComparablePath(val value: String, val windowsStyle: Boolean) {
+        fun isInside(root: ComparablePath): Boolean {
+            if (windowsStyle != root.windowsStyle) return false
+            return if (windowsStyle) {
+                value.equals(root.value, ignoreCase = true) ||
+                    value.startsWith(root.value.trimEnd('/') + "/", ignoreCase = true)
+            } else {
+                value == root.value || value.startsWith(root.value.trimEnd('/') + "/")
+            }
+        }
+    }
+
+    private fun comparablePath(path: String): ComparablePath? {
+        val slashNormalized = path.replace('\\', '/')
+        val inputUsesWindowsDrive = Regex("^[A-Za-z]:/").containsMatchIn(slashNormalized)
+        val inputUsesWindowsUnc = slashNormalized.startsWith("//")
+        val inputUsesWindowsStyle = inputUsesWindowsDrive || inputUsesWindowsUnc
+        val nativeWindows = java.io.File.separatorChar == '\\'
+        return try {
+            // Native paths must always be canonicalized so junctions/symlinks cannot bypass an
+            // access root. Lexical parsing is only for a foreign Windows path on a Unix host,
+            // where java.io.File would otherwise prefix the current directory to `C:\\...`.
+            val value = if (inputUsesWindowsStyle && !nativeWindows) {
+                normalizeWindowsPath(slashNormalized)
+            } else {
+                java.io.File(path).canonicalPath.replace('\\', '/')
+            }
+            val windowsStyle = Regex("^[A-Za-z]:/").containsMatchIn(value) || value.startsWith("//")
+            ComparablePath(value.trimEnd('/'), windowsStyle)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun normalizeWindowsPath(path: String): String {
+        val isUnc = path.startsWith("//")
+        val segments = mutableListOf<String>()
+        path.drop(2).split('/').forEach { segment ->
+            when (segment) {
+                "", "." -> Unit
+                // The server and share form the UNC root and cannot be traversed above.
+                ".." -> if (segments.size > if (isUnc) 2 else 0) segments.removeLast()
+                else -> segments += segment
+            }
+        }
+        val root = if (isUnc) "//" else "${path.take(2)}/"
+        return "$root${segments.joinToString("/")}".trimEnd('/')
     }
 }
 
@@ -454,4 +499,3 @@ fun deleteRecursively(path: kotlinx.io.files.Path) {
         }
     }
 }
-

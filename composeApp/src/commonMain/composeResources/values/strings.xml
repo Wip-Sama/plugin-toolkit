@@ -191,6 +191,8 @@
     <string name="plugin_settings_actions">Actions</string>
     <string name="plugin_settings_custom">Custom Settings</string>
     <string name="plugin_settings_global_defaults">Global Parameter Defaults</string>
+    <string name="plugin_settings_required">Required</string>
+    <string name="plugin_settings_optional">Optional</string>
     <string name="plugin_settings_capability">Capability: %1$s</string>
     <string name="settings_enum_unlock_message">Configure required settings to unlock options</string>
     <string name="settings_locked_capability">Locked capability: %1$s</string>
@@ -201,7 +203,6 @@
     <string name="job_no_archived">No archived jobs</string>
     <string name="job_ended_jobs">Ended Jobs</string>
     <string name="job_no_ended">No ended jobs recorded yet</string>
-    <string name="job_scheduler_soon">Scheduler coming soon</string>
     <string name="job_error_format">Error: %1$s</string>
     <string name="plugin_choose_install_location">Choose Install Location</string>
     <string name="plugin_action_blocked">Action Blocked</string>
@@ -426,6 +427,16 @@
     <string name="setting_plugin_settings_in_place_subtitle">Open plugin settings in an overlay popup instead of navigating away</string>
     <string name="dialog_plugin_settings_in_place_warning_title">Warning: In-Place Settings</string>
     <string name="plugin_settings_by_section">By Section</string>
+    <string name="job_schedule_action">Schedule recurring run</string>
+    <string name="job_schedule_title">Create recurring schedule</string>
+    <string name="job_schedule_interval_label">Interval (minutes)</string>
+    <string name="job_schedule_create">Schedule</string>
+    <string name="job_schedule_empty">Schedule a completed capability or flow to run at a recurring interval.</string>
+    <string name="job_schedule_next_format">Every %1$d minutes · next %2$s</string>
+    <string name="job_schedule_run_now">Run schedule now</string>
+    <string name="job_schedule_delete">Delete schedule</string>
+    <string name="job_schedule_save_failed">The schedule change could not be saved. Nothing was changed; check storage access and try again.</string>
+    <string name="job_schedule_load_failed">Saved schedules could not be loaded. They will not run until storage recovers; the scheduler will retry automatically.</string>
     <string name="setting_launch_at_startup_disabled_portable_subtitle">This feature is not available in the portable version of the application</string>
     <string name="setting_cache_management">Cache Location</string>
     <string name="setting_cache_management_subtitle">Choose where application cache and temporary files are stored</string>

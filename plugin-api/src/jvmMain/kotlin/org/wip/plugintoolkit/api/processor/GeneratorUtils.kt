@@ -10,6 +10,7 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.PluginUiPage
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.parseSemanticTypes
 
@@ -108,6 +109,40 @@ object GeneratorUtils {
     fun KSAnnotation.hasQualifiedName(name: String): Boolean {
         return this.annotationType.resolve().declaration.qualifiedName?.asString() == name
     }
+
+    fun extractUiPages(
+        classDeclaration: KSClassDeclaration,
+        reportError: (String) -> Unit = {}
+    ): List<PluginUiPage> =
+        classDeclaration.annotations
+            .filter { it.hasQualifiedName(ProcessorConstants.PLUGIN_UI_PAGE_ANNOTATION) }
+            .mapNotNull { annotation ->
+                val id = annotation.arguments.find { it.name?.asString() == "id" }?.value as? String
+                val title = annotation.arguments.find { it.name?.asString() == "title" }?.value as? String
+                if (id == null || title == null) {
+                    reportError("@PluginUiPage requires string 'id' and 'title' arguments")
+                    return@mapNotNull null
+                }
+                val rawCapabilities = annotation.arguments
+                    .find { it.name?.asString() == "capabilityNames" }
+                    ?.value
+                if (rawCapabilities != null && rawCapabilities !is List<*>) {
+                    reportError("@PluginUiPage.capabilityNames must be a string array")
+                    return@mapNotNull null
+                }
+                val capabilityNames = (rawCapabilities as? List<*>)?.filterIsInstance<String>().orEmpty()
+                if ((rawCapabilities as? List<*>)?.size != capabilityNames.size) {
+                    reportError("@PluginUiPage.capabilityNames must contain only strings")
+                    return@mapNotNull null
+                }
+                PluginUiPage(
+                    id = id,
+                    title = title,
+                    description = annotation.arguments.find { it.name?.asString() == "description" }?.value as? String ?: "",
+                    capabilityNames = capabilityNames
+                )
+            }
+            .toList()
 
     fun generateDataTypeCode(dataType: DataType): com.squareup.kotlinpoet.CodeBlock {
         val cnDataType = com.squareup.kotlinpoet.ClassName("org.wip.plugintoolkit.api", "DataType")

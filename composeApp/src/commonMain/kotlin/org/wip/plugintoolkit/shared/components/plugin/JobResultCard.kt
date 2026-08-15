@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -95,6 +96,7 @@ fun JobResultCard(
     onPause: (() -> Unit)? = null,
     onResume: (() -> Unit)? = null,
     onClear: (() -> Unit)? = null,
+    onSchedule: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -155,6 +157,15 @@ fun JobResultCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatusBadge(job.status)
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+
+                    if (onSchedule != null) {
+                        IconButton(onClick = onSchedule) {
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = stringResource(Res.string.job_schedule_action)
+                            )
+                        }
+                    }
 
                     if (onDelete != null) {
                         IconButton(

@@ -12,18 +12,20 @@ import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
 import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 
-class JvmSettingsPersistence : SettingsPersistence, KoinComponent {
-    private val appConfig: SystemConfig by inject()
+class JvmSettingsPersistence(
+    private val configuredAppConfig: SystemConfig? = null,
+    private val configuredSettingsDir: String? = null
+) : SettingsPersistence, KoinComponent {
+    private val appConfig: SystemConfig by lazy { configuredAppConfig ?: getKoin().get() }
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
 
-    private val settingsDirPath by lazy { PlatformPathUtils.getAppDataDir() }
+    private val settingsDirPath by lazy { configuredSettingsDir ?: PlatformPathUtils.getAppDataDir(appConfig) }
     private val settingsDir by lazy { Path(settingsDirPath) }
     private val settingsFile by lazy { Path("$settingsDirPath/${appConfig.SETTINGS_FILE_NAME}") }
 

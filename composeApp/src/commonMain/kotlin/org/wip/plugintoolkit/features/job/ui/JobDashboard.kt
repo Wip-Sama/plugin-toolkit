@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -42,9 +44,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -80,6 +84,8 @@ import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.MAX_SCHEDULE_INTERVAL_MINUTES
+import org.wip.plugintoolkit.features.job.model.canBeScheduled
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import org.wip.plugintoolkit.shared.components.ToolkitChip
@@ -103,7 +109,15 @@ import plugintoolkit.composeapp.generated.resources.job_no_ended
 import plugintoolkit.composeapp.generated.resources.job_paused_jobs
 import plugintoolkit.composeapp.generated.resources.job_queue
 import plugintoolkit.composeapp.generated.resources.job_running_jobs
-import plugintoolkit.composeapp.generated.resources.job_scheduler_soon
+import plugintoolkit.composeapp.generated.resources.job_schedule_create
+import plugintoolkit.composeapp.generated.resources.job_schedule_delete
+import plugintoolkit.composeapp.generated.resources.job_schedule_empty
+import plugintoolkit.composeapp.generated.resources.job_schedule_load_failed
+import plugintoolkit.composeapp.generated.resources.job_schedule_save_failed
+import plugintoolkit.composeapp.generated.resources.job_schedule_interval_label
+import plugintoolkit.composeapp.generated.resources.job_schedule_next_format
+import plugintoolkit.composeapp.generated.resources.job_schedule_run_now
+import plugintoolkit.composeapp.generated.resources.job_schedule_title
 import plugintoolkit.composeapp.generated.resources.nav_job_archive
 import plugintoolkit.composeapp.generated.resources.nav_job_ended
 import plugintoolkit.composeapp.generated.resources.nav_job_general
@@ -213,7 +227,7 @@ fun JobDashboard(
                         is JobNavKey.General -> NavEntry(key) { GeneralTab(viewModel) }
                         is JobNavKey.Archive -> NavEntry(key) { ArchiveTab(viewModel) }
                         is JobNavKey.Ended -> NavEntry(key) { EndedTab(viewModel) }
-                        is JobNavKey.Scheduler -> NavEntry(key) { SchedulerTab() }
+                        is JobNavKey.Scheduler -> NavEntry(key) { SchedulerTab(viewModel) }
                         is JobNavKey.History -> NavEntry(key) { HistoryTab(viewModel) }
                         else -> NavEntry(key) { }
                     }
@@ -308,6 +322,49 @@ fun EndedTab(viewModel: JobViewModel) {
     val endedJobs by viewModel.endedJobs.collectAsState()
     val logsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
     val progressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
+    val scheduleOperationFailed by viewModel.scheduleOperationFailed.collectAsState()
+    var jobToSchedule by remember { mutableStateOf<BackgroundJob?>(null) }
+    var intervalText by remember { mutableStateOf(DEFAULT_SCHEDULE_INTERVAL_MINUTES.toString()) }
+
+    jobToSchedule?.let { job ->
+        val interval = intervalText.toLongOrNull()?.takeIf { it in 1..MAX_SCHEDULE_INTERVAL_MINUTES }
+        AlertDialog(
+            onDismissRequest = { jobToSchedule = null },
+            title = { Text(stringResource(Res.string.job_schedule_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
+                    OutlinedTextField(
+                        value = intervalText,
+                        onValueChange = { value -> intervalText = value.filter(Char::isDigit) },
+                        label = { Text(stringResource(Res.string.job_schedule_interval_label)) },
+                        singleLine = true
+                    )
+                    if (scheduleOperationFailed) {
+                        Text(
+                            stringResource(Res.string.job_schedule_save_failed),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = interval != null,
+                    onClick = {
+                        viewModel.scheduleRecurring(job, interval!!) { succeeded ->
+                            if (succeeded) jobToSchedule = null
+                        }
+                    }
+                ) { Text(stringResource(Res.string.job_schedule_create)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { jobToSchedule = null }) {
+                    Text(stringResource(Res.string.dialog_cancel))
+                }
+            }
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -338,7 +395,14 @@ fun EndedTab(viewModel: JobViewModel) {
                         job = job,
                         progress = progressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                         logs = logsMap[job.id] ?: emptyList(),
-                        onClear = { viewModel.clearEndedJob(job.id) }
+                        onClear = { viewModel.clearEndedJob(job.id) },
+                        onSchedule = if (job.type.canBeScheduled()) {
+                            {
+                                viewModel.clearScheduleError()
+                                intervalText = DEFAULT_SCHEDULE_INTERVAL_MINUTES.toString()
+                                jobToSchedule = job
+                            }
+                        } else null
                     )
                 }
             } else {
@@ -351,26 +415,83 @@ fun EndedTab(viewModel: JobViewModel) {
 }
 
 @Composable
-fun SchedulerTab() {
-    Column(
+fun SchedulerTab(viewModel: JobViewModel) {
+    val schedules by viewModel.schedules.collectAsState()
+    val scheduleOperationFailed by viewModel.scheduleOperationFailed.collectAsState()
+    val scheduleLoadFailed by viewModel.scheduleLoadFailed.collectAsState()
+
+    if (schedules.isEmpty() && !scheduleOperationFailed && !scheduleLoadFailed) {
+        EmptyState(stringResource(Res.string.job_schedule_empty), Icons.Default.Schedule)
+        return
+    }
+
+    LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
-        Icon(
-            imageVector = Icons.Default.Schedule,
-            contentDescription = null,
-            modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraLarge),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground)
-        )
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-        Text(
-            text = stringResource(Res.string.job_scheduler_soon),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (scheduleLoadFailed) {
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Text(
+                        stringResource(Res.string.job_schedule_load_failed),
+                        modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+        if (scheduleOperationFailed) {
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Text(
+                        stringResource(Res.string.job_schedule_save_failed),
+                        modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+        items(schedules, key = { it.id }) { schedule ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.medium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(schedule.jobTemplate.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(
+                                Res.string.job_schedule_next_format,
+                                schedule.intervalMinutes,
+                                formatTime(schedule.nextRunAt)
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = schedule.enabled,
+                        onCheckedChange = { viewModel.setScheduleEnabled(schedule.id, it) }
+                    )
+                    IconButton(onClick = { viewModel.runScheduleNow(schedule.id) }) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(Res.string.job_schedule_run_now))
+                    }
+                    IconButton(onClick = { viewModel.removeSchedule(schedule.id) }) {
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(Res.string.job_schedule_delete))
+                    }
+                }
+            }
+        }
     }
 }
+
+private const val DEFAULT_SCHEDULE_INTERVAL_MINUTES = 24L * 60L
 
 @Composable
 fun HistoryTab(viewModel: JobViewModel) {
@@ -482,4 +603,3 @@ private fun formatTime(instant: Instant): String {
         localDateTime.minute.toString().padStart(2, '0')
     }:${localDateTime.second.toString().padStart(2, '0')}"
 }
-
