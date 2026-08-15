@@ -18,9 +18,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
@@ -101,7 +102,6 @@ import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_used_in
 import plugintoolkit.composeapp.generated.resources.flow_search_placeholder
 import plugintoolkit.composeapp.generated.resources.flow_used_in_chip
 import plugintoolkit.composeapp.generated.resources.flow_used_in_parents
-import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun FlowManagerView(
@@ -117,13 +117,10 @@ fun FlowManagerView(
     var searchQuery by remember { mutableStateOf("") }
     var flowToDelete by remember { mutableStateOf<String?>(null) }
     var flowToEditMetadata by remember { mutableStateOf<String?>(null) }
-    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
+    val clipboard = LocalClipboard.current
     val textClipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-
-//    LaunchedEffect(Unit) {
-//        // flows are reloaded automatically via flowRepository
-//    }
+    val lazyListState = rememberLazyListState()
 
     val activeCapabilities = remember(state.flows) {
         PluginLoader.getPlugins().flatMap { it.getManifest().getOrThrow().capabilities.map { cap -> cap.name } }.toSet()

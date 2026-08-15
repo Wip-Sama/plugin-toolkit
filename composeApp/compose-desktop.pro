@@ -91,3 +91,9 @@
 -keep class androidx.** { *; }
 -keep interface androidx.** { *; }
 -dontwarn androidx.**
+
+# FileKit and Skia
+-dontwarn io.github.vinceglb.filekit.**
+-dontwarn org.jetbrains.skia.**
+-dontwarn org.jetbrains.skiko.**
+-dontwarn com.jetbrains.**

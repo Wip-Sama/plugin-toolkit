@@ -130,3 +130,14 @@ Since the repository is purely static, you can host it on:
 - **GitHub Pages**: Ideal for community-driven repositories.
 - **S3 / Cloud Storage**: For high-availability distribution.
 - **Local Web Server**: For development and testing.
+- **Local Filesystem (Local Repositories)**: Point directly to a local `.json` index manifest on your storage drive (e.g. `D:\Plugins\DevWorkspace\index.json`).
+
+## Local Repositories (Offline / Dev Workspaces)
+
+The application supports registering local repository manifest files directly from your filesystem without requiring a web server or internet connectivity.
+
+### How Local Repositories Work
+1. **Direct Index Selection**: You specify the exact path to the repository index manifest (e.g. `D:\Plugins\DevWorkspace\index.json`).
+2. **Relative Folder Resolution**: The repository root is considered the folder containing the selected `index.json`. The `pluginsFolder` (default: `"plugins"`) and `flowsFolder` (default: `"flows"`) declared in `index.json` are resolved relative to that directory.
+3. **Zero-Network File Operations**: Plugins and flows are copied directly from local storage using high-speed filesystem operations.
+4. **Validation & Verification**: The in-app repository manager provides instant pre-flight validation for local indexes, reporting detected plugin counts, flow counts, and manifest validity.

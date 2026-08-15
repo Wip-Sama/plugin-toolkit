@@ -51,6 +51,9 @@ import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.model.resolveProvidedValues
+import org.wip.plugintoolkit.features.navigation.GlobalRouter
+import org.wip.plugintoolkit.features.navigation.LocalGlobalRouter
+import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
@@ -73,9 +76,11 @@ fun DirectExecutionSidebar(
     onBackToPlugins: () -> Unit,
     selectedCapability: Capability?,
     onCapabilitySelected: (Capability) -> Unit,
+    router: GlobalRouter? = null,
     onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val currentRouter = router ?: LocalGlobalRouter.current
     var pluginSearchQuery by remember { mutableStateOf("") }
     var capabilitySearchQuery by remember { mutableStateOf("") }
     var isShiftPressed by remember { mutableStateOf(false) }
@@ -201,12 +206,16 @@ fun DirectExecutionSidebar(
                                 val lockStatus = org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils.checkCapabilityLockStatus(cap, locks, settings)
                                 val isLocked = lockStatus is org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus.Locked
 
-                                if (isLocked && onNavigateToPluginSetting != null) {
+                                if (isLocked) {
                                     val targetSettingKey = when (lockStatus) {
                                         is org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus.Locked -> lockStatus.missingLocks.firstOrNull() ?: lockStatus.missingSettings.firstOrNull() ?: ""
                                         else -> cap.requiredLocks.firstOrNull() ?: cap.requiresSettings.firstOrNull() ?: ""
                                     }
-                                    onNavigateToPluginSetting(manifest.plugin.id, targetSettingKey)
+                                    if (onNavigateToPluginSetting != null) {
+                                        onNavigateToPluginSetting(manifest.plugin.id, targetSettingKey)
+                                    } else {
+                                        currentRouter.navigateTo(Screen.PluginManager(manifest.plugin.id, targetSettingKey))
+                                    }
                                 } else {
                                     onCapabilitySelected(cap)
                                 }

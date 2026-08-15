@@ -37,8 +37,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.jetbrains.compose.resources.stringResource
-import plugintoolkit.composeapp.generated.resources.*
+import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.plugin.ui.lockedClickInterceptor
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.theme_amoled
+import plugintoolkit.composeapp.generated.resources.theme_dark
+import plugintoolkit.composeapp.generated.resources.theme_light
+import plugintoolkit.composeapp.generated.resources.theme_system
 
 @Deprecated(
     message = "This is a workaround for the Material 3 Expressive Dropdown menu. Migrate to native when JetBrains drops support.",
@@ -159,16 +164,28 @@ fun <T> ExpressiveMenu(
                                     )
                                     .onPointerEvent(PointerEventType.Enter) { isHovered = true }
                                     .onPointerEvent(PointerEventType.Exit) { isHovered = false }
-                                    .lockedClickInterceptor(
-                                        isLocked = isDisabled,
-                                        pluginId = pluginId,
-                                        targetSettingKey = itemSettingKey,
-                                        hasUnsavedChanges = hasUnsavedChanges,
-                                        onNavigateToPluginSetting = if (onNavigateToPluginSetting != null) { pid, key ->
-                                            expanded = false
-                                            onNavigateToPluginSetting(pid, key)
-                                        } else null
-                                    ),
+                                    .then(
+                                         if (onNavigateToPluginSetting != null) {
+                                             Modifier.lockedClickInterceptor(
+                                                 isLocked = isDisabled,
+                                                 pluginId = pluginId,
+                                                 targetSettingKey = itemSettingKey,
+                                                 hasUnsavedChanges = hasUnsavedChanges,
+                                                 onNavigateToPluginSetting = { pid, key ->
+                                                     expanded = false
+                                                     onNavigateToPluginSetting(pid, key)
+                                                 }
+                                             )
+                                         } else {
+                                             Modifier.lockedClickInterceptor(
+                                                 isLocked = isDisabled,
+                                                 targetScreen = if (pluginId.isNotEmpty() || itemSettingKey.isNotEmpty()) {
+                                                     Screen.PluginManager(pluginId = pluginId.ifEmpty { null }, scrollToSetting = itemSettingKey.ifEmpty { null })
+                                                 } else null,
+                                                 hasUnsavedChanges = hasUnsavedChanges
+                                             )
+                                         }
+                                     ),
                                 colors = MenuDefaults.itemColors(
                                     textColor = if (isDisabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                                 else if (isSelected) MaterialTheme.colorScheme.onPrimary

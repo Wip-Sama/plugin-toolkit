@@ -265,9 +265,6 @@ fun PluginSettingsContent(
         }
     }
 
-    val topFadeLength = if (lazyListState.canScrollBackward) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
-    val bottomFadeLength = if (lazyListState.canScrollForward) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
-
     // 1. Macro-Layout Topology: Split View
     Row(
         modifier = modifier
@@ -423,8 +420,9 @@ fun PluginSettingsContent(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalFadingEdges(
-                                topFadeLength = topFadeLength,
-                                bottomFadeLength = bottomFadeLength,
+                                lazyListState = lazyListState,
+                                topFadeLength = ToolkitTheme.spacing.large,
+                                bottomFadeLength = ToolkitTheme.spacing.large,
                                 almostOpaque = ToolkitTheme.opacity.almostOpaque
                             ),
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)

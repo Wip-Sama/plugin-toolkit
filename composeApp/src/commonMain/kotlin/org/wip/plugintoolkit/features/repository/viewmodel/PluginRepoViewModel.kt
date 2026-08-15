@@ -17,6 +17,9 @@ import org.koin.mp.KoinPlatform
 import io.ktor.http.encodeURLPathPart
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.core.utils.VersionUtils
+import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
@@ -28,6 +31,8 @@ import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
+import org.wip.plugintoolkit.features.repository.model.RepoValidationResult
+import plugintoolkit.composeapp.generated.resources.dialog_select_plugin
 import plugintoolkit.composeapp.generated.resources.plugin_choose_install_location
 import plugintoolkit.composeapp.generated.resources.repo_add_error
 import plugintoolkit.composeapp.generated.resources.repo_add_success
@@ -64,6 +69,28 @@ class PluginRepoViewModel(
     val repositories = repoManager.repositories
     val isRefreshing = repoManager.isRefreshing
 
+    // Repo Filtering & Sorting State
+    var repoTypeTab by mutableStateOf(RepoTypeTab.All)
+    var repoSearchQuery by mutableStateOf("")
+    var repoStatusFilter by mutableStateOf(RepoStatusFilter.All)
+
+    val totalRepoCount: StateFlow<Int> = repositories.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    val remoteRepoCount: StateFlow<Int> = repositories.map { it.count { r -> r.isRemote } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    val localRepoCount: StateFlow<Int> = repositories.map { it.count { r -> r.isLocal } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    // Plugin Controls Toolbar State
+    var pluginSearchQuery by mutableStateOf("")
+    var pluginSortMode by mutableStateOf(PluginSortMode.NameAsc)
+    var pluginChipFilter by mutableStateOf(PluginChipFilter.All)
+    var pluginTagFilter by mutableStateOf<String?>(null)
+
+    // Add Repository Dialog State
+    var addRepoDialogState by mutableStateOf(AddRepoDialogState())
+        private set
+
     // pkg -> List of repos offering it
     val conflicts: StateFlow<Map<String, List<ExtensionRepo>>> = repoManager.plugins.map { pluginsMap ->
         val pkgToRepos = mutableMapOf<String, MutableList<String>>()
@@ -87,6 +114,171 @@ class PluginRepoViewModel(
                 .associate { it.pluginId to (progressMap[it.id]?.mainProgress ?: 0f) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    fun filterRepositories(repos: List<ExtensionRepo>): List<ExtensionRepo> {
+        return repos.filter { repo ->
+            val matchesType = when (repoTypeTab) {
+                RepoTypeTab.All -> true
+                RepoTypeTab.Remote -> repo.isRemote
+                RepoTypeTab.Local -> repo.isLocal
+            }
+            val matchesSearch = repoSearchQuery.isBlank() ||
+                    repo.name.contains(repoSearchQuery, ignoreCase = true) ||
+                    repo.url.contains(repoSearchQuery, ignoreCase = true)
+            matchesType && matchesSearch
+        }
+    }
+
+    fun filterAndSortPlugins(pluginsList: List<ExtensionPlugin>): List<ExtensionPlugin> {
+        val filtered = pluginsList.filter { plugin ->
+            val installedPlugin = installedPlugins.value.find { it.pkg == plugin.pkg }
+            val isInstalled = installedPlugin != null
+            val hasUpdate = installedPlugin != null && VersionUtils.compare(plugin.version, installedPlugin.version) > 0
+            val (isCompatible, _) = PluginCompatibilityUtils.checkCompatibility(plugin)
+
+            val matchesSearch = pluginSearchQuery.isBlank() ||
+                    plugin.name.contains(pluginSearchQuery, ignoreCase = true) ||
+                    (plugin.description ?: "").contains(pluginSearchQuery, ignoreCase = true) ||
+                    plugin.pkg.contains(pluginSearchQuery, ignoreCase = true)
+
+            val matchesChip = when (pluginChipFilter) {
+                PluginChipFilter.All -> true
+                PluginChipFilter.Installed -> isInstalled
+                PluginChipFilter.UpdateAvailable -> hasUpdate
+                PluginChipFilter.NotInstalled -> !isInstalled
+                PluginChipFilter.Incompatible -> !isCompatible
+            }
+
+            val matchesTag = pluginTagFilter == null ||
+                    (plugin.manifest?.plugin?.id?.contains(pluginTagFilter!!, ignoreCase = true) == true) ||
+                    plugin.name.contains(pluginTagFilter!!, ignoreCase = true) ||
+                    (plugin.description ?: "").contains(pluginTagFilter!!, ignoreCase = true)
+
+            matchesSearch && matchesChip && matchesTag
+        }
+
+        return when (pluginSortMode) {
+            PluginSortMode.NameAsc -> filtered.sortedBy { it.name.lowercase() }
+            PluginSortMode.NameDesc -> filtered.sortedByDescending { it.name.lowercase() }
+            PluginSortMode.StatusInstalledFirst -> filtered.sortedByDescending { isInstalled(it.pkg) }
+            PluginSortMode.LatestVersion -> filtered.sortedWith { a, b -> VersionUtils.compare(b.version, a.version) }
+        }
+    }
+
+    fun filterAndSortFlows(flowsList: List<ExtensionFlow>): List<ExtensionFlow> {
+        val currentFlowState = flowState.value
+        val filtered = flowsList.filter { flow ->
+            val isInstalled = currentFlowState.flows.any { it.name == flow.name }
+            val (isCompatible, _) = PluginCompatibilityUtils.checkCompatibility(flow)
+
+            val matchesSearch = pluginSearchQuery.isBlank() ||
+                    flow.name.contains(pluginSearchQuery, ignoreCase = true) ||
+                    (flow.description ?: "").contains(pluginSearchQuery, ignoreCase = true) ||
+                    flow.fileName.contains(pluginSearchQuery, ignoreCase = true)
+
+            val matchesChip = when (pluginChipFilter) {
+                PluginChipFilter.All -> true
+                PluginChipFilter.Installed -> isInstalled
+                PluginChipFilter.UpdateAvailable -> false
+                PluginChipFilter.NotInstalled -> !isInstalled
+                PluginChipFilter.Incompatible -> !isCompatible
+            }
+
+            matchesSearch && matchesChip
+        }
+
+        return when (pluginSortMode) {
+            PluginSortMode.NameAsc -> filtered.sortedBy { it.name.lowercase() }
+            PluginSortMode.NameDesc -> filtered.sortedByDescending { it.name.lowercase() }
+            PluginSortMode.StatusInstalledFirst -> filtered.sortedByDescending { flow -> currentFlowState.flows.any { it.name == flow.name } }
+            PluginSortMode.LatestVersion -> filtered.sortedWith { a, b -> VersionUtils.compare(b.version, a.version) }
+        }
+    }
+
+    fun openAddRepoDialog(isLocal: Boolean = false) {
+        addRepoDialogState = AddRepoDialogState(
+            isOpen = true,
+            isLocalMode = isLocal,
+            targetInput = "",
+            validationResult = RepoValidationResult.Idle
+        )
+    }
+
+    fun closeAddRepoDialog() {
+        addRepoDialogState = AddRepoDialogState(isOpen = false)
+    }
+
+    fun onAddRepoTargetChange(input: String) {
+        addRepoDialogState = addRepoDialogState.copy(
+            targetInput = input,
+            validationResult = RepoValidationResult.Idle
+        )
+    }
+
+    fun onAddRepoModeChange(isLocal: Boolean) {
+        addRepoDialogState = addRepoDialogState.copy(
+            isLocalMode = isLocal,
+            targetInput = "",
+            validationResult = RepoValidationResult.Idle
+        )
+    }
+
+    fun validateAddRepoTarget() {
+        val target = addRepoDialogState.targetInput.trim()
+        if (target.isEmpty()) return
+
+        addRepoDialogState = addRepoDialogState.copy(validationResult = RepoValidationResult.Checking)
+        viewModelScope.launch {
+            val result = repoManager.validateRepository(target)
+            addRepoDialogState = addRepoDialogState.copy(validationResult = result)
+        }
+    }
+
+    fun browseLocalIndexFile() {
+        viewModelScope.launch {
+            val pickedPath = PlatformUtils.pickFile(
+                title = getString(ResStrings.dialog_select_plugin),
+                allowedExtensions = listOf("json")
+            )
+            if (pickedPath != null) {
+                addRepoDialogState = addRepoDialogState.copy(
+                    targetInput = pickedPath,
+                    validationResult = RepoValidationResult.Checking
+                )
+                val result = repoManager.validateRepository(pickedPath)
+                addRepoDialogState = addRepoDialogState.copy(validationResult = result)
+            }
+        }
+    }
+
+    fun confirmAddRepository() {
+        val target = addRepoDialogState.targetInput.trim()
+        if (target.isEmpty()) return
+
+        viewModelScope.launch {
+            when (val result = repoManager.addRepository(target)) {
+                is AddRepoResult.Success -> {
+                    closeAddRepoDialog()
+                    notificationService.toast(getString(ResStrings.repo_add_success))
+                }
+                is AddRepoResult.AlreadyAdded -> {
+                    notificationService.toast(getString(ResStrings.repo_already_added))
+                }
+                is AddRepoResult.Error -> {
+                    notificationService.toast(getString(ResStrings.repo_add_error, result.message))
+                }
+            }
+        }
+    }
+
+    fun openLocalFolder(path: String) {
+        val folderPath = if (path.endsWith(".json", ignoreCase = true)) {
+            path.replace('\\', '/').substringBeforeLast('/')
+        } else {
+            path
+        }
+        PlatformUtils.openFolder(folderPath)
+    }
 
     fun addRepository() {
         val url = repoUrlInput.trim()
