@@ -371,17 +371,19 @@ object SystemPathSecurity {
     private fun comparablePath(path: String): ComparablePath? {
         val slashNormalized = path.replace('\\', '/')
         val inputUsesWindowsDrive = Regex("^[A-Za-z]:/").containsMatchIn(slashNormalized)
+        val inputUsesWindowsUnc = slashNormalized.startsWith("//")
+        val inputUsesWindowsStyle = inputUsesWindowsDrive || inputUsesWindowsUnc
         val nativeWindows = java.io.File.separatorChar == '\\'
         return try {
             // Native paths must always be canonicalized so junctions/symlinks cannot bypass an
             // access root. Lexical parsing is only for a foreign Windows path on a Unix host,
             // where java.io.File would otherwise prefix the current directory to `C:\\...`.
-            val value = if (inputUsesWindowsDrive && !nativeWindows) {
+            val value = if (inputUsesWindowsStyle && !nativeWindows) {
                 normalizeWindowsPath(slashNormalized)
             } else {
                 java.io.File(path).canonicalPath.replace('\\', '/')
             }
-            val windowsStyle = Regex("^[A-Za-z]:/").containsMatchIn(value)
+            val windowsStyle = Regex("^[A-Za-z]:/").containsMatchIn(value) || value.startsWith("//")
             ComparablePath(value.trimEnd('/'), windowsStyle)
         } catch (_: Exception) {
             null
@@ -389,16 +391,18 @@ object SystemPathSecurity {
     }
 
     private fun normalizeWindowsPath(path: String): String {
-        val root = path.take(2)
+        val isUnc = path.startsWith("//")
         val segments = mutableListOf<String>()
         path.drop(2).split('/').forEach { segment ->
             when (segment) {
                 "", "." -> Unit
-                ".." -> if (segments.isNotEmpty()) segments.removeLast()
+                // The server and share form the UNC root and cannot be traversed above.
+                ".." -> if (segments.size > if (isUnc) 2 else 0) segments.removeLast()
                 else -> segments += segment
             }
         }
-        return "$root/${segments.joinToString("/")}".trimEnd('/')
+        val root = if (isUnc) "//" else "${path.take(2)}/"
+        return "$root${segments.joinToString("/")}".trimEnd('/')
     }
 }
 

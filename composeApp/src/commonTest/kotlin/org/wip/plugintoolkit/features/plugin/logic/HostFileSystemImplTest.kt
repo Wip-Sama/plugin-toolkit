@@ -83,6 +83,33 @@ class HostFileSystemImplTest {
     }
 
     @Test
+    fun windowsUncRulesAreCaseInsensitiveAndSegmentBounded() {
+        val blocked = "\\\\server\\share\\secret"
+
+        assertFalse(
+            SystemPathSecurity.isPathAllowed(
+                "\\\\SERVER\\SHARE\\SECRET\\file.txt",
+                FileAccessMode.Blacklist,
+                customBlacklist = listOf(blocked)
+            )
+        )
+        assertTrue(
+            SystemPathSecurity.isPathAllowed(
+                "\\\\server\\share\\secret-sibling\\file.txt",
+                FileAccessMode.Blacklist,
+                customBlacklist = listOf(blocked)
+            )
+        )
+        assertTrue(
+            SystemPathSecurity.isPathAllowed(
+                "\\\\SERVER\\SHARE\\SECRET\\file.txt",
+                FileAccessMode.Whitelist,
+                customWhitelist = listOf(blocked)
+            )
+        )
+    }
+
+    @Test
     fun testSystemPathSecurityCustomBlacklistRemovalOfDefaults() {
         val userCustomBlacklist = listOf("/custom/blocked/folder")
         assertTrue(
