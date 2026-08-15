@@ -56,6 +56,7 @@ import androidx.navigation3.runtime.NavKey
 import org.wip.plugintoolkit.features.navigation.GlobalRouter
 import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.model.resolveProvidedValues
 import org.wip.plugintoolkit.features.plugin.ui.lockedClickInterceptor
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import plugintoolkit.composeapp.generated.resources.Res
@@ -254,8 +255,9 @@ private fun CapabilitiesPalette(
                     )
                 )
                 caps.forEach { cap ->
-                    val isReady = remember(cap, settingsStore.settings, manifest?.settings) {
-                        cap.isReady(settingsStore.settings, manifest?.settings)
+                    val providedSettings = settingsStore.resolveProvidedValues(manifest)
+                    val isReady = remember(cap, providedSettings, manifest?.settings) {
+                        cap.isReady(providedSettings, manifest?.settings)
                     }
 
                     val targetSettingKey = cap.requiredLocks.firstOrNull()

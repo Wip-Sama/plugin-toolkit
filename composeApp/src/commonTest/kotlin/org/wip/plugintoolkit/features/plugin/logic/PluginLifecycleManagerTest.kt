@@ -7,9 +7,16 @@ import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
+import org.wip.plugintoolkit.features.plugin.model.resolveCustomSettings
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PluginInfo
+import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.Requirements
+import org.wip.plugintoolkit.api.SettingMetadata
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
@@ -46,6 +53,58 @@ class PluginLifecycleManagerTest {
         override fun getJobsDir(): String = "/tmp/jobs"
         override fun openLogFolder() {}
         override fun openLatestLog() {}
+    }
+
+    @Test
+    fun testPluginContextReceivesExactlyResolvedCustomSettings() = runTest {
+        val fileSystem = FakeFileSystem()
+        val settingsRepo = SettingsRepository(FakeSettingsPersistence(), backgroundScope)
+        val registry = PluginRegistry(
+            settingsRepo,
+            backgroundScope,
+            loomDispatcher,
+            io.mockk.mockk(relaxed = true)
+        )
+        val lifecycleManager = PluginLifecycleManager(
+            registry,
+            JobManager(backgroundScope, settingsRepo),
+            settingsRepo,
+            fileSystem
+        )
+        val pkg = "test.context.defaults"
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(pkg, "Test", "1.0.0", "/tmp/test.context.defaults")
+        )
+        val manifest = PluginManifest(
+            manifestVersion = "1",
+            plugin = PluginInfo(pkg, "Test", "1.0.0", "Test plugin"),
+            requirements = Requirements(128, 10),
+            settings = mapOf(
+                "endpoint" to SettingMetadata(
+                    defaultValue = JsonPrimitive("https://default.test"),
+                    description = "Endpoint",
+                    type = DataType.Primitive(PrimitiveType.STRING)
+                ),
+                "optionalFlag" to SettingMetadata(
+                    description = "Optional flag",
+                    type = DataType.Primitive(PrimitiveType.BOOLEAN)
+                )
+            )
+        )
+        val store = PluginSettingsStore(
+            settings = mapOf("endpoint" to JsonPrimitive("https://custom.test")),
+            globalParams = mapOf("region" to JsonPrimitive("eu"))
+        )
+
+        val context = lifecycleManager.createPluginContext(
+            pkg = pkg,
+            manifest = manifest,
+            overriddenSettings = store
+        )
+
+        assertEquals(store.resolveCustomSettings(manifest), context.settings)
+        kotlin.test.assertFalse(context.settings.containsKey("optionalFlag"))
+        kotlin.test.assertFalse(context.settings.containsKey("region"))
     }
 
     @Test

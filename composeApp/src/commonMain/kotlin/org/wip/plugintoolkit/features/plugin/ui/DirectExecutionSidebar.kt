@@ -50,6 +50,7 @@ import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.plugin.model.resolveProvidedValues
 import org.wip.plugintoolkit.features.navigation.GlobalRouter
 import org.wip.plugintoolkit.features.navigation.LocalGlobalRouter
 import org.wip.plugintoolkit.features.navigation.model.Screen
@@ -172,7 +173,7 @@ fun DirectExecutionSidebar(
                     val manifest = plugin.getManifest().getOrThrow()
                     val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = org.koin.compose.koinInject()
                     val settingsStore = pluginManager.loadPluginSettings(pluginId)
-                    val settings = settingsStore.settings + settingsStore.globalParams
+                    val settings = settingsStore.resolveProvidedValues(manifest)
                     val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
                     val locks = pluginLocksState[pluginId] ?: pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
 
