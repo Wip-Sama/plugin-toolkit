@@ -17,35 +17,20 @@ class DefaultExecutionFileSystem(
         SystemFileSystem.createDirectories(Path(sandboxPath))
     }
 
-    private fun resolvePath(relativePath: RelativePath): Path {
-        val resolved = Path(sandboxPath, relativePath.value)
-        val file = java.io.File(resolved.toString())
-        val normalized = try {
-            file.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve canonical path for '${relativePath.value}': ${e.message}")
-        }
-        val baseFile = java.io.File(sandboxPath)
-        val baseCanonical = try {
-            baseFile.canonicalPath
-        } catch (e: Exception) {
-            throw SecurityException("Failed to resolve base canonical path for '$sandboxPath': ${e.message}")
-        }
+    private val sandboxOperations = SandboxFileOperations(sandboxPath)
 
-        if (normalized != baseCanonical && !normalized.startsWith(baseCanonical + java.io.File.separator)) {
-            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the sandbox.")
-        }
-        return resolved
+    private fun resolvePath(relativePath: RelativePath): Path {
+        return sandboxOperations.resolve(relativePath)
     }
 
     override suspend fun readFile(relativePath: RelativePath): ByteArray? {
-        val path = resolvePath(relativePath)
+        val path = sandboxOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
     override suspend fun readTextFile(relativePath: RelativePath): String? {
-        val path = resolvePath(relativePath)
+        val path = sandboxOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
@@ -73,11 +58,12 @@ class DefaultExecutionFileSystem(
     }
 
     override suspend fun exists(relativePath: RelativePath): Boolean {
-        return SystemFileSystem.exists(resolvePath(relativePath))
+        val path = sandboxOperations.resolveIfRootExists(relativePath) ?: return false
+        return SystemFileSystem.exists(path)
     }
 
     override suspend fun listFiles(relativePath: RelativePath): List<String> {
-        val path = resolvePath(relativePath)
+        val path = sandboxOperations.resolveIfRootExists(relativePath) ?: return emptyList()
         if (!SystemFileSystem.exists(path)) return emptyList()
         val metadata = SystemFileSystem.metadataOrNull(path)
         if (metadata?.isDirectory != true) return emptyList()
@@ -95,6 +81,15 @@ class DefaultExecutionFileSystem(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    override suspend fun createDirectory(relativePath: RelativePath): Result<Unit> = runCatching {
+        SystemFileSystem.createDirectories(resolvePath(relativePath))
+    }
+
+    override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> = runCatching {
+        require(relativePath.value.isNotEmpty()) { "The execution sandbox root cannot be deleted" }
+        sandboxOperations.deleteDirectory(resolvePath(relativePath), recursive)
     }
 
     override fun getBasePath(): String = sandboxPath
