@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Upgrade
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,18 +41,24 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_install
+import plugintoolkit.composeapp.generated.resources.plugin_available_in
 import plugintoolkit.composeapp.generated.resources.repo_action_cancel_update
 import plugintoolkit.composeapp.generated.resources.repo_action_update_version
 import plugintoolkit.composeapp.generated.resources.repo_action_updating
+import plugintoolkit.composeapp.generated.resources.repo_downgrade_version
+import plugintoolkit.composeapp.generated.resources.repo_filter_chip_update
+import plugintoolkit.composeapp.generated.resources.repo_incompatible_badge
+import plugintoolkit.composeapp.generated.resources.repo_install_version
 import plugintoolkit.composeapp.generated.resources.repo_plugin_installed_version_format
 import plugintoolkit.composeapp.generated.resources.repo_plugin_pkg_version_format
-import plugintoolkit.composeapp.generated.resources.*
+import plugintoolkit.composeapp.generated.resources.repo_reinstall_version
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -73,6 +81,7 @@ fun PluginListItem(
         plugin.version,
         installedVersion
     ) > 0
+    val (isCompatible, _) = PluginCompatibilityUtils.checkCompatibility(plugin)
 
     GlassCard(
         modifier = Modifier.fillMaxWidth()
@@ -111,36 +120,106 @@ fun PluginListItem(
 
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
 
-                    if (isInstalled) {
+                    if (!isCompatible) {
                         Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
+                            color = MaterialTheme.colorScheme.errorContainer,
                             shape = CircleShape,
                             modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.badgeVertical)
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.badgeVertical
+                                )
                             ) {
                                 Icon(
-                                    Icons.Default.Check,
+                                    imageVector = Icons.Default.Block,
                                     contentDescription = null,
                                     modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    stringResource(Res.string.repo_incompatible_badge),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    } else if (hasUpdate) {
+                        Surface(
+                            color = ToolkitTheme.colors.warning.copy(alpha = 0.2f),
+                            shape = CircleShape,
+                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.badgeVertical
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Upgrade,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
+                                    tint = ToolkitTheme.colors.warning
+                                )
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    stringResource(Res.string.repo_filter_chip_update) + " ($installedVersion -> ${plugin.version})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = ToolkitTheme.colors.warning
+                                )
+                            }
+                        }
+                    } else if (isInstalled) {
+                        Surface(
+                            color = ToolkitTheme.colors.success.copy(alpha = 0.2f),
+                            shape = CircleShape,
+                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.badgeVertical
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
+                                    tint = ToolkitTheme.colors.success
                                 )
                                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                                 Text(
                                     stringResource(Res.string.repo_plugin_installed_version_format, installedVersion!!),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = ToolkitTheme.colors.success
                                 )
                             }
                         }
                     } else {
-                        Text(
-                            stringResource(Res.string.repo_plugin_pkg_version_format, plugin.pkg, plugin.version),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = CircleShape,
+                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
+                        ) {
+                            Text(
+                                text = "v${plugin.version}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.badgeVertical
+                                )
+                            )
+                        }
                     }
                 }
 
@@ -225,20 +304,40 @@ fun PluginListItem(
                         }
                     }
                 }
+            } else if (hasUpdate) {
+                Button(
+                    onClick = { onInstall(plugin) },
+                    enabled = !isRefreshing && isCompatible,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Upgrade,
+                        contentDescription = null,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                    Text(stringResource(Res.string.repo_action_update_version, plugin.version))
+                }
             } else if (isInstalled) {
                 val isDowngrade =
                     org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion!!) < 0
-                val buttonColor =
-                    if (hasUpdate) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer
-                val contentColor =
-                    if (hasUpdate) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                val label = if (isDowngrade) {
+                    stringResource(Res.string.repo_downgrade_version, plugin.version)
+                } else {
+                    stringResource(Res.string.repo_reinstall_version, plugin.version)
+                }
 
                 Button(
                     onClick = { onInstall(plugin) },
-                    enabled = !isRefreshing,
+                    enabled = !isRefreshing && isCompatible,
+                    shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = buttonColor,
-                        contentColor = contentColor
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 ) {
                     Icon(
@@ -247,17 +346,17 @@ fun PluginListItem(
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    val label = when {
-                        hasUpdate -> stringResource(Res.string.repo_action_update_version, plugin.version)
-                        isDowngrade -> "Downgrade to ${plugin.version}"
-                        else -> "Reinstall ${plugin.version}"
-                    }
                     Text(label)
                 }
             } else {
                 Button(
                     onClick = { onInstall(plugin) },
-                    enabled = !isRefreshing
+                    enabled = !isRefreshing && isCompatible,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 ) {
                     Icon(
                         Icons.Default.Download,
@@ -265,7 +364,7 @@ fun PluginListItem(
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(stringResource(Res.string.action_install))
+                    Text(stringResource(Res.string.repo_install_version, plugin.version))
                 }
             }
         }

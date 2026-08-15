@@ -7,12 +7,7 @@ import org.koin.core.component.inject
 object PlatformPathUtils : KoinComponent {
     private val appConfig: SystemConfig by inject()
 
-    fun getAppDataDir(): String {
-        val appData = System.getenv("APPDATA")
-        return if (PlatformUtils.isWindows && appData != null) {
-            "$appData/${appConfig.APP_DATA_DIR_NAME}"
-        } else {
-            "${System.getProperty("user.home")}/${appConfig.LEGACY_SETTINGS_DIR_NAME}"
-        }
-    }
+    fun getAppDataDir(): String = appConfig.getAppDataDir()
+
+    fun getCacheDir(systemManaged: Boolean = false): String = appConfig.getCacheDir(systemManaged)
 }

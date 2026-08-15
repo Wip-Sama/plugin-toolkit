@@ -125,8 +125,6 @@ fun <T> NavigationSidebar(
             }
 
             val bodyScrollState = rememberScrollState()
-            val topSidebarFade = if (bodyScrollState.canScrollBackward) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
-            val bottomSidebarFade = if (bodyScrollState.canScrollForward) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
 
             // Nav sections (BODY SECTION - Scrollable)
             Column(
@@ -134,8 +132,9 @@ fun <T> NavigationSidebar(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalFadingEdges(
-                        topFadeLength = topSidebarFade,
-                        bottomFadeLength = bottomSidebarFade,
+                        scrollState = bodyScrollState,
+                        topFadeLength = ToolkitTheme.spacing.large,
+                        bottomFadeLength = ToolkitTheme.spacing.large,
                         almostOpaque = ToolkitTheme.opacity.almostOpaque
                     )
                     .verticalScroll(bodyScrollState)

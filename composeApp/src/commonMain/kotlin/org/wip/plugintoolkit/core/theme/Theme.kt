@@ -130,7 +130,10 @@ data class Dimensions(
     val cornerRadiusMedium: Dp = 12.dp,
     val cornerRadiusLarge: Dp = 16.dp,
     val cornerRadiusExtraLarge: Dp = 24.dp,
-    val tooltipVerticalOffset: Dp = 8.dp
+    val tooltipVerticalOffset: Dp = 8.dp,
+    val dialogMaxWidthMedium: Dp = 540.dp,
+    val filterChipHeight: Dp = 32.dp,
+    val segmentedButtonHeight: Dp = 36.dp
 )
 
 data class CustomColors(
