@@ -85,12 +85,14 @@ import plugintoolkit.composeapp.generated.resources.flow_name_label
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_running
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_used_in_other
 import kotlin.math.roundToInt
+import org.wip.plugintoolkit.features.navigation.GlobalRouter
 
 @Composable
 fun FlowEditorView(
     viewModel: FlowEditorViewModel,
     notificationService: NotificationService,
     onExit: () -> Unit,
+    router: GlobalRouter? = null,
     onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {

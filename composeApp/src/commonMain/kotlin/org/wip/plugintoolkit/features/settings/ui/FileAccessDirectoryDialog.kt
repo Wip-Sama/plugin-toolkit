@@ -32,6 +32,7 @@ import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.FileAccessMode
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import plugintoolkit.composeapp.generated.resources.*
 
 /**
@@ -124,12 +125,6 @@ fun FileAccessDirectoryDialog(
     val isInputPathValid = remember(manualPathInput) {
         isValidPathFormat(manualPathInput)
     }
-
-    val canScrollUp = lazyListState.canScrollBackward
-    val canScrollDown = lazyListState.canScrollForward
-
-    val topFadeLength = if (canScrollUp) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
-    val bottomFadeLength = if (canScrollDown) ToolkitTheme.spacing.large else ToolkitTheme.spacing.none
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -292,8 +287,9 @@ fun FileAccessDirectoryDialog(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .verticalFadingEdges(
-                                    topFadeLength = topFadeLength,
-                                    bottomFadeLength = bottomFadeLength,
+                                    lazyListState = lazyListState,
+                                    topFadeLength = ToolkitTheme.spacing.large,
+                                    bottomFadeLength = ToolkitTheme.spacing.large,
                                     almostOpaque = ToolkitTheme.opacity.almostOpaque
                                 ),
                             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
@@ -416,41 +412,5 @@ private fun isValidPathFormat(pathStr: String): Boolean {
     val invalidChars = listOf('<', '>', '"', '|', '?', '*')
     return invalidChars.none { trimmed.contains(it) }
 }
-
-/**
- * Applies vertical fading edges at the top and bottom of a scrollable container.
- */
-private fun Modifier.verticalFadingEdges(
-    topFadeLength: Dp,
-    bottomFadeLength: Dp,
-    almostOpaque: Float
-): Modifier = this
-    .graphicsLayer { alpha = almostOpaque }
-    .drawWithContent {
-        drawContent()
-        val topFadePx = topFadeLength.toPx()
-        val bottomFadePx = bottomFadeLength.toPx()
-
-        if (topFadePx > 0f) {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black),
-                    startY = 0f,
-                    endY = topFadePx
-                ),
-                blendMode = BlendMode.DstIn
-            )
-        }
-        if (bottomFadePx > 0f) {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Black, Color.Transparent),
-                    startY = size.height - bottomFadePx,
-                    endY = size.height
-                ),
-                blendMode = BlendMode.DstIn
-            )
-        }
-    }
 
 
