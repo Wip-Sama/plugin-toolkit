@@ -32,8 +32,6 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog
-import org.wip.plugintoolkit.features.colorpicker.utils.colorStringHasAlpha
-import org.wip.plugintoolkit.features.colorpicker.utils.parseHexColor
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.colorpicker.utils.toRGB
 import org.wip.plugintoolkit.shared.components.plugin.StandardTextField
@@ -54,9 +52,6 @@ fun ColorInput(
     var showColorPicker by remember { mutableStateOf(false) }
     val parsedColor = remember(value) { parseColorString(value) }
     val isArray = metadata.type is DataType.Array
-    val isRgba = metadata.semanticTypes.any { it.canonicalId.contains("rgba", ignoreCase = true) } ||
-        colorStringHasAlpha(value)
-    val isRgb = metadata.semanticTypes.any { it.canonicalId.contains("rgb", ignoreCase = true) }
 
     Column(modifier = Modifier
         .fillMaxWidth()
@@ -106,16 +101,17 @@ fun ColorInput(
         if (showColorPicker && enabled) {
             ColorPickerDialog(
                 show = showColorPicker,
-                initialColor = parsedColor,
-                showAlpha = isRgba,
                 onDismissRequest = { showColorPicker = false },
 
                 onPickedColor = { color ->
                     showColorPicker = false
-                    val formatted = if (isRgb) {
-                        color.toRGB(rgbPrefix = true, includeAlpha = isRgba)
+                    val formatted = if (metadata.semanticTypes.any {
+                            it.canonicalId.contains("rgb", ignoreCase = true)
+                        }
+                    ) {
+                        color.toRGB()
                     } else {
-                        color.toHex(hexPrefix = true, includeAlpha = isRgba)
+                        color.toHex()
                     }
                     onValueChange(formatted)
                 }
@@ -129,7 +125,6 @@ fun parseColorString(colorStr: String): Color {
     if (trimmed.isEmpty()) return Color.Transparent
 
     try {
-        parseHexColor(trimmed)?.let { return it }
         if (trimmed.startsWith("#")) {
             val hex = trimmed.substring(1)
             when (hex.length) {

@@ -169,10 +169,6 @@
     <string name="action_pause">Pausa</string>
     <string name="action_save">Salva</string>
     <string name="action_cancel">Annulla</string>
-    <string name="color_picker_title">Scegli un colore</string>
-    <string name="color_picker_hex">Esadecimale</string>
-    <string name="color_picker_hex_hint">Usa #RRGGBB o #AARRGGBB</string>
-    <string name="color_picker_apply">Applica</string>
     <string name="action_expand">Espandi</string>
     <string name="action_collapse">Comprimi</string>
 
