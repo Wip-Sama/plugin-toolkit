@@ -227,6 +227,7 @@ class FlowEditorViewModel(
                 is FlowEvent.ConnectPorts,
                 is FlowEvent.AutoConvertAndConnect,
                 is FlowEvent.DeleteConnection,
+                is FlowEvent.RewireConnection,
                 is FlowEvent.ResetBoard,
                 is FlowEvent.Save,
                 is FlowEvent.SaveAs,
@@ -493,7 +494,8 @@ class FlowEditorViewModel(
                     event.sourceNodeId,
                     event.sourcePortId,
                     event.targetNodeId,
-                    event.targetPortId
+                    event.targetPortId,
+                    event.originalConnection
                 )
             }
 
@@ -501,6 +503,20 @@ class FlowEditorViewModel(
                 shouldSaveHistory = true
                 shouldRunTypeInference = true
                 newState = connectionManager.handleDeleteConnection(currentState, event.connection)
+            }
+
+            is FlowEvent.RewireConnection -> {
+                shouldSaveHistory = true
+                shouldRunTypeInference = true
+                newState = connectionManager.handleRewireConnection(
+                    currentState,
+                    event.original,
+                    event.sourceNodeId,
+                    event.sourcePortId,
+                    event.targetNodeId,
+                    event.targetPortId,
+                    event.isShiftPressed
+                )
             }
 
             is FlowEvent.Pan -> handlePan(event.delta)

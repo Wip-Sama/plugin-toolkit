@@ -91,10 +91,19 @@ sealed interface FlowEvent {
         val sourceNodeId: Long,
         val sourcePortId: String,
         val targetNodeId: Long,
-        val targetPortId: String
+        val targetPortId: String,
+        val originalConnection: Connection? = null
     ) : FlowEvent
 
     data class DeleteConnection(val connection: Connection) : FlowEvent
+    data class RewireConnection(
+        val original: Connection,
+        val sourceNodeId: Long,
+        val sourcePortId: String,
+        val targetNodeId: Long,
+        val targetPortId: String,
+        val isShiftPressed: Boolean
+    ) : FlowEvent
 
     data class Pan(val delta: Offset) : FlowEvent
     data class Zoom(val delta: Float, val focusPosition: Offset, val isShiftPressed: Boolean = false) : FlowEvent

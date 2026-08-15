@@ -2,6 +2,9 @@ package org.wip.plugintoolkit.features.flows.ui.canvas
 
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
@@ -145,6 +148,7 @@ fun Modifier.boardSelectionBoxGesture(
     )
 }
 
+@Composable
 fun Modifier.boardPointerEventGesture(
     interactionState: BoardInteractionState,
     isDrawingConnection: Boolean,
@@ -156,9 +160,17 @@ fun Modifier.boardPointerEventGesture(
     onZoom: (Float, Offset, Boolean) -> Unit,
     onConnectionDrag: (Offset) -> Unit,
     onConnectionDrop: (Boolean) -> Unit,
+    onConnectionCancel: () -> Unit,
     onDeleteConnection: (Connection) -> Unit,
     onDetachConnection: (Connection, Boolean, Offset) -> Unit
-): Modifier = this.pointerInput(connections, nodes, scale, offset, isDrawingConnection) {
+): Modifier {
+    val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
+    val currentOnConnectionDrag by rememberUpdatedState(onConnectionDrag)
+    val currentOnConnectionDrop by rememberUpdatedState(onConnectionDrop)
+    val currentOnConnectionCancel by rememberUpdatedState(onConnectionCancel)
+    val currentOnDetachConnection by rememberUpdatedState(onDetachConnection)
+
+    return this.pointerInput(connections, nodes, scale, offset) {
     awaitPointerEventScope {
         while (true) {
             val event = awaitPointerEvent()
@@ -173,9 +185,9 @@ fun Modifier.boardPointerEventGesture(
                 }
             } else if (event.type == PointerEventType.Move) {
                 interactionState.lastPointerPosition = position
-                if (isDrawingConnection) {
+                if (currentIsDrawingConnection) {
                     val boardPos = (position - offset) / scale
-                    onConnectionDrag(boardPos)
+                    currentOnConnectionDrag(boardPos)
                 }
 
                 var bestConnection: Connection? = null
@@ -241,26 +253,33 @@ fun Modifier.boardPointerEventGesture(
                 } else if (event.keyboardModifiers.isCtrlPressed) {
                     interactionState.hoveredConnection?.let { conn ->
                         val isSrc = interactionState.hoveredConnectionIsSource ?: false
-                        onDetachConnection(conn, isSrc, position)
+                        currentOnDetachConnection(conn, isSrc, position)
 
                         event.changes.forEach { it.consume() }
 
-                        while (true) {
-                            val dragEvent = awaitPointerEvent()
-                            if (dragEvent.type == PointerEventType.Move) {
-                                val screenPos = dragEvent.changes.firstOrNull()?.position ?: Offset.Zero
-                                interactionState.lastPointerPosition = screenPos
-                                val boardPos = (screenPos - offset) / scale
-                                onConnectionDrag(boardPos)
-                                dragEvent.changes.forEach { it.consume() }
-                            } else if (dragEvent.type == PointerEventType.Release) {
-                                onConnectionDrop(dragEvent.keyboardModifiers.isShiftPressed)
-                                break
+                        var completed = false
+                        try {
+                            while (true) {
+                                val dragEvent = awaitPointerEvent()
+                                if (dragEvent.type == PointerEventType.Move) {
+                                    val screenPos = dragEvent.changes.firstOrNull()?.position ?: Offset.Zero
+                                    interactionState.lastPointerPosition = screenPos
+                                    val boardPos = (screenPos - offset) / scale
+                                    currentOnConnectionDrag(boardPos)
+                                    dragEvent.changes.forEach { it.consume() }
+                                } else if (dragEvent.type == PointerEventType.Release) {
+                                    currentOnConnectionDrop(dragEvent.keyboardModifiers.isShiftPressed)
+                                    completed = true
+                                    break
+                                }
                             }
+                        } finally {
+                            if (!completed) currentOnConnectionCancel()
                         }
                     }
                 }
             }
         }
     }
+}
 }

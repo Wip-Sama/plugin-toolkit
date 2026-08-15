@@ -55,6 +55,7 @@ import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
@@ -156,6 +157,7 @@ fun FlowEditorView(
     var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
     var dragGrabOffset by remember { mutableStateOf(Offset.Zero) }
     var draggingNodeScale by remember { mutableStateOf(1f) }
+    var connectionBeingRewired by remember { mutableStateOf<Connection?>(null) }
 
     val handlePaletteClick = { paletteNode: PaletteNode ->
         val dropPos = (Offset(boardSize.width / 2f, boardSize.height / 2f) - state.offset) / state.scale
@@ -215,7 +217,7 @@ fun FlowEditorView(
             onBoardSizeChanged = { boardSize = it },
             onDeleteConnection = { viewModel.onEvent(FlowEvent.DeleteConnection(it)) },
             onDetachConnection = { connection, isSource, offset ->
-                viewModel.onEvent(FlowEvent.DeleteConnection(connection))
+                connectionBeingRewired = connection
                 if (isSource) {
                     connectionStartNodeId = connection.targetNodeId
                     connectionStartPortId = connection.targetPortId
@@ -247,17 +249,38 @@ fun FlowEditorView(
                     val targetPortId =
                         if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
 
+                    val original = connectionBeingRewired
                     viewModel.onEvent(
-                        FlowEvent.TryConnectPorts(
-                            sourceNodeId,
-                            sourcePortId,
-                            targetNodeId,
-                            targetPortId,
-                            isShiftPressed
-                        )
+                        if (original != null) {
+                            FlowEvent.RewireConnection(
+                                original,
+                                sourceNodeId,
+                                sourcePortId,
+                                targetNodeId,
+                                targetPortId,
+                                isShiftPressed
+                            )
+                        } else {
+                            FlowEvent.TryConnectPorts(
+                                sourceNodeId,
+                                sourcePortId,
+                                targetNodeId,
+                                targetPortId,
+                                isShiftPressed
+                            )
+                        }
                     )
                 }
                 isDrawingConnection = false
+                connectionBeingRewired = null
+                connectionStartNodeId = null
+                connectionStartPortId = null
+                highlightedPortId = null
+                highlightedNodeId = null
+            },
+            onConnectionCancel = {
+                isDrawingConnection = false
+                connectionBeingRewired = null
                 connectionStartNodeId = null
                 connectionStartPortId = null
                 highlightedPortId = null
@@ -710,7 +733,8 @@ fun FlowEditorView(
                                     pendingConn.sourceNodeId,
                                     pendingConn.sourcePortId,
                                     pendingConn.targetNodeId,
-                                    pendingConn.targetPortId
+                                    pendingConn.targetPortId,
+                                    pendingConn.originalConnection
                                 )
                             )
                             viewModel.onEvent(FlowEvent.CancelPendingConnection)
