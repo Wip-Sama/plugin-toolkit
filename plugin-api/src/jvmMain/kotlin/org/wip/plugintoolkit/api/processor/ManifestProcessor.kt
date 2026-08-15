@@ -176,6 +176,25 @@ class ManifestProcessor(
             it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
         }.toList()
 
+        val uiPages = org.wip.plugintoolkit.api.processor.GeneratorUtils.extractUiPages(classDeclaration) { message ->
+            logger.error(message, classDeclaration)
+        }
+        uiPages.filter { it.id.isBlank() }.forEach {
+            logger.error("@PluginUiPage.id must not be blank", classDeclaration)
+        }
+        uiPages.groupBy { it.id }.filterValues { it.size > 1 }.keys.forEach { duplicateId ->
+            logger.error("Duplicate @PluginUiPage id '$duplicateId'", classDeclaration)
+        }
+        val capabilityNames = functions.map { function ->
+            val annotation = function.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
+            annotation.arguments.first { it.name?.asString() == "name" }.value as String
+        }.toSet()
+        uiPages.flatMap { page -> page.capabilityNames.map { page.id to it } }
+            .filter { (_, capabilityName) -> capabilityName !in capabilityNames }
+            .forEach { (pageId, capabilityName) ->
+                logger.warn("@PluginUiPage '$pageId' references unknown capability '$capabilityName'", classDeclaration)
+            }
+
         // 1. Parse Changelog
         var changelogObj: Changelog? = null
         val sourceFile = classDeclaration.containingFile
