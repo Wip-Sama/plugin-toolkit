@@ -1,6 +1,8 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -125,7 +127,7 @@ class DefaultPluginFileSystem(
         fun createCacheOnly(pluginInstallPath: String, jarPath: String? = null): PluginFileSystem {
             return DefaultPluginFileSystem(pluginInstallPath, jarPath).let { fs ->
                 // Create a variant that uses cachePath as basePath
-                object : PluginFileSystem by fs {
+                object : PluginFileSystem {
                     override fun getBasePath(): String = fs.cachePath
                     override suspend fun readFile(relativePath: RelativePath): ByteArray? =
                         fs.readFromCache(relativePath)
@@ -138,6 +140,39 @@ class DefaultPluginFileSystem(
 
                     override suspend fun writeTextFile(relativePath: RelativePath, text: String): Result<Unit> =
                         fs.writeTextToCache(relativePath, text)
+
+                    // Keep every compound/stream operation explicitly cache-routed. In
+                    // particular, do not use Kotlin interface delegation here: generated
+                    // forwards would bypass these overrides and touch persistent files.
+                    override suspend fun readStream(relativePath: RelativePath): Flow<ByteArray> = flow {
+                        fs.readFromCache(relativePath)?.let { emit(it) }
+                    }
+
+                    override suspend fun writeStream(
+                        relativePath: RelativePath,
+                        stream: Flow<ByteArray>
+                    ): Result<Unit> = runCatching {
+                        val bytes = mutableListOf<Byte>()
+                        stream.collect { chunk -> chunk.forEach { byte -> bytes.add(byte) } }
+                        fs.writeToCache(relativePath, bytes.toByteArray()).getOrThrow()
+                    }
+
+                    override suspend fun copyFile(
+                        source: RelativePath,
+                        destination: RelativePath
+                    ): Result<Unit> = runCatching {
+                        val content = fs.readFromCache(source)
+                            ?: throw IllegalArgumentException("Source file does not exist")
+                        fs.writeToCache(destination, content).getOrThrow()
+                    }
+
+                    override suspend fun moveFile(
+                        source: RelativePath,
+                        destination: RelativePath
+                    ): Result<Unit> = runCatching {
+                        copyFile(source, destination).getOrThrow()
+                        fs.deleteFromCache(source).getOrThrow()
+                    }
 
                     override suspend fun exists(relativePath: RelativePath): Boolean =
                         fs.cacheOperations.resolveIfRootExists(relativePath)?.let(SystemFileSystem::exists) ?: false
