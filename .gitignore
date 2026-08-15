@@ -20,3 +20,4 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
 local_scripts/
+__pycache__/

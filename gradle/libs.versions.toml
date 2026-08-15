@@ -27,6 +27,8 @@ kotest = "6.2.2"
 mockk = "1.14.11"
 buildkonfig = "0.22.0"
 turbine = "1.2.1"
+clikt = "5.0.3"
+
 
 [libraries]
 # AndroidX
@@ -90,6 +92,8 @@ kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
+
 
 # Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

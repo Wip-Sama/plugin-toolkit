@@ -11,13 +11,12 @@ Replace Throwable in ExecutionResult.Error with a structured ErrorDetail class c
 
 Undo/Redo Command Pattern: Implement a full Command pattern for the history stack (e.g., NodeMovedCommand, NodeAddedCommand) to store diffs instead of deep state snapshots. This will ensure memory usage remains low even with massive graphs and extensive edit histories.
 
-### Support for portable installation (Completed)
-
-A portable build is available with local data/settings and isolated execution without touching host registry or autostart.
-
 ### Support for local repositories
 
 A way to insert a local folder as local repository on the system
 
-### Making flow resum work properly
+### Making flow resume work properly
 
+### MILESTONES
+- Plugin Standalone Compilation
+- Modules

@@ -33,7 +33,13 @@ plugins {
 }
 
 include(":composeApp")
+include(":shared:core")
+include(":shared:logic")
+include(":shared:gui")
+include(":desktopApp")
+include(":cliApp")
 include(":plugin-api")
 include(":minimalExample")
 include(":completeExample")
+
 
