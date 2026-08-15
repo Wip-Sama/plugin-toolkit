@@ -247,7 +247,6 @@ fun InputPortRow(
                 providedSettings = providedSettings,
                 providedLocks = effectiveLocks,
                 pluginId = nodePluginId,
-                onNavigateToPluginSetting = org.wip.plugintoolkit.features.plugin.ui.LocalNavigateToPluginSetting.current,
                 compact = true
             )
         }

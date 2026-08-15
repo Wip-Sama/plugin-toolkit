@@ -49,6 +49,7 @@ import org.wip.plugintoolkit.api.ParameterRole
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
 import plugintoolkit.composeapp.generated.resources.Res
@@ -370,11 +371,20 @@ fun CapabilityTester(
         onClick = onExecute,
         modifier = Modifier
             .fillMaxWidth()
-            .lockedClickInterceptor(
-                isLocked = requirementError != null,
-                pluginId = pluginId,
-                targetSettingKey = targetSetting,
-                onNavigateToPluginSetting = onNavigateToPluginSetting
+            .then(
+                if (onNavigateToPluginSetting != null) {
+                    Modifier.lockedClickInterceptor(
+                        isLocked = requirementError != null,
+                        pluginId = pluginId,
+                        targetSettingKey = targetSetting,
+                        onNavigateToPluginSetting = onNavigateToPluginSetting
+                    )
+                } else {
+                    Modifier.lockedClickInterceptor(
+                        isLocked = requirementError != null,
+                        targetScreen = Screen.PluginManager(pluginId = pluginId.ifEmpty { null }, scrollToSetting = targetSetting.ifEmpty { null })
+                    )
+                }
             ),
         shape = MaterialTheme.shapes.medium,
         enabled = isValid
@@ -396,11 +406,20 @@ fun CapabilityTester(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .padding(top = ToolkitTheme.spacing.extraSmall)
-                .lockedClickInterceptor(
-                    isLocked = true,
-                    pluginId = pluginId,
-                    targetSettingKey = targetSetting,
-                    onNavigateToPluginSetting = onNavigateToPluginSetting
+                .then(
+                    if (onNavigateToPluginSetting != null) {
+                        Modifier.lockedClickInterceptor(
+                            isLocked = true,
+                            pluginId = pluginId,
+                            targetSettingKey = targetSetting,
+                            onNavigateToPluginSetting = onNavigateToPluginSetting
+                        )
+                    } else {
+                        Modifier.lockedClickInterceptor(
+                            isLocked = true,
+                            targetScreen = Screen.PluginManager(pluginId = pluginId.ifEmpty { null }, scrollToSetting = targetSetting.ifEmpty { null })
+                        )
+                    }
                 )
         ) {
             LockedCapabilityIcon(modifier = Modifier.size(ToolkitTheme.dimensions.settingsIconSize))

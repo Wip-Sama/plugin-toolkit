@@ -19,6 +19,7 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.AppConfig
+import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 
@@ -32,12 +33,17 @@ class UpdateService(
             connectTimeoutMillis = 15000
             socketTimeoutMillis = 30000
         }
-    }
+    },
+    private val appConfig: SystemConfig? = null
 ) {
     private val _downloadProgress = MutableStateFlow(0f)
     val downloadProgress: StateFlow<Float> = _downloadProgress
 
     suspend fun checkForUpdates(): UpdateInfo? = withContext(loomDispatcher) {
+        if (appConfig?.isPortable == true) {
+            Logger.i { "UpdateService: Updates are disabled in portable mode" }
+            return@withContext null
+        }
         try {
             val response = client.get("https://api.github.com/repos/Wip-Sama/plugin-toolkit/releases/latest")
             if (response.status.value in 200..299) {

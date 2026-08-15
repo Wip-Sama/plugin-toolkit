@@ -19,18 +19,23 @@ import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationEvent
+import org.wip.plugintoolkit.core.utils.FileSystem
+import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.core.utils.RealFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginSecurity
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.model.RepoIndex
+import org.wip.plugintoolkit.features.repository.model.RepoValidationResult
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 
 class RepoManager(
     private val settingsRepository: SettingsRepository,
     private val client: HttpClient,
     private val jsonConfig: Json,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    private val fileSystem: FileSystem = RealFileSystem()
 ) {
 
     private val _repositories = MutableStateFlow<List<ExtensionRepo>>(emptyList())
@@ -62,30 +67,26 @@ class RepoManager(
 
     suspend fun addRepository(url: String): AddRepoResult {
         // Aggressively clean the URL to remove any hidden characters or whitespace
-        val trimmedUrl = url.replace(Regex("\\s+"), "").replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
+        val trimmedUrl = url.trim().replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
 
         if (_repositories.value.any { it.url == trimmedUrl }) {
-
             Logger.w { "Repository already added: $trimmedUrl" }
             return AddRepoResult.AlreadyAdded
         }
 
         Logger.i { "Adding repository: $trimmedUrl" }
         return try {
-            val response = client.get(trimmedUrl)
-            if (!response.status.isSuccess()) {
-                val errorBody = response.bodyAsText()
-                throw Exception("Server returned ${response.status}: $errorBody")
-            }
-
-            val responseBody = response.bodyAsText()
-            val index = jsonConfig.decodeFromString<RepoIndex>(responseBody)
-
+            val index = loadRepoIndex(trimmedUrl)
             Logger.v { "Index: $index" }
 
+            val defaultName = if (isLocalUrl(trimmedUrl)) {
+                trimmedUrl.replace('\\', '/').substringAfterLast("/").substringBeforeLast(".")
+            } else {
+                trimmedUrl.substringAfterLast("/").substringBeforeLast(".")
+            }
 
             val newRepo = ExtensionRepo(
-                name = index.name ?: trimmedUrl.substringAfterLast("/").substringBeforeLast("."),
+                name = index.name ?: defaultName,
                 url = trimmedUrl,
                 schemaVersion = index.schemaVersion,
                 signPublicKey = index.signPublicKey,
@@ -94,18 +95,17 @@ class RepoManager(
                 flowsFolder = index.flowsFolder
             )
 
-
             val updatedRepos = _repositories.value + newRepo
             _repositories.value = updatedRepos
-
             saveReposToSettings(updatedRepos)
 
             coroutineScope {
                 val updatedPlugins = index.plugins.map { plugin ->
                     async {
-                        val baseUrl = trimmedUrl.substringBeforeLast("/") + "/" + (index.pluginsFolder
-                            ?: "plugins") + "/${plugin.pkg}"
-                        val manifestContent = fetchText("$baseUrl/manifest.json")
+                        val baseLocation = getBaseLocation(trimmedUrl)
+                        val pluginsFolder = index.pluginsFolder ?: "plugins"
+                        val manifestPath = "$baseLocation/$pluginsFolder/${plugin.pkg}/manifest.json"
+                        val manifestContent = fetchText(manifestPath)
                         val manifest = manifestContent?.let {
                             try {
                                 jsonConfig.decodeFromString<PluginManifest>(it)
@@ -140,15 +140,12 @@ class RepoManager(
                 _flows.value += (trimmedUrl to updatedFlows)
             }
 
-
             Logger.i { "Successfully added repository: ${newRepo.name} ($trimmedUrl)" }
-
             AddRepoResult.Success
         } catch (e: Exception) {
             Logger.e(e) { "Failed to add repository: $url" }
             AddRepoResult.Error(e.message ?: "Unknown error")
         }
-
     }
 
     fun removeRepository(url: String) {
@@ -163,25 +160,18 @@ class RepoManager(
     }
 
     suspend fun refreshRepository(url: String) {
-        val trimmedUrl = url.replace(Regex("\\s+"), "").replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
+        val trimmedUrl = url.trim().replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
         Logger.d { "Refreshing repository: $trimmedUrl" }
         try {
-            val response = client.get(trimmedUrl)
-
-            if (!response.status.isSuccess()) {
-                val errorBody = response.bodyAsText()
-                throw Exception("Server returned ${response.status}: $errorBody")
-            }
-            val responseBody = response.bodyAsText()
-            val index = jsonConfig.decodeFromString<RepoIndex>(responseBody)
+            val index = loadRepoIndex(trimmedUrl)
 
             coroutineScope {
                 val updatedPlugins = index.plugins.map { plugin ->
                     async {
-                        val baseUrl = trimmedUrl.substringBeforeLast("/") + "/" + (index.pluginsFolder
-                            ?: "plugins") + "/${plugin.pkg}"
-
-                        val manifestContent = fetchText("$baseUrl/manifest.json")
+                        val baseLocation = getBaseLocation(trimmedUrl)
+                        val pluginsFolder = index.pluginsFolder ?: "plugins"
+                        val manifestPath = "$baseLocation/$pluginsFolder/${plugin.pkg}/manifest.json"
+                        val manifestContent = fetchText(manifestPath)
                         val manifest = manifestContent?.let {
                             try {
                                 jsonConfig.decodeFromString<PluginManifest>(it)
@@ -219,7 +209,6 @@ class RepoManager(
             // Update repo metadata if changed
             val updatedRepos = _repositories.value.map {
                 if (it.url == trimmedUrl) {
-
                     it.copy(
                         name = index.name ?: it.name,
                         schemaVersion = index.schemaVersion,
@@ -237,14 +226,17 @@ class RepoManager(
             Logger.d { "Successfully refreshed repository: $trimmedUrl" }
             NotificationEvent.Toast(
                 "Repository refreshed: ${
-                    index.name ?: trimmedUrl.substringAfterLast("/").substringBeforeLast(".")
+                    index.name ?: if (isLocalUrl(trimmedUrl)) {
+                        trimmedUrl.replace('\\', '/').substringAfterLast("/").substringBeforeLast(".")
+                    } else {
+                        trimmedUrl.substringAfterLast("/").substringBeforeLast(".")
+                    }
                 }".localized
             )
         } catch (e: Exception) {
             Logger.e(e) { "Failed to refresh repository: $trimmedUrl" }
             NotificationEvent.Toast("Failed to refresh repository: $trimmedUrl".localized)
         }
-
     }
 
     suspend fun refreshAll() {
@@ -261,6 +253,61 @@ class RepoManager(
         }
     }
 
+    suspend fun validateRepository(target: String): RepoValidationResult {
+        val trimmedTarget = target.trim().replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
+        if (trimmedTarget.isEmpty()) {
+            return RepoValidationResult.Invalid("Please specify a repository address or file path.")
+        }
+        val isLocal = isLocalUrl(trimmedTarget)
+        return try {
+            val index = loadRepoIndex(trimmedTarget)
+            val defaultName = if (isLocal) {
+                trimmedTarget.replace('\\', '/').substringAfterLast("/").substringBeforeLast(".")
+            } else {
+                trimmedTarget.substringAfterLast("/").substringBeforeLast(".")
+            }
+            RepoValidationResult.Valid(
+                name = index.name ?: defaultName,
+                pluginCount = index.plugins.size,
+                flowCount = index.flows.size,
+                index = index,
+                isLocal = isLocal
+            )
+        } catch (e: Exception) {
+            Logger.e(e) { "Validation error for repository target: $target" }
+            RepoValidationResult.Invalid(e.message ?: "Failed to validate repository manifest")
+        }
+    }
+
+    private suspend fun loadRepoIndex(urlOrPath: String): RepoIndex {
+        return if (isLocalUrl(urlOrPath)) {
+            val normalizedPath = urlOrPath.removePrefix("file://").removePrefix("file:/")
+            if (!fileSystem.exists(normalizedPath)) {
+                throw Exception("File does not exist: $normalizedPath")
+            }
+            val content = fileSystem.readFile(normalizedPath)
+                ?: throw Exception("Could not read file content: $normalizedPath")
+            jsonConfig.decodeFromString<RepoIndex>(content)
+        } else {
+            val response = client.get(urlOrPath)
+            if (!response.status.isSuccess()) {
+                val errorBody = response.bodyAsText()
+                throw Exception("Server returned ${response.status}: $errorBody")
+            }
+            val responseBody = response.bodyAsText()
+            jsonConfig.decodeFromString<RepoIndex>(responseBody)
+        }
+    }
+
+    private fun isLocalUrl(url: String): Boolean {
+        return !url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)
+    }
+
+    private fun getBaseLocation(urlOrPath: String): String {
+        val normalized = urlOrPath.replace('\\', '/')
+        return if (normalized.contains('/')) normalized.substringBeforeLast("/") else normalized
+    }
+
     private fun saveReposToSettings(repos: List<ExtensionRepo>) {
         settingsRepository.updateSettings {
             it.copy(extensions = it.extensions.copy(repositories = repos))
@@ -268,20 +315,30 @@ class RepoManager(
     }
 
     suspend fun fetchText(url: String): String? {
-        return try {
-            client.get(url).body<String>()
-        } catch (e: Exception) {
-            Logger.e(e) { "Failed to fetch text from: $url" }
-            null
+        return if (isLocalUrl(url)) {
+            val normalizedPath = url.removePrefix("file://").removePrefix("file:/")
+            fileSystem.readFile(normalizedPath)
+        } else {
+            try {
+                client.get(url).body<String>()
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to fetch text from: $url" }
+                null
+            }
         }
     }
 
     suspend fun fetchBytes(url: String): ByteArray? {
-        return try {
-            client.get(url).readBytes()
-        } catch (e: Exception) {
-            Logger.e(e) { "Failed to fetch bytes from: $url" }
-            null
+        return if (isLocalUrl(url)) {
+            val normalizedPath = url.removePrefix("file://").removePrefix("file:/")
+            PlatformUtils.readBytes(normalizedPath)
+        } else {
+            try {
+                client.get(url).readBytes()
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to fetch bytes from: $url" }
+                null
+            }
         }
     }
 
@@ -302,9 +359,11 @@ class RepoManager(
     suspend fun fetchRemoteChangelog(pkg: String): String? {
         val remote = _plugins.value.values.flatten().find { it.pkg == pkg } ?: return null
         val repoUrl = remote.repoUrl ?: return null
-        val pluginsFolder = repoUrl.substringBeforeLast("/") + "/plugins"
-        val baseUrl = "$pluginsFolder/${remote.pkg}"
-        return fetchText("$baseUrl/changelog.md")
+        val baseLocation = getBaseLocation(repoUrl)
+        val repo = _repositories.value.find { it.url == repoUrl }
+        val pluginsFolder = repo?.pluginsFolder ?: "plugins"
+        val changelogPath = "$baseLocation/$pluginsFolder/${remote.pkg}/changelog.md"
+        return fetchText(changelogPath)
     }
 }
 
