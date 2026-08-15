@@ -21,8 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -53,7 +51,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,10 +72,8 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PrimitiveType
-import org.wip.plugintoolkit.api.SettingMetadata
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.features.plugin.model.resolveCustomSettings
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitChip
@@ -100,19 +95,12 @@ import plugintoolkit.composeapp.generated.resources.plugin_settings_by_section
 import plugintoolkit.composeapp.generated.resources.plugin_settings_capability
 import plugintoolkit.composeapp.generated.resources.plugin_settings_custom
 import plugintoolkit.composeapp.generated.resources.plugin_settings_global_defaults
-import plugintoolkit.composeapp.generated.resources.plugin_settings_optional
-import plugintoolkit.composeapp.generated.resources.plugin_settings_required
 import plugintoolkit.composeapp.generated.resources.settings
 import plugintoolkit.composeapp.generated.resources.settings_locked_capability
 import plugintoolkit.composeapp.generated.resources.settings_no_results
 import plugintoolkit.composeapp.generated.resources.settings_search_placeholder
 
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
-
-internal fun partitionSettings(
-    settings: Map<String, SettingMetadata>
-): Pair<Map<String, SettingMetadata>, Map<String, SettingMetadata>> =
-    settings.filterValues { it.required } to settings.filterValues { !it.required }
 
 @Composable
 fun PluginSettingsContent(
@@ -137,8 +125,6 @@ fun PluginSettingsContent(
     val actionsTitle = stringResource(Res.string.plugin_settings_actions)
     val customTitle = stringResource(Res.string.plugin_settings_custom)
     val globalTitle = stringResource(Res.string.plugin_settings_global_defaults)
-    val requiredTitle = stringResource(Res.string.plugin_settings_required)
-    val optionalTitle = stringResource(Res.string.plugin_settings_optional)
 
     val capabilityTitles = manifest.capabilities.associate {
         it.name to stringResource(Res.string.plugin_settings_capability, it.name)
@@ -187,10 +173,6 @@ fun PluginSettingsContent(
     val hasGlobalParams = globalParams.isNotEmpty()
     val hasCapabilities = capabilities.isNotEmpty()
     val hasAnyResults = hasActions || hasCustomSettings || hasGlobalParams || hasCapabilities
-    val (requiredSettings, optionalSettings) = remember(customSettings) { partitionSettings(customSettings) }
-    val customSettingRequesters = remember(customSettings.keys) {
-        customSettings.keys.associateWith { BringIntoViewRequester() }
-    }
 
     val lockedEnumOptions = remember(manifest) {
         val result = mutableMapOf<String, MutableList<String>>()
@@ -264,8 +246,7 @@ fun PluginSettingsContent(
     // Auto-scroll to requested setting or section
     LaunchedEffect(scrollToSetting, sectionIndices, customSettings) {
         if (scrollToSetting != null) {
-            val isCustomSetting = customSettings.containsKey(scrollToSetting)
-            val targetKey = if (isCustomSetting) {
+            val targetKey = if (customSettings.containsKey(scrollToSetting)) {
                 "section_custom"
             } else if (capabilities.any { it.parameters?.containsKey(scrollToSetting) == true }) {
                 val cap = capabilities.first { it.parameters?.containsKey(scrollToSetting) == true }
@@ -279,10 +260,6 @@ fun PluginSettingsContent(
             val targetIndex = targetKey?.let { sectionIndices[it] }
             if (targetIndex != null) {
                 lazyListState.animateScrollToItem(targetIndex)
-                if (isCustomSetting) {
-                    withFrameNanos { }
-                    customSettingRequesters[scrollToSetting]?.bringIntoView()
-                }
             }
         }
     }
@@ -436,8 +413,15 @@ fun PluginSettingsContent(
                         )
                     }
                 } else {
-                    val providedSettings = remember(manifest, store.settings) {
-                        store.resolveCustomSettings(manifest)
+                    val manifestDefaults = remember(manifest) {
+                        (manifest.settings?.mapValues { (_, meta) ->
+                            meta.defaultValue ?: if (meta.type is DataType.Primitive && (meta.type as DataType.Primitive).primitiveType == PrimitiveType.BOOLEAN) {
+                                JsonPrimitive(false)
+                            } else null
+                        }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement>
+                    }
+                    val providedSettings = remember(manifestDefaults, store.settings) {
+                        manifestDefaults + store.settings
                     }
 
                     LazyColumn(
@@ -490,91 +474,75 @@ fun PluginSettingsContent(
                                     modifier = Modifier.fillMaxWidth().padding(top = ToolkitTheme.spacing.small),
                                     verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
                                 ) {
-                                    listOf(
-                                        requiredTitle to requiredSettings,
-                                        optionalTitle to optionalSettings
-                                    ).forEach { (groupTitle, groupSettings) ->
-                                        if (groupSettings.isNotEmpty()) {
-                                            PluginSettingGroupHeader(groupTitle, groupSettings.size)
-                                        }
-                                        groupSettings.forEach { (key, meta) ->
-                                            Column(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .bringIntoViewRequester(customSettingRequesters.getValue(key))
-                                            ) {
-                                                val value = store.settings[key] ?: meta.defaultValue
-                                                DynamicParameterInput(
-                                                    name = key,
-                                                    metadata = ParameterMetadata(
-                                                        description = meta.description,
-                                                        type = meta.type,
-                                                        defaultValue = meta.defaultValue,
-                                                        constraints = meta.constraints,
-                                                        required = meta.required,
-                                                        secret = meta.secret,
-                                                        semanticTypes = meta.semanticTypes,
-                                                        autogeneratedPattern = meta.autogeneratedPattern
-                                                    ),
-                                                    value = SettingsUtils.jsonToString(value, meta.type),
-                                                    onValueChange = {
-                                                        viewModel.updateSetting(
-                                                            key,
-                                                            SettingsUtils.stringToJson(it, meta.type)
+                                    customSettings.forEach { (key, meta) ->
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            val value = store.settings[key] ?: meta.defaultValue
+                                            DynamicParameterInput(
+                                                name = key,
+                                                metadata = ParameterMetadata(
+                                                    description = meta.description,
+                                                    type = meta.type,
+                                                    defaultValue = meta.defaultValue,
+                                                    required = meta.required,
+                                                    secret = meta.secret
+                                                ),
+                                                value = SettingsUtils.jsonToString(value, meta.type),
+                                                onValueChange = {
+                                                    viewModel.updateSetting(
+                                                        key,
+                                                        SettingsUtils.stringToJson(it, meta.type)
+                                                    )
+                                                },
+                                                enabled = !isBusy,
+                                                providedSettings = providedSettings,
+                                                providedLocks = locks
+                                            )
+
+                                            val lockedOptionsForSetting = lockedEnumOptions[key]?.distinct() ?: emptyList()
+
+                                            if (meta.requiredByCapabilities.isNotEmpty() || lockedOptionsForSetting.isNotEmpty()) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(
+                                                            start = ToolkitTheme.spacing.medium,
+                                                            bottom = ToolkitTheme.spacing.mediumSmall,
+                                                            end = ToolkitTheme.spacing.medium
                                                         )
-                                                    },
-                                                    enabled = !isBusy && meta.autogeneratedPattern == null,
-                                                    isAutoGenerated = meta.autogeneratedPattern != null,
-                                                    providedSettings = providedSettings,
-                                                    providedLocks = locks
-                                                )
-
-                                                val lockedOptionsForSetting = lockedEnumOptions[key]?.distinct() ?: emptyList()
-
-                                                if (meta.requiredByCapabilities.isNotEmpty() || lockedOptionsForSetting.isNotEmpty()) {
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(
-                                                                start = ToolkitTheme.spacing.medium,
-                                                                bottom = ToolkitTheme.spacing.mediumSmall,
-                                                                end = ToolkitTheme.spacing.medium
-                                                            )
-                                                            .horizontalScroll(rememberScrollState()),
-                                                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-                                                    ) {
-                                                        meta.requiredByCapabilities.forEach { capName ->
-                                                            ToolkitChip(
-                                                                text = stringResource(
-                                                                    Res.string.settings_locked_capability,
-                                                                    capName
-                                                                ),
-                                                                icon = {
-                                                                    Icon(
-                                                                        Icons.Default.Lock,
-                                                                        contentDescription = null,
-                                                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
-                                                                    )
-                                                                },
-                                                                style = ToolkitChipStyle.Tinted
-                                                            )
-                                                        }
-                                                        if (lockedOptionsForSetting.isNotEmpty()) {
-                                                            ToolkitChip(
-                                                                text = "Unlocks Enum Options",
-                                                                modifier = Modifier.tooltip(
-                                                                    text = "Unlocks values:\n" + lockedOptionsForSetting.joinToString("\n"),
-                                                                ),
-                                                                icon = {
-                                                                    Icon(
-                                                                        Icons.Default.Lock,
-                                                                        contentDescription = null,
-                                                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
-                                                                    )
-                                                                },
-                                                                style = ToolkitChipStyle.Outlined
-                                                            )
-                                                        }
+                                                        .horizontalScroll(rememberScrollState()),
+                                                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                                                ) {
+                                                    meta.requiredByCapabilities.forEach { capName ->
+                                                        ToolkitChip(
+                                                            text = stringResource(
+                                                                Res.string.settings_locked_capability,
+                                                                capName
+                                                            ),
+                                                            icon = {
+                                                                Icon(
+                                                                    Icons.Default.Lock,
+                                                                    contentDescription = null,
+                                                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
+                                                                )
+                                                            },
+                                                            style = ToolkitChipStyle.Tinted
+                                                        )
+                                                    }
+                                                    if (lockedOptionsForSetting.isNotEmpty()) {
+                                                        ToolkitChip(
+                                                            text = "Unlocks Enum Options",
+                                                            modifier = Modifier.tooltip(
+                                                                text = "Unlocks values:\n" + lockedOptionsForSetting.joinToString("\n"),
+                                                            ),
+                                                            icon = {
+                                                                Icon(
+                                                                    Icons.Default.Lock,
+                                                                    contentDescription = null,
+                                                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
+                                                                )
+                                                            },
+                                                            style = ToolkitChipStyle.Outlined
+                                                        )
                                                     }
                                                 }
                                             }
@@ -703,21 +671,6 @@ private fun PluginSectionHeader(title: String) {
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall, bottom = ToolkitTheme.spacing.extraSmall)
-    )
-}
-
-@Composable
-private fun PluginSettingGroupHeader(title: String, count: Int) {
-    Text(
-        text = "$title ($count)",
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(
-            start = ToolkitTheme.spacing.medium,
-            top = ToolkitTheme.spacing.small,
-            bottom = ToolkitTheme.spacing.extraSmall
-        )
     )
 }
 

@@ -1,6 +1,4 @@
 <resources>
-    <string name="plugin_settings_required">Obbligatorie</string>
-    <string name="plugin_settings_optional">Facoltative</string>
     <string name="app_name">PluginToolkit</string>
     <string name="section_runner">Runner</string>
     <string name="nav_main">Dashboard</string>
