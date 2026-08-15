@@ -8,37 +8,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Parses #RGBA, #RRGGBB or #AARRGGBB; long alpha values match the ARGB order emitted by [toHex]. */
-fun parseHexColor(value: String): Color? {
-    val digits = value.trim().removePrefix("#")
-    val normalized = when (digits.length) {
-        4 -> {
-            val red = digits[0].toString().repeat(2)
-            val green = digits[1].toString().repeat(2)
-            val blue = digits[2].toString().repeat(2)
-            val alpha = digits[3].toString().repeat(2)
-            "$alpha$red$green$blue"
-        }
-        6 -> "FF$digits"
-        8 -> digits
-        else -> return null
-    }
-    val argb = normalized.toLongOrNull(16) ?: return null
-    return Color(argb.toInt())
-}
-
-/** Detects alpha-bearing legacy and current color representations without changing their format. */
-fun colorStringHasAlpha(value: String): Boolean {
-    val trimmed = value.trim()
-    if (trimmed.startsWith("rgba(", ignoreCase = true) || trimmed.startsWith("hsla(", ignoreCase = true)) {
-        return true
-    }
-    val candidate = value.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim().orEmpty()
-    val digits = candidate.removePrefix("#")
-    return (candidate.startsWith("#") && digits.length == 4 && digits.toLongOrNull(16) != null) ||
-        (digits.length == 8 && digits.toLongOrNull(16) != null)
-}
-
 /**
  * Returns an integer array for all color channels value.
  */
@@ -267,15 +236,5 @@ internal fun Color.toHueProgress(): Float {
     hue *= 60
     if (hue < 0) hue += 360
 
-    return hue / 360f
-}
-
-internal fun Color.saturationAndValue(): Pair<Float, Float> {
-    val red = red() / 255f
-    val green = green() / 255f
-    val blue = blue() / 255f
-    val maximum = max(red, max(green, blue))
-    val minimum = min(red, min(green, blue))
-    val saturation = if (maximum == 0f) 0f else (maximum - minimum) / maximum
-    return saturation to maximum
+    return hue
 }
