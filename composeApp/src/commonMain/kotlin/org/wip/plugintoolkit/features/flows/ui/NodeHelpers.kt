@@ -26,6 +26,7 @@ import kotlinx.serialization.json.booleanOrNull
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.colorpicker.utils.parseHexColor
 
 @Composable
 fun PortCircle(
@@ -154,9 +155,17 @@ fun getNodeDescription(node: Node): String {
 }
 
 fun parseColorString(colorStr: String): Color {
-    val lastColor = colorStr.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim() ?: colorStr
+    val completeValue = colorStr.trim()
+    val isFunctionalColor = completeValue.startsWith("rgb(", ignoreCase = true) ||
+        completeValue.startsWith("rgba(", ignoreCase = true)
+    val lastColor = if (isFunctionalColor) {
+        completeValue
+    } else {
+        colorStr.split(",").lastOrNull { it.trim().isNotEmpty() }?.trim() ?: colorStr
+    }
     val trimmed = lastColor.trim()
     if (trimmed.isEmpty()) return Color.Transparent
+    parseHexColor(trimmed)?.let { return it }
     if (trimmed.startsWith("#")) {
         return try {
             val hex = trimmed.substring(1)
@@ -184,10 +193,10 @@ fun parseColorString(colorStr: String): Color {
                 }
 
                 8 -> {
-                    val r = hex.substring(0, 2).toInt(16) / 255f
-                    val g = hex.substring(2, 4).toInt(16) / 255f
-                    val b = hex.substring(4, 6).toInt(16) / 255f
-                    val a = hex.substring(6, 8).toInt(16) / 255f
+                    val a = hex.substring(0, 2).toInt(16) / 255f
+                    val r = hex.substring(2, 4).toInt(16) / 255f
+                    val g = hex.substring(4, 6).toInt(16) / 255f
+                    val b = hex.substring(6, 8).toInt(16) / 255f
                     Color(r, g, b, a)
                 }
 
