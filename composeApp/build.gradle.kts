@@ -135,3 +135,46 @@ compose.desktop {
         }
     }
 }
+
+val packagePortableZip by tasks.registering(Zip::class) {
+    group = "compose desktop"
+    description = "Packages a portable zip distribution containing the application and a .portable marker file."
+
+    val createDistributableTask = tasks.matching { 
+        it.name == "createReleaseDistributable" || it.name == "createDistributable" 
+    }
+    dependsOn(createDistributableTask)
+
+    val appName = "PluginToolkit"
+    val osName = System.getProperty("os.name", "").lowercase()
+    val platformName = when {
+        osName.contains("win") -> "windows"
+        osName.contains("mac") -> "macos"
+        else -> "linux"
+    }
+
+    archiveBaseName.set("$appName-$platformName-portable")
+    archiveVersion.set(libs.versions.app.get())
+    destinationDirectory.set(layout.buildDirectory.dir("compose/binaries/main/portable"))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // Include the app files from createDistributable output
+    from(layout.buildDirectory.dir("compose/binaries/main/app/$appName")) {
+        into(appName)
+    }
+    from(layout.buildDirectory.dir("compose/binaries/main-release/app/$appName")) {
+        into(appName)
+    }
+
+    // Generate .portable marker file
+    val markerDir = layout.buildDirectory.dir("tmp/portable-marker")
+    doFirst {
+        val markerFile = markerDir.get().asFile.resolve(".portable")
+        markerFile.parentFile.mkdirs()
+        markerFile.writeText("portable=true\n")
+    }
+    from(markerDir) {
+        into(appName)
+        include(".portable")
+    }
+}

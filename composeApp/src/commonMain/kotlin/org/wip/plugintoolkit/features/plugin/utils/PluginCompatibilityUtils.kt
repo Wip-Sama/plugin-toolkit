@@ -31,6 +31,11 @@ object PluginCompatibilityUtils {
         return checkVersionAndOs(target, emptyList())
     }
 
+    fun checkCompatibility(flow: org.wip.plugintoolkit.features.repository.model.ExtensionFlow): Pair<Boolean, String?> {
+        val target = flow.minAppVersion ?: return true to null
+        return checkVersionAndOs(target, emptyList())
+    }
+
     private fun checkVersionAndOs(targetVersion: String, supportedOs: List<org.wip.plugintoolkit.api.OS>): Pair<Boolean, String?> {
         val current = AppConfig.VERSION
         val min = AppConfig.MIN_COMPATIBLE_PLUGIN_VERSION
