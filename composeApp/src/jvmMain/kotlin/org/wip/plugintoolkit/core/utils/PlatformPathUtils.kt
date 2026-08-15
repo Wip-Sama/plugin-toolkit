@@ -2,12 +2,14 @@ package org.wip.plugintoolkit.core.utils
 
 import org.wip.plugintoolkit.core.SystemConfig
 import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 
 object PlatformPathUtils : KoinComponent {
-    private val appConfig: SystemConfig by inject()
+    private val injectedAppConfig: SystemConfig by lazy { getKoin().get() }
 
-    fun getAppDataDir(): String = appConfig.getAppDataDir()
+    fun getAppDataDir(appConfig: SystemConfig = injectedAppConfig): String = appConfig.getAppDataDir()
 
-    fun getCacheDir(systemManaged: Boolean = false): String = appConfig.getCacheDir(systemManaged)
+    fun getCacheDir(
+        systemManaged: Boolean = false,
+        appConfig: SystemConfig = injectedAppConfig
+    ): String = appConfig.getCacheDir(systemManaged)
 }

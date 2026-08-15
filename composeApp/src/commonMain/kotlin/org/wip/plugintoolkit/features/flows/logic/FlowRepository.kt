@@ -46,92 +46,99 @@ class FlowRepository(
     }
 
     private fun getFlowPath(appDataDir: String, flowName: String): Path {
-        val safeName = flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
-        return Path("$appDataDir/flows/$safeName.json")
+        return storedFlowPath(appDataDir, flowName)
     }
 
     fun reloadFlows() {
         scope.launch(Dispatchers.IO) {
             try {
-                val appDataDir = settingsPersistence.getSettingsDir()
-                val flowsDir = Path("$appDataDir/flows")
-
-                if (!SystemFileSystem.exists(flowsDir)) {
-                    SystemFileSystem.createDirectories(flowsDir)
-                }
-
-                // Check for legacy migration first
-                val legacyFile = Path("$appDataDir/${appConfig.FLOWS_FILE_NAME}")
-                if (SystemFileSystem.exists(legacyFile)) {
-                    try {
-                        val legacyContent = SystemFileSystem.source(legacyFile).buffered().use { it.readString() }
-                        if (legacyContent.isNotBlank()) {
-                            val loadedFlows = json.decodeFromString<List<Flow>>(legacyContent)
-                            loadedFlows.forEach { flow ->
-                                val targetFile = getFlowPath(appDataDir, flow.name)
-                                if (!SystemFileSystem.exists(targetFile)) {
-                                    val flowContent = json.encodeToString(Flow.serializer(), flow)
-                                    SystemFileSystem.sink(targetFile).buffered().use { it.writeString(flowContent) }
-                                }
-                            }
-                        }
-                        val backupFile = Path("$appDataDir/${appConfig.FLOWS_FILE_NAME}.bak")
-                        if (SystemFileSystem.exists(backupFile)) {
-                            SystemFileSystem.delete(backupFile)
-                        }
-                        SystemFileSystem.source(legacyFile).buffered().use { source ->
-                            SystemFileSystem.sink(backupFile).buffered().use { sink ->
-                                val data = source.readString()
-                                sink.writeString(data)
-                            }
-                        }
-                        SystemFileSystem.delete(legacyFile)
-                        Logger.i { "Legacy flows.json successfully migrated and backed up" }
-                    } catch (e: Exception) {
-                        Logger.e(e) { "Migration failed" }
-                    }
-                }
-
-                val loadedFlows = mutableListOf<Flow>()
+                val storedFlows = loadStoredFlows(settingsPersistence, appConfig)
                 val manifests = pluginManager.installedPlugins.value.filter { it.isEnabled }
                     .associate { it.pkg to pluginManager.getManifest(it.pkg) }
                     .filterValues { it != null }.mapValues { it.value!! }
-
-                SystemFileSystem.list(flowsDir).forEach { file ->
-                    if (file.name.endsWith(".json")) {
-                        try {
-                            val content = SystemFileSystem.source(file).buffered().use { it.readString() }
-                            val flow = json.decodeFromString<Flow>(content)
-
-                            val updatedNodes = flow.nodes.map { node ->
-                                if (node is Node.CapabilityNode) {
-                                    val currentManifest = manifests[node.pluginInfo.id]
-                                    val actualCapability =
-                                        currentManifest?.capabilities?.find { it.name == node.capability.name }
-                                    if (currentManifest == null || actualCapability == null) {
-                                        node.copy(isBroken = true)
-                                    } else {
-                                        node.copy(
-                                            isBroken = false,
-                                            capability = actualCapability,
-                                            pluginInfo = currentManifest.plugin
-                                        )
-                                    }
-                                } else {
-                                    node
-                                }
+                _flows.value = storedFlows.map { flow ->
+                    val updatedNodes = flow.nodes.map { node ->
+                        if (node is Node.CapabilityNode) {
+                            val currentManifest = manifests[node.pluginInfo.id]
+                            val actualCapability = currentManifest?.capabilities?.find { it.name == node.capability.name }
+                            if (currentManifest == null || actualCapability == null) {
+                                node.copy(isBroken = true)
+                            } else {
+                                node.copy(
+                                    isBroken = false,
+                                    capability = actualCapability,
+                                    pluginInfo = currentManifest.plugin
+                                )
                             }
-                            loadedFlows.add(flow.copy(nodes = updatedNodes))
-                        } catch (e: Exception) {
-                            Logger.e(e) { "Failed to parse flow file: ${file.name}" }
+                        } else {
+                            node
                         }
                     }
+                    flow.copy(nodes = updatedNodes)
                 }
-
-                _flows.value = loadedFlows
             } catch (e: Exception) {
                 Logger.e(e) { "Failed to reload flows" }
             }
+        }
+    }
+
+    companion object {
+        private val storageJson = Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
+
+        private fun storedFlowPath(appDataDir: String, flowName: String): Path {
+            val safeName = flowName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            return Path("$appDataDir/flows/$safeName.json")
+        }
+
+        suspend fun loadStoredFlows(
+            settingsPersistence: SettingsPersistence,
+            appConfig: SystemConfig
+        ): List<Flow> = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            val appDataDir = settingsPersistence.getSettingsDir()
+            val flowsDir = Path("$appDataDir/flows")
+            if (!SystemFileSystem.exists(flowsDir)) SystemFileSystem.createDirectories(flowsDir)
+
+            val legacyFile = Path("$appDataDir/${appConfig.FLOWS_FILE_NAME}")
+            if (SystemFileSystem.exists(legacyFile)) {
+                try {
+                    val legacyContent = SystemFileSystem.source(legacyFile).buffered().use { it.readString() }
+                    if (legacyContent.isNotBlank()) {
+                        storageJson.decodeFromString<List<Flow>>(legacyContent).forEach { flow ->
+                            val targetFile = storedFlowPath(appDataDir, flow.name)
+                            if (!SystemFileSystem.exists(targetFile)) {
+                                SystemFileSystem.sink(targetFile).buffered().use {
+                                    it.writeString(storageJson.encodeToString(Flow.serializer(), flow))
+                                }
+                            }
+                        }
+                    }
+                    val backupFile = Path("$appDataDir/${appConfig.FLOWS_FILE_NAME}.bak")
+                    if (SystemFileSystem.exists(backupFile)) SystemFileSystem.delete(backupFile)
+                    SystemFileSystem.source(legacyFile).buffered().use { source ->
+                        SystemFileSystem.sink(backupFile).buffered().use { sink -> sink.writeString(source.readString()) }
+                    }
+                    SystemFileSystem.delete(legacyFile)
+                    Logger.i { "Legacy flows.json successfully migrated and backed up" }
+                } catch (error: Exception) {
+                    Logger.e(error) { "Migration failed" }
+                }
+            }
+
+            SystemFileSystem.list(flowsDir)
+                .filter { it.name.endsWith(".json") }
+                .mapNotNull { file ->
+                    try {
+                        val content = SystemFileSystem.source(file).buffered().use { it.readString() }
+                        storageJson.decodeFromString<Flow>(content)
+                    } catch (error: Exception) {
+                        Logger.e(error) { "Failed to parse flow file: ${file.name}" }
+                        null
+                    }
+                }
         }
     }
 

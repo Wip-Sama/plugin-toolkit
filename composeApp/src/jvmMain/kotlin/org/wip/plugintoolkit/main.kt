@@ -134,6 +134,9 @@ import javax.swing.JOptionPane.showMessageDialog
 import javax.swing.JWindow
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.seconds
+import org.wip.plugintoolkit.cli.parseToolkitCliInvocation
+import org.wip.plugintoolkit.cli.runToolkitCli
+import org.wip.plugintoolkit.cli.ToolkitCliInvocation
 
 fun detectSystemConfig(): SystemConfig {
     val userDir = java.io.File(System.getProperty("user.dir"))
@@ -169,6 +172,20 @@ fun detectSystemConfig(): SystemConfig {
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun main(args: Array<String>) {
+    when (val invocation = parseToolkitCliInvocation(args)) {
+        is ToolkitCliInvocation.Command -> {
+            // Keep command output machine-readable; desktop logging is configured only below.
+            Logger.setLogWriters()
+            val exitCode = kotlinx.coroutines.runBlocking { runToolkitCli(invocation.command) }
+            exitProcess(exitCode)
+        }
+        is ToolkitCliInvocation.Invalid -> {
+            System.err.println("Unknown command: ${invocation.arguments.joinToString(" ")}. Use --help.")
+            exitProcess(2)
+        }
+        ToolkitCliInvocation.Desktop -> Unit
+    }
+
     ComposeFoundationFlags.isNewContextMenuEnabled = true
     val splashWindow = try {
         showSplashWindow()
