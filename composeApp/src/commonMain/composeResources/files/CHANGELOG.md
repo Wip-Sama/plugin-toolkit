@@ -1,4 +1,5 @@
 Version: 2.0.0
+VersionName: Local Everything
 Date: 01-08-2026
 Changes:
   - The cancel button in job operation is now disabled in non-cancelable phases

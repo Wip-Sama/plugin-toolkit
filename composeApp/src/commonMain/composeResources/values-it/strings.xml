@@ -474,4 +474,11 @@
     <string name="repo_filter_label">Filtra:</string>
     <string name="repo_sort_label">Ordina:</string>
     <string name="repo_sync_all">Sincronizza tutti</string>
+    <string name="changelog_version_title">Versione %1$s</string>
+    <string name="changelog_title_prefix">Registro modifiche: %1$s</string>
+    <string name="changelog_filter_general">Generale</string>
+    <string name="changelog_filter_everything">Tutto</string>
+    <string name="changelog_filter_major">Major</string>
+    <string name="changelog_filter_minor">Minor</string>
+    <string name="changelog_filter_patch">Patch</string>
 </resources>

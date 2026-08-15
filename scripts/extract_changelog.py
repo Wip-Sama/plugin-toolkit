@@ -9,17 +9,12 @@ def extract_changelog(version, changelog_path):
     with open(changelog_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Pattern to find the block
-    # It starts with "Version: <version>" (case insensitive)
-    # And ends before a line of at least 50 dashes or end of file
-    # Uses re.DOTALL to make '.' match newlines
-    pattern = rf'(?i)Version:\s*{re.escape(version)}.*?(?=\n-{{50,}}|\Z)'
-    match = re.search(pattern, content, re.DOTALL)
-
-    if match:
-        return match.group(0).strip()
-    else:
-        return None
+    # Split by separator of at least 50 dashes
+    blocks = re.split(r'\n-{50,}\n?', content)
+    for block in blocks:
+        if re.search(rf'(?i)^Version:\s*{re.escape(version)}\s*$', block, re.MULTILINE):
+            return block.strip()
+    return None
 
 def main():
     parser = argparse.ArgumentParser(description='Extract version-specific notes from CHANGELOG.md')

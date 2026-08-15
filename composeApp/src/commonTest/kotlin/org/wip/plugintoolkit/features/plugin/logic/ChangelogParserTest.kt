@@ -88,4 +88,64 @@ class ChangelogParserTest {
         assertEquals(1, versions.size)
         assertEquals("1.0.0", versions[0].version)
     }
+
+    @Test
+    fun testParseVersionName() {
+        val content = """
+            Version: 2.0.0
+            VersionName: Major Redesign
+            Date: 2026-06-01
+            Features:
+              - Added new UI
+            
+            ${separator}
+            
+            VersionName: Security Hotfix
+            Version: 1.9.1
+            Date: 2026-05-15
+            Fixes:
+              - Fixed CVE
+            
+            ${separator}
+            
+            Version: 1.9.0
+            Date: 2026-05-01
+            General:
+              - Unnamed update
+        """.trimIndent()
+
+        val versions = ChangelogParser.parse(content).releases
+        assertEquals(3, versions.size)
+
+        assertEquals("2.0.0", versions[0].version)
+        assertEquals("Major Redesign", versions[0].versionName)
+        assertEquals("Major Redesign", versions[0].name)
+        assertEquals("2026-06-01", versions[0].date)
+
+        assertEquals("1.9.1", versions[1].version)
+        assertEquals("Security Hotfix", versions[1].versionName)
+        assertEquals("Security Hotfix", versions[1].name)
+        assertEquals("2026-05-15", versions[1].date)
+
+        assertEquals("1.9.0", versions[2].version)
+        assertEquals(null, versions[2].versionName)
+        assertEquals(null, versions[2].name)
+        assertEquals("2026-05-01", versions[2].date)
+    }
+
+    @Test
+    fun testParseVersionNameCaseInsensitive() {
+        val content = """
+            version: 1.0.0
+            versionname: Cool Edition
+            date: 2026-01-01
+            General:
+              - Initial
+        """.trimIndent()
+
+        val versions = ChangelogParser.parse(content).releases
+        assertEquals(1, versions.size)
+        assertEquals("1.0.0", versions[0].version)
+        assertEquals("Cool Edition", versions[0].versionName)
+    }
 }

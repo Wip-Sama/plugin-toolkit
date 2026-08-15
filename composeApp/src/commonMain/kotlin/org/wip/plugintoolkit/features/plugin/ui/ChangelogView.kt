@@ -155,13 +155,18 @@ fun ChangelogView(
                         val options = when (selectedLevel) {
                             FilterLevel.Major -> majors.map { "v$it.x.x" }
                             FilterLevel.Minor -> minors.map { "v$it.x" }
-                            FilterLevel.Patch -> allVersions.map { "v$it" }
+                            FilterLevel.Patch -> versions.map {
+                                if (!it.versionName.isNullOrBlank()) "v${it.version} (${it.versionName})" else "v${it.version}"
+                            }
                             else -> emptyList()
                         }
                         val currentText = when (selectedLevel) {
                             FilterLevel.Major -> "v$selectedMajor.x.x"
                             FilterLevel.Minor -> "v$selectedMinor.x"
-                            FilterLevel.Patch -> "v$selectedPatch"
+                            FilterLevel.Patch -> {
+                                val rel = versions.firstOrNull { it.version == selectedPatch }
+                                if (rel != null && !rel.versionName.isNullOrBlank()) "v$selectedPatch (${rel.versionName})" else "v$selectedPatch"
+                            }
                             else -> ""
                         }
 
@@ -187,7 +192,7 @@ fun ChangelogView(
                                             when (selectedLevel) {
                                                 FilterLevel.Major -> selectedMajor = majors[index]
                                                 FilterLevel.Minor -> selectedMinor = minors[index]
-                                                FilterLevel.Patch -> selectedPatch = allVersions[index]
+                                                FilterLevel.Patch -> selectedPatch = versions[index].version
                                                 else -> {}
                                             }
                                             expanded = false
@@ -264,12 +269,26 @@ fun VersionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "Version ${version.version}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Text(
+                        "Version ${version.version}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    if (!version.versionName.isNullOrBlank()) {
+                        Text(
+                            "— \"${version.versionName}\"",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = ToolkitTheme.shapes.small

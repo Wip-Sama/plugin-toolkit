@@ -325,8 +325,11 @@ data class Changelog(
 data class Release(
     val version: String,
     val date: String,
-    val categories: Map<String, List<String>>
-)
+    val categories: Map<String, List<String>>,
+    val versionName: String? = null
+) {
+    val name: String? get() = versionName
+}
 
 object OSSerializer : KSerializer<OS> by createSafeEnumSerializer("OS", OS.UNKNOWN)
 

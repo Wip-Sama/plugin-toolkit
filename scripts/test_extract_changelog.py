@@ -70,8 +70,26 @@ Version: 1.4.1
 """
         self.write_changelog(content)
         notes = extract_changelog("1.4.2", self.changelog_path)
-        self.assertIn("- Still 1.4.2", notes)
+    def test_extract_with_version_name(self):
+        content = """Version: 1.4.2
+VersionName: Summer Update
+Date: 2026-05-15
+- Feature A
+-----------------------------------------------------------------------------------------------------
+VersionName: Spring Release
+Version: 1.4.1
+- Feature B
+"""
+        self.write_changelog(content)
+        notes = extract_changelog("1.4.2", self.changelog_path)
+        self.assertIn("Version: 1.4.2", notes)
+        self.assertIn("VersionName: Summer Update", notes)
         self.assertNotIn("Version: 1.4.1", notes)
+
+        notes_prev = extract_changelog("1.4.1", self.changelog_path)
+        self.assertIn("Version: 1.4.1", notes_prev)
+        self.assertIn("VersionName: Spring Release", notes_prev)
+        self.assertNotIn("Version: 1.4.2", notes_prev)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,5 @@
 Version: 1.0.0
+VersionName: Complete Suite Showcase
 Date: 04-08-2026
 Added:
   - Initial release of Complete Example Plugin.

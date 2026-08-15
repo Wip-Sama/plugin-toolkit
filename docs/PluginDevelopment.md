@@ -231,6 +231,7 @@ The file should follow a specific plain-text format:
 
 ```text
 Version: 1.1.0
+VersionName: Sync & Themes Update
 Date: 2026-05-03
 Added:
   - New capability for data sync
@@ -239,12 +240,14 @@ Fixed:
   - Minor crash during initialization
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.0
+VersionName: Initial Release
 Date: 2026-05-01
 Initial:
   - Initial release with core features
 ```
 
 - **Version:** and **Date:** are mandatory for each release block.
+- **VersionName:** (optional) allows specifying a human-readable title or name for the release.
 - Categories (like **Added:**, **Fixed:**) must end with a colon and start at the beginning of the line.
 - Items under categories must be indented with at least one space and start with a hyphen (`-`).
 - 100 (`-`) separate a version from another
