@@ -102,6 +102,10 @@ interface ScopedFileSystem {
     suspend fun exists(relativePath: RelativePath): Boolean
     suspend fun listFiles(relativePath: RelativePath = RelativePath.ROOT): List<String>
     suspend fun deleteFile(relativePath: RelativePath): Result<Unit>
+    suspend fun createDirectory(relativePath: RelativePath): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Directory creation is not supported by this host"))
+    suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean = false): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Directory deletion is not supported by this host"))
 
     /**
      * Get the absolute base path of the managed file area.
