@@ -70,6 +70,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.mp.KoinPlatform.getKoin
 import org.wip.plugintoolkit.core.DefaultSystemConfig
+import org.wip.plugintoolkit.core.PortableSystemConfig
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.coroutineModule
 import org.wip.plugintoolkit.core.utils.DefaultSemanticRegistry
@@ -139,6 +140,38 @@ import org.wip.plugintoolkit.cli.parseToolkitCliInvocation
 import org.wip.plugintoolkit.cli.runToolkitCli
 import org.wip.plugintoolkit.cli.ToolkitCliInvocation
 
+fun detectSystemConfig(): SystemConfig {
+    val userDir = java.io.File(System.getProperty("user.dir"))
+    if (java.io.File(userDir, ".portable").exists()) {
+        Logger.i { "Startup: Portable marker found in user.dir (${userDir.absolutePath})" }
+        return PortableSystemConfig(userDir.absolutePath)
+    }
+
+    try {
+        val location = SystemConfig::class.java.protectionDomain.codeSource?.location
+        if (location != null) {
+            val file = java.io.File(location.toURI())
+            val parent = file.parentFile
+            if (parent != null) {
+                if (java.io.File(parent, ".portable").exists()) {
+                    Logger.i { "Startup: Portable marker found in JAR parent dir (${parent.absolutePath})" }
+                    return PortableSystemConfig(parent.absolutePath)
+                }
+                val grandParent = parent.parentFile
+                if (grandParent != null && java.io.File(grandParent, ".portable").exists()) {
+                    Logger.i { "Startup: Portable marker found in app root dir (${grandParent.absolutePath})" }
+                    return PortableSystemConfig(grandParent.absolutePath)
+                }
+            }
+        }
+    } catch (e: Throwable) {
+        Logger.w(e) { "Startup: Failed to inspect codeSource location for .portable marker" }
+    }
+
+    Logger.i { "Startup: Running in standard system installation mode" }
+    return DefaultSystemConfig()
+}
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun main(args: Array<String>) {
     when (val invocation = parseToolkitCliInvocation(args)) {
@@ -184,9 +217,7 @@ fun main(args: Array<String>) {
 
 suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit = {}): Pair<SettingsViewModel, WindowStartMode> {
     updateStatus("Loading configuration...")
-    // Determine initial window state based on persistence directly
-    val persistence = JvmSettingsPersistence()
-    val initialSettings = persistence.load() // This is now a suspend call, no runBlocking
+    val detectedConfig = detectSystemConfig()
 
     // We need a late-init provider for settings because viewModel is created after startKoin
     // but viewModel needs NotificationService which needs settings.
@@ -195,7 +226,7 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     updateStatus("Initializing Dependency Injection...")
     startKoin {
         modules(coroutineModule, module {
-            single<SystemConfig> { DefaultSystemConfig() }
+            single<SystemConfig> { detectedConfig }
             single<SemanticRegistry> { DefaultSemanticRegistry() }
             single<SettingsPersistence> { JvmSettingsPersistence() }
             single { SettingsRepository(get(), get(named("LoomScope"))) }
@@ -208,10 +239,11 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
             single<SettingsRegistry> {
                 val settingsViewModel: SettingsViewModel = get()
                 val notificationViewModel: NotificationViewModel = get()
+                val appConfig: SystemConfig = get()
 
                 SettingsRegistry.build {
                     appearanceDefinitions()
-                    systemDefinitions(settingsViewModel)
+                    systemDefinitions(settingsViewModel, appConfig)
                     loggingDefinitions(settingsViewModel)
                     jobDefinitions()
                     notificationDefinitions(notificationViewModel)
@@ -279,11 +311,14 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
             factory { JobViewModel(get()) }
             factory { AppViewModel(get(), get()) }
             single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
-            single { UpdateService(get()) }
+            single { UpdateService(get(), get()) }
         })
     }
 
     val koin = getKoin()
+    val persistence = koin.get<SettingsPersistence>()
+    val initialSettings = persistence.load()
+
     val viewModel = koin.get<SettingsViewModel>()
     val registry = koin.get<PluginRegistry>()
     val pluginManager = koin.get<PluginManager>()

@@ -111,22 +111,42 @@ class PluginInstaller(
             fileSystem.mkdirs(pluginDir)
 
             val repoUrl = plugin.repoUrl ?: return Result.failure(Exception("Missing repo URL"))
-            val pluginsFolder = repoUrl.substringBeforeLast("/") + "/plugins"
-            val baseUrl = "$pluginsFolder/${plugin.pkg}"
-
-            val pluginFileUrl = "$baseUrl/${plugin.fileName.encodeURLPathPart()}"
+            val repo = repoManager.repositories.value.find { it.url == repoUrl }
+            val isLocal = repo?.isLocal ?: (!repoUrl.startsWith("http://", ignoreCase = true) && !repoUrl.startsWith("https://", ignoreCase = true))
+            val baseLocation = repo?.getBaseLocation() ?: (if (repoUrl.contains('/')) repoUrl.replace('\\', '/').substringBeforeLast('/') else repoUrl)
+            val pluginsFolder = repo?.pluginsFolder ?: "plugins"
+            val baseUrl = "$baseLocation/$pluginsFolder/${plugin.pkg}"
             val destFile = "$pluginDir/${plugin.fileName}"
 
-            downloadFile(pluginFileUrl, destFile, onProgress).onFailure { return Result.failure(it) }
+            if (isLocal) {
+                val sourceJar = "$baseUrl/${plugin.fileName}"
+                if (!fileSystem.exists(sourceJar)) {
+                    return Result.failure(Exception("Source plugin file not found: $sourceJar"))
+                }
+                fileSystem.copyFile(sourceJar, destFile)
+                onProgress?.invoke(1.0f)
+                listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach {
+                    val assetPath = "$baseUrl/$it"
+                    if (fileSystem.exists(assetPath)) {
+                        fileSystem.copyFile(assetPath, "$pluginDir/$it")
+                    }
+                }
+                val changelogPath = "$baseUrl/changelog.md"
+                if (fileSystem.exists(changelogPath)) {
+                    fileSystem.copyFile(changelogPath, "$pluginDir/changelog.md")
+                }
+            } else {
+                val pluginFileUrl = "$baseUrl/${plugin.fileName.encodeURLPathPart()}"
+                downloadFile(pluginFileUrl, destFile, onProgress).onFailure { return Result.failure(it) }
 
-            // Download optional assets
-            listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach {
-                downloadFile("$baseUrl/$it", "$pluginDir/$it")
+                // Download optional assets
+                listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach {
+                    downloadFile("$baseUrl/$it", "$pluginDir/$it")
+                }
+                downloadFile("$baseUrl/changelog.md", "$pluginDir/changelog.md")
             }
-            downloadFile("$baseUrl/changelog.md", "$pluginDir/changelog.md")
 
             // Signature verification
-            val repo = repoManager.repositories.value.find { it.url == repoUrl }
             val publicKey = repo?.signPublicKey
             val strictChecking = settingsRepository.loadSettings().extensions.strictSignatureChecking
 
