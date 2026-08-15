@@ -85,6 +85,24 @@ class DefaultExecutionFileSystemTest {
     }
 
     @Test
+    fun testCreateAndDeleteDirectory() = runTest {
+        val directory = RelativePath.from("models/nested").getOrThrow()
+        assertTrue(fileSystem.createDirectory(directory).isSuccess)
+        assertTrue(fileSystem.exists(directory))
+
+        fileSystem.writeTextFile(RelativePath.from("models/nested/model.txt").getOrThrow(), "model")
+        assertTrue(fileSystem.deleteDirectory(RelativePath.from("models").getOrThrow()).isFailure)
+        assertTrue(fileSystem.deleteDirectory(RelativePath.from("models").getOrThrow(), recursive = true).isSuccess)
+        assertFalse(fileSystem.exists(RelativePath.from("models").getOrThrow()))
+    }
+
+    @Test
+    fun testCannotDeleteSandboxRoot() = runTest {
+        assertTrue(fileSystem.deleteDirectory(RelativePath.ROOT, recursive = true).isFailure)
+        assertTrue(SystemFileSystem.exists(Path(sandboxPath)))
+    }
+
+    @Test
     fun testPathTraversalPrevention() = runTest {
         // Attempt to create a path outside the sandbox using ../
         val maliciousPathResult = RelativePath.from("../outside.txt")

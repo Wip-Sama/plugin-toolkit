@@ -1,6 +1,8 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -23,25 +25,21 @@ class DefaultPluginFileSystem(
         SystemFileSystem.createDirectories(Path(cachePath))
     }
 
-    private fun resolvePath(relativePath: RelativePath): Path {
-        val resolved = Path(basePath, relativePath.value)
-        val normalized = resolved.toString().replace('\\', '/')
-        val baseCanonical = Path(basePath).toString().replace('\\', '/')
+    private val filesOperations = SandboxFileOperations(basePath)
+    private val cacheOperations = SandboxFileOperations(cachePath)
 
-        if (normalized != baseCanonical && !normalized.startsWith(if (baseCanonical.endsWith("/")) baseCanonical else "$baseCanonical/")) {
-            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin files directory.")
-        }
-        return resolved
+    private fun resolvePath(relativePath: RelativePath): Path {
+        return filesOperations.resolve(relativePath)
     }
 
     override suspend fun readFile(relativePath: RelativePath): ByteArray? {
-        val path = resolvePath(relativePath)
+        val path = filesOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
     override suspend fun readTextFile(relativePath: RelativePath): String? {
-        val path = resolvePath(relativePath)
+        val path = filesOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
@@ -69,11 +67,12 @@ class DefaultPluginFileSystem(
     }
 
     override suspend fun exists(relativePath: RelativePath): Boolean {
-        return SystemFileSystem.exists(resolvePath(relativePath))
+        val path = filesOperations.resolveIfRootExists(relativePath) ?: return false
+        return SystemFileSystem.exists(path)
     }
 
     override suspend fun listFiles(relativePath: RelativePath): List<String> {
-        val path = resolvePath(relativePath)
+        val path = filesOperations.resolveIfRootExists(relativePath) ?: return emptyList()
         if (!SystemFileSystem.exists(path)) return emptyList()
         val metadata = SystemFileSystem.metadataOrNull(path)
         if (metadata?.isDirectory != true) return emptyList()
@@ -91,6 +90,15 @@ class DefaultPluginFileSystem(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    override suspend fun createDirectory(relativePath: RelativePath): Result<Unit> = runCatching {
+        SystemFileSystem.createDirectories(resolvePath(relativePath))
+    }
+
+    override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> = runCatching {
+        require(relativePath.value.isNotEmpty()) { "The plugin files root cannot be deleted" }
+        filesOperations.deleteDirectory(resolvePath(relativePath), recursive)
     }
 
     override suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit> {
@@ -116,10 +124,10 @@ class DefaultPluginFileSystem(
     override fun getBasePath(): String = basePath
 
     companion object {
-        fun createCacheOnly(pluginInstallPath: String): PluginFileSystem {
-            return DefaultPluginFileSystem(pluginInstallPath).let { fs ->
+        fun createCacheOnly(pluginInstallPath: String, jarPath: String? = null): PluginFileSystem {
+            return DefaultPluginFileSystem(pluginInstallPath, jarPath).let { fs ->
                 // Create a variant that uses cachePath as basePath
-                object : PluginFileSystem by fs {
+                object : PluginFileSystem {
                     override fun getBasePath(): String = fs.cachePath
                     override suspend fun readFile(relativePath: RelativePath): ByteArray? =
                         fs.readFromCache(relativePath)
@@ -133,35 +141,83 @@ class DefaultPluginFileSystem(
                     override suspend fun writeTextFile(relativePath: RelativePath, text: String): Result<Unit> =
                         fs.writeTextToCache(relativePath, text)
 
+                    // Keep every compound/stream operation explicitly cache-routed. In
+                    // particular, do not use Kotlin interface delegation here: generated
+                    // forwards would bypass these overrides and touch persistent files.
+                    override suspend fun readStream(relativePath: RelativePath): Flow<ByteArray> = flow {
+                        fs.readFromCache(relativePath)?.let { emit(it) }
+                    }
+
+                    override suspend fun writeStream(
+                        relativePath: RelativePath,
+                        stream: Flow<ByteArray>
+                    ): Result<Unit> = runCatching {
+                        val bytes = mutableListOf<Byte>()
+                        stream.collect { chunk -> chunk.forEach { byte -> bytes.add(byte) } }
+                        fs.writeToCache(relativePath, bytes.toByteArray()).getOrThrow()
+                    }
+
+                    override suspend fun copyFile(
+                        source: RelativePath,
+                        destination: RelativePath
+                    ): Result<Unit> = runCatching {
+                        val content = fs.readFromCache(source)
+                            ?: throw IllegalArgumentException("Source file does not exist")
+                        fs.writeToCache(destination, content).getOrThrow()
+                    }
+
+                    override suspend fun moveFile(
+                        source: RelativePath,
+                        destination: RelativePath
+                    ): Result<Unit> = runCatching {
+                        copyFile(source, destination).getOrThrow()
+                        fs.deleteFromCache(source).getOrThrow()
+                    }
+
                     override suspend fun exists(relativePath: RelativePath): Boolean =
-                        SystemFileSystem.exists(fs.resolveCachePath(relativePath))
+                        fs.cacheOperations.resolveIfRootExists(relativePath)?.let(SystemFileSystem::exists) ?: false
+
+                    override suspend fun listFiles(relativePath: RelativePath): List<String> {
+                        val path = fs.cacheOperations.resolveIfRootExists(relativePath) ?: return emptyList()
+                        if (!SystemFileSystem.exists(path)) return emptyList()
+                        if (SystemFileSystem.metadataOrNull(path)?.isDirectory != true) return emptyList()
+                        return SystemFileSystem.list(path).map { it.name }
+                    }
 
                     override suspend fun deleteFile(relativePath: RelativePath): Result<Unit> =
                         fs.deleteFromCache(relativePath)
+
+                    override suspend fun createDirectory(relativePath: RelativePath): Result<Unit> = runCatching {
+                        SystemFileSystem.createDirectories(fs.resolveCachePath(relativePath))
+                    }
+
+                    override suspend fun deleteDirectory(relativePath: RelativePath, recursive: Boolean): Result<Unit> =
+                        runCatching {
+                            require(relativePath.value.isNotEmpty()) { "The plugin cache root cannot be deleted" }
+                            fs.cacheOperations.deleteDirectory(fs.resolveCachePath(relativePath), recursive)
+                        }
+
+                    override suspend fun extractResource(
+                        resourcePath: String,
+                        targetRelativePath: RelativePath
+                    ): Result<Unit> = fs.extractResourceToCache(resourcePath, targetRelativePath)
                 }
             }
         }
     }
 
     private fun resolveCachePath(relativePath: RelativePath): Path {
-        val resolved = Path(cachePath, relativePath.value)
-        val normalized = resolved.toString().replace('\\', '/')
-        val baseCanonical = Path(cachePath).toString().replace('\\', '/')
-
-        if (normalized != baseCanonical && !normalized.startsWith(if (baseCanonical.endsWith("/")) baseCanonical else "$baseCanonical/")) {
-            throw SecurityException("Access to path '${relativePath.value}' is denied. It is outside the plugin cache directory.")
-        }
-        return resolved
+        return cacheOperations.resolve(relativePath)
     }
 
     private suspend fun readFromCache(relativePath: RelativePath): ByteArray? {
-        val path = resolveCachePath(relativePath)
+        val path = cacheOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readByteArray() }
     }
 
     private suspend fun readTextFromCache(relativePath: RelativePath): String? {
-        val path = resolveCachePath(relativePath)
+        val path = cacheOperations.resolveIfRootExists(relativePath) ?: return null
         if (!SystemFileSystem.exists(path)) return null
         return SystemFileSystem.source(path).buffered().use { it.readString() }
     }
@@ -197,6 +253,24 @@ class DefaultPluginFileSystem(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    private suspend fun extractResourceToCache(
+        resourcePath: String,
+        targetRelativePath: RelativePath
+    ): Result<Unit> {
+        if (resourcePath.contains("..") || resourcePath.startsWith("/") ||
+            resourcePath.startsWith("\\") || resourcePath.contains("\u0000")) {
+            return Result.failure(SecurityException("Invalid resource path: $resourcePath"))
+        }
+        return runCatching {
+            withContext(loomDispatcher) {
+                val jar = jarPath ?: error("No JAR path configured for resource extraction")
+                val data = org.wip.plugintoolkit.core.utils.PlatformUtils.readBytesFromZip(jar, resourcePath)
+                    ?: error("Resource not found in JAR: $resourcePath")
+                writeToCache(targetRelativePath, data).getOrThrow()
+            }
         }
     }
 }
