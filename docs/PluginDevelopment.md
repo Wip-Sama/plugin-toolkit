@@ -333,6 +333,7 @@ While you can set a plugin to "not support cancellation" the host app can force-
 The `PluginContext` (and focused interfaces like `PluginLogger`, `PluginFileSystem`, `ExecutionFileSystem`, `HostFileSystem`) provide access to host services:
 - **Logger**: `PluginLogger` (e.g. `logger.info("Message")`)
 - **Plugin File System**: `PluginFileSystem` (Persistent, isolated storage for the plugin. Preserved across executions. e.g. `fileSystem.getBasePath()`)
+- **Directory operations**: scoped file systems support `createDirectory` and guarded `deleteDirectory`; recursive deletion must be requested explicitly and the sandbox root can never be deleted.
 - **Execution File System**: `ExecutionFileSystem` (Temporary, isolated sandbox storage for the current execution. Cleared automatically after the flow finishes.)
 - **Host File System**: `HostFileSystem` (External file access. Restricted to paths explicitly granted by the user via file input/output parameters: `@CapabilityInput` and `@CapabilityOutput`.)
 - **Plugin Storage**: `PluginStorage` (`context.storage`) provides a persistent, internal key-value store (`get`, `put`, `getAll`, `remove`) for saving plugin-internal state without polluting user settings.
