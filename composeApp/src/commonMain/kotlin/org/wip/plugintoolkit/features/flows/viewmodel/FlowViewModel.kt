@@ -27,6 +27,7 @@ import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.capabilityIdentities
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -559,9 +560,7 @@ class FlowViewModel(
     fun executeFlow(flow: Flow, parameterValues: Map<String, String>) {
         val activeCapabilities = org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
             .mapNotNull { it.getManifest().getOrNull() }
-            .flatMap { it.capabilities }
-            .map { it.name }
-            .toSet()
+            .capabilityIdentities()
 
         if (flow.isBroken(activeCapabilities)) {
             Logger.e { "Failed to execute flow '${flow.name}': Flow contains broken or unready nodes." }
