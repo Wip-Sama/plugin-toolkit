@@ -52,5 +52,11 @@ class RelativePathTest {
         val path = "  foo/bar.txt  ".toRelativePath()
         assertTrue(path.isSuccess)
         assertEquals("foo/bar.txt", path.getOrNull()?.value, "Should trim whitespace")
+        assertEquals(RelativePath.ROOT, ".".toRelativePath().getOrThrow())
+        assertEquals(RelativePath.ROOT, "././".toRelativePath().getOrThrow())
+        assertEquals("foo/bar", "foo/./bar".toRelativePath().getOrThrow().value)
+        assertEquals("foo/bar", "foo\\bar".toRelativePath().getOrThrow().value)
+        assertEquals("file%2ename.txt", "file%2ename.txt".toRelativePath().getOrThrow().value)
+        assertEquals("file\u2024txt", "file\u2024txt".toRelativePath().getOrThrow().value)
     }
 }
