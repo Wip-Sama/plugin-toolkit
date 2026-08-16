@@ -32,14 +32,18 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
+// Shared modules
 include(":shared:core")
 include(":shared:logic")
 include(":shared:gui")
-include(":desktopApp")
-include(":cliApp")
+
+// API
 include(":plugin-api")
-include(":minimalExample")
-include(":completeExample")
 
+// Applications
+include(":apps:desktopApp")
+include(":apps:cliApp")
 
-
+// Plugin examples
+include(":plugins:minimalExample")
+include(":plugins:completeExample")

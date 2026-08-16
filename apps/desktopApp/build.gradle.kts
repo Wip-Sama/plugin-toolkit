@@ -70,13 +70,13 @@ compose.desktop {
 
             windows {
                 upgradeUuid = "8ddd074e-db0a-4ae3-ba98-35013c6ae5cc"
-                iconFile.set(project.file("../shared/gui/src/commonMain/composeResources/files/app_logo.ico"))
+                iconFile.set(project.file("../../shared/gui/src/commonMain/composeResources/files/app_logo.ico"))
             }
             macOS {
-                iconFile.set(project.file("../shared/gui/src/commonMain/composeResources/drawable/icon.icns"))
+                iconFile.set(project.file("../../shared/gui/src/commonMain/composeResources/drawable/icon.icns"))
             }
             linux {
-                iconFile.set(project.file("../shared/gui/src/commonMain/composeResources/drawable/icon.png"))
+                iconFile.set(project.file("../../shared/gui/src/commonMain/composeResources/drawable/icon.png"))
             }
             modules(
                 "java.instrument",
@@ -107,9 +107,10 @@ val packagePortableZip by tasks.registering(Zip::class) {
     description = "Packages a portable zip distribution containing the application and a .portable marker file."
 
     val createDistributableTask = tasks.matching { 
-        it.name == "createReleaseDistributable" || it.name == "createDistributable" 
+        it.name == "createReleaseDistributable" || it.name == "createDistributable" || it.name == "packageAppImage" || it.name == "packageReleaseAppImage"
     }
     dependsOn(createDistributableTask)
+
 
     val appName = "PluginToolkit"
     val osName = System.getProperty("os.name", "").lowercase()

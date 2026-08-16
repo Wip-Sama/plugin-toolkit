@@ -32,14 +32,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Run Unit Tests
-        run: .\gradlew test
+        run: ./gradlew check
 
       - name: Build Release Distribution
-        run: .\gradlew packageDistributionForCurrentOS packageUberJarForCurrentOS packagePortableZip
-        # run: .\gradlew packageReleaseDistributionForCurrentOS packageReleaseUberJarForCurrentOS packagePortableZip
+        run: ./gradlew :apps:desktopApp:packageDistributionForCurrentOS :apps:desktopApp:packageUberJarForCurrentOS :apps:desktopApp:packagePortableZip :apps:cliApp:distZip :apps:cliApp:distTar
 
       - name: Publish Plugin API
-        run: .\gradlew :plugin-api:publish
+        run: ./gradlew :plugin-api:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -48,8 +47,9 @@ jobs:
         with:
           name: artifacts-${{ matrix.os }}
           path: |
-            composeApp/build/compose/
-            !composeApp/build/compose/tmp/**
+            apps/desktopApp/build/compose/
+            !apps/desktopApp/build/compose/tmp/**
+            apps/cliApp/build/distributions/
 
   release:
     name: Create Release
@@ -74,7 +74,7 @@ jobs:
 
       - name: Extract Changelog
         run: |
-          python scripts/extract_changelog.py ${{ env.VERSION }} composeApp/src/commonMain/composeResources/files/CHANGELOG.md --output release_notes.md
+          python scripts/extract_changelog.py ${{ env.VERSION }} shared/gui/src/commonMain/composeResources/files/CHANGELOG.md --output release_notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -29,14 +29,12 @@ Auto update:
 General:
 - Notify that to set the system startup in the registry you need to start the application as administrator
 > Possibly implement a way to start a subprocess to avoid restarting teh app and spawn that as administrator
-- Add icon provider attribution (muh_zakaria from SVGRepo) in the About section (https://www.svgrepo.com/author/muh_zakaria/)
+
 
 Security:
 - Sign App releases
 > Check app signature on download update, if invalid notify the user and ask if it is willing to proceed anyway
 > It may be dangerous to make github auto sign the application, search for a solution
-- Sign modules
-> Same procedure as app for modules update
 
 Bugs:
 - Reload should also revalidate

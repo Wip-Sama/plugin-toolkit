@@ -19,8 +19,9 @@ class SplashWindow(val window: JWindow) {
 
     init {
         var logo: Image? = null
-        val localFile = File("composeApp/src/commonMain/composeResources/drawable/splash_logo.png")
+        val localFile = File("shared/gui/src/commonMain/composeResources/drawable/splash_logo.png")
         if (localFile.exists()) {
+
             logo = ImageIcon(localFile.absolutePath).image
         } else {
             val resourceUrl = Thread.currentThread().contextClassLoader.getResource("composeResources/plugintoolkit.composeapp.generated.resources/drawable/splash_logo.png")
