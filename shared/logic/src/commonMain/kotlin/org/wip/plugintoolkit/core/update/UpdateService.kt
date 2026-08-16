@@ -1,0 +1,175 @@
+package org.wip.plugintoolkit.core.update
+
+import co.touchlab.kermit.Logger
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.onDownload
+import io.ktor.client.plugins.timeout
+import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.serialization.json.Json
+import org.wip.plugintoolkit.AppConfig
+import org.wip.plugintoolkit.core.SystemConfig
+import org.wip.plugintoolkit.core.loomDispatcher
+import org.wip.plugintoolkit.core.utils.FileUtils
+
+class UpdateService(
+    private val client: HttpClient = HttpClient {
+        install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true })
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60000
+            connectTimeoutMillis = 15000
+            socketTimeoutMillis = 30000
+        }
+    },
+    private val appConfig: SystemConfig? = null
+) {
+    private val _downloadProgress = MutableStateFlow(0f)
+    val downloadProgress: StateFlow<Float> = _downloadProgress
+
+    suspend fun checkForUpdates(): UpdateInfo? = withContext(loomDispatcher) {
+        if (appConfig?.isPortable == true) {
+            Logger.i { "UpdateService: Updates are disabled in portable mode" }
+            return@withContext null
+        }
+        try {
+            val response = client.get("https://api.github.com/repos/Wip-Sama/plugin-toolkit/releases/latest")
+            if (response.status.value in 200..299) {
+                val release: GithubRelease = response.body()
+                val latestVersion = release.tagName.removePrefix("v")
+                val currentVersion = AppConfig.VERSION
+
+                if (isNewer(latestVersion, currentVersion)) {
+                    val asset = findBestAsset(release.assets)
+                    if (asset != null) {
+                        return@withContext UpdateInfo(
+                            version = latestVersion,
+                            changelog = release.body ?: release.name, // Fallback to release name if body is empty
+                            downloadUrl = asset.downloadUrl,
+                            fileName = asset.name,
+                            size = asset.size
+                        )
+                    }
+                }
+            } else {
+                Logger.w { "Failed to check for updates: GitHub API returned ${response.status}" }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to check for updates" }
+        }
+        null
+    }
+
+    internal fun isNewer(latest: String, current: String): Boolean {
+        val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
+        val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
+
+        for (i in 0 until minOf(latestParts.size, currentParts.size)) {
+            if (latestParts[i] > currentParts[i]) return true
+            if (latestParts[i] < currentParts[i]) return false
+        }
+        return latestParts.size > currentParts.size
+    }
+
+    private fun extractVersion(fileName: String): String? {
+        val regex = """(\d+\.\d+\.\d+)""".toRegex()
+        return regex.find(fileName)?.value
+    }
+
+    /**
+     * Deletes update installers in the data directory that have a version lower than the current app version.
+     */
+    fun cleanupOldUpdates(dataDir: String) {
+        val path = Path(dataDir)
+        try {
+            if (!SystemFileSystem.exists(path)) return
+
+            val currentVersion = AppConfig.VERSION.removePrefix("v")
+            val extensions = listOf(".exe", ".msi", ".deb", ".AppImage")
+
+            Logger.d { "Starting update cleanup in $dataDir (current version: $currentVersion)" }
+
+            SystemFileSystem.list(path).forEach { file ->
+                val name = file.name
+                if (extensions.any { name.endsWith(it, ignoreCase = true) }) {
+                    val fileVersion = extractVersion(name)
+                    if (fileVersion != null && isNewer(currentVersion, fileVersion)) {
+                        Logger.i { "Deleting old update file: $name (current: $currentVersion, file: $fileVersion)" }
+                        try {
+                            SystemFileSystem.delete(file)
+                        } catch (e: Exception) {
+                            Logger.e(e) { "Failed to delete old update file: $name" }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Error during update cleanup" }
+        }
+    }
+
+    private fun findBestAsset(assets: List<GithubAsset>): GithubAsset? {
+        return when {
+            FileUtils.isWindows -> assets.find { it.name.endsWith(".msi") || it.name.endsWith(".exe") }
+            FileUtils.isLinux -> assets.find { it.name.endsWith(".deb") || it.name.endsWith(".AppImage") }
+            // Add macOS detection if needed in FileUtils
+            else -> assets.firstOrNull()
+        }
+    }
+
+    suspend fun downloadUpdate(info: UpdateInfo, destinationPath: String): Result<Unit> = withContext(loomDispatcher) {
+        try {
+            val response = client.prepareGet(info.downloadUrl) {
+                timeout {
+                    requestTimeoutMillis = 30 * 60 * 1000 // 30 minutes
+                    socketTimeoutMillis = 30000 // 30 seconds inactivity timeout
+                }
+                onDownload { bytesSentTotal, contentLength ->
+                    contentLength?.let {
+                        if (it > 0) {
+                            _downloadProgress.value = bytesSentTotal.toFloat() / contentLength
+                        }
+                    }
+                }
+            }.execute { response ->
+                if (response.status.value in 200..299) {
+                    val channel = response.bodyAsChannel()
+                    val file = java.io.File(destinationPath)
+                    file.parentFile?.mkdirs()
+
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(8192)
+                        var totalRead = 0L
+                        while (!channel.isClosedForRead) {
+                            val read = channel.readAvailable(buffer, 0, buffer.size)
+                            if (read == -1) break
+                            if (read > 0) {
+                                output.write(buffer, 0, read)
+                                totalRead += read
+                            }
+                        }
+                    }
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception("Failed to download: ${response.status}"))
+                }
+            }
+            response
+        } catch (e: Exception) {
+            Logger.e(e) { "Error downloading update" }
+            Result.failure(e)
+        }
+    }
+}

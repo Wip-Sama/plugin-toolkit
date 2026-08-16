@@ -13,14 +13,28 @@ kotlin {
 
     sourceSets {
         jvmMain.dependencies {
-            implementation(project(":shared:gui"))
+            api(project(":shared:gui"))
+            implementation(project(":shared:core"))
+            implementation(project(":shared:logic"))
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.slf4j.simple)
+            implementation(libs.kermit)
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
+            implementation(libs.compose.components.resources)
+            implementation(libs.kotlinx.io.core)
+            implementation(libs.androidx.lifecycle.viewmodel)
+            implementation(libs.androidx.lifecycle.viewmodel.compose)
         }
+
         jvmTest.dependencies {
             implementation(libs.compose.ui.test.junit4)
+            implementation(libs.kotlin.test)
         }
+
     }
 }
 

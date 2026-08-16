@@ -26,12 +26,23 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.navigation3.ui)
             implementation(libs.lifecycle.nav3)
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.filekit.dialogs)
+
             implementation(libs.filekit.dialogs.compose)
             implementation(libs.filekit.coil)
+            implementation(libs.kermit)
+            implementation(libs.ktor.client.core)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.io.core)
+            implementation(libs.kotlinx.datetime)
         }
+
+
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
@@ -50,3 +61,10 @@ kotlin {
         }
     }
 }
+
+compose.resources {
+    packageOfResClass = "plugintoolkit.composeapp.generated.resources"
+    publicResClass = true
+}
+
+

@@ -1,7 +1,9 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.buildkonfig)
 }
+
 
 kotlin {
     jvm()
@@ -32,3 +34,24 @@ kotlin {
         }
     }
 }
+
+buildkonfig {
+    packageName = "org.wip.plugintoolkit"
+    objectName = "AppConfig"
+    exposeObjectWithName = "AppConfig"
+
+    defaultConfigs {
+
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "VERSION",
+            libs.versions.app.get()
+        )
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "MIN_COMPATIBLE_PLUGIN_VERSION",
+            "1.7.4"
+        )
+    }
+}
+

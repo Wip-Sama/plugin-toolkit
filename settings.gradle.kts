@@ -32,7 +32,6 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":composeApp")
 include(":shared:core")
 include(":shared:logic")
 include(":shared:gui")
@@ -41,5 +40,6 @@ include(":cliApp")
 include(":plugin-api")
 include(":minimalExample")
 include(":completeExample")
+
 
 

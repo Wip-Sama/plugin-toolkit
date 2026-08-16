@@ -1,0 +1,333 @@
+package org.wip.plugintoolkit.features.plugin.ui
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
+import org.wip.plugintoolkit.features.plugin.utils.PluginSearchUtils
+import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
+import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.*
+
+@Composable
+fun RemotePluginInstallDialog(
+    availablePlugins: List<ExtensionPlugin>,
+    installedPackageNames: Set<String>,
+    activeJobs: Map<String, Float>,
+    onInstall: (ExtensionPlugin) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredPlugins = remember(availablePlugins, searchQuery, installedPackageNames) {
+        PluginSearchUtils.filterPlugins(
+            availablePlugins,
+            searchQuery,
+            installedPackageNames
+        )
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .fillMaxHeight(0.85f)
+                .clip(MaterialTheme.shapes.large),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = ToolkitTheme.dimensions.elevationMediumHigh
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(ToolkitTheme.spacing.medium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        stringResource(Res.string.plugin_install_remote_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.action_close))
+                    }
+                }
+
+                // Search Bar
+                ToolkitTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = ToolkitTheme.spacing.medium),
+                    placeholder = { Text(stringResource(Res.string.plugin_search_placeholder)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+
+                // List
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(ToolkitTheme.spacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    items(filteredPlugins) { plugin ->
+                        val isInstalled = installedPackageNames.contains(plugin.pkg)
+                        val progress = activeJobs[plugin.pkg]
+
+                        RemotePluginCard(
+                            plugin = plugin,
+                            isInstalled = isInstalled,
+                            progress = progress,
+                            onInstall = { onInstall(plugin) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RemotePluginCard(
+    plugin: ExtensionPlugin,
+    isInstalled: Boolean,
+    progress: Float?,
+    onInstall: () -> Unit
+) {
+    val alpha = if (isInstalled) 0.6f else 1f
+    var showInfo by remember { mutableStateOf(false) }
+
+    val (isCompatible, compError) = remember(plugin) {
+        PluginCompatibilityUtils.checkCompatibility(plugin)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().alpha(alpha),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isInstalled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.divider)
+            else MaterialTheme.colorScheme.surface
+        ),
+        border = if (progress != null) BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary) else null
+    ) {
+        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Icon
+                Box(
+                    modifier = Modifier
+                        .size(ToolkitTheme.dimensions.pluginIcon)
+                        .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Extension,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            plugin.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (!isCompatible) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            ToolkitChip(
+                                text = compError ?: "Incompatible",
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        } else if (isInstalled) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = MaterialTheme.shapes.extraSmall
+                            ) {
+                                Text(
+                                    stringResource(Res.string.plugin_status_installed),
+                                    modifier = Modifier.padding(
+                                        horizontal = ToolkitTheme.spacing.badgeHorizontal,
+                                        vertical = ToolkitTheme.spacing.badgeVertical
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        "v${plugin.version} • ${plugin.pkg}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (!isCompatible) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val supportedOs = plugin.manifest?.plugin?.supportedOs
+                    if (!supportedOs.isNullOrEmpty()) {
+                        Text(
+                            "Supported OS: ${supportedOs.joinToString { it.name }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showInfo = !showInfo }) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = stringResource(Res.string.action_info),
+                            tint = if (showInfo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (progress != null) {
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
+                                .padding(ToolkitTheme.spacing.extraSmall),
+                            strokeWidth = ToolkitTheme.dimensions.borderSelected
+                        )
+                    } else if (!isInstalled) {
+                        Button(
+                            onClick = onInstall,
+                            enabled = isCompatible,
+                            contentPadding = PaddingValues(
+                                horizontal = ToolkitTheme.spacing.mediumSmall,
+                                vertical = ToolkitTheme.spacing.small
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.CloudDownload,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Text(stringResource(Res.string.plugin_install_button))
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(showInfo) {
+                Column(
+                    modifier = Modifier.padding(top = ToolkitTheme.spacing.small),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+                    HorizontalDivider(modifier = Modifier.alpha(0.5f))
+
+                    val desc = plugin.description
+                    if (desc != null) {
+                        Text(
+                            desc,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = ToolkitTheme.spacing.small),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+
+                    InfoRow("Repository", plugin.repoUrl ?: "Unknown")
+                    plugin.size?.let { InfoRow("Size", formatSize(it)) }
+                    plugin.hash?.let { InfoRow("Hash", it) }
+                    plugin.signature?.let { InfoRow("Signature", it) }
+                }
+            }
+
+            if (progress != null) {
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth()
+                        .height(ToolkitTheme.spacing.extraSmall)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun InfoRow(label: String, value: String) {
+    Row(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)) {
+        Text(
+            "$label: ",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.secondary
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+fun formatSize(size: Long): String {
+    val kb = size / 1024.0
+    val mb = kb / 1024.0
+    return if (mb >= 1.0) "%.2f MB".format(mb) else "%.2f KB".format(kb)
+}

@@ -62,7 +62,6 @@
 
 # Compose Resources
 -keep class plugintoolkit.composeapp.generated.resources.** { *; }
--keep class org.wip.plugintoolkit.generated.resources.** { *; }
 
 # Project Models and Persistence
 -keep class org.wip.plugintoolkit.features.**.model.** { *; }
