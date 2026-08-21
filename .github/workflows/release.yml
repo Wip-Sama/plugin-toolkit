@@ -41,6 +41,7 @@ jobs:
         run: ./gradlew :plugin-api:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
