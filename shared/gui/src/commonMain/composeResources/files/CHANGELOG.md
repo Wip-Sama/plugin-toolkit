@@ -1,6 +1,6 @@
 Version: 2.0.0
-VersionName: Portability and CLI 
-Date: 01-08-2026
+VersionName: Portable Chihuahua
+Date: 21-08-2026
 Changes:
   - The cancel button in job operation is now disabled in non-cancelable phases
   - JobManager sandbox cleanup now has retry to cancel sandbox up to 3 times with a notification if errors occur
@@ -26,12 +26,12 @@ Added:
   - PluginStorage to give plugins a way to have custom persistent data
   - PluginSetting navigation when pressing on locked components
   - Changelog now supports named updates
-  - Basic CLI version of the application
 Fixed:
   - Locks are now safely evicted from jarLocks when no active operations remain
   - Fixed an issue where switches required a manual toggle to activate from their default state
 Planned:
   - A button to clear the sandbox folder
+  - CLI version of the application, right now only an experimental cli
 Note:
   - Since PluginLoader operates synchronously on URLClassLoader and Java reflection (which are JVM-specific), standard JVM synchronization works. Replacing synchronized with Kotlin's @Synchronized or kotlinx.coroutines.sync.Mutex is cleaner for KMP but it's not a priority.
 ----------------------------------------------------------------------------------------------------
