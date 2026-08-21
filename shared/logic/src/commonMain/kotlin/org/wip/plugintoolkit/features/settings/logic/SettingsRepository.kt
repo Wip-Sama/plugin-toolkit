@@ -1,5 +1,9 @@
 package org.wip.plugintoolkit.features.settings.logic
 
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.update
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -12,11 +16,18 @@ import kotlinx.coroutines.launch
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import kotlin.time.Duration.Companion.milliseconds
 
+private sealed interface LoadState {
+    data class Loading(val pending: PersistentList<(AppSettings) -> AppSettings> = persistentListOf()) : LoadState
+    data object Ready : LoadState
+}
+
 @OptIn(FlowPreview::class)
 class SettingsRepository(
     val persistence: SettingsPersistence,
     scope: CoroutineScope
 ) {
+
+    private val loadState = atomic<LoadState>(LoadState.Loading())
 
     private val _settings = MutableStateFlow(AppSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -28,8 +39,26 @@ class SettingsRepository(
 
     init {
         scope.launch {
-            _settings.value = persistence.load()
+            val loaded = persistence.load()
+            var applied = loaded
+            var hadPending = false
+            loadState.update { state ->
+                when (state) {
+                    is LoadState.Loading -> {
+                        for (fn in state.pending) {
+                            applied = fn(applied)
+                        }
+                        hadPending = state.pending.isNotEmpty()
+                        LoadState.Ready
+                    }
+                    is LoadState.Ready -> state
+                }
+            }
+            _settings.value = applied
             _isLoaded.value = true
+            if (hadPending) {
+                saveChannel.trySend(applied)
+            }
             saveChannel.receiveAsFlow()
                 .debounce(500.milliseconds)
                 .collect {
@@ -42,6 +71,12 @@ class SettingsRepository(
      * Updates settings atomically and schedules a debounced save to disk.
      */
     fun updateSettings(update: (AppSettings) -> AppSettings) {
+        loadState.update { state ->
+            when (state) {
+                is LoadState.Loading -> LoadState.Loading(state.pending.add(update))
+                is LoadState.Ready -> state
+            }
+        }
         _settings.value = update(_settings.value)
         saveChannel.trySend(_settings.value)
     }
