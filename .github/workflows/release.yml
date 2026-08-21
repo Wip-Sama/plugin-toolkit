@@ -47,9 +47,24 @@ jobs:
         with:
           name: artifacts-${{ matrix.os }}
           path: |
-            apps/desktopApp/build/compose/
-            !apps/desktopApp/build/compose/tmp/**
-            apps/cliApp/build/distributions/
+            apps/desktopApp/build/compose/binaries/main/msi/*.msi
+            apps/desktopApp/build/compose/binaries/main/exe/*.exe
+            apps/desktopApp/build/compose/binaries/main/dmg/*.dmg
+            apps/desktopApp/build/compose/binaries/main/deb/*.deb
+            apps/desktopApp/build/compose/binaries/main/pkg/*.pkg
+            apps/desktopApp/build/compose/binaries/main/appimage/*.AppImage
+            apps/desktopApp/build/compose/binaries/main-release/msi/*.msi
+            apps/desktopApp/build/compose/binaries/main-release/exe/*.exe
+            apps/desktopApp/build/compose/binaries/main-release/dmg/*.dmg
+            apps/desktopApp/build/compose/binaries/main-release/deb/*.deb
+            apps/desktopApp/build/compose/binaries/main-release/pkg/*.pkg
+            apps/desktopApp/build/compose/binaries/main-release/appimage/*.AppImage
+            apps/desktopApp/build/compose/binaries/main/portable/*.zip
+            apps/desktopApp/build/compose/jars/*.jar
+            apps/cliApp/build/distributions/*.zip
+            apps/cliApp/build/distributions/*.tar
+            apps/cliApp/build/distributions/*.tar.gz
+          if-no-files-found: warn
 
   release:
     name: Create Release
@@ -84,6 +99,7 @@ jobs:
           body_path: release_notes.md
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
           files: |
             all-artifacts/**/*.msi
             all-artifacts/**/*.exe
@@ -93,6 +109,7 @@ jobs:
             all-artifacts/**/*.jar
             all-artifacts/**/*.zip
             all-artifacts/**/*.AppImage
+            all-artifacts/**/*.tar
             all-artifacts/**/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
