@@ -1,3 +1,8 @@
+Version: 2.0.1
+Date: 24-08-2026
+Changes:
+	- Minor changes on how big plugin loading is handled/siplayed to the user
+----------------------------------------------------------------------------------------------------
 Version: 2.0.0
 VersionName: Portable Chihuahua
 Date: 21-08-2026

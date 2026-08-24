@@ -176,6 +176,44 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     val updateService = koin.get<UpdateService>()
     val appConfig = koin.get<SystemConfig>()
 
+    viewModelProvider = { viewModel }
+
+    // Initialize Logging with Kermit immediately so startup & plugin initialization logs are captured
+    val logDirPath = "${PlatformPathUtils.getAppDataDir()}/${appConfig.LOGS_DIR_NAME}"
+    val logDir = Path(logDirPath)
+
+    Logger.setLogWriters(
+        platformLogWriter(),
+        FileLogWriter(logDir, koin.get(named("LoomScope"))) {
+            viewModelProvider()?.settings?.value?.logging ?: initialSettings.logging
+        }
+    )
+
+    val initialSeverity = when (initialSettings.logging.level) {
+        LogLevel.Verbose -> Severity.Verbose
+        LogLevel.Debug -> Severity.Debug
+        LogLevel.Info -> Severity.Info
+        LogLevel.Warn -> Severity.Warn
+        LogLevel.Error -> Severity.Error
+        LogLevel.Assert -> Severity.Assert
+    }
+    Logger.setMinSeverity(initialSeverity)
+
+    // Sync logger severity with settings changes dynamically
+    snapshotFlow { viewModel.settings.value.logging.level }.onEach { level ->
+        val severity = when (level) {
+            LogLevel.Verbose -> Severity.Verbose
+            LogLevel.Debug -> Severity.Debug
+            LogLevel.Info -> Severity.Info
+            LogLevel.Warn -> Severity.Warn
+            LogLevel.Error -> Severity.Error
+            LogLevel.Assert -> Severity.Assert
+        }
+        Logger.setMinSeverity(severity)
+    }.launchIn(appScope)
+
+    Logger.i { "Application starting. Logging initialized at: $logDir with minSeverity=$initialSeverity" }
+
     updateStatus("Cleaning up updates...")
     updateService.cleanupOldUpdates(settingsRepository.getSettingsDir())
 
@@ -219,37 +257,11 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     updateStatus("Refreshing repositories...")
     koin.get<RepoManager>() // Trigger initialization and background refresh
 
-    viewModelProvider = { viewModel }
-
     // Check for updates on startup if enabled
     val settings = viewModel.settings.value
     if (settings.autoUpdate.enabled && settings.autoUpdate.checkOnStartup) {
         viewModel.checkForUpdates()
     }
-
-    // Initialize Logging with Kermit
-    val logDirPath = "${PlatformPathUtils.getAppDataDir()}/${appConfig.LOGS_DIR_NAME}"
-    val logDir = Path(logDirPath)
-
-    Logger.setLogWriters(
-        platformLogWriter(),
-        FileLogWriter(logDir, getKoin().get(named("LoomScope"))) { viewModel.settings.value.logging }
-    )
-
-    // Sync logger severity with settings
-    snapshotFlow { viewModel.settings.value.logging.level }.onEach { level ->
-        val severity = when (level) {
-            LogLevel.Verbose -> Severity.Verbose
-            LogLevel.Debug -> Severity.Debug
-            LogLevel.Info -> Severity.Info
-            LogLevel.Warn -> Severity.Warn
-            LogLevel.Error -> Severity.Error
-            LogLevel.Assert -> Severity.Assert
-        }
-        Logger.setMinSeverity(severity)
-    }.launchIn(getKoin().get(named("AppScope")))
-
-    Logger.i { "Application started. Logging initialized at: $logDir" }
 
     updateStatus("Finalizing startup...")
     viewModel.isLoaded.first { it }

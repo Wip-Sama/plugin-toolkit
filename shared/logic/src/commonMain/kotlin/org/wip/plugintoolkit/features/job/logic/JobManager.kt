@@ -44,7 +44,11 @@ class JobManager(
 
     val activeJobIds: StateFlow<Set<String>> = _jobs.map { list ->
         list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running }.map { it.id }.toSet()
-    }.stateIn(scope, SharingStarted.WhileSubscribed(5000), emptySet())
+    }.stateIn(scope, SharingStarted.Eagerly, emptySet())
+
+    fun isJobPendingOrRunning(jobId: String): Boolean {
+        return _jobs.value.any { it.id == jobId && (it.status == JobStatus.Queued || it.status == JobStatus.Running) }
+    }
 
     private val _endedJobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
     val endedJobs: StateFlow<List<BackgroundJob>> = _endedJobs.asStateFlow()
@@ -76,9 +80,17 @@ class JobManager(
         scope.launch {
             try {
                 val savedJobs = jobRepository.loadJobs()
+                val (activeSaved, endedSaved) = savedJobs.partition {
+                    it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.Paused
+                }
                 _jobs.update { currentJobs ->
                     val newJobIds = currentJobs.map { it.id }.toSet()
-                    savedJobs.filterNot { it.id in newJobIds } + currentJobs
+                    activeSaved.filterNot { it.id in newJobIds } + currentJobs
+                }
+                if (endedSaved.isNotEmpty()) {
+                    _endedJobs.update { currentEnded ->
+                        (endedSaved + currentEnded).distinctBy { it.id }.take(maxEndedJobs)
+                    }
                 }
 
                 // Wake up workers in case we loaded queued jobs
@@ -111,11 +123,13 @@ class JobManager(
     }
 
     fun enqueueJob(job: BackgroundJob) {
-        // Remove previous ended jobs of the same capability/flow that should not be saved in history
+        // Remove previous ended jobs of the same ID or capability/flow that should not be saved in history
         val jobsToRemove = _endedJobs.value.filter {
-            it.pluginId == job.pluginId &&
-                    it.capabilityName == job.capabilityName &&
-                    !it.keepResult
+            it.id == job.id || (
+                it.pluginId == job.pluginId &&
+                it.capabilityName == job.capabilityName &&
+                !it.keepResult
+            )
         }
         if (jobsToRemove.isNotEmpty()) {
             val idsToRemove = jobsToRemove.map { it.id }.toSet()
@@ -128,20 +142,18 @@ class JobManager(
         }
 
         _jobs.update { currentList ->
-            val filtered = if (!job.keepResult) {
-                currentList.filterNot {
+            val filtered = currentList.filterNot {
+                it.id == job.id || (
+                    !job.keepResult &&
                     it.pluginId == job.pluginId &&
-                            it.capabilityName == job.capabilityName &&
-                            !it.keepResult &&
-                            (it.status == JobStatus.Completed || it.status == JobStatus.Failed || it.status == JobStatus.Cancelled)
-                }
-            } else {
-                currentList
+                    it.capabilityName == job.capabilityName &&
+                    (it.status == JobStatus.Completed || it.status == JobStatus.Failed || it.status == JobStatus.Cancelled)
+                )
             }
-            filtered + job
+            filtered + job.copy(status = JobStatus.Queued, enqueuedAt = Clock.System.now())
         }
         addHistoryEntryInternal(job.id, job.name, "Enqueued")
-        Logger.i { "Job ${job.id} (${job.name}) enqueued" }
+        Logger.i { "Job ${job.id} (${job.name}) enqueued (type=${job.type}, plugin=${job.pluginId})" }
         jobSignal.trySend(Unit)
     }
 
@@ -457,31 +469,32 @@ class JobManager(
     }
 
     fun getPluginLogger(pkg: String, jobId: String? = null): PluginLogger {
+        val tag = if (jobId != null) "$pkg/$jobId" else pkg
         return object : PluginLogger {
             override fun verbose(message: String) {
                 if (jobId != null) addJobLog(jobId, message, "VERBOSE")
-                else Logger.v { "[$pkg] $message" }
+                Logger.v { "[$tag] $message" }
             }
 
             override fun debug(message: String) {
                 if (jobId != null) addJobLog(jobId, message, "DEBUG")
-                else Logger.d { "[$pkg] $message" }
+                Logger.d { "[$tag] $message" }
             }
 
             override fun info(message: String) {
                 if (jobId != null) addJobLog(jobId, message, "INFO")
-                else Logger.i { "[$pkg] $message" }
+                Logger.i { "[$tag] $message" }
             }
 
             override fun warn(message: String) {
                 if (jobId != null) addJobLog(jobId, message, "WARN")
-                else Logger.w { "[$pkg] $message" }
+                Logger.w { "[$tag] $message" }
             }
 
             override fun error(message: String, throwable: Throwable?) {
                 val msg = message + (throwable?.let { ": ${it.message}" } ?: "")
                 if (jobId != null) addJobLog(jobId, msg, "ERROR")
-                else Logger.e(throwable ?: Exception()) { "[$pkg] $message" }
+                Logger.e(throwable ?: Exception(msg)) { "[$tag] $message" }
             }
         }
     }

@@ -88,15 +88,88 @@ class PluginManagerViewModel(
         .map { it.values.flatten() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val activePluginInstallationJobs: StateFlow<Map<String, Float>> = jobManager.jobProgress
+    val loadingPlugins: StateFlow<Set<String>> = pluginManager.loadingPlugins
+    val pluginLoadingSteps: StateFlow<Map<String, String>> = pluginManager.pluginLoadingSteps
+
+    val activePluginJobs: StateFlow<Map<String, ActivePluginJobInfo>> = jobManager.jobProgress
         .combine(jobManager.jobs) { progressMap, jobs ->
-            jobs.filter { it.type == org.wip.plugintoolkit.features.job.model.JobType.Setup || it.type == org.wip.plugintoolkit.features.job.model.JobType.Update || it.type == org.wip.plugintoolkit.features.job.model.JobType.Validation }
-                .associate { it.pluginId to (progressMap[it.id]?.mainProgress ?: 0f) }
+            jobs.filter {
+                (it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+                        (it.status == JobStatus.Running || it.status == JobStatus.Queued)
+            }
+                .associate { job ->
+                    job.pluginId to ActivePluginJobInfo(
+                        jobId = job.id,
+                        type = job.type,
+                        status = job.status,
+                        progress = progressMap[job.id]?.mainProgress ?: 0f
+                    )
+                }
         }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val activePluginInstallationJobs: StateFlow<Map<String, Float>> = activePluginJobs
+        .map { map -> map.mapValues { it.value.progress } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     private val _togglingPlugins = MutableStateFlow<Set<String>>(emptySet())
     val togglingPlugins: StateFlow<Set<String>> = _togglingPlugins.asStateFlow()
+
+    val pluginActivities: StateFlow<Map<String, PluginActivityInfo>> = combine(
+        jobManager.jobProgress,
+        jobManager.jobs,
+        pluginManager.loadingPlugins,
+        pluginManager.pluginLoadingSteps,
+        _togglingPlugins
+    ) { progressMap, jobs, loadingSet, stepsMap, togglingSet ->
+        val activeJobs = jobs.filter {
+            (it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+                    (it.status == JobStatus.Running || it.status == JobStatus.Queued)
+        }
+        val result = mutableMapOf<String, PluginActivityInfo>()
+
+        for (job in activeJobs) {
+            val prog = progressMap[job.id]?.mainProgress ?: 0f
+            result[job.pluginId] = PluginActivityInfo(
+                type = job.type,
+                step = when (job.type) {
+                    JobType.Setup -> "Setting up dependencies and models"
+                    JobType.Validation -> "Validating plugin capabilities"
+                    JobType.Update -> "Updating plugin"
+                    else -> "Processing"
+                },
+                progress = prog,
+                isDeterminate = prog > 0f,
+                isBusy = true
+            )
+        }
+
+        for (pkg in loadingSet) {
+            if (!result.containsKey(pkg)) {
+                result[pkg] = PluginActivityInfo(
+                    type = null,
+                    step = stepsMap[pkg] ?: "Loading plugin...",
+                    progress = 0f,
+                    isDeterminate = false,
+                    isBusy = true
+                )
+            }
+        }
+
+        for (pkg in togglingSet) {
+            if (!result.containsKey(pkg)) {
+                result[pkg] = PluginActivityInfo(
+                    type = null,
+                    step = "Updating state...",
+                    progress = 0f,
+                    isDeterminate = false,
+                    isBusy = true
+                )
+            }
+        }
+
+        result
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     // Persistence flags handled via InstalledPlugin now
 
@@ -493,3 +566,18 @@ class PluginManagerViewModel(
         }
     }
 }
+
+data class ActivePluginJobInfo(
+    val jobId: String,
+    val type: JobType,
+    val status: JobStatus,
+    val progress: Float
+)
+
+data class PluginActivityInfo(
+    val type: JobType? = null,
+    val step: String? = null,
+    val progress: Float = 0f,
+    val isDeterminate: Boolean = false,
+    val isBusy: Boolean = true
+)

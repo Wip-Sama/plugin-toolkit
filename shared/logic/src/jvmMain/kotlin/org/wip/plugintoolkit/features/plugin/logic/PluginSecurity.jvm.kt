@@ -60,7 +60,12 @@ actual object PluginSecurity {
                 }
 
                 // We must read the entry completely to trigger signature verification
-                jar.getInputStream(entry).use { it.readBytes() }
+                jar.getInputStream(entry).use { stream ->
+                    val buffer = ByteArray(8192)
+                    while (stream.read(buffer) != -1) {
+                        // Consuming stream triggers signature verification without allocating large byte arrays
+                    }
+                }
 
                 val signers = entry.codeSigners
                 if (signers == null || signers.isEmpty()) {

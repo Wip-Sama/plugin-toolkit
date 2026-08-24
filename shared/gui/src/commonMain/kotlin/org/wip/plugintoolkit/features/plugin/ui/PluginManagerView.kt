@@ -58,7 +58,9 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.plugin.viewmodel.PluginActivityInfo
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
@@ -71,21 +73,33 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_more_actions
 import plugintoolkit.composeapp.generated.resources.action_remove
 import plugintoolkit.composeapp.generated.resources.plugin_add_folder
-import plugintoolkit.composeapp.generated.resources.plugin_install_remote
-import plugintoolkit.composeapp.generated.resources.plugin_rerun_setup
-import plugintoolkit.composeapp.generated.resources.plugin_open_folder
 import plugintoolkit.composeapp.generated.resources.plugin_broken
 import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.plugin_default_folder_label
 import plugintoolkit.composeapp.generated.resources.plugin_default_tag
 import plugintoolkit.composeapp.generated.resources.plugin_install_local
+import plugintoolkit.composeapp.generated.resources.plugin_install_remote
 import plugintoolkit.composeapp.generated.resources.plugin_loaded
 import plugintoolkit.composeapp.generated.resources.plugin_managed_folders
+import plugintoolkit.composeapp.generated.resources.plugin_open_folder
 import plugintoolkit.composeapp.generated.resources.plugin_refresh_list
 import plugintoolkit.composeapp.generated.resources.plugin_reload
 import plugintoolkit.composeapp.generated.resources.plugin_reload_all
+import plugintoolkit.composeapp.generated.resources.plugin_rerun_setup
 import plugintoolkit.composeapp.generated.resources.plugin_rescan
+import plugintoolkit.composeapp.generated.resources.plugin_setting_up
 import plugintoolkit.composeapp.generated.resources.plugin_settings
+import plugintoolkit.composeapp.generated.resources.plugin_state_activating
+import plugintoolkit.composeapp.generated.resources.plugin_state_active
+import plugintoolkit.composeapp.generated.resources.plugin_state_deactivating
+import plugintoolkit.composeapp.generated.resources.plugin_state_disabled
+import plugintoolkit.composeapp.generated.resources.plugin_state_setting_up
+import plugintoolkit.composeapp.generated.resources.plugin_state_setting_up_percent
+import plugintoolkit.composeapp.generated.resources.plugin_state_updating
+import plugintoolkit.composeapp.generated.resources.plugin_state_validating
+import plugintoolkit.composeapp.generated.resources.plugin_step_setup
+import plugintoolkit.composeapp.generated.resources.plugin_step_update
+import plugintoolkit.composeapp.generated.resources.plugin_step_validation
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall
 import plugintoolkit.composeapp.generated.resources.plugin_update
 import plugintoolkit.composeapp.generated.resources.plugin_update_local
@@ -105,7 +119,8 @@ fun PluginManagerView(
     val loadedPlugins by viewModel.loadedPlugins.collectAsState()
     val isReady by viewModel.isRegistryReady.collectAsState()
     val settingsPkg by viewModel.settingsPkg.collectAsState()
-    val togglingPlugins by viewModel.togglingPlugins.collectAsState()
+    val activities by viewModel.pluginActivities.collectAsState()
+    val activeInstallationJobs by viewModel.activePluginInstallationJobs.collectAsState()
 
     val lazyListState = rememberLazyListState()
 
@@ -133,12 +148,11 @@ fun PluginManagerView(
     if (showRemoteInstall) {
         val availablePlugins by viewModel.availableRemotePlugins.collectAsState()
         val installedPlugins by viewModel.installedPlugins.collectAsState()
-        val activeJobs by viewModel.activePluginInstallationJobs.collectAsState()
 
         RemotePluginInstallDialog(
             availablePlugins = availablePlugins,
             installedPackageNames = installedPlugins.map { it.pkg }.toSet(),
-            activeJobs = activeJobs,
+            activeJobs = activeInstallationJobs,
             onInstall = { viewModel.installRemote(it) },
             onDismiss = { viewModel.closeRemoteInstall() }
         )
@@ -234,8 +248,6 @@ fun PluginManagerView(
 
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
-        val lazyListState = rememberLazyListState()
-
         // Plugin List
         LazyColumn(
             state = lazyListState,
@@ -259,13 +271,14 @@ fun PluginManagerView(
                 val customActions = remember(plugin.pkg, plugin.version) {
                     viewModel.getActions(plugin.pkg)
                 }
+                val activity = activities[plugin.pkg]
                 PluginCard(
                     plugin = plugin,
                     isLoaded = loadedPlugins.contains(plugin.pkg),
                     hasUpdate = hasUpdate,
                     customActions = customActions,
                     enabled = isReady,
-                    isToggling = togglingPlugins.contains(plugin.pkg),
+                    activity = activity,
                     onToggle = { if (isReady) viewModel.toggleEnabled(plugin.pkg, it) },
                     onAction = { action ->
                         if (isReady) {
@@ -351,7 +364,7 @@ fun PluginCard(
     hasUpdate: Boolean,
     customActions: List<PluginAction>,
     enabled: Boolean = true,
-    isToggling: Boolean = false,
+    activity: PluginActivityInfo? = null,
     onToggle: (Boolean) -> Unit,
     onAction: (PluginStatusAction) -> Unit,
     onClick: () -> Unit
@@ -361,6 +374,10 @@ fun PluginCard(
     else if (isLoaded) ToolkitTheme.colors.success
     else if (plugin.isValidated) ToolkitTheme.colors.validated
     else MaterialTheme.colorScheme.outline
+
+    val isBusy = activity != null && activity.isBusy
+    val progress = activity?.progress ?: 0f
+    val isDeterminate = activity?.isDeterminate == true && progress > 0f
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -423,7 +440,24 @@ fun PluginCard(
                         )
                     }
 
-                    if (plugin.isCompatible && plugin.loadError == null) {
+                    if (activity != null) {
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        val chipText = when (activity.type) {
+                            JobType.Setup -> if (isDeterminate) {
+                                stringResource(Res.string.plugin_state_setting_up_percent, (progress * 100).toInt().coerceIn(0, 100))
+                            } else {
+                                stringResource(Res.string.plugin_state_setting_up)
+                            }
+                            JobType.Validation -> stringResource(Res.string.plugin_state_validating)
+                            JobType.Update -> stringResource(Res.string.plugin_state_updating, (progress * 100).toInt().coerceIn(0, 100))
+                            else -> stringResource(Res.string.plugin_state_activating)
+                        }
+                        ToolkitChip(
+                            text = chipText,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    } else if (plugin.isCompatible && plugin.loadError == null) {
                         if (plugin.isValidated) {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                             ToolkitChip(
@@ -469,6 +503,38 @@ fun PluginCard(
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
                     )
+                }
+
+                if (activity != null) {
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                    val stepText = when (activity.type) {
+                        JobType.Setup -> stringResource(Res.string.plugin_step_setup)
+                        JobType.Validation -> stringResource(Res.string.plugin_step_validation)
+                        JobType.Update -> stringResource(Res.string.plugin_step_update)
+                        else -> activity.step ?: stringResource(Res.string.plugin_state_activating)
+                    }
+                    Text(
+                        text = stepText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = ToolkitTheme.spacing.extraSmall / 2)
+                    )
+                    if (isDeterminate) {
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(ToolkitTheme.spacing.extraSmall),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        androidx.compose.material3.LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(ToolkitTheme.spacing.extraSmall),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
             }
@@ -538,19 +604,49 @@ fun PluginCard(
                         } else {
                             ButtonDefaults.filledTonalButtonColors()
                         }
+                        val toggleText = when {
+                            activity != null -> when (activity.type) {
+                                JobType.Setup -> if (isDeterminate) {
+                                    stringResource(Res.string.plugin_state_setting_up_percent, (progress * 100).toInt().coerceIn(0, 100))
+                                } else {
+                                    stringResource(Res.string.plugin_state_setting_up)
+                                }
+                                JobType.Validation -> stringResource(Res.string.plugin_state_validating)
+                                JobType.Update -> stringResource(Res.string.plugin_state_updating, (progress * 100).toInt().coerceIn(0, 100))
+                                else -> if (plugin.isEnabled) {
+                                    stringResource(Res.string.plugin_state_activating)
+                                } else {
+                                    stringResource(Res.string.plugin_state_deactivating)
+                                }
+                            }
+                            else -> if (plugin.isEnabled) {
+                                stringResource(Res.string.plugin_state_active)
+                            } else {
+                                stringResource(Res.string.plugin_state_disabled)
+                            }
+                        }
                         FilledTonalButton(
                             onClick = { onToggle(!plugin.isEnabled) },
                             colors = toggleColor,
                             shape = shape,
                             modifier = modifierSpec,
-                            enabled = readyStatus && !isToggling
+                            enabled = readyStatus && !isBusy
                         ) {
-                            if (isToggling) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
-                                    strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
-                                    color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            if (isBusy) {
+                                if (isDeterminate) {
+                                    CircularProgressIndicator(
+                                        progress = { progress },
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
+                                        strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
+                                        color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
+                                        strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
+                                        color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             } else {
                                 Icon(
                                     imageVector = if (plugin.isEnabled) Icons.Default.CheckCircle else Icons.Default.Extension,
@@ -559,13 +655,7 @@ fun PluginCard(
                                 )
                             }
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                text = if (isToggling) {
-                                    if (plugin.isEnabled) "Activating..." else "Deactivating..."
-                                } else {
-                                    if (plugin.isEnabled) "Active" else "Disabled"
-                                }
-                            )
+                            Text(text = toggleText)
                         }
                     }
 
@@ -575,19 +665,17 @@ fun PluginCard(
                                 onClick = { expanded = true },
                                 shape = shape,
                                 modifier = modifierSpec.size(ToolkitTheme.dimensions.standardButtonHeight),
-                                enabled = readyStatus && !isToggling
+                                enabled = readyStatus && !isBusy
                             ) {
                                 Icon(
                                     Icons.Default.MoreVert,
                                     contentDescription = stringResource(Res.string.action_more_actions)
                                 )
                             }
-                            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_reload)) },
-                                    onClick = { onAction(PluginStatusAction.Reload); expanded = false },
-                                    leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
-                                )
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_validate)) },
                                     onClick = { onAction(PluginStatusAction.Validate); expanded = false },
@@ -596,6 +684,11 @@ fun PluginCard(
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_rerun_setup)) },
                                     onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
+                                    leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(Res.string.plugin_reload)) },
+                                    onClick = { onAction(PluginStatusAction.Reload); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
                                 )
                                 DropdownMenuItem(

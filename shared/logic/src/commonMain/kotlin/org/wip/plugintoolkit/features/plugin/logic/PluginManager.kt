@@ -24,6 +24,8 @@ class PluginManager(
 ) {
     val installedPlugins: StateFlow<List<InstalledPlugin>> = registry.installedPlugins
     val loadedPlugins: StateFlow<Set<String>> = lifecycleManager.loadedPlugins
+    val loadingPlugins: StateFlow<Set<String>> = lifecycleManager.loadingPlugins
+    val pluginLoadingSteps: StateFlow<Map<String, String>> = lifecycleManager.pluginLoadingSteps
     val isRegistryReady: StateFlow<Boolean> = registry.isReady
     val pluginLocksState: StateFlow<Map<String, Map<String, Boolean>>> = lifecycleManager.pluginLocksState
     val pluginSettingsState: StateFlow<Map<String, PluginSettingsStore>> = lifecycleManager.pluginSettingsState

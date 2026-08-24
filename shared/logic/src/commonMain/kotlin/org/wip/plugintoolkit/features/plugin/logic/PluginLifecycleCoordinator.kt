@@ -129,10 +129,11 @@ class PluginLifecycleCoordinator(
     }
 
     private suspend fun processAction(action: LifecycleAction) {
+        Logger.d { "LifecycleCoordinator: Processing action ${action::class.simpleName} for pkg=${action.targetPkg}" }
         when (action) {
             is LifecycleAction.OnJobCompleted -> {
                 val job = action.job
-                Logger.d { "Lifecycle job completed for ${job.pluginId}: ${job.type}" }
+                Logger.i { "LifecycleCoordinator: Lifecycle job completed for ${job.pluginId}: ${job.type}" }
                 when (job.type) {
                     JobType.Validation -> markAsValidated(job.pluginId)
                     JobType.Setup, JobType.Update -> triggerValidationInternal(job.pluginId)
@@ -145,7 +146,7 @@ class PluginLifecycleCoordinator(
 
             is LifecycleAction.OnJobFailed -> {
                 val job = action.job
-                Logger.w { "Lifecycle job failed for ${job.pluginId}: ${job.type} - ${action.error}" }
+                Logger.w { "LifecycleCoordinator: Lifecycle job failed for ${job.pluginId}: ${job.type} - ${action.error}" }
                 if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
                     markAsInvalidated(job.pluginId, action.error)
                 }
@@ -479,26 +480,37 @@ class PluginLifecycleCoordinator(
     // --- Internal Helpers (Actor Thread Only) ---
 
     private suspend fun enqueueSetupJobInternal(pkg: String) {
-        val plugin = registry.getPlugin(pkg) ?: return
-        if (isJobPendingOrRunning("setup_$pkg")) return
+        val plugin = registry.getPlugin(pkg) ?: run {
+            Logger.w { "LifecycleCoordinator: Cannot enqueue setup for $pkg: plugin not found in registry" }
+            return
+        }
+        if (isJobPendingOrRunning("setup_$pkg")) {
+            Logger.d { "LifecycleCoordinator: Setup job setup_$pkg is already pending or running, skipping." }
+            return
+        }
 
         val manifest = lifecycleManager.getManifest(pkg)
         if (hasMissingRequiredSettings(pkg, manifest)) {
+            Logger.i { "LifecycleCoordinator: Plugin $pkg has missing required settings; requesting CONFIGURE_SETTINGS" }
             registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
             return
         }
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
-            markAsInvalidated(pkg, loadResult.exceptionOrNull()?.message)
+            val error = loadResult.exceptionOrNull()?.message
+            Logger.e { "LifecycleCoordinator: Failed to load plugin $pkg before setup: $error" }
+            markAsInvalidated(pkg, error)
             return
         }
 
         if (manifest?.hasSetupHandler != true) {
+            Logger.d { "LifecycleCoordinator: Plugin $pkg has no setup handler, proceeding to validation" }
             triggerValidationInternal(pkg)
             return
         }
 
+        Logger.i { "LifecycleCoordinator: Enqueuing setup job setup_$pkg for $pkg" }
         val job = BackgroundJob(
             id = "setup_$pkg",
             name = "Setup: ${plugin.name}",
@@ -511,26 +523,37 @@ class PluginLifecycleCoordinator(
     }
 
     private suspend fun enqueueUpdateJobInternal(pkg: String) {
-        val plugin = registry.getPlugin(pkg) ?: return
-        if (isJobPendingOrRunning("update_$pkg")) return
+        val plugin = registry.getPlugin(pkg) ?: run {
+            Logger.w { "LifecycleCoordinator: Cannot enqueue update for $pkg: plugin not found in registry" }
+            return
+        }
+        if (isJobPendingOrRunning("update_$pkg")) {
+            Logger.d { "LifecycleCoordinator: Update job update_$pkg is already pending or running, skipping." }
+            return
+        }
 
         val manifest = lifecycleManager.getManifest(pkg)
         if (hasMissingRequiredSettings(pkg, manifest)) {
+            Logger.i { "LifecycleCoordinator: Plugin $pkg has missing required settings; requesting CONFIGURE_SETTINGS" }
             registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
             return
         }
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
-            markAsInvalidated(pkg, loadResult.exceptionOrNull()?.message)
+            val error = loadResult.exceptionOrNull()?.message
+            Logger.e { "LifecycleCoordinator: Failed to load plugin $pkg before update: $error" }
+            markAsInvalidated(pkg, error)
             return
         }
 
         if (manifest?.hasUpdateHandler != true) {
+            Logger.d { "LifecycleCoordinator: Plugin $pkg has no update handler, proceeding to validation" }
             triggerValidationInternal(pkg)
             return
         }
 
+        Logger.i { "LifecycleCoordinator: Enqueuing update job update_$pkg for $pkg" }
         val job = BackgroundJob(
             id = "update_$pkg",
             name = "Update: ${plugin.name}",
@@ -543,22 +566,32 @@ class PluginLifecycleCoordinator(
     }
 
     private suspend fun triggerValidationInternal(pkg: String): Result<Unit> {
-        val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin not found"))
-        if (plugin.isValidated) return Result.success(Unit)
-        if (isJobPendingOrRunning("val_$pkg")) return Result.success(Unit)
+        val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin not found: $pkg"))
+        if (plugin.isValidated) {
+            Logger.d { "LifecycleCoordinator: Plugin $pkg is already validated, skipping validation." }
+            return Result.success(Unit)
+        }
+        if (isJobPendingOrRunning("val_$pkg")) {
+            Logger.d { "LifecycleCoordinator: Validation job val_$pkg is already pending or running, skipping." }
+            return Result.success(Unit)
+        }
 
         val manifest = lifecycleManager.getManifest(pkg)
         if (hasMissingRequiredSettings(pkg, manifest)) {
+            Logger.i { "LifecycleCoordinator: Plugin $pkg has missing required settings, cannot validate; requesting CONFIGURE_SETTINGS" }
             registry.updatePlugin(pkg) { it.copy(requiredAction = "CONFIGURE_SETTINGS") }
-            return Result.failure(Exception("Missing required settings"))
+            return Result.failure(Exception("Missing required settings for $pkg"))
         }
 
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
-            markAsInvalidated(pkg, loadResult.exceptionOrNull()?.message)
+            val error = loadResult.exceptionOrNull()?.message
+            Logger.e { "LifecycleCoordinator: Failed to load plugin $pkg before validation: $error" }
+            markAsInvalidated(pkg, error)
             return Result.failure(loadResult.exceptionOrNull()!!)
         }
 
+        Logger.i { "LifecycleCoordinator: Enqueuing validation job val_$pkg for $pkg" }
         val job = BackgroundJob(
             id = "val_$pkg",
             name = "Validation: ${plugin.name}",
@@ -572,20 +605,29 @@ class PluginLifecycleCoordinator(
     }
 
     private fun isJobPendingOrRunning(jobId: String): Boolean {
-        return jobManager.activeJobIds.value.contains(jobId)
+        return jobManager.isJobPendingOrRunning(jobId)
     }
 
     private suspend fun markAsValidated(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
-        if (plugin.isValidated) return
-        registry.updatePlugin(pkg) { it.copy(isValidated = true) }
-        lifecycleManager.loadPlugin(pkg)
+        if (plugin.isValidated) {
+            Logger.d { "LifecycleCoordinator: Plugin $pkg is already marked as validated" }
+            return
+        }
+        Logger.i { "LifecycleCoordinator: Marking plugin $pkg as validated and loading plugin" }
+        registry.updatePlugin(pkg) { it.copy(isValidated = true, loadError = null) }
+        val loadResult = lifecycleManager.loadPlugin(pkg)
+        if (loadResult.isFailure) {
+            Logger.e { "LifecycleCoordinator: Failed to activate validated plugin $pkg: ${loadResult.exceptionOrNull()?.message}" }
+        }
     }
 
     private suspend fun markAsInvalidated(pkg: String, error: String? = null) {
         val plugin = registry.getPlugin(pkg) ?: return
+        Logger.w { "LifecycleCoordinator: Marking plugin $pkg as invalidated (error=$error)" }
         registry.updatePlugin(pkg) { it.copy(isValidated = false, loadError = error) }
         if (lifecycleManager.loadedPlugins.value.contains(pkg)) {
+            Logger.i { "LifecycleCoordinator: Unloading invalidated plugin $pkg" }
             lifecycleManager.unloadPlugin(pkg)
         }
     }

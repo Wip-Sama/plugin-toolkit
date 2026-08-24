@@ -110,7 +110,10 @@ class PluginRepoViewModel(
 
     val activePluginInstallationJobs: StateFlow<Map<String, Float>> = jobManager.jobProgress
         .combine(jobManager.jobs) { progressMap, jobs ->
-            jobs.filter { it.type == org.wip.plugintoolkit.features.job.model.JobType.Setup || it.type == org.wip.plugintoolkit.features.job.model.JobType.Update || it.type == org.wip.plugintoolkit.features.job.model.JobType.Validation }
+            jobs.filter {
+                (it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+                        (it.status == JobStatus.Running || it.status == JobStatus.Queued)
+            }
                 .associate { it.pluginId to (progressMap[it.id]?.mainProgress ?: 0f) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())

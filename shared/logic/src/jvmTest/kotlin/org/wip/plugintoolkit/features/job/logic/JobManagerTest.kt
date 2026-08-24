@@ -93,4 +93,75 @@ class JobManagerTest {
         assertEquals(1, jobManager.endedJobs.value.size)
         assertEquals("job-1", jobManager.endedJobs.value[0].id)
     }
+
+    @Test
+    fun testIsJobPendingOrRunning() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val setupJob = BackgroundJob(
+            id = "setup_com.wip.ocr_ia",
+            name = "Setup OCR IA",
+            type = JobType.Setup,
+            pluginId = "com.wip.ocr_ia",
+            capabilityName = "setup",
+            keepResult = false
+        )
+
+        assertEquals(false, jobManager.isJobPendingOrRunning("setup_com.wip.ocr_ia"))
+
+        jobManager.enqueueJob(setupJob)
+        assertEquals(true, jobManager.isJobPendingOrRunning("setup_com.wip.ocr_ia"))
+
+        val claimed = jobManager.waitForNextJob()
+        assertEquals("setup_com.wip.ocr_ia", claimed.id)
+        assertEquals(true, jobManager.isJobPendingOrRunning("setup_com.wip.ocr_ia"))
+
+        jobManager.tryCompleteJob("setup_com.wip.ocr_ia", "Success")
+        assertEquals(false, jobManager.isJobPendingOrRunning("setup_com.wip.ocr_ia"))
+    }
+
+    @Test
+    fun testEnqueueReplacesExistingFailedOrEndedJobWithSameId() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val setupJob = BackgroundJob(
+            id = "setup_com.wip.cleaner",
+            name = "Setup Cleaner",
+            type = JobType.Setup,
+            pluginId = "com.wip.cleaner",
+            capabilityName = "setup",
+            keepResult = false
+        )
+
+        jobManager.enqueueJob(setupJob)
+        val claimed = jobManager.waitForNextJob()
+        jobManager.tryFailJob(claimed.id, "Network failed")
+
+        // Job is in endedJobs now
+        assertEquals(1, jobManager.endedJobs.value.size)
+        assertEquals("setup_com.wip.cleaner", jobManager.endedJobs.value[0].id)
+        assertEquals(0, jobManager.jobs.value.size)
+
+        // Re-enqueue the same job ID
+        val retryJob = BackgroundJob(
+            id = "setup_com.wip.cleaner",
+            name = "Setup Cleaner Retry",
+            type = JobType.Setup,
+            pluginId = "com.wip.cleaner",
+            capabilityName = "setup",
+            keepResult = false
+        )
+        jobManager.enqueueJob(retryJob)
+
+        assertEquals(1, jobManager.jobs.value.size)
+        assertEquals("setup_com.wip.cleaner", jobManager.jobs.value[0].id)
+        assertEquals(0, jobManager.endedJobs.value.size)
+
+        val claimedRetry = jobManager.waitForNextJob()
+        assertEquals("setup_com.wip.cleaner", claimedRetry.id)
+    }
 }

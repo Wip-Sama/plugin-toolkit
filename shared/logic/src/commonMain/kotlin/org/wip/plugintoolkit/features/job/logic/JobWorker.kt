@@ -342,19 +342,51 @@ class JobWorker(
             }
         })
 
+        val pluginName = plugin.getManifest().getOrNull()?.plugin?.name ?: job.pluginId
         manager.updateJobProgress(job.id, 0.1f)
-        manager.addJobLog(job.id, "Performing setup for ${plugin.getManifest().getOrThrow().plugin.name}...")
+        manager.addJobLog(job.id, "Performing setup for $pluginName...")
+        Logger.i { "Worker $workerId: Performing setup for plugin '${job.pluginId}' ($pluginName)" }
 
-        if (!plugin.getManifest().getOrThrow().hasSetupHandler) {
+        val hasSetup = plugin.getManifest().getOrNull()?.hasSetupHandler == true
+        if (!hasSetup) {
             manager.addJobLog(job.id, "No setup handler found, skipping setup phase.")
+            Logger.d { "Worker $workerId: Plugin '${job.pluginId}' has no setup handler, skipping." }
         } else {
-            val setupResult = withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.performSetup(context) }
+            val timeout = settingsRepository.settings.value.jobs.pluginTimeoutMs
+            val setupResult = try {
+                if (timeout == -1L) {
+                    withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.performSetup(context) }
+                } else {
+                    withTimeout(timeout.milliseconds) {
+                        withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.performSetup(context) }
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                val error = "Setup timed out after ${timeout}ms"
+                Logger.e(e) { "Worker $workerId: Setup timed out for '${job.pluginId}'" }
+                manager.tryFailJob(job.id, error)
+                lifecycleCoordinator.onLifecycleJobFailed(job, error)
+                return
+            } catch (e: CancellationException) {
+                Logger.w { "Worker $workerId: Setup job for '${job.pluginId}' was cancelled" }
+                throw e
+            } catch (e: Throwable) {
+                val error = e.message ?: "Setup failed with exception"
+                Logger.e(e) { "Worker $workerId: Exception during setup of '${job.pluginId}': $error" }
+                manager.tryFailJob(job.id, error)
+                lifecycleCoordinator.onLifecycleJobFailed(job, error)
+                return
+            }
+
             if (setupResult.isFailure) {
                 val error = setupResult.exceptionOrNull()?.message ?: "Setup failed"
+                Logger.e { "Worker $workerId: Setup failed for '${job.pluginId}': $error" }
                 manager.tryFailJob(job.id, error)
+                lifecycleCoordinator.onLifecycleJobFailed(job, error)
                 return
             }
             manager.addJobLog(job.id, "Setup successful.")
+            Logger.i { "Worker $workerId: Setup successful for '${job.pluginId}'" }
         }
 
         manager.updateJobProgress(job.id, 1.0f)
@@ -383,19 +415,51 @@ class JobWorker(
             }
         })
 
+        val pluginName = plugin.getManifest().getOrNull()?.plugin?.name ?: job.pluginId
         manager.updateJobProgress(job.id, 0.2f)
-        manager.addJobLog(job.id, "Running update handler for ${plugin.getManifest().getOrThrow().plugin.name}...")
+        manager.addJobLog(job.id, "Running update handler for $pluginName...")
+        Logger.i { "Worker $workerId: Running update handler for plugin '${job.pluginId}' ($pluginName)" }
 
-        if (!plugin.getManifest().getOrThrow().hasUpdateHandler) {
+        val hasUpdate = plugin.getManifest().getOrNull()?.hasUpdateHandler == true
+        if (!hasUpdate) {
             manager.addJobLog(job.id, "No update handler found, skipping update phase.")
+            Logger.d { "Worker $workerId: Plugin '${job.pluginId}' has no update handler, skipping." }
         } else {
-            val updateResult = withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.performUpdate(context) }
+            val timeout = settingsRepository.settings.value.jobs.pluginTimeoutMs
+            val updateResult = try {
+                if (timeout == -1L) {
+                    withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.performUpdate(context) }
+                } else {
+                    withTimeout(timeout.milliseconds) {
+                        withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.performUpdate(context) }
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                val error = "Update timed out after ${timeout}ms"
+                Logger.e(e) { "Worker $workerId: Update timed out for '${job.pluginId}'" }
+                manager.tryFailJob(job.id, error)
+                lifecycleCoordinator.onLifecycleJobFailed(job, error)
+                return
+            } catch (e: CancellationException) {
+                Logger.w { "Worker $workerId: Update job for '${job.pluginId}' was cancelled" }
+                throw e
+            } catch (e: Throwable) {
+                val error = e.message ?: "Update failed with exception"
+                Logger.e(e) { "Worker $workerId: Exception during update of '${job.pluginId}': $error" }
+                manager.tryFailJob(job.id, error)
+                lifecycleCoordinator.onLifecycleJobFailed(job, error)
+                return
+            }
+
             if (updateResult.isFailure) {
                 val error = updateResult.exceptionOrNull()?.message ?: "Update failed"
+                Logger.e { "Worker $workerId: Update failed for '${job.pluginId}': $error" }
                 manager.tryFailJob(job.id, error)
+                lifecycleCoordinator.onLifecycleJobFailed(job, error)
                 return
             }
             manager.addJobLog(job.id, "Update successful.")
+            Logger.i { "Worker $workerId: Update successful for '${job.pluginId}'" }
         }
 
         manager.updateJobProgress(job.id, 1.0f)
@@ -424,18 +488,48 @@ class JobWorker(
             }
         })
 
+        val pluginName = plugin.getManifest().getOrNull()?.plugin?.name ?: job.pluginId
         manager.updateJobProgress(job.id, 0.2f)
-        manager.addJobLog(job.id, "Running validation for ${plugin.getManifest().getOrThrow().plugin.name}...")
+        manager.addJobLog(job.id, "Running validation for $pluginName...")
+        Logger.i { "Worker $workerId: Running validation for plugin '${job.pluginId}' ($pluginName)" }
 
-        val validationResult = withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.validate(context) }
+        val timeout = settingsRepository.settings.value.jobs.pluginTimeoutMs
+        val validationResult = try {
+            if (timeout == -1L) {
+                withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.validate(context) }
+            } else {
+                withTimeout(timeout.milliseconds) {
+                    withContext(kotlinx.coroutines.Dispatchers.IO) { plugin.validate(context) }
+                }
+            }
+        } catch (e: TimeoutCancellationException) {
+            val error = "Validation timed out after ${timeout}ms"
+            Logger.e(e) { "Worker $workerId: Validation timed out for '${job.pluginId}'" }
+            manager.tryFailJob(job.id, error)
+            lifecycleCoordinator.onLifecycleJobFailed(job, error)
+            return
+        } catch (e: CancellationException) {
+            Logger.w { "Worker $workerId: Validation job for '${job.pluginId}' was cancelled" }
+            throw e
+        } catch (e: Throwable) {
+            val error = e.message ?: "Validation failed with exception"
+            Logger.e(e) { "Worker $workerId: Exception during validation of '${job.pluginId}': $error" }
+            manager.tryFailJob(job.id, error)
+            lifecycleCoordinator.onLifecycleJobFailed(job, error)
+            return
+        }
+
         if (validationResult.isFailure) {
             val error = validationResult.exceptionOrNull()?.message ?: "Validation failed"
+            Logger.w { "Worker $workerId: Validation failed for '${job.pluginId}': $error" }
             manager.tryFailJob(job.id, error)
+            lifecycleCoordinator.onLifecycleJobFailed(job, error)
             return
         }
 
         manager.updateJobProgress(job.id, 1.0f)
         manager.addJobLog(job.id, "Validation successful.")
+        Logger.i { "Worker $workerId: Validation successful for '${job.pluginId}'" }
         manager.tryCompleteJob(job.id, "Success")
         lifecycleCoordinator.onLifecycleJobCompleted(job)
     }

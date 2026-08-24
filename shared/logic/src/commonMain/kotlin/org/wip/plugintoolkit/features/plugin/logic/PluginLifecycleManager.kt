@@ -41,6 +41,12 @@ class PluginLifecycleManager(
     private val _loadedPlugins = MutableStateFlow<Set<String>>(emptySet())
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
 
+    private val _loadingPlugins = MutableStateFlow<Set<String>>(emptySet())
+    val loadingPlugins: StateFlow<Set<String>> = _loadingPlugins.asStateFlow()
+
+    private val _pluginLoadingSteps = MutableStateFlow<Map<String, String>>(emptyMap())
+    val pluginLoadingSteps: StateFlow<Map<String, String>> = _pluginLoadingSteps.asStateFlow()
+
     private val _pluginLocksState = MutableStateFlow<Map<String, Map<String, Boolean>>>(emptyMap())
     val pluginLocksState: StateFlow<Map<String, Map<String, Boolean>>> = _pluginLocksState.asStateFlow()
 
@@ -80,88 +86,102 @@ class PluginLifecycleManager(
             return Result.success(Unit)
         }
 
-        val (isComp, compError) = PluginCompatibilityUtils.checkCompatibility(plugin)
-        if (!isComp || !plugin.isCompatible) {
-            val errorMsg = compError ?: plugin.compatibilityError ?: "Plugin is incompatible with the current app version"
-            Logger.w { "Cannot load plugin $pkg: $errorMsg" }
-            registry.updatePlugin(pkg) { it.copy(isCompatible = false, compatibilityError = compError ?: it.compatibilityError) }
-            return Result.failure(Exception(errorMsg))
-        }
+        _loadingPlugins.update { it + pkg }
+        _pluginLoadingSteps.update { it + (pkg to "Starting load...") }
+        try {
+            val (isComp, compError) = PluginCompatibilityUtils.checkCompatibility(plugin)
+            if (!isComp || !plugin.isCompatible) {
+                val errorMsg = compError ?: plugin.compatibilityError ?: "Plugin is incompatible with the current app version"
+                Logger.w { "Cannot load plugin $pkg: $errorMsg" }
+                registry.updatePlugin(pkg) { it.copy(isCompatible = false, compatibilityError = compError ?: it.compatibilityError) }
+                return Result.failure(Exception(errorMsg))
+            }
 
-        val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
-        val jarFile = "${plugin.installPath}/$jarFileName"
+            val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
+            val jarFile = "${plugin.installPath}/$jarFileName"
 
-        // Runtime signature verification for remote plugins
-        if (plugin.repoUrl != null) {
-            val repo = settingsRepository.loadSettings().extensions.repositories.find { it.url == plugin.repoUrl }
-            val publicKey = repo?.signPublicKey
-            val strictChecking = settingsRepository.loadSettings().extensions.strictSignatureChecking
+            // Runtime signature verification for remote plugins
+            if (plugin.repoUrl != null) {
+                _pluginLoadingSteps.update { it + (pkg to "Verifying signature...") }
+                val repo = settingsRepository.loadSettings().extensions.repositories.find { it.url == plugin.repoUrl }
+                val publicKey = repo?.signPublicKey
+                val strictChecking = settingsRepository.loadSettings().extensions.strictSignatureChecking
 
-            if (publicKey != null) {
-                val isSignatureValid = PluginSecurity.verify(jarFile, publicKey)
-                if (!isSignatureValid) {
-                    val msg = "Plugin signature verification failed for ${plugin.pkg}"
-                    Logger.w { msg }
-                    if (strictChecking || plugin.requiredAction == "CONFIRM_SIGNATURE") {
-                        updateLoadError(pkg, msg)
-                        return Result.failure(Exception(msg))
+                if (publicKey != null) {
+                    val isSignatureValid = PluginSecurity.verify(jarFile, publicKey)
+                    if (!isSignatureValid) {
+                        val msg = "Plugin signature verification failed for ${plugin.pkg}"
+                        Logger.w { msg }
+                        if (strictChecking || plugin.requiredAction == "CONFIRM_SIGNATURE") {
+                            updateLoadError(pkg, msg)
+                            return Result.failure(Exception(msg))
+                        }
                     }
                 }
             }
-        }
 
-        Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
-        val settings = loadPluginSettings(pkg)
-        val result = try {
-            PluginLoader.loadPlugin(jarFile, settings.settings)
-        } catch (t: Throwable) {
-            Result.failure(Exception("Fatal error loading plugin classes", t))
-        }
+            Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
+            _pluginLoadingSteps.update { it + (pkg to "Loading classes...") }
+            val settings = loadPluginSettings(pkg)
+            val result = try {
+                PluginLoader.loadPlugin(jarFile, settings.settings)
+            } catch (t: Throwable) {
+                Result.failure(Exception("Fatal error loading plugin classes", t))
+            }
 
-        return if (result.isSuccess) {
-            val entry = result.getOrThrow()
-            try {
-                // Initialize with context
-                val manifest = entry.getManifest().getOrThrow()
-                val initResult = entry.initialize(createPluginContext(pkg, manifest = manifest))
-                if (initResult.isFailure) {
-                    val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")
-                    Logger.e(error) { "Initialization failed for $pkg" }
-                    updateLoadError(pkg, error.message)
-                    return Result.failure(error)
-                }
-
-                // Perform load step only if already validated.
-                // For new installations/updates, this is handled by the JobWorker after setup/update.
-                if (plugin.isValidated) {
-                    val loadResult = entry.performLoad(createPluginContext(pkg, manifest = manifest))
-                    if (loadResult.isFailure) {
-                        val error = loadResult.exceptionOrNull() ?: Exception("Load failed")
-                        Logger.e(error) { "Load failed for $pkg" }
+            return if (result.isSuccess) {
+                val entry = result.getOrThrow()
+                try {
+                    // Initialize with context
+                    _pluginLoadingSteps.update { it + (pkg to "Initializing context...") }
+                    val manifest = entry.getManifest().getOrThrow()
+                    val initResult = entry.initialize(createPluginContext(pkg, manifest = manifest))
+                    if (initResult.isFailure) {
+                        val error = initResult.exceptionOrNull() ?: Exception("Initialization failed")
+                        Logger.e(error) { "Initialization failed for $pkg" }
                         updateLoadError(pkg, error.message)
                         return Result.failure(error)
                     }
-                }
 
-                if (plugin.isValidated) {
-                    _loadedPlugins.update { it + pkg }
-                    updateLoadError(pkg, null) // Clear errors on success
-                    Logger.i { "Plugin $pkg successfully loaded and activated" }
-                } else {
-                    Logger.i { "Plugin $pkg loaded but waiting for validation/activation" }
+                    // Perform load step only if already validated.
+                    // For new installations/updates, this is handled by the JobWorker after setup/update.
+                    if (plugin.isValidated) {
+                        _pluginLoadingSteps.update { it + (pkg to "Running load hook...") }
+                        val loadResult = entry.performLoad(createPluginContext(pkg, manifest = manifest))
+                        if (loadResult.isFailure) {
+                            val error = loadResult.exceptionOrNull() ?: Exception("Load failed")
+                            Logger.e(error) { "Load failed for $pkg" }
+                            updateLoadError(pkg, error.message)
+                            return Result.failure(error)
+                        }
+                    }
+
+                    if (plugin.isValidated) {
+                        _loadedPlugins.update { it + pkg }
+                        updateLoadError(pkg, null) // Clear errors on success
+                        Logger.i { "Plugin $pkg successfully loaded and activated" }
+                    } else {
+                        Logger.i { "Plugin $pkg loaded but waiting for validation/activation" }
+                    }
+
+                    _pluginLoadingSteps.update { it + (pkg to "Checking model locks...") }
+                    refreshLocks(pkg)
+                    Result.success(Unit)
+                } catch (t: Throwable) {
+                    val msg = "Fatal error during initialization of $pkg: ${t.message}"
+                    Logger.e(t) { msg }
+                    updateLoadError(pkg, msg)
+                    Result.failure(Exception(msg, t))
                 }
-                Result.success(Unit)
-            } catch (t: Throwable) {
-                val msg = "Fatal error during initialization of $pkg: ${t.message}"
-                Logger.e(t) { msg }
-                updateLoadError(pkg, msg)
-                Result.failure(Exception(msg, t))
+            } else {
+                val error = result.exceptionOrNull() ?: Exception("Unknown error loading JAR")
+                Logger.e(error) { "PluginLoader failed to load $jarFile: ${error.message}" }
+                updateLoadError(pkg, error.message)
+                Result.failure(error)
             }
-        } else {
-            val error = result.exceptionOrNull() ?: Exception("Unknown load error")
-            Logger.e(error) { "PluginLoader failed for $pkg" }
-            updateLoadError(pkg, error.message)
-            Result.failure(error)
+        } finally {
+            _loadingPlugins.update { it - pkg }
+            _pluginLoadingSteps.update { it - pkg }
         }
     }
 
@@ -412,11 +432,19 @@ class PluginLifecycleManager(
         pkg: String,
         overriddenSettings: PluginSettingsStore? = null
     ): Map<String, Boolean> {
-        val entry = PluginLoader.getPluginById(pkg) ?: return emptyMap()
-        val processor = entry.getProcessor().getOrNull() ?: return emptyMap()
+        val entry = PluginLoader.getPluginById(pkg) ?: run {
+            Logger.d { "refreshLocks: Plugin $pkg not loaded in PluginLoader, skipping locks refresh" }
+            return emptyMap()
+        }
+        val processor = entry.getProcessor().getOrNull() ?: run {
+            Logger.d { "refreshLocks: Plugin $pkg has no processor, skipping locks refresh" }
+            return emptyMap()
+        }
         val context = createPluginContext(pkg, overriddenSettings = overriddenSettings)
         return try {
+            Logger.d { "refreshLocks: Refreshing locks for plugin $pkg..." }
             val locks = processor.refreshLocks(context)
+            Logger.d { "refreshLocks: Refreshed locks for $pkg: $locks" }
             _pluginLocksState.update { current ->
                 current + (pkg to locks)
             }
