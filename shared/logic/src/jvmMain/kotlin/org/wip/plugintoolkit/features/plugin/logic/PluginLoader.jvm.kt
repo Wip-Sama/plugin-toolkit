@@ -137,7 +137,7 @@ actual object PluginLoader {
                         it.classLoader.close()
                         unloadedClassLoaders[normalizedPath] = java.lang.ref.WeakReference(it.classLoader)
                         Logger.i { "Successfully unloaded, closed Koin app and classloader for $normalizedPath" }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         Logger.e(e) { "Error during shutdown of plugin at $normalizedPath" }
                     }
                     return

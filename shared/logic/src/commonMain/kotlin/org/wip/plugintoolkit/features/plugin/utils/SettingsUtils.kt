@@ -241,7 +241,7 @@ object SettingsUtils {
         providedSettings: Map<String, JsonElement>
     ): String? {
         for (lockKey in capability.requiredLocks) {
-            if (providedLocks[lockKey] != true) {
+            if (!CapabilityLockUtils.isLockSatisfied(lockKey, providedLocks)) {
                 return "Requires lock: $lockKey"
             }
         }

@@ -72,4 +72,32 @@ class SettingsUtilsTest {
         val stringFromNullElement = SettingsUtils.jsonToString(null, booleanType)
         assertEquals("false", stringFromNullElement, "null JsonElement for Primitive BOOLEAN must convert to 'false'")
     }
+
+    @Test
+    fun testValidateCapabilityLocksAndSettings_caseInsensitiveLocks() {
+        val capability = Capability(
+            name = "testOcrCap",
+            description = "OCR with model lock",
+            returnType = DataType.Primitive(PrimitiveType.UNIT),
+            requiredLocks = listOf("model:Unlimited-OCR")
+        )
+        val locks = mapOf("model:unlimited-ocr" to true)
+        val settings = emptyMap<String, kotlinx.serialization.json.JsonElement>()
+
+        val result = SettingsUtils.validateCapabilityLocksAndSettings(capability, locks, settings)
+        assertNull(result, "Case-insensitive lock matching should succeed when lock exists in lowercase")
+
+        val status = CapabilityLockUtils.checkCapabilityLockStatus(capability, locks, settings)
+        assertEquals(CapabilityLockStatus.Unlocked, status)
+    }
+
+    @Test
+    fun testCapabilityLockUtils_isLockSatisfied() {
+        val locks = mapOf("model:unlimited-ocr" to true, "FEATURE_A" to true)
+        kotlin.test.assertTrue(CapabilityLockUtils.isLockSatisfied("model:Unlimited-OCR", locks))
+        kotlin.test.assertTrue(CapabilityLockUtils.isLockSatisfied("model:unlimited-ocr", locks))
+        kotlin.test.assertTrue(CapabilityLockUtils.isLockSatisfied("feature_a", locks))
+        kotlin.test.assertTrue(CapabilityLockUtils.isLockSatisfied("FEATURE_A", locks))
+        kotlin.test.assertFalse(CapabilityLockUtils.isLockSatisfied("non_existent", locks))
+    }
 }

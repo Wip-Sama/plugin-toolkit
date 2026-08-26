@@ -449,8 +449,8 @@ class PluginLifecycleManager(
                 current + (pkg to locks)
             }
             locks
-        } catch (e: Exception) {
-            Logger.e(e) { "Failed to evaluate checkLocks for $pkg" }
+        } catch (t: Throwable) {
+            Logger.e(t) { "Failed to evaluate checkLocks for $pkg" }
             emptyMap()
         }
     }

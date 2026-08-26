@@ -15,6 +15,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.common_no_options
@@ -72,7 +73,7 @@ fun EnumDropdownInput(
                 reqValue != null && reqValue.toString().replace("\"", "").isNotBlank()
             }
             val locksSatisfied = lockReqs.all { lockKey ->
-                providedLocks[lockKey] == true
+                CapabilityLockUtils.isLockSatisfied(lockKey, providedLocks)
             }
 
             !settingsSatisfied || !locksSatisfied

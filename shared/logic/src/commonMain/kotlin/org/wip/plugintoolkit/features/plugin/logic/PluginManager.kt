@@ -121,7 +121,11 @@ class PluginManager(
     fun savePluginSettings(pkg: String, store: PluginSettingsStore) {
         lifecycleManager.savePluginSettings(pkg, store)
         scope.launch {
-            lifecycleManager.refreshLocks(pkg)
+            try {
+                lifecycleManager.refreshLocks(pkg)
+            } catch (t: Throwable) {
+                Logger.e(t) { "Failed to refresh locks after saving settings for $pkg" }
+            }
         }
     }
 

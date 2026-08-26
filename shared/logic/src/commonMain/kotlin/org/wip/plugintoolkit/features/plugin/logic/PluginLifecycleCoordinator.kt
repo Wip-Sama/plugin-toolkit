@@ -119,12 +119,39 @@ class PluginLifecycleCoordinator(
                 for (action in channel) {
                     try {
                         processAction(action)
-                    } catch (e: Exception) {
-                        Logger.e(e) { "Error processing LifecycleAction: $action" }
+                    } catch (t: Throwable) {
+                        Logger.e(t) { "Error processing LifecycleAction: $action" }
+                        completeActionExceptionally(action, t)
                     }
                 }
             }
             channel
+        }
+    }
+
+    private fun completeActionExceptionally(action: LifecycleAction, t: Throwable) {
+        val error = if (t is Exception) t else Exception(t.message, t)
+        try {
+            when (action) {
+                is LifecycleAction.LoadPlugin -> action.response.complete(Result.failure(error))
+                is LifecycleAction.SetEnabled -> action.response.complete(Result.failure(error))
+                is LifecycleAction.TriggerValidation -> action.response.complete(Result.failure(error))
+                is LifecycleAction.ValidatePlugin -> action.response.complete(Result.failure(error))
+                is LifecycleAction.OnJobCompleted -> action.response.complete(Unit)
+                is LifecycleAction.OnJobFailed -> action.response.complete(Unit)
+                is LifecycleAction.OnManualValidation -> action.response.complete(Unit)
+                is LifecycleAction.UnloadPlugin -> action.response.complete(Unit)
+                is LifecycleAction.ReloadPlugin -> action.response.complete(Unit)
+                is LifecycleAction.HandlePostInstall -> action.response.complete(Unit)
+                is LifecycleAction.HandlePostUpdate -> action.response.complete(Unit)
+                is LifecycleAction.EnqueueSetupJob -> action.response.complete(Unit)
+                is LifecycleAction.EnqueueUpdateJob -> action.response.complete(Unit)
+                is LifecycleAction.CheckAndResumeSetup -> action.response.complete(Unit)
+                is LifecycleAction.RerunSetup -> action.response.complete(Unit)
+                is LifecycleAction.RunAction -> action.response.complete(Unit)
+            }
+        } catch (e: Throwable) {
+            Logger.e(e) { "Failed to complete deferred for action $action" }
         }
     }
 
@@ -281,7 +308,11 @@ class PluginLifecycleCoordinator(
                         action.response.complete(Result.failure(safeRes.exceptionOrNull()!!))
                         return
                     }
-                    lifecycleManager.unloadPlugin(action.pkg)
+                    try {
+                        lifecycleManager.unloadPlugin(action.pkg)
+                    } catch (t: Throwable) {
+                        Logger.e(t) { "Error unloading plugin ${action.pkg} during setEnabled(false)" }
+                    }
                 }
 
                 registry.updatePlugin(action.pkg) { it.copy(isEnabled = action.enabled) }

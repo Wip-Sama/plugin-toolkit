@@ -2,6 +2,8 @@ package org.wip.plugintoolkit.features.plugin.logic
 
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
+import org.wip.plugintoolkit.api.DataProcessor
+import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
@@ -139,6 +141,86 @@ class PluginLifecycleManagerTest {
                 updatedPlugin?.loadError,
                 "Load error should be set on the plugin"
             )
+        } finally {
+            io.mockk.unmockkAll()
+        }
+    }
+
+    @Test
+    fun testRefreshLocksCatchesNoClassDefFoundError() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+
+        val pkg = "test.noclassdef.plugin"
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(
+                pkg = pkg,
+                name = "NoClassDefPlugin",
+                version = "1.0.0",
+                installPath = "/tmp/test.noclassdef.plugin",
+                isEnabled = true
+            )
+        )
+
+        val mockEntry = io.mockk.mockk<PluginEntry>()
+        val mockProcessor = io.mockk.mockk<DataProcessor>()
+        io.mockk.coEvery { mockProcessor.refreshLocks(any()) } throws NoClassDefFoundError("it/krzeminski/snakeyaml/engine/kmp/exceptions/MarkedYamlEngineException")
+        io.mockk.every { mockEntry.getProcessor() } returns Result.success(mockProcessor)
+        io.mockk.mockkObject(PluginLoader)
+
+        try {
+            io.mockk.every { PluginLoader.getPluginById(pkg) } returns mockEntry
+
+            val locks = lifecycleManager.refreshLocks(pkg)
+            kotlin.test.assertEquals(emptyMap(), locks, "refreshLocks must catch NoClassDefFoundError and return emptyMap")
+        } finally {
+            io.mockk.unmockkAll()
+        }
+    }
+
+    @Test
+    fun testCoordinatorActorSurvivesErrorAndAllowsDisabling() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+        val coordinator = PluginLifecycleCoordinator(registry, jobManager, lifecycleManager, backgroundScope)
+
+        val pkg = "test.broken.plugin"
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(
+                pkg = pkg,
+                name = "BrokenPlugin",
+                version = "1.0.0",
+                installPath = "/tmp/test.broken.plugin",
+                isEnabled = true,
+                isValidated = true
+            )
+        )
+
+        io.mockk.mockkObject(PluginLoader)
+        try {
+            io.mockk.every { PluginLoader.loadPlugin(any(), any()) } throws NoClassDefFoundError("MissingClass")
+            io.mockk.every { PluginLoader.unloadPlugin(any()) } throws NoClassDefFoundError("MissingClassOnUnload")
+
+            // Attempt to load plugin (which triggers Error)
+            val loadResult = coordinator.loadPlugin(pkg)
+            kotlin.test.assertTrue(loadResult.isFailure, "Load must fail cleanly")
+
+            // Coordinator actor must still be alive and process SetEnabled(false) immediately
+            val disableResult = coordinator.setEnabled(pkg, false)
+            kotlin.test.assertTrue(disableResult.isSuccess, "Disabling plugin must succeed even after fatal load error")
+
+            val updatedPlugin = registry.getPlugin(pkg)
+            kotlin.test.assertEquals(false, updatedPlugin?.isEnabled, "Plugin isEnabled must be updated to false")
         } finally {
             io.mockk.unmockkAll()
         }

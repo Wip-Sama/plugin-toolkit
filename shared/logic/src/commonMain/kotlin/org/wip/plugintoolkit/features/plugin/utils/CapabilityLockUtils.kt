@@ -15,12 +15,20 @@ sealed class CapabilityLockStatus {
 }
 
 object CapabilityLockUtils {
+    fun isLockSatisfied(lockKey: String, providedLocks: Map<String, Boolean>): Boolean {
+        return providedLocks[lockKey] == true ||
+                providedLocks[lockKey.lowercase()] == true ||
+                providedLocks.any { (k, v) -> k.equals(lockKey, ignoreCase = true) && v }
+    }
+
     fun checkCapabilityLockStatus(
         capability: Capability,
         providedLocks: Map<String, Boolean>,
         providedSettings: Map<String, JsonElement>
     ): CapabilityLockStatus {
-        val missingLocks = capability.requiredLocks.filter { providedLocks[it] != true }
+        val missingLocks = capability.requiredLocks.filter { lockKey ->
+            !isLockSatisfied(lockKey, providedLocks)
+        }
         val missingSettings = capability.requiresSettings.filter { settingKey ->
             val v = providedSettings[settingKey]
             v == null || v is JsonNull || v.toString().replace("\"", "").isBlank()
