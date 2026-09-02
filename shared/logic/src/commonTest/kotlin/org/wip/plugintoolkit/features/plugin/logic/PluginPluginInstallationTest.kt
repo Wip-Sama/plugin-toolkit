@@ -244,6 +244,32 @@ class PluginPluginInstallationTest {
         unmockkObject(PluginSecurity)
     }
 
+    @Test
+    fun testRemoteInstallationWithProgress() = runTest {
+        mockkObject(PluginSecurity)
+        every { PluginSecurity.verify(any(), any()) } returns true
+
+        val (installer, repoManager, registry, fileSystem) = createTestInstaller()
+        val repoUrl = "https://example.com/repo/index.json"
+        repoManager.addRepository(repoUrl)
+        val plugin = repoManager.plugins.value[repoUrl]!![0]
+
+        fileSystem.zips["target/org.test/test.jar"] = mapOf(
+            "manifest.json" to """{ "manifestVersion": "1.0", "plugin": { "id": "org.test", "name": "Test", "version": "1.0", "description": "" }, "requirements": { "minMemoryMb": 0, "minExecutionTimeMs": 0 } }"""
+        )
+
+        val progressUpdates = mutableListOf<Float>()
+        val result = installer.installRemote(plugin, "target") { progress ->
+            progressUpdates.add(progress)
+        }
+
+        assertTrue(result.isSuccess)
+        assertTrue(progressUpdates.isNotEmpty(), "Progress updates should have been received")
+        assertEquals(1.0f, progressUpdates.last(), "Final progress update should be 1.0f (100%)")
+        assertTrue(fileSystem.exists("target/org.test/test.jar"))
+        unmockkObject(PluginSecurity)
+    }
+
     private fun TestScope.createTestInstaller(
         persistence: FakeSettingsPersistence = FakeSettingsPersistence(),
         fileSystem: FakeFileSystem = FakeFileSystem()

@@ -1,9 +1,9 @@
 Version: 2.0.2
-Date: 24-08-2026
+Date: 29-08-2026
 Fixed:
 	- Plugin got stuck on unloading if something failed during a procedure
-	- Plugins locks would not update in the flow editor until a restart§
-	- Disabling strict signature checking would load the plugin with invalid signature but make it unusable (TODO)
+	- Plugins locks would not update in the flow editor until a restart
+	- Plugins downloaded from remote could fail due to java heap space, now they're written to the disk as they're downloaded
 ----------------------------------------------------------------------------------------------------
 Version: 2.0.1
 Date: 24-08-2026

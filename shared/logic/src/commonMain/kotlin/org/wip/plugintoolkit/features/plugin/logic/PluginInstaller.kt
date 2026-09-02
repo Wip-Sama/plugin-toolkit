@@ -7,6 +7,8 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.readBytes
 import io.ktor.utils.io.readAvailable
 import io.ktor.http.encodeURLPathPart
+import kotlinx.io.Buffer
+import kotlinx.io.readByteArray
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.VersionUtils
@@ -312,19 +314,21 @@ class PluginInstaller(
             }
 
             val contentLength = response.headers[io.ktor.http.HttpHeaders.ContentLength]?.toLong()
-            val bytes = if (contentLength != null && onProgress != null) {
+            val bytes = if (contentLength != null && contentLength > 0L && onProgress != null) {
                 val channel = response.bodyAsChannel()
-                val buffer = ByteArray(8192)
+                val tempBuffer = ByteArray(8192)
                 var totalRead = 0L
-                val output = mutableListOf<Byte>()
+                val packet = kotlinx.io.Buffer()
                 while (!channel.isClosedForRead) {
-                    val read = channel.readAvailable(buffer)
+                    val read = channel.readAvailable(tempBuffer)
                     if (read == -1) break
-                    totalRead += read
-                    for (i in 0 until read) output.add(buffer[i])
-                    onProgress(totalRead.toFloat() / contentLength)
+                    if (read > 0) {
+                        totalRead += read
+                        packet.write(tempBuffer, 0, read)
+                        onProgress((totalRead.toFloat() / contentLength).coerceIn(0f, 1f))
+                    }
                 }
-                output.toByteArray()
+                packet.readByteArray()
             } else {
                 response.readBytes()
             }
