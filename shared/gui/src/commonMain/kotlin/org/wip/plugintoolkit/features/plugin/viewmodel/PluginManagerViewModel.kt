@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.plugin.viewmodel
 
+import co.touchlab.kermit.Logger
 import org.wip.plugintoolkit.core.model.resolveNonComposable
 
 import androidx.lifecycle.ViewModel
@@ -355,6 +356,30 @@ class PluginManagerViewModel(
     fun rescan() {
         viewModelScope.launch {
             pluginManager.rescanManagedFolders()
+        }
+    }
+
+    fun refreshLocks(pkg: String) {
+        viewModelScope.launch {
+            try {
+                pluginManager.refreshLocks(pkg)
+                val plugin = installedPlugins.value.find { it.pkg == pkg }
+                val name = plugin?.name ?: pkg
+                notificationService.toast(getString(Res.string.plugin_locks_refreshed_single, name))
+            } catch (t: Throwable) {
+                Logger.e(t) { "Failed to refresh locks for $pkg" }
+            }
+        }
+    }
+
+    fun refreshAllLocks() {
+        viewModelScope.launch {
+            try {
+                pluginManager.refreshAllLocks()
+                notificationService.toast(getString(Res.string.plugin_locks_refreshed_all))
+            } catch (t: Throwable) {
+                Logger.e(t) { "Failed to refresh all plugin locks" }
+            }
         }
     }
 

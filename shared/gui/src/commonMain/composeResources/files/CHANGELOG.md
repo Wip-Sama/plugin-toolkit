@@ -4,6 +4,11 @@ Added:
 	- MaxLogLineLength setting to limit the length of a log line
 	- Hyperlink and folder support in the worker terminal
 	- Extra info about the job while/when they run
+	- Changelog to plugin repository
+	- Tooltip to better explain the plugin manager actions
+	- Actions to refresh custom locks
+	- Plugin actions can now use toast to notify the user if needed
+	- Single-Instance System Lock, now you can run only on instance of the app at a time (opt-out available)
 Changes:
 	- The progress report now is formatted in a way that avoid spamming multiple times the same log progress
 	- Capabilities runner now have logger terminal
@@ -21,10 +26,6 @@ Fixed:
 	- System node regexes are now correctly executed and validated by the flow runner
 	- Not required nodes are now optional in the flor runner
 	- Properly cleaned old plugin jars when removing/updating plugins
-
--the max number of lines to keep in the terminal has a flaw, it does not account for max line length, if a Line is too big the terminal needs to keep render a lot, we need to do something to optimize it
--auto scroll does not seems to be able to keep the log terminal window scrolled down in job manager, especially under heavy load
-
 ----------------------------------------------------------------------------------------------------
 Version: 2.0.1
 Date: 24-08-2026

@@ -146,7 +146,12 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
         return Result.success(Unit)
     }
 
-    @PluginAction(name = "Reset Plugin State", description = "Clears cached plugin data and resets counters.")
+    @PluginAction(
+        name = "Reset Plugin State",
+        description = "Clears cached plugin data and resets counters.",
+        showToast = true,
+        toastMessage = "CompleteExample: State reset complete!"
+    )
     suspend fun resetState(logger: PluginLogger) {
         logger.info("Resetting complete example plugin state...")
         delay(100)
@@ -312,7 +317,8 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
 
     @PluginAction(
         name = "Toggle Feature Lock",
-        description = "Writes a boolean flag to storage to lock or unlock restricted plugin features."
+        description = "Writes a boolean flag to storage to lock or unlock restricted plugin features.",
+        showToast = true
     )
     suspend fun toggleFeatureLock(
         @CapabilityParam(description = "True to unlock features, false to lock") unlocked: Boolean,
@@ -320,6 +326,7 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
     ) {
         context.logger.info("Setting feature lock state in storage: unlocked=$unlocked")
         context.storage.put("feature_unlocked", JsonPrimitive(unlocked))
+        context.showToast("Feature lock state changed: unlocked=$unlocked")
     }
 
     @PluginAction(

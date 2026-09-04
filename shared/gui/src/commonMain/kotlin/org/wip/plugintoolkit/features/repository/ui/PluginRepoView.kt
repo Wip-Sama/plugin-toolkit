@@ -105,7 +105,8 @@ fun PluginRepoView(
                     onInstallPlugin = { viewModel.installPlugin(it) },
                     onCancelPlugin = { viewModel.cancelPluginInstall(it) },
                     onInstallFlow = { viewModel.installFlow(it) },
-                    onSetPackageSource = { pkg, url -> viewModel.setPackageSource(pkg, url) }
+                    onSetPackageSource = { pkg, url -> viewModel.setPackageSource(pkg, url) },
+                    onShowChangelog = { viewModel.showChangelog(it) }
                 )
             }
         }

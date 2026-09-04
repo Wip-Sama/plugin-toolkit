@@ -660,6 +660,39 @@ class GroupSectionBuilder<G>(
         subtitleProvider: ((AppSettings) -> String)? = null,
         update: G.(Float) -> G
     ) = slider(prop, SettingText.Resource(title), icon, range, steps, subtitle, enabled, sideEffect, subtitleProvider, update)
+
+    /**
+     * Declares a custom setting control for a property in group [G].
+     */
+    fun custom(
+        id: String,
+        title: SettingText,
+        icon: ImageVector,
+        subtitle: SettingText? = null,
+        enabled: (AppSettings) -> Boolean = { true },
+        onClick: (() -> Unit)? = null,
+        control: @Composable (settings: AppSettings, onUpdate: (AppSettings) -> Unit) -> Unit
+    ) {
+        sectionBuilder.SettingCustom(
+            id = id,
+            title = title,
+            icon = icon,
+            subtitle = subtitle,
+            enabled = enabled,
+            onClick = onClick,
+            control = control
+        )
+    }
+
+    fun custom(
+        id: String,
+        title: StringResource,
+        icon: ImageVector,
+        subtitle: SettingText? = null,
+        enabled: (AppSettings) -> Boolean = { true },
+        onClick: (() -> Unit)? = null,
+        control: @Composable (settings: AppSettings, onUpdate: (AppSettings) -> Unit) -> Unit
+    ) = custom(id, SettingText.Resource(title), icon, subtitle, enabled, onClick, control)
 }
 
 /**

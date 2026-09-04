@@ -575,10 +575,18 @@ class JobWorker(
             manager.addJobLog(job.id, "Action completed successfully.")
             manager.tryCompleteJob(job.id, "Success")
             lifecycleCoordinator.onLifecycleJobCompleted(job)
+            if (action.showToast) {
+                val toastMsg = action.toastMessage?.takeIf { it.isNotBlank() }
+                    ?: "Action '${action.name}' completed successfully."
+                notificationService.toast(toastMsg)
+            }
         } else {
             val error = result.exceptionOrNull()?.message ?: "Action failed"
             manager.tryFailJob(job.id, error)
             lifecycleCoordinator.onLifecycleJobFailed(job, error)
+            if (action.showToast) {
+                notificationService.toast("Action '${action.name}' failed: $error")
+            }
         }
     }
 

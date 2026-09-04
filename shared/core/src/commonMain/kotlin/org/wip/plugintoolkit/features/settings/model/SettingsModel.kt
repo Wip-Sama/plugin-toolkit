@@ -91,8 +91,17 @@ data class GeneralSettings(
     val launchMinimizedAtStartup: Boolean = true,
     val windowStartMode: WindowStartMode = WindowStartMode.Normal,
     val closeToTray: Boolean = false,
-    val cacheManagement: CacheManagementMode = CacheManagementMode.SystemManaged
-)
+    val cacheManagement: CacheManagementMode = CacheManagementMode.SystemManaged,
+    val singleInstanceLock: Boolean = true,
+    val maxMemoryMb: Int = DEFAULT_MAX_MEMORY_MB
+) {
+    fun effectiveMaxMemoryMb(): Int = maxMemoryMb.coerceAtLeast(MIN_MAX_MEMORY_MB)
+
+    companion object {
+        const val MIN_MAX_MEMORY_MB: Int = 1024
+        const val DEFAULT_MAX_MEMORY_MB: Int = 2048
+    }
+}
 
 /**
  * System logging severity levels and retention policies.

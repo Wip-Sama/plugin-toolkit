@@ -362,6 +362,18 @@ interface PluginContext {
     fun setRequiredAction(actionName: String?)
 
     /**
+     * Display a toast notification in the host application UI.
+     * @param message The message to display to the user.
+     */
+    fun showToast(message: String) {}
+
+    /**
+     * Helper to display a toast notification in the host application UI.
+     * @param message The message to display to the user.
+     */
+    fun toast(message: String) = showToast(message)
+
+    /**
      * Typed helpers for settings access.
      */
     fun getStringSetting(key: String, defaultValue: String = ""): String {

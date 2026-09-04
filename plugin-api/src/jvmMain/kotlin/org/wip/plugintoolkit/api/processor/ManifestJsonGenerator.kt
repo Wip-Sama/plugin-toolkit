@@ -311,6 +311,8 @@ object ManifestJsonGenerator {
             val ann = func.annotations.first { it.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
             val actName = ann.arguments.find { it.name?.asString() == "name" }?.value as String
             val actDesc = ann.arguments.find { it.name?.asString() == "description" }?.value as String
+            val showToast = ann.arguments.find { it.name?.asString() == "showToast" }?.value as? Boolean ?: true
+            val toastMessage = (ann.arguments.find { it.name?.asString() == "toastMessage" }?.value as? String)?.takeIf { it.isNotBlank() }
 
             val nonInfraParams = func.parameters.filter { param ->
                 val paramType = param.type.resolve().toTypeName()
@@ -343,7 +345,9 @@ object ManifestJsonGenerator {
                 name = actName,
                 description = actDesc,
                 functionName = func.simpleName.asString(),
-                parameters = paramsMap
+                parameters = paramsMap,
+                showToast = showToast,
+                toastMessage = toastMessage
             )
         }
 

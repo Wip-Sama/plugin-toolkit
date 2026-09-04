@@ -168,6 +168,50 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     val persistence = koin.get<SettingsPersistence>()
     val initialSettings = persistence.load()
 
+    // ── Single Instance System Lock Check ────────────────────────
+    if (initialSettings.general.singleInstanceLock) {
+        val appDataDir = File(detectedConfig.getAppDataDir())
+        when (val lockResult = org.wip.plugintoolkit.core.utils.AppLockManager.acquireLock(appDataDir)) {
+            is org.wip.plugintoolkit.core.utils.LockResult.Acquired -> {
+                Logger.i { "Single instance lock acquired successfully" }
+            }
+            is org.wip.plugintoolkit.core.utils.LockResult.AlreadyRunning -> {
+                Logger.w { "Another instance of PluginToolkit is already running (PID: ${lockResult.pid})" }
+                val options = arrayOf("Exit", "Clear Lock & Force Start")
+                val choice = javax.swing.JOptionPane.showOptionDialog(
+                    null,
+                    "Another instance of PluginToolkit is currently running${lockResult.pid?.let { " (PID: $it)" } ?: ""}.\n" +
+                            "Running multiple instances simultaneously may cause data corruption or unexpected conflicts.\n\n" +
+                            "Would you like to exit or clear the lock and start anyway?",
+                    "PluginToolkit Already Running",
+                    javax.swing.JOptionPane.DEFAULT_OPTION,
+                    javax.swing.JOptionPane.WARNING_MESSAGE,
+                    null,
+                    options,
+                    options[0]
+                )
+                if (choice == 1) {
+                    Logger.w { "User chose to clear lock and force start" }
+                    val forced = org.wip.plugintoolkit.core.utils.AppLockManager.forceClearAndAcquire(appDataDir)
+                    if (forced !is org.wip.plugintoolkit.core.utils.LockResult.Acquired) {
+                        javax.swing.JOptionPane.showMessageDialog(
+                            null,
+                            "Failed to clear lock and start application.",
+                            "Lock Error",
+                            javax.swing.JOptionPane.ERROR_MESSAGE
+                        )
+                        exitProcess(1)
+                    }
+                } else {
+                    exitProcess(0)
+                }
+            }
+            is org.wip.plugintoolkit.core.utils.LockResult.Error -> {
+                Logger.e { "Error checking single instance lock: ${lockResult.message}" }
+            }
+        }
+    }
+
     val viewModel = koin.get<SettingsViewModel>()
     val registry = koin.get<PluginRegistry>()
     val pluginManager = koin.get<PluginManager>()
@@ -210,6 +254,18 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
             LogLevel.Assert -> Severity.Assert
         }
         Logger.setMinSeverity(severity)
+    }.launchIn(appScope)
+
+    // Dynamically sync single-instance lock with settings changes
+    snapshotFlow { viewModel.settings.value.general.singleInstanceLock }.onEach { isEnabled ->
+        val appDataDir = File(detectedConfig.getAppDataDir())
+        if (isEnabled) {
+            if (!org.wip.plugintoolkit.core.utils.AppLockManager.isLockAcquired()) {
+                org.wip.plugintoolkit.core.utils.AppLockManager.acquireLock(appDataDir)
+            }
+        } else {
+            org.wip.plugintoolkit.core.utils.AppLockManager.releaseLock()
+        }
     }.launchIn(appScope)
 
     Logger.i { "Application starting. Logging initialized at: $logDir with minSeverity=$initialSeverity" }

@@ -41,6 +41,8 @@ import plugintoolkit.composeapp.generated.resources.repo_already_added
 import plugintoolkit.composeapp.generated.resources.repo_link_copied
 import plugintoolkit.composeapp.generated.resources.repo_refreshed
 import plugintoolkit.composeapp.generated.resources.repo_removed
+import plugintoolkit.composeapp.generated.resources.plugin_changelog
+import plugintoolkit.composeapp.generated.resources.plugin_changelog_not_found_remote
 import plugintoolkit.composeapp.generated.resources.repo_source_updated
 
 class PluginRepoViewModel(
@@ -483,5 +485,29 @@ class PluginRepoViewModel(
         }
 
         flowViewModel.importFlowFromBytes(bytes, flow.fileName)
+    }
+
+    fun showChangelog(plugin: ExtensionPlugin) {
+        viewModelScope.launch {
+            val installed = installedPlugins.value.find { it.pkg == plugin.pkg }
+            var content: String? = null
+            if (installed != null) {
+                val jarFileName = installed.jarFileName ?: (installed.pkg.substringAfterLast(".") + ".jar")
+                val jarPath = installed.installPath + "/" + jarFileName
+                content = PlatformUtils.readFileFromZip(jarPath, "resources/changelog.md")
+                    ?: PlatformUtils.readFileFromZip(jarPath, "changelog.md")
+            }
+            if (content == null) {
+                content = pluginManager.fetchRemoteChangelog(plugin.pkg)
+            }
+            val name = plugin.name.ifBlank { plugin.pkg }
+            if (content != null) {
+                val versions = org.wip.plugintoolkit.api.utils.ChangelogParser.parse(content).releases
+                dialogService.showChangelog(name, versions)
+            } else {
+                val errorMsg = getString(ResStrings.plugin_changelog_not_found_remote, name)
+                dialogService.showConfirmation(getString(ResStrings.plugin_changelog), errorMsg) {}
+            }
+        }
     }
 }

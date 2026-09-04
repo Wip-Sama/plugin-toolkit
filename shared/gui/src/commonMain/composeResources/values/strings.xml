@@ -506,4 +506,36 @@
     <string name="job_export_success_toast">Execution report exported successfully</string>
     <string name="job_no_metrics_recorded">No execution metrics recorded</string>
     <string name="job_execution_count_format">x%1$d</string>
+    <string name="setting_single_instance_lock">Single Instance Lock</string>
+    <string name="setting_single_instance_lock_subtitle">Prevent multiple instances of PluginToolkit from running concurrently using a protected lock file.</string>
+    <string name="setting_single_instance_lock_warning_title">Disable Single Instance Lock?</string>
+    <string name="setting_single_instance_lock_warning_message">Disabling this lock allows multiple instances to run at the same time. This may cause database corruption, race conditions, or plugin conflicts. Are you sure you want to proceed?</string>
+    <string name="setting_max_memory">Maximum Memory Allocation</string>
+    <string name="setting_max_memory_subtitle">Configure maximum Java heap memory. Requires application restart to take effect.</string>
+    <string name="setting_max_memory_restart_warning">Memory limit changed. Application restart required to take effect.</string>
+    <string name="setting_max_memory_current_runtime">Current runtime limit: %1$s</string>
+    <string name="action_restart_now">Restart Now</string>
+    <string name="plugin_action_refresh_all_locks">Refresh Locks</string>
+    <string name="plugin_action_refresh_locks">Refresh Custom Locks</string>
+    <string name="plugin_locks_refreshed_all">Custom locks refreshed for all plugins</string>
+    <string name="plugin_locks_refreshed_single">Custom locks refreshed for %1$s</string>
+    <string name="plugin_refresh_list_tooltip">Check for updates and refresh list</string>
+    <string name="plugin_rescan_tooltip">Rescan managed plugin folders</string>
+    <string name="plugin_reload_all_tooltip">Reload all active plugins</string>
+    <string name="plugin_refresh_all_locks_tooltip">Refresh custom capability locks for all plugins</string>
+    <string name="plugin_install_remote_tooltip">Browse repository to install plugins</string>
+    <string name="plugin_install_local_tooltip">Install plugin from local JAR file</string>
+    <string name="plugin_settings_tooltip">Plugin Settings</string>
+    <string name="setting_max_memory_default">Default</string>
+    <string name="setting_max_memory_custom_label">Custom (%1$d MB)</string>
+    <string name="setting_max_memory_custom_action">Custom (Manual)...</string>
+    <string name="setting_max_memory_custom_tooltip">Set RAM manually</string>
+    <string name="setting_max_memory_dialog_title">Custom RAM Allocation</string>
+    <string name="setting_max_memory_dialog_desc">Enter the maximum heap memory allocation. Minimum required is 1024 MB (1 GB). A restart is required for changes to take effect.</string>
+    <string name="setting_max_memory_error_min">Minimum memory allocation is 1024 MB (1 GB)</string>
+    <string name="setting_max_memory_unit_mb">MB</string>
+    <string name="setting_max_memory_unit_gb">GB</string>
+    <string name="setting_max_memory_approx_gb">≈ %1$s GB</string>
+    <string name="setting_max_memory_approx_mb">= %1$d MB</string>
+    <string name="dialog_apply">Apply</string>
 </resources>

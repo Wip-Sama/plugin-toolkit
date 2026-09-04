@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
@@ -68,11 +69,21 @@ import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
+import org.wip.plugintoolkit.shared.components.tooltip
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_more_actions
 import plugintoolkit.composeapp.generated.resources.action_remove
 import plugintoolkit.composeapp.generated.resources.plugin_add_folder
+import plugintoolkit.composeapp.generated.resources.plugin_action_refresh_all_locks
+import plugintoolkit.composeapp.generated.resources.plugin_action_refresh_locks
+import plugintoolkit.composeapp.generated.resources.plugin_refresh_list_tooltip
+import plugintoolkit.composeapp.generated.resources.plugin_rescan_tooltip
+import plugintoolkit.composeapp.generated.resources.plugin_reload_all_tooltip
+import plugintoolkit.composeapp.generated.resources.plugin_refresh_all_locks_tooltip
+import plugintoolkit.composeapp.generated.resources.plugin_install_remote_tooltip
+import plugintoolkit.composeapp.generated.resources.plugin_install_local_tooltip
+import plugintoolkit.composeapp.generated.resources.plugin_settings_tooltip
 import plugintoolkit.composeapp.generated.resources.plugin_broken
 import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.plugin_default_folder_label
@@ -185,7 +196,7 @@ fun PluginManagerView(
                         onClick = { viewModel.refreshList() },
                         enabled = isReady,
                         shape = shape,
-                        modifier = modifierSpec
+                        modifier = modifierSpec.tooltip(Res.string.plugin_refresh_list_tooltip)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
@@ -197,7 +208,7 @@ fun PluginManagerView(
                         onClick = { viewModel.rescan() },
                         enabled = isReady,
                         shape = shape,
-                        modifier = modifierSpec
+                        modifier = modifierSpec.tooltip(Res.string.plugin_rescan_tooltip)
                     ) {
                         Icon(Icons.Default.Folder, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
@@ -209,11 +220,23 @@ fun PluginManagerView(
                         onClick = { viewModel.reloadAll() },
                         enabled = isReady,
                         shape = shape,
-                        modifier = modifierSpec
+                        modifier = modifierSpec.tooltip(Res.string.plugin_reload_all_tooltip)
                     ) {
                         Icon(Icons.Default.Replay, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                         Text(stringResource(Res.string.plugin_reload_all))
+                    }
+                }
+                item { shape, modifierSpec ->
+                    FilledTonalButton(
+                        onClick = { viewModel.refreshAllLocks() },
+                        enabled = isReady,
+                        shape = shape,
+                        modifier = modifierSpec.tooltip(Res.string.plugin_refresh_all_locks_tooltip)
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.plugin_action_refresh_all_locks))
                     }
                 }
             }
@@ -224,7 +247,7 @@ fun PluginManagerView(
                         onClick = { viewModel.openRemoteInstall() },
                         enabled = isReady,
                         shape = shape,
-                        modifier = modifierSpec
+                        modifier = modifierSpec.tooltip(Res.string.plugin_install_remote_tooltip)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
@@ -236,7 +259,7 @@ fun PluginManagerView(
                         onClick = { viewModel.installLocal() },
                         enabled = isReady,
                         shape = shape,
-                        modifier = modifierSpec
+                        modifier = modifierSpec.tooltip(Res.string.plugin_install_local_tooltip)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
@@ -290,6 +313,7 @@ fun PluginManagerView(
                                 PluginStatusAction.RerunSetup -> viewModel.rerunSetup(plugin.pkg)
                                 PluginStatusAction.Changelog -> viewModel.showChangelog(plugin.pkg)
                                 PluginStatusAction.Settings -> viewModel.openSettings(plugin.pkg)
+                                PluginStatusAction.RefreshLocks -> viewModel.refreshLocks(plugin.pkg)
                                 PluginStatusAction.OpenFolder -> viewModel.openFolder(plugin.pkg)
                                 is PluginStatusAction.Custom -> viewModel.runAction(plugin.pkg, action.name)
                             }
@@ -660,6 +684,22 @@ fun PluginCard(
                     }
 
                     item { shape, modifierSpec ->
+                        FilledTonalIconButton(
+                            onClick = { onAction(PluginStatusAction.Settings) },
+                            shape = shape,
+                            modifier = modifierSpec
+                                .size(ToolkitTheme.dimensions.standardButtonHeight)
+                                .tooltip(Res.string.plugin_settings_tooltip),
+                            enabled = readyStatus && !isBusy
+                        ) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(Res.string.plugin_settings)
+                            )
+                        }
+                    }
+
+                    item { shape, modifierSpec ->
                         Box {
                             FilledTonalIconButton(
                                 onClick = { expanded = true },
@@ -697,9 +737,9 @@ fun PluginCard(
                                     leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_settings)) },
-                                    onClick = { onAction(PluginStatusAction.Settings); expanded = false },
-                                    leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
+                                    text = { Text(stringResource(Res.string.plugin_action_refresh_locks)) },
+                                    onClick = { onAction(PluginStatusAction.RefreshLocks); expanded = false },
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_open_folder)) },
@@ -740,6 +780,7 @@ sealed class PluginStatusAction {
     object RerunSetup : PluginStatusAction()
     object Changelog : PluginStatusAction()
     object Settings : PluginStatusAction()
+    object RefreshLocks : PluginStatusAction()
     object OpenFolder : PluginStatusAction()
     data class Custom(val name: String) : PluginStatusAction()
 }

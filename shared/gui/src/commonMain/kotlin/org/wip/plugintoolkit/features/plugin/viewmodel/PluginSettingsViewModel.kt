@@ -94,6 +94,13 @@ class PluginSettingsViewModel(
         }
     }
 
+    fun refreshLocks() {
+        viewModelScope.launch {
+            val newLocks = pluginManager.refreshLocks(pkg, _store.value)
+            locks.value = newLocks
+        }
+    }
+
     fun runAction(actionName: String, parameters: Map<String, JsonElement> = emptyMap()) {
         viewModelScope.launch {
             val action = manifest?.actions?.find { it.functionName == actionName || it.name == actionName }

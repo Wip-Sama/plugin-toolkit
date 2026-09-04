@@ -232,7 +232,9 @@ annotation class PluginLoad
 @Retention(AnnotationRetention.SOURCE)
 annotation class PluginAction(
     val name: String,
-    val description: String
+    val description: String,
+    val showToast: Boolean = true,
+    val toastMessage: String = ""
 )
 
 /**

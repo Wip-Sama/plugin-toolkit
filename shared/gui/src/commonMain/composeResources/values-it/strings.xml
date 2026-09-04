@@ -506,4 +506,36 @@
     <string name="job_export_success_toast">Report di esecuzione esportato con successo</string>
     <string name="job_no_metrics_recorded">Nessuna metrica registrata</string>
     <string name="job_execution_count_format">x%1$d</string>
+    <string name="setting_single_instance_lock">Blocco Istanza Singola</string>
+    <string name="setting_single_instance_lock_subtitle">Impedisce l\'esecuzione contemporanea di più istanze di PluginToolkit utilizzando un file di blocco protetto.</string>
+    <string name="setting_single_instance_lock_warning_title">Disabilitare il blocco istanza singola?</string>
+    <string name="setting_single_instance_lock_warning_message">La disabilitazione di questo blocco consente l\'esecuzione contemporanea di più istanze. Ciò potrebbe causare corruzione dei dati o conflitti nei plugin. Sei sicuro di voler procedere?</string>
+    <string name="setting_max_memory">Allocazione Memoria Massima</string>
+    <string name="setting_max_memory_subtitle">Configura la memoria heap Java massima. Richiede il riavvio dell\'applicazione per avere effetto.</string>
+    <string name="setting_max_memory_restart_warning">Limite di memoria modificato. È necessario riavviare l\'applicazione per applicare le modifiche.</string>
+    <string name="setting_max_memory_current_runtime">Limite runtime attuale: %1$s</string>
+    <string name="action_restart_now">Riavvia ora</string>
+    <string name="plugin_action_refresh_all_locks">Aggiorna Blocchi</string>
+    <string name="plugin_action_refresh_locks">Aggiorna Blocchi Personalizzati</string>
+    <string name="plugin_locks_refreshed_all">Blocchi personalizzati aggiornati per tutti i plugin</string>
+    <string name="plugin_locks_refreshed_single">Blocchi personalizzati aggiornati per %1$s</string>
+    <string name="plugin_refresh_list_tooltip">Controlla aggiornamenti e aggiorna elenco</string>
+    <string name="plugin_rescan_tooltip">Esegui nuova scansione delle cartelle gestite</string>
+    <string name="plugin_reload_all_tooltip">Ricarica tutti i plugin attivi</string>
+    <string name="plugin_refresh_all_locks_tooltip">Aggiorna blocchi di funzionalità personalizzati per tutti i plugin</string>
+    <string name="plugin_install_remote_tooltip">Sfoglia repository per installare plugin</string>
+    <string name="plugin_install_local_tooltip">Installa plugin da file JAR locale</string>
+    <string name="plugin_settings_tooltip">Impostazioni Plugin</string>
+    <string name="setting_max_memory_default">Predefinito</string>
+    <string name="setting_max_memory_custom_label">Personalizzato (%1$d MB)</string>
+    <string name="setting_max_memory_custom_action">Personalizzato (Manuale)...</string>
+    <string name="setting_max_memory_custom_tooltip">Imposta RAM manualmente</string>
+    <string name="setting_max_memory_dialog_title">Allocazione RAM Personalizzata</string>
+    <string name="setting_max_memory_dialog_desc">Inserisci l\'allocazione di memoria heap massima. Il minimo richiesto è 1024 MB (1 GB). È necessario riavviare l\'applicazione per applicare le modifiche.</string>
+    <string name="setting_max_memory_error_min">L\'allocazione minima di memoria è 1024 MB (1 GB)</string>
+    <string name="setting_max_memory_unit_mb">MB</string>
+    <string name="setting_max_memory_unit_gb">GB</string>
+    <string name="setting_max_memory_approx_gb">≈ %1$s GB</string>
+    <string name="setting_max_memory_approx_mb">= %1$d MB</string>
+    <string name="dialog_apply">Applica</string>
 </resources>

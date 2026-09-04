@@ -9,8 +9,14 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Window
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Memory
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.SystemConfig
+import org.wip.plugintoolkit.core.model.localized
+import org.wip.plugintoolkit.core.model.resolveNonComposable
+import org.wip.plugintoolkit.core.ui.DialogService
+import org.wip.plugintoolkit.core.utils.MemoryUtils
 import org.wip.plugintoolkit.core.utils.StartupManager
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.AutoUpdateSettings
@@ -28,7 +34,12 @@ import plugintoolkit.composeapp.generated.resources.*
 /**
  * Registers system startup, window management, flow editing, and software update settings.
  */
-fun SettingsRegistryBuilder.systemDefinitions(viewModel: SettingsViewModel, appConfig: SystemConfig) {
+fun SettingsRegistryBuilder.systemDefinitions(
+    viewModel: SettingsViewModel,
+    appConfig: SystemConfig,
+    dialogService: DialogService? = null
+) {
+    val effectiveDialogService = dialogService ?: org.koin.core.context.GlobalContext.getOrNull()?.get<DialogService>()
     nav(SettingNavKey.SystemSettings) {
         // ── System ───────────────────────────────────────────────────
         section(Res.string.section_system) {
@@ -88,6 +99,44 @@ fun SettingsRegistryBuilder.systemDefinitions(viewModel: SettingsViewModel, appC
                         }
                     }
                 ) { copy(cacheManagement = it) }
+
+                switch(
+                    GeneralSettings::singleInstanceLock,
+                    Res.string.setting_single_instance_lock,
+                    Icons.Default.Lock,
+                    subtitle = SettingText.Resource(Res.string.setting_single_instance_lock_subtitle),
+                    onBeforeChange = { targetValue, proceed ->
+                        if (!targetValue) {
+                            effectiveDialogService?.showConfirmation(
+                                title = Res.string.setting_single_instance_lock_warning_title.localized.resolveNonComposable(),
+                                message = Res.string.setting_single_instance_lock_warning_message.localized.resolveNonComposable(),
+                                onConfirm = proceed
+                            ) ?: proceed()
+                        } else {
+                            proceed()
+                        }
+                    }
+                ) { copy(singleInstanceLock = it) }
+
+                custom(
+                    id = "general.maxMemoryMb",
+                    title = Res.string.setting_max_memory,
+                    icon = Icons.Default.Memory,
+                    subtitle = SettingText.Resource(Res.string.setting_max_memory_subtitle),
+                    control = { settings, onUpdate ->
+                        org.wip.plugintoolkit.features.settings.ui.MaxMemoryControl(
+                            currentMaxMemoryMb = settings.general.maxMemoryMb,
+                            onMaxMemoryChanged = { newMb ->
+                                val coerced = newMb.coerceAtLeast(GeneralSettings.MIN_MAX_MEMORY_MB)
+                                if (coerced != settings.general.maxMemoryMb) {
+                                    onUpdate(settings.copy(general = settings.general.copy(maxMemoryMb = coerced)))
+                                    val notificationService = org.koin.core.context.GlobalContext.getOrNull()?.get<org.wip.plugintoolkit.core.notification.NotificationService>()
+                                    notificationService?.toast(Res.string.setting_max_memory_restart_warning.localized.resolveNonComposable())
+                                }
+                            }
+                        )
+                    }
+                )
             }
         }
 

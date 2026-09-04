@@ -17,11 +17,13 @@ import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Upgrade
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,9 +48,11 @@ import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.shared.components.GlassCard
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
+import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_install
 import plugintoolkit.composeapp.generated.resources.plugin_available_in
+import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.repo_action_cancel_update
 import plugintoolkit.composeapp.generated.resources.repo_action_update_version
 import plugintoolkit.composeapp.generated.resources.repo_action_updating
@@ -72,6 +76,7 @@ fun PluginListItem(
     conflicts: Map<String, List<ExtensionRepo>>,
     onInstall: (ExtensionPlugin) -> Unit,
     onCancel: (String) -> Unit,
+    onShowChangelog: (ExtensionPlugin) -> Unit = {}
 ) {
     val installedPlugin = installedPlugins.find { it.pkg == plugin.pkg }
     val installedVersion = installedPlugin?.version
@@ -261,7 +266,23 @@ fun PluginListItem(
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
 
             // Action Buttons
-            if (progress != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ToolkitTheme.spacing.small)
+            ) {
+                IconButton(
+                    onClick = { onShowChangelog(plugin) },
+                    modifier = Modifier.tooltip(Res.string.plugin_changelog)
+                ) {
+                    Icon(
+                        Icons.Default.History,
+                        contentDescription = stringResource(Res.string.plugin_changelog),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                    )
+                }
+
+                if (progress != null) {
                 var isHovered by remember { mutableStateOf(false) }
 
                 Surface(
@@ -366,6 +387,7 @@ fun PluginListItem(
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                     Text(stringResource(Res.string.repo_install_version, plugin.version))
                 }
+            }
             }
         }
     }

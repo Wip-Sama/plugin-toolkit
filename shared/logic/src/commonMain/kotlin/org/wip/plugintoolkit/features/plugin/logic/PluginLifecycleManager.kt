@@ -28,6 +28,10 @@ import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.persistentMapOf
 
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import org.wip.plugintoolkit.core.notification.NotificationService
+
 /**
  * Manages the runtime lifecycle of plugins (loading, unloading, context creation).
  * Ensures sequential operations per plugin to avoid race conditions during rapid reloads.
@@ -37,7 +41,8 @@ class PluginLifecycleManager(
     private val jobManager: JobManager,
     private val settingsRepository: SettingsRepository,
     private val fileSystem: FileSystem
-) {
+) : KoinComponent {
+    private val notificationService: NotificationService by inject()
     private val _loadedPlugins = MutableStateFlow<Set<String>>(emptySet())
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
 
@@ -396,6 +401,9 @@ class PluginLifecycleManager(
                 val currentStore = loadPluginSettings(pkg)
                 val updatedStore = currentStore.copy(settings = currentStore.settings + newSettings)
                 savePluginSettings(pkg, updatedStore)
+            },
+            onShowToast = { message ->
+                notificationService.toast(message)
             }
         )
     }
@@ -463,6 +471,17 @@ class PluginLifecycleManager(
         }
     }
 
+    suspend fun refreshAllLocks(): Map<String, Map<String, Boolean>> {
+        val targets = _loadedPlugins.value.ifEmpty {
+            registry.installedPlugins.value.filter { it.isEnabled }.map { it.pkg }.toSet()
+        }
+        val results = mutableMapOf<String, Map<String, Boolean>>()
+        for (pkg in targets) {
+            results[pkg] = refreshLocks(pkg)
+        }
+        return results
+    }
+
 }
 
 /**
@@ -494,7 +513,8 @@ class DefaultPluginContext(
     override val storage: org.wip.plugintoolkit.api.PluginStorage,
     override val signals: PluginSignalManager = DefaultPluginSignalManager(),
     private val onRequiredActionChange: (String?) -> Unit = {},
-    private val onUpdateSettings: (suspend (Map<String, JsonElement>) -> Unit)? = null
+    private val onUpdateSettings: (suspend (Map<String, JsonElement>) -> Unit)? = null,
+    private val onShowToast: ((String) -> Unit)? = null
 ) : PluginContext {
     private val _settings = mutableMapOf<String, JsonElement>().apply { putAll(settings) }
     override val settings: Map<String, JsonElement>
@@ -502,6 +522,10 @@ class DefaultPluginContext(
 
     override fun setRequiredAction(actionName: String?) {
         onRequiredActionChange(actionName)
+    }
+
+    override fun showToast(message: String) {
+        onShowToast?.invoke(message)
     }
 
     override suspend fun updateSetting(key: String, value: JsonElement) {

@@ -151,4 +151,25 @@ class SettingsDSLTest {
         settings = sliderDef.setValue(settings, 1.5f)
         assertEquals(1.5f, settings.general.scaling)
     }
+
+    @Test
+    fun testSettingCustomInGroup() {
+        val registry = SettingsRegistry.build {
+            nav(SettingNavKey.SystemSettings) {
+                section(SettingText.Raw("System")) {
+                    bindGroup(AppSettings::general, { copy(general = it) }) {
+                        custom(
+                            id = "general.maxMemoryMb",
+                            title = SettingText.Raw("Max Memory"),
+                            icon = Icons.Default.Settings,
+                            control = { _, _ -> }
+                        )
+                    }
+                }
+            }
+        }
+
+        val customDef = registry.definitions.value[0] as SettingDefinition.CustomSetting
+        assertEquals("general.maxMemoryMb", customDef.id)
+    }
 }

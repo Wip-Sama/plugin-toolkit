@@ -93,6 +93,7 @@ fun PluginRepoDetails(
     onCancelPlugin: (String) -> Unit,
     onInstallFlow: (ExtensionFlow) -> Unit,
     onSetPackageSource: (String, String) -> Unit,
+    onShowChangelog: (ExtensionPlugin) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -346,7 +347,8 @@ fun PluginRepoDetails(
                                 onSetPackageSource = onSetPackageSource,
                                 conflicts = conflicts,
                                 onInstall = onInstallPlugin,
-                                onCancel = onCancelPlugin
+                                onCancel = onCancelPlugin,
+                                onShowChangelog = onShowChangelog
                             )
                         }
                     }

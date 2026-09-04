@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -89,6 +90,7 @@ import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_cancel
 import plugintoolkit.composeapp.generated.resources.action_save
+import plugintoolkit.composeapp.generated.resources.plugin_action_refresh_locks
 import plugintoolkit.composeapp.generated.resources.plugin_capabilities
 import plugintoolkit.composeapp.generated.resources.plugin_settings_actions
 import plugintoolkit.composeapp.generated.resources.plugin_settings_by_section
@@ -330,6 +332,20 @@ fun PluginSettingsContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+
+                FilledTonalButton(
+                    onClick = { viewModel.refreshLocks() },
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.tooltip(Res.string.plugin_action_refresh_locks)
+                ) {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                    Text(stringResource(Res.string.plugin_action_refresh_locks))
                 }
             }
 

@@ -14,6 +14,7 @@ interface SystemConfig {
     val PLUGINS_DIR_NAME: String
     val JOBS_DIR_NAME: String
     val CACHE_DIR_NAME: String
+    val LOCK_FILE_NAME: String
     val INSTALLED_PLUGINS_FILE_NAME: String
     val STARTUP_APP_NAME: String
     val STARTUP_FLAG_BACKGROUND: String
@@ -35,6 +36,7 @@ open class DefaultSystemConfig : SystemConfig {
     override val PLUGINS_DIR_NAME = "plugins"
     override val JOBS_DIR_NAME = "jobs"
     override val CACHE_DIR_NAME = "cache"
+    override val LOCK_FILE_NAME = ".lock"
     override val INSTALLED_PLUGINS_FILE_NAME = "installed_plugins.json"
     override val STARTUP_APP_NAME = "PluginToolkit"
     override val STARTUP_FLAG_BACKGROUND = "--background"

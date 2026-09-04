@@ -1,13 +1,16 @@
 package org.wip.plugintoolkit.shared.components.plugin
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -369,8 +372,12 @@ fun JobResultCard(
                             )
                             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                             Surface(
-                                color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.divider),
-                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                shape = ToolkitTheme.shapes.large,
+                                border = BorderStroke(
+                                    ToolkitTheme.dimensions.borderThin,
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+                                ),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 SelectionContainer {
@@ -432,9 +439,15 @@ fun JobResultCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(logHeight)
+                            .clip(ToolkitTheme.shapes.large)
                             .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.high),
-                                MaterialTheme.shapes.medium
+                                MaterialTheme.colorScheme.surfaceContainerLowest,
+                                ToolkitTheme.shapes.large
+                            )
+                            .border(
+                                ToolkitTheme.dimensions.borderThin,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider),
+                                ToolkitTheme.shapes.large
                             )
                             .onPointerEvent(PointerEventType.Move) {
                                 isShiftPressed = it.keyboardModifiers.isShiftPressed

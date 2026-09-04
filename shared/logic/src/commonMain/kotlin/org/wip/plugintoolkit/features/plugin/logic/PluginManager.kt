@@ -132,6 +132,9 @@ class PluginManager(
     suspend fun refreshLocks(pkg: String, overriddenSettings: org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore? = null) =
         lifecycleManager.refreshLocks(pkg, overriddenSettings)
 
+    suspend fun refreshAllLocks(): Map<String, Map<String, Boolean>> =
+        lifecycleManager.refreshAllLocks()
+
     fun getManifest(pkg: String): PluginManifest? = lifecycleManager.getManifest(pkg)
 
     fun getMigrations(pkg: String): List<PluginMigration> = lifecycleManager.getMigrations(pkg)

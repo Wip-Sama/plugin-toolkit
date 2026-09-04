@@ -633,6 +633,8 @@ data class PluginAction(
     val name: String,
     val description: String,
     val functionName: String,
-    val parameters: Map<String, ParameterMetadata>? = null
+    val parameters: Map<String, ParameterMetadata>? = null,
+    val showToast: Boolean = true,
+    val toastMessage: String? = null
 )
 
