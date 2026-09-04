@@ -322,6 +322,18 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
         context.storage.put("feature_unlocked", JsonPrimitive(unlocked))
     }
 
+    @PluginAction(
+        name = "Update Api Key Setting",
+        description = "Showcase updating plugin settings dynamically via PluginContext."
+    )
+    suspend fun updateApiKeySetting(
+        @CapabilityParam(description = "New API key value") newApiKey: String,
+        context: PluginContext
+    ) {
+        context.logger.info("Updating apiKey setting dynamically: $newApiKey")
+        context.updateSetting("apiKey", newApiKey)
+    }
+
     @Capability(
         name = "capabilityWithLockRequirement",
         description = "Showcase of a capability restricted by a dynamic lock flag stored in plugin storage."

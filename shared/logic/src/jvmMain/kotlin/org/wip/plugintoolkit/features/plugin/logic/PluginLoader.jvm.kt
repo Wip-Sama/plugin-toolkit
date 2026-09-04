@@ -57,7 +57,8 @@ actual object PluginLoader {
 
     actual fun loadPlugin(
         jarPath: String,
-        settings: Map<String, JsonElement>
+        settings: Map<String, JsonElement>,
+        forceReload: Boolean
     ): Result<PluginEntry> {
         val normalizedPath = normalizePath(jarPath)
 
@@ -68,14 +69,19 @@ actual object PluginLoader {
                 val file = File(normalizedPath)
                 val currentLastModified = if (file.exists()) file.lastModified() else 0L
 
-                // If already loaded, return it (unless it was modified)
-                loadedPlugins[normalizedPath]?.let {
-                    if (it.lastModified == currentLastModified) {
-                        Logger.d { "Plugin already loaded and up to date: $normalizedPath" }
-                        return Result.success(it.entry)
-                    } else {
-                        Logger.i { "Plugin jar was modified, reloading: $normalizedPath" }
-                        unloadPlugin(jarPath) // Unload the old version first
+                if (forceReload) {
+                    Logger.i { "Force reloading plugin: $normalizedPath" }
+                    unloadPlugin(normalizedPath)
+                } else {
+                    // If already loaded, return it (unless it was modified)
+                    loadedPlugins[normalizedPath]?.let {
+                        if (it.lastModified == currentLastModified) {
+                            Logger.d { "Plugin already loaded and up to date: $normalizedPath" }
+                            return Result.success(it.entry)
+                        } else {
+                            Logger.i { "Plugin jar was modified, reloading: $normalizedPath" }
+                            unloadPlugin(normalizedPath) // Unload the old version first
+                        }
                     }
                 }
 
@@ -106,6 +112,13 @@ actual object PluginLoader {
                 val manifest = pluginEntry.getManifest().getOrThrow()
                 val pluginId = manifest.plugin.id
 
+                // If this pluginId was previously registered under a different jar path, unload the old path
+                val previousJarPath = idToJarPath[pluginId]
+                if (previousJarPath != null && previousJarPath != normalizedPath) {
+                    Logger.i { "Plugin $pluginId was previously loaded from $previousJarPath, unloading old path" }
+                    unloadPlugin(previousJarPath)
+                }
+
                 val loadedPlugin =
                     LoadedPlugin(pluginId, normalizedPath, pluginEntry, newClassLoader, koinApp, currentLastModified)
                 loadedPlugins[normalizedPath] = loadedPlugin
@@ -120,6 +133,18 @@ actual object PluginLoader {
             return Result.failure(Exception(e.message, e))
         } finally {
             releaseJarLock(normalizedPath)
+        }
+    }
+
+    actual fun unloadPluginById(pluginId: String) {
+        val jarPath = idToJarPath.remove(pluginId)
+        if (jarPath != null) {
+            unloadPlugin(jarPath)
+        } else {
+            val matchingPath = loadedPlugins.entries.find { it.value.id == pluginId }?.key
+            if (matchingPath != null) {
+                unloadPlugin(matchingPath)
+            }
         }
     }
 

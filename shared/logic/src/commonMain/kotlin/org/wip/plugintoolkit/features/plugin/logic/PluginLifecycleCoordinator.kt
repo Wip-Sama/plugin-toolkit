@@ -208,6 +208,7 @@ class PluginLifecycleCoordinator(
             }
 
             is LifecycleAction.HandlePostInstall -> {
+                registry.updatePlugin(action.pkg) { it.copy(isValidated = false) }
                 if (action.manifest.hasSetupHandler) {
                     enqueueSetupJobInternal(action.pkg)
                 } else {
@@ -217,6 +218,7 @@ class PluginLifecycleCoordinator(
             }
 
             is LifecycleAction.HandlePostUpdate -> {
+                registry.updatePlugin(action.pkg) { it.copy(isValidated = false) }
                 if (action.manifest.hasUpdateHandler) {
                     enqueueUpdateJobInternal(action.pkg)
                 } else if (action.manifest.hasSetupHandler) {
@@ -641,10 +643,6 @@ class PluginLifecycleCoordinator(
 
     private suspend fun markAsValidated(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
-        if (plugin.isValidated) {
-            Logger.d { "LifecycleCoordinator: Plugin $pkg is already marked as validated" }
-            return
-        }
         Logger.i { "LifecycleCoordinator: Marking plugin $pkg as validated and loading plugin" }
         registry.updatePlugin(pkg) { it.copy(isValidated = true, loadError = null) }
         val loadResult = lifecycleManager.loadPlugin(pkg)

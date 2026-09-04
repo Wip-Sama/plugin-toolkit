@@ -137,7 +137,7 @@ object SettingsUtils {
         value: String,
         isRequired: Boolean,
         type: DataType,
-        constraints: ParameterConstraints?
+        constraints: ParameterConstraints? = null
     ): String? {
         if (isRequired && value.isBlank()) return "Required"
         if (value.isBlank()) return null

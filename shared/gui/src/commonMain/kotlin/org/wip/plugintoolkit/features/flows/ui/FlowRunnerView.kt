@@ -75,7 +75,9 @@ data class FlowParameter(
     val defaultValue: String,
     val semanticTypes: List<SemanticType> = emptyList(),
     val role: org.wip.plugintoolkit.api.ParameterRole = org.wip.plugintoolkit.api.ParameterRole.STANDARD,
-    val pluginId: String = ""
+    val pluginId: String = "",
+    val isRequired: Boolean = true,
+    val constraints: org.wip.plugintoolkit.api.ParameterConstraints? = null
 )
 
 enum class ParameterType {
@@ -94,11 +96,12 @@ fun FlowRunnerView(
     val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = koinInject()
     val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
     val pluginSettingsState by pluginManager.pluginSettingsState.collectAsState()
+    val loadedPlugins by pluginManager.loadedPlugins.collectAsState()
     val providedLocks = remember(pluginLocksState) {
         pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
     }
 
-    val activeCapabilities = remember(state.flows) {
+    val activeCapabilities = remember(state.flows, loadedPlugins) {
         org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
             .mapNotNull { it.getManifest().getOrNull() }
             .flatMap { it.capabilities }
@@ -194,6 +197,14 @@ fun FlowRunnerView(
 
                                     val paramPluginId = (targetNode as? Node.CapabilityNode)?.pluginInfo?.id ?: ""
 
+                                    val mappedConstraints = node.constraints?.let { c ->
+                                        org.wip.plugintoolkit.api.ParameterConstraints(
+                                            minValue = c.min,
+                                            maxValue = c.max,
+                                            regex = c.regex
+                                        )
+                                    }
+
                                     listOf(
                                         FlowParameter(
                                             nodeId = node.id,
@@ -203,7 +214,9 @@ fun FlowRunnerView(
                                             dataType = inferredType,
                                             defaultValue = "",
                                             semanticTypes = inferredSemanticTypes,
-                                            pluginId = paramPluginId
+                                            pluginId = paramPluginId,
+                                            isRequired = node.isRequired,
+                                            constraints = mappedConstraints
                                         )
                                     )
                                 } else emptyList()
@@ -366,9 +379,10 @@ fun FlowRunnerView(
                             defaultValue = JsonPrimitive(param.defaultValue),
                             description = "",
                             type = param.dataType,
-                            required = param.nodeId != -1L,
+                            required = param.isRequired,
                             semanticTypes = param.semanticTypes,
-                            role = param.role
+                            role = param.role,
+                            constraints = param.constraints
                         )
                     }
                     org.wip.plugintoolkit.shared.components.plugin.ExecutionParameter(
@@ -479,9 +493,9 @@ fun FlowRunnerView(
                         val value = parameterValues["${param.nodeId}_${param.portId}"] ?: param.defaultValue
                         val error = SettingsUtils.validateParameter(
                             value = value,
-                            isRequired = true,
+                            isRequired = param.isRequired,
                             type = param.dataType,
-                            constraints = null
+                            constraints = param.constraints
                         )
                         error == null
                     }

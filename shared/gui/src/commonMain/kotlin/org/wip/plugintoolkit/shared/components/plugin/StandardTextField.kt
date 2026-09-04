@@ -39,7 +39,7 @@ fun StandardTextField(
     type: DataType = DataType.Primitive(PrimitiveType.ANY),
     trailingIcon: @Composable (() -> Unit)? = null
 ) {
-    val validationError = remember(value, isRequired, type) {
+    val validationError = remember(value, isRequired, type, constraints) {
         org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateParameter(
             value = value,
             isRequired = isRequired,

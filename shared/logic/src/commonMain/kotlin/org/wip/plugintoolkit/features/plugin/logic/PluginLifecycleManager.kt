@@ -201,6 +201,8 @@ class PluginLifecycleManager(
         val plugin = registry.getPlugin(pkg)
         if (plugin == null) {
             Logger.w { "Cannot unload $pkg: not found in registry" }
+            PluginLoader.unloadPluginById(pkg)
+            _loadedPlugins.update { it - pkg }
             return
         }
 
@@ -208,6 +210,7 @@ class PluginLifecycleManager(
         val jarFile = "${plugin.installPath}/$jarFileName"
 
         PluginLoader.unloadPlugin(jarFile)
+        PluginLoader.unloadPluginById(pkg)
         _loadedPlugins.update { it - pkg }
         Logger.d { "Plugin $pkg unloaded and removed from active set" }
     }
@@ -388,6 +391,11 @@ class PluginLifecycleManager(
                 registry.scope.launch {
                     registry.updatePlugin(pkg) { it.copy(requiredAction = actionName) }
                 }
+            },
+            onUpdateSettings = { newSettings ->
+                val currentStore = loadPluginSettings(pkg)
+                val updatedStore = currentStore.copy(settings = currentStore.settings + newSettings)
+                savePluginSettings(pkg, updatedStore)
             }
         )
     }
@@ -482,12 +490,26 @@ class DefaultPluginContext(
     override val cacheFileSystem: PluginFileSystem,
     override val executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem,
     override val hostFileSystem: org.wip.plugintoolkit.api.HostFileSystem,
-    override val settings: Map<String, JsonElement>,
+    settings: Map<String, JsonElement>,
     override val storage: org.wip.plugintoolkit.api.PluginStorage,
     override val signals: PluginSignalManager = DefaultPluginSignalManager(),
-    private val onRequiredActionChange: (String?) -> Unit = {}
+    private val onRequiredActionChange: (String?) -> Unit = {},
+    private val onUpdateSettings: (suspend (Map<String, JsonElement>) -> Unit)? = null
 ) : PluginContext {
+    private val _settings = mutableMapOf<String, JsonElement>().apply { putAll(settings) }
+    override val settings: Map<String, JsonElement>
+        get() = _settings.toMap()
+
     override fun setRequiredAction(actionName: String?) {
         onRequiredActionChange(actionName)
+    }
+
+    override suspend fun updateSetting(key: String, value: JsonElement) {
+        updateSettings(mapOf(key to value))
+    }
+
+    override suspend fun updateSettings(newSettings: Map<String, JsonElement>) {
+        _settings.putAll(newSettings)
+        onUpdateSettings?.invoke(newSettings)
     }
 }

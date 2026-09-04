@@ -41,6 +41,13 @@ class PluginSettingsViewModel(
                 map[pkg]?.let { locks.value = it }
             }
         }
+        viewModelScope.launch {
+            pluginManager.pluginSettingsState.collect { map ->
+                map[pkg]?.let { loadedStore ->
+                    _store.value = loadedStore
+                }
+            }
+        }
     }
 
     fun updateSetting(key: String, value: JsonElement) {

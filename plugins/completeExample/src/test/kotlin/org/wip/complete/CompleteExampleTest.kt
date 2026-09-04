@@ -58,14 +58,21 @@ class CompleteExampleTest {
         override val progress: ProgressReporter = FakeProgressReporter(),
         override val signals: PluginSignalManager = FakePluginSignalManager(),
         override val storage: PluginStorage = FakePluginStorage(),
-        override val settings: Map<String, JsonElement> = emptyMap()
+        initialSettings: Map<String, JsonElement> = emptyMap()
     ) : PluginContext {
+        val updatedSettings = mutableMapOf<String, JsonElement>().apply { putAll(initialSettings) }
+        override val settings: Map<String, JsonElement> get() = updatedSettings
+
         override val fileSystem: PluginFileSystem get() = throw UnsupportedOperationException()
         override val cacheFileSystem: PluginFileSystem get() = throw UnsupportedOperationException()
         override val executionFileSystem: ExecutionFileSystem get() = throw UnsupportedOperationException()
         override val hostFileSystem: HostFileSystem get() = throw UnsupportedOperationException()
 
         override fun setRequiredAction(actionName: String?) {}
+
+        override suspend fun updateSetting(key: String, value: JsonElement) {
+            updatedSettings[key] = value
+        }
     }
 
     @Test
@@ -207,6 +214,16 @@ class CompleteExampleTest {
         plugin.toggleFeatureLock(unlocked = false, context = context)
         val relockedLocks = plugin.checkLocks(context)
         assertEquals(false, relockedLocks["feature_unlocked"])
+    }
+
+    @Test
+    fun testUpdateApiKeySettingAction() = runTest {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+        val context = TestPluginContext()
+
+        plugin.updateApiKeySetting(newApiKey = "custom-api-key-999", context = context)
+        assertEquals("custom-api-key-999", context.getStringSetting("apiKey"))
     }
 }
 

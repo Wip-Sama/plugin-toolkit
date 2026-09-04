@@ -100,4 +100,58 @@ class SettingsUtilsTest {
         kotlin.test.assertTrue(CapabilityLockUtils.isLockSatisfied("FEATURE_A", locks))
         kotlin.test.assertFalse(CapabilityLockUtils.isLockSatisfied("non_existent", locks))
     }
+
+    @Test
+    fun testValidateParameter_optionalAndRequired() {
+        val stringType = DataType.Primitive(PrimitiveType.STRING)
+
+        // Empty with isRequired = false should pass
+        val optionalResult = SettingsUtils.validateParameter(
+            value = "",
+            isRequired = false,
+            type = stringType
+        )
+        assertNull(optionalResult, "Empty optional parameter should have no validation error")
+
+        // Empty with isRequired = true should fail
+        val requiredResult = SettingsUtils.validateParameter(
+            value = "",
+            isRequired = true,
+            type = stringType
+        )
+        assertEquals("Required", requiredResult)
+    }
+
+    @Test
+    fun testValidateParameter_regexConstraints() {
+        val stringType = DataType.Primitive(PrimitiveType.STRING)
+        val constraints = org.wip.plugintoolkit.api.ParameterConstraints(regex = "^[A-Z]{3}-\\d+$")
+
+        // Valid match
+        val validResult = SettingsUtils.validateParameter(
+            value = "ABC-123",
+            isRequired = true,
+            type = stringType,
+            constraints = constraints
+        )
+        assertNull(validResult, "Matching regex string should be valid")
+
+        // Invalid regex match
+        val invalidResult = SettingsUtils.validateParameter(
+            value = "abc-123",
+            isRequired = true,
+            type = stringType,
+            constraints = constraints
+        )
+        assertEquals("Does not match required format", invalidResult)
+
+        // Non-required empty with regex constraints should pass
+        val emptyOptionalResult = SettingsUtils.validateParameter(
+            value = "",
+            isRequired = false,
+            type = stringType,
+            constraints = constraints
+        )
+        assertNull(emptyOptionalResult, "Empty optional input with regex constraint should be valid")
+    }
 }

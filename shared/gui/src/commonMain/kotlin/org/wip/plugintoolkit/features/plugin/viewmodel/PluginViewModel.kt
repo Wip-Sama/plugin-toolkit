@@ -144,11 +144,23 @@ class PluginViewModel(
                 val selectedId = try {
                     selectedPlugin?.getManifest()?.getOrThrow()?.plugin?.id
                 } catch (t: Throwable) {
-                    //TODO: maybe do something
                     null
                 }
-                if (selectedPlugin != null && (selectedId == null || !activeIds.contains(selectedId))) {
-                    selectPlugin(null)
+                if (selectedPlugin != null) {
+                    if (selectedId == null || !activeIds.contains(selectedId)) {
+                        selectPlugin(null)
+                    } else {
+                        val refreshedPlugin = loadedPlugins.find {
+                            it.getManifest().getOrNull()?.plugin?.id == selectedId
+                        }
+                        if (refreshedPlugin != null && refreshedPlugin !== selectedPlugin) {
+                            selectedPlugin = refreshedPlugin
+                            val currentCapName = selectedCapability?.name
+                            if (currentCapName != null) {
+                                selectedCapability = refreshedPlugin.getManifest().getOrNull()?.capabilities?.find { it.name == currentCapName }
+                            }
+                        }
+                    }
                 }
             }
             .launchIn(viewModelScope)

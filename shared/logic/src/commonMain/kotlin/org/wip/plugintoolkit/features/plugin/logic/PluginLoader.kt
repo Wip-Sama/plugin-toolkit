@@ -6,10 +6,12 @@ import org.wip.plugintoolkit.api.PluginEntry
 expect object PluginLoader {
     fun loadPlugin(
         jarPath: String,
-        settings: Map<String, JsonElement> = emptyMap()
+        settings: Map<String, JsonElement> = emptyMap(),
+        forceReload: Boolean = false
     ): Result<PluginEntry>
 
     fun unloadPlugin(jarPath: String)
+    fun unloadPluginById(pluginId: String)
     fun unloadAll()
     fun getPlugins(): List<PluginEntry>
     fun getPlugin(jarPath: String): PluginEntry?

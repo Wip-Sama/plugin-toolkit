@@ -410,6 +410,35 @@ interface PluginContext {
      * Register a block to handle lifecycle signals (Pause, Cancel).
      */
     fun onSignal(handler: suspend (PluginSignal) -> Unit) = signals.onSignal(handler)
+
+    /**
+     * Update or set a specific setting value for this plugin.
+     * Persists the change to disk and updates in-memory settings.
+     *
+     * @param key The setting key.
+     * @param value The setting value as a [JsonElement].
+     */
+    suspend fun updateSetting(key: String, value: JsonElement) {}
+
+    /**
+     * Update multiple settings for this plugin simultaneously.
+     * Persists the changes to disk and updates in-memory settings.
+     *
+     * @param newSettings A map of setting keys to their new [JsonElement] values.
+     */
+    suspend fun updateSettings(newSettings: Map<String, JsonElement>) {}
+
+    suspend fun updateSetting(key: String, value: String) {
+        updateSetting(key, kotlinx.serialization.json.JsonPrimitive(value))
+    }
+
+    suspend fun updateSetting(key: String, value: Boolean) {
+        updateSetting(key, kotlinx.serialization.json.JsonPrimitive(value))
+    }
+
+    suspend fun updateSetting(key: String, value: Number) {
+        updateSetting(key, kotlinx.serialization.json.JsonPrimitive(value))
+    }
 }
 
 /**

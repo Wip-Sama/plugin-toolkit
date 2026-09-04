@@ -99,6 +99,41 @@ class PluginLifecycleManagerTest {
     }
 
     @Test
+    fun testPluginContextUpdateSettingPersistsAndUpdatesCache() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+
+        val pkg = "test.plugin.context"
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(
+                pkg = pkg,
+                name = "Test",
+                version = "1.0.0",
+                installPath = "/tmp/test.plugin.context"
+            )
+        )
+
+        val context = lifecycleManager.createPluginContext(pkg)
+        context.updateSetting("api_key", "secret-token-xyz")
+        context.updateSetting("enabled_flag", true)
+
+        assertEquals("secret-token-xyz", context.getStringSetting("api_key"))
+        assertEquals(true, context.getBooleanSetting("enabled_flag"))
+
+        val loadedFromDisk = lifecycleManager.loadPluginSettings(pkg)
+        assertEquals("secret-token-xyz", (loadedFromDisk.settings["api_key"] as JsonPrimitive).content)
+        assertEquals(true, (loadedFromDisk.settings["enabled_flag"] as JsonPrimitive).content.toBooleanStrict())
+
+        val stateStore = lifecycleManager.pluginSettingsState.value[pkg]
+        assertEquals("secret-token-xyz", (stateStore?.settings?.get("api_key") as? JsonPrimitive)?.content)
+    }
+
+    @Test
     fun testLoadPluginCatchesError() = runTest {
         val fileSystem = FakeFileSystem()
         val persistence = FakeSettingsPersistence()

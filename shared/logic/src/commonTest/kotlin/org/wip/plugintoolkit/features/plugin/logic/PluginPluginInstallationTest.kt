@@ -270,6 +270,43 @@ class PluginPluginInstallationTest {
         unmockkObject(PluginSecurity)
     }
 
+    @Test
+    fun testReinstallUnloadsPluginAndCleansOldJar() = runTest {
+        mockkObject(PluginLoader)
+        every { PluginLoader.unloadPlugin(any()) } returns Unit
+        every { PluginLoader.unloadPluginById(any()) } returns Unit
+
+        val (installer, _, registry, fileSystem) = createTestInstaller()
+
+        // 1. Initial installation with plugin-1.0.jar
+        val manifestV1 = """{ "manifestVersion": "1.0", "plugin": { "id": "org.test", "name": "Test", "version": "1.0.0", "description": "" }, "requirements": { "minMemoryMb": 0, "minExecutionTimeMs": 0 } }"""
+        fileSystem.zips["source/plugin-1.0.jar"] = mapOf("manifest.json" to manifestV1)
+        fileSystem.files["source/plugin-1.0.jar"] = byteArrayOf(1, 2, 3)
+
+        val res1 = installer.installLocal("source/plugin-1.0.jar", "target")
+        assertTrue(res1.isSuccess)
+        assertTrue(fileSystem.exists("target/org.test/plugin-1.0.jar"))
+        assertEquals("plugin-1.0.jar", registry.getPlugin("org.test")?.jarFileName)
+
+        // 2. Reinstall with updated version and different jar filename: plugin-1.1.0.jar
+        val manifestV2 = """{ "manifestVersion": "1.0", "plugin": { "id": "org.test", "name": "Test", "version": "1.1.0", "description": "" }, "requirements": { "minMemoryMb": 0, "minExecutionTimeMs": 0 } }"""
+        fileSystem.zips["source/plugin-1.1.0.jar"] = mapOf("manifest.json" to manifestV2)
+        fileSystem.files["source/plugin-1.1.0.jar"] = byteArrayOf(4, 5, 6)
+
+        val res2 = installer.installLocal("source/plugin-1.1.0.jar", "target")
+        assertTrue(res2.isSuccess)
+
+        // Old jar should be removed and new jar installed
+        assertFalse(fileSystem.exists("target/org.test/plugin-1.0.jar"), "Old JAR should be cleaned up")
+        assertTrue(fileSystem.exists("target/org.test/plugin-1.1.0.jar"), "New JAR should be present")
+        assertEquals("1.1.0", registry.getPlugin("org.test")?.version)
+        assertEquals("plugin-1.1.0.jar", registry.getPlugin("org.test")?.jarFileName)
+        assertFalse(registry.getPlugin("org.test")?.isValidated ?: true, "Reinstalled plugin should have isValidated = false")
+
+        io.mockk.verify(atLeast = 1) { PluginLoader.unloadPluginById("org.test") }
+        unmockkObject(PluginLoader)
+    }
+
     private fun TestScope.createTestInstaller(
         persistence: FakeSettingsPersistence = FakeSettingsPersistence(),
         fileSystem: FakeFileSystem = FakeFileSystem()

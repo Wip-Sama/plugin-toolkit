@@ -57,6 +57,25 @@ class PluginInstaller(
             val jarFileName = filePath.replace('\\', '/').substringAfterLast("/")
             val dest = "$pluginDir/$jarFileName"
 
+            // Unload existing plugin if present to release file locks and in-memory caches
+            try {
+                lifecycleManager.unloadPlugin(pkg)
+            } catch (t: Throwable) {
+                Logger.w { "Could not unload plugin $pkg before install/reinstall: ${t.message}" }
+            }
+            PluginLoader.unloadPluginById(pkg)
+
+            // Remove previous JAR if filename changed
+            val existingPlugin = registry.getPlugin(pkg)
+            if (existingPlugin?.jarFileName != null && existingPlugin.jarFileName != jarFileName) {
+                val oldJarPath = "$pluginDir/${existingPlugin.jarFileName}"
+                try {
+                    fileSystem.deleteDirectory(oldJarPath)
+                } catch (t: Throwable) {
+                    Logger.w { "Could not delete old JAR $oldJarPath: ${t.message}" }
+                }
+            }
+
             fileSystem.copyFile(filePath, dest)
 
             val (isCompatible, compError) = manifest?.let { checkCompatibility(it) } ?: (true to null as String?)
@@ -120,6 +139,25 @@ class PluginInstaller(
             val baseUrl = "$baseLocation/$pluginsFolder/${plugin.pkg}"
             val destFile = "$pluginDir/${plugin.fileName}"
 
+            // Unload existing plugin if present to release file locks and in-memory caches
+            try {
+                lifecycleManager.unloadPlugin(plugin.pkg)
+            } catch (t: Throwable) {
+                Logger.w { "Could not unload plugin ${plugin.pkg} before remote install/reinstall: ${t.message}" }
+            }
+            PluginLoader.unloadPluginById(plugin.pkg)
+
+            // Remove previous JAR if filename changed
+            val existingPlugin = registry.getPlugin(plugin.pkg)
+            if (existingPlugin?.jarFileName != null && existingPlugin.jarFileName != plugin.fileName) {
+                val oldJarPath = "$pluginDir/${existingPlugin.jarFileName}"
+                try {
+                    fileSystem.deleteDirectory(oldJarPath)
+                } catch (t: Throwable) {
+                    Logger.w { "Could not delete old JAR $oldJarPath: ${t.message}" }
+                }
+            }
+
             if (isLocal) {
                 val sourceJar = "$baseUrl/${plugin.fileName}"
                 if (!fileSystem.exists(sourceJar)) {
@@ -179,6 +217,7 @@ class PluginInstaller(
                 jarFileName = plugin.fileName,
                 description = plugin.description,
                 isEnabled = isSignatureValid,
+                isValidated = false,
                 isCompatible = isCompatible,
                 compatibilityError = compError,
                 requiredAction = if (!isSignatureValid) "CONFIRM_SIGNATURE" else null,

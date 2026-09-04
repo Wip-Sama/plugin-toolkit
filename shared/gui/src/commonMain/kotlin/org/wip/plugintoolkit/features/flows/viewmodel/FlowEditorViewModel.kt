@@ -96,12 +96,20 @@ class FlowEditorViewModel(
         }
     }
 
+    private val resolvedPluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager? by lazy {
+        try {
+            getKoin().get()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     val plugins: StateFlow<List<PluginEntry>> = resolvedPluginRegistry?.let { registry ->
-        registry.installedPlugins
-            .map { installed ->
-                installed.filter { it.isEnabled && it.isValidated }
-                    .mapNotNull { PluginLoader.getPluginById(it.pkg) }
-            }
+        val loadedFlow = resolvedPluginManager?.loadedPlugins ?: kotlinx.coroutines.flow.flowOf(emptySet())
+        kotlinx.coroutines.flow.combine(registry.installedPlugins, loadedFlow) { installed, _ ->
+            installed.filter { it.isEnabled && it.isValidated }
+                .mapNotNull { PluginLoader.getPluginById(it.pkg) }
+        }
     }?.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,

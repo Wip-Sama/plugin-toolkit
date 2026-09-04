@@ -14,6 +14,9 @@ Fixed:
 	- Node readyness state now account for the lockstate of the selected node parameters (at creation time)
 	- Changes in the plugin states should now properly reflect live in the flow editor/manager
 	- Reinstalling plugins with the same version should nwo properly update all the new/old capabilities without need for a restart
+	- System node regexes are now correctly executed and validated by the flow runner
+	- Not required nodes are now optional in the flor runner
+	- Properly cleaned old plugin jars when removing/updating plugins	
 
 -the max number of lines to keep in the terminal has a flaw, it does not account for max line length, if a Line is too big the terminal needs to keep render a lot, we need to do something to optimize it
 -auto scroll does not seems to be able to keep the log terminal window scrolled down in job manager, especially under heavy load
