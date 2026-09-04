@@ -2,6 +2,9 @@ package org.wip.plugintoolkit.features.flows.ui.canvas
 
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
@@ -145,6 +148,7 @@ fun Modifier.boardSelectionBoxGesture(
     )
 }
 
+@Composable
 fun Modifier.boardPointerEventGesture(
     interactionState: BoardInteractionState,
     isDrawingConnection: Boolean,
@@ -158,106 +162,110 @@ fun Modifier.boardPointerEventGesture(
     onConnectionDrop: (Boolean) -> Unit,
     onDeleteConnection: (Connection) -> Unit,
     onDetachConnection: (Connection, Boolean, Offset) -> Unit
-): Modifier = this.pointerInput(connections, nodes, scale, offset, isDrawingConnection) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent()
-            val position = event.changes.firstOrNull()?.position ?: Offset.Zero
+): Modifier {
+    val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
+    val currentScale by rememberUpdatedState(scale)
+    val currentOffset by rememberUpdatedState(offset)
+    val currentNodes by rememberUpdatedState(nodes)
+    val currentConnections by rememberUpdatedState(connections)
+    val currentGetPortBoardPosition by rememberUpdatedState(getPortBoardPosition)
+    val currentOnZoom by rememberUpdatedState(onZoom)
+    val currentOnConnectionDrag by rememberUpdatedState(onConnectionDrag)
+    val currentOnConnectionDrop by rememberUpdatedState(onConnectionDrop)
+    val currentOnDeleteConnection by rememberUpdatedState(onDeleteConnection)
+    val currentOnDetachConnection by rememberUpdatedState(onDetachConnection)
 
-            if (event.type == PointerEventType.Scroll) {
-                val scrollDelta = event.changes.firstOrNull()?.scrollDelta ?: Offset.Zero
-                val delta = if (scrollDelta.y != 0f) scrollDelta.y else scrollDelta.x
-                if (delta != 0f) {
-                    val isShiftPressed = event.keyboardModifiers.isShiftPressed
-                    onZoom(-delta, position, isShiftPressed)
-                }
-            } else if (event.type == PointerEventType.Move) {
-                interactionState.lastPointerPosition = position
-                if (isDrawingConnection) {
-                    val boardPos = (position - offset) / scale
-                    onConnectionDrag(boardPos)
-                }
+    return this.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                val position = event.changes.firstOrNull()?.position ?: Offset.Zero
 
-                var bestConnection: Connection? = null
-                var isHoveringPort = false
-                val portHoverRadius = 20f
+                if (event.type == PointerEventType.Scroll) {
+                    val scrollDelta = event.changes.firstOrNull()?.scrollDelta ?: Offset.Zero
+                    val delta = if (scrollDelta.y != 0f) scrollDelta.y else scrollDelta.x
+                    if (delta != 0f) {
+                        val isShiftPressed = event.keyboardModifiers.isShiftPressed
+                        currentOnZoom(-delta, position, isShiftPressed)
+                    }
+                } else if (event.type == PointerEventType.Move) {
+                    interactionState.lastPointerPosition = position
+                    if (currentIsDrawingConnection) {
+                        val boardPos = (position - currentOffset) / currentScale
+                        currentOnConnectionDrag(boardPos)
+                    }
 
-                nodes.forEach { node ->
-                    node.inputs.forEach { port ->
-                        val portBoardPos = getPortBoardPosition(node.id, port.id, false) ?: return@forEach
-                        val portScreenPos = (portBoardPos * scale) + offset
-                        if ((position - portScreenPos).getDistance() < portHoverRadius) {
-                            isHoveringPort = true
+                    var bestConnection: Connection? = null
+                    var isHoveringPort = false
+                    val portHoverRadius = 20f
+
+                    currentNodes.forEach { node ->
+                        node.inputs.forEach { port ->
+                            val portBoardPos = currentGetPortBoardPosition(node.id, port.id, false) ?: return@forEach
+                            val portScreenPos = (portBoardPos * currentScale) + currentOffset
+                            if ((position - portScreenPos).getDistance() < portHoverRadius) {
+                                isHoveringPort = true
+                            }
+                        }
+                        node.outputs.forEach { port ->
+                            val portBoardPos = currentGetPortBoardPosition(node.id, port.id, true) ?: return@forEach
+                            val portScreenPos = (portBoardPos * currentScale) + currentOffset
+                            if ((position - portScreenPos).getDistance() < portHoverRadius) {
+                                isHoveringPort = true
+                            }
                         }
                     }
-                    node.outputs.forEach { port ->
-                        val portBoardPos = getPortBoardPosition(node.id, port.id, true) ?: return@forEach
-                        val portScreenPos = (portBoardPos * scale) + offset
-                        if ((position - portScreenPos).getDistance() < portHoverRadius) {
-                            isHoveringPort = true
-                        }
+
+                    if (!isHoveringPort) {
+                        bestConnection = ConnectionHitTester.findClosestConnection(
+                            position = position,
+                            connections = currentConnections,
+                            getPortBoardPosition = currentGetPortBoardPosition,
+                            scale = currentScale,
+                            offset = currentOffset
+                        )
                     }
-                }
+                    interactionState.isCtrlModifierPressed = event.keyboardModifiers.isCtrlPressed
+                    interactionState.lastPointerPosition = position
 
-                if (!isHoveringPort) {
-                    bestConnection = ConnectionHitTester.findClosestConnection(
-                        position = position,
-                        connections = connections,
-                        getPortBoardPosition = getPortBoardPosition,
-                        scale = scale,
-                        offset = offset
-                    )
-                }
-                interactionState.isCtrlModifierPressed = event.keyboardModifiers.isCtrlPressed
-                interactionState.lastPointerPosition = position
-
-                if (bestConnection != null && interactionState.isCtrlModifierPressed) {
-                    val sourcePortBoardPos =
-                        getPortBoardPosition(bestConnection.sourceNodeId, bestConnection.sourcePortId, true)
-                    val targetPortBoardPos =
-                        getPortBoardPosition(bestConnection.targetNodeId, bestConnection.targetPortId, false)
-                    if (sourcePortBoardPos != null && targetPortBoardPos != null) {
-                        val startPos = (sourcePortBoardPos * scale) + offset
-                        val endPos = (targetPortBoardPos * scale) + offset
-                        interactionState.hoveredConnectionIsSource = ConnectionHitTester.determineCloserEnd(position, startPos, endPos)
+                    if (bestConnection != null && interactionState.isCtrlModifierPressed) {
+                        val sourcePortBoardPos =
+                            currentGetPortBoardPosition(bestConnection.sourceNodeId, bestConnection.sourcePortId, true)
+                        val targetPortBoardPos =
+                            currentGetPortBoardPosition(bestConnection.targetNodeId, bestConnection.targetPortId, false)
+                        if (sourcePortBoardPos != null && targetPortBoardPos != null) {
+                            val startPos = (sourcePortBoardPos * currentScale) + currentOffset
+                            val endPos = (targetPortBoardPos * currentScale) + currentOffset
+                            interactionState.hoveredConnectionIsSource = ConnectionHitTester.determineCloserEnd(position, startPos, endPos)
+                        } else {
+                            interactionState.hoveredConnectionIsSource = null
+                        }
                     } else {
                         interactionState.hoveredConnectionIsSource = null
                     }
-                } else {
-                    interactionState.hoveredConnectionIsSource = null
-                }
-                interactionState.hoveredConnection = bestConnection
-            } else if (event.type == PointerEventType.Exit) {
-                interactionState.clearHoveredConnection()
-            } else if (event.type == PointerEventType.Press) {
-                if (event.buttons.isSecondaryPressed || event.keyboardModifiers.isShiftPressed) {
-                    interactionState.hoveredConnection?.let { conn ->
-                        onDeleteConnection(conn)
-                        interactionState.clearHoveredConnection()
-                        if (interactionState.selectedConnection == conn) {
-                            interactionState.selectedConnection = null
-                        }
-                    }
-                } else if (event.keyboardModifiers.isCtrlPressed) {
-                    interactionState.hoveredConnection?.let { conn ->
-                        val isSrc = interactionState.hoveredConnectionIsSource ?: false
-                        onDetachConnection(conn, isSrc, position)
-
-                        event.changes.forEach { it.consume() }
-
-                        while (true) {
-                            val dragEvent = awaitPointerEvent()
-                            if (dragEvent.type == PointerEventType.Move) {
-                                val screenPos = dragEvent.changes.firstOrNull()?.position ?: Offset.Zero
-                                interactionState.lastPointerPosition = screenPos
-                                val boardPos = (screenPos - offset) / scale
-                                onConnectionDrag(boardPos)
-                                dragEvent.changes.forEach { it.consume() }
-                            } else if (dragEvent.type == PointerEventType.Release) {
-                                onConnectionDrop(dragEvent.keyboardModifiers.isShiftPressed)
-                                break
+                    interactionState.hoveredConnection = bestConnection
+                } else if (event.type == PointerEventType.Exit) {
+                    interactionState.clearHoveredConnection()
+                } else if (event.type == PointerEventType.Press) {
+                    if (event.buttons.isSecondaryPressed || event.keyboardModifiers.isShiftPressed) {
+                        interactionState.hoveredConnection?.let { conn ->
+                            currentOnDeleteConnection(conn)
+                            interactionState.clearHoveredConnection()
+                            if (interactionState.selectedConnection == conn) {
+                                interactionState.selectedConnection = null
                             }
                         }
+                    } else if (event.keyboardModifiers.isCtrlPressed) {
+                        interactionState.hoveredConnection?.let { conn ->
+                            val isSrc = interactionState.hoveredConnectionIsSource ?: false
+                            val boardPos = (position - currentOffset) / currentScale
+                            currentOnDetachConnection(conn, isSrc, boardPos)
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                } else if (event.type == PointerEventType.Release) {
+                    if (currentIsDrawingConnection) {
+                        currentOnConnectionDrop(event.keyboardModifiers.isShiftPressed)
                     }
                 }
             }

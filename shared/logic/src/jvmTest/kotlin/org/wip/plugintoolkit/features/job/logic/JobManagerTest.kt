@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.job.logic
 
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -163,5 +164,92 @@ class JobManagerTest {
 
         val claimedRetry = jobManager.waitForNextJob()
         assertEquals("setup_com.wip.cleaner", claimedRetry.id)
+    }
+
+    @Test
+    fun testJobLogsTruncateToMaxLogLines() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = persistence.settings.copy(
+            jobs = persistence.settings.jobs.copy(maxLogLines = 5)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        for (i in 1..10) {
+            jobManager.addJobLog("job-lines", "Message $i")
+        }
+
+        val logs = jobManager.jobLogs.value["job-lines"]
+        assertEquals(5, logs?.size)
+        assertTrue(logs?.first()?.endsWith("Message 6") == true)
+        assertTrue(logs?.last()?.endsWith("Message 10") == true)
+    }
+
+    @Test
+    fun testJobLogsTruncateToMaxLogLineLength() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = persistence.settings.copy(
+            jobs = persistence.settings.jobs.copy(maxLogLineLength = 50)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val longMessage = "A".repeat(200)
+        jobManager.addJobLog("job-long", longMessage)
+
+        val logs = jobManager.jobLogs.value["job-long"]
+        assertEquals(1, logs?.size)
+        val logLine = logs?.first().orEmpty()
+        assertTrue(logLine.endsWith("... [truncated]"))
+        assertEquals(50 + "... [truncated]".length, logLine.length)
+    }
+
+    @Test
+    fun testJobLogsMultilineMessageSplitting() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = persistence.settings.copy(
+            jobs = persistence.settings.jobs.copy(maxLogLines = 5, maxLogLineLength = 200)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        jobManager.addJobLog("job-multi", "Line 1\nLine 2\nLine 3\nLine 4")
+        val initialLogs = jobManager.jobLogs.value["job-multi"]
+        assertEquals(4, initialLogs?.size)
+
+        jobManager.addJobLog("job-multi", "Line 5\nLine 6\nLine 7")
+        val prunedLogs = jobManager.jobLogs.value["job-multi"]
+        assertEquals(5, prunedLogs?.size)
+        assertTrue(prunedLogs?.get(0)?.contains("Line 3") == true)
+        assertTrue(prunedLogs?.get(1)?.contains("Line 4") == true)
+        assertTrue(prunedLogs?.get(2)?.contains("Line 5") == true)
+        assertTrue(prunedLogs?.get(3)?.contains("Line 6") == true)
+        assertTrue(prunedLogs?.get(4)?.contains("Line 7") == true)
+    }
+
+    @Test
+    fun testJobLogsUnlimitedSettings() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = persistence.settings.copy(
+            jobs = persistence.settings.jobs.copy(maxLogLines = -1, maxLogLineLength = -1)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        for (i in 1..25) {
+            jobManager.addJobLog("job-unlimited", "Message $i")
+        }
+        val longMessage = "B".repeat(500)
+        jobManager.addJobLog("job-unlimited", longMessage)
+
+        val logs = jobManager.jobLogs.value["job-unlimited"]
+        assertEquals(26, logs?.size)
+        val lastLog = logs?.last().orEmpty()
+        assertTrue(lastLog.endsWith(longMessage))
+        assertTrue(!lastLog.contains("... [truncated]"))
     }
 }

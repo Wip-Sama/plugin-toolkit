@@ -27,6 +27,7 @@ import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.parseSemanticTypes
 import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
+import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils
 
 @Serializable
 data class Offset(val x: Float = 0f, val y: Float = 0f) {
@@ -244,7 +245,7 @@ sealed class Node {
     abstract fun copyWithCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithInputsCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithOutputsCollapsedState(isCollapsed: Boolean): Node
-    abstract fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>? = null): Boolean
+    abstract fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>? = null, locks: Map<String, Boolean>? = null): Boolean
 
     @Serializable
     @SerialName("capability")
@@ -272,7 +273,11 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean {
+        override fun isReady(
+            connections: List<Connection>,
+            settings: Map<String, JsonElement>?,
+            locks: Map<String, Boolean>?
+        ): Boolean {
             if (isBroken) return false
             val parameters = capability.parameters ?: return true
             for ((portId, metadata) in parameters) {
@@ -283,14 +288,25 @@ sealed class Node {
                     val enumType = metadata.type as DataType.Enum
                     val selectedValueStr = effectiveValue?.let {
                         if (it is JsonPrimitive) it.content else it.toString()
-                    }
-                    if (selectedValueStr != null && settings != null) {
-                        val reqs = enumType.optionRequirements[selectedValueStr]
-                        if (reqs != null && reqs.any { reqSetting ->
-                                val s = settings[reqSetting]
-                                s == null || s is JsonNull || (s as? JsonPrimitive)?.content?.isBlank() == true
-                            }) {
-                            return false
+                    } ?: (metadata.defaultValue as? JsonPrimitive)?.content ?: enumType.options.firstOrNull()
+
+                    if (selectedValueStr != null) {
+                        if (settings != null) {
+                            val reqs = enumType.optionRequirements[selectedValueStr]
+                            if (reqs != null && reqs.any { reqSetting ->
+                                    val s = settings[reqSetting]
+                                    s == null || s is JsonNull || (s as? JsonPrimitive)?.content?.isBlank() == true
+                                }) {
+                                return false
+                            }
+                        }
+                        if (locks != null) {
+                            val lockReqs = enumType.optionLockRequirements[selectedValueStr]
+                            if (lockReqs != null && lockReqs.any { lockKey ->
+                                    !CapabilityLockUtils.isLockSatisfied(lockKey, locks)
+                                }) {
+                                return false
+                            }
                         }
                     }
                 }
@@ -339,7 +355,11 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean {
+        override fun isReady(
+            connections: List<Connection>,
+            settings: Map<String, JsonElement>?,
+            locks: Map<String, Boolean>?
+        ): Boolean {
             if (systemAction.lowercase() == "load") return true
             return inputs.all { input ->
                 if (!input.isRequired) return@all true
@@ -372,7 +392,11 @@ sealed class Node {
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node = this
-        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean = true
+        override fun isReady(
+            connections: List<Connection>,
+            settings: Map<String, JsonElement>?,
+            locks: Map<String, Boolean>?
+        ): Boolean = true
     }
 
     @Serializable
@@ -398,7 +422,11 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean = true
+        override fun isReady(
+            connections: List<Connection>,
+            settings: Map<String, JsonElement>?,
+            locks: Map<String, Boolean>?
+        ): Boolean = true
     }
 
     @Serializable
@@ -427,7 +455,11 @@ sealed class Node {
             })
         }
 
-        override fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>?): Boolean = true
+        override fun isReady(
+            connections: List<Connection>,
+            settings: Map<String, JsonElement>?,
+            locks: Map<String, Boolean>?
+        ): Boolean = true
     }
 }
 
@@ -486,11 +518,19 @@ data class Flow(
         return fallbackType
     }
 
-    fun isBroken(activeCapabilities: Set<String>): Boolean {
+    fun isBroken(
+        activeCapabilities: Set<String>,
+        settingsMap: Map<Long, Map<String, JsonElement>>? = null,
+        locksMap: Map<Long, Map<String, Boolean>>? = null
+    ): Boolean {
         val hasBrokenNode = this.nodes.any { it is Node.CapabilityNode && it.isBroken }
         val hasMissingCapability =
             this.nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.name !in activeCapabilities }
-        val hasNotReadyNode = this.nodes.any { !it.isReady(connections) }
+        val hasNotReadyNode = this.nodes.any { node ->
+            val settings = settingsMap?.get(node.id)
+            val locks = locksMap?.get(node.id)
+            !node.isReady(connections, settings, locks)
+        }
         return hasBrokenNode || hasMissingCapability || hasNotReadyNode
     }
 

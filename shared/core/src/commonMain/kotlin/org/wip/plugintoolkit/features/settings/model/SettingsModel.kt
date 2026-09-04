@@ -185,6 +185,7 @@ data class JobSettings(
     val saveHistory: Boolean = true,
     val maxHistoryLength: Int = 200,
     val maxLogLines: Int = 100,
+    val maxLogLineLength: Int = 1000,
     val maxEndedJobs: Int = 20,
     val pluginTimeoutMs: Long = 600000L,
     val enableTransientRetries: Boolean = true,

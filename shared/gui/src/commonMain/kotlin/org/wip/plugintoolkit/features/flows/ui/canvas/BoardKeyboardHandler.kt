@@ -19,7 +19,8 @@ fun Modifier.boardKeyboardHandler(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onCopy: () -> Unit,
-    onPaste: (Offset) -> Unit
+    onPaste: (Offset) -> Unit,
+    isReadOnly: Boolean = false
 ): Modifier = this.onKeyEvent { keyEvent ->
     val newCtrlPressed = keyEvent.isCtrlPressed
     if (interactionState.isCtrlModifierPressed != newCtrlPressed) {
@@ -45,7 +46,7 @@ fun Modifier.boardKeyboardHandler(
     if (keyEvent.type == KeyEventType.KeyDown) {
         when {
             keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> {
-                if (selectedNodeIds.isNotEmpty()) {
+                if (selectedNodeIds.isNotEmpty() && !isReadOnly) {
                     onDeleteSelectedNodes()
                     true
                 } else {
@@ -54,12 +55,12 @@ fun Modifier.boardKeyboardHandler(
             }
 
             keyEvent.isCtrlPressed && keyEvent.key == Key.Z -> {
-                onUndo()
+                if (!isReadOnly) onUndo()
                 true
             }
 
             keyEvent.isCtrlPressed && keyEvent.key == Key.Y -> {
-                onRedo()
+                if (!isReadOnly) onRedo()
                 true
             }
 
@@ -69,8 +70,10 @@ fun Modifier.boardKeyboardHandler(
             }
 
             keyEvent.isCtrlPressed && keyEvent.key == Key.V -> {
-                val boardPos = (interactionState.lastPointerPosition - offset) / scale
-                onPaste(boardPos)
+                if (!isReadOnly) {
+                    val boardPos = (interactionState.lastPointerPosition - offset) / scale
+                    onPaste(boardPos)
+                }
                 true
             }
 

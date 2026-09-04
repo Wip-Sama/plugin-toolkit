@@ -328,7 +328,6 @@ class JobManager(
         }:${local.second.toString().padStart(2, '0')}"
 
         val prefix = if (level == "VERBOSE") "[$jobId] " else ""
-        val formattedLog = "[$timestamp] [$level] $prefix$message"
 
         // Log to global logger as well
         when (level) {
@@ -339,11 +338,26 @@ class JobManager(
             "ERROR" -> Logger.e { "[$jobId] $message" }
         }
 
+        val jobSettings = settingsRepository.settings.value.jobs
+        val maxLines = jobSettings.maxLogLines
+        val maxLineLength = jobSettings.maxLogLineLength
+
+        val rawLines = message.lines()
+        val formattedLines = rawLines.mapIndexed { index, rawLine ->
+            val header = if (index == 0) "[$timestamp] [$level] $prefix" else "        "
+            val fullLine = "$header$rawLine"
+            if (maxLineLength > 0 && fullLine.length > maxLineLength) {
+                fullLine.take(maxLineLength) + "... [truncated]"
+            } else {
+                fullLine
+            }
+        }
+
         _jobLogs.update { currentLogs ->
             val logs = currentLogs[jobId] ?: emptyList()
-            val maxLines = settingsRepository.settings.value.jobs.maxLogLines
-            val newLogs = logs + formattedLog
-            currentLogs + (jobId to if (maxLines == -1) newLogs else newLogs.takeLast(maxLines))
+            val combined = logs + formattedLines
+            val pruned = if (maxLines == -1) combined else combined.takeLast(maxLines)
+            currentLogs + (jobId to pruned)
         }
     }
 

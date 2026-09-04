@@ -65,6 +65,9 @@ class FlowEditorViewModel(
         }
     }
 
+    val isAutoSaveEnabled: Boolean
+        get() = resolvedSettingsRepository?.settings?.value?.flows?.autosave == true
+
     private val resolvedActiveFlowEditorTracker: ActiveFlowEditorTracker by lazy {
         activeFlowEditorTracker ?: try {
             getKoin().get()
@@ -133,6 +136,7 @@ class FlowEditorViewModel(
     }
 
     fun undo() {
+        if (_state.value.isReadOnly && !bypassReadOnlyForTesting) return
         if (undoStack.isNotEmpty()) {
             val previousFlow = undoStack.removeAt(undoStack.size - 1)
             val currentFlow = _state.value.flow
@@ -149,6 +153,7 @@ class FlowEditorViewModel(
     }
 
     fun redo() {
+        if (_state.value.isReadOnly && !bypassReadOnlyForTesting) return
         if (redoStack.isNotEmpty()) {
             val nextFlow = redoStack.removeAt(redoStack.size - 1)
             val currentFlow = _state.value.flow
@@ -235,7 +240,16 @@ class FlowEditorViewModel(
                 is FlowEvent.SaveAs,
                 is FlowEvent.UpdateInputPortValue,
                 is FlowEvent.UpdateBoundaryNode,
-                is FlowEvent.DeleteSelectedNodes -> {
+                is FlowEvent.DeleteSelectedNodes,
+                is FlowEvent.TryConnectPorts,
+                is FlowEvent.PasteNodes,
+                is FlowEvent.MoveConnectionFirst,
+                is FlowEvent.MoveConnectionLast,
+                is FlowEvent.UpdateConnectionOrder,
+                is FlowEvent.UpdateSystemNodeSettings,
+                is FlowEvent.ToggleNodeCollapse,
+                is FlowEvent.ToggleNodeInputsCollapse,
+                is FlowEvent.ToggleNodeOutputsCollapse -> {
                     resolvedNotificationService?.toast("Cannot modify the flow because it is currently running or used as a subflow in other flows.")
                     return
                 }
@@ -618,7 +632,7 @@ class FlowEditorViewModel(
             runTypeInference()
         }
 
-        if (_state.value.hasUnsavedChanges && event !is FlowEvent.Save && event !is FlowEvent.SaveAs) {
+        if (_state.value.hasUnsavedChanges && (!_state.value.isReadOnly || bypassReadOnlyForTesting) && event !is FlowEvent.Save && event !is FlowEvent.SaveAs) {
             if (resolvedSettingsRepository?.settings?.value?.flows?.autosave == true) {
                 handleSave()
             }
@@ -711,46 +725,44 @@ class FlowEditorViewModel(
     }
 
 
-    internal fun updateReadOnlyState() {
-        viewModelScope.launch {
+    internal    fun updateReadOnlyState() {
+        val currentState = _state.value
+        val currentFlowName = currentState.flow.name
 
-            val currentState = _state.value
-            val currentFlowName = currentState.flow.name
+        if (currentFlowName.isBlank()) {
+            _state.update { it.copy(isReadOnly = false, readOnlyReasons = emptyList()) }
+            return
+        }
 
-            if (currentFlowName.isBlank()) {
-                _state.update { it.copy(isReadOnly = false, readOnlyReasons = emptyList()) }
-                return@launch
+        var isRunning = false
+        try {
+            val jobManager = getKoin().get<JobManager>()
+            isRunning = jobManager.jobs.value.any {
+                it.type == JobType.Flow && (it.capabilityName == currentFlowName || it.pluginId == currentFlowName) && (it.status == JobStatus.Running || it.status == JobStatus.Queued)
             }
+        } catch (e: Exception) {
+            // Ignore
+        }
 
-            var isRunning = false
-            try {
-                val jobManager = getKoin().get<JobManager>()
-                isRunning = jobManager.jobs.value.any {
-                    it.type == JobType.Flow && it.pluginId == currentFlowName && (it.status == JobStatus.Running || it.status == JobStatus.Queued)
-                }
-            } catch (e: Exception) {
-                // Ignore
-            }
+        val isUsedAsSubflow = currentState.flows.any { otherFlow ->
+            otherFlow.name != currentFlowName && otherFlow.nodes.filterIsInstance<Node.SubFlowNode>()
+                .any { it.flowName == currentFlowName }
+        }
 
-            val isUsedAsSubflow = currentState.flows.any { otherFlow ->
-                otherFlow.name != currentFlowName && otherFlow.nodes.filterIsInstance<Node.SubFlowNode>()
-                    .any { it.flowName == currentFlowName }
-            }
+        val reasons = mutableListOf<ReadOnlyReason>()
+        if (isRunning) reasons.add(ReadOnlyReason.Running)
+        if (isUsedAsSubflow) reasons.add(ReadOnlyReason.UsedInOtherFlows)
 
-            val reasons = mutableListOf<ReadOnlyReason>()
-            if (isRunning) reasons.add(ReadOnlyReason.Running)
-            if (isUsedAsSubflow) reasons.add(ReadOnlyReason.UsedInOtherFlows)
-
-            _state.update {
-                it.copy(
-                    isReadOnly = reasons.isNotEmpty(),
-                    readOnlyReasons = reasons
-                )
-            }
+        _state.update {
+            it.copy(
+                isReadOnly = reasons.isNotEmpty(),
+                readOnlyReasons = reasons
+            )
         }
     }
 
     private fun handleSave() {
+        if (_state.value.isReadOnly && !bypassReadOnlyForTesting) return
         val flowToSave = _state.value.flow
         if (flowToSave.name.isBlank()) return
 
@@ -759,6 +771,7 @@ class FlowEditorViewModel(
     }
 
     private fun handleSaveAs(newName: String) {
+        if (_state.value.isReadOnly && !bypassReadOnlyForTesting) return
         if (newName.isBlank()) return
         val flowToSave = _state.value.flow.copy(name = newName)
 

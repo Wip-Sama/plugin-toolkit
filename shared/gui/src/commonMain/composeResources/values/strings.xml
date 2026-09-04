@@ -128,6 +128,10 @@
     <string name="setting_max_history_length_subtitle">Maximum number of events to keep in the history log</string>
     <string name="setting_max_ended_jobs">Max Ended Jobs to Keep</string>
     <string name="setting_max_ended_jobs_subtitle">Number of finished jobs to keep in the Ended tab</string>
+    <string name="setting_max_log_lines">Max Log Lines</string>
+    <string name="setting_max_log_lines_subtitle">Maximum number of console log lines to keep for each job (-1 for unlimited)</string>
+    <string name="setting_max_log_line_length">Max Log Line Length</string>
+    <string name="setting_max_log_line_length_subtitle">Maximum character length for each console log line (-1 for unlimited)</string>
     <string name="section_auto_update">Auto Update</string>
     <string name="setting_enable_auto_update">Check for Updates Automatically</string>
     <string name="setting_enable_auto_update_subtitle">The application will check for new versions on startup</string>

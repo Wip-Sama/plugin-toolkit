@@ -91,6 +91,7 @@ fun BoardCanvas(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     nodeSizes: Map<Long, IntSize>,
+    isReadOnly: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.(hoveredConnection: Connection?) -> Unit
 ) {
@@ -135,7 +136,8 @@ fun BoardCanvas(
                 onUndo = onUndo,
                 onRedo = onRedo,
                 onCopy = onCopy,
-                onPaste = onPaste
+                onPaste = onPaste,
+                isReadOnly = isReadOnly
             )
             .boardConnectionTapGesture(
                 interactionState = interactionState,

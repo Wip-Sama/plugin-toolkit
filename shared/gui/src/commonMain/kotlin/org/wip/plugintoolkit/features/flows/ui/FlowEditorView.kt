@@ -99,6 +99,7 @@ fun FlowEditorView(
     val state by viewModel.state.collectAsState()
     val flow = state.flow
     val pluginManager = koinInject<org.wip.plugintoolkit.features.plugin.logic.PluginManager>()
+    val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
     val density = androidx.compose.ui.platform.LocalDensity.current
 
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
@@ -215,18 +216,20 @@ fun FlowEditorView(
             onBoardSizeChanged = { boardSize = it },
             onDeleteConnection = { viewModel.onEvent(FlowEvent.DeleteConnection(it)) },
             onDetachConnection = { connection, isSource, offset ->
-                viewModel.onEvent(FlowEvent.DeleteConnection(connection))
-                if (isSource) {
-                    connectionStartNodeId = connection.targetNodeId
-                    connectionStartPortId = connection.targetPortId
-                    connectionStartIsOutput = false
-                } else {
-                    connectionStartNodeId = connection.sourceNodeId
-                    connectionStartPortId = connection.sourcePortId
-                    connectionStartIsOutput = true
+                if (!state.isReadOnly) {
+                    viewModel.onEvent(FlowEvent.DeleteConnection(connection))
+                    if (isSource) {
+                        connectionStartNodeId = connection.targetNodeId
+                        connectionStartPortId = connection.targetPortId
+                        connectionStartIsOutput = false
+                    } else {
+                        connectionStartNodeId = connection.sourceNodeId
+                        connectionStartPortId = connection.sourcePortId
+                        connectionStartIsOutput = true
+                    }
+                    connectionCurrentPos = offset
+                    isDrawingConnection = true
                 }
-                connectionCurrentPos = offset
-                isDrawingConnection = true
             },
             onConnectionDrag = { boardPosition ->
                 connectionCurrentPos = boardPosition
@@ -273,7 +276,8 @@ fun FlowEditorView(
             onPaste = { viewModel.onEvent(FlowEvent.PasteNodes(it)) },
             onUndo = { viewModel.undo() },
             onRedo = { viewModel.redo() },
-            nodeSizes = nodeSizes
+            nodeSizes = nodeSizes,
+            isReadOnly = state.isReadOnly
         ) { hoveredConnection ->
             CompositionLocalProvider(LocalOverlayHost provides dropdownOverlay) {
                 // 1.2 Nodes
@@ -362,9 +366,16 @@ fun FlowEditorView(
                                 validationErrors = state.validationErrors,
                                 isReady = node.isReady(
                                     flow.connections,
-                                    if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
+                                    if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null,
+                                    if (node is Node.CapabilityNode) {
+                                        pluginLocksState[node.pluginInfo.id] ?: pluginLocksState.values.fold(emptyMap()) { acc, m -> acc + m }
+                                    } else null
                                 ),
-                                onFocusLost = { viewModel.onEvent(FlowEvent.Save) },
+                                onFocusLost = {
+                                    if (viewModel.isAutoSaveEnabled && !state.isReadOnly) {
+                                        viewModel.onEvent(FlowEvent.Save)
+                                    }
+                                },
                                 onMove = { id, delta, snap, showGhost ->
                                     viewModel.onEvent(
                                         FlowEvent.MoveNode(

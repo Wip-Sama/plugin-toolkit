@@ -55,11 +55,19 @@ fun SettingsRegistryBuilder.jobDefinitions() {
 
                 numeric(
                     JobSettings::maxLogLines,
-                    SettingText.Raw("Max Log Lines"),
+                    Res.string.setting_max_log_lines,
                     Icons.Default.Subject,
                     range = -1..10000,
-                    subtitle = SettingText.Raw("Maximum number of console log lines to keep for each job (-1 for unlimited)")
+                    subtitle = SettingText.Resource(Res.string.setting_max_log_lines_subtitle)
                 ) { copy(maxLogLines = it) }
+
+                numeric(
+                    JobSettings::maxLogLineLength,
+                    Res.string.setting_max_log_line_length,
+                    Icons.Default.Subject,
+                    range = -1..10000,
+                    subtitle = SettingText.Resource(Res.string.setting_max_log_line_length_subtitle)
+                ) { copy(maxLogLineLength = it) }
 
                 longNumeric(
                     JobSettings::pluginTimeoutMs,

@@ -238,7 +238,8 @@ object SettingsUtils {
     fun validateCapabilityLocksAndSettings(
         capability: org.wip.plugintoolkit.api.Capability,
         providedLocks: Map<String, Boolean>,
-        providedSettings: Map<String, JsonElement>
+        providedSettings: Map<String, JsonElement>,
+        parameterValues: Map<String, String> = emptyMap()
     ): String? {
         for (lockKey in capability.requiredLocks) {
             if (!CapabilityLockUtils.isLockSatisfied(lockKey, providedLocks)) {
@@ -251,7 +252,73 @@ object SettingsUtils {
                 return "Requires setting: $settingKey"
             }
         }
+        capability.parameters?.forEach { (paramName, meta) ->
+            if (meta.type is DataType.Enum) {
+                val enumType = meta.type as DataType.Enum
+                val selectedOption = parameterValues[paramName]?.ifEmpty { null }
+                    ?: (meta.defaultValue as? JsonPrimitive)?.content
+                    ?: enumType.options.firstOrNull()
+                if (selectedOption != null) {
+                    val reqs = enumType.optionRequirements[selectedOption] ?: emptyList()
+                    for (reqSetting in reqs) {
+                        val settingValue = providedSettings[reqSetting]
+                        if (settingValue == null || settingValue is JsonNull || settingValue.toString().replace("\"", "").isBlank()) {
+                            return "Option '$selectedOption' requires setting: $reqSetting"
+                        }
+                    }
+                    val lockReqs = enumType.optionLockRequirements[selectedOption] ?: emptyList()
+                    for (lockKey in lockReqs) {
+                        if (!CapabilityLockUtils.isLockSatisfied(lockKey, providedLocks)) {
+                            return "Option '$selectedOption' requires lock: $lockKey"
+                        }
+                    }
+                }
+            }
+        }
         return null
+    }
+
+    fun getCapabilityTargetSettingKey(
+        capability: org.wip.plugintoolkit.api.Capability,
+        providedLocks: Map<String, Boolean>,
+        providedSettings: Map<String, JsonElement>,
+        parameterValues: Map<String, String> = emptyMap()
+    ): String {
+        for (lockKey in capability.requiredLocks) {
+            if (!CapabilityLockUtils.isLockSatisfied(lockKey, providedLocks)) {
+                return lockKey
+            }
+        }
+        for (settingKey in capability.requiresSettings) {
+            val settingValue = providedSettings[settingKey]
+            if (settingValue == null || settingValue is JsonNull || settingValue.toString().replace("\"", "").isBlank()) {
+                return settingKey
+            }
+        }
+        capability.parameters?.forEach { (paramName, meta) ->
+            if (meta.type is DataType.Enum) {
+                val enumType = meta.type as DataType.Enum
+                val selectedOption = parameterValues[paramName]?.ifEmpty { null }
+                    ?: (meta.defaultValue as? JsonPrimitive)?.content
+                    ?: enumType.options.firstOrNull()
+                if (selectedOption != null) {
+                    val lockReqs = enumType.optionLockRequirements[selectedOption] ?: emptyList()
+                    for (lockKey in lockReqs) {
+                        if (!CapabilityLockUtils.isLockSatisfied(lockKey, providedLocks)) {
+                            return lockKey
+                        }
+                    }
+                    val reqs = enumType.optionRequirements[selectedOption] ?: emptyList()
+                    for (reqSetting in reqs) {
+                        val settingValue = providedSettings[reqSetting]
+                        if (settingValue == null || settingValue is JsonNull || settingValue.toString().replace("\"", "").isBlank()) {
+                            return reqSetting
+                        }
+                    }
+                }
+            }
+        }
+        return capability.requiredLocks.firstOrNull() ?: capability.requiresSettings.firstOrNull() ?: ""
     }
 
     fun jsonToString(element: JsonElement?, type: DataType): String {

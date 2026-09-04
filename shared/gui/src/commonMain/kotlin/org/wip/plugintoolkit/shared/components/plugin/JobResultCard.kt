@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Close
@@ -40,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,13 +53,18 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -99,13 +107,27 @@ fun JobResultCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     var logHeight by remember { mutableStateOf(150.dp) }
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState()
     var autoScroll by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
 
-    androidx.compose.runtime.LaunchedEffect(logs.size) {
+    val isAtBottom by remember {
+        derivedStateOf {
+            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
+            lastVisibleItem.index >= logs.lastIndex - 1
+        }
+    }
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress && !isAtBottom && autoScroll) {
+            autoScroll = false
+        }
+    }
+
+    LaunchedEffect(logs.size, logs.lastOrNull()) {
         if (autoScroll && logs.isNotEmpty()) {
-            scrollState.animateScrollTo(scrollState.maxValue)
+            listState.scrollToItem(logs.lastIndex)
         }
     }
 
@@ -380,6 +402,8 @@ fun JobResultCard(
                     )
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
+                    var isShiftPressed by remember { mutableStateOf(false) }
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -388,40 +412,31 @@ fun JobResultCard(
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.high),
                                 MaterialTheme.shapes.medium
                             )
+                            .onPointerEvent(PointerEventType.Move) {
+                                isShiftPressed = it.keyboardModifiers.isShiftPressed
+                            }
+                            .onPointerEvent(PointerEventType.Press) {
+                                isShiftPressed = it.keyboardModifiers.isShiftPressed
+                            }
+                            .onPointerEvent(PointerEventType.Release) {
+                                isShiftPressed = it.keyboardModifiers.isShiftPressed
+                            }
                             .padding(ToolkitTheme.spacing.medium)
                     ) {
                         SelectionContainer {
-                            Column(
-                                modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
                             ) {
-                                val errorColor = MaterialTheme.colorScheme.error
-                                val warnColor = MaterialTheme.colorScheme.tertiary
-                                val defaultColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                
-                                val annotatedLogs = remember(logs, errorColor, warnColor, defaultColor) {
-                                    androidx.compose.ui.text.buildAnnotatedString {
-                                        logs.forEachIndexed { index, logLine ->
-                                            val color = when {
-                                                logLine.contains("[ERROR]", ignoreCase = true) || logLine.startsWith("ERROR:") -> errorColor
-                                                logLine.contains("[WARN]", ignoreCase = true) || logLine.startsWith("WARN:") -> warnColor
-                                                else -> defaultColor
-                                            }
-                                            withStyle(androidx.compose.ui.text.SpanStyle(color = color)) {
-                                                append(logLine)
-                                            }
-                                            if (index < logs.size - 1) {
-                                                append("\n")
-                                            }
-                                        }
-                                    }
+                                items(logs) { logLine ->
+                                    TerminalLogLine(
+                                        logLine = logLine,
+                                        isShiftPressed = isShiftPressed,
+                                        onOpenUrl = { url -> uriHandler.openUri(url) },
+                                        onOpenFolder = { path -> PlatformUtils.openFolder(path) }
+                                    )
                                 }
-
-                                Text(
-                                    text = annotatedLogs,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontFamily = FontFamily.Monospace,
-                                )
                             }
                         }
                     }
@@ -462,7 +477,14 @@ fun JobResultCard(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(
                                 checked = autoScroll,
-                                onCheckedChange = { autoScroll = it }
+                                onCheckedChange = { isChecked ->
+                                    autoScroll = isChecked
+                                    if (isChecked && logs.isNotEmpty()) {
+                                        coroutineScope.launch {
+                                            listState.scrollToItem(logs.lastIndex)
+                                        }
+                                    }
+                                }
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                             Text(
@@ -561,4 +583,123 @@ private fun formatDuration(ms: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}s"
+}
+
+private data class LinkSpan(
+    val start: Int,
+    val end: Int,
+    val target: String,
+    val isUrl: Boolean
+)
+
+private val URL_REGEX = Regex("""https?://[^\s)\]>"']+""")
+private val PATH_REGEX = Regex("""(?:[a-zA-Z]:[/\\]|\\\\|/(?:Users|home|tmp|var|etc|opt|usr|Applications|mnt|Volumes)/)[^\s)\]>"']+""")
+
+private fun findLinkSpans(line: String): List<LinkSpan> {
+    val spans = mutableListOf<LinkSpan>()
+    for (match in URL_REGEX.findAll(line)) {
+        val cleanTarget = match.value.trimEnd('.', ',', ';', ':', ')', ']')
+        val end = match.range.first + cleanTarget.length
+        spans.add(LinkSpan(match.range.first, end, cleanTarget, isUrl = true))
+    }
+    for (match in PATH_REGEX.findAll(line)) {
+        val start = match.range.first
+        val cleanTarget = match.value.trimEnd('.', ',', ';', ':', ')', ']')
+        val end = start + cleanTarget.length
+        val overlaps = spans.any { it.start < end && start < it.end }
+        if (!overlaps) {
+            spans.add(LinkSpan(start, end, cleanTarget, isUrl = false))
+        }
+    }
+    return spans.sortedBy { it.start }
+}
+
+@Composable
+private fun TerminalLogLine(
+    logLine: String,
+    isShiftPressed: Boolean,
+    onOpenUrl: (String) -> Unit,
+    onOpenFolder: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val errorColor = MaterialTheme.colorScheme.error
+    val warnColor = MaterialTheme.colorScheme.tertiary
+    val defaultColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val linkColor = MaterialTheme.colorScheme.primary
+
+    val baseColor = when {
+        logLine.contains("[ERROR]", ignoreCase = true) || logLine.startsWith("ERROR:") -> errorColor
+        logLine.contains("[WARN]", ignoreCase = true) || logLine.startsWith("WARN:") -> warnColor
+        else -> defaultColor
+    }
+
+    val linkSpans = remember(logLine) { findLinkSpans(logLine) }
+
+    val annotatedText = remember(logLine, isShiftPressed, baseColor, linkColor, linkSpans) {
+        buildAnnotatedString {
+            if (linkSpans.isEmpty()) {
+                withStyle(SpanStyle(color = baseColor)) {
+                    append(logLine)
+                }
+            } else {
+                var currentIndex = 0
+                for (span in linkSpans) {
+                    if (span.start > currentIndex) {
+                        withStyle(SpanStyle(color = baseColor)) {
+                            append(logLine.substring(currentIndex, span.start))
+                        }
+                    }
+                    val style = if (isShiftPressed) {
+                        SpanStyle(
+                            color = linkColor,
+                            textDecoration = TextDecoration.Underline,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    } else {
+                        SpanStyle(color = baseColor)
+                    }
+                    withStyle(style) {
+                        append(logLine.substring(span.start, span.end))
+                    }
+                    currentIndex = span.end
+                }
+                if (currentIndex < logLine.length) {
+                    withStyle(SpanStyle(color = baseColor)) {
+                        append(logLine.substring(currentIndex))
+                    }
+                }
+            }
+        }
+    }
+
+    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+
+    val clickModifier = if (isShiftPressed && linkSpans.isNotEmpty()) {
+        Modifier
+            .pointerHoverIcon(PointerIcon.Hand)
+            .pointerInput(isShiftPressed, linkSpans) {
+                detectTapGestures { offset ->
+                    val layout = layoutResult ?: return@detectTapGestures
+                    val characterOffset = layout.getOffsetForPosition(offset)
+                    val clickedSpan = linkSpans.firstOrNull { characterOffset in it.start until it.end }
+                    if (clickedSpan != null) {
+                        if (clickedSpan.isUrl) {
+                            onOpenUrl(clickedSpan.target)
+                        } else {
+                            onOpenFolder(clickedSpan.target)
+                        }
+                    }
+                }
+            }
+    } else {
+        Modifier
+    }
+
+    Text(
+        text = annotatedText,
+        style = MaterialTheme.typography.bodySmall,
+        fontFamily = FontFamily.Monospace,
+        onTextLayout = { layoutResult = it },
+        modifier = modifier.fillMaxWidth().then(clickModifier)
+    )
 }

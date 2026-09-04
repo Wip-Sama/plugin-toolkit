@@ -356,16 +356,24 @@ fun CapabilityTester(
             parameters = capability.parameters
         )
     }
-    val requirementError = remember(capability, providedLocks, providedSettings) {
+    val requirementError = remember(capability, providedLocks, providedSettings, parameterValues.toMap()) {
         org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.validateCapabilityLocksAndSettings(
             capability = capability,
             providedLocks = providedLocks,
-            providedSettings = providedSettings
+            providedSettings = providedSettings,
+            parameterValues = parameterValues.toMap()
         )
     }
     val isValid = validationErrors.isEmpty() && requirementError == null
 
-    val targetSetting = capability.requiredLocks.firstOrNull() ?: capability.requiresSettings.firstOrNull() ?: ""
+    val targetSetting = remember(capability, providedLocks, providedSettings, parameterValues.toMap()) {
+        org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.getCapabilityTargetSettingKey(
+            capability = capability,
+            providedLocks = providedLocks,
+            providedSettings = providedSettings,
+            parameterValues = parameterValues.toMap()
+        )
+    }
 
     Button(
         onClick = onExecute,

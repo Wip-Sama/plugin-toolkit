@@ -112,6 +112,9 @@ fun FlowManagerView(
 ) {
     val state by viewModel.state.collectAsState()
     val pluginManager = org.koin.compose.koinInject<org.wip.plugintoolkit.features.plugin.logic.PluginManager>()
+    val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
+    val loadedPlugins by pluginManager.loadedPlugins.collectAsState()
+    val installedPlugins by pluginManager.installedPlugins.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFlowName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
@@ -122,8 +125,18 @@ fun FlowManagerView(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
 
-    val activeCapabilities = remember(state.flows) {
-        PluginLoader.getPlugins().flatMap { it.getManifest().getOrThrow().capabilities.map { cap -> cap.name } }.toSet()
+    androidx.compose.runtime.LaunchedEffect(loadedPlugins) {
+        loadedPlugins.forEach { pkg ->
+            try {
+                pluginManager.refreshLocks(pkg)
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    val activeCapabilities = remember(state.flows, loadedPlugins, installedPlugins) {
+        PluginLoader.getPlugins().flatMap { it.getManifest().getOrNull()?.capabilities?.map { cap -> cap.name } ?: emptyList() }.toSet()
     }
 
     val filteredFlows = remember(state.flows, searchQuery) {
@@ -252,11 +265,14 @@ fun FlowManagerView(
                             .distinct()
                     }
 
-                    val notReadyNodes = remember(flow, state.flows) {
+                    val notReadyNodes = remember(flow, state.flows, pluginLocksState, loadedPlugins) {
                         flow.nodes.filter { node ->
                             val settings =
                                 if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
-                            !node.isReady(flow.connections, settings)
+                            val locks = if (node is Node.CapabilityNode) {
+                                pluginLocksState[node.pluginInfo.id] ?: pluginLocksState.values.fold(emptyMap()) { acc, m -> acc + m }
+                            } else null
+                            !node.isReady(flow.connections, settings, locks)
                         }
                     }
 

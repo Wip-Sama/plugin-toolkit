@@ -106,9 +106,15 @@ fun FlowRunnerView(
             .toSet()
     }
 
-    val executableFlows = remember(state.flows, activeCapabilities) {
+    val executableFlows = remember(state.flows, activeCapabilities, pluginLocksState) {
         state.flows.filter { flow ->
-            !flow.isBroken(activeCapabilities)
+            val settingsMap = flow.nodes.filterIsInstance<Node.CapabilityNode>().associate {
+                it.id to pluginManager.loadPluginSettings(it.pluginInfo.id).settings
+            }
+            val locksMap = flow.nodes.filterIsInstance<Node.CapabilityNode>().associate {
+                it.id to (pluginLocksState[it.pluginInfo.id] ?: providedLocks)
+            }
+            !flow.isBroken(activeCapabilities, settingsMap, locksMap)
         }
     }
 
