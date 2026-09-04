@@ -45,8 +45,36 @@ data class BackgroundJob(
     val resumeState: JsonElement? = null,
     val keepResult: Boolean = true,
     val isPausable: Boolean = false,
-    val isCancellable: Boolean = true
+    val isCancellable: Boolean = true,
+    val executionMetrics: JobExecutionMetrics? = null
 )
+
+@Serializable
+data class CapabilityExecutionMetric(
+    val capabilityName: String,
+    val durationMs: Long,
+    val memoryUsageBytes: Long? = null
+)
+
+@Serializable
+data class JobExecutionMetrics(
+    val startedAt: Instant? = null,
+    val completedAt: Instant? = null,
+    val totalDurationMs: Long = 0L,
+    val memoryUsageBytes: Long? = null,
+    val capabilityMetrics: List<CapabilityExecutionMetric> = emptyList()
+) {
+    val totalDurationPerCapability: Map<String, Long>
+        get() = capabilityMetrics
+            .groupBy { it.capabilityName }
+            .mapValues { (_, metrics) -> metrics.sumOf { it.durationMs } }
+
+    val executionCountPerCapability: Map<String, Int>
+        get() = capabilityMetrics
+            .groupBy { it.capabilityName }
+            .mapValues { (_, metrics) -> metrics.size }
+}
+
 
 @Serializable
 data class JobHistoryEntry(

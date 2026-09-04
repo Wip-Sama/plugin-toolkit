@@ -208,17 +208,23 @@ class JobWorker(
 
             while (attempt <= retries) {
                 try {
-                    if (timeout == -1L) {
-                        return@async withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val startMark = kotlin.time.TimeSource.Monotonic.markNow()
+                    val memBefore = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
+                    val processResult = if (timeout == -1L) {
+                        withContext(kotlinx.coroutines.Dispatchers.IO) {
                             processor.process(request, context)
                         }
                     } else {
-                        return@async withTimeout(timeout.milliseconds) {
+                        withTimeout(timeout.milliseconds) {
                             withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 processor.process(request, context)
                             }
                         }
                     }
+                    val durationMs = startMark.elapsedNow().inWholeMilliseconds
+                    val memAfter = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
+                    manager.recordCapabilityMetric(job.id, job.capabilityName, durationMs, maxOf(memBefore, memAfter))
+                    return@async processResult
                 } catch (e: TimeoutCancellationException) {
                     lastError = e
                     attempt++

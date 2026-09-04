@@ -27,8 +27,23 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.ui.graphics.vector.ImageVector
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import org.koin.compose.koinInject
+import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.core.utils.MemoryUtils
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
+import kotlin.time.Instant
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -106,11 +121,15 @@ fun JobResultCard(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var logHeight by remember { mutableStateOf(150.dp) }
+    val defaultLogHeight = ToolkitTheme.dimensions.logTerminalDefaultHeight
+    val minLogHeight = ToolkitTheme.dimensions.logTerminalMinHeight
+    val maxLogHeight = ToolkitTheme.dimensions.logTerminalMaxHeight
+    var logHeight by remember { mutableStateOf(defaultLogHeight) }
     val listState = rememberLazyListState()
     var autoScroll by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
+    val notificationService: NotificationService = koinInject()
 
     val isAtBottom by remember {
         derivedStateOf {
@@ -192,10 +211,11 @@ fun JobResultCard(
                         }
                     }
 
-                    // Only show expand button if there are details to show (success result, error, or logs)
+                    // Only show expand button if there are details to show (success result, error, metrics, or logs)
                     val hasDetails = job.status == JobStatus.Completed ||
                             job.status == JobStatus.Failed ||
                             job.status == JobStatus.Cancelled ||
+                            job.executionMetrics != null ||
                             logs.isNotEmpty()
 
                     if (hasDetails) {
@@ -261,6 +281,10 @@ fun JobResultCard(
             if (expanded) {
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+
+                // Execution Info Section
+                ExecutionInfoSection(job = job)
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
                 when (job.status) {
@@ -444,20 +468,23 @@ fun JobResultCard(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(24.dp)
-                            .pointerInput(Unit) {
+                            .height(ToolkitTheme.dimensions.logHandleHeight)
+                            .pointerInput(minLogHeight, maxLogHeight) {
                                 detectDragGestures { change, dragAmount ->
                                     change.consume()
                                     val newHeight = logHeight + dragAmount.y.toDp()
-                                    logHeight = newHeight.coerceIn(100.dp, 800.dp)
+                                    logHeight = newHeight.coerceIn(
+                                        minLogHeight,
+                                        maxLogHeight
+                                    )
                                 }
                             },
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
-                                .width(40.dp)
-                                .height(4.dp)
+                                .width(ToolkitTheme.dimensions.logHandleWidth)
+                                .height(ToolkitTheme.dimensions.logHandleBarHeight)
                                 .background(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
                         )
                     }
@@ -498,13 +525,33 @@ fun JobResultCard(
                     }
 
                     Row(horizontalArrangement = Arrangement.End) {
-                    if (logs.isNotEmpty()) {
+                    val canExport = logs.isNotEmpty() || job.executionMetrics != null || job.result != null
+                    if (canExport) {
+                        val exportSuccessMsg = stringResource(Res.string.job_export_success_toast)
+                        val startedAtLabel = stringResource(Res.string.job_started_at_label)
+                        val completedAtLabel = stringResource(Res.string.job_completed_at_label)
+                        val durationLabel = stringResource(Res.string.job_duration_label)
+                        val memoryLabel = stringResource(Res.string.job_memory_label)
+                        val capBreakdownLabel = stringResource(Res.string.job_capability_breakdown_title)
+
                         TextButton(
                             onClick = {
                                 coroutineScope.launch {
                                     val dateStr = job.enqueuedAt.toString().take(19).replace(":", "-").replace("T", "_")
                                     val baseName = "${job.name}_$dateStr"
-                                    PlatformUtils.saveFile(baseName, "txt", logs.joinToString("\n").encodeToByteArray())
+                                    val reportContent = buildJobExportReport(
+                                        job = job,
+                                        logs = logs,
+                                        startedAtLabel = startedAtLabel,
+                                        completedAtLabel = completedAtLabel,
+                                        durationLabel = durationLabel,
+                                        memoryLabel = memoryLabel,
+                                        capabilityBreakdownLabel = capBreakdownLabel
+                                    )
+                                    val savedPath = PlatformUtils.saveFile(baseName, "txt", reportContent.encodeToByteArray())
+                                    if (savedPath != null) {
+                                        notificationService.toast(exportSuccessMsg)
+                                    }
                                 }
                             }
                         ) {
@@ -579,10 +626,11 @@ private fun ElapsedTimeText(job: BackgroundJob) {
 }
 
 private fun formatDuration(ms: Long): String {
-    val totalSeconds = ms / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}s"
+    if (ms < 1000L) return "${ms}ms"
+    val totalSeconds = ms / 1000.0
+    val minutes = (ms / 60000L)
+    val seconds = ((ms % 60000L) / 1000.0 * 10.0).roundToLong() / 10.0
+    return if (minutes > 0) "${minutes}m ${seconds.toInt()}s" else "${seconds}s"
 }
 
 private data class LinkSpan(
@@ -703,3 +751,292 @@ private fun TerminalLogLine(
         modifier = modifier.fillMaxWidth().then(clickModifier)
     )
 }
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ExecutionInfoSection(
+    job: BackgroundJob,
+    modifier: Modifier = Modifier
+) {
+    val metrics = job.executionMetrics
+    val startedAt = metrics?.startedAt ?: job.startedAt
+    val completedAt = metrics?.completedAt ?: job.completedAt
+    val durationMs = metrics?.totalDurationMs ?: run {
+        if (startedAt != null) {
+            val end = completedAt ?: Clock.System.now()
+            (end - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
+        } else null
+    }
+    val memoryUsage = metrics?.memoryUsageBytes ?: if (job.status == JobStatus.Running) {
+        MemoryUtils.getCurrentMemoryUsageBytes()
+    } else null
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.divider),
+                MaterialTheme.shapes.medium
+            )
+            .padding(ToolkitTheme.spacing.medium)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Speed,
+                contentDescription = null,
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = stringResource(Res.string.job_execution_info_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            MetricTile(
+                icon = Icons.Default.PlayCircleOutline,
+                label = stringResource(Res.string.job_started_at_label),
+                value = formatTimestamp(startedAt)
+            )
+            MetricTile(
+                icon = Icons.Default.StopCircle,
+                label = stringResource(Res.string.job_completed_at_label),
+                value = if (job.status == JobStatus.Running) "..." else formatTimestamp(completedAt)
+            )
+            MetricTile(
+                icon = Icons.Default.Timer,
+                label = stringResource(Res.string.job_duration_label),
+                value = if (durationMs != null) formatDuration(durationMs) else "—"
+            )
+            MetricTile(
+                icon = Icons.Default.Memory,
+                label = stringResource(Res.string.job_memory_label),
+                value = if (memoryUsage != null) MemoryUtils.formatMemoryBytes(memoryUsage) else "—"
+            )
+        }
+
+        // Per-capability breakdown
+        val capDurations = metrics?.totalDurationPerCapability ?: emptyMap()
+        val capCounts = metrics?.executionCountPerCapability ?: emptyMap()
+        if (capDurations.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
+            Text(
+                text = stringResource(Res.string.job_capability_breakdown_title),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+
+            val totalMs = durationMs?.coerceAtLeast(1L) ?: capDurations.values.sum().coerceAtLeast(1L)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                capDurations.forEach { (capName, ms) ->
+                    val count = capCounts[capName] ?: 1
+                    val fraction = (ms.toFloat() / totalMs).coerceIn(0f, 1f)
+                    val percent = (fraction * 100).roundToInt()
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.divider),
+                                MaterialTheme.shapes.small
+                            )
+                            .padding(ToolkitTheme.spacing.small)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = capName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                if (count > 1) {
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                    Text(
+                                        text = stringResource(Res.string.job_execution_count_format, count),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "${formatDuration(ms)} ($percent%)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                        LinearProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
+                                .clip(MaterialTheme.shapes.extraSmall),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricTile(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.high),
+        shape = MaterialTheme.shapes.small,
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.smallMedium, vertical = ToolkitTheme.spacing.small),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+            Column {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+private fun formatTimestamp(instant: Instant?): String {
+    if (instant == null) return "—"
+    val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+    return "${local.hour.toString().padStart(2, '0')}:${
+        local.minute.toString().padStart(2, '0')
+    }:${local.second.toString().padStart(2, '0')}"
+}
+
+private fun buildJobExportReport(
+    job: BackgroundJob,
+    logs: List<String>,
+    startedAtLabel: String,
+    completedAtLabel: String,
+    durationLabel: String,
+    memoryLabel: String,
+    capabilityBreakdownLabel: String
+): String {
+    val sb = StringBuilder()
+    sb.appendLine("================================================================================")
+    sb.appendLine("JOB EXECUTION REPORT")
+    sb.appendLine("================================================================================")
+    sb.appendLine("Job ID:         ${job.id}")
+    sb.appendLine("Job Name:       ${job.name}")
+    sb.appendLine("Job Type:       ${job.type}")
+    sb.appendLine("Status:         ${job.status}")
+    sb.appendLine("Triggered At:   ${job.enqueuedAt}")
+
+    val metrics = job.executionMetrics
+    val startedAt = metrics?.startedAt ?: job.startedAt
+    val completedAt = metrics?.completedAt ?: job.completedAt
+    val durationMs = metrics?.totalDurationMs ?: run {
+        if (startedAt != null) {
+            val end = completedAt ?: Clock.System.now()
+            (end - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
+        } else null
+    }
+
+    if (startedAt != null) {
+        sb.appendLine("$startedAtLabel:     $startedAt")
+    }
+    if (completedAt != null) {
+        sb.appendLine("$completedAtLabel:   $completedAt")
+    }
+    if (durationMs != null) {
+        sb.appendLine("$durationLabel: $durationMs ms (${formatDuration(durationMs)})")
+    }
+    val memoryUsage = metrics?.memoryUsageBytes
+    if (memoryUsage != null) {
+        sb.appendLine("$memoryLabel:   ${MemoryUtils.formatMemoryBytes(memoryUsage)}")
+    }
+
+    if (metrics != null && metrics.capabilityMetrics.isNotEmpty()) {
+        sb.appendLine()
+        sb.appendLine("--------------------------------------------------------------------------------")
+        sb.appendLine(capabilityBreakdownLabel.uppercase())
+        sb.appendLine("--------------------------------------------------------------------------------")
+        val durations = metrics.totalDurationPerCapability
+        val counts = metrics.executionCountPerCapability
+        durations.forEach { (capName, ms) ->
+            val count = counts[capName] ?: 1
+            val countStr = if (count > 1) " (x$count)" else ""
+            val pctStr = if (durationMs != null && durationMs > 0L) {
+                " [${((ms.toDouble() / durationMs) * 100.0).roundToInt()}%]"
+            } else ""
+            sb.appendLine("- $capName: $ms ms (${formatDuration(ms)})$countStr$pctStr")
+        }
+    }
+
+    if (job.result != null) {
+        sb.appendLine()
+        sb.appendLine("--------------------------------------------------------------------------------")
+        sb.appendLine("RESULT")
+        sb.appendLine("--------------------------------------------------------------------------------")
+        sb.appendLine(job.result)
+    }
+
+    if (job.errorMessage != null) {
+        sb.appendLine()
+        sb.appendLine("--------------------------------------------------------------------------------")
+        sb.appendLine("ERROR")
+        sb.appendLine("--------------------------------------------------------------------------------")
+        sb.appendLine(job.errorMessage)
+    }
+
+    if (logs.isNotEmpty()) {
+        sb.appendLine()
+        sb.appendLine("================================================================================")
+        sb.appendLine("CONSOLE LOGS (${logs.size} lines)")
+        sb.appendLine("================================================================================")
+        sb.appendLine(logs.joinToString("\n"))
+    }
+
+    return sb.toString()
+}
+

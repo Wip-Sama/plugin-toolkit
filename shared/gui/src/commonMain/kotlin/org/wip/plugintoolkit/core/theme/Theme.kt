@@ -133,7 +133,14 @@ data class Dimensions(
     val tooltipVerticalOffset: Dp = 8.dp,
     val dialogMaxWidthMedium: Dp = 540.dp,
     val filterChipHeight: Dp = 32.dp,
-    val segmentedButtonHeight: Dp = 36.dp
+    val segmentedButtonHeight: Dp = 36.dp,
+    val logHandleHeight: Dp = 24.dp,
+    val logHandleWidth: Dp = 40.dp,
+    val logHandleBarHeight: Dp = 4.dp,
+    val logTerminalMinHeight: Dp = 100.dp,
+    val logTerminalMaxHeight: Dp = 800.dp,
+    val logTerminalDefaultHeight: Dp = 150.dp,
+    val capabilityProgressBarHeight: Dp = 4.dp
 )
 
 data class CustomColors(

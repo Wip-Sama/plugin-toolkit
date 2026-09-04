@@ -3,6 +3,10 @@ Date: 29-08-2026
 Added:
 	- MaxLogLineLength setting to limit the length of a log line
 	- Hyperlink and folder support in the worker terminal
+	- Extra info about the job while/when they run
+Changes:
+	- The progress report now is formatted in a way that avoid spamming multiple times the same log progress
+	- Capabilities runner now have logger terminal
 Fixed:
 	- Plugin got stuck on unloading if something failed during a procedure
 	- Plugins locks would not update in the flow editor until a restart
@@ -16,7 +20,7 @@ Fixed:
 	- Reinstalling plugins with the same version should nwo properly update all the new/old capabilities without need for a restart
 	- System node regexes are now correctly executed and validated by the flow runner
 	- Not required nodes are now optional in the flor runner
-	- Properly cleaned old plugin jars when removing/updating plugins	
+	- Properly cleaned old plugin jars when removing/updating plugins
 
 -the max number of lines to keep in the terminal has a flaw, it does not account for max line length, if a Line is too big the terminal needs to keep render a lot, we need to do something to optimize it
 -auto scroll does not seems to be able to keep the log terminal window scrolled down in job manager, especially under heavy load

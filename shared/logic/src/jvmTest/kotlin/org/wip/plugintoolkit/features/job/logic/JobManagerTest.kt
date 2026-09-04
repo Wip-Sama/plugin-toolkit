@@ -9,6 +9,7 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JobManagerTest {
@@ -251,5 +252,116 @@ class JobManagerTest {
         val lastLog = logs?.last().orEmpty()
         assertTrue(lastLog.endsWith(longMessage))
         assertTrue(!lastLog.contains("... [truncated]"))
+    }
+
+    @Test
+    fun testProgressLoggingDeduplication() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job = BackgroundJob(
+            id = "progress-job",
+            name = "Progress Job",
+            type = JobType.Capability,
+            pluginId = "test-plugin",
+            capabilityName = "test-cap"
+        )
+        jobManager.enqueueJob(job)
+        val claimed = jobManager.waitForNextJob()
+
+        // 1. First progress update at 0.12 (12%) -> should log
+        jobManager.updateJobProgress(claimed.id, 0.12f)
+        var logs = jobManager.jobLogs.value[claimed.id].orEmpty()
+        assertEquals(1, logs.size)
+        assertTrue(logs[0].endsWith("Progress: 12%"))
+
+        // 2. Minor change that still rounds to 12% (0.1204f) -> should be deduplicated (no new log)
+        jobManager.updateJobProgress(claimed.id, 0.1204f)
+        logs = jobManager.jobLogs.value[claimed.id].orEmpty()
+        assertEquals(1, logs.size)
+
+        // 3. Update to 0.125f -> 12.5% -> should log
+        jobManager.updateJobProgress(claimed.id, 0.125f)
+        logs = jobManager.jobLogs.value[claimed.id].orEmpty()
+        assertEquals(2, logs.size)
+        assertTrue(logs[1].endsWith("Progress: 12.5%"))
+
+        // 4. Minor change that still rounds to 12.5% (0.1253f) -> deduplicated
+        jobManager.updateJobProgress(claimed.id, 0.1253f)
+        logs = jobManager.jobLogs.value[claimed.id].orEmpty()
+        assertEquals(2, logs.size)
+
+        // 5. Update to 1.0f (100%) -> should log
+        jobManager.updateJobProgress(claimed.id, 1.0f)
+        logs = jobManager.jobLogs.value[claimed.id].orEmpty()
+        assertEquals(3, logs.size)
+        assertTrue(logs[2].endsWith("Progress: 100%"))
+    }
+
+    @Test
+    fun testExecutionMetricsPopulatedOnJobComplete() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job = BackgroundJob(
+            id = "metrics-job",
+            name = "Metrics Job",
+            type = JobType.Flow,
+            pluginId = "test-plugin",
+            capabilityName = "flow"
+        )
+        jobManager.enqueueJob(job)
+        val claimed = jobManager.waitForNextJob()
+
+        jobManager.recordCapabilityMetric(claimed.id, "capabilityA", 150L, 1024L)
+        jobManager.recordCapabilityMetric(claimed.id, "capabilityA", 200L, 2048L)
+        jobManager.recordCapabilityMetric(claimed.id, "capabilityB", 300L, 4096L)
+
+        jobManager.tryCompleteJob(claimed.id, "Success")
+
+        val endedJobs = jobManager.endedJobs.value
+        assertEquals(1, endedJobs.size)
+        val endedJob = endedJobs.first()
+        val metrics = endedJob.executionMetrics
+        assertNotNull(metrics)
+
+        assertEquals(3, metrics.capabilityMetrics.size)
+        assertTrue(metrics.totalDurationMs >= 0L)
+        assertTrue(metrics.memoryUsageBytes != null && metrics.memoryUsageBytes >= 4096L)
+        assertEquals(350L, metrics.totalDurationPerCapability["capabilityA"])
+        assertEquals(2, metrics.executionCountPerCapability["capabilityA"])
+        assertEquals(300L, metrics.totalDurationPerCapability["capabilityB"])
+        assertEquals(1, metrics.executionCountPerCapability["capabilityB"])
+    }
+
+    @Test
+    fun testExecutionMetricsPopulatedOnJobCancel() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job = BackgroundJob(
+            id = "cancel-metrics-job",
+            name = "Cancel Metrics Job",
+            type = JobType.Capability,
+            pluginId = "test-plugin",
+            capabilityName = "test-cap"
+        )
+        jobManager.enqueueJob(job)
+        val claimed = jobManager.waitForNextJob()
+
+        jobManager.recordCapabilityMetric(claimed.id, "test-cap", 500L, 8192L)
+        jobManager.cancelJob(claimed.id)
+
+        val endedJobs = jobManager.endedJobs.value
+        assertEquals(1, endedJobs.size)
+        val endedJob = endedJobs.first()
+        val metrics = endedJob.executionMetrics
+        assertNotNull(metrics)
+        assertEquals(1, metrics.capabilityMetrics.size)
+        assertEquals(500L, metrics.totalDurationPerCapability["test-cap"])
+        assertTrue(metrics.memoryUsageBytes != null && metrics.memoryUsageBytes >= 8192L)
     }
 }

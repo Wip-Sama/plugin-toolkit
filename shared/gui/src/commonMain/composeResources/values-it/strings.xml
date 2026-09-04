@@ -497,4 +497,13 @@
     <string name="changelog_filter_major">Major</string>
     <string name="changelog_filter_minor">Minor</string>
     <string name="changelog_filter_patch">Patch</string>
+    <string name="job_execution_info_title">Info di Esecuzione</string>
+    <string name="job_started_at_label">Avviato</string>
+    <string name="job_completed_at_label">Completato</string>
+    <string name="job_duration_label">Durata Totale</string>
+    <string name="job_memory_label">Utilizzo Memoria</string>
+    <string name="job_capability_breakdown_title">Dettaglio Funzionalità</string>
+    <string name="job_export_success_toast">Report di esecuzione esportato con successo</string>
+    <string name="job_no_metrics_recorded">Nessuna metrica registrata</string>
+    <string name="job_execution_count_format">x%1$d</string>
 </resources>

@@ -28,6 +28,11 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import org.wip.plugintoolkit.core.utils.MemoryUtils
+import org.wip.plugintoolkit.features.job.model.CapabilityExecutionMetric
+import org.wip.plugintoolkit.features.job.model.JobExecutionMetrics
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Clock
 
 class JobManager(
@@ -75,6 +80,25 @@ class JobManager(
     private val settingsPersistence: org.wip.plugintoolkit.features.settings.logic.SettingsPersistence =
         settingsRepository.persistence
     private val jobRepository = JobRepository(settingsPersistence)
+
+    private val lastLoggedProgress = ConcurrentHashMap<String, String>()
+    private val activeJobCapabilityMetrics = ConcurrentHashMap<String, CopyOnWriteArrayList<CapabilityExecutionMetric>>()
+    private val activeJobPeakMemory = ConcurrentHashMap<String, Long>()
+
+    fun recordCapabilityMetric(
+        jobId: String,
+        capabilityName: String,
+        durationMs: Long,
+        memoryBytes: Long? = null
+    ) {
+        val list = activeJobCapabilityMetrics.computeIfAbsent(jobId) { CopyOnWriteArrayList() }
+        list.add(CapabilityExecutionMetric(capabilityName, durationMs, memoryBytes))
+        if (memoryBytes != null && memoryBytes > 0L) {
+            activeJobPeakMemory.compute(jobId) { _, current ->
+                kotlin.math.max(current ?: 0L, memoryBytes)
+            }
+        }
+    }
 
     init {
         scope.launch {
@@ -171,10 +195,28 @@ class JobManager(
             jobName = job.name
             if (job.status == JobStatus.Running || job.status == JobStatus.Queued || job.status == JobStatus.Paused) {
                 cancelled = true
+                val completedAt = Clock.System.now()
+                val startedAt = job.startedAt ?: job.enqueuedAt
+                val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
+                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes()
+                val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
+                val peakMem = kotlin.math.max(recordedPeak, currentMem)
+                val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
+                lastLoggedProgress.remove(jobId)
+
+                val metrics = JobExecutionMetrics(
+                    startedAt = startedAt,
+                    completedAt = completedAt,
+                    totalDurationMs = totalDuration,
+                    memoryUsageBytes = if (peakMem > 0L) peakMem else null,
+                    capabilityMetrics = capMetrics
+                )
+
                 currentList.map {
                     if (it.id == jobId) it.copy(
                         status = JobStatus.Cancelled,
-                        completedAt = Clock.System.now()
+                        completedAt = completedAt,
+                        executionMetrics = metrics
                     ) else it
                 }
             } else {
@@ -269,6 +311,7 @@ class JobManager(
 
                 if (candidate != null) {
                     claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
+                    activeJobPeakMemory[candidate.id] = MemoryUtils.getCurrentMemoryUsageBytes()
                     currentList.map { if (it.id == candidate.id) claimedJob else it }
                 } else {
                     currentList
@@ -296,12 +339,37 @@ class JobManager(
     }
 
     fun updateJobProgress(jobId: String, progress: Float) {
+        val clampedProgress = progress.coerceIn(0f, 1f)
         _jobProgress.update { current ->
             val currentProgress = current[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
-            current + (jobId to currentProgress.copy(mainProgress = progress))
+            if (currentProgress.mainProgress == clampedProgress) {
+                current
+            } else {
+                current + (jobId to currentProgress.copy(mainProgress = clampedProgress))
+            }
         }
-        val progressPercent = (progress * 100).toInt()
-        addJobLog(jobId, "Progress: $progressPercent%", "VERBOSE")
+        val percent = clampedProgress * 100f
+        val formattedPercent = formatProgressPercent(percent)
+        val previous = lastLoggedProgress[jobId]
+        if (previous != formattedPercent) {
+            lastLoggedProgress[jobId] = formattedPercent
+            addJobLog(jobId, "Progress: $formattedPercent", "VERBOSE")
+        }
+    }
+
+    private fun formatProgressPercent(percent: Float): String {
+        return if (percent >= 100f) {
+            "100%"
+        } else if (percent <= 0f) {
+            "0%"
+        } else {
+            val roundedOneDecimal = kotlin.math.round(percent * 10f) / 10f
+            if (roundedOneDecimal % 1f == 0f) {
+                "${roundedOneDecimal.toInt()}%"
+            } else {
+                "$roundedOneDecimal%"
+            }
+        }
     }
 
     fun updateCapabilityProgress(jobId: String, capabilityName: String, progress: Float) {
@@ -370,11 +438,29 @@ class JobManager(
             if (job.status == JobStatus.Running) {
                 completed = true
                 updateJobProgress(jobId, 1.0f)
+                val completedAt = Clock.System.now()
+                val startedAt = job.startedAt ?: job.enqueuedAt
+                val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
+                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes()
+                val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
+                val peakMem = kotlin.math.max(recordedPeak, currentMem)
+                val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
+                lastLoggedProgress.remove(jobId)
+
+                val metrics = JobExecutionMetrics(
+                    startedAt = startedAt,
+                    completedAt = completedAt,
+                    totalDurationMs = totalDuration,
+                    memoryUsageBytes = if (peakMem > 0L) peakMem else null,
+                    capabilityMetrics = capMetrics
+                )
+
                 currentList.map {
                     if (it.id == jobId) it.copy(
                         status = JobStatus.Completed,
-                        completedAt = Clock.System.now(),
-                        result = result
+                        completedAt = completedAt,
+                        result = result,
+                        executionMetrics = metrics
                     ) else it
                 }
             } else {
@@ -405,11 +491,29 @@ class JobManager(
             jobName = job.name
             if (job.status == JobStatus.Running) {
                 failed = true
+                val completedAt = Clock.System.now()
+                val startedAt = job.startedAt ?: job.enqueuedAt
+                val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
+                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes()
+                val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
+                val peakMem = kotlin.math.max(recordedPeak, currentMem)
+                val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
+                lastLoggedProgress.remove(jobId)
+
+                val metrics = JobExecutionMetrics(
+                    startedAt = startedAt,
+                    completedAt = completedAt,
+                    totalDurationMs = totalDuration,
+                    memoryUsageBytes = if (peakMem > 0L) peakMem else null,
+                    capabilityMetrics = capMetrics
+                )
+
                 currentList.map {
                     if (it.id == jobId) it.copy(
                         status = JobStatus.Failed,
                         errorMessage = errorMessage,
-                        completedAt = Clock.System.now()
+                        completedAt = completedAt,
+                        executionMetrics = metrics
                     ) else it
                 }
             } else {
@@ -574,12 +678,20 @@ class JobManager(
     fun clearEndedJob(jobId: String) {
         _endedJobs.update { it.filterNot { k -> k.id == jobId } }
         _jobLogs.update { it - jobId }
+        lastLoggedProgress.remove(jobId)
+        activeJobCapabilityMetrics.remove(jobId)
+        activeJobPeakMemory.remove(jobId)
     }
 
     fun clearAllEndedJobs() {
         val endedIds = _endedJobs.value.map { it.id }
         _endedJobs.value = emptyList()
         _jobLogs.update { it.filterKeys { k -> k !in endedIds } }
+        endedIds.forEach {
+            lastLoggedProgress.remove(it)
+            activeJobCapabilityMetrics.remove(it)
+            activeJobPeakMemory.remove(it)
+        }
     }
 
     suspend fun stopAll() {

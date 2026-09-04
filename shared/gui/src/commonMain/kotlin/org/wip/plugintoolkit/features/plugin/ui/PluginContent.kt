@@ -78,6 +78,7 @@ fun PluginContent(
         val allJobs = remember(activeJobs, endedJobs) { activeJobs + endedJobs }
 
         val jobProgressMap by viewModel.jobProgress.collectAsState(initial = emptyMap())
+        val jobLogsMap by viewModel.jobLogs.collectAsState(initial = emptyMap())
         val capabilityJobs = remember(allJobs, viewModel.selectedPlugin, selectedCapability) {
             val pluginId = viewModel.selectedPlugin?.getManifest()?.getOrThrow()?.plugin?.id
             val capName = selectedCapability?.name
@@ -185,14 +186,18 @@ fun PluginContent(
                                 JobResultCard(
                                     job = job,
                                     progress = jobProgressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
-                                    logs = emptyList(),
+                                    logs = jobLogsMap[job.id] ?: emptyList(),
                                     onDelete = {
                                         if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
                                             viewModel.removeEndedJob(job.id)
                                         } else {
-                                            viewModel.removeJob(job.id)
+                                            viewModel.cancelJob(job.id, force = true)
                                         }
-                                    }
+                                    },
+                                    onCancel = { force -> viewModel.cancelJob(job.id, force) },
+                                    onPause = { viewModel.pauseJob(job.id) },
+                                    onResume = { viewModel.resumeJob(job.id) },
+                                    onClear = { viewModel.removeEndedJob(job.id) }
                                 )
                             }
                         }

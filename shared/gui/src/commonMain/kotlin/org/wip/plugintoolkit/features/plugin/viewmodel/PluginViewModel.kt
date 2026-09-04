@@ -44,6 +44,7 @@ class PluginViewModel(
     val activeJobs = jobManager.jobs // Flow<List<BackgroundJob>>
     val endedJobs = jobManager.endedJobs // Flow<List<BackgroundJob>>
     val jobProgress = jobManager.jobProgress // Flow<Map<String, Float>>
+    val jobLogs = jobManager.jobLogs
 
     val parameterValues = mutableStateMapOf<String, String>()
     val manuallyModifiedParameters = mutableStateMapOf<String, Boolean>()
@@ -280,6 +281,24 @@ class PluginViewModel(
 
     fun removeEndedJob(jobId: String) {
         jobManager.clearEndedJob(jobId)
+    }
+
+    fun cancelJob(jobId: String, force: Boolean = false) {
+        viewModelScope.launch {
+            jobManager.cancelJob(jobId, force)
+        }
+    }
+
+    fun pauseJob(jobId: String) {
+        viewModelScope.launch {
+            jobManager.pauseJob(jobId)
+        }
+    }
+
+    fun resumeJob(jobId: String) {
+        viewModelScope.launch {
+            jobManager.resumeJob(jobId)
+        }
     }
 
     fun clearCapabilityHistory() {

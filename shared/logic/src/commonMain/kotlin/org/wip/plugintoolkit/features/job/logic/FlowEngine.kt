@@ -494,17 +494,23 @@ class FlowEngine(
 
                         while (attempt <= retries) {
                             try {
-                                if (timeout == -1L) {
-                                    return@async kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                val startMark = kotlin.time.TimeSource.Monotonic.markNow()
+                                val memBefore = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
+                                val processResult = if (timeout == -1L) {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                         processor.process(request, context)
                                     }
                                 } else {
-                                    return@async kotlinx.coroutines.withTimeout(timeout) {
+                                    kotlinx.coroutines.withTimeout(timeout) {
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                             processor.process(request, context)
                                         }
                                     }
                                 }
+                                val durationMs = startMark.elapsedNow().inWholeMilliseconds
+                                val memAfter = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
+                                manager.recordCapabilityMetric(job.id, node.capability.name, durationMs, maxOf(memBefore, memAfter))
+                                return@async processResult
                             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                                 lastError = e
                                 attempt++
@@ -554,11 +560,15 @@ class FlowEngine(
 
                     val monitorJob = if (isRoot) {
                         workerScope.launch {
+                            var lastCapProg = -1f
                             manager.jobProgress.collect { progressMap ->
                                 val p = progressMap[job.id] ?: return@collect
                                 val capProg = p.capabilitiesProgress[node.capability.name] ?: 0f
-                                val flowProgress = (completedNodesCount + capProg) / totalNodes.toFloat()
-                                manager.updateJobProgress(job.id, flowProgress)
+                                if (capProg != lastCapProg) {
+                                    lastCapProg = capProg
+                                    val flowProgress = (completedNodesCount + capProg) / totalNodes.toFloat()
+                                    manager.updateJobProgress(job.id, flowProgress)
+                                }
                             }
                         }
                     } else null
