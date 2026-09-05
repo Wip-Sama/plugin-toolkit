@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.plugin.logic
 
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
+import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.api.DataProcessor
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.loomDispatcher
@@ -151,7 +152,7 @@ class PluginLifecycleManagerTest {
                 version = "1.0.0",
                 installPath = "/tmp/test.plugin",
                 isEnabled = true,
-                targetAppVersion = "2.0.0"
+                targetAppVersion = AppConfig.VERSION
             )
         )
 

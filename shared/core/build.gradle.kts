@@ -50,7 +50,7 @@ buildkonfig {
         buildConfigField(
             com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
             "MIN_COMPATIBLE_PLUGIN_VERSION",
-            "1.7.4"
+            libs.versions.min.compatible.plugin.version.get()
         )
     }
 }

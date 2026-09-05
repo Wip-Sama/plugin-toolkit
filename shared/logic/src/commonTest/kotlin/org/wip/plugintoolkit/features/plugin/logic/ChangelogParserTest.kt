@@ -148,4 +148,55 @@ class ChangelogParserTest {
         assertEquals("1.0.0", versions[0].version)
         assertEquals("Cool Edition", versions[0].versionName)
     }
+
+    @Test
+    fun testParseSingleVersionAppReleaseNotes() {
+        val content = """
+            Version: 2.1.0
+            Date: 05-09-2026
+            Added:
+              - Added support for new features
+              - Added parsed changelog viewer
+            Changes:
+              - Improved update notification dialog
+            Fixed:
+              - Fixed minor bugs
+        """.trimIndent()
+
+        val versions = ChangelogParser.parse(content).releases
+        assertEquals(1, versions.size)
+        val release = versions.first()
+        assertEquals("2.1.0", release.version)
+        assertEquals("05-09-2026", release.date)
+        assertEquals(3, release.categories.size)
+        assertEquals(listOf("Added support for new features", "Added parsed changelog viewer"), release.categories["Added"])
+        assertEquals(listOf("Improved update notification dialog"), release.categories["Changes"])
+        assertEquals(listOf("Fixed minor bugs"), release.categories["Fixed"])
+    }
+
+    @Test
+    fun testParseReleaseNotesWithoutVersionHeaderWhenPrepended() {
+        val rawContent = """
+            Date: 05-09-2026
+            Added:
+              - Awesome feature
+            Fixed:
+              - Critical fix
+        """.trimIndent()
+
+        // When parsed without version, releases list is empty
+        val directReleases = ChangelogParser.parse(rawContent).releases
+        assertEquals(0, directReleases.size)
+
+        // When prepended with version header
+        val version = "2.1.0"
+        val withVersion = "Version: $version\n$rawContent"
+        val prependedReleases = ChangelogParser.parse(withVersion).releases
+        assertEquals(1, prependedReleases.size)
+        val release = prependedReleases.first()
+        assertEquals("2.1.0", release.version)
+        assertEquals("05-09-2026", release.date)
+        assertEquals(listOf("Awesome feature"), release.categories["Added"])
+        assertEquals(listOf("Critical fix"), release.categories["Fixed"])
+    }
 }

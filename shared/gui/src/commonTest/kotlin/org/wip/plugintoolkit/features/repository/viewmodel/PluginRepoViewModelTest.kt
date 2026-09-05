@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.ui.DialogService
@@ -227,7 +228,7 @@ class PluginRepoViewModelTest {
     @Test
     fun testIncompatibleFilterChip() = runTest {
         val plugins = listOf(
-            ExtensionPlugin(name = "Compatible Plugin", pkg = "org.compat", version = "1.0.0", fileName = "compat.jar", minAppVersion = "2.0.0"),
+            ExtensionPlugin(name = "Compatible Plugin", pkg = "org.compat", version = "1.0.0", fileName = "compat.jar", minAppVersion = AppConfig.VERSION),
             ExtensionPlugin(name = "Incompatible Plugin", pkg = "org.incompat", version = "1.0.0", fileName = "incompat.jar", minAppVersion = "99.0.0")
         )
         every { repoManager.repositories } returns MutableStateFlow(emptyList())
@@ -244,8 +245,8 @@ class PluginRepoViewModelTest {
     @Test
     fun testFlowFilterAndSorting() = runTest {
         val flows = listOf(
-            ExtensionFlow(name = "Zeta Flow", version = "1.0.0", fileName = "zeta.flow.json", minAppVersion = "2.0.0"),
-            ExtensionFlow(name = "Alpha Flow", version = "2.0.0", fileName = "alpha.flow.json", minAppVersion = "2.0.0"),
+            ExtensionFlow(name = "Zeta Flow", version = "1.0.0", fileName = "zeta.flow.json", minAppVersion = AppConfig.VERSION),
+            ExtensionFlow(name = "Alpha Flow", version = "2.0.0", fileName = "alpha.flow.json", minAppVersion = AppConfig.VERSION),
             ExtensionFlow(name = "Beta Flow", version = "1.5.0", fileName = "beta.flow.json", minAppVersion = "99.0.0")
         )
         every { repoManager.repositories } returns MutableStateFlow(emptyList())

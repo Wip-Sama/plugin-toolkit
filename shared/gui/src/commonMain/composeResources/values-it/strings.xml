@@ -163,6 +163,7 @@
     <string name="update_downloading">Download Aggiornamento in corso...</string>
     <string name="update_ready_to_install">Aggiornamento scaricato. Avvio dell\'installer...</string>
     <string name="update_changelog_title">Cosa c\'è di nuovo</string>
+    <string name="update_no_release_notes">Nessuna nota di rilascio disponibile.</string>
     <string name="update_check_failed">Impossibile verificare la presenza di aggiornamenti</string>
     <string name="update_no_updates">Stai utilizzando la versione più recente</string>
     <string name="update_check_started">Controllo aggiornamenti in corso...</string>

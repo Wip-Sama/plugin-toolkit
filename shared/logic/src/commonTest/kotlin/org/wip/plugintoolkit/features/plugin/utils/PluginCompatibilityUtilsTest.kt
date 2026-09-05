@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.plugin.utils
 
+import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginManifest
@@ -49,12 +50,12 @@ class PluginCompatibilityUtilsTest {
             requirements = Requirements(
                 minMemoryMb = 0,
                 minExecutionTimeMs = 0,
-                targetAppVersion = "2.0.0"
+                targetAppVersion = AppConfig.VERSION
             )
         )
 
         val (isCompatible, error) = PluginCompatibilityUtils.checkCompatibility(manifest)
-        assertTrue(isCompatible, "Plugin targeted for 2.0.0 should be compatible")
+        assertTrue(isCompatible, "Plugin targeted for ${AppConfig.VERSION} should be compatible")
         assertTrue(error == null, "Error message should be null for compatible plugin")
     }
 
@@ -100,11 +101,11 @@ class PluginCompatibilityUtilsTest {
             name = "Compatible Local Plugin",
             version = "1.0.0",
             installPath = "/fake/path",
-            targetAppVersion = "2.0.0"
+            targetAppVersion = AppConfig.VERSION
         )
 
         val (isCompCompatible, compError) = PluginCompatibilityUtils.checkCompatibility(compatiblePlugin)
-        assertTrue(isCompCompatible, "InstalledPlugin targeted for 2.0.0 should be marked compatible")
+        assertTrue(isCompCompatible, "InstalledPlugin targeted for ${AppConfig.VERSION} should be marked compatible")
         assertTrue(compError == null)
     }
 
@@ -123,7 +124,7 @@ class PluginCompatibilityUtilsTest {
             requirements = Requirements(
                 minMemoryMb = 0,
                 minExecutionTimeMs = 0,
-                targetAppVersion = "2.0.0"
+                targetAppVersion = AppConfig.VERSION
             )
         )
 

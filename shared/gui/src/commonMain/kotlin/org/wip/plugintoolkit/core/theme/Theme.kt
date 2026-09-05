@@ -140,7 +140,12 @@ data class Dimensions(
     val logTerminalMinHeight: Dp = 100.dp,
     val logTerminalMaxHeight: Dp = 800.dp,
     val logTerminalDefaultHeight: Dp = 150.dp,
-    val capabilityProgressBarHeight: Dp = 4.dp
+    val capabilityProgressBarHeight: Dp = 4.dp,
+    val dialogUpdateWidth: Dp = 680.dp,
+    val dialogUpdateHeight: Dp = 540.dp,
+    val dialogUpdateMinWidth: Dp = 500.dp,
+    val dialogUpdateMaxHeight: Dp = 620.dp,
+    val updateIconContainerSize: Dp = 48.dp
 )
 
 data class CustomColors(
