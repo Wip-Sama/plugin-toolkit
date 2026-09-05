@@ -241,11 +241,37 @@ actual object PlatformUtils {
 
     actual fun openFolder(path: String) {
         try {
-            val file = File(path)
+            val cleanPath = path.trim('"', '\'')
+            val file = File(cleanPath)
             if (file.exists()) {
-                Desktop.getDesktop().open(file)
+                val isWindows = System.getProperty("os.name").lowercase().contains("win")
+                if (file.isDirectory) {
+                    try {
+                        Desktop.getDesktop().open(file)
+                    } catch (e: Exception) {
+                        if (isWindows) {
+                            ProcessBuilder("explorer.exe", file.absolutePath).start()
+                        } else {
+                            throw e
+                        }
+                    }
+                } else {
+                    if (isWindows) {
+                        try {
+                            ProcessBuilder("explorer.exe", "/select,", file.absolutePath).start()
+                        } catch (_: Exception) {
+                            Desktop.getDesktop().open(file)
+                        }
+                    } else {
+                        try {
+                            Desktop.getDesktop().open(file)
+                        } catch (_: Exception) {
+                            file.parentFile?.let { Desktop.getDesktop().open(it) }
+                        }
+                    }
+                }
             } else {
-                Logger.w { "Folder does not exist: $path" }
+                Logger.w { "Folder or file does not exist: $path" }
             }
         } catch (e: Exception) {
             Logger.e(e) { "Failed to open folder $path" }

@@ -2,9 +2,13 @@ package org.wip.plugintoolkit.shared.components.plugin
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,10 +25,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
@@ -72,11 +78,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
@@ -100,6 +109,11 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.job.ui.StatusBadge
 import org.wip.plugintoolkit.shared.components.GlassCard
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_delete
 import plugintoolkit.composeapp.generated.resources.flow_console_logs_title
@@ -108,6 +122,10 @@ import plugintoolkit.composeapp.generated.resources.flow_run_id_label
 import plugintoolkit.composeapp.generated.resources.flow_triggered_label
 import plugintoolkit.composeapp.generated.resources.plugin_executing_progress
 import plugintoolkit.composeapp.generated.resources.plugin_execution_id_format
+import plugintoolkit.composeapp.generated.resources.terminal_link_click_to_open_path
+import plugintoolkit.composeapp.generated.resources.terminal_link_click_to_open_url
+import plugintoolkit.composeapp.generated.resources.terminal_link_shift_click_to_open_path
+import plugintoolkit.composeapp.generated.resources.terminal_link_shift_click_to_open_url
 import plugintoolkit.composeapp.generated.resources.*
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
@@ -128,7 +146,7 @@ fun JobResultCard(
     val minLogHeight = ToolkitTheme.dimensions.logTerminalMinHeight
     val maxLogHeight = ToolkitTheme.dimensions.logTerminalMaxHeight
     var logHeight by remember { mutableStateOf(defaultLogHeight) }
-    val listState = rememberLazyListState()
+    val scrollState = rememberScrollState()
     var autoScroll by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
@@ -136,20 +154,19 @@ fun JobResultCard(
 
     val isAtBottom by remember {
         derivedStateOf {
-            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
-            lastVisibleItem.index >= logs.lastIndex - 1
+            scrollState.value >= (scrollState.maxValue - 20)
         }
     }
 
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress && !isAtBottom && autoScroll) {
+    LaunchedEffect(scrollState.isScrollInProgress) {
+        if (scrollState.isScrollInProgress && !isAtBottom && autoScroll) {
             autoScroll = false
         }
     }
 
     LaunchedEffect(logs.size, logs.lastOrNull()) {
         if (autoScroll && logs.isNotEmpty()) {
-            listState.scrollToItem(logs.lastIndex)
+            scrollState.scrollTo(scrollState.maxValue)
         }
     }
 
@@ -271,7 +288,7 @@ fun JobResultCard(
                             progress = { capProg },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(2.dp)
+                                .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
                                 .clip(MaterialTheme.shapes.small),
                             color = MaterialTheme.colorScheme.secondary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -374,10 +391,6 @@ fun JobResultCard(
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceContainerLowest,
                                 shape = ToolkitTheme.shapes.large,
-                                border = BorderStroke(
-                                    ToolkitTheme.dimensions.borderThin,
-                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-                                ),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 SelectionContainer {
@@ -433,8 +446,6 @@ fun JobResultCard(
                     )
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
-                    var isShiftPressed by remember { mutableStateOf(false) }
-
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -444,38 +455,14 @@ fun JobResultCard(
                                 MaterialTheme.colorScheme.surfaceContainerLowest,
                                 ToolkitTheme.shapes.large
                             )
-                            .border(
-                                ToolkitTheme.dimensions.borderThin,
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider),
-                                ToolkitTheme.shapes.large
-                            )
-                            .onPointerEvent(PointerEventType.Move) {
-                                isShiftPressed = it.keyboardModifiers.isShiftPressed
-                            }
-                            .onPointerEvent(PointerEventType.Press) {
-                                isShiftPressed = it.keyboardModifiers.isShiftPressed
-                            }
-                            .onPointerEvent(PointerEventType.Release) {
-                                isShiftPressed = it.keyboardModifiers.isShiftPressed
-                            }
                             .padding(ToolkitTheme.spacing.medium)
                     ) {
-                        SelectionContainer {
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
-                            ) {
-                                items(logs) { logLine ->
-                                    TerminalLogLine(
-                                        logLine = logLine,
-                                        isShiftPressed = isShiftPressed,
-                                        onOpenUrl = { url -> uriHandler.openUri(url) },
-                                        onOpenFolder = { path -> PlatformUtils.openFolder(path) }
-                                    )
-                                }
-                            }
-                        }
+                        TerminalView(
+                            logs = logs,
+                            scrollState = scrollState,
+                            onOpenUrl = { url -> uriHandler.openUri(url) },
+                            onOpenFolder = { path -> PlatformUtils.openFolder(path) }
+                        )
                     }
 
                     Box(
@@ -521,7 +508,7 @@ fun JobResultCard(
                                     autoScroll = isChecked
                                     if (isChecked && logs.isNotEmpty()) {
                                         coroutineScope.launch {
-                                            listState.scrollToItem(logs.lastIndex)
+                                            scrollState.scrollTo(scrollState.maxValue)
                                         }
                                     }
                                 }
@@ -538,6 +525,20 @@ fun JobResultCard(
                     }
 
                     Row(horizontalArrangement = Arrangement.End) {
+                    if (logs.isNotEmpty()) {
+                        val clipboardManager = LocalClipboardManager.current
+                        val copySuccessMsg = stringResource(Res.string.job_copy_logs_success_toast)
+                        TextButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(logs.joinToString("\n")))
+                                notificationService.toast(copySuccessMsg)
+                            }
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(Res.string.action_copy_logs))
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Text(stringResource(Res.string.action_copy_logs))
+                        }
+                    }
                     val canExport = logs.isNotEmpty() || job.executionMetrics != null || job.result != null
                     if (canExport) {
                         val exportSuccessMsg = stringResource(Res.string.job_export_success_toast)
@@ -646,65 +647,37 @@ private fun formatDuration(ms: Long): String {
     return if (minutes > 0) "${minutes}m ${seconds.toInt()}s" else "${seconds}s"
 }
 
-private data class LinkSpan(
-    val start: Int,
-    val end: Int,
-    val target: String,
-    val isUrl: Boolean
+private data class CombinedLogData(
+    val annotatedText: AnnotatedString,
+    val linkSpans: List<TerminalLinkSpan>
 )
 
-private val URL_REGEX = Regex("""https?://[^\s)\]>"']+""")
-private val PATH_REGEX = Regex("""(?:[a-zA-Z]:[/\\]|\\\\|/(?:Users|home|tmp|var|etc|opt|usr|Applications|mnt|Volumes)/)[^\s)\]>"']+""")
-
-private fun findLinkSpans(line: String): List<LinkSpan> {
-    val spans = mutableListOf<LinkSpan>()
-    for (match in URL_REGEX.findAll(line)) {
-        val cleanTarget = match.value.trimEnd('.', ',', ';', ':', ')', ']')
-        val end = match.range.first + cleanTarget.length
-        spans.add(LinkSpan(match.range.first, end, cleanTarget, isUrl = true))
-    }
-    for (match in PATH_REGEX.findAll(line)) {
-        val start = match.range.first
-        val cleanTarget = match.value.trimEnd('.', ',', ';', ':', ')', ']')
-        val end = start + cleanTarget.length
-        val overlaps = spans.any { it.start < end && start < it.end }
-        if (!overlaps) {
-            spans.add(LinkSpan(start, end, cleanTarget, isUrl = false))
-        }
-    }
-    return spans.sortedBy { it.start }
-}
-
-@Composable
-private fun TerminalLogLine(
-    logLine: String,
+private fun buildCombinedLogData(
+    logs: List<String>,
     isShiftPressed: Boolean,
-    onOpenUrl: (String) -> Unit,
-    onOpenFolder: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val errorColor = MaterialTheme.colorScheme.error
-    val warnColor = MaterialTheme.colorScheme.tertiary
-    val defaultColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val linkColor = MaterialTheme.colorScheme.primary
+    defaultColor: Color,
+    linkColor: Color,
+    errorColor: Color,
+    warnColor: Color
+): CombinedLogData {
+    val allSpans = mutableListOf<TerminalLinkSpan>()
+    val annotatedText = buildAnnotatedString {
+        var currentOffset = 0
+        logs.forEachIndexed { index, logLine ->
+            val baseColor = when {
+                logLine.contains("[ERROR]", ignoreCase = true) || logLine.startsWith("ERROR:") -> errorColor
+                logLine.contains("[WARN]", ignoreCase = true) || logLine.startsWith("WARN:") -> warnColor
+                else -> defaultColor
+            }
 
-    val baseColor = when {
-        logLine.contains("[ERROR]", ignoreCase = true) || logLine.startsWith("ERROR:") -> errorColor
-        logLine.contains("[WARN]", ignoreCase = true) || logLine.startsWith("WARN:") -> warnColor
-        else -> defaultColor
-    }
-
-    val linkSpans = remember(logLine) { findLinkSpans(logLine) }
-
-    val annotatedText = remember(logLine, isShiftPressed, baseColor, linkColor, linkSpans) {
-        buildAnnotatedString {
-            if (linkSpans.isEmpty()) {
+            val lineSpans = TerminalLinkHelper.findLinkSpans(logLine)
+            if (lineSpans.isEmpty()) {
                 withStyle(SpanStyle(color = baseColor)) {
                     append(logLine)
                 }
             } else {
                 var currentIndex = 0
-                for (span in linkSpans) {
+                for (span in lineSpans) {
                     if (span.start > currentIndex) {
                         withStyle(SpanStyle(color = baseColor)) {
                             append(logLine.substring(currentIndex, span.start))
@@ -722,6 +695,14 @@ private fun TerminalLogLine(
                     withStyle(style) {
                         append(logLine.substring(span.start, span.end))
                     }
+                    allSpans.add(
+                        TerminalLinkSpan(
+                            start = currentOffset + span.start,
+                            end = currentOffset + span.end,
+                            target = span.target,
+                            isUrl = span.isUrl
+                        )
+                    )
                     currentIndex = span.end
                 }
                 if (currentIndex < logLine.length) {
@@ -730,39 +711,135 @@ private fun TerminalLogLine(
                     }
                 }
             }
+
+            currentOffset += logLine.length
+            if (index < logs.size - 1) {
+                append("\n")
+                currentOffset += 1
+            }
         }
     }
+    return CombinedLogData(annotatedText, allSpans)
+}
 
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun TerminalView(
+    logs: List<String>,
+    scrollState: ScrollState,
+    onOpenUrl: (String) -> Unit,
+    onOpenFolder: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val errorColor = MaterialTheme.colorScheme.error
+    val warnColor = MaterialTheme.colorScheme.tertiary
+    val defaultColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val linkColor = MaterialTheme.colorScheme.primary
+
+    var isShiftHeld by remember { mutableStateOf(false) }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var hoveredSpan by remember { mutableStateOf<TerminalLinkSpan?>(null) }
+    var pointerPosition by remember { mutableStateOf(Offset.Zero) }
 
-    val clickModifier = if (isShiftPressed && linkSpans.isNotEmpty()) {
-        Modifier
-            .pointerHoverIcon(PointerIcon.Hand)
-            .pointerInput(isShiftPressed, linkSpans) {
-                detectTapGestures { offset ->
-                    val layout = layoutResult ?: return@detectTapGestures
-                    val characterOffset = layout.getOffsetForPosition(offset)
-                    val clickedSpan = linkSpans.firstOrNull { characterOffset in it.start until it.end }
-                    if (clickedSpan != null) {
-                        if (clickedSpan.isUrl) {
-                            onOpenUrl(clickedSpan.target)
-                        } else {
-                            onOpenFolder(clickedSpan.target)
+    val logData = remember(logs, isShiftHeld, defaultColor, linkColor, errorColor, warnColor) {
+        buildCombinedLogData(logs, isShiftHeld, defaultColor, linkColor, errorColor, warnColor)
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+    ) {
+        SelectionContainer {
+            Text(
+                text = logData.annotatedText,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                onTextLayout = { layoutResult = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerHoverIcon(if (hoveredSpan != null) PointerIcon.Hand else PointerIcon.Default)
+                    .onPointerEvent(PointerEventType.Move) { event ->
+                        isShiftHeld = event.keyboardModifiers.isShiftPressed
+                        if (event.buttons.isPrimaryPressed) {
+                            hoveredSpan = null
+                            return@onPointerEvent
                         }
+                        val pos = event.changes.firstOrNull()?.position ?: return@onPointerEvent
+                        pointerPosition = pos
+                        val layout = layoutResult
+                        if (layout != null && logData.linkSpans.isNotEmpty()) {
+                            val offset = layout.getOffsetForPosition(pos)
+                            hoveredSpan = logData.linkSpans.firstOrNull { offset in it.start until it.end }
+                        } else {
+                            hoveredSpan = null
+                        }
+                    }
+                    .onPointerEvent(PointerEventType.Exit) {
+                        hoveredSpan = null
+                    }
+                    .pointerInput(logData.linkSpans) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                if (event.type == PointerEventType.Press && event.keyboardModifiers.isShiftPressed) {
+                                    val change = event.changes.firstOrNull() ?: continue
+                                    val pos = change.position
+                                    val layout = layoutResult ?: continue
+                                    val charOffset = layout.getOffsetForPosition(pos)
+                                    val clickedSpan = logData.linkSpans.firstOrNull { charOffset in it.start until it.end }
+                                    if (clickedSpan != null) {
+                                        change.consume()
+                                        if (clickedSpan.isUrl) {
+                                            onOpenUrl(clickedSpan.target)
+                                        } else {
+                                            onOpenFolder(clickedSpan.target)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+            )
+        }
+
+        if (hoveredSpan != null) {
+            val span = hoveredSpan!!
+            val tooltipText = if (isShiftHeld) {
+                if (span.isUrl) stringResource(Res.string.terminal_link_click_to_open_url, span.target)
+                else stringResource(Res.string.terminal_link_click_to_open_path, span.target)
+            } else {
+                if (span.isUrl) stringResource(Res.string.terminal_link_shift_click_to_open_url, span.target)
+                else stringResource(Res.string.terminal_link_shift_click_to_open_path, span.target)
+            }
+
+            DisableSelection {
+                Popup(
+                    offset = IntOffset(
+                        pointerPosition.x.toInt(),
+                        (pointerPosition.y + 20f).toInt()
+                    ),
+                    properties = PopupProperties(focusable = false)
+                ) {
+                    Surface(
+                        shape = ToolkitTheme.shapes.extraSmall,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        shadowElevation = ToolkitTheme.spacing.small
+                    ) {
+                        Text(
+                            text = tooltipText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(
+                                horizontal = ToolkitTheme.spacing.small,
+                                vertical = ToolkitTheme.spacing.extraSmall
+                            )
+                        )
                     }
                 }
             }
-    } else {
-        Modifier
+        }
     }
-
-    Text(
-        text = annotatedText,
-        style = MaterialTheme.typography.bodySmall,
-        fontFamily = FontFamily.Monospace,
-        onTextLayout = { layoutResult = it },
-        modifier = modifier.fillMaxWidth().then(clickModifier)
-    )
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -771,27 +848,42 @@ private fun ExecutionInfoSection(
     job: BackgroundJob,
     modifier: Modifier = Modifier
 ) {
+    var ticker by remember { mutableStateOf(0L) }
+    LaunchedEffect(job.id, job.status) {
+        if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
+            while (true) {
+                delay(1000)
+                ticker++
+            }
+        }
+    }
+
     val metrics = job.executionMetrics
     val startedAt = metrics?.startedAt ?: job.startedAt
     val completedAt = metrics?.completedAt ?: job.completedAt
-    val durationMs = metrics?.totalDurationMs ?: run {
-        if (startedAt != null) {
-            val end = completedAt ?: Clock.System.now()
-            (end - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
-        } else null
+    val isRunning = job.status == JobStatus.Running || job.status == JobStatus.Queued
+
+    val durationMs = if (isRunning && startedAt != null) {
+        if (ticker >= 0) {
+            (Clock.System.now() - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
+        } else 0L
+    } else {
+        metrics?.totalDurationMs ?: run {
+            if (startedAt != null) {
+                val end = completedAt ?: Clock.System.now()
+                (end - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
+            } else null
+        }
     }
-    val memoryUsage = metrics?.memoryUsageBytes ?: if (job.status == JobStatus.Running) {
-        MemoryUtils.getCurrentMemoryUsageBytes()
-    } else null
+
+    val memoryUsage = if (isRunning) {
+        if (ticker >= 0) MemoryUtils.getCurrentMemoryUsageBytes() else null
+    } else {
+        metrics?.memoryUsageBytes
+    }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.divider),
-                MaterialTheme.shapes.medium
-            )
-            .padding(ToolkitTheme.spacing.medium)
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -826,7 +918,7 @@ private fun ExecutionInfoSection(
             MetricTile(
                 icon = Icons.Default.StopCircle,
                 label = stringResource(Res.string.job_completed_at_label),
-                value = if (job.status == JobStatus.Running) "..." else formatTimestamp(completedAt)
+                value = if (isRunning) "..." else formatTimestamp(completedAt)
             )
             MetricTile(
                 icon = Icons.Default.Timer,
@@ -844,14 +936,14 @@ private fun ExecutionInfoSection(
         val capDurations = metrics?.totalDurationPerCapability ?: emptyMap()
         val capCounts = metrics?.executionCountPerCapability ?: emptyMap()
         if (capDurations.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             Text(
                 text = stringResource(Res.string.job_capability_breakdown_title),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
             val totalMs = durationMs?.coerceAtLeast(1L) ?: capDurations.values.sum().coerceAtLeast(1L)
             Column(
@@ -867,8 +959,8 @@ private fun ExecutionInfoSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.divider),
-                                MaterialTheme.shapes.small
+                                MaterialTheme.colorScheme.surfaceContainerLowest,
+                                ToolkitTheme.shapes.small
                             )
                             .padding(ToolkitTheme.spacing.small)
                     ) {
@@ -926,8 +1018,8 @@ private fun MetricTile(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.high),
-        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shape = ToolkitTheme.shapes.small,
         modifier = modifier
     ) {
         Row(

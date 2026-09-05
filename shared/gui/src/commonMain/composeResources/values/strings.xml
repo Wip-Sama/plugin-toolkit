@@ -538,4 +538,10 @@
     <string name="setting_max_memory_approx_gb">≈ %1$s GB</string>
     <string name="setting_max_memory_approx_mb">= %1$d MB</string>
     <string name="dialog_apply">Apply</string>
+    <string name="terminal_link_click_to_open_path">Click to open folder: %1$s</string>
+    <string name="terminal_link_shift_click_to_open_path">Shift + Click to open folder: %1$s</string>
+    <string name="terminal_link_click_to_open_url">Click to open: %1$s</string>
+    <string name="terminal_link_shift_click_to_open_url">Shift + Click to open: %1$s</string>
+    <string name="action_copy_logs">Copy Logs</string>
+    <string name="job_copy_logs_success_toast">Logs copied to clipboard</string>
 </resources>
