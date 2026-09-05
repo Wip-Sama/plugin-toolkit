@@ -1,5 +1,5 @@
 Version: 2.0.2
-Date: 29-08-2026
+Date: 05-09-2026
 Added:
 	- MaxLogLineLength setting to limit the length of a log line
 	- Hyperlink and folder support in the worker terminal
