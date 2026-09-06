@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
+import org.wip.plugintoolkit.api.ErrorDetail
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.PluginContext
@@ -353,5 +354,25 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
         val storageValue = context.storage.get("feature_unlocked")
         val isUnlocked = (storageValue as? JsonPrimitive)?.booleanOrNull
         return "Feature is unlocked and operational! storageValue=$storageValue, isUnlocked=$isUnlocked, feature=$feature"
+    }
+
+    @Capability(
+        name = "capabilityWithErrorDetail",
+        description = "Showcase of structured, serializable error reporting using ErrorDetail."
+    )
+    fun capabilityWithErrorDetail(
+        @CapabilityParam(description = "Whether to trigger an error", defaultValue = "true") triggerError: Boolean
+    ): ExecutionResult {
+        return if (triggerError) {
+            ExecutionResult.Error(
+                error = ErrorDetail(
+                    message = "Simulated domain error with structured diagnostic details",
+                    exceptionType = "DomainValidationException",
+                    details = mapOf("errorCode" to "ERR_DEMO_001", "suggestion" to "Check configuration parameters")
+                )
+            )
+        } else {
+            ExecutionResult.Success(PluginResponse(result = JsonPrimitive("Operation completed successfully")))
+        }
     }
 }

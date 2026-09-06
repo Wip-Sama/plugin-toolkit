@@ -78,12 +78,12 @@ class PluginLifecycleManager(
     /**
      * Loads a plugin into the JVM and initializes it.
      */
-    suspend fun loadPlugin(pkg: String): Result<Unit> = getPluginLock(pkg).withLock {
-        loadPluginInternal(pkg)
+    suspend fun loadPlugin(pkg: String, forceReload: Boolean = false): Result<Unit> = getPluginLock(pkg).withLock {
+        loadPluginInternal(pkg, forceReload)
     }
 
-    private suspend fun loadPluginInternal(pkg: String): Result<Unit> {
-        Logger.i { "Loading plugin: $pkg" }
+    private suspend fun loadPluginInternal(pkg: String, forceReload: Boolean = false): Result<Unit> {
+        Logger.i { "Loading plugin: $pkg (forceReload=$forceReload)" }
         val plugin = registry.getPlugin(pkg) ?: return Result.failure(Exception("Plugin $pkg not found in registry"))
 
         if (!plugin.isEnabled) {
@@ -129,7 +129,7 @@ class PluginLifecycleManager(
             _pluginLoadingSteps.update { it + (pkg to "Loading classes...") }
             val settings = loadPluginSettings(pkg)
             val result = try {
-                PluginLoader.loadPlugin(jarFile, settings.settings)
+                PluginLoader.loadPlugin(jarFile, settings.settings, forceReload = forceReload)
             } catch (t: Throwable) {
                 Result.failure(Exception("Fatal error loading plugin classes", t))
             }
@@ -164,6 +164,7 @@ class PluginLifecycleManager(
                     if (plugin.isValidated) {
                         _loadedPlugins.update { it + pkg }
                         updateLoadError(pkg, null) // Clear errors on success
+                        registry.updatePlugin(pkg) { it.copy(status = org.wip.plugintoolkit.features.plugin.model.PluginLifecycleStatus.VALIDATED) }
                         Logger.i { "Plugin $pkg successfully loaded and activated" }
                     } else {
                         Logger.i { "Plugin $pkg loaded but waiting for validation/activation" }
@@ -221,11 +222,11 @@ class PluginLifecycleManager(
     }
 
     /**
-     * Sequential unload and load.
+     * Sequential unload and load with force reload.
      */
     suspend fun reloadPlugin(pkg: String) = getPluginLock(pkg).withLock {
         unloadPluginInternal(pkg)
-        loadPluginInternal(pkg)
+        loadPluginInternal(pkg, forceReload = true)
     }
 
     /**
@@ -270,7 +271,14 @@ class PluginLifecycleManager(
             it.copy(
                 loadError = error,
                 // Fatal load errors invalidate the plugin state
-                isValidated = if (error != null) false else it.isValidated
+                isValidated = if (error != null) false else it.isValidated,
+                status = if (error != null) {
+                    org.wip.plugintoolkit.features.plugin.model.PluginLifecycleStatus.VALIDATION_FAILED
+                } else if (it.isValidated) {
+                    org.wip.plugintoolkit.features.plugin.model.PluginLifecycleStatus.VALIDATED
+                } else {
+                    it.status
+                }
             )
         }
     }

@@ -1,8 +1,12 @@
 package org.wip.plugintoolkit.api
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import org.koin.core.module.Module
 
@@ -291,27 +295,82 @@ interface PluginSignalManager {
 }
 
 /**
+ * Structured, serializable detail for an execution error.
+ * Suitable for cross-process IPC and RPC protocols.
+ */
+@Serializable
+data class ErrorDetail(
+    val message: String,
+    val exceptionType: String? = null,
+    val cause: String? = null,
+    val details: Map<String, String> = emptyMap(),
+    val stackTrace: String? = null
+) {
+    val code: String? get() = exceptionType
+
+    fun toThrowable(): Throwable = Exception(message)
+
+    companion object {
+        fun fromThrowable(throwable: Throwable?, code: String? = null): ErrorDetail? {
+            if (throwable == null) return null
+            return ErrorDetail(
+                message = throwable.message ?: "Unknown error",
+                exceptionType = code ?: throwable::class.simpleName,
+                cause = throwable.cause?.message,
+                stackTrace = throwable.stackTraceToString()
+            )
+        }
+    }
+}
+
+/**
  * The result of a plugin capability execution.
  */
+@Serializable
 sealed class ExecutionResult {
     /**
      * The task completed successfully.
      * @property response The response data.
      */
+    @Serializable
+    @SerialName("Success")
     data class Success(val response: PluginResponse) : ExecutionResult()
 
     /**
      * The task has paused and saved its state.
      * @property resumeState The state to be used for resumption.
      */
+    @Serializable
+    @SerialName("Paused")
     data class Paused(val resumeState: JsonElement) : ExecutionResult()
 
     /**
      * The task failed with an error.
      * @property message A human-readable error message.
-     * @property throwable The underlying cause of the failure.
+     * @property detail Structured serializable error detail.
      */
-    data class Error(val message: String, val throwable: Throwable? = null) : ExecutionResult()
+    @Serializable
+    @SerialName("Error")
+    data class Error(
+        val message: String = "Execution failed",
+        val detail: ErrorDetail? = null
+    ) : ExecutionResult() {
+        constructor(throwable: Throwable) : this(
+            message = throwable.message ?: "Execution failed",
+            detail = ErrorDetail.fromThrowable(throwable)
+        )
+        constructor(message: String, throwable: Throwable?) : this(
+            message = message,
+            detail = ErrorDetail.fromThrowable(throwable)
+        )
+        constructor(error: ErrorDetail) : this(
+            message = error.message,
+            detail = error
+        )
+
+        val error: ErrorDetail get() = detail ?: ErrorDetail(message = message, exceptionType = "Exception")
+        val throwable: Throwable get() = detail?.toThrowable() ?: Exception(message)
+    }
 }
 
 /**
@@ -321,9 +380,10 @@ sealed class ExecutionResult {
  */
 interface JobHandle {
     /**
-     * The deferred result of the task.
+     * Await the execution result of the task asynchronously.
+     * Decoupled from in-memory kotlinx.coroutines Deferred to support IPC/RPC boundaries.
      */
-    val result: Deferred<ExecutionResult>
+    suspend fun awaitResult(): ExecutionResult
 
     /**
      * Request the task to pause. The task must handle this by saving its state
@@ -337,6 +397,11 @@ interface JobHandle {
      */
     fun cancel(force: Boolean = false)
 }
+
+/**
+ * Extension helper to adapt a [JobHandle] into an in-memory [Deferred] if needed.
+ */
+fun JobHandle.asDeferred(scope: CoroutineScope): Deferred<ExecutionResult> = scope.async { awaitResult() }
 
 /**
  * Context provided to a plugin during execution.

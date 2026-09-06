@@ -260,7 +260,7 @@ class JobWorker(
         }
 
         val handle = object : JobHandle {
-            override val result: Deferred<ExecutionResult> = deferredResult
+            override suspend fun awaitResult(): ExecutionResult = deferredResult.await()
 
             override fun pause() {
                 workerScope.launch { context.signals.sendSignal(PluginSignal.PAUSE) }
@@ -276,7 +276,7 @@ class JobWorker(
         manager.registerJobHandle(job.id, handle)
 
         val result = try {
-            handle.result.await()
+            handle.awaitResult()
         } catch (e: TimeoutCancellationException) {
             Logger.e(e) { "CRITICAL WARNING: Worker $workerId: Capability job ${job.id} timed out. The plugin may be hanging and could leak classloaders." }
             ExecutionResult.Error("Plugin execution timed out and may have leaked resources.", e)
@@ -337,8 +337,8 @@ class JobWorker(
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: Deferred<ExecutionResult>
-                get() = throw UnsupportedOperationException("Not used for setup")
+            override suspend fun awaitResult(): ExecutionResult =
+                ExecutionResult.Success(org.wip.plugintoolkit.api.PluginResponse(kotlinx.serialization.json.JsonPrimitive("Setup Completed")))
 
             override fun pause() { /* Not supported */
             }
@@ -410,8 +410,8 @@ class JobWorker(
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: Deferred<ExecutionResult>
-                get() = throw UnsupportedOperationException("Not used for update")
+            override suspend fun awaitResult(): ExecutionResult =
+                ExecutionResult.Success(org.wip.plugintoolkit.api.PluginResponse(kotlinx.serialization.json.JsonPrimitive("Update Completed")))
 
             override fun pause() { /* Not supported */
             }
@@ -483,8 +483,8 @@ class JobWorker(
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: Deferred<ExecutionResult>
-                get() = throw UnsupportedOperationException("Not used for validation")
+            override suspend fun awaitResult(): ExecutionResult =
+                ExecutionResult.Success(org.wip.plugintoolkit.api.PluginResponse(kotlinx.serialization.json.JsonPrimitive("Validation Completed")))
 
             override fun pause() { /* Not supported */
             }
@@ -550,8 +550,8 @@ class JobWorker(
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: Deferred<ExecutionResult>
-                get() = throw UnsupportedOperationException("Not used for actions")
+            override suspend fun awaitResult(): ExecutionResult =
+                ExecutionResult.Success(org.wip.plugintoolkit.api.PluginResponse(kotlinx.serialization.json.JsonPrimitive("Action Completed")))
 
             override fun pause() { /* Not supported for actions currently */
             }
@@ -607,8 +607,8 @@ class JobWorker(
         // Register a simple handle for cancellation
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: Deferred<ExecutionResult>
-                get() = throw UnsupportedOperationException("Not used for installation")
+            override suspend fun awaitResult(): ExecutionResult =
+                ExecutionResult.Success(org.wip.plugintoolkit.api.PluginResponse(kotlinx.serialization.json.JsonPrimitive("Installation Completed")))
 
             override fun pause() { /* Not supported */
             }

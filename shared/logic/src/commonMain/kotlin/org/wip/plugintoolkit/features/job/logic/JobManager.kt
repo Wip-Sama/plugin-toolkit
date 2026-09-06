@@ -48,11 +48,11 @@ class JobManager(
     val jobs: StateFlow<List<BackgroundJob>> = _jobs.asStateFlow()
 
     val activeJobIds: StateFlow<Set<String>> = _jobs.map { list ->
-        list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running }.map { it.id }.toSet()
+        list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.PauseRequested }.map { it.id }.toSet()
     }.stateIn(scope, SharingStarted.Eagerly, emptySet())
 
     fun isJobPendingOrRunning(jobId: String): Boolean {
-        return _jobs.value.any { it.id == jobId && (it.status == JobStatus.Queued || it.status == JobStatus.Running) }
+        return _jobs.value.any { it.id == jobId && (it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.PauseRequested) }
     }
 
     private val _endedJobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
@@ -105,7 +105,7 @@ class JobManager(
             try {
                 val savedJobs = jobRepository.loadJobs()
                 val (activeSaved, endedSaved) = savedJobs.partition {
-                    it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.Paused
+                    it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.Paused || it.status == JobStatus.PauseRequested
                 }
                 _jobs.update { currentJobs ->
                     val newJobIds = currentJobs.map { it.id }.toSet()
@@ -193,7 +193,7 @@ class JobManager(
         _jobs.update { currentList ->
             val job = currentList.find { it.id == jobId } ?: return@update currentList
             jobName = job.name
-            if (job.status == JobStatus.Running || job.status == JobStatus.Queued || job.status == JobStatus.Paused) {
+            if (job.status == JobStatus.Running || job.status == JobStatus.Queued || job.status == JobStatus.Paused || job.status == JobStatus.PauseRequested) {
                 cancelled = true
                 val completedAt = Clock.System.now()
                 val startedAt = job.startedAt ?: job.enqueuedAt
@@ -249,7 +249,7 @@ class JobManager(
             jobName = job.name
             if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
                 paused = true
-                currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Paused) else it }
+                currentList.map { if (it.id == jobId) it.copy(status = JobStatus.PauseRequested) else it }
             } else {
                 currentList
             }
@@ -272,7 +272,7 @@ class JobManager(
         _jobs.update { currentList ->
             val job = currentList.find { it.id == jobId } ?: return@update currentList
             jobName = job.name
-            if (job.status == JobStatus.Paused) {
+            if (job.status == JobStatus.Paused || job.status == JobStatus.PauseRequested) {
                 resumed = true
                 currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Queued) else it }
             } else {
@@ -358,18 +358,8 @@ class JobManager(
     }
 
     private fun formatProgressPercent(percent: Float): String {
-        return if (percent >= 100f) {
-            "100%"
-        } else if (percent <= 0f) {
-            "0%"
-        } else {
-            val roundedOneDecimal = kotlin.math.round(percent * 10f) / 10f
-            if (roundedOneDecimal % 1f == 0f) {
-                "${roundedOneDecimal.toInt()}%"
-            } else {
-                "$roundedOneDecimal%"
-            }
-        }
+        val intPercent = percent.toInt().coerceIn(0, 100)
+        return "$intPercent%"
     }
 
     fun updateCapabilityProgress(jobId: String, capabilityName: String, progress: Float) {
@@ -435,7 +425,7 @@ class JobManager(
         _jobs.update { currentList ->
             val job = currentList.find { it.id == jobId } ?: return@update currentList
             jobName = job.name
-            if (job.status == JobStatus.Running) {
+            if (job.status == JobStatus.Running || job.status == JobStatus.PauseRequested) {
                 completed = true
                 updateJobProgress(jobId, 1.0f)
                 val completedAt = Clock.System.now()
@@ -489,7 +479,7 @@ class JobManager(
         _jobs.update { currentList ->
             val job = currentList.find { it.id == jobId } ?: return@update currentList
             jobName = job.name
-            if (job.status == JobStatus.Running) {
+            if (job.status == JobStatus.Running || job.status == JobStatus.PauseRequested) {
                 failed = true
                 val completedAt = Clock.System.now()
                 val startedAt = job.startedAt ?: job.enqueuedAt
@@ -559,7 +549,7 @@ class JobManager(
         _jobs.update { currentList ->
             val job = currentList.find { it.id == jobId } ?: return@update currentList
             jobName = job.name
-            if (job.status == JobStatus.Running || job.status == JobStatus.Paused) {
+            if (job.status == JobStatus.Running || job.status == JobStatus.PauseRequested || job.status == JobStatus.Paused) {
                 paused = true
                 currentList.map {
                     if (it.id == jobId) it.copy(

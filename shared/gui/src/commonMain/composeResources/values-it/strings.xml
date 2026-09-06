@@ -96,6 +96,7 @@
     <string name="plugin_loaded">Caricato</string>
     <string name="plugin_validated">Validato</string>
     <string name="plugin_validation_pending">In attesa di configurazione</string>
+    <string name="plugin_status_validation_failed">Validazione fallita</string>
     <string name="plugin_setting_up">Configurazione in corso (%d%%)</string>
     <string name="plugin_state_activating">Attivazione...</string>
     <string name="plugin_state_deactivating">Disattivazione...</string>

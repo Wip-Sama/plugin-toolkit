@@ -225,5 +225,20 @@ class CompleteExampleTest {
         plugin.updateApiKeySetting(newApiKey = "custom-api-key-999", context = context)
         assertEquals("custom-api-key-999", context.getStringSetting("apiKey"))
     }
+
+    @Test
+    fun testCapabilityWithErrorDetail() {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+
+        val errorResult = plugin.capabilityWithErrorDetail(triggerError = true)
+        assertTrue(errorResult is ExecutionResult.Error)
+        assertEquals("Simulated domain error with structured diagnostic details", errorResult.error.message)
+        assertEquals("DomainValidationException", errorResult.error.exceptionType)
+        assertEquals("ERR_DEMO_001", errorResult.error.details["errorCode"])
+
+        val successResult = plugin.capabilityWithErrorDetail(triggerError = false)
+        assertTrue(successResult is ExecutionResult.Success)
+    }
 }
 

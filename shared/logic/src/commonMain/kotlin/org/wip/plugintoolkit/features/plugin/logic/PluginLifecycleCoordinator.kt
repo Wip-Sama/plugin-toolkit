@@ -9,6 +9,7 @@ import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.plugin.model.PluginLifecycleStatus
 import kotlin.time.Clock
 
 sealed interface LifecycleAction {
@@ -163,7 +164,11 @@ class PluginLifecycleCoordinator(
                 Logger.i { "LifecycleCoordinator: Lifecycle job completed for ${job.pluginId}: ${job.type}" }
                 when (job.type) {
                     JobType.Validation -> markAsValidated(job.pluginId)
-                    JobType.Setup, JobType.Update -> triggerValidationInternal(job.pluginId)
+                    JobType.Setup -> {
+                        registry.updatePlugin(job.pluginId) { it.copy(isSetupCompleted = true) }
+                        triggerValidationInternal(job.pluginId)
+                    }
+                    JobType.Update -> triggerValidationInternal(job.pluginId)
                     JobType.PluginAction -> clearRequiredAction(job.pluginId)
                     else -> {}
                 }
@@ -174,7 +179,18 @@ class PluginLifecycleCoordinator(
             is LifecycleAction.OnJobFailed -> {
                 val job = action.job
                 Logger.w { "LifecycleCoordinator: Lifecycle job failed for ${job.pluginId}: ${job.type} - ${action.error}" }
-                if (job.type == JobType.Validation || job.type == JobType.Setup || job.type == JobType.Update) {
+                if (job.type == JobType.Setup) {
+                    registry.updatePlugin(job.pluginId) {
+                        it.copy(
+                            isValidated = false,
+                            status = PluginLifecycleStatus.PENDING_SETUP,
+                            loadError = action.error
+                        )
+                    }
+                    if (lifecycleManager.loadedPlugins.value.contains(job.pluginId) || PluginLoader.getPluginById(job.pluginId) != null) {
+                        lifecycleManager.unloadPlugin(job.pluginId)
+                    }
+                } else if (job.type == JobType.Validation || job.type == JobType.Update) {
                     markAsInvalidated(job.pluginId, action.error)
                 }
                 action.response.complete(Unit)
@@ -203,13 +219,34 @@ class PluginLifecycleCoordinator(
             }
 
             is LifecycleAction.ReloadPlugin -> {
-                lifecycleManager.reloadPlugin(action.pkg)
+                Logger.i { "LifecycleCoordinator: Reloading plugin ${action.pkg}" }
+                lifecycleManager.unloadPlugin(action.pkg)
+                val loadRes = lifecycleManager.loadPlugin(action.pkg, forceReload = true)
+                if (loadRes.isFailure) {
+                    markAsInvalidated(action.pkg, loadRes.exceptionOrNull()?.message)
+                } else {
+                    val plugin = PluginLoader.getPluginById(action.pkg)
+                    val valResult = plugin?.validate(lifecycleManager.createPluginContext(action.pkg))
+                        ?: Result.failure(Exception("Plugin not loaded after reload: ${action.pkg}"))
+                    if (valResult.isSuccess) {
+                        markAsValidated(action.pkg)
+                    } else {
+                        markAsInvalidated(action.pkg, valResult.exceptionOrNull()?.message)
+                    }
+                }
                 action.response.complete(Unit)
             }
 
             is LifecycleAction.HandlePostInstall -> {
-                registry.updatePlugin(action.pkg) { it.copy(isValidated = false) }
-                if (action.manifest.hasSetupHandler) {
+                val hasSetup = action.manifest.hasSetupHandler
+                registry.updatePlugin(action.pkg) {
+                    it.copy(
+                        isValidated = false,
+                        isSetupCompleted = !hasSetup,
+                        status = if (hasSetup) PluginLifecycleStatus.PENDING_SETUP else PluginLifecycleStatus.VALIDATING
+                    )
+                }
+                if (hasSetup) {
                     enqueueSetupJobInternal(action.pkg)
                 } else {
                     triggerValidationInternal(action.pkg)
@@ -218,13 +255,19 @@ class PluginLifecycleCoordinator(
             }
 
             is LifecycleAction.HandlePostUpdate -> {
-                registry.updatePlugin(action.pkg) { it.copy(isValidated = false) }
+                registry.updatePlugin(action.pkg) {
+                    it.copy(
+                        isValidated = false,
+                        status = PluginLifecycleStatus.PENDING_SETUP
+                    )
+                }
                 if (action.manifest.hasUpdateHandler) {
                     enqueueUpdateJobInternal(action.pkg)
                 } else if (action.manifest.hasSetupHandler) {
                     action.installer.clearFiles(action.pkg)
                     enqueueSetupJobInternal(action.pkg)
                 } else {
+                    registry.updatePlugin(action.pkg) { it.copy(isSetupCompleted = true) }
                     triggerValidationInternal(action.pkg)
                 }
                 action.response.complete(Unit)
@@ -297,7 +340,14 @@ class PluginLifecycleCoordinator(
                 Logger.i { "Rerunning setup for plugin: ${action.pkg}" }
                 lifecycleManager.unloadPlugin(action.pkg)
                 action.installer.clearFiles(action.pkg)
-                registry.updatePlugin(action.pkg) { it.copy(isValidated = false, loadError = null) }
+                registry.updatePlugin(action.pkg) {
+                    it.copy(
+                        isValidated = false,
+                        isSetupCompleted = false,
+                        status = PluginLifecycleStatus.PENDING_SETUP,
+                        loadError = null
+                    )
+                }
                 enqueueSetupJobInternal(action.pkg)
                 action.response.complete(Unit)
             }
@@ -317,7 +367,18 @@ class PluginLifecycleCoordinator(
                     }
                 }
 
-                registry.updatePlugin(action.pkg) { it.copy(isEnabled = action.enabled) }
+                registry.updatePlugin(action.pkg) {
+                    it.copy(
+                        isEnabled = action.enabled,
+                        status = if (!action.enabled) {
+                            PluginLifecycleStatus.DISABLED
+                        } else if (it.isValidated) {
+                            PluginLifecycleStatus.VALIDATED
+                        } else {
+                            PluginLifecycleStatus.PENDING_SETUP
+                        }
+                    )
+                }
 
                 if (action.enabled) {
                     val plugin = registry.getPlugin(action.pkg)
@@ -539,11 +600,13 @@ class PluginLifecycleCoordinator(
 
         if (manifest?.hasSetupHandler != true) {
             Logger.d { "LifecycleCoordinator: Plugin $pkg has no setup handler, proceeding to validation" }
+            registry.updatePlugin(pkg) { it.copy(isSetupCompleted = true) }
             triggerValidationInternal(pkg)
             return
         }
 
         Logger.i { "LifecycleCoordinator: Enqueuing setup job setup_$pkg for $pkg" }
+        registry.updatePlugin(pkg) { it.copy(status = PluginLifecycleStatus.SETTING_UP) }
         val job = BackgroundJob(
             id = "setup_$pkg",
             name = "Setup: ${plugin.name}",
@@ -587,6 +650,7 @@ class PluginLifecycleCoordinator(
         }
 
         Logger.i { "LifecycleCoordinator: Enqueuing update job update_$pkg for $pkg" }
+        registry.updatePlugin(pkg) { it.copy(status = PluginLifecycleStatus.SETTING_UP) }
         val job = BackgroundJob(
             id = "update_$pkg",
             name = "Update: ${plugin.name}",
@@ -625,6 +689,7 @@ class PluginLifecycleCoordinator(
         }
 
         Logger.i { "LifecycleCoordinator: Enqueuing validation job val_$pkg for $pkg" }
+        registry.updatePlugin(pkg) { it.copy(status = PluginLifecycleStatus.VALIDATING) }
         val job = BackgroundJob(
             id = "val_$pkg",
             name = "Validation: ${plugin.name}",
@@ -644,7 +709,14 @@ class PluginLifecycleCoordinator(
     private suspend fun markAsValidated(pkg: String) {
         val plugin = registry.getPlugin(pkg) ?: return
         Logger.i { "LifecycleCoordinator: Marking plugin $pkg as validated and loading plugin" }
-        registry.updatePlugin(pkg) { it.copy(isValidated = true, loadError = null) }
+        registry.updatePlugin(pkg) {
+            it.copy(
+                isValidated = true,
+                isSetupCompleted = true,
+                status = PluginLifecycleStatus.VALIDATED,
+                loadError = null
+            )
+        }
         val loadResult = lifecycleManager.loadPlugin(pkg)
         if (loadResult.isFailure) {
             Logger.e { "LifecycleCoordinator: Failed to activate validated plugin $pkg: ${loadResult.exceptionOrNull()?.message}" }
@@ -654,8 +726,14 @@ class PluginLifecycleCoordinator(
     private suspend fun markAsInvalidated(pkg: String, error: String? = null) {
         val plugin = registry.getPlugin(pkg) ?: return
         Logger.w { "LifecycleCoordinator: Marking plugin $pkg as invalidated (error=$error)" }
-        registry.updatePlugin(pkg) { it.copy(isValidated = false, loadError = error) }
-        if (lifecycleManager.loadedPlugins.value.contains(pkg)) {
+        registry.updatePlugin(pkg) {
+            it.copy(
+                isValidated = false,
+                status = PluginLifecycleStatus.VALIDATION_FAILED,
+                loadError = error
+            )
+        }
+        if (lifecycleManager.loadedPlugins.value.contains(pkg) || PluginLoader.getPluginById(pkg) != null) {
             Logger.i { "LifecycleCoordinator: Unloading invalidated plugin $pkg" }
             lifecycleManager.unloadPlugin(pkg)
         }

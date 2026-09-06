@@ -94,11 +94,11 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
 
         // First call to processAsync (Node 2)
         val deferred1 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
-        every { mockHandle1.result } returns deferred1
+        coEvery { mockHandle1.awaitResult() } coAnswers { deferred1.await() }
 
         // Second call to processAsync (Node 3)
         val deferred2 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
-        every { mockHandle2.result } returns deferred2
+        coEvery { mockHandle2.awaitResult() } coAnswers { deferred2.await() }
 
         var callCount = 0
         coEvery { mockProcessor.process(any(), any()) } coAnswers {
@@ -339,8 +339,8 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val deferred1 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
         val deferred2 = kotlinx.coroutines.CompletableDeferred<org.wip.plugintoolkit.api.ExecutionResult>()
 
-        every { mockHandle1.result } returns deferred1
-        every { mockHandle2.result } returns deferred2
+        coEvery { mockHandle1.awaitResult() } coAnswers { deferred1.await() }
+        coEvery { mockHandle2.awaitResult() } coAnswers { deferred2.await() }
 
         coEvery { mockProcessor.process(any(), any()) } coAnswers {
             val req = firstArg<PluginRequest>()

@@ -3,10 +3,12 @@ package org.wip.plugintoolkit.features.job.logic
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -281,16 +283,16 @@ class JobManagerTest {
         logs = jobManager.jobLogs.value[claimed.id].orEmpty()
         assertEquals(1, logs.size)
 
-        // 3. Update to 0.125f -> 12.5% -> should log
+        // 3. Update to 0.125f -> still 12% -> should be deduplicated (no new log)
         jobManager.updateJobProgress(claimed.id, 0.125f)
         logs = jobManager.jobLogs.value[claimed.id].orEmpty()
-        assertEquals(2, logs.size)
-        assertTrue(logs[1].endsWith("Progress: 12.5%"))
+        assertEquals(1, logs.size)
 
-        // 4. Minor change that still rounds to 12.5% (0.1253f) -> deduplicated
-        jobManager.updateJobProgress(claimed.id, 0.1253f)
+        // 4. Update to 0.13f -> 13% -> should log
+        jobManager.updateJobProgress(claimed.id, 0.13f)
         logs = jobManager.jobLogs.value[claimed.id].orEmpty()
         assertEquals(2, logs.size)
+        assertTrue(logs[1].endsWith("Progress: 13%"))
 
         // 5. Update to 1.0f (100%) -> should log
         jobManager.updateJobProgress(claimed.id, 1.0f)
@@ -363,5 +365,73 @@ class JobManagerTest {
         assertEquals(1, metrics.capabilityMetrics.size)
         assertEquals(500L, metrics.totalDurationPerCapability["test-cap"])
         assertTrue(metrics.memoryUsageBytes != null && metrics.memoryUsageBytes >= 8192L)
+    }
+
+    @Test
+    fun testPauseRequestedStateTransitions() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        // 1. Job completes while PauseRequested
+        val job1 = BackgroundJob(
+            id = "pause-complete-job",
+            name = "Job 1",
+            type = JobType.Capability,
+            pluginId = "test-plugin",
+            capabilityName = "cap1"
+        )
+        jobManager.enqueueJob(job1)
+        val claimed1 = jobManager.waitForNextJob()
+        jobManager.pauseJob(claimed1.id)
+
+        // Verify status is PauseRequested
+        val runningJob1 = jobManager.jobs.value.find { it.id == claimed1.id }
+        assertNotNull(runningJob1)
+        assertEquals(JobStatus.PauseRequested, runningJob1.status)
+
+        // Completion while PauseRequested should succeed
+        val completed1 = jobManager.tryCompleteJob(claimed1.id, "Finished before pause acknowledged")
+        assertTrue(completed1)
+        val ended1 = jobManager.endedJobs.value.find { it.id == claimed1.id }
+        assertNotNull(ended1)
+        assertEquals(JobStatus.Completed, ended1.status)
+
+        // 2. Job fails while PauseRequested
+        val job2 = BackgroundJob(
+            id = "pause-fail-job",
+            name = "Job 2",
+            type = JobType.Capability,
+            pluginId = "test-plugin",
+            capabilityName = "cap2"
+        )
+        jobManager.enqueueJob(job2)
+        val claimed2 = jobManager.waitForNextJob()
+        jobManager.pauseJob(claimed2.id)
+
+        val failed2 = jobManager.tryFailJob(claimed2.id, "Error before pause acknowledged")
+        assertTrue(failed2)
+        val ended2 = jobManager.endedJobs.value.find { it.id == claimed2.id }
+        assertNotNull(ended2)
+        assertEquals(JobStatus.Failed, ended2.status)
+
+        // 3. Job acknowledges pause -> Paused
+        val job3 = BackgroundJob(
+            id = "pause-acknowledged-job",
+            name = "Job 3",
+            type = JobType.Capability,
+            pluginId = "test-plugin",
+            capabilityName = "cap3"
+        )
+        jobManager.enqueueJob(job3)
+        val claimed3 = jobManager.waitForNextJob()
+        jobManager.pauseJob(claimed3.id)
+
+        val paused3 = jobManager.tryPauseJob(claimed3.id, JsonPrimitive("state_snapshot"))
+        assertTrue(paused3)
+        val runningJob3 = jobManager.jobs.value.find { it.id == claimed3.id }
+        assertNotNull(runningJob3)
+        assertEquals(JobStatus.Paused, runningJob3.status)
+        assertEquals(JsonPrimitive("state_snapshot"), runningJob3.resumeState)
     }
 }

@@ -442,6 +442,7 @@ fun StatusBadge(status: JobStatus) {
     val color = when (status) {
         JobStatus.Queued -> MaterialTheme.colorScheme.onSurfaceVariant
         JobStatus.Running -> MaterialTheme.colorScheme.primary
+        JobStatus.PauseRequested -> MaterialTheme.colorScheme.primary
         JobStatus.Paused -> MaterialTheme.colorScheme.primary
         JobStatus.Completed -> ToolkitTheme.colors.success
         JobStatus.Failed -> MaterialTheme.colorScheme.error

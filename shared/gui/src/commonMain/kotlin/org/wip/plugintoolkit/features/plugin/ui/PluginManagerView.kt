@@ -116,6 +116,7 @@ import plugintoolkit.composeapp.generated.resources.plugin_update
 import plugintoolkit.composeapp.generated.resources.plugin_update_local
 import plugintoolkit.composeapp.generated.resources.plugin_validate
 import plugintoolkit.composeapp.generated.resources.plugin_validated
+import plugintoolkit.composeapp.generated.resources.plugin_status_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_pending
 import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_format
 
@@ -488,6 +489,13 @@ fun PluginCard(
                                 text = stringResource(Res.string.plugin_validated),
                                 contentColor = ToolkitTheme.colors.validated,
                                 containerColor = ToolkitTheme.colors.onValidated
+                            )
+                        } else if (plugin.isSetupCompleted) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            ToolkitChip(
+                                text = stringResource(Res.string.plugin_status_validation_failed),
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
                             )
                         } else {
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))

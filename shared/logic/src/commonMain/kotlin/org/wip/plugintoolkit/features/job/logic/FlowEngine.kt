@@ -50,7 +50,8 @@ class FlowEngine(
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         var initialPauseRequested = false
         manager.registerJobHandle(job.id, object : JobHandle {
-            override val result: Deferred<ExecutionResult> get() = throw UnsupportedOperationException("Not used directly")
+            override suspend fun awaitResult(): ExecutionResult =
+                ExecutionResult.Success(org.wip.plugintoolkit.api.PluginResponse(kotlinx.serialization.json.JsonPrimitive("Flow Completed")))
             override fun pause() {
                 initialPauseRequested = true
             }
@@ -250,7 +251,8 @@ class FlowEngine(
 
         if (isRoot) {
             val flowHandle = object : JobHandle {
-                override val result: Deferred<ExecutionResult> get() = throw UnsupportedOperationException("Not used directly")
+                override suspend fun awaitResult(): ExecutionResult =
+                    ExecutionResult.Success(org.wip.plugintoolkit.api.PluginResponse(kotlinx.serialization.json.JsonPrimitive("Flow Completed")))
                 override fun pause() {
                     pauseRequested = true
                     activeCapabilityHandle?.pause()
@@ -547,7 +549,7 @@ class FlowEngine(
                     }
 
                     val handle = object : JobHandle {
-                        override val result = deferredResult
+                        override suspend fun awaitResult(): ExecutionResult = deferredResult.await()
                         override fun pause() {
                             workerScope.launch { context.signals.sendSignal(org.wip.plugintoolkit.api.PluginSignal.PAUSE) }
                         }
@@ -574,9 +576,9 @@ class FlowEngine(
                     } else null
 
                     val result = try {
-                        handle.result.await()
+                        handle.awaitResult()
                     } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                        ExecutionResult.Error("Timeout", e)
+                        ExecutionResult.Error(e)
                     } catch (e: CancellationException) {
                         if (pauseRequested) ExecutionResult.Paused(JsonNull) else throw e
                     } catch (e: Exception) {

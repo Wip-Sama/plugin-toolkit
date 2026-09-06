@@ -9,6 +9,7 @@ import kotlin.time.Instant
 enum class JobStatus {
     Queued,
     Running,
+    PauseRequested,
     Paused,
     Completed,
     Failed,
