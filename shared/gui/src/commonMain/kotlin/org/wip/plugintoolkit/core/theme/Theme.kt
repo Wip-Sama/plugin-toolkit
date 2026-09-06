@@ -9,6 +9,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -21,9 +22,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.settings.model.AppTheme
 import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
@@ -31,17 +36,30 @@ import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
 data class Spacing(
     val none: Dp = 0.dp,
     val extraExtraSmall: Dp = 2.dp,
+    val xxs: Dp = 2.dp,
     val extraSmall: Dp = 4.dp,
+    val xs: Dp = 4.dp,
     val small: Dp = 8.dp,
+    val sm: Dp = 8.dp,
+    @Deprecated("Violates 8dp/4dp grid. Use sm (8.dp) or md (16.dp)", ReplaceWith("small"))
     val smallMedium: Dp = 10.dp,
+    @Deprecated("Violates 8dp/4dp grid. Use sm (8.dp) or md (16.dp)", ReplaceWith("small"))
     val mediumSmall: Dp = 12.dp,
     val medium: Dp = 16.dp,
+    val md: Dp = 16.dp,
+    @Deprecated("Violates 8dp/4dp grid. Use md (16.dp) or lg (24.dp)", ReplaceWith("medium"))
     val mediumLarge: Dp = 20.dp,
     val large: Dp = 24.dp,
+    val lg: Dp = 24.dp,
     val extraLarge: Dp = 32.dp,
+    val xl: Dp = 32.dp,
     val huge: Dp = 40.dp,
+    val xxl: Dp = 48.dp,
     val massive: Dp = 64.dp,
-    val badgeHorizontal: Dp = 6.dp,
+    val xxxl: Dp = 64.dp,
+    @Deprecated("Use xs (4.dp)", ReplaceWith("extraSmall"))
+    val badgeHorizontal: Dp = 4.dp,
+    @Deprecated("Use xxs (2.dp)", ReplaceWith("extraExtraSmall"))
     val badgeVertical: Dp = 2.dp
 )
 
@@ -90,7 +108,7 @@ data class Dimensions(
     val menuElevation: Dp = 4.dp,
     val iconExtraLarge: Dp = 64.dp,
     
-    // Auto-generated generic/component-specific sized dimensions
+    // Auto-generated generic/component-specific sized dimensions (deprecated in favor of semantic tokens)
     val ringWidthMedium: Dp = 10.dp,
     val previewRadiusLarge: Dp = 80.dp,
     val ringWidthLarge: Dp = 20.dp,
@@ -125,10 +143,15 @@ data class Dimensions(
     val heightSmall: Dp = 8.dp,
     val dialogMaxWidthLarge: Dp = 1280.dp,
     
+    @Deprecated("Use ToolkitTheme.shapes.extraSmall", ReplaceWith("ToolkitTheme.shapes.extraSmall"))
     val cornerRadiusExtraSmall: Dp = 4.dp,
+    @Deprecated("Use ToolkitTheme.shapes.small", ReplaceWith("ToolkitTheme.shapes.small"))
     val cornerRadiusSmall: Dp = 8.dp,
+    @Deprecated("Use ToolkitTheme.shapes.medium", ReplaceWith("ToolkitTheme.shapes.medium"))
     val cornerRadiusMedium: Dp = 12.dp,
+    @Deprecated("Use ToolkitTheme.shapes.large", ReplaceWith("ToolkitTheme.shapes.large"))
     val cornerRadiusLarge: Dp = 16.dp,
+    @Deprecated("Use ToolkitTheme.shapes.extraLarge", ReplaceWith("ToolkitTheme.shapes.extraLarge"))
     val cornerRadiusExtraLarge: Dp = 24.dp,
     val tooltipVerticalOffset: Dp = 8.dp,
     val dialogMaxWidthMedium: Dp = 540.dp,
@@ -149,32 +172,43 @@ data class Dimensions(
 )
 
 data class CustomColors(
-    val success: Color = Color(0xFF4CAF50),
-    val warning: Color = Color(0xFFFF9800),
-    val info: Color = Color(0xFF2196F3),
+    val success: Color = Color(0xFF2E7D32),
+    val onSuccess: Color = Color.White,
+    val successContainer: Color = Color(0xFFA5D6A7),
+    val onSuccessContainer: Color = Color(0xFF003300),
+    val warning: Color = Color(0xFFE65100),
+    val onWarning: Color = Color.Black,
+    val warningContainer: Color = Color(0xFFFFCC80),
+    val onWarningContainer: Color = Color(0xFF4E2600),
+    val info: Color = Color(0xFF0277BD),
+    val onInfo: Color = Color.White,
     val validated: Color = Color(0xFFD0BCFF),
-    val red: Color = Color.Red,
-    val green: Color = Color.Green,
-    val blue: Color = Color.Blue,
-    val yellow: Color = Color.Yellow,
-    val gray: Color = Color.Gray,
-    val cyan: Color = Color.Cyan,
-    val magenta: Color = Color.Magenta,
+    val onValidated: Color = Color(0xFF381E72),
+    val transparent: Color = Color.Transparent,
     val white: Color = Color.White,
     val black: Color = Color.Black,
-    val transparent: Color = Color.Transparent
-) {
-    val onSuccess: Color = if (success.luminance() > 0.5f) Color.Black else Color.White
-    val onWarning: Color = if (warning.luminance() > 0.5f) Color.Black else Color.White
-    val onInfo: Color = if (info.luminance() > 0.5f) Color.Black else Color.White
-    val onValidated: Color = if (validated.luminance() > 0.5f) Color.Black else Color.White
-}
+    @Deprecated("Use MaterialTheme.colorScheme.error", ReplaceWith("MaterialTheme.colorScheme.error"))
+    val red: Color = Color(0xFFBA1A1A),
+    @Deprecated("Use success", ReplaceWith("success"))
+    val green: Color = Color(0xFF2E7D32),
+    @Deprecated("Use info", ReplaceWith("info"))
+    val blue: Color = Color(0xFF0277BD),
+    @Deprecated("Use warning", ReplaceWith("warning"))
+    val yellow: Color = Color(0xFFE65100),
+    @Deprecated("Use MaterialTheme.colorScheme.outline", ReplaceWith("MaterialTheme.colorScheme.outline"))
+    val gray: Color = Color(0xFF757575),
+    @Deprecated("Use info", ReplaceWith("info"))
+    val cyan: Color = Color(0xFF00838F),
+    @Deprecated("Use primary", ReplaceWith("MaterialTheme.colorScheme.primary"))
+    val magenta: Color = Color(0xFFAD1457)
+)
 
 data class Opacity(
     val transparent: Float = 0.0f,
     val cardBackground: Float = 0.05f,
     val subtleHighlight: Float = 0.08f,
     val borderLow: Float = 0.2f,
+    @Deprecated("Glass styling is non-native in Material 3 Expressive. Use semantic surface containers instead.")
     val glassBackground: Float = 0.3f,
     val sidebarBackground: Float = 0.4f,
     val divider: Float = 0.5f,
@@ -194,10 +228,27 @@ data class Opacity(
     val disabledContent: Float = 0.5f
 )
 
+val DesktopTypography = Typography(
+    headlineLarge = TextStyle(fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold),
+    headlineMedium = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold),
+    headlineSmall = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
+    titleSmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal),
+    bodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal),
+    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal),
+    labelLarge = TextStyle(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
+    labelMedium = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium)
+)
+
 val LocalSpacing = staticCompositionLocalOf { Spacing() }
 val LocalDimensions = staticCompositionLocalOf { Dimensions() }
 val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
 val LocalOpacity = staticCompositionLocalOf { Opacity() }
+val LocalTypography = staticCompositionLocalOf { DesktopTypography }
+
 data class ToolkitShapes(
     val extraSmall: CornerBasedShape = RoundedCornerShape(4.dp),
     val small: CornerBasedShape = RoundedCornerShape(8.dp),
@@ -249,30 +300,120 @@ object ToolkitTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalShapes.current
+
+    val typography: Typography
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.typography
+
+    val codeMedium: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
+
+    val codeSmall: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 14.sp)
 }
 
 private val DarkColorScheme =
     darkColorScheme(
         primary = Color(0xFFD0BCFF),
+        onPrimary = Color(0xFF381E72),
+        primaryContainer = Color(0xFF4F378B),
+        onPrimaryContainer = Color(0xFFEADDFF),
         secondary = Color(0xFFCCC2DC),
-        tertiary = Color(0xFFEFB8C8)
+        onSecondary = Color(0xFF332D41),
+        secondaryContainer = Color(0xFF4A4458),
+        onSecondaryContainer = Color(0xFFE8DEF8),
+        tertiary = Color(0xFFEFB8C8),
+        onTertiary = Color(0xFF492532),
+        tertiaryContainer = Color(0xFF633B48),
+        onTertiaryContainer = Color(0xFFFFD8E4),
+        background = Color(0xFF141218),
+        onBackground = Color(0xFFE6E0E9),
+        surface = Color(0xFF141218),
+        onSurface = Color(0xFFE6E0E9),
+        surfaceVariant = Color(0xFF49454F),
+        onSurfaceVariant = Color(0xFFCAC4D0),
+        surfaceContainerLowest = Color(0xFF0F0D13),
+        surfaceContainerLow = Color(0xFF1C1A20),
+        surfaceContainer = Color(0xFF201E24),
+        surfaceContainerHigh = Color(0xFF28262C),
+        surfaceContainerHighest = Color(0xFF333038),
+        outline = Color(0xFF948F9A),
+        outlineVariant = Color(0xFF49454F),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6)
     )
 
 private val LightColorScheme =
     lightColorScheme(
         primary = Color(0xFF6750A4),
-        secondary = Color(0xFF625b71),
-        tertiary = Color(0xFF7D5260)
+        onPrimary = Color.White,
+        primaryContainer = Color(0xFFEADDFF),
+        onPrimaryContainer = Color(0xFF21005D),
+        secondary = Color(0xFF625B71),
+        onSecondary = Color.White,
+        secondaryContainer = Color(0xFFE8DEF8),
+        onSecondaryContainer = Color(0xFF1D192B),
+        tertiary = Color(0xFF7D5260),
+        onTertiary = Color.White,
+        tertiaryContainer = Color(0xFFFFD8E4),
+        onTertiaryContainer = Color(0xFF31111D),
+        background = Color(0xFFFAF9FE),
+        onBackground = Color(0xFF1D1B20),
+        surface = Color(0xFFFAF9FE),
+        onSurface = Color(0xFF1D1B20),
+        surfaceVariant = Color(0xFFE7E0EC),
+        onSurfaceVariant = Color(0xFF49454F),
+        surfaceContainerLowest = Color(0xFFFFFFFF),
+        surfaceContainerLow = Color(0xFFF5F3F7),
+        surfaceContainer = Color(0xFFEFECEF),
+        surfaceContainerHigh = Color(0xFFE9E6EA),
+        surfaceContainerHighest = Color(0xFFE3E0E4),
+        outline = Color(0xFF7A757F),
+        outlineVariant = Color(0xFFCAC4D0),
+        error = Color(0xFFBA1A1A),
+        onError = Color.White,
+        errorContainer = Color(0xFFFFDAD6),
+        onErrorContainer = Color(0xFF410002)
     )
 
 private val AmoledColorScheme =
     darkColorScheme(
         primary = Color(0xFFD0BCFF),
+        onPrimary = Color(0xFF381E72),
+        primaryContainer = Color(0xFF4F378B),
+        onPrimaryContainer = Color(0xFFEADDFF),
         secondary = Color(0xFFCCC2DC),
+        onSecondary = Color(0xFF332D41),
+        secondaryContainer = Color(0xFF4A4458),
+        onSecondaryContainer = Color(0xFFE8DEF8),
         tertiary = Color(0xFFEFB8C8),
+        onTertiary = Color(0xFF492532),
+        tertiaryContainer = Color(0xFF633B48),
+        onTertiaryContainer = Color(0xFFFFD8E4),
         background = Color.Black,
+        onBackground = Color(0xFFE6E0E9),
         surface = Color.Black,
-        surfaceVariant = Color(0xFF1C1B1F)
+        onSurface = Color(0xFFE6E0E9),
+        surfaceVariant = Color(0xFF1C1B1F),
+        onSurfaceVariant = Color(0xFFCAC4D0),
+        surfaceContainerLowest = Color(0xFF050505),
+        surfaceContainerLow = Color(0xFF0D0D0D),
+        surfaceContainer = Color(0xFF141414),
+        surfaceContainerHigh = Color(0xFF1F1F1F),
+        surfaceContainerHighest = Color(0xFF2A2A2A),
+        outline = Color(0xFF8E8A94),
+        outlineVariant = Color(0xFF38353D),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6)
     )
 
 @Composable
@@ -310,14 +451,27 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
     val isLightPrimary = seedColor.luminance() > 0.5f
     val onPrimaryColor = if (isLightPrimary) Color.Black else Color.White
 
+    val primaryContainerColor = if (darkTheme) {
+        Color(
+            red = (seedColor.red * 0.25f + baseScheme.surfaceContainer.red * 0.75f).coerceIn(0f, 1f),
+            green = (seedColor.green * 0.25f + baseScheme.surfaceContainer.green * 0.75f).coerceIn(0f, 1f),
+            blue = (seedColor.blue * 0.25f + baseScheme.surfaceContainer.blue * 0.75f).coerceIn(0f, 1f)
+        )
+    } else {
+        Color(
+            red = (seedColor.red * 0.15f + 0.85f).coerceIn(0f, 1f),
+            green = (seedColor.green * 0.15f + 0.85f).coerceIn(0f, 1f),
+            blue = (seedColor.blue * 0.15f + 0.85f).coerceIn(0f, 1f)
+        )
+    }
+    val onPrimaryContainerColor = if (darkTheme) Color(0xFFEADDFF) else Color(0xFF21005D)
+
     val colorScheme =
         baseScheme.copy(
             primary = seedColor,
             onPrimary = onPrimaryColor,
-            primaryContainer = seedColor.copy(alpha = 0.2f),
-            onPrimaryContainer = seedColor,
-            error = Color(0xFFB00020),
-            onError = Color.White
+            primaryContainer = primaryContainerColor,
+            onPrimaryContainer = onPrimaryContainerColor
         )
 
     CompositionLocalProvider(
@@ -325,13 +479,21 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
         LocalDimensions provides Dimensions(),
         LocalCustomColors provides CustomColors(
             validated = seedColor,
-            success = Color(0xFF4CAF50) //TODO: Could be tuned based on theme
+            onValidated = if (seedColor.luminance() > 0.5f) Color.Black else Color.White,
+            success = if (darkTheme) Color(0xFF81C784) else Color(0xFF2E7D32),
+            onSuccess = if (darkTheme) Color(0xFF00390B) else Color.White,
+            warning = if (darkTheme) Color(0xFFFFB74D) else Color(0xFFE65100),
+            onWarning = if (darkTheme) Color(0xFF4E2600) else Color.Black,
+            info = if (darkTheme) Color(0xFF64B5F6) else Color(0xFF0277BD),
+            onInfo = if (darkTheme) Color(0xFF003258) else Color.White
         ),
         LocalOpacity provides Opacity(),
-        LocalShapes provides ToolkitShapes()
+        LocalShapes provides ToolkitShapes(),
+        LocalTypography provides DesktopTypography
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
+            typography = DesktopTypography,
             shapes = LocalShapes.current.material,
             content = content
         )
@@ -351,4 +513,5 @@ private fun ThemePreview() {
         }
     }
 }
+
 

@@ -66,7 +66,7 @@ import org.wip.plugintoolkit.features.flows.viewmodel.ConflictResolutionAction
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitChip
@@ -590,7 +590,7 @@ private fun FlowItem(
 ) {
     val isBroken = missingCapabilities.isNotEmpty() || notReadyNodes.isNotEmpty()
 
-    GlassCard(
+    ToolkitCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onSelect
     ) {

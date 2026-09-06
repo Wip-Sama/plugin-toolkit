@@ -49,7 +49,7 @@ import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitCard
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.landing_active_jobs
 import plugintoolkit.composeapp.generated.resources.landing_link_docs
@@ -133,7 +133,7 @@ fun LandingPage(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.large)
         ) {
-            GlassCard(modifier = Modifier.weight(1.5f).height(ToolkitTheme.dimensions.cardHeightLarge)) {
+            ToolkitCard(modifier = Modifier.weight(1.5f).height(ToolkitTheme.dimensions.cardHeightLarge)) {
                 Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                     Text(
                         stringResource(Res.string.landing_recent_activity),
@@ -177,7 +177,7 @@ fun LandingPage(
                 }
             }
 
-            GlassCard(modifier = Modifier.weight(1f).height(ToolkitTheme.dimensions.cardHeightLarge)) {
+            ToolkitCard(modifier = Modifier.weight(1f).height(ToolkitTheme.dimensions.cardHeightLarge)) {
                 Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
                     Text(
                         stringResource(Res.string.landing_quick_links),
@@ -227,6 +227,9 @@ fun DashboardHero() {
         )
     )
 
+    val titleColor = MaterialTheme.colorScheme.onPrimary
+    val subtitleColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = ToolkitTheme.opacity.secondaryText)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -240,13 +243,13 @@ fun DashboardHero() {
             Text(
                 stringResource(Res.string.landing_welcome_title),
                 style = MaterialTheme.typography.headlineMedium,
-                color = ToolkitTheme.colors.white,
+                color = titleColor,
                 fontWeight = FontWeight.ExtraBold
             )
             Text(
                 stringResource(Res.string.landing_welcome_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
-                color = ToolkitTheme.colors.white.copy(alpha = ToolkitTheme.opacity.secondaryText)
+                color = subtitleColor
             )
         }
     }
@@ -260,7 +263,7 @@ fun StatCard(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    GlassCard(modifier = modifier) {
+    ToolkitCard(modifier = modifier) {
         Row(
             modifier = Modifier.padding(ToolkitTheme.spacing.large),
             verticalAlignment = Alignment.CenterVertically

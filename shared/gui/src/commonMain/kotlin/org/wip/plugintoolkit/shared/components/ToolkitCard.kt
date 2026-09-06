@@ -1,11 +1,17 @@
 package org.wip.plugintoolkit.shared.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CardElevation
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -22,45 +28,60 @@ import plugintoolkit.composeapp.generated.resources.preview_glasscard_subtitle
 import plugintoolkit.composeapp.generated.resources.preview_glasscard_title
 
 /**
- * @deprecated Glass styling is non-native in Material 3 Expressive. Use [ToolkitCard] instead.
+ * Standard Material 3 Expressive Card for the Toolkit design system.
+ * Uses semantic container colors (surfaceContainer), expressive shapes,
+ * and subtle tonal elevation instead of non-native glassmorphism.
  */
-@Deprecated(
-    message = "Glass styling is non-native in Material 3 Expressive. Use ToolkitCard instead.",
-    replaceWith = ReplaceWith(
-        "ToolkitCard(modifier, shape, border = border, onClick = onClick, interactionSource = interactionSource, content = content)",
-        "org.wip.plugintoolkit.shared.components.ToolkitCard"
-    )
-)
 @Composable
-fun GlassCard(
+fun ToolkitCard(
     modifier: Modifier = Modifier,
     shape: Shape = ToolkitTheme.shapes.large,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    border: BorderStroke? = null,
+    elevation: CardElevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.dimensions.cardElevation),
     contentPadding: PaddingValues = PaddingValues(ToolkitTheme.spacing.md),
-    border: BorderStroke? = BorderStroke(
-        width = ToolkitTheme.dimensions.borderUnselected,
-        color = androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant
-    ),
     onClick: (() -> Unit)? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable ColumnScope.() -> Unit
 ) {
-    ToolkitCard(
-        modifier = modifier,
-        shape = shape,
-        contentPadding = contentPadding,
-        border = border,
-        onClick = onClick,
-        interactionSource = interactionSource,
-        content = content
-    )
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            modifier = modifier.animateContentSize(),
+            shape = shape,
+            colors = CardDefaults.cardColors(
+                containerColor = containerColor,
+                contentColor = contentColor
+            ),
+            border = border,
+            elevation = elevation,
+            interactionSource = interactionSource
+        ) {
+            Column(modifier = Modifier.padding(contentPadding), content = content)
+        }
+    } else {
+        Card(
+            modifier = modifier.animateContentSize(),
+            shape = shape,
+            colors = CardDefaults.cardColors(
+                containerColor = containerColor,
+                contentColor = contentColor
+            ),
+            border = border,
+            elevation = elevation
+        ) {
+            Column(modifier = Modifier.padding(contentPadding), content = content)
+        }
+    }
 }
 
 @Preview
 @Composable
-private fun GlassCardPreview() {
+private fun ToolkitCardPreview() {
     AppTheme(appearance = AppearanceSettings()) {
         Box(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-            GlassCard {
+            ToolkitCard {
                 Text(stringResource(Res.string.preview_glasscard_title), style = ToolkitTheme.typography.bodyLarge)
                 Text(stringResource(Res.string.preview_glasscard_subtitle), style = ToolkitTheme.typography.bodySmall)
             }

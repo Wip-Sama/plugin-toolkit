@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.shared.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -40,7 +41,12 @@ fun ZoomControls(
     Row(
         modifier = modifier
             .background(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.glassBackground),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shape = CircleShape
+            )
+            .border(
+                width = ToolkitTheme.dimensions.borderUnselected,
+                color = MaterialTheme.colorScheme.outlineVariant,
                 shape = CircleShape
             )
             .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),

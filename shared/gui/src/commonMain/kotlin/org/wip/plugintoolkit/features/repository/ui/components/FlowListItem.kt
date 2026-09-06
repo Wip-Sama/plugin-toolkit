@@ -33,7 +33,7 @@ import org.wip.plugintoolkit.features.flows.viewmodel.FlowState
 import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitCard
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_install
 import plugintoolkit.composeapp.generated.resources.plugin_status_installed
@@ -54,7 +54,7 @@ fun FlowListItem(
     val hasUpdate = false
     val (isCompatible, _) = PluginCompatibilityUtils.checkCompatibility(flow)
 
-    GlassCard(
+    ToolkitCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(

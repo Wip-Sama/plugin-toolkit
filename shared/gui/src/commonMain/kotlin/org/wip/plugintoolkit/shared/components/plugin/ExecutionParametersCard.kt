@@ -26,7 +26,7 @@ import org.wip.plugintoolkit.api.FileAccess
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.ParameterRole
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.plugin_destructive_warning
@@ -62,7 +62,7 @@ fun ExecutionParametersCard(
     onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    GlassCard(modifier = modifier.fillMaxWidth()) {
+    ToolkitCard(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

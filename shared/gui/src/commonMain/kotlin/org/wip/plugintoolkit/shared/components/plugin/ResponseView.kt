@@ -18,14 +18,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun ResponseView(response: PluginResponse) {
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
+    ToolkitCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(title = stringResource(Res.string.plugin_execution_result), icon = Icons.Default.CheckCircle)
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.mediumSmall))
 

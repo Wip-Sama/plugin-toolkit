@@ -240,9 +240,7 @@ fun CapabilityItem(
 ) {
     Surface(
         onClick = onClick,
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(
-            alpha = ToolkitTheme.opacity.glassBackground
-        ),
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         shape = ToolkitTheme.shapes.medium,
         border = if (isSelected) BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.primary) else null
     ) {

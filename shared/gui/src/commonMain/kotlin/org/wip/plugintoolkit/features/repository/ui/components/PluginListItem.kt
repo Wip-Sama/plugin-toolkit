@@ -46,7 +46,7 @@ import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitCard
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
@@ -88,7 +88,7 @@ fun PluginListItem(
     ) > 0
     val (isCompatible, _) = PluginCompatibilityUtils.checkCompatibility(plugin)
 
-    GlassCard(
+    ToolkitCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(

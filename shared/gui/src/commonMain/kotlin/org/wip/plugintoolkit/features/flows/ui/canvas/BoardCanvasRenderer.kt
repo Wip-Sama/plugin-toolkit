@@ -77,7 +77,7 @@ fun BoardGridAndConnectionsCanvas(
     val customColors = ToolkitTheme.colors
 
     val connectionColor = MaterialTheme.colorScheme.primary
-    val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = opacity.glassBackground)
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
 
     val connectionAlphas = flow.connections.associateWith { connection ->
         val isDimmed = interactionState.hoveredConnection != null && interactionState.hoveredConnection != connection

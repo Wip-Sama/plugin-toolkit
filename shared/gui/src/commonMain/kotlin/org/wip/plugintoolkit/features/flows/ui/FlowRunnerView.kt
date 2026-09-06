@@ -460,7 +460,7 @@ fun FlowRunnerView(
                             } else {
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
-                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = ToolkitTheme.opacity.glassBackground),
+                                    color = MaterialTheme.colorScheme.surfaceContainer,
                                     shape = MaterialTheme.shapes.medium
                                 ) {
                                     Row(
@@ -476,7 +476,7 @@ fun FlowRunnerView(
                                         Text(
                                             stringResource(Res.string.flow_collected_automatically),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = ToolkitTheme.opacity.high)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }

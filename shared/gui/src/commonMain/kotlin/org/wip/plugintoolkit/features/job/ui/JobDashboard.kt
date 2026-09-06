@@ -361,7 +361,7 @@ fun SchedulerTab() {
             imageVector = Icons.Default.Schedule,
             contentDescription = null,
             modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraLarge),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground)
+            tint = MaterialTheme.colorScheme.outline
         )
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
         Text(
@@ -383,7 +383,7 @@ fun HistoryTab(viewModel: JobViewModel) {
         items(history) { entry ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.glassBackground))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
             ) {
                 Row(
                     modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),

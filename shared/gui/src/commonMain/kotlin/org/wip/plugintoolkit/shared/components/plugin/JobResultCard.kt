@@ -108,7 +108,7 @@ import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.job.ui.StatusBadge
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitCard
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.unit.IntOffset
@@ -170,11 +170,12 @@ fun JobResultCard(
         }
     }
 
-    // Outer GlassCard with animateContentSize enables extremely smooth expansion transitions!
-    GlassCard(
+    // Outer ToolkitCard with animateContentSize enables extremely smooth expansion transitions!
+    ToolkitCard(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize()
+            .animateContentSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
     ) {
         Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
             // Header Row
@@ -335,7 +336,7 @@ fun JobResultCard(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .background(
-                                                MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.divider),
+                                                MaterialTheme.colorScheme.surfaceContainerLow,
                                                 MaterialTheme.shapes.medium
                                             )
                                             .padding(ToolkitTheme.spacing.medium)

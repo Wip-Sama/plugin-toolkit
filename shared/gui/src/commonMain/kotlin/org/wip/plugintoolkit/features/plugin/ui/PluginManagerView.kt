@@ -63,7 +63,7 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginActivityInfo
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
-import org.wip.plugintoolkit.shared.components.GlassCard
+import org.wip.plugintoolkit.shared.components.ToolkitCard
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
@@ -403,7 +403,7 @@ fun PluginCard(
     val progress = activity?.progress ?: 0f
     val isDeterminate = activity?.isDeterminate == true && progress > 0f
 
-    GlassCard(
+    ToolkitCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = if (isLoaded) onClick else null
     ) {
