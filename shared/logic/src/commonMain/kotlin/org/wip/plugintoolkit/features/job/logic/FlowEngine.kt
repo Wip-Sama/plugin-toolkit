@@ -35,6 +35,8 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus
+import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 
 class FlowEngine(
@@ -460,6 +462,37 @@ class FlowEngine(
                         extSettings
                     )
                     validateCapabilityParameters(manifest, node.capability.name, capabilityParameters)
+
+                    val pluginLocksStateMap = try {
+                        pluginManager.pluginLocksState.value
+                    } catch (e: Exception) {
+                        emptyMap<String, Map<String, Boolean>>()
+                    }
+                    val pluginLocks = pluginLocksStateMap[node.pluginInfo.id]
+                        ?: pluginLocksStateMap.values.fold(emptyMap()) { acc, next -> acc + next }
+                    val pluginSettings = try {
+                        pluginManager.loadPluginSettings(node.pluginInfo.id).settings
+                    } catch (e: Exception) {
+                        emptyMap<String, kotlinx.serialization.json.JsonElement>()
+                    }
+                    val lockStatus = CapabilityLockUtils.checkCapabilityLockStatus(
+                        capability = node.capability,
+                        providedLocks = pluginLocks,
+                        providedSettings = pluginSettings
+                    )
+                    if (lockStatus is CapabilityLockStatus.Locked) {
+                        throw Exception(
+                            "Capability '${node.capability.name}' is locked. Missing locks: ${lockStatus.missingLocks}, Missing settings: ${lockStatus.missingSettings}"
+                        )
+                    }
+                    val isReady = try {
+                        node.isReady(flow.connections, pluginSettings, pluginLocks)
+                    } catch (e: Exception) {
+                        true
+                    }
+                    if (!isReady) {
+                        throw Exception("Capability node '${node.title}' parameters or option locks are not satisfied.")
+                    }
 
                     val processor = plugin.getProcessor().getOrThrow()
                     val execFs = org.wip.plugintoolkit.features.plugin.logic.DefaultExecutionFileSystem(nodeSandbox)

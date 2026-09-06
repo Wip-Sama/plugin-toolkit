@@ -25,8 +25,16 @@ class FlowRepository(
     private val settingsPersistence: SettingsPersistence,
     private val pluginManager: PluginManager,
     private val scope: CoroutineScope,
-    private val appConfig: SystemConfig
+    private val appConfig: SystemConfig,
+    private val executionGuard: FlowExecutionGuard? = null
 ) {
+    private val resolvedExecutionGuard: FlowExecutionGuard? by lazy {
+        executionGuard ?: try {
+            org.koin.mp.KoinPlatform.getKoin().getOrNull()
+        } catch (_: Exception) {
+            null
+        }
+    }
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -136,6 +144,7 @@ class FlowRepository(
     }
 
     fun saveFlow(flow: Flow) {
+        resolvedExecutionGuard?.assertCanMutate(flow.name, _flows.value)
         scope.launch(Dispatchers.IO) {
             try {
                 val appDataDir = settingsPersistence.getSettingsDir()
@@ -163,6 +172,7 @@ class FlowRepository(
     }
 
     fun deleteFlow(flowName: String) {
+        resolvedExecutionGuard?.assertCanMutate(flowName, _flows.value)
         scope.launch(Dispatchers.IO) {
             try {
                 val appDataDir = settingsPersistence.getSettingsDir()
@@ -209,6 +219,8 @@ class FlowRepository(
     }
 
     fun renameFlow(oldName: String, newName: String) {
+        resolvedExecutionGuard?.assertCanMutate(oldName, _flows.value)
+        resolvedExecutionGuard?.assertCanMutate(newName, _flows.value)
         scope.launch(Dispatchers.IO) {
             try {
                 val appDataDir = settingsPersistence.getSettingsDir()
@@ -235,6 +247,7 @@ class FlowRepository(
     }
 
     fun updateFlowMetadata(flowName: String, newVersion: String, newDescription: String?) {
+        resolvedExecutionGuard?.assertCanMutate(flowName, _flows.value)
         scope.launch(Dispatchers.IO) {
             try {
                 val appDataDir = settingsPersistence.getSettingsDir()

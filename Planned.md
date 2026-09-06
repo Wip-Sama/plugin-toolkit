@@ -7,9 +7,9 @@ JobHandle.result: Deferred<ExecutionResult> Currently, JobHandle tightly couples
 Change val result: Deferred<ExecutionResult> to suspend fun awaitResult(): ExecutionResult.
 Replace Throwable in ExecutionResult.Error with a structured ErrorDetail class containing serializable string fields (code, message, stackTrace).
 
-### Memory Management for Undo/Redo in flows
+### Memory Management for Undo/Redo in flows [COMPLETED]
 
-Undo/Redo Command Pattern: Implement a full Command pattern for the history stack (e.g., NodeMovedCommand, NodeAddedCommand) to store diffs instead of deep state snapshots. This will ensure memory usage remains low even with massive graphs and extensive edit histories.
+- [x] **Undo/Redo Command Pattern:** Implemented bounded diff-based Command pattern (`FlowCommand`, `MoveNodesCommand`, `AddNodeCommand`, `DeleteNodesCommand`, `ConnectPortsCommand`, `DisconnectPortsCommand`, `UpdateNodeCommand`, `CompositeCommand`, `FlowHistoryManager`) storing delta differences instead of deep state snapshots. Bounded to 100 history items with O(diff) heap footprint.
 
 ### Support for local repositories
 

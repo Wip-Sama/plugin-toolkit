@@ -30,6 +30,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -220,6 +221,7 @@ private fun CapabilitiesPalette(
     onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null
 ) {
     val pluginManager = koinInject<PluginManager>()
+    val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
 
     val groupedCaps = remember(searchQuery, plugins) {
         plugins.map { p ->
@@ -240,6 +242,8 @@ private fun CapabilitiesPalette(
             val manifest = remember(plugin.id, plugins) {
                 plugins.find { it.getManifest().getOrThrow().plugin.id == plugin.id }?.getManifest()?.getOrNull()
             }
+            val locks = pluginLocksState[plugin.id] ?: pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
+            val settings = settingsStore.settings + settingsStore.globalParams
 
             Column(verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)) {
                 // Sleek sidebar headers
@@ -254,20 +258,25 @@ private fun CapabilitiesPalette(
                     )
                 )
                 caps.forEach { cap ->
-                    val isReady = remember(cap, settingsStore.settings, manifest?.settings) {
+                    val lockStatus = org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils.checkCapabilityLockStatus(cap, locks, settings)
+                    val isLocked = lockStatus is org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus.Locked
+                    val isConfigReady = remember(cap, settingsStore.settings, manifest?.settings) {
                         cap.isReady(settingsStore.settings, manifest?.settings)
                     }
+                    val isReady = !isLocked && isConfigReady
 
-                    val targetSettingKey = cap.requiredLocks.firstOrNull()
-                        ?: cap.requiresSettings.firstOrNull()
-                        ?: ""
+                    val targetSettingKey = when (lockStatus) {
+                        is org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus.Locked ->
+                            lockStatus.missingLocks.firstOrNull() ?: lockStatus.missingSettings.firstOrNull() ?: ""
+                        else -> cap.requiredLocks.firstOrNull() ?: cap.requiresSettings.firstOrNull() ?: ""
+                    }
 
                     val paletteNode = PaletteNode.Capability(plugin, cap)
                     PaletteItem(
                         text = cap.name,
                         color = MaterialTheme.colorScheme.primary,
                         enabled = isReady,
-                        tooltip = if (!isReady) "Configuration required" else null,
+                        tooltip = if (!isReady) "Configuration required or capability is locked" else null,
                         targetScreen = Screen.PluginManager(plugin.id, targetSettingKey),
                         targetSettingKey = targetSettingKey,
                         pluginId = plugin.id,

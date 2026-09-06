@@ -21,3 +21,4 @@ captures
 node_modules/
 local_scripts/
 __pycache__/
+ignore

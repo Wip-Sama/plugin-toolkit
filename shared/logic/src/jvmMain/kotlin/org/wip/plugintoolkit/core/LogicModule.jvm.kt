@@ -16,7 +16,9 @@ import org.wip.plugintoolkit.core.utils.DefaultSemanticRegistry
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.RealFileSystem
 import org.wip.plugintoolkit.core.utils.SemanticRegistry
+import org.wip.plugintoolkit.features.flows.logic.FlowExecutionGuard
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
+import org.wip.plugintoolkit.features.flows.logic.ReactiveCapabilityLockTracker
 import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.logic.SandboxCleanupManager
@@ -73,13 +75,10 @@ actual val logicModule: Module = module {
     single { PluginScanner(get(), get()) }
     single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(named("LoomScope"))) }
     single { SandboxCleanupManager() }
-    single {
-        JobManager(
-            get(named("LoomScope")),
-            get()
-        )
-    }
-    single { FlowRepository(get(), get(), get(named("LoomScope")), get()) }
+    single { JobManager(get(named("LoomScope")), get()) }
+    single { FlowExecutionGuard { getOrNull<JobManager>() } }
+    single { FlowRepository(get(), get(), get(named("LoomScope")), get(), get()) }
+    single { ReactiveCapabilityLockTracker(get()) }
     single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
     single { UpdateService(get(), get()) }
 }

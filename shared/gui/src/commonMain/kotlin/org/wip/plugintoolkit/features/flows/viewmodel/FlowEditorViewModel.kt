@@ -18,6 +18,19 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.flows.history.AddNodeCommand
+import org.wip.plugintoolkit.features.flows.history.CompositeCommand
+import org.wip.plugintoolkit.features.flows.history.ConnectPortsCommand
+import org.wip.plugintoolkit.features.flows.history.DeleteNodesCommand
+import org.wip.plugintoolkit.features.flows.history.DisconnectPortsCommand
+import org.wip.plugintoolkit.features.flows.history.FlowCommand
+import org.wip.plugintoolkit.features.flows.history.FlowHistoryManager
+import org.wip.plugintoolkit.features.flows.history.MoveNodesCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateBoundaryNodeCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateConnectionOrderCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateInputPortValueCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateNodeCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateSystemNodeSettingsCommand
 import org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.logic.FlowTypeInference
@@ -132,47 +145,24 @@ class FlowEditorViewModel(
         onEvent = ::onEvent
     )
 
-    private val undoStack = mutableListOf<Flow>()
-    private val redoStack = mutableListOf<Flow>()
-
-    private fun saveToHistory() {
-        val currentFlow = _state.value.flow
-        if (undoStack.isEmpty() || undoStack.last() != currentFlow) {
-            undoStack.add(currentFlow.copy())
-            redoStack.clear()
-        }
-    }
+    val historyManager = FlowHistoryManager(maxStackSize = 100)
+    val canUndo: StateFlow<Boolean> = historyManager.canUndo
+    val canRedo: StateFlow<Boolean> = historyManager.canRedo
 
     fun undo() {
         if (_state.value.isReadOnly && !bypassReadOnlyForTesting) return
-        if (undoStack.isNotEmpty()) {
-            val previousFlow = undoStack.removeAt(undoStack.size - 1)
-            val currentFlow = _state.value.flow
-            redoStack.add(currentFlow.copy())
-
-            _state.update { currentState ->
-                currentState.copy(
-                    flow = previousFlow,
-                    hasUnsavedChanges = true
-                )
-            }
+        val revertedState = historyManager.undo(_state.value)
+        if (revertedState != null) {
+            _state.value = revertedState
             runTypeInference()
         }
     }
 
     fun redo() {
         if (_state.value.isReadOnly && !bypassReadOnlyForTesting) return
-        if (redoStack.isNotEmpty()) {
-            val nextFlow = redoStack.removeAt(redoStack.size - 1)
-            val currentFlow = _state.value.flow
-            undoStack.add(currentFlow.copy())
-
-            _state.update { currentState ->
-                currentState.copy(
-                    flow = nextFlow,
-                    hasUnsavedChanges = true
-                )
-            }
+        val redoneState = historyManager.redo(_state.value)
+        if (redoneState != null) {
+            _state.value = redoneState
             runTypeInference()
         }
     }
@@ -220,6 +210,7 @@ class FlowEditorViewModel(
                         hasUnsavedChanges = false
                     )
                 }
+                historyManager.clear()
                 updateReadOnlyState()
                 runTypeInference()
             }
@@ -257,7 +248,8 @@ class FlowEditorViewModel(
                 is FlowEvent.UpdateSystemNodeSettings,
                 is FlowEvent.ToggleNodeCollapse,
                 is FlowEvent.ToggleNodeInputsCollapse,
-                is FlowEvent.ToggleNodeOutputsCollapse -> {
+                is FlowEvent.ToggleNodeOutputsCollapse,
+                is FlowEvent.BringToFront -> {
                     resolvedNotificationService?.toast("Cannot modify the flow because it is currently running or used as a subflow in other flows.")
                     return
                 }
@@ -266,14 +258,13 @@ class FlowEditorViewModel(
             }
         }
 
-        var shouldSaveHistory = false
+        var pendingCommand: FlowCommand? = null
         var shouldRunTypeInference = false
         val currentState = _state.value
         var newState = currentState
 
         when (event) {
             is FlowEvent.AddCapabilityNode -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 val node = Node.CapabilityNode(
                     id = currentState.nextId,
@@ -321,10 +312,10 @@ class FlowEditorViewModel(
                         } ?: emptyList())
                 )
                 newState = nodeManager.handleAddNode(currentState, node, event.density)
+                pendingCommand = AddNodeCommand(node)
             }
 
             is FlowEvent.AddSystemNode -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 val inputs = SystemNodesRegistry.getInputs(event.systemAction)
                 val outputs = SystemNodesRegistry.getOutputs(event.systemAction)
@@ -337,10 +328,10 @@ class FlowEditorViewModel(
                     outputs = outputs
                 )
                 newState = nodeManager.handleAddNode(currentState, node, event.density)
+                pendingCommand = AddNodeCommand(node)
             }
 
             is FlowEvent.AddFlowInputNode -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 val node = Node.FlowInputNode(
                     id = currentState.nextId,
@@ -348,10 +339,10 @@ class FlowEditorViewModel(
                     outputs = listOf(OutputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY)))
                 )
                 newState = nodeManager.handleAddNode(currentState, node, event.density)
+                pendingCommand = AddNodeCommand(node)
             }
 
             is FlowEvent.AddFlowOutputNode -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 val node = Node.FlowOutputNode(
                     id = currentState.nextId,
@@ -359,6 +350,7 @@ class FlowEditorViewModel(
                     inputs = listOf(InputPort("output_data", "Output Data", DataType.Primitive(PrimitiveType.ANY)))
                 )
                 newState = nodeManager.handleAddNode(currentState, node, event.density)
+                pendingCommand = AddNodeCommand(node)
             }
 
             is FlowEvent.AddSubFlowNode -> {
@@ -373,7 +365,6 @@ class FlowEditorViewModel(
                     return
                 }
 
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 val targetFlow = currentState.flows.find { it.name == event.flowName }
                 val (inputs, outputs) = if (targetFlow != null) {
@@ -406,6 +397,7 @@ class FlowEditorViewModel(
                     outputMappings = outputMappings
                 )
                 newState = nodeManager.handleAddNode(currentState, node, event.density)
+                pendingCommand = AddNodeCommand(node)
             }
 
             is FlowEvent.ExpandSubFlow -> handleExpandSubFlow(event.nodeId)
@@ -414,15 +406,31 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.EndMoveNode -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 newState = nodeManager.handleEndMoveNode(currentState, event.id, event.density)
+                val isSelectedGroupMove = currentState.selectedNodeIds.contains(event.id)
+                val nodesToMove = if (isSelectedGroupMove) currentState.selectedNodeIds else setOf(event.id)
+                val moves = mutableMapOf<Long, Pair<ModelOffset, ModelOffset>>()
+                for (nodeId in nodesToMove) {
+                    val oldPos = currentState.flow.nodes.find { it.id == nodeId }?.position
+                    val newPos = newState.flow.nodes.find { it.id == nodeId }?.position
+                    if (oldPos != null && newPos != null && oldPos != newPos) {
+                        moves[nodeId] = oldPos to newPos
+                    }
+                }
+                if (moves.isNotEmpty()) {
+                    pendingCommand = MoveNodesCommand(moves)
+                }
             }
 
             is FlowEvent.DeleteNode -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
+                val deletedNode = currentState.flow.nodes.find { it.id == event.id }
+                val cascadeConns = currentState.flow.connections.filter { it.sourceNodeId == event.id || it.targetNodeId == event.id }
                 newState = nodeManager.handleDeleteNode(currentState, event.id)
+                if (deletedNode != null) {
+                    pendingCommand = DeleteNodesCommand(listOf(deletedNode), cascadeConns)
+                }
             }
             is FlowEvent.CopySelectedNodes -> {
                 val selected = currentState.selectedNodeIds
@@ -435,7 +443,6 @@ class FlowEditorViewModel(
             }
             is FlowEvent.PasteNodes -> {
                 if (clipboardNodes.isNotEmpty()) {
-                    shouldSaveHistory = true
                     shouldRunTypeInference = true
                     
                     var nextId = currentState.nextId
@@ -480,11 +487,13 @@ class FlowEditorViewModel(
                         ),
                         selectedNodeIds = positionedNodes.map { it.id }.toSet()
                     )
+                    val addNodeCommands = positionedNodes.map { AddNodeCommand(it) }
+                    val addConnCommands = newConnections.map { ConnectPortsCommand(it) }
+                    pendingCommand = CompositeCommand("Paste ${positionedNodes.size} node(s)", addNodeCommands + addConnCommands)
                 }
             }
 
             is FlowEvent.ConnectPorts -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 newState = connectionManager.handleConnectPorts(
                     currentState,
@@ -493,6 +502,13 @@ class FlowEditorViewModel(
                     event.targetNodeId,
                     event.targetPortId
                 )
+                if (newState !== currentState) {
+                    val addedConn = newState.flow.connections.firstOrNull { it !in currentState.flow.connections }
+                    val removedConns = currentState.flow.connections.filter { it !in newState.flow.connections }
+                    if (addedConn != null) {
+                        pendingCommand = ConnectPortsCommand(addedConn, removedConns)
+                    }
+                }
             }
 
             is FlowEvent.TryConnectPorts -> {
@@ -511,7 +527,6 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.AutoConvertAndConnect -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 newState = connectionManager.handleAutoConvertAndConnect(
                     currentState,
@@ -520,12 +535,27 @@ class FlowEditorViewModel(
                     event.targetNodeId,
                     event.targetPortId
                 )
+                if (newState !== currentState) {
+                    val addedNode = newState.flow.nodes.firstOrNull { it !in currentState.flow.nodes }
+                    val addedConns = newState.flow.connections.filter { it !in currentState.flow.connections }
+                    val removedConns = currentState.flow.connections.filter { it !in newState.flow.connections }
+                    val commands = mutableListOf<FlowCommand>()
+                    if (addedNode != null) {
+                        commands.add(AddNodeCommand(addedNode))
+                    }
+                    addedConns.forEach { conn ->
+                        commands.add(ConnectPortsCommand(conn, if (conn == addedConns.last()) removedConns else emptyList()))
+                    }
+                    pendingCommand = CompositeCommand("Auto convert and connect", commands)
+                }
             }
 
             is FlowEvent.DeleteConnection -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
                 newState = connectionManager.handleDeleteConnection(currentState, event.connection)
+                if (newState !== currentState) {
+                    pendingCommand = DisconnectPortsCommand(event.connection)
+                }
             }
 
             is FlowEvent.Pan -> handlePan(event.delta)
@@ -546,8 +576,8 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.UpdateBoundaryNode -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
+                val oldNode = currentState.flow.nodes.find { it.id == event.nodeId }
                 newState = nodeManager.handleUpdateBoundaryNode(
                     currentState,
                     event.nodeId,
@@ -558,11 +588,15 @@ class FlowEditorViewModel(
                     event.isList,
                     event.isRequired
                 )
+                val newNode = newState.flow.nodes.find { it.id == event.nodeId }
+                if (oldNode != null && newNode != null && oldNode != newNode) {
+                    pendingCommand = UpdateBoundaryNodeCommand(event.nodeId, oldNode, newNode)
+                }
             }
 
             is FlowEvent.UpdateSystemNodeSettings -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
+                val oldNode = currentState.flow.nodes.find { it.id == event.nodeId }
                 newState = nodeManager.handleUpdateSystemNodeSettings(
                     currentState,
                     event.nodeId,
@@ -571,6 +605,10 @@ class FlowEditorViewModel(
                     event.inputPortId,
                     event.extensions
                 )
+                val newNode = newState.flow.nodes.find { it.id == event.nodeId }
+                if (oldNode != null && newNode != null && oldNode != newNode) {
+                    pendingCommand = UpdateSystemNodeSettingsCommand(event.nodeId, oldNode, newNode)
+                }
             }
 
             is FlowEvent.BringToFront -> {
@@ -586,50 +624,74 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.DeleteSelectedNodes -> {
-                shouldSaveHistory = true
                 shouldRunTypeInference = true
+                val deletedNodes = currentState.flow.nodes.filter { it.id in currentState.selectedNodeIds }
+                val cascadeConns = currentState.flow.connections.filter {
+                    it.sourceNodeId in currentState.selectedNodeIds || it.targetNodeId in currentState.selectedNodeIds
+                }
                 newState = nodeManager.handleDeleteSelectedNodes(currentState)
+                if (deletedNodes.isNotEmpty()) {
+                    pendingCommand = DeleteNodesCommand(deletedNodes, cascadeConns)
+                }
             }
 
             is FlowEvent.ToggleNodeCollapse -> {
-                shouldSaveHistory = true
+                val oldNode = currentState.flow.nodes.find { it.id == event.nodeId }
                 newState = nodeManager.handleToggleNodeCollapse(currentState, event.nodeId)
+                val newNode = newState.flow.nodes.find { it.id == event.nodeId }
+                if (oldNode != null && newNode != null && oldNode != newNode) {
+                    pendingCommand = UpdateNodeCommand(event.nodeId, oldNode, newNode, "Toggle node collapse")
+                }
             }
 
             is FlowEvent.ToggleNodeInputsCollapse -> {
-                shouldSaveHistory = true
+                val oldNode = currentState.flow.nodes.find { it.id == event.nodeId }
                 newState = nodeManager.handleToggleNodeInputsCollapse(currentState, event.nodeId)
+                val newNode = newState.flow.nodes.find { it.id == event.nodeId }
+                if (oldNode != null && newNode != null && oldNode != newNode) {
+                    pendingCommand = UpdateNodeCommand(event.nodeId, oldNode, newNode, "Toggle node inputs collapse")
+                }
             }
 
             is FlowEvent.ToggleNodeOutputsCollapse -> {
-                shouldSaveHistory = true
+                val oldNode = currentState.flow.nodes.find { it.id == event.nodeId }
                 newState = nodeManager.handleToggleNodeOutputsCollapse(currentState, event.nodeId)
+                val newNode = newState.flow.nodes.find { it.id == event.nodeId }
+                if (oldNode != null && newNode != null && oldNode != newNode) {
+                    pendingCommand = UpdateNodeCommand(event.nodeId, oldNode, newNode, "Toggle node outputs collapse")
+                }
             }
 
             is FlowEvent.UpdateConnectionOrder -> {
-                shouldSaveHistory = true
                 newState = connectionManager.handleUpdateConnectionOrder(
                     currentState,
                     event.connection,
                     event.newOrderIndex
                 )
+                if (newState !== currentState && newState.flow.connections != currentState.flow.connections) {
+                    pendingCommand = UpdateConnectionOrderCommand(currentState.flow.connections, newState.flow.connections)
+                }
             }
 
             is FlowEvent.MoveConnectionFirst -> {
-                shouldSaveHistory = true
                 newState = connectionManager.handleMoveConnectionFirst(currentState, event.connection)
+                if (newState !== currentState && newState.flow.connections != currentState.flow.connections) {
+                    pendingCommand = UpdateConnectionOrderCommand(currentState.flow.connections, newState.flow.connections)
+                }
             }
 
             is FlowEvent.MoveConnectionLast -> {
-                shouldSaveHistory = true
                 newState = connectionManager.handleMoveConnectionLast(currentState, event.connection)
+                if (newState !== currentState && newState.flow.connections != currentState.flow.connections) {
+                    pendingCommand = UpdateConnectionOrderCommand(currentState.flow.connections, newState.flow.connections)
+                }
             }
 
             else -> {}
         }
 
-        if (shouldSaveHistory && newState !== currentState) {
-            saveToHistory()
+        if (pendingCommand != null) {
+            historyManager.recordExecutedCommand(pendingCommand)
         }
 
         if (newState !== currentState) {
@@ -697,9 +759,15 @@ class FlowEditorViewModel(
     }
 
     private fun handleResetBoard() {
-        _state.update { currentState ->
-            val newFlow = currentState.flow.copy(nodes = emptyList(), connections = emptyList())
-            currentState.copy(
+        val currentState = _state.value
+        if (currentState.flow.nodes.isNotEmpty() || currentState.flow.connections.isNotEmpty()) {
+            historyManager.recordExecutedCommand(
+                DeleteNodesCommand(currentState.flow.nodes, currentState.flow.connections)
+            )
+        }
+        _state.update { curr ->
+            val newFlow = curr.flow.copy(nodes = emptyList(), connections = emptyList())
+            curr.copy(
                 flow = newFlow,
                 offset = Offset.Zero,
                 scale = 1f,
@@ -709,21 +777,30 @@ class FlowEditorViewModel(
     }
 
     private fun handleExpandSubFlow(nodeId: Long) {
-        saveToHistory()
-        _state.update { currentState ->
-            val subFlowNode =
-                currentState.flow.nodes.find { it.id == nodeId } as? Node.SubFlowNode ?: return@update currentState
-            val targetFlow = currentState.flows.find { it.name == subFlowNode.flowName } ?: return@update currentState
+        val currentState = _state.value
+        val subFlowNode =
+            currentState.flow.nodes.find { it.id == nodeId } as? Node.SubFlowNode ?: return
+        val targetFlow = currentState.flows.find { it.name == subFlowNode.flowName } ?: return
 
-            val unpackedFlow = FlowUnpacker.unpackSubflowInFlow(currentState.flow, nodeId, targetFlow)
-            if (FlowUnpacker.hasCycle(unpackedFlow.connections)) {
-                resolvedNotificationService?.toast("Cannot expand subflow: Expansion would introduce a cycle. Enforcing Directed Acyclic Graph (DAG).")
-                return@update currentState
-            }
+        val unpackedFlow = FlowUnpacker.unpackSubflowInFlow(currentState.flow, nodeId, targetFlow)
+        if (FlowUnpacker.hasCycle(unpackedFlow.connections)) {
+            resolvedNotificationService?.toast("Cannot expand subflow: Expansion would introduce a cycle. Enforcing Directed Acyclic Graph (DAG).")
+            return
+        }
 
-            val nextId = (unpackedFlow.nodes.maxOfOrNull { it.id } ?: -1L) + 1
+        val deletedConns = currentState.flow.connections.filter { it !in unpackedFlow.connections }
+        val addedNodes = unpackedFlow.nodes.filter { it.id != nodeId && it !in currentState.flow.nodes }
+        val addedConns = unpackedFlow.connections.filter { it !in currentState.flow.connections }
+        val commands = mutableListOf<FlowCommand>()
+        commands.add(DeleteNodesCommand(listOf(subFlowNode), deletedConns))
+        addedNodes.forEach { commands.add(AddNodeCommand(it)) }
+        addedConns.forEach { commands.add(ConnectPortsCommand(it)) }
+        historyManager.recordExecutedCommand(CompositeCommand("Expand subflow '${subFlowNode.flowName}'", commands))
 
-            currentState.copy(
+        val nextId = (unpackedFlow.nodes.maxOfOrNull { it.id } ?: -1L) + 1
+
+        _state.update { curr ->
+            curr.copy(
                 flow = unpackedFlow,
                 nextId = nextId,
                 hasUnsavedChanges = true

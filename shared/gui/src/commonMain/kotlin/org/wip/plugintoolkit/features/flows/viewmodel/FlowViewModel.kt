@@ -565,6 +565,20 @@ class FlowViewModel(
 
         if (flow.isBroken(activeCapabilities)) {
             Logger.e { "Failed to execute flow '${flow.name}': Flow contains broken or unready nodes." }
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast("Cannot execute flow '${flow.name}': Flow contains broken or unready nodes.")
+            }
+            return
+        }
+
+        val lockTracker = try { getKoin().get<org.wip.plugintoolkit.features.flows.logic.ReactiveCapabilityLockTracker>() } catch (e: Exception) { null }
+        val validation = lockTracker?.validateFlowForExecution(flow)
+        if (validation != null && validation.isFailure) {
+            val errorMsg = validation.exceptionOrNull()?.message ?: "Flow contains locked capabilities."
+            Logger.e { "Failed to execute flow '${flow.name}': $errorMsg" }
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast(errorMsg)
+            }
             return
         }
 
