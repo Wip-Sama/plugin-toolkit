@@ -5,12 +5,24 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.json.JsonElement
 import org.koin.dsl.koinApplication
+import org.wip.plugintoolkit.api.ManifestLoader
 import org.wip.plugintoolkit.api.PluginEntry
+import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.PluginModuleProvider
 import java.io.File
 import java.net.URLClassLoader
 import java.util.ServiceLoader
 import java.util.concurrent.ConcurrentHashMap
+
+private class ResilientPluginEntry(
+    private val delegate: PluginEntry,
+    private val fallbackManifest: PluginManifest
+) : PluginEntry by delegate {
+    override fun getManifest(): Result<PluginManifest> {
+        return runCatching { delegate.getManifest().getOrThrow() }
+            .recover { fallbackManifest }
+    }
+}
 
 private data class LoadedPlugin(
     val id: String,
@@ -106,10 +118,38 @@ actual object PluginLoader {
                 }
 
                 // Retrieve the real PluginEntry from Koin
-                val pluginEntry = koinApp.koin.get<PluginEntry>()
+                val rawPluginEntry = koinApp.koin.get<PluginEntry>()
 
-                // Cache the ID for O(1) lookups
-                val manifest = pluginEntry.getManifest().getOrThrow()
+                // Safely retrieve manifest with fallback to manifest.json if linkage or static init fails
+                val manifestResult = runCatching { rawPluginEntry.getManifest().getOrThrow() }
+                val manifest = manifestResult.getOrElse { e ->
+                    Logger.w(e) { "rawPluginEntry.getManifest() failed for $normalizedPath; attempting fallback to manifest.json" }
+                    val loadedFromResource = runCatching {
+                        ManifestLoader.loadFromResources(rawPluginEntry::class.java)
+                    }.getOrNull()
+
+                    loadedFromResource ?: runCatching {
+                        java.util.jar.JarFile(File(normalizedPath)).use { jar ->
+                            val entry = jar.getJarEntry("META-INF/manifest.json")
+                                ?: jar.getJarEntry("/META-INF/manifest.json")
+                                ?: jar.getJarEntry("manifest.json")
+                                ?: jar.getJarEntry("/manifest.json")
+                            entry?.let { jarEntry ->
+                                jar.getInputStream(jarEntry).bufferedReader().use { it.readText() }
+                            }
+                        }?.let { jsonContent ->
+                            ManifestLoader.loadFromString(jsonContent)
+                        }
+                    }.getOrNull() ?: throw Exception("Failed to retrieve manifest from plugin entry or fallback manifest.json in $normalizedPath", e)
+                }
+
+                // Wrap pluginEntry in ResilientPluginEntry if getManifest() had failed so all subsequent calls succeed
+                val pluginEntry = if (manifestResult.isFailure) {
+                    ResilientPluginEntry(rawPluginEntry, manifest)
+                } else {
+                    rawPluginEntry
+                }
+
                 val pluginId = manifest.plugin.id
 
                 // If this pluginId was previously registered under a different jar path, unload the old path

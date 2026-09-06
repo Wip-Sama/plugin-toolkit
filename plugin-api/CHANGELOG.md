@@ -9,3 +9,5 @@ All notable changes to the Plugin API will be documented in this file.
 - Required Action mechanism for plugins needing user intervention.
 - Enhanced Changelog parsing support.
 - Added CommonSemanticTypes registry for standardized SemanticType definitions.
+- Added `@JvmOverloads` across manifest and API data classes (`PluginAction`, `Capability`, `ParameterMetadata`, `SettingMetadata`, `PluginManifest`, etc.) to preserve JVM constructor signatures for precompiled plugins.
+- Enhanced generated `PluginEntry.getManifest()` with self-healing fallback to `ManifestLoader.loadFromResources()`.

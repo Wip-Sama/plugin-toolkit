@@ -11,6 +11,7 @@ import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DATA_PROCESSOR
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_MANIFEST_LOADER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_CONTEXT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ENTRY
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_FILESYSTEM
@@ -69,7 +70,11 @@ object EntryGenerator {
                 FunSpec.builder("getManifest")
                     .addModifiers(KModifier.OVERRIDE)
                     .returns(CN_RESULT.parameterizedBy(CN_PLUGIN_MANIFEST))
-                    .addStatement("return Result.success(%L.manifest)", manifestName)
+                    .addStatement(
+                        "return runCatching { %L.manifest }.recoverCatching { %T.loadFromResources(this::class.java) }",
+                        manifestName,
+                        CN_MANIFEST_LOADER
+                    )
                     .build()
             )
             .addFunction(

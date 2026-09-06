@@ -1,7 +1,11 @@
 Version: 2.1.0
-Date: 05-09-2026
+Date: 06-09-2026
 Changes:
 	- Refactored the update available menu
+	- Improved plugin binary backwards compatibility with @JvmOverloads across API data classes
+Fixed:
+	- Plugins breaking with NoSuchMethodError across app updates when optional parameters are added to plugin-api models
+	- PluginLoader now gracefully falls back to manifest.json when older plugin bytecode encounters static manifest linkage errors
 ----------------------------------------------------------------------------------------------------
 Version: 2.0.2
 Date: 05-09-2026

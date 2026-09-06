@@ -11,6 +11,7 @@ import org.wip.plugintoolkit.api.DataProcessor
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.HostFileSystem
 import org.wip.plugintoolkit.api.JobHandle
+import org.wip.plugintoolkit.api.ManifestLoader
 import org.wip.plugintoolkit.api.ParameterConstraints
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.PluginAction
@@ -63,6 +64,7 @@ object ProcessorConstants {
     val CN_PLUGIN_REQUEST = PluginRequest::class.asClassName()
     val CN_PLUGIN_RESPONSE = PluginResponse::class.asClassName()
     val CN_PLUGIN_ENTRY = PluginEntry::class.asClassName()
+    val CN_MANIFEST_LOADER = ManifestLoader::class.asClassName()
     val CN_SETTING_METADATA = SettingMetadata::class.asClassName()
     val CN_JOB_HANDLE = JobHandle::class.asClassName()
     val CN_PLUGIN_SIGNAL = PluginSignal::class.asClassName()

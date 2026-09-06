@@ -516,3 +516,7 @@ For local development (loading plugins from the local filesystem), signature ver
 - **Resource Cleanup**: Always implement `shutdown()` or use try-finally blocks to clean up resources.
 - **Isolation**: Plugins should not attempt to access files outside their managed folders.
 - **Security**: Never share your private key or keystore password. Store them securely.
+- **ABI & Version Compatibility**: When updating or extending `plugin-api` models:
+  - Always assign default values to newly added properties.
+  - Apply `@kotlin.jvm.JvmOverloads constructor(...)` to data classes so that the Kotlin compiler generates JVM bytecode overloads for existing compiled plugins.
+  - The host application includes fallback deserialization from `META-INF/manifest.json` (`ignoreUnknownKeys = true`) to ensure already-built plugin JARs remain compatible across app updates even if JVM constructor signatures differ.
