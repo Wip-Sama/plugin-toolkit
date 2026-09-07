@@ -17,7 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.clip
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -263,19 +266,26 @@ fun BoardCanvas(
                                         onDismiss = { showMenu = false }
                                     ) {
                                         Card(
-                                            elevation = CardDefaults.cardElevation(defaultElevation = dimensions.cardElevation),
-                                            shape = MaterialTheme.shapes.medium,
-                                            modifier = Modifier.width(dimensions.widthLarge)
+                                            elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.dimensions.menuElevation),
+                                            shape = ToolkitTheme.shapes.large,
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                                            modifier = Modifier.widthIn(min = ToolkitTheme.dimensions.menuMinWidth).clip(ToolkitTheme.shapes.large)
                                         ) {
-                                            Column(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.extraSmall)) {
-                                                DropdownMenuItem(
+                                            Column(
+                                                modifier = Modifier.padding(
+                                                    horizontal = ToolkitTheme.spacing.xs,
+                                                    vertical = ToolkitTheme.spacing.xs
+                                                ),
+                                                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
+                                            ) {
+                                                ToolkitDropdownMenuItem(
                                                     text = { Text("Move to Start") },
                                                     onClick = {
                                                         onMoveConnectionFirst(conn)
                                                         showMenu = false
                                                     }
                                                 )
-                                                DropdownMenuItem(
+                                                ToolkitDropdownMenuItem(
                                                     text = { Text("Move to End") },
                                                     onClick = {
                                                         onMoveConnectionLast(conn)

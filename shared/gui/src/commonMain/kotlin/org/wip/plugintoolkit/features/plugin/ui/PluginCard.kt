@@ -31,10 +31,11 @@ import androidx.compose.material.icons.filled.Upgrade
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownDivider
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -513,12 +514,12 @@ fun PluginCard(
                                     contentDescription = stringResource(Res.string.action_more_actions)
                                 )
                             }
-                            DropdownMenu(
+                            ToolkitDropdownMenu(
                                 expanded = expanded,
                                 onDismissRequest = { expanded = false }
                             ) {
                                 if (alternateUpdate != null) {
-                                    DropdownMenuItem(
+                                    ToolkitDropdownMenuItem(
                                         text = {
                                             Text(
                                                 stringResource(
@@ -538,59 +539,54 @@ fun PluginCard(
                                             )
                                         }
                                     )
-                                    DropdownMenuItem(
+                                    ToolkitDropdownMenuItem(
                                         text = { Text(stringResource(Res.string.plugin_update_local)) },
                                         onClick = { onAction(PluginStatusAction.Update); expanded = false },
                                         leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
                                     )
-                                    HorizontalDivider()
+                                    ToolkitDropdownDivider()
                                 }
-                                DropdownMenuItem(
+                                ToolkitDropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_validate)) },
                                     onClick = { onAction(PluginStatusAction.Validate); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
                                 )
-                                DropdownMenuItem(
+                                ToolkitDropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_rerun_setup)) },
                                     onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
                                 )
-                                DropdownMenuItem(
+                                ToolkitDropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_reload)) },
                                     onClick = { onAction(PluginStatusAction.Reload); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
                                 )
-                                DropdownMenuItem(
+                                ToolkitDropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_changelog)) },
                                     onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
                                 )
-                                DropdownMenuItem(
+                                ToolkitDropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_action_refresh_locks)) },
                                     onClick = { onAction(PluginStatusAction.RefreshLocks); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) }
                                 )
-                                DropdownMenuItem(
+                                ToolkitDropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_open_folder)) },
                                     onClick = { onAction(PluginStatusAction.OpenFolder); expanded = false },
                                     leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
                                 )
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(Res.string.plugin_uninstall),
-                                            color = MaterialTheme.colorScheme.error
-                                        )
-                                    },
+                                ToolkitDropdownDivider()
+                                ToolkitDropdownMenuItem(
+                                    text = { Text(stringResource(Res.string.plugin_uninstall)) },
                                     onClick = { onAction(PluginStatusAction.Uninstall); expanded = false },
                                     leadingIcon = {
                                         Icon(
                                             Icons.Default.Delete,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error
+                                            contentDescription = null
                                         )
-                                    }
+                                    },
+                                    isDestructive = true
                                 )
                             }
                         }

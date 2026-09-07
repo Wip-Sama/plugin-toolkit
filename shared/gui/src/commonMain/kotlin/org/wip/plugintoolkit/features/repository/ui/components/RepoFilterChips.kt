@@ -18,10 +18,10 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Upgrade
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -185,7 +185,7 @@ fun SortDropdownChip(
             }
         }
 
-        DropdownMenu(
+        ToolkitDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
@@ -197,14 +197,14 @@ fun SortDropdownChip(
                     PluginSortMode.LatestVersion -> stringResource(Res.string.repo_sort_version)
                 }
                 val isSelected = mode == sortMode
-                DropdownMenuItem(
+                ToolkitDropdownMenuItem(
                     text = {
                         Text(
                             text = label,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
                     },
+                    isSelected = isSelected,
                     onClick = {
                         expanded = false
                         onSortModeChange(mode)

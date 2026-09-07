@@ -106,6 +106,7 @@ data class Dimensions(
     val iconExtraSmall: Dp = 14.dp,
     val iconMicro: Dp = 12.dp,
     val menuElevation: Dp = 4.dp,
+    val menuMinWidth: Dp = 180.dp,
     val iconExtraLarge: Dp = 64.dp,
     
     // Auto-generated generic/component-specific sized dimensions (deprecated in favor of semantic tokens)

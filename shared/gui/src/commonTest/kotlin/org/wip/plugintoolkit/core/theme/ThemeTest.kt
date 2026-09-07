@@ -179,4 +179,12 @@ class ThemeTest {
         val updated = defaultSettings.copy(useAccentInTheme = true)
         assertTrue(updated.useAccentInTheme)
     }
+
+    @Test
+    fun testMenuDimensionsAndTokens() {
+        val dimensions = Dimensions()
+        assertEquals(180.dp, dimensions.menuMinWidth)
+        assertEquals(4.dp, dimensions.menuElevation)
+        assertEquals(40.dp, dimensions.standardButtonHeight)
+    }
 }

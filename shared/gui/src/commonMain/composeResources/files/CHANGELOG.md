@@ -4,15 +4,19 @@ Added:
 	- Flows can now have default values for their parameters
 	- Flow system nodes can now have default values for their parameters
 	- Flow/capability runner now shows a "set as default" button for the parameters
+	- Setting to generate theme variants from accent color according to Material 3 Expressive guidelines
 Changes:
 	- Refactored the update available menu
 	- Improved plugin binary backwards compatibility with @JvmOverloads across API data classes
 	- Refactored plugin source selector and added a way to switch to a new version of the plugin in a new repo is available
+	- Restyled the application with Material 3 Expressive surface hierarchy and color engine
+	- Restyled ExpressiveMenu and migrated all dropdown and context menus across the application to Material 3 Expressive (ToolkitDropdownMenu) with unconstrained width expansion
 Fixed:
 	- Plugins breaking with NoSuchMethodError across app updates when optional parameters are added to plugin-api models
 	- PluginLoader now gracefully falls back to manifest.json when older plugin bytecode encounters static manifest linkage errors
 	- Fixed plugin repository install/update/downgrade/reinstall actions allowing multiple clicks and enqueuing duplicate installations
 	- Repository items now immediately show queued state upon click and display progress bar once installation starts
+	- Fixed element clipping and overflow in rounded corners for ToolkitCard and custom dropdown menus
 ----------------------------------------------------------------------------------------------------
 Version: 2.0.2
 Date: 05-09-2026

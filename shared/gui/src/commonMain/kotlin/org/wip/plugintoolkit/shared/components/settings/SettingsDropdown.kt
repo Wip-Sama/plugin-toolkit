@@ -15,6 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.material3.MaterialTheme
@@ -89,87 +90,95 @@ fun <T> ExpressiveMenu(
         }
 
 
-        val containerRadius = ToolkitTheme.spacing.medium
-        val itemNormalRadius = ToolkitTheme.spacing.small
+        val containerRadius = ToolkitTheme.shapes.large
+        val itemShape = ToolkitTheme.shapes.medium
 
         ExposedDropdownMenu(
             expanded = expanded,
-            modifier = Modifier.clip(RoundedCornerShape(containerRadius)),
+            modifier = Modifier
+                .widthIn(min = ToolkitTheme.dimensions.menuMinWidth)
+                .clip(containerRadius),
             onDismissRequest = { expanded = false },
-            shape = RoundedCornerShape(containerRadius),
+            shape = containerRadius,
             tonalElevation = ToolkitTheme.spacing.none,
             shadowElevation = ToolkitTheme.dimensions.menuElevation,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            matchTextFieldWidth = false
         ) {
             Column(
-                modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
+                modifier = Modifier.padding(
+                    horizontal = ToolkitTheme.spacing.xs,
+                    vertical = ToolkitTheme.spacing.xs
+                ),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
             ) {
                 options.forEachIndexed { index, option ->
                     val isDisabled = option in disabledOptions
                     val isSelected = option == selectedOption
                     val itemSettingKey = disabledOptionTargetKey(option)
-
-                    val itemShape = RoundedCornerShape(itemNormalRadius)
                     var isHovered by remember { mutableStateOf(false) }
 
-                            DropdownMenuItem(
-                                text = { Text(labelProvider(option)) },
-                                onClick = {
-                                    if (!isDisabled) {
-                                        onOptionSelected(option)
-                                        expanded = false
-                                    }
-                                },
-                                modifier = Modifier
-                                    .padding(horizontal = ToolkitTheme.spacing.small)
-                                    .height(ToolkitTheme.dimensions.menuItem)
-                                    .clip(itemShape)
-                                    .background(
-                                        when {
-                                            isSelected -> MaterialTheme.colorScheme.primary
-                                            isHovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
-                                            else -> ToolkitTheme.colors.transparent
-                                        }
-                                    )
-                                    .onPointerEvent(PointerEventType.Enter) { isHovered = true }
-                                    .onPointerEvent(PointerEventType.Exit) { isHovered = false }
-                                    .then(
-                                         if (onNavigateToPluginSetting != null) {
-                                             Modifier.lockedClickInterceptor(
-                                                 isLocked = isDisabled,
-                                                 pluginId = pluginId,
-                                                 targetSettingKey = itemSettingKey,
-                                                 hasUnsavedChanges = hasUnsavedChanges,
-                                                 onNavigateToPluginSetting = { pid, key ->
-                                                     expanded = false
-                                                     onNavigateToPluginSetting(pid, key)
-                                                 }
-                                             )
-                                         } else {
-                                             Modifier.lockedClickInterceptor(
-                                                 isLocked = isDisabled,
-                                                 targetScreen = if (pluginId.isNotEmpty() || itemSettingKey.isNotEmpty()) {
-                                                     Screen.PluginManager(pluginId = pluginId.ifEmpty { null }, scrollToSetting = itemSettingKey.ifEmpty { null })
-                                                 } else null,
-                                                 hasUnsavedChanges = hasUnsavedChanges
-                                             )
-                                         }
-                                     ),
-                                colors = MenuDefaults.itemColors(
-                                    textColor = if (isDisabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                                else if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                                else MaterialTheme.colorScheme.onSurface
-                                ),
-                                enabled = !isDisabled,
-                                contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.none)
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = labelProvider(option),
+                                style = MaterialTheme.typography.bodyMedium
                             )
-                            if (gapAfter(option) && index != options.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-                                )
+                        },
+                        onClick = {
+                            if (!isDisabled) {
+                                onOptionSelected(option)
+                                expanded = false
                             }
+                        },
+                        modifier = Modifier
+                            .height(ToolkitTheme.dimensions.standardButtonHeight)
+                            .clip(itemShape)
+                            .background(
+                                when {
+                                    isSelected -> MaterialTheme.colorScheme.secondaryContainer
+                                    isHovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
+                                    else -> ToolkitTheme.colors.transparent
+                                }
+                            )
+                            .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+                            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+                            .then(
+                                 if (onNavigateToPluginSetting != null) {
+                                     Modifier.lockedClickInterceptor(
+                                         isLocked = isDisabled,
+                                         pluginId = pluginId,
+                                         targetSettingKey = itemSettingKey,
+                                         hasUnsavedChanges = hasUnsavedChanges,
+                                         onNavigateToPluginSetting = { pid, key ->
+                                             expanded = false
+                                             onNavigateToPluginSetting(pid, key)
+                                         }
+                                     )
+                                 } else {
+                                     Modifier.lockedClickInterceptor(
+                                         isLocked = isDisabled,
+                                         targetScreen = if (pluginId.isNotEmpty() || itemSettingKey.isNotEmpty()) {
+                                             Screen.PluginManager(pluginId = pluginId.ifEmpty { null }, scrollToSetting = itemSettingKey.ifEmpty { null })
+                                         } else null,
+                                         hasUnsavedChanges = hasUnsavedChanges
+                                     )
+                                 }
+                             ),
+                        colors = MenuDefaults.itemColors(
+                            textColor = if (isDisabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                        else if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                                        else MaterialTheme.colorScheme.onSurface
+                        ),
+                        enabled = !isDisabled,
+                        contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.none)
+                    )
+                    if (gapAfter(option) && index != options.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+                        )
+                    }
                 }
             }
         }

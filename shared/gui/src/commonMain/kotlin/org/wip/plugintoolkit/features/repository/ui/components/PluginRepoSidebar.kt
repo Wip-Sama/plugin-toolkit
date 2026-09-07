@@ -30,11 +30,11 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -235,12 +235,12 @@ fun PluginRepoSidebar(
                                 )
                             }
 
-                            DropdownMenu(
+                            ToolkitDropdownMenu(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false }
                             ) {
                                 if (repo.isLocal) {
-                                    DropdownMenuItem(
+                                    ToolkitDropdownMenuItem(
                                         text = { Text(stringResource(Res.string.repo_action_open_folder)) },
                                         leadingIcon = {
                                             Icon(
@@ -256,7 +256,7 @@ fun PluginRepoSidebar(
                                     )
                                 }
 
-                                DropdownMenuItem(
+                                ToolkitDropdownMenuItem(
                                     text = { Text(stringResource(Res.string.repo_share_link_desc)) },
                                     leadingIcon = {
                                         Icon(
@@ -274,7 +274,7 @@ fun PluginRepoSidebar(
                                     }
                                 )
 
-                                DropdownMenuItem(
+                                ToolkitDropdownMenuItem(
                                     text = { Text(stringResource(Res.string.action_refresh)) },
                                     leadingIcon = {
                                         Icon(
@@ -289,21 +289,16 @@ fun PluginRepoSidebar(
                                     }
                                 )
 
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(Res.string.action_remove),
-                                            color = MaterialTheme.colorScheme.error
-                                        )
-                                    },
+                                ToolkitDropdownMenuItem(
+                                    text = { Text(stringResource(Res.string.action_remove)) },
                                     leadingIcon = {
                                         Icon(
                                             Icons.Default.Delete,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                         )
                                     },
+                                    isDestructive = true,
                                     onClick = {
                                         showMenu = false
                                         onRemoveRepo(repo)

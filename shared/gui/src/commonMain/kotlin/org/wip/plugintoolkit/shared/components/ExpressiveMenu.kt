@@ -43,11 +43,15 @@ fun <T> ExpressiveMenu(
         modifier = modifier.clip(ToolkitTheme.shapes.large),
         shape = ToolkitTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = ToolkitTheme.dimensions.menuElevation,
+        tonalElevation = ToolkitTheme.spacing.none,
         shadowElevation = ToolkitTheme.dimensions.menuElevation
     ) {
         Column(
-            modifier = Modifier.padding(ToolkitTheme.spacing.small)
+            modifier = Modifier.padding(
+                horizontal = ToolkitTheme.spacing.xs,
+                vertical = ToolkitTheme.spacing.xs
+            ),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
         ) {
             options.forEach { option ->
                 val isSelected = option == selectedOption
@@ -55,7 +59,8 @@ fun <T> ExpressiveMenu(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(ToolkitTheme.shapes.small)
+                        .height(ToolkitTheme.dimensions.standardButtonHeight)
+                        .clip(ToolkitTheme.shapes.medium)
                         .background(
                             if (isSelected) MaterialTheme.colorScheme.secondaryContainer
                             else ToolkitTheme.colors.transparent
@@ -65,7 +70,8 @@ fun <T> ExpressiveMenu(
                             role = Role.Tab
                             selected = isSelected
                         }
-                        .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.smallMedium)
+                        .padding(horizontal = ToolkitTheme.spacing.mediumSmall),
+                    contentAlignment = androidx.compose.ui.Alignment.CenterStart
                 ) {
                     Text(
                         text = labelProvider(option),
@@ -73,11 +79,6 @@ fun <T> ExpressiveMenu(
                                 else MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium
                     )
-                }
-                
-                // Add a small spacer between items if they are not the last one
-                if (option != options.last()) {
-                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraExtraSmall))
                 }
             }
         }

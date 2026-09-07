@@ -20,8 +20,8 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -229,10 +229,12 @@ fun ChangelogContent(
                                     }
                                 }
 
-                                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                ToolkitDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                                     options.forEachIndexed { index, option ->
-                                        DropdownMenuItem(
+                                        val isSelected = option == currentText
+                                        ToolkitDropdownMenuItem(
                                             text = { Text(option) },
+                                            isSelected = isSelected,
                                             onClick = {
                                                 when (selectedLevel) {
                                                     FilterLevel.Major -> selectedMajor = majors[index]
