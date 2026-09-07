@@ -398,19 +398,29 @@ fun FlowEditorView(
                                         )
                                     )
                                 },
-                                onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList, isRequired ->
-                                    viewModel.onEvent(
-                                        FlowEvent.UpdateBoundaryNode(
-                                            id,
-                                            name,
-                                            dataType,
-                                            semanticTypes,
-                                            constraints,
-                                            isList,
-                                            isRequired
-                                        )
-                                    )
-                                },
+                                onUpdateBoundaryNode = { id, name, dataType, semanticTypes, constraints, isList, isRequired, defaultValue ->
+                                     viewModel.onEvent(
+                                         FlowEvent.UpdateBoundaryNode(
+                                             id,
+                                             name,
+                                             dataType,
+                                             semanticTypes,
+                                             constraints,
+                                             isList,
+                                             isRequired,
+                                             defaultValue
+                                         )
+                                     )
+                                 },
+                                 onUpdateInputPortDefault = { id, portId, defaultValue ->
+                                     viewModel.onEvent(
+                                         FlowEvent.UpdateInputPortDefault(
+                                             id,
+                                             portId,
+                                             defaultValue
+                                         )
+                                     )
+                                 },
                                 onUpdateSystemNodeSettings = { id, portId, semanticTypes, inputPortId, extensions ->
                                     viewModel.onEvent(
                                         FlowEvent.UpdateSystemNodeSettings(

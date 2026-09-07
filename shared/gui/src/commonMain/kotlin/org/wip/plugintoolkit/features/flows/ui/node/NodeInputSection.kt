@@ -52,6 +52,7 @@ fun NodeInputSection(
     onPortPositioned: (Long, String, Boolean, LayoutCoordinates) -> Unit,
     onUpdateValue: (Long, String, Any?) -> Unit,
     onFocusLost: () -> Unit,
+    onUpdateInputPortDefault: (Long, String, Any?) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val sectionTag = "input_section_${sectionType.name.lowercase()}_${node.id}"
@@ -127,7 +128,8 @@ fun NodeInputSection(
                 onDropConnection = onDropConnection,
                 onPortPositioned = onPortPositioned,
                 onUpdateValue = onUpdateValue,
-                onFocusLost = onFocusLost
+                onFocusLost = onFocusLost,
+                onUpdateInputPortDefault = onUpdateInputPortDefault
             )
         }
     }

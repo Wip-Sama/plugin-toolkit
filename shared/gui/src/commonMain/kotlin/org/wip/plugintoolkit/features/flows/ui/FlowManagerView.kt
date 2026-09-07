@@ -80,6 +80,7 @@ import plugintoolkit.composeapp.generated.resources.dialog_cancel
 import plugintoolkit.composeapp.generated.resources.error_invalid_version_format
 import plugintoolkit.composeapp.generated.resources.flow_metadata_edit_title
 import plugintoolkit.composeapp.generated.resources.flow_version
+import plugintoolkit.composeapp.generated.resources.flow_clear_defaults
 import plugintoolkit.composeapp.generated.resources.flow_description
 import plugintoolkit.composeapp.generated.resources.flow_broken_tag
 import plugintoolkit.composeapp.generated.resources.flow_create_button
@@ -417,6 +418,33 @@ fun FlowManagerView(
                             label = { Text(stringResource(Res.string.flow_description)) },
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        if (flow.defaultValues.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${flow.defaultValues.size} default parameter(s) configured",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                TextButton(
+                                    onClick = {
+                                        viewModel.clearFlowDefaults(flow)
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                    )
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                    Text(stringResource(Res.string.flow_clear_defaults))
+                                }
+                            }
+                        }
                     }
                 },
                 confirmButton = {

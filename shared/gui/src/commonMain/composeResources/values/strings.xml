@@ -546,4 +546,14 @@
     <string name="terminal_link_shift_click_to_open_url">Shift + Click to open: %1$s</string>
     <string name="action_copy_logs">Copy Logs</string>
     <string name="job_copy_logs_success_toast">Logs copied to clipboard</string>
+    <string name="action_set_as_default">Set as Default</string>
+    <string name="action_reset_to_default">Reset to Default</string>
+    <string name="action_set_node_default">Set as Node Default</string>
+    <string name="defaults_saved_success">Default values saved successfully</string>
+    <string name="flow_defaults_saved">Default values saved for flow \'%1$s\'</string>
+    <string name="capability_defaults_saved">Default values saved for capability \'%1$s\'</string>
+    <string name="node_default_value">Default Value</string>
+    <string name="node_configure_defaults">Configure Node Defaults</string>
+    <string name="flow_clear_defaults">Clear Defaults</string>
+    <string name="flow_defaults_cleared">Default values cleared for flow \'%1$s\'</string>
 </resources>

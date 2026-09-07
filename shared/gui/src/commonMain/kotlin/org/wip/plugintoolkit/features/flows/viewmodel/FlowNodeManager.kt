@@ -155,7 +155,8 @@ class FlowNodeManager {
         semanticTypes: List<SemanticType>,
         constraints: PortConstraints?,
         isList: Boolean,
-        isRequired: Boolean
+        isRequired: Boolean,
+        defaultValue: Any? = null
     ): FlowEditorState {
         val updatedNodes = currentState.flow.nodes.map { node ->
             if (node.id == nodeId) {
@@ -171,7 +172,8 @@ class FlowNodeManager {
                             outputs = listOf(port),
                             constraints = constraints,
                             isList = isList,
-                            isRequired = isRequired
+                            isRequired = isRequired,
+                            defaultValue = defaultValue
                         )
                     }
 
@@ -187,6 +189,24 @@ class FlowNodeManager {
 
                     else -> node
                 }
+            } else node
+        }
+        val newFlow = currentState.flow.copy(nodes = updatedNodes)
+        return currentState.copy(
+            flow = newFlow,
+            hasUnsavedChanges = true
+        )
+    }
+
+    fun handleUpdateInputPortDefault(
+        currentState: FlowEditorState,
+        nodeId: Long,
+        portId: String,
+        defaultValue: Any?
+    ): FlowEditorState {
+        val updatedNodes = currentState.flow.nodes.map { node ->
+            if (node.id == nodeId) {
+                node.copyWithUpdatedInputDefault(portId, defaultValue)
             } else node
         }
         val newFlow = currentState.flow.copy(nodes = updatedNodes)

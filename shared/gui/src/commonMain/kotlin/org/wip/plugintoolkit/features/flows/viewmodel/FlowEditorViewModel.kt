@@ -28,6 +28,7 @@ import org.wip.plugintoolkit.features.flows.history.FlowHistoryManager
 import org.wip.plugintoolkit.features.flows.history.MoveNodesCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateBoundaryNodeCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateConnectionOrderCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateInputPortDefaultCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateInputPortValueCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateNodeCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateSystemNodeSettingsCommand
@@ -238,6 +239,7 @@ class FlowEditorViewModel(
                 is FlowEvent.Save,
                 is FlowEvent.SaveAs,
                 is FlowEvent.UpdateInputPortValue,
+                is FlowEvent.UpdateInputPortDefault,
                 is FlowEvent.UpdateBoundaryNode,
                 is FlowEvent.DeleteSelectedNodes,
                 is FlowEvent.TryConnectPorts,
@@ -575,6 +577,22 @@ class FlowEditorViewModel(
                 )
             }
 
+            is FlowEvent.UpdateInputPortDefault -> {
+                shouldRunTypeInference = true
+                val oldNode = currentState.flow.nodes.find { it.id == event.nodeId }
+                val oldDefault = (oldNode as? Node.FlowInputNode)?.defaultValue
+                    ?: oldNode?.inputs?.find { it.id == event.portId }?.defaultValue
+                newState = nodeManager.handleUpdateInputPortDefault(
+                    currentState,
+                    event.nodeId,
+                    event.portId,
+                    event.defaultValue
+                )
+                if (oldDefault != event.defaultValue) {
+                    pendingCommand = UpdateInputPortDefaultCommand(event.nodeId, event.portId, oldDefault, event.defaultValue)
+                }
+            }
+
             is FlowEvent.UpdateBoundaryNode -> {
                 shouldRunTypeInference = true
                 val oldNode = currentState.flow.nodes.find { it.id == event.nodeId }
@@ -586,7 +604,8 @@ class FlowEditorViewModel(
                     event.semanticTypes,
                     event.constraints,
                     event.isList,
-                    event.isRequired
+                    event.isRequired,
+                    event.defaultValue
                 )
                 val newNode = newState.flow.nodes.find { it.id == event.nodeId }
                 if (oldNode != null && newNode != null && oldNode != newNode) {

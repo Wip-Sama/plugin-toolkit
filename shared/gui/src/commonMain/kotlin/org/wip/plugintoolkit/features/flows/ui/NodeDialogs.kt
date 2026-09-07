@@ -48,7 +48,9 @@ import plugintoolkit.composeapp.generated.resources.action_delete
 import plugintoolkit.composeapp.generated.resources.action_save
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
 import plugintoolkit.composeapp.generated.resources.node_class_name_label
+import plugintoolkit.composeapp.generated.resources.node_configure_defaults
 import plugintoolkit.composeapp.generated.resources.node_data_type_label
+import plugintoolkit.composeapp.generated.resources.node_default_value
 import plugintoolkit.composeapp.generated.resources.node_delete_confirm
 import plugintoolkit.composeapp.generated.resources.node_delete_title
 import plugintoolkit.composeapp.generated.resources.node_edit_input_title
@@ -66,14 +68,15 @@ fun NodeDialogs(
     onConfirmDelete: () -> Unit,
     showEditBoundaryDialog: Boolean,
     onDismissEditBoundary: () -> Unit,
-    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean) -> Unit,
+    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean, Any?) -> Unit,
     showColorPicker: Boolean,
     activeColorInputId: String?,
     onDismissColorPicker: () -> Unit,
     onUpdateValue: (Long, String, Any?) -> Unit,
     showLoadSettingsDialog: Boolean,
     onDismissLoadSettings: () -> Unit,
-    onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit
+    onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit,
+    onUpdateInputPortDefault: (Long, String, Any?) -> Unit = { _, _, _ -> }
 ) {
     if (showDeleteConfirmation) {
         AlertDialog(
@@ -147,6 +150,9 @@ fun NodeDialogs(
             }
             var regexStr by remember {
                 mutableStateOf(if (node is Node.FlowInputNode) node.constraints?.regex ?: "" else "")
+            }
+            var defaultValueStr by remember {
+                mutableStateOf(if (node is Node.FlowInputNode) node.defaultValue?.toString() ?: "" else "")
             }
 
             AlertDialog(
@@ -255,6 +261,16 @@ fun NodeDialogs(
                                     )
                                 }
                             }
+
+                            if (node is Node.FlowInputNode) {
+                                ToolkitTextField(
+                                    value = defaultValueStr,
+                                    onValueChange = { defaultValueStr = it },
+                                    label = { Text(stringResource(Res.string.node_default_value)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 },
@@ -279,6 +295,8 @@ fun NodeDialogs(
                                 )
                             } else null
 
+                            val parsedDefaultValue = defaultValueStr.takeIf { it.isNotBlank() }
+
                             onUpdateBoundaryNode(
                                 node.id,
                                 name.ifBlank { port.name },
@@ -286,7 +304,8 @@ fun NodeDialogs(
                                 parseSemanticTypes(semanticType),
                                 constraints,
                                 isList,
-                                isRequired
+                                isRequired,
+                                parsedDefaultValue
                             )
                             onDismissEditBoundary()
                         }
@@ -333,18 +352,103 @@ fun NodeDialogs(
         )
     }
 
-    if (showLoadSettingsDialog && node is Node.SystemNode && node.systemAction.lowercase() == "load") {
-        val port = node.outputs.firstOrNull { it.id == "data" }
-        val inPort = node.inputs.firstOrNull { it.id == "file_path" }
-        if (port != null && inPort != null) {
-            var semanticTypesStr by remember { mutableStateOf(port.semanticTypes.joinToString { it.canonicalId }) }
-            var extensionsStr by remember { mutableStateOf(inPort.constraints?.extensions?.joinToString(", ") ?: "") }
+    if (showLoadSettingsDialog && node is Node.SystemNode) {
+        if (node.systemAction.lowercase() == "load") {
+            val port = node.outputs.firstOrNull { it.id == "data" }
+            val inPort = node.inputs.firstOrNull { it.id == "file_path" }
+            if (port != null && inPort != null) {
+                var semanticTypesStr by remember { mutableStateOf(port.semanticTypes.joinToString { it.canonicalId }) }
+                var extensionsStr by remember { mutableStateOf(inPort.constraints?.extensions?.joinToString(", ") ?: "") }
+                var defaultFilePath by remember { mutableStateOf(inPort.defaultValue?.toString() ?: "") }
+
+                AlertDialog(
+                    onDismissRequest = onDismissLoadSettings,
+                    title = {
+                        Text(
+                            text = "Configure Load Node",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    },
+                    text = {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Set the expected semantic types for the loaded file (e.g. image/png, file/txt).",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            ToolkitTextField(
+                                value = semanticTypesStr,
+                                onValueChange = { semanticTypesStr = it },
+                                label = { Text("Supported Semantic Types") },
+                                placeholder = { Text("e.g. image/png, file/txt") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                text = "Add extensions constraint (!txt to allow semantics but forcefully reject txt)",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            ToolkitTextField(
+                                value = extensionsStr,
+                                onValueChange = { extensionsStr = it },
+                                label = { Text("Supported Extensions") },
+                                placeholder = { Text("e.g. txt, json, !csv") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            ToolkitTextField(
+                                value = defaultFilePath,
+                                onValueChange = { defaultFilePath = it },
+                                label = { Text(stringResource(Res.string.node_default_value) + " (file_path)") },
+                                placeholder = { Text("e.g. /path/to/default/file") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val parsed = parseSemanticTypes(semanticTypesStr)
+                                val extensionsList = extensionsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                onUpdateSystemNodeSettings(
+                                    node.id,
+                                    "data",
+                                    parsed,
+                                    "file_path",
+                                    extensionsList.takeIf { it.isNotEmpty() }
+                                )
+                                onUpdateInputPortDefault(
+                                    node.id,
+                                    "file_path",
+                                    defaultFilePath.takeIf { it.isNotBlank() }
+                                )
+                                onDismissLoadSettings()
+                            }
+                        ) {
+                            Text(stringResource(Res.string.action_save))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = onDismissLoadSettings) {
+                            Text(stringResource(Res.string.dialog_cancel))
+                        }
+                    }
+                )
+            }
+        } else if (node.inputs.isNotEmpty()) {
+            var portDefaults by remember {
+                mutableStateOf(node.inputs.associate { it.id to (it.defaultValue?.toString() ?: "") })
+            }
 
             AlertDialog(
                 onDismissRequest = onDismissLoadSettings,
                 title = {
                     Text(
-                        text = "Configure Load Node",
+                        text = stringResource(Res.string.node_configure_defaults),
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -354,52 +458,35 @@ fun NodeDialogs(
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "Set the expected semantic types for the loaded file (e.g. image/png, file/txt).",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        ToolkitTextField(
-                            value = semanticTypesStr,
-                            onValueChange = { semanticTypesStr = it },
-                            label = { Text("Supported Semantic Types") },
-                            placeholder = { Text("e.g. image/png, file/txt") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = "Add extensions constraint (!txt to allow semantics but forcefully reject txt)",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        ToolkitTextField(
-                            value = extensionsStr,
-                            onValueChange = { extensionsStr = it },
-                            label = { Text("Supported Extensions") },
-                            placeholder = { Text("e.g. txt, json, !csv") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        node.inputs.forEach { inputPort ->
+                            ToolkitTextField(
+                                value = portDefaults[inputPort.id] ?: "",
+                                onValueChange = { newVal ->
+                                    portDefaults = portDefaults + (inputPort.id to newVal)
+                                },
+                                label = { Text("${inputPort.name} (${formatDataType(inputPort.dataType)})") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = {
-                            val parsed = parseSemanticTypes(semanticTypesStr)
-                            val extensionsList = extensionsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                            onUpdateSystemNodeSettings(
-                                node.id,
-                                "data",
-                                parsed,
-                                "file_path",
-                                extensionsList.takeIf { it.isNotEmpty() })
+                            node.inputs.forEach { inputPort ->
+                                val defaultVal = portDefaults[inputPort.id]?.takeIf { it.isNotBlank() }
+                                onUpdateInputPortDefault(node.id, inputPort.id, defaultVal)
+                            }
                             onDismissLoadSettings()
                         }
                     ) {
-                        Text("Save")
+                        Text(stringResource(Res.string.action_save))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = onDismissLoadSettings) {
-                        Text("Cancel")
+                        Text(stringResource(Res.string.dialog_cancel))
                     }
                 }
             )

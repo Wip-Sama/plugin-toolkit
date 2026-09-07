@@ -57,8 +57,9 @@ fun NodeComponent(
     onDropConnection: (isShiftPressed: Boolean) -> Unit = {},
     onPortPositioned: (Long, String, Boolean, LayoutCoordinates) -> Unit = { _, _, _, _ -> },
     onPress: (Long) -> Unit = {},
-    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
+    onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean, Any?) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit = { _, _, _, _, _ -> },
+    onUpdateInputPortDefault: (Long, String, Any?) -> Unit = { _, _, _ -> },
     onToggleCollapse: (Long) -> Unit = {},
     onToggleInputsCollapse: (Long) -> Unit = {},
     onToggleOutputsCollapse: (Long) -> Unit = {},
@@ -228,7 +229,8 @@ fun NodeComponent(
                             onDropConnection = onDropConnection,
                             onPortPositioned = onPortPositioned,
                             onUpdateValue = onUpdateValue,
-                            onFocusLost = onFocusLost
+                            onFocusLost = onFocusLost,
+                            onUpdateInputPortDefault = onUpdateInputPortDefault
                         )
                     }
 
@@ -278,6 +280,7 @@ fun NodeComponent(
         onUpdateValue = onUpdateValue,
         showLoadSettingsDialog = showLoadSettingsDialog,
         onDismissLoadSettings = { showLoadSettingsDialog = false },
-        onUpdateSystemNodeSettings = onUpdateSystemNodeSettings
+        onUpdateSystemNodeSettings = onUpdateSystemNodeSettings,
+        onUpdateInputPortDefault = onUpdateInputPortDefault
     )
 }

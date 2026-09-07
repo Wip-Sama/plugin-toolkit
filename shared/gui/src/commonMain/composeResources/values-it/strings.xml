@@ -546,4 +546,14 @@
     <string name="terminal_link_shift_click_to_open_url">Shift + Clic per aprire: %1$s</string>
     <string name="action_copy_logs">Copia log</string>
     <string name="job_copy_logs_success_toast">Log copiati negli appunti</string>
+    <string name="action_set_as_default">Imposta come predefinito</string>
+    <string name="action_reset_to_default">Ripristina predefinito</string>
+    <string name="action_set_node_default">Imposta come predefinito del nodo</string>
+    <string name="defaults_saved_success">Valori predefiniti salvati con successo</string>
+    <string name="flow_defaults_saved">Valori predefiniti salvati per il flusso \'%1$s\'</string>
+    <string name="capability_defaults_saved">Valori predefiniti salvati per la capacità \'%1$s\'</string>
+    <string name="node_default_value">Valore predefinito</string>
+    <string name="node_configure_defaults">Configura predefiniti del nodo</string>
+    <string name="flow_clear_defaults">Cancella predefiniti</string>
+    <string name="flow_defaults_cleared">Valori predefiniti cancellati per il flusso \'%1$s\'</string>
 </resources>

@@ -22,6 +22,11 @@ import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.notification.NotificationType
+import org.wip.plugintoolkit.core.model.localized
+import org.wip.plugintoolkit.core.model.resolveNonComposable
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.flow_defaults_cleared
+import plugintoolkit.composeapp.generated.resources.flow_defaults_saved
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Connection
@@ -119,6 +124,7 @@ sealed interface FlowEvent {
     data object Save : FlowEvent
     data class SaveAs(val name: String) : FlowEvent
     data class UpdateInputPortValue(val nodeId: Long, val portId: String, val value: Any?) : FlowEvent
+    data class UpdateInputPortDefault(val nodeId: Long, val portId: String, val defaultValue: Any?) : FlowEvent
     data class UpdateBoundaryNode(
         val nodeId: Long,
         val portName: String,
@@ -126,7 +132,8 @@ sealed interface FlowEvent {
         val semanticTypes: List<SemanticType>,
         val constraints: org.wip.plugintoolkit.features.flows.model.PortConstraints? = null,
         val isList: Boolean = false,
-        val isRequired: Boolean = true
+        val isRequired: Boolean = true,
+        val defaultValue: Any? = null
     ) : FlowEvent
 
     data class UpdateSystemNodeSettings(
@@ -644,6 +651,71 @@ class FlowViewModel(
                     type = NotificationType.Error
                 )
             }
+        }
+    }
+
+    fun saveFlowDefaults(flow: Flow, parameterValues: Map<String, String>) {
+        val updatedDefaults = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+        parameterValues.forEach { (key, value) ->
+            val parts = key.split("_", limit = 2)
+            val nodeId = parts[0].toLongOrNull()
+            val portId = parts.getOrNull(1)
+            val node = flow.nodes.find { it.id == nodeId }
+
+            val dataType = when (node) {
+                is Node.FlowInputNode -> {
+                    val outPort = node.outputs.firstOrNull()
+                    if (outPort != null) {
+                        flow.getInferredDataTypeForOutput(node.id, outPort.id, outPort.dataType)
+                    } else {
+                        DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.ANY)
+                    }
+                }
+                is Node.SystemNode -> {
+                    val targetPort = if (portId != null) node.inputs.find { it.id == portId } else node.inputs.firstOrNull()
+                    targetPort?.dataType ?: DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.ANY)
+                }
+                else -> DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.ANY)
+            }
+            updatedDefaults[key] = org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.stringToJson(value, dataType)
+        }
+
+        val updatedNodes = flow.nodes.map { node ->
+            if (node is Node.FlowInputNode) {
+                val outPort = node.outputs.firstOrNull()
+                val portKey = "${node.id}_${outPort?.id}"
+                val newVal = updatedDefaults[portKey] ?: updatedDefaults["${node.id}"]
+                if (newVal != null) {
+                    node.copy(defaultValue = org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(newVal))
+                } else node
+            } else if (node is Node.SystemNode) {
+                val updatedInputs = node.inputs.map { input ->
+                    val portKey = "${node.id}_${input.id}"
+                    val newVal = updatedDefaults[portKey]
+                    if (newVal != null) {
+                        input.copy(defaultValue = org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(newVal))
+                    } else input
+                }
+                node.copy(inputs = updatedInputs)
+            } else node
+        }
+
+        val updatedFlow = flow.copy(defaultValues = updatedDefaults, nodes = updatedNodes)
+        flowRepository.saveFlow(updatedFlow)
+        viewModelScope.launch(Dispatchers.Main) {
+            resolvedNotificationService?.toast(
+                Res.string.flow_defaults_saved.localized.resolveNonComposable(flow.name)
+            )
+        }
+    }
+
+    fun clearFlowDefaults(flow: Flow) {
+        val updatedFlow = flow.copy(defaultValues = emptyMap())
+        flowRepository.saveFlow(updatedFlow)
+        viewModelScope.launch(Dispatchers.Main) {
+            resolvedNotificationService?.toast(
+                Res.string.flow_defaults_cleared.localized.resolveNonComposable(flow.name)
+            )
         }
     }
 }

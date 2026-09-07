@@ -193,7 +193,7 @@ fun NodeHeader(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (node is Node.SystemNode && node.systemAction.lowercase() == "load" && !isReadOnly) {
+            if (node is Node.SystemNode && (node.systemAction.lowercase() == "load" || node.inputs.isNotEmpty()) && !isReadOnly) {
                 IconButton(
                     onClick = { onShowLoadSettings() },
                     modifier = Modifier
@@ -202,7 +202,7 @@ fun NodeHeader(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Load Node Settings",
+                        contentDescription = "Node Settings",
                         tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )

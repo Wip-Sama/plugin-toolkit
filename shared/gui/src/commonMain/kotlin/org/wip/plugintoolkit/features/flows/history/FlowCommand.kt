@@ -189,6 +189,33 @@ data class UpdateInputPortValueCommand(
 }
 
 /**
+ * Command recording port input default value changes.
+ */
+data class UpdateInputPortDefaultCommand(
+    private val nodeId: Long,
+    private val portId: String,
+    private val oldDefault: Any?,
+    private val newDefault: Any?
+) : FlowCommand {
+    override val description: String = "Update port default"
+
+    override fun execute(state: FlowEditorState): FlowEditorState {
+        val updated = state.flow.nodes.map { node ->
+            if (node.id == nodeId) node.copyWithUpdatedInputDefault(portId, newDefault) else node
+        }
+        return state.copy(flow = state.flow.copy(nodes = updated), hasUnsavedChanges = true)
+    }
+
+    override fun undo(state: FlowEditorState): FlowEditorState {
+        val updated = state.flow.nodes.map { node ->
+            if (node.id == nodeId) node.copyWithUpdatedInputDefault(portId, oldDefault) else node
+        }
+        return state.copy(flow = state.flow.copy(nodes = updated), hasUnsavedChanges = true)
+    }
+}
+
+
+/**
  * Command recording boundary node definition modifications.
  */
 data class UpdateBoundaryNodeCommand(

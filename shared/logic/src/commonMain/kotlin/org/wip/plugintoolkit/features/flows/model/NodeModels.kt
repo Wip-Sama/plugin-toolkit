@@ -241,6 +241,7 @@ sealed class Node {
 
     abstract fun copyWithPosition(newPosition: Offset): Node
     abstract fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node
+    abstract fun copyWithUpdatedInputDefault(portId: String, defaultValue: Any?): Node
     abstract fun copyWithId(newId: Long): Node
     abstract fun copyWithCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithInputsCollapsedState(isCollapsed: Boolean): Node
@@ -270,6 +271,11 @@ sealed class Node {
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
+            })
+        }
+        override fun copyWithUpdatedInputDefault(portId: String, defaultValue: Any?): Node {
+            return copy(inputs = inputs.map { input ->
+                if (input.id == portId) input.copy(defaultValue = defaultValue) else input
             })
         }
 
@@ -354,6 +360,11 @@ sealed class Node {
                 if (input.id == portId) input.copy(value = value) else input
             })
         }
+        override fun copyWithUpdatedInputDefault(portId: String, defaultValue: Any?): Node {
+            return copy(inputs = inputs.map { input ->
+                if (input.id == portId) input.copy(defaultValue = defaultValue) else input
+            })
+        }
 
         override fun isReady(
             connections: List<Connection>,
@@ -380,6 +391,7 @@ sealed class Node {
         val constraints: PortConstraints? = null,
         val isList: Boolean = false,
         val isRequired: Boolean = true,
+        @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
         override val isCollapsed: Boolean = false,
         override val isInputsCollapsed: Boolean = false,
         override val isOutputsCollapsed: Boolean = false
@@ -392,6 +404,7 @@ sealed class Node {
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node = this
+        override fun copyWithUpdatedInputDefault(portId: String, defaultValue: Any?): Node = copy(defaultValue = defaultValue)
         override fun isReady(
             connections: List<Connection>,
             settings: Map<String, JsonElement>?,
@@ -419,6 +432,11 @@ sealed class Node {
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
+            })
+        }
+        override fun copyWithUpdatedInputDefault(portId: String, defaultValue: Any?): Node {
+            return copy(inputs = inputs.map { input ->
+                if (input.id == portId) input.copy(defaultValue = defaultValue) else input
             })
         }
 
@@ -454,6 +472,11 @@ sealed class Node {
                 if (input.id == portId) input.copy(value = value) else input
             })
         }
+        override fun copyWithUpdatedInputDefault(portId: String, defaultValue: Any?): Node {
+            return copy(inputs = inputs.map { input ->
+                if (input.id == portId) input.copy(defaultValue = defaultValue) else input
+            })
+        }
 
         override fun isReady(
             connections: List<Connection>,
@@ -478,7 +501,8 @@ data class Flow(
     val nodes: List<Node> = emptyList(),
     val connections: List<Connection> = emptyList(),
     val version: String = "1.0.0",
-    val description: String? = null
+    val description: String? = null,
+    val defaultValues: Map<String, JsonElement> = emptyMap()
 ) {
     fun getInferredDataTypeForOutput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
         val baseArray = fallbackType as? DataType.Array

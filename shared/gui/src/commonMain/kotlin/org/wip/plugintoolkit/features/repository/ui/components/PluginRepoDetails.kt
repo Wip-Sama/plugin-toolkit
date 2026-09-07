@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,10 +41,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowState
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
@@ -51,11 +54,14 @@ import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginChipFilter
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginSortMode
+import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
+import org.wip.plugintoolkit.shared.components.tooltip
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_refresh
+import plugintoolkit.composeapp.generated.resources.plugin_open_folder
 import plugintoolkit.composeapp.generated.resources.repo_action_open_folder
 import plugintoolkit.composeapp.generated.resources.repo_conflicts_title
 import plugintoolkit.composeapp.generated.resources.repo_no_flows_found
@@ -86,7 +92,7 @@ fun PluginRepoDetails(
     conflicts: Map<String, List<ExtensionRepo>>,
     isRefreshing: Boolean,
     activeJobs: Map<String, Float>,
-    clipboard: androidx.compose.ui.platform.Clipboard,
+    clipboard: Clipboard,
     onRefreshRepo: (ExtensionRepo) -> Unit,
     onOpenLocalFolder: (String) -> Unit,
     onInstallPlugin: (ExtensionPlugin) -> Unit,
@@ -124,41 +130,68 @@ fun PluginRepoDetails(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = currentRepo.name,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        val activeConflicts = conflicts.filter { (_, repos) -> repos.any { it.url == currentRepo.url } }
+                        if (activeConflicts.isNotEmpty()) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(ToolkitTheme.dimensions.iconSmall)
+                                    .tooltip(Res.string.plugin_repo_multiple_warning),
+                            )
+                        }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)) {
-                        Button(
-                            onClick = { onRefreshRepo(currentRepo) },
-                            enabled = !isRefreshing,
-                            shape = MaterialTheme.shapes.large,
-                            colors = ButtonDefaults.filledTonalButtonColors()
-                        ) {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                            )
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(stringResource(Res.string.action_refresh))
-                        }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ToolkitButtonGroup {
+                            item { shape, modifierSpec ->
+                                Button(
+                                    onClick = { onRefreshRepo(currentRepo) },
+                                    enabled = !isRefreshing,
+                                    colors = ButtonDefaults.filledTonalButtonColors(),
+                                    shape = shape,
+                                    modifier = modifierSpec
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                    )
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                    Text(stringResource(Res.string.action_refresh))
+                                }
+                            }
 
-                        if (currentRepo.isLocal) {
-                            IconButton(
-                                onClick = { onOpenLocalFolder(currentRepo.url) },
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
-                            ) {
-                                Icon(
-                                    Icons.Default.FolderOpen,
-                                    contentDescription = stringResource(Res.string.repo_action_open_folder),
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                                )
+                            if (currentRepo.isLocal) {
+                                item { shape, modifierSpec ->
+                                    Button(
+                                        onClick = { onOpenLocalFolder(currentRepo.url) },
+                                        modifier = modifierSpec,
+                                        shape = shape,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.FolderOpen,
+                                            contentDescription = stringResource(Res.string.repo_action_open_folder),
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                        )
+                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                        Text(stringResource(Res.string.plugin_open_folder))
+                                    }
+                                }
                             }
                         }
                     }
@@ -194,7 +227,7 @@ fun PluginRepoDetails(
                             onClick = {
                                 scope.launch {
                                     clipboard.setClipEntry(
-                                        org.wip.plugintoolkit.core.utils.PlatformUtils.clipEntryOf(currentRepo.url)
+                                        PlatformUtils.clipEntryOf(currentRepo.url)
                                     )
                                 }
                             },
@@ -211,34 +244,34 @@ fun PluginRepoDetails(
                 }
 
                 // Conflicts Warning Banner if any
-                val activeConflicts = conflicts.filter { (_, repos) -> repos.any { it.url == currentRepo.url } }
-                if (activeConflicts.isNotEmpty()) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        ),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Warning, contentDescription = null)
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
-                            Column {
-                                Text(
-                                    stringResource(Res.string.repo_conflicts_title, activeConflicts.size),
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    stringResource(Res.string.plugin_repo_multiple_warning),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
-                }
+//                val activeConflicts = conflicts.filter { (_, repos) -> repos.any { it.url == currentRepo.url } }
+//                if (activeConflicts.isNotEmpty()) {
+//                    Card(
+//                        colors = CardDefaults.cardColors(
+//                            containerColor = MaterialTheme.colorScheme.errorContainer,
+//                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+//                        ),
+//                        shape = MaterialTheme.shapes.medium
+//                    ) {
+//                        Row(
+//                            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+//                            verticalAlignment = Alignment.CenterVertically
+//                        ) {
+//                            Icon(Icons.Default.Warning, contentDescription = null)
+//                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+//                            Column {
+//                                Text(
+//                                    stringResource(Res.string.repo_conflicts_title, activeConflicts.size),
+//                                    fontWeight = FontWeight.Bold
+//                                )
+//                                Text(
+//                                    stringResource(Res.string.plugin_repo_multiple_warning),
+//                                    style = MaterialTheme.typography.bodySmall
+//                                )
+//                            }
+//                        }
+//                    }
+//                }
             }
         }
 

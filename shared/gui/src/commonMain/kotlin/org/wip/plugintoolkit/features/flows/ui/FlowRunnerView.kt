@@ -10,17 +10,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +68,8 @@ import plugintoolkit.composeapp.generated.resources.flow_run_description
 import plugintoolkit.composeapp.generated.resources.flow_run_title
 import plugintoolkit.composeapp.generated.resources.flow_select_hint
 import plugintoolkit.composeapp.generated.resources.flow_select_title
+import plugintoolkit.composeapp.generated.resources.action_set_as_default
+import plugintoolkit.composeapp.generated.resources.action_reset_to_default
 
 data class FlowParameter(
     val nodeId: Long,
@@ -205,6 +210,14 @@ fun FlowRunnerView(
                                         )
                                     }
 
+                                    val flowDefault = currentFlow.defaultValues["${node.id}_${outPort.id}"]
+                                        ?: currentFlow.defaultValues["${node.id}"]
+                                    val resolvedDefault = flowDefault?.let { SettingsUtils.jsonToString(it, inferredType) }
+                                        ?: node.defaultValue?.let {
+                                            if (it is kotlinx.serialization.json.JsonElement) SettingsUtils.jsonToString(it, inferredType) else it.toString()
+                                        }
+                                        ?: ""
+
                                     listOf(
                                         FlowParameter(
                                             nodeId = node.id,
@@ -212,7 +225,7 @@ fun FlowRunnerView(
                                             label = outPort.name.replaceFirstChar { it.uppercase() },
                                             portId = outPort.id,
                                             dataType = inferredType,
-                                            defaultValue = "",
+                                            defaultValue = resolvedDefault,
                                             semanticTypes = inferredSemanticTypes,
                                             pluginId = paramPluginId,
                                             isRequired = node.isRequired,
@@ -230,6 +243,11 @@ fun FlowRunnerView(
                                             val isConnected =
                                                 currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == filePort.id }
                                             if (!isConnected) {
+                                                val flowDefault = currentFlow.defaultValues["${node.id}_${filePort.id}"]
+                                                val resolvedDefault = flowDefault?.let { SettingsUtils.jsonToString(it, filePort.dataType) }
+                                                    ?: filePort.value as? String
+                                                    ?: filePort.defaultValue as? String
+                                                    ?: "output.txt"
                                                 listOf(
                                                     FlowParameter(
                                                         nodeId = node.id,
@@ -237,8 +255,7 @@ fun FlowRunnerView(
                                                         label = "${node.title} -> File Path",
                                                         portId = filePort.id,
                                                         dataType = filePort.dataType,
-                                                        defaultValue = filePort.value as? String
-                                                            ?: filePort.defaultValue as? String ?: "output.txt",
+                                                        defaultValue = resolvedDefault,
                                                         semanticTypes = filePort.semanticTypes.ifEmpty {
                                                             org.wip.plugintoolkit.api.parseSemanticTypes(
                                                                 "file"
@@ -257,6 +274,11 @@ fun FlowRunnerView(
                                             val isConnected =
                                                 currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == filePort.id }
                                             if (!isConnected) {
+                                                val flowDefault = currentFlow.defaultValues["${node.id}_${filePort.id}"]
+                                                val resolvedDefault = flowDefault?.let { SettingsUtils.jsonToString(it, filePort.dataType) }
+                                                    ?: filePort.value as? String
+                                                    ?: filePort.defaultValue as? String
+                                                    ?: "output.txt"
                                                 listOf(
                                                     FlowParameter(
                                                         nodeId = node.id,
@@ -264,8 +286,7 @@ fun FlowRunnerView(
                                                         label = "${node.title} -> File Path",
                                                         portId = filePort.id,
                                                         dataType = filePort.dataType,
-                                                        defaultValue = filePort.value as? String
-                                                            ?: filePort.defaultValue as? String ?: "output.txt",
+                                                        defaultValue = resolvedDefault,
                                                         semanticTypes = filePort.semanticTypes.ifEmpty {
                                                             org.wip.plugintoolkit.api.parseSemanticTypes(
                                                                 "file"
@@ -284,6 +305,11 @@ fun FlowRunnerView(
                                             val isConnected =
                                                 currentFlow.connections.any { it.targetNodeId == node.id && it.targetPortId == destPort.id }
                                             if (!isConnected) {
+                                                val flowDefault = currentFlow.defaultValues["${node.id}_${destPort.id}"]
+                                                val resolvedDefault = flowDefault?.let { SettingsUtils.jsonToString(it, destPort.dataType) }
+                                                    ?: destPort.value as? String
+                                                    ?: destPort.defaultValue as? String
+                                                    ?: ""
                                                 listOf(
                                                     FlowParameter(
                                                         nodeId = node.id,
@@ -291,8 +317,7 @@ fun FlowRunnerView(
                                                         label = "${node.title} -> Destination Folder",
                                                         portId = destPort.id,
                                                         dataType = destPort.dataType,
-                                                        defaultValue = destPort.value as? String
-                                                            ?: destPort.defaultValue as? String ?: "",
+                                                        defaultValue = resolvedDefault,
                                                         semanticTypes = destPort.semanticTypes.ifEmpty {
                                                             org.wip.plugintoolkit.api.parseSemanticTypes(
                                                                 "path"
@@ -501,15 +526,48 @@ fun FlowRunnerView(
                     }
                 }
 
-                Button(
-                    onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    enabled = isFlowValid
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null)
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(stringResource(Res.string.flow_execute_button))
+                    OutlinedButton(
+                        onClick = { viewModel.saveFlowDefaults(currentFlow, parameterValues.toMap()) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            Icons.Default.Bookmark,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.action_set_as_default))
+                    }
+
+                    if (currentFlow.defaultValues.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                flowParameters.forEach { param ->
+                                    if (param.type != ParameterType.OUTPUT) {
+                                        parameterValues["${param.nodeId}_${param.portId}"] = param.defaultValue
+                                    }
+                                }
+                            }
+                        ) {
+                            Text(stringResource(Res.string.action_reset_to_default))
+                        }
+                    }
+
+                    Button(
+                        onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        enabled = isFlowValid
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        Text(stringResource(Res.string.flow_execute_button))
+                    }
                 }
                 if (!isFlowValid) {
                     Text(

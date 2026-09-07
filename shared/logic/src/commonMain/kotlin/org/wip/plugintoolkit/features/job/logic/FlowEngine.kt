@@ -182,7 +182,7 @@ class FlowEngine(
                 }
             } else {
                 val overrideKey = "${nodeId}_${portId}"
-                val overrideVal = initialParameters[overrideKey]
+                val overrideVal = initialParameters[overrideKey] ?: flow.defaultValues[overrideKey]
                 if (overrideVal != null) {
                     return fromJsonElement(overrideVal)
                 }
@@ -340,7 +340,10 @@ class FlowEngine(
                         val portKey = "${node.id}_${outputPort.id}"
                         val valueJson =
                             initialParameters[portKey] ?: initialParameters[key] ?: initialParameters[outputPort.id]
-                        val rawValue = valueJson?.let { je -> fromJsonElement(je) } ?: ""
+                                ?: flow.defaultValues[portKey] ?: flow.defaultValues[key] ?: flow.defaultValues[outputPort.id]
+                        val rawValue = valueJson?.let { je -> fromJsonElement(je) }
+                            ?: node.defaultValue
+                            ?: ""
                         computedValues[Pair(node.id, outputPort.id)] = rawValue
                     }
                 }

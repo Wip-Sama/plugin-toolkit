@@ -27,7 +27,10 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
-import plugintoolkit.composeapp.generated.resources.*
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.common_error
+import plugintoolkit.composeapp.generated.resources.common_success
+import plugintoolkit.composeapp.generated.resources.capability_defaults_saved
 import org.wip.plugintoolkit.core.model.localized
 
 class PluginViewModel(
@@ -330,6 +333,35 @@ class PluginViewModel(
         return PluginRequest(
             method = capability.name,
             parameters = params
+        )
+    }
+
+    fun resetParametersToDefault() {
+        val capability = selectedCapability ?: return
+        selectCapability(capability)
+    }
+
+    fun saveCurrentParametersAsDefault() {
+        val capability = selectedCapability ?: return
+        val plugin = selectedPlugin ?: return
+        val pkg = try {
+            plugin.getManifest().getOrThrow().plugin.id
+        } catch (t: Throwable) {
+            return
+        }
+        val currentStore = pluginManager.loadPluginSettings(pkg)
+        val newParams = mutableMapOf<String, JsonElement>()
+        capability.parameters?.forEach { (name, meta) ->
+            val stringValue = parameterValues[name] ?: ""
+            newParams[name] = SettingsUtils.stringToJson(stringValue, meta.type)
+        }
+        val updatedCapabilityParams = currentStore.capabilityParams.toMutableMap()
+        updatedCapabilityParams[capability.name] = newParams
+        val newStore = currentStore.copy(capabilityParams = updatedCapabilityParams)
+        pluginManager.savePluginSettings(pkg, newStore)
+
+        notificationService.toast(
+            message = Res.string.capability_defaults_saved.localized.resolveNonComposable(capability.name)
         )
     }
 }
