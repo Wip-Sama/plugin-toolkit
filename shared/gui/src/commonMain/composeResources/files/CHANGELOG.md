@@ -7,6 +7,7 @@ Added:
 Changes:
 	- Refactored the update available menu
 	- Improved plugin binary backwards compatibility with @JvmOverloads across API data classes
+	- Refactored plugin source selector and added a way to switch to a new version of the plugin in a new repo is available
 Fixed:
 	- Plugins breaking with NoSuchMethodError across app updates when optional parameters are added to plugin-api models
 	- PluginLoader now gracefully falls back to manifest.json when older plugin bytecode encounters static manifest linkage errors
