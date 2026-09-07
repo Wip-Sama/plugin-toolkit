@@ -6,11 +6,14 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.koin.mp.KoinPlatform
@@ -31,6 +34,7 @@ import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
+import org.wip.plugintoolkit.features.repository.model.PluginInstallationJobState
 import org.wip.plugintoolkit.features.repository.model.RepoValidationResult
 import plugintoolkit.composeapp.generated.resources.dialog_select_plugin
 import plugintoolkit.composeapp.generated.resources.plugin_choose_install_location
@@ -114,15 +118,41 @@ class PluginRepoViewModel(
         .map { it.extensions.packageSourceOverrides }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
-    val activePluginInstallationJobs: StateFlow<Map<String, Float>> = jobManager.jobProgress
-        .combine(jobManager.jobs) { progressMap, jobs ->
-            jobs.filter {
-                (it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
-                        (it.status == JobStatus.Running || it.status == JobStatus.Queued)
-            }
-                .associate { it.pluginId to (progressMap[it.id]?.mainProgress ?: 0f) }
+    private val _pendingInstalls = MutableStateFlow<Set<String>>(emptySet())
+    val pendingInstalls: StateFlow<Set<String>> = _pendingInstalls.asStateFlow()
+
+    val activePluginInstallationJobs: StateFlow<Map<String, PluginInstallationJobState>> = combine(
+        jobManager.jobProgress,
+        jobManager.jobs,
+        _pendingInstalls
+    ) { progressMap, jobs, pendingSet ->
+        val resultMap = mutableMapOf<String, PluginInstallationJobState>()
+
+        for (pkg in pendingSet) {
+            resultMap[pkg] = PluginInstallationJobState(
+                status = JobStatus.Queued,
+                progress = 0f
+            )
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+        val activeJobs = jobs.filter {
+            (it.type == JobType.PluginInstallation || it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+                    (it.status == JobStatus.Running || it.status == JobStatus.Queued)
+        }
+
+        for (job in activeJobs) {
+            val progress = progressMap[job.id]?.mainProgress ?: 0f
+            val existing = resultMap[job.pluginId]
+            if (job.status == JobStatus.Running || existing == null || existing.status != JobStatus.Running) {
+                resultMap[job.pluginId] = PluginInstallationJobState(
+                    status = job.status,
+                    progress = progress
+                )
+            }
+        }
+
+        resultMap
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     fun filterRepositories(repos: List<ExtensionRepo>): List<ExtensionRepo> {
         return repos.filter { repo ->
@@ -344,25 +374,56 @@ class PluginRepoViewModel(
         return override ?: repos.first()
     }
 
+    fun isInstallingOrQueued(pkg: String): Boolean {
+        if (pkg in _pendingInstalls.value) return true
+        val job = jobManager.jobs.value.find {
+            it.pluginId == pkg &&
+                    (it.type == JobType.PluginInstallation || it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+                    (it.status == JobStatus.Running || it.status == JobStatus.Queued)
+        }
+        return job != null
+    }
+
     fun installPlugin(plugin: ExtensionPlugin) {
-        pickInstallLocation { target ->
+        if (isInstallingOrQueued(plugin.pkg)) {
+            Logger.w { "Installation for ${plugin.pkg} is already queued or active" }
+            return
+        }
+
+        _pendingInstalls.update { it + plugin.pkg }
+
+        pickInstallLocation(
+            onDismiss = {
+                _pendingInstalls.update { it - plugin.pkg }
+            }
+        ) { target ->
             viewModelScope.launch {
-                pluginManager.enqueueRemoteInstall(plugin, target)
+                try {
+                    pluginManager.enqueueRemoteInstall(plugin, target)
+                } catch (e: Exception) {
+                    Logger.e(e) { "Failed to enqueue installation for ${plugin.pkg}" }
+                } finally {
+                    _pendingInstalls.update { it - plugin.pkg }
+                }
             }
         }
     }
 
     fun cancelPluginInstall(pkg: String) {
         viewModelScope.launch {
-            val job =
-                jobManager.jobs.value.find { it.type == JobType.PluginInstallation && it.status == JobStatus.Running && it.pluginId == pkg }
-            if (job != null) {
+            _pendingInstalls.update { it - pkg }
+            val activeJobs = jobManager.jobs.value.filter {
+                (it.type == JobType.PluginInstallation || it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+                        (it.status == JobStatus.Running || it.status == JobStatus.Queued) &&
+                        it.pluginId == pkg
+            }
+            for (job in activeJobs) {
                 jobManager.cancelJob(job.id, force = true)
             }
         }
     }
 
-    private fun pickInstallLocation(onSelected: (String) -> Unit) {
+    private fun pickInstallLocation(onDismiss: () -> Unit = {}, onSelected: (String) -> Unit) {
         val defaultPath = settingsRepository.getSettingsDir() + "/" + appConfig.PLUGINS_DIR_NAME
         val savedFolders = settingsRepository.loadSettings().extensions.pluginFolders
         val allFolders = (listOf(defaultPath) + savedFolders).distinct()
@@ -374,9 +435,10 @@ class PluginRepoViewModel(
 
         viewModelScope.launch {
             dialogService.showLocationPicker(
-                getString(ResStrings.plugin_choose_install_location),
-                allFolders,
-                onSelected
+                title = getString(ResStrings.plugin_choose_install_location),
+                folders = allFolders,
+                onSelected = onSelected,
+                onDismiss = onDismiss
             )
         }
     }

@@ -30,11 +30,16 @@ import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.model.RepoIndex
 import org.wip.plugintoolkit.features.repository.model.RepoValidationResult
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobProgress
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -66,6 +71,8 @@ class PluginRepoViewModelTest {
     @BeforeTest
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        every { jobManager.jobs } returns MutableStateFlow(emptyList())
+        every { jobManager.jobProgress } returns MutableStateFlow(emptyMap())
     }
 
     @AfterTest
@@ -331,5 +338,164 @@ class PluginRepoViewModelTest {
         viewModel.setPackageSource("org.alpha", "https://repo2.com")
         testScheduler.advanceUntilIdle()
         verify { repoManager.setPackageSourceOverride("org.alpha", "https://repo2.com") }
+    }
+
+    @Test
+    fun testInstallPluginImmediatelyMarksAsQueued() = runTest {
+        val repo1Plugin = ExtensionPlugin(name = "Alpha", pkg = "org.alpha", version = "1.0.0", fileName = "alpha-1.jar", repoUrl = "https://repo1.com")
+        every { repoManager.plugins } returns MutableStateFlow(mapOf("https://repo1.com" to listOf(repo1Plugin)))
+        every { repoManager.repositories } returns MutableStateFlow(emptyList())
+        every { pluginManager.installedPlugins } returns MutableStateFlow(emptyList())
+        every { settingsRepository.getSettingsDir() } returns "/app/settings"
+        every { appConfig.PLUGINS_DIR_NAME } returns "plugins"
+        every { settingsRepository.loadSettings() } returns org.wip.plugintoolkit.features.settings.model.AppSettings(
+            extensions = org.wip.plugintoolkit.features.settings.model.ExtensionSettings(pluginFolders = emptyList())
+        )
+        val jobsFlow = MutableStateFlow<List<BackgroundJob>>(emptyList())
+        val progressFlow = MutableStateFlow<Map<String, JobProgress>>(emptyMap())
+        every { jobManager.jobs } returns jobsFlow
+        every { jobManager.jobProgress } returns progressFlow
+
+        coEvery { pluginManager.enqueueRemoteInstall(repo1Plugin, any()) } coAnswers {
+            jobsFlow.value = listOf(
+                BackgroundJob(
+                    id = "install_org.alpha_1",
+                    name = "Installing Alpha",
+                    type = JobType.PluginInstallation,
+                    pluginId = "org.alpha",
+                    capabilityName = "install",
+                    status = JobStatus.Queued
+                )
+            )
+        }
+
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(null, viewModel.activePluginInstallationJobs.value["org.alpha"])
+
+        viewModel.installPlugin(repo1Plugin)
+        testScheduler.runCurrent()
+        val state = viewModel.activePluginInstallationJobs.value["org.alpha"]
+        assertNotNull(state)
+        assertEquals(JobStatus.Queued, state.status)
+
+        testScheduler.advanceUntilIdle()
+        val stateAfter = viewModel.activePluginInstallationJobs.value["org.alpha"]
+        assertNotNull(stateAfter)
+        assertEquals(JobStatus.Queued, stateAfter.status)
+        coVerify(exactly = 1) { pluginManager.enqueueRemoteInstall(repo1Plugin, "/app/settings/plugins") }
+    }
+
+    @Test
+    fun testInstallPluginPreventsDuplicateClicks() = runTest {
+        val repo1Plugin = ExtensionPlugin(name = "Alpha", pkg = "org.alpha", version = "1.0.0", fileName = "alpha-1.jar", repoUrl = "https://repo1.com")
+        every { repoManager.plugins } returns MutableStateFlow(mapOf("https://repo1.com" to listOf(repo1Plugin)))
+        every { repoManager.repositories } returns MutableStateFlow(emptyList())
+        every { pluginManager.installedPlugins } returns MutableStateFlow(emptyList())
+        every { settingsRepository.getSettingsDir() } returns "/app/settings"
+        every { appConfig.PLUGINS_DIR_NAME } returns "plugins"
+        every { settingsRepository.loadSettings() } returns org.wip.plugintoolkit.features.settings.model.AppSettings(
+            extensions = org.wip.plugintoolkit.features.settings.model.ExtensionSettings(pluginFolders = emptyList())
+        )
+        val jobsFlow = MutableStateFlow<List<BackgroundJob>>(emptyList())
+        val progressFlow = MutableStateFlow<Map<String, JobProgress>>(emptyMap())
+        every { jobManager.jobs } returns jobsFlow
+        every { jobManager.jobProgress } returns progressFlow
+
+        coEvery { pluginManager.enqueueRemoteInstall(repo1Plugin, any()) } coAnswers {
+            jobsFlow.value = listOf(
+                BackgroundJob(
+                    id = "install_org.alpha_1",
+                    name = "Installing Alpha",
+                    type = JobType.PluginInstallation,
+                    pluginId = "org.alpha",
+                    capabilityName = "install",
+                    status = JobStatus.Queued
+                )
+            )
+        }
+
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+
+        // Multiple rapid clicks
+        viewModel.installPlugin(repo1Plugin)
+        viewModel.installPlugin(repo1Plugin)
+        viewModel.installPlugin(repo1Plugin)
+
+        testScheduler.advanceUntilIdle()
+        // Only one enqueueRemoteInstall should occur
+        coVerify(exactly = 1) { pluginManager.enqueueRemoteInstall(repo1Plugin, "/app/settings/plugins") }
+    }
+
+    @Test
+    fun testActivePluginInstallationJobsReflectsQueuedAndRunningStates() = runTest {
+        val jobsFlow = MutableStateFlow<List<BackgroundJob>>(emptyList())
+        val progressFlow = MutableStateFlow<Map<String, JobProgress>>(emptyMap())
+        every { jobManager.jobs } returns jobsFlow
+        every { jobManager.jobProgress } returns progressFlow
+
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+
+        val installJob = BackgroundJob(
+            id = "job-1",
+            name = "Installing Alpha",
+            type = JobType.PluginInstallation,
+            pluginId = "org.alpha",
+            capabilityName = "install",
+            status = JobStatus.Queued
+        )
+        jobsFlow.value = listOf(installJob)
+        testScheduler.advanceUntilIdle()
+
+        var jobState = viewModel.activePluginInstallationJobs.value["org.alpha"]
+        assertNotNull(jobState)
+        assertEquals(JobStatus.Queued, jobState.status)
+        assertEquals(0f, jobState.progress)
+
+        val runningJob = installJob.copy(status = JobStatus.Running)
+        jobsFlow.value = listOf(runningJob)
+        progressFlow.value = mapOf("job-1" to JobProgress(mainProgress = 0.65f))
+        testScheduler.advanceUntilIdle()
+
+        jobState = viewModel.activePluginInstallationJobs.value["org.alpha"]
+        assertNotNull(jobState)
+        assertEquals(JobStatus.Running, jobState.status)
+        assertEquals(0.65f, jobState.progress)
+
+        val completedJob = installJob.copy(status = JobStatus.Completed)
+        jobsFlow.value = listOf(completedJob)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(null, viewModel.activePluginInstallationJobs.value["org.alpha"])
+    }
+
+    @Test
+    fun testCancelPluginInstallCancelsActiveJobAndClearsState() = runTest {
+        val jobsFlow = MutableStateFlow<List<BackgroundJob>>(emptyList())
+        val progressFlow = MutableStateFlow<Map<String, JobProgress>>(emptyMap())
+        every { jobManager.jobs } returns jobsFlow
+        every { jobManager.jobProgress } returns progressFlow
+
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+
+        val queuedJob = BackgroundJob(
+            id = "job-queued",
+            name = "Installing Alpha",
+            type = JobType.PluginInstallation,
+            pluginId = "org.alpha",
+            capabilityName = "install",
+            status = JobStatus.Queued
+        )
+        jobsFlow.value = listOf(queuedJob)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.cancelPluginInstall("org.alpha")
+        testScheduler.advanceUntilIdle()
+
+        coVerify { jobManager.cancelJob("job-queued", force = true) }
     }
 }

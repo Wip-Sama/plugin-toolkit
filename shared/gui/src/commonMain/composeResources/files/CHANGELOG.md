@@ -11,6 +11,8 @@ Changes:
 Fixed:
 	- Plugins breaking with NoSuchMethodError across app updates when optional parameters are added to plugin-api models
 	- PluginLoader now gracefully falls back to manifest.json when older plugin bytecode encounters static manifest linkage errors
+	- Fixed plugin repository install/update/downgrade/reinstall actions allowing multiple clicks and enqueuing duplicate installations
+	- Repository items now immediately show queued state upon click and display progress bar once installation starts
 ----------------------------------------------------------------------------------------------------
 Version: 2.0.2
 Date: 05-09-2026

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Upgrade
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -42,10 +43,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
+import org.wip.plugintoolkit.features.repository.model.PluginInstallationJobState
 import org.wip.plugintoolkit.shared.components.ToolkitCard
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
 import org.wip.plugintoolkit.shared.components.tooltip
@@ -54,6 +57,7 @@ import plugintoolkit.composeapp.generated.resources.action_install
 import plugintoolkit.composeapp.generated.resources.plugin_available_in
 import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.repo_action_cancel_update
+import plugintoolkit.composeapp.generated.resources.repo_action_queued
 import plugintoolkit.composeapp.generated.resources.repo_action_update_version
 import plugintoolkit.composeapp.generated.resources.repo_action_updating
 import plugintoolkit.composeapp.generated.resources.repo_badge_local
@@ -74,7 +78,7 @@ fun PluginListItem(
     currentRepo: ExtensionRepo,
     installedPlugins: List<InstalledPlugin>,
     isRefreshing: Boolean,
-    activeJobs: Map<String, Float>,
+    activeJobs: Map<String, PluginInstallationJobState>,
     onSetPackageSource: (String, String) -> Unit,
     conflicts: Map<String, List<ExtensionRepo>>,
     packageSourceOverrides: Map<String, String> = emptyMap(),
@@ -96,7 +100,7 @@ fun PluginListItem(
     val installedPlugin = installedPlugins.find { it.pkg == plugin.pkg }
     val installedVersion = installedPlugin?.version
     val isInstalled = installedPlugin != null
-    val progress = activeJobs[plugin.pkg]
+    val installState = activeJobs[plugin.pkg]
     val hasUpdate = installedVersion != null && org.wip.plugintoolkit.core.utils.VersionUtils.compare(
         plugin.version,
         installedVersion
@@ -309,8 +313,8 @@ fun PluginListItem(
                     )
                 }
 
-                if (progress != null) {
-                var isHovered by remember { mutableStateOf(false) }
+                if (installState != null) {
+                var isHovered by remember(plugin.pkg) { mutableStateOf(false) }
 
                 Surface(
                     shape = CircleShape,
@@ -337,9 +341,20 @@ fun PluginListItem(
                                 stringResource(Res.string.repo_action_cancel_update),
                                 style = MaterialTheme.typography.labelMedium
                             )
+                        } else if (installState.status == JobStatus.Queued) {
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Text(
+                                stringResource(Res.string.repo_action_queued),
+                                style = MaterialTheme.typography.labelMedium
+                            )
                         } else {
                             CircularProgressIndicator(
-                                progress = { progress },
+                                progress = { installState.progress },
                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
                                 strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant

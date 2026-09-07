@@ -14,6 +14,7 @@ import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.VersionUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
@@ -235,6 +236,16 @@ class PluginInstaller(
     }
 
     suspend fun enqueueRemoteInstall(plugin: ExtensionPlugin, targetFolderPath: String) {
+        val alreadyActive = jobManager.jobs.value.any {
+            it.pluginId == plugin.pkg &&
+            (it.type == JobType.PluginInstallation || it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+            (it.status == JobStatus.Running || it.status == JobStatus.Queued)
+        }
+        if (alreadyActive) {
+            Logger.w { "Installation for ${plugin.pkg} is already queued or running. Skipping duplicate enqueue." }
+            return
+        }
+
         Logger.i { "Enqueuing remote installation for: ${plugin.pkg}" }
         val job = BackgroundJob(
             id = "install_${plugin.pkg}_${Clock.System.now().toEpochMilliseconds()}",

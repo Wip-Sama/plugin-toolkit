@@ -332,13 +332,34 @@ class PluginPluginInstallationTest {
         val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
         val installer =
             PluginInstaller(registry, repoManager, lifecycleManager, settingsRepo, jobManager, client, fileSystem)
-        return TestInstallerComponents(installer, repoManager, registry, fileSystem)
+        return TestInstallerComponents(installer, repoManager, registry, fileSystem, jobManager)
+    }
+
+    @Test
+    fun testEnqueueRemoteInstallPreventsDuplicateQueuing() = runTest {
+        val (installer, _, _, _, jobManager) = createTestInstaller()
+        val plugin = org.wip.plugintoolkit.features.repository.model.ExtensionPlugin(
+            name = "Test",
+            pkg = "org.test",
+            version = "1.0",
+            fileName = "test.jar"
+        )
+
+        installer.enqueueRemoteInstall(plugin, "target")
+        assertEquals(1, jobManager.jobs.value.size)
+        assertEquals("org.test", jobManager.jobs.value.first().pluginId)
+        assertEquals(org.wip.plugintoolkit.features.job.model.JobStatus.Queued, jobManager.jobs.value.first().status)
+
+        // Second enqueue should be ignored
+        installer.enqueueRemoteInstall(plugin, "target")
+        assertEquals(1, jobManager.jobs.value.size, "Duplicate enqueue should be ignored when job is already queued")
     }
 
     private data class TestInstallerComponents(
         val installer: PluginInstaller,
         val repoManager: RepoManager,
         val registry: PluginRegistry,
-        val fileSystem: FakeFileSystem
+        val fileSystem: FakeFileSystem,
+        val jobManager: JobManager
     )
 }

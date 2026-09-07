@@ -14,8 +14,13 @@ class DialogService {
         _dialogState.value = DialogData.Confirmation(title, message, onConfirm)
     }
 
-    fun showLocationPicker(title: String, folders: List<String>, onSelected: (String) -> Unit) {
-        _dialogState.value = DialogData.LocationPicker(title, folders, onSelected)
+    fun showLocationPicker(
+        title: String,
+        folders: List<String>,
+        onSelected: (String) -> Unit,
+        onDismiss: () -> Unit = {}
+    ) {
+        _dialogState.value = DialogData.LocationPicker(title, folders, onSelected, onDismiss)
     }
 
     fun showWarning(title: String, message: String, onConfirm: () -> Unit) {
@@ -34,8 +39,12 @@ class DialogService {
 sealed class DialogData {
     data class Confirmation(val title: String, val message: String, val onConfirm: () -> Unit) : DialogData()
     data class Warning(val title: String, val message: String, val onConfirm: () -> Unit) : DialogData()
-    data class LocationPicker(val title: String, val folders: List<String>, val onSelected: (String) -> Unit) :
-        DialogData()
+    data class LocationPicker(
+        val title: String,
+        val folders: List<String>,
+        val onSelected: (String) -> Unit,
+        val onDismiss: () -> Unit = {}
+    ) : DialogData()
 
     data class Changelog(val pluginName: String, val versions: List<Release>) : DialogData()
 }

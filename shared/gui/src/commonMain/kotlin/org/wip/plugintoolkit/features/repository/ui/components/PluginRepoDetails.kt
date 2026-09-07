@@ -53,6 +53,7 @@ import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionFlow
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
+import org.wip.plugintoolkit.features.repository.model.PluginInstallationJobState
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginChipFilter
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginSortMode
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
@@ -94,7 +95,7 @@ fun PluginRepoDetails(
     packageSourceOverrides: Map<String, String> = emptyMap(),
     pluginsMap: Map<String, List<ExtensionPlugin>> = emptyMap(),
     isRefreshing: Boolean,
-    activeJobs: Map<String, Float>,
+    activeJobs: Map<String, PluginInstallationJobState>,
     clipboard: Clipboard,
     onRefreshRepo: (ExtensionRepo) -> Unit,
     onOpenLocalFolder: (String) -> Unit,
@@ -373,7 +374,7 @@ fun PluginRepoDetails(
                             .fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                     ) {
-                        items(plugins) { plugin ->
+                        items(plugins, key = { it.pkg }) { plugin ->
                             PluginListItem(
                                 plugin = plugin,
                                 currentRepo = currentRepo,

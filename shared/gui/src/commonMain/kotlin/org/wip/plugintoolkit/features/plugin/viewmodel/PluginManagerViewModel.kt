@@ -98,7 +98,7 @@ class PluginManagerViewModel(
     val activePluginJobs: StateFlow<Map<String, ActivePluginJobInfo>> = jobManager.jobProgress
         .combine(jobManager.jobs) { progressMap, jobs ->
             jobs.filter {
-                (it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+                (it.type == JobType.PluginInstallation || it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
                         (it.status == JobStatus.Running || it.status == JobStatus.Queued)
             }
                 .associate { job ->
@@ -127,7 +127,7 @@ class PluginManagerViewModel(
         _togglingPlugins
     ) { progressMap, jobs, loadingSet, stepsMap, togglingSet ->
         val activeJobs = jobs.filter {
-            (it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
+            (it.type == JobType.PluginInstallation || it.type == JobType.Setup || it.type == JobType.Update || it.type == JobType.Validation) &&
                     (it.status == JobStatus.Running || it.status == JobStatus.Queued)
         }
         val result = mutableMapOf<String, PluginActivityInfo>()
@@ -137,6 +137,7 @@ class PluginManagerViewModel(
             result[job.pluginId] = PluginActivityInfo(
                 type = job.type,
                 step = when (job.type) {
+                    JobType.PluginInstallation -> "Installing plugin"
                     JobType.Setup -> "Setting up dependencies and models"
                     JobType.Validation -> "Validating plugin capabilities"
                     JobType.Update -> "Updating plugin"

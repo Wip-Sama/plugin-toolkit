@@ -72,7 +72,10 @@ fun DialogHost(dialogService: DialogService) {
             }
 
             is DialogData.LocationPicker -> {
-                Dialog(onDismissRequest = { dialogService.dismiss() }) {
+                Dialog(onDismissRequest = {
+                    data.onDismiss()
+                    dialogService.dismiss()
+                }) {
                     Card(
                         modifier = Modifier.fillMaxWidth(0.8f).padding(ToolkitTheme.spacing.medium),
                         shape = MaterialTheme.shapes.large
@@ -94,7 +97,10 @@ fun DialogHost(dialogService: DialogService) {
                             }
                             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                             TextButton(
-                                onClick = { dialogService.dismiss() },
+                                onClick = {
+                                    data.onDismiss()
+                                    dialogService.dismiss()
+                                },
                                 modifier = Modifier.align(androidx.compose.ui.Alignment.End)
                             ) {
                                 Text(stringResource(Res.string.dialog_cancel))

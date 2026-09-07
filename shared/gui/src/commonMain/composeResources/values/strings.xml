@@ -375,6 +375,7 @@
     <string name="repo_action_update_version">Update to v%1$s</string>
     <string name="repo_plugin_installed_version_format">Installed (v%1$s)</string>
     <string name="repo_action_updating">Updating...</string>
+    <string name="repo_action_queued">Queued</string>
     <string name="repo_action_cancel_update">Cancel</string>
     <string name="cancel_update_title">Cancel Update</string>
     <string name="cancel_update_desc">Are you sure you want to cancel the plugin update?</string>
