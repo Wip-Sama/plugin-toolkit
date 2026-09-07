@@ -591,112 +591,22 @@ fun FlowEditorView(
         }
 
         // 3. Top Status Bar (Overlay Layer)
-        Surface(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(ToolkitTheme.spacing.medium),
-            shape = RoundedCornerShape(ToolkitTheme.spacing.large),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.almostOpaque),
-            tonalElevation = ToolkitTheme.spacing.small,
-            shadowElevation = ToolkitTheme.spacing.extraSmall
-        ) {
-            Row(
-                modifier = Modifier.padding(
-                    horizontal = ToolkitTheme.spacing.medium,
-                    vertical = ToolkitTheme.spacing.small
-                ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
-            ) {
-                Column(modifier = Modifier.weight(1f, fill = false)) {
-                    if (flow.name.isBlank()) {
-                        Text(
-                            text = stringResource(Res.string.flow_editor_no_flow_selected),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-                        ) {
-                            Column {
-                                Text(
-                                    text = stringResource(Res.string.flow_editor_flow_selected),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = flow.name,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            if (state.isReadOnly) {
-                                @Suppress("SimplifiableCallChain")
-                                val reasonString = state.readOnlyReasons.map { reason ->
-                                    when (reason) {
-                                        ReadOnlyReason.Running -> stringResource(Res.string.flow_readonly_reason_running)
-                                        ReadOnlyReason.UsedInOtherFlows -> stringResource(Res.string.flow_readonly_reason_used_in_other)
-                                    }
-                                }.joinToString(", ")
-
-                                val displayText = if (reasonString.isNotEmpty()) {
-                                    stringResource(Res.string.flow_editor_read_only_reason, reasonString)
-                                } else {
-                                    stringResource(Res.string.flow_editor_read_only)
-                                }
-
-                                Surface(
-                                    color = MaterialTheme.colorScheme.errorContainer,
-                                    shape = CircleShape
-                                ) {
-                                    Text(
-                                        text = displayText,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onErrorContainer,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(
-                                            horizontal = ToolkitTheme.spacing.small,
-                                            vertical = ToolkitTheme.spacing.extraSmall
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
+        FlowEditorTopBar(
+            flowName = flow.name,
+            isReadOnly = state.isReadOnly,
+            readOnlyReasons = state.readOnlyReasons,
+            hasUnsavedChanges = state.hasUnsavedChanges,
+            onSave = {
+                if (flow.name.isBlank()) {
+                    saveAsName = ""
+                    showSaveAsDialog = true
+                } else {
+                    viewModel.onEvent(FlowEvent.Save)
                 }
-
-                Button(
-                    onClick = {
-                        if (flow.name.isBlank()) {
-                            saveAsName = ""
-                            showSaveAsDialog = true
-                        } else {
-                            viewModel.onEvent(FlowEvent.Save)
-                        }
-                    },
-                    enabled = state.hasUnsavedChanges && !state.isReadOnly,
-                    contentPadding = PaddingValues(
-                        horizontal = ToolkitTheme.spacing.medium,
-                        vertical = ToolkitTheme.spacing.small
-                    )
-                ) {
-                    Text(stringResource(Res.string.flow_editor_save_changes))
-                }
-
-                OutlinedButton(
-                    onClick = onExit,
-                    contentPadding = PaddingValues(
-                        horizontal = ToolkitTheme.spacing.medium,
-                        vertical = ToolkitTheme.spacing.small
-                    )
-                ) {
-                    Text(stringResource(Res.string.flow_editor_btn_exit))
-                }
-            }
-        }
+            },
+            onExit = onExit,
+            modifier = Modifier.align(Alignment.TopEnd)
+        )
 
         // 4. Global Dragging Preview (Highest Layer)
         draggingNodeFromPalette?.let { node ->
@@ -715,89 +625,34 @@ fun FlowEditorView(
         }
 
         state.pendingConnection?.let { pendingConn ->
-            AlertDialog(
-                onDismissRequest = { viewModel.onEvent(FlowEvent.CancelPendingConnection) },
-                title = { Text(stringResource(Res.string.flow_editor_incompatible_title)) },
-                text = {
-                    Text(
-                        stringResource(
-                            Res.string.flow_editor_incompatible_message,
-                            pendingConn.sourceType.format(),
-                            pendingConn.targetType.format()
+            IncompatibleConnectionDialog(
+                pendingConnection = pendingConn,
+                onConvertAndConnect = {
+                    viewModel.onEvent(
+                        FlowEvent.AutoConvertAndConnect(
+                            pendingConn.sourceNodeId,
+                            pendingConn.sourcePortId,
+                            pendingConn.targetNodeId,
+                            pendingConn.targetPortId
                         )
                     )
+                    viewModel.onEvent(FlowEvent.CancelPendingConnection)
                 },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            viewModel.onEvent(
-                                FlowEvent.AutoConvertAndConnect(
-                                    pendingConn.sourceNodeId,
-                                    pendingConn.sourcePortId,
-                                    pendingConn.targetNodeId,
-                                    pendingConn.targetPortId
-                                )
-                            )
-                            viewModel.onEvent(FlowEvent.CancelPendingConnection)
-                        }
-                    ) {
-                        Text(stringResource(Res.string.flow_editor_convert_connect))
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { viewModel.onEvent(FlowEvent.CancelPendingConnection) }
-                    ) {
-                        Text(stringResource(Res.string.dialog_cancel))
-                    }
-                }
+                onDismiss = { viewModel.onEvent(FlowEvent.CancelPendingConnection) }
             )
         }
 
         if (showSaveAsDialog) {
-            AlertDialog(
-                onDismissRequest = { showSaveAsDialog = false },
-                title = { Text(stringResource(Res.string.flow_editor_save_as_title)) },
-                text = {
-                    Column {
-                        Text(
-                            text = stringResource(Res.string.flow_editor_enter_name),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = ToolkitTheme.spacing.medium)
-                        )
-                        ToolkitTextField(
-                            value = saveAsName,
-                            onValueChange = { saveAsName = it },
-                            label = { Text(stringResource(Res.string.flow_name_label)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+            FlowEditorSaveAsDialog(
+                initialName = saveAsName,
+                existingFlowNames = state.flows.map { it.name },
+                duplicateErrorMessage = duplicateFlowMsg,
+                onShowToast = { notificationService.toast(it) },
+                onConfirm = {
+                    viewModel.onEvent(FlowEvent.SaveAs(it))
+                    showSaveAsDialog = false
                 },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            val trimmedName = saveAsName.trim()
-                            if (trimmedName.isNotBlank()) {
-                                val exists = state.flows.any { it.name.equals(trimmedName, ignoreCase = true) }
-                                if (exists) {
-                                    notificationService.toast(duplicateFlowMsg.format(trimmedName))
-                                } else {
-                                    viewModel.onEvent(FlowEvent.SaveAs(trimmedName))
-                                    showSaveAsDialog = false
-                                }
-                            }
-                        },
-                        enabled = saveAsName.isNotBlank()
-                    ) {
-                        Text(stringResource(Res.string.action_save))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showSaveAsDialog = false }) {
-                        Text(stringResource(Res.string.dialog_cancel))
-                    }
-                }
+                onDismiss = { showSaveAsDialog = false }
             )
         }
         
@@ -805,81 +660,3 @@ fun FlowEditorView(
     }
 }
 
-@Composable
-private fun NodeComponentPlaceholder(node: Node, height: Dp = ToolkitTheme.dimensions.heightLarge) {
-    Surface(
-        modifier = Modifier.width(ToolkitTheme.dimensions.containerWidthLarge).height(height),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
-        border = androidx.compose.foundation.BorderStroke(ToolkitTheme.dimensions.progressIndicatorStroke, MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.borderLow))
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(node.title, color = MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.disabled))
-        }
-    }
-}
-
-private fun getPortRelativeOffset(node: Node, portId: String, density: androidx.compose.ui.unit.Density): Offset {
-    val headerHeight = 48f
-    val bodyTopPadding = 12f
-    val rowHeight = 48f
-    val spacing = 12f
-    val dividerHeight = 0.5f
-
-    val isInput = node.inputs.any { it.id == portId }
-    val isOutput = node.outputs.any { it.id == portId }
-
-    val xDp = if (isInput) 19f else 281f
-
-    var yDp = headerHeight + bodyTopPadding
-    val numInputs = node.inputs.size
-    val numOutputs = node.outputs.size
-
-    if (isInput) {
-        val index = node.inputs.indexOfFirst { it.id == portId }
-        if (index != -1) {
-            yDp += index * (rowHeight + spacing) + (rowHeight / 2f)
-        }
-    } else if (isOutput) {
-        val index = node.outputs.indexOfFirst { it.id == portId }
-        if (index != -1) {
-            var precedingHeight = numInputs * rowHeight
-            var numGaps = numInputs
-            if (numInputs > 0) {
-                precedingHeight += dividerHeight
-                numGaps += 1
-            }
-            yDp += precedingHeight + (numGaps + index) * spacing + index * rowHeight + (rowHeight / 2f)
-        }
-    }
-
-    return with(density) {
-        Offset(xDp.dp.toPx(), yDp.dp.toPx())
-    }
-}
-
-private fun findClosestPort(
-    boardPosition: Offset,
-    flow: Flow,
-    connectionStartIsOutput: Boolean,
-    scale: Float,
-    getPortBoardPosition: (Long, String, Boolean) -> Offset?
-): Pair<Long?, String?> {
-    var closestPortId: String? = null
-    var closestNodeId: Long? = null
-    var minDistance = 30f / scale
-
-    flow.nodes.forEach { n ->
-        val portsToTrack = if (connectionStartIsOutput) n.inputs else n.outputs
-        portsToTrack.forEach { port ->
-            val portBoardPos = getPortBoardPosition(n.id, port.id, !connectionStartIsOutput) ?: return@forEach
-            val dist = (boardPosition - portBoardPos).getDistance()
-            if (dist < minDistance) {
-                minDistance = dist
-                closestPortId = port.id
-                closestNodeId = n.id
-            }
-        }
-    }
-    return Pair(closestNodeId, closestPortId)
-}
