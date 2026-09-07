@@ -56,6 +56,8 @@ import plugintoolkit.composeapp.generated.resources.plugin_changelog
 import plugintoolkit.composeapp.generated.resources.repo_action_cancel_update
 import plugintoolkit.composeapp.generated.resources.repo_action_update_version
 import plugintoolkit.composeapp.generated.resources.repo_action_updating
+import plugintoolkit.composeapp.generated.resources.repo_badge_local
+import plugintoolkit.composeapp.generated.resources.repo_badge_remote
 import plugintoolkit.composeapp.generated.resources.repo_downgrade_version
 import plugintoolkit.composeapp.generated.resources.repo_filter_chip_update
 import plugintoolkit.composeapp.generated.resources.repo_incompatible_badge
@@ -63,6 +65,7 @@ import plugintoolkit.composeapp.generated.resources.repo_install_version
 import plugintoolkit.composeapp.generated.resources.repo_plugin_installed_version_format
 import plugintoolkit.composeapp.generated.resources.repo_plugin_pkg_version_format
 import plugintoolkit.composeapp.generated.resources.repo_reinstall_version
+import plugintoolkit.composeapp.generated.resources.repo_source_this
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -74,10 +77,22 @@ fun PluginListItem(
     activeJobs: Map<String, Float>,
     onSetPackageSource: (String, String) -> Unit,
     conflicts: Map<String, List<ExtensionRepo>>,
+    packageSourceOverrides: Map<String, String> = emptyMap(),
+    pluginsMap: Map<String, List<ExtensionPlugin>> = emptyMap(),
     onInstall: (ExtensionPlugin) -> Unit,
     onCancel: (String) -> Unit,
     onShowChangelog: (ExtensionPlugin) -> Unit = {}
 ) {
+    val pluginConflicts = conflicts[plugin.pkg]
+    val selectedSourceRepo = if (!pluginConflicts.isNullOrEmpty()) {
+        val overrideUrl = packageSourceOverrides[plugin.pkg]
+        pluginConflicts.find { it.url == overrideUrl }
+            ?: pluginConflicts.find { it.url == currentRepo.url }
+            ?: pluginConflicts.first()
+    } else {
+        currentRepo
+    }
+
     val installedPlugin = installedPlugins.find { it.pkg == plugin.pkg }
     val installedVersion = installedPlugin?.version
     val isInstalled = installedPlugin != null
@@ -239,7 +254,6 @@ fun PluginListItem(
                     )
                 }
 
-                val pluginConflicts = conflicts[plugin.pkg]
                 if (pluginConflicts != null && pluginConflicts.size > 1) {
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -250,13 +264,26 @@ fun PluginListItem(
                         )
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
 
-                        Box(modifier = Modifier.height(ToolkitTheme.dimensions.iconMedium)) {
+                        Box {
                             ExpressiveMenu(
                                 options = pluginConflicts,
-                                selectedOption = pluginConflicts.firstOrNull { it.url == currentRepo.url }
-                                    ?: pluginConflicts.first(),
+                                selectedOption = selectedSourceRepo,
                                 onOptionSelected = { onSetPackageSource(plugin.pkg, it.url) },
-                                labelProvider = { it.name }
+                                labelProvider = { repo ->
+                                    val isCurrent = repo.url == currentRepo.url
+                                    val isDuplicateName = pluginConflicts.count { it.name == repo.name } > 1
+                                    val extraInfo = buildList {
+                                        if (isCurrent) add(stringResource(Res.string.repo_source_this))
+                                        else if (isDuplicateName) {
+                                            add(if (repo.isLocal) stringResource(Res.string.repo_badge_local) else stringResource(Res.string.repo_badge_remote))
+                                        }
+                                    }
+                                    if (extraInfo.isNotEmpty()) {
+                                        "${repo.name} ${extraInfo.joinToString(" ")}"
+                                    } else {
+                                        repo.name
+                                    }
+                                }
                             )
                         }
                     }

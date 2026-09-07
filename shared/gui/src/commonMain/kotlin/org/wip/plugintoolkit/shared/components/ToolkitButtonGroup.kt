@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,30 +36,40 @@ fun ToolkitButtonGroup(
         verticalAlignment = Alignment.CenterVertically
     ) {
         children.forEachIndexed { index, childContent ->
-            // Subtract padding from outer corner radius so the inner button corners run parallel to container corners
-            val buttonOuterCorner = (outerCorner - containerPadding).coerceAtLeast(ToolkitTheme.spacing.none)
+            key(index) {
+                // Subtract padding from outer corner radius so the inner button corners run parallel to container corners
+                val buttonOuterCorner = (outerCorner - containerPadding).coerceAtLeast(ToolkitTheme.spacing.none)
 
-            val shape = computeGroupedShape(
-                index = index,
-                totalCount = children.size,
-                outerCorner = buttonOuterCorner,
-                innerCorner = innerCorner,
-                orientation = GroupOrientation.Horizontal
-            )
+                val shape = computeGroupedShape(
+                    index = index,
+                    totalCount = children.size,
+                    outerCorner = buttonOuterCorner,
+                    innerCorner = innerCorner,
+                    orientation = GroupOrientation.Horizontal
+                )
 
-            childContent(shape, Modifier.clip(shape))
+                childContent(shape, Modifier.clip(shape))
+            }
         }
     }
 }
 
 interface ToolkitButtonGroupScope {
-    fun item(content: @Composable (shape: CornerBasedShape, modifier: Modifier) -> Unit)
+    fun item(
+        visible: Boolean = true,
+        content: @Composable (shape: CornerBasedShape, modifier: Modifier) -> Unit
+    )
 }
 
 private class ToolkitButtonGroupScopeImpl : ToolkitButtonGroupScope {
     val children = mutableListOf<@Composable (shape: CornerBasedShape, modifier: Modifier) -> Unit>()
 
-    override fun item(content: @Composable (shape: CornerBasedShape, modifier: Modifier) -> Unit) {
-        children.add(content)
+    override fun item(
+        visible: Boolean,
+        content: @Composable (shape: CornerBasedShape, modifier: Modifier) -> Unit
+    ) {
+        if (visible) {
+            children.add(content)
+        }
     }
 }

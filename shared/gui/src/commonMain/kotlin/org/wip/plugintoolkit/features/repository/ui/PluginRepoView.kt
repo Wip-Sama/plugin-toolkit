@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -30,6 +31,7 @@ fun PluginRepoView(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val pluginsMap by viewModel.plugins.collectAsState()
     val flowsMap by viewModel.flows.collectAsState()
+    val packageSourceOverrides by viewModel.packageSourceOverrides.collectAsState()
 
     val totalRepoCount by viewModel.totalRepoCount.collectAsState()
     val remoteRepoCount by viewModel.remoteRepoCount.collectAsState()
@@ -78,36 +80,40 @@ fun PluginRepoView(
             )
 
             selectedRepo?.let { currentRepo ->
-                val rawPlugins = pluginsMap[currentRepo.url] ?: emptyList()
-                val sortedFilteredPlugins = viewModel.filterAndSortPlugins(rawPlugins)
+                key(currentRepo.url) {
+                    val rawPlugins = pluginsMap[currentRepo.url] ?: emptyList()
+                    val sortedFilteredPlugins = viewModel.filterAndSortPlugins(rawPlugins)
 
-                PluginRepoDetails(
-                    modifier = Modifier.weight(1f),
-                    currentRepo = currentRepo,
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                    searchQuery = viewModel.pluginSearchQuery,
-                    onSearchQueryChange = { viewModel.pluginSearchQuery = it },
-                    sortMode = viewModel.pluginSortMode,
-                    onSortModeChange = { viewModel.pluginSortMode = it },
-                    chipFilter = viewModel.pluginChipFilter,
-                    onChipFilterChange = { viewModel.pluginChipFilter = it },
-                    plugins = sortedFilteredPlugins,
-                    flows = viewModel.filterAndSortFlows(flowsMap[currentRepo.url] ?: emptyList()),
-                    installedPlugins = installedPlugins,
-                    flowState = flowState,
-                    activeJobs = activeJobs,
-                    conflicts = conflicts,
-                    isRefreshing = isRefreshing,
-                    clipboard = clipboard,
-                    onRefreshRepo = { viewModel.refreshRepository(it.url) },
-                    onOpenLocalFolder = { viewModel.openLocalFolder(it) },
-                    onInstallPlugin = { viewModel.installPlugin(it) },
-                    onCancelPlugin = { viewModel.cancelPluginInstall(it) },
-                    onInstallFlow = { viewModel.installFlow(it) },
-                    onSetPackageSource = { pkg, url -> viewModel.setPackageSource(pkg, url) },
-                    onShowChangelog = { viewModel.showChangelog(it) }
-                )
+                    PluginRepoDetails(
+                        modifier = Modifier.weight(1f),
+                        currentRepo = currentRepo,
+                        selectedTab = selectedTab,
+                        onTabSelected = { selectedTab = it },
+                        searchQuery = viewModel.pluginSearchQuery,
+                        onSearchQueryChange = { viewModel.pluginSearchQuery = it },
+                        sortMode = viewModel.pluginSortMode,
+                        onSortModeChange = { viewModel.pluginSortMode = it },
+                        chipFilter = viewModel.pluginChipFilter,
+                        onChipFilterChange = { viewModel.pluginChipFilter = it },
+                        plugins = sortedFilteredPlugins,
+                        flows = viewModel.filterAndSortFlows(flowsMap[currentRepo.url] ?: emptyList()),
+                        installedPlugins = installedPlugins,
+                        flowState = flowState,
+                        activeJobs = activeJobs,
+                        conflicts = conflicts,
+                        packageSourceOverrides = packageSourceOverrides,
+                        pluginsMap = pluginsMap,
+                        isRefreshing = isRefreshing,
+                        clipboard = clipboard,
+                        onRefreshRepo = { viewModel.refreshRepository(it.url) },
+                        onOpenLocalFolder = { viewModel.openLocalFolder(it) },
+                        onInstallPlugin = { viewModel.installPlugin(it) },
+                        onCancelPlugin = { viewModel.cancelPluginInstall(it) },
+                        onInstallFlow = { viewModel.installFlow(it) },
+                        onSetPackageSource = { pkg, url -> viewModel.setPackageSource(pkg, url) },
+                        onShowChangelog = { viewModel.showChangelog(it) }
+                    )
+                }
             }
         }
 

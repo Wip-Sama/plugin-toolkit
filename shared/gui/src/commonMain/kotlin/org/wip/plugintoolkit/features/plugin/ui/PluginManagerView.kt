@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Upgrade
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,6 +64,7 @@ import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.plugin.viewmodel.AlternateRepoUpdate
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginActivityInfo
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitCard
@@ -119,6 +123,8 @@ import plugintoolkit.composeapp.generated.resources.plugin_validated
 import plugintoolkit.composeapp.generated.resources.plugin_status_validation_failed
 import plugintoolkit.composeapp.generated.resources.plugin_validation_pending
 import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_format
+import plugintoolkit.composeapp.generated.resources.plugin_newer_version_in_other_repo
+import plugintoolkit.composeapp.generated.resources.plugin_switch_repo_action
 
 @Composable
 fun PluginManagerView(
@@ -133,6 +139,7 @@ fun PluginManagerView(
     val settingsPkg by viewModel.settingsPkg.collectAsState()
     val activities by viewModel.pluginActivities.collectAsState()
     val activeInstallationJobs by viewModel.activePluginInstallationJobs.collectAsState()
+    val alternateRepoUpdates by viewModel.alternateRepoUpdates.collectAsState()
 
     val lazyListState = rememberLazyListState()
 
@@ -296,14 +303,17 @@ fun PluginManagerView(
                     viewModel.getActions(plugin.pkg)
                 }
                 val activity = activities[plugin.pkg]
+                val alternateUpdate = alternateRepoUpdates[plugin.pkg]
                 PluginCard(
                     plugin = plugin,
                     isLoaded = loadedPlugins.contains(plugin.pkg),
                     hasUpdate = hasUpdate,
+                    alternateUpdate = alternateUpdate,
                     customActions = customActions,
                     enabled = isReady,
                     activity = activity,
                     onToggle = { if (isReady) viewModel.toggleEnabled(plugin.pkg, it) },
+                    onSwitchRepo = { viewModel.promptSwitchRepo(it) },
                     onAction = { action ->
                         if (isReady) {
                             when (action) {
@@ -388,9 +398,11 @@ fun PluginCard(
     isLoaded: Boolean,
     hasUpdate: Boolean,
     customActions: List<PluginAction>,
+    alternateUpdate: AlternateRepoUpdate? = null,
     enabled: Boolean = true,
     activity: PluginActivityInfo? = null,
     onToggle: (Boolean) -> Unit,
+    onSwitchRepo: (String) -> Unit = {},
     onAction: (PluginStatusAction) -> Unit,
     onClick: () -> Unit
 ) {
@@ -537,6 +549,55 @@ fun PluginCard(
                     )
                 }
 
+                if (alternateUpdate != null) {
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .clickable { onSwitchRepo(plugin.pkg) }
+                            .padding(top = ToolkitTheme.spacing.extraSmall / 2)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(
+                                horizontal = ToolkitTheme.spacing.small,
+                                vertical = ToolkitTheme.spacing.badgeVertical
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Upgrade,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Text(
+                                stringResource(
+                                    Res.string.plugin_newer_version_in_other_repo,
+                                    alternateUpdate.newerVersion,
+                                    alternateUpdate.repo.name
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Text(
+                                "•",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Text(
+                                stringResource(Res.string.plugin_switch_repo_action),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
                 if (activity != null) {
                     Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
                     val stepText = when (activity.type) {
@@ -574,11 +635,12 @@ fun PluginCard(
             // Actions
             var expanded by remember { mutableStateOf(false) }
 
-            val buttonState = Triple(plugin.requiredAction, hasUpdate, enabled)
+            val buttonState = CardButtonState(plugin.requiredAction, hasUpdate, alternateUpdate != null, enabled)
             AnimatedContent(
                 targetState = buttonState,
                 transitionSpec = { fadeIn() togetherWith fadeOut() }
-            ) { (reqAction, isUpdateAvailable, readyStatus) ->
+            ) { state ->
+                val (reqAction, isUpdateAvailable, hasAltUpdate, readyStatus) = state
                 ToolkitButtonGroup {
                     if (reqAction != null) {
                         val action = customActions.find { it.functionName == reqAction }
@@ -614,6 +676,16 @@ fun PluginCard(
                                 enabled = readyStatus
                             ) {
                                 Text(stringResource(Res.string.plugin_update))
+                            }
+                        } else if (hasAltUpdate) {
+                            Button(
+                                onClick = { onSwitchRepo(plugin.pkg) },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = shape,
+                                modifier = modifierSpec,
+                                enabled = readyStatus
+                            ) {
+                                Text(stringResource(Res.string.plugin_switch_repo_action))
                             }
                         } else {
                             FilledTonalButton(
@@ -724,6 +796,34 @@ fun PluginCard(
                                 expanded = expanded,
                                 onDismissRequest = { expanded = false }
                             ) {
+                                if (alternateUpdate != null) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                stringResource(
+                                                    Res.string.plugin_switch_repo_action
+                                                ) + " (${alternateUpdate.repo.name})"
+                                            )
+                                        },
+                                        onClick = {
+                                            expanded = false
+                                            onSwitchRepo(plugin.pkg)
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Upgrade,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.plugin_update_local)) },
+                                        onClick = { onAction(PluginStatusAction.Update); expanded = false },
+                                        leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
+                                    )
+                                    androidx.compose.material3.HorizontalDivider()
+                                }
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.plugin_validate)) },
                                     onClick = { onAction(PluginStatusAction.Validate); expanded = false },
@@ -792,3 +892,10 @@ sealed class PluginStatusAction {
     object OpenFolder : PluginStatusAction()
     data class Custom(val name: String) : PluginStatusAction()
 }
+
+private data class CardButtonState(
+    val reqAction: String?,
+    val hasUpdate: Boolean,
+    val hasAltUpdate: Boolean,
+    val enabled: Boolean
+)

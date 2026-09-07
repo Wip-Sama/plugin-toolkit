@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,6 +91,8 @@ fun PluginRepoDetails(
     installedPlugins: List<InstalledPlugin>,
     flowState: FlowState,
     conflicts: Map<String, List<ExtensionRepo>>,
+    packageSourceOverrides: Map<String, String> = emptyMap(),
+    pluginsMap: Map<String, List<ExtensionPlugin>> = emptyMap(),
     isRefreshing: Boolean,
     activeJobs: Map<String, Float>,
     clipboard: Clipboard,
@@ -157,27 +160,27 @@ fun PluginRepoDetails(
                         horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ToolkitButtonGroup {
-                            item { shape, modifierSpec ->
-                                Button(
-                                    onClick = { onRefreshRepo(currentRepo) },
-                                    enabled = !isRefreshing,
-                                    colors = ButtonDefaults.filledTonalButtonColors(),
-                                    shape = shape,
-                                    modifier = modifierSpec
-                                ) {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                    )
-                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                    Text(stringResource(Res.string.action_refresh))
-                                }
-                            }
-
-                            if (currentRepo.isLocal) {
+                        key(currentRepo.url, currentRepo.isLocal) {
+                            ToolkitButtonGroup {
                                 item { shape, modifierSpec ->
+                                    Button(
+                                        onClick = { onRefreshRepo(currentRepo) },
+                                        enabled = !isRefreshing,
+                                        colors = ButtonDefaults.filledTonalButtonColors(),
+                                        shape = shape,
+                                        modifier = modifierSpec
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                        )
+                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                        Text(stringResource(Res.string.action_refresh))
+                                    }
+                                }
+
+                                item(visible = currentRepo.isLocal) { shape, modifierSpec ->
                                     Button(
                                         onClick = { onOpenLocalFolder(currentRepo.url) },
                                         modifier = modifierSpec,
@@ -379,6 +382,8 @@ fun PluginRepoDetails(
                                 activeJobs = activeJobs,
                                 onSetPackageSource = onSetPackageSource,
                                 conflicts = conflicts,
+                                packageSourceOverrides = packageSourceOverrides,
+                                pluginsMap = pluginsMap,
                                 onInstall = onInstallPlugin,
                                 onCancel = onCancelPlugin,
                                 onShowChangelog = onShowChangelog

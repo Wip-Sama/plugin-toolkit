@@ -5,6 +5,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -280,5 +281,55 @@ class PluginRepoViewModelTest {
         val incompatible = viewModel.filterAndSortFlows(flows)
         assertEquals(1, incompatible.size)
         assertEquals("Beta Flow", incompatible.first().name)
+    }
+
+    @Test
+    fun testPackageSourceOverridesObservation() = runTest {
+        val initialSettings = org.wip.plugintoolkit.features.settings.model.AppSettings(
+            extensions = org.wip.plugintoolkit.features.settings.model.ExtensionSettings(
+                packageSourceOverrides = mapOf("org.alpha" to "https://community.org/repo/index.json")
+            )
+        )
+        val settingsFlow = MutableStateFlow(initialSettings)
+        every { settingsRepository.settings } returns settingsFlow
+        every { repoManager.repositories } returns MutableStateFlow(emptyList())
+        every { pluginManager.installedPlugins } returns MutableStateFlow(emptyList())
+
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("https://community.org/repo/index.json", viewModel.packageSourceOverrides.value["org.alpha"])
+    }
+
+    @Test
+    fun testInstallPluginDirectly() = runTest {
+        val repo1Plugin = ExtensionPlugin(name = "Alpha", pkg = "org.alpha", version = "1.0.0", fileName = "alpha-1.jar", repoUrl = "https://repo1.com")
+
+        every { repoManager.plugins } returns MutableStateFlow(
+            mapOf("https://repo1.com" to listOf(repo1Plugin))
+        )
+        every { repoManager.repositories } returns MutableStateFlow(emptyList())
+        every { pluginManager.installedPlugins } returns MutableStateFlow(emptyList())
+        every { settingsRepository.getSettingsDir() } returns "/app/settings"
+        every { appConfig.PLUGINS_DIR_NAME } returns "plugins"
+        every { settingsRepository.loadSettings() } returns org.wip.plugintoolkit.features.settings.model.AppSettings(
+            extensions = org.wip.plugintoolkit.features.settings.model.ExtensionSettings(
+                pluginFolders = emptyList()
+            )
+        )
+
+        val viewModel = createViewModel()
+        viewModel.installPlugin(repo1Plugin)
+        testScheduler.advanceUntilIdle()
+
+        coVerify { pluginManager.enqueueRemoteInstall(repo1Plugin, "/app/settings/plugins") }
+    }
+
+    @Test
+    fun testSetPackageSource() = runTest {
+        val viewModel = createViewModel()
+        viewModel.setPackageSource("org.alpha", "https://repo2.com")
+        testScheduler.advanceUntilIdle()
+        verify { repoManager.setPackageSourceOverride("org.alpha", "https://repo2.com") }
     }
 }

@@ -110,6 +110,10 @@ class PluginRepoViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    val packageSourceOverrides: StateFlow<Map<String, String>> = settingsRepository.settings
+        .map { it.extensions.packageSourceOverrides }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
     val activePluginInstallationJobs: StateFlow<Map<String, Float>> = jobManager.jobProgress
         .combine(jobManager.jobs) { progressMap, jobs ->
             jobs.filter {

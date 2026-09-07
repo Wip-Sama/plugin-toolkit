@@ -21,14 +21,17 @@ import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.core.utils.VersionUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
+import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
+import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.plugin_action_blocked
@@ -56,7 +59,7 @@ class PluginManagerViewModel(
     private val pluginManager: PluginManager,
     private val dialogService: DialogService,
     private val settingsRepository: SettingsRepository,
-    repoManager: RepoManager,
+    private val repoManager: RepoManager,
     jobManager: JobManager,
     private val flowViewModel: FlowViewModel,
     appConfig: SystemConfig,
@@ -245,12 +248,63 @@ class PluginManagerViewModel(
         }
     }
 
+    val alternateRepoUpdates: StateFlow<Map<String, AlternateRepoUpdate>> = combine(
+        installedPlugins,
+        repoManager.plugins,
+        repoManager.repositories,
+        settingsRepository.settings
+    ) { installedList, pluginsMap, repos, settings ->
+        val result = mutableMapOf<String, AlternateRepoUpdate>()
+        val reposByUrl = repos.associateBy { it.url }
+
+        for (installed in installedList) {
+            val overrideUrl = settings.extensions.packageSourceOverrides[installed.pkg]
+            val currentRepoUrl = overrideUrl ?: installed.repoUrl
+            val currentRepoPlugin = if (currentRepoUrl != null) {
+                pluginsMap[currentRepoUrl]?.find { it.pkg == installed.pkg }
+            } else null
+
+            val baselineVersion = if (currentRepoPlugin != null && VersionUtils.compare(currentRepoPlugin.version, installed.version) > 0) {
+                currentRepoPlugin.version
+            } else {
+                installed.version
+            }
+
+            var bestAlternate: AlternateRepoUpdate? = null
+
+            for ((repoUrl, pluginList) in pluginsMap) {
+                if (repoUrl == currentRepoUrl) continue
+                val repo = reposByUrl[repoUrl] ?: continue
+                val remotePlugin = pluginList.find { it.pkg == installed.pkg } ?: continue
+                val (isCompatible, _) = PluginCompatibilityUtils.checkCompatibility(remotePlugin)
+                if (!isCompatible) continue
+
+                val targetVersion = bestAlternate?.newerVersion ?: baselineVersion
+                if (VersionUtils.compare(remotePlugin.version, targetVersion) > 0) {
+                    bestAlternate = AlternateRepoUpdate(
+                        pkg = installed.pkg,
+                        installedVersion = installed.version,
+                        newerVersion = remotePlugin.version,
+                        repo = repo,
+                        plugin = remotePlugin
+                    )
+                }
+            }
+
+            if (bestAlternate != null) {
+                result[installed.pkg] = bestAlternate
+            }
+        }
+        result
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
     val sortedPlugins: StateFlow<List<InstalledPlugin>> = combine(
         installedPlugins,
-        pluginManager.loadedPlugins // to trigger refresh if needed
-    ) { plugins, _ ->
+        pluginManager.loadedPlugins,
+        alternateRepoUpdates
+    ) { plugins, _, altUpdates ->
         plugins.sortedWith(
-            compareByDescending<InstalledPlugin> { pluginManager.getUpdate(it.pkg) != null }
+            compareByDescending<InstalledPlugin> { pluginManager.getUpdate(it.pkg) != null || altUpdates.containsKey(it.pkg) }
                 .thenBy { it.name }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -590,7 +644,45 @@ class PluginManagerViewModel(
             }
         }
     }
+    fun promptSwitchRepo(pkg: String) {
+        val altUpdate = alternateRepoUpdates.value[pkg] ?: return
+        val installed = installedPlugins.value.find { it.pkg == pkg }
+        val pluginName = installed?.name ?: pkg
+
+        viewModelScope.launch {
+            dialogService.showConfirmation(
+                title = getString(Res.string.plugin_switch_repo_title),
+                message = getString(
+                    Res.string.plugin_switch_repo_message,
+                    pluginName,
+                    altUpdate.newerVersion,
+                    altUpdate.repo.name
+                ),
+                onConfirm = {
+                    switchSourceRepoAndUpdate(altUpdate.pkg, altUpdate.repo.url)
+                }
+            )
+        }
+    }
+
+    fun switchSourceRepoAndUpdate(pkg: String, newRepoUrl: String) {
+        viewModelScope.launch {
+            repoManager.setPackageSourceOverride(pkg, newRepoUrl)
+            val repo = repoManager.repositories.value.find { it.url == newRepoUrl }
+            val repoName = repo?.name ?: newRepoUrl
+            notificationService.toast(getString(Res.string.plugin_repo_switched_toast, repoName))
+            updatePlugin(pkg)
+        }
+    }
 }
+
+data class AlternateRepoUpdate(
+    val pkg: String,
+    val installedVersion: String,
+    val newerVersion: String,
+    val repo: ExtensionRepo,
+    val plugin: ExtensionPlugin
+)
 
 data class ActivePluginJobInfo(
     val jobId: String,

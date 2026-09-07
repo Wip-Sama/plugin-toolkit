@@ -333,12 +333,21 @@ class PluginInstaller(
      * Checks if an update is available for the given plugin.
      */
     fun getUpdate(pkg: String): ExtensionPlugin? {
-        return repoManager.plugins.value.values.flatten().find { it.pkg == pkg }?.let { remote ->
-            val installed = registry.getPlugin(pkg)
-            if (installed != null && VersionUtils.compare(remote.version, installed.version) > 0) {
-                remote
-            } else null
-        }
+        val installed = registry.getPlugin(pkg) ?: return null
+        val overrideUrl = repoManager.getPackageSourceOverride(pkg)
+        val targetRepoUrl = overrideUrl ?: installed.repoUrl
+
+        val candidate = if (targetRepoUrl != null) {
+            repoManager.plugins.value[targetRepoUrl]?.find { it.pkg == pkg }
+        } else null
+
+        val remote = candidate ?: if (overrideUrl == null) {
+            repoManager.plugins.value.values.flatten().find { it.pkg == pkg }
+        } else null
+
+        return if (remote != null && VersionUtils.compare(remote.version, installed.version) > 0) {
+            remote
+        } else null
     }
 
     private fun checkCompatibility(manifest: PluginManifest): Pair<Boolean, String?> {

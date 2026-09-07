@@ -259,6 +259,14 @@
     <string name="repo_refreshed">Repository refreshed</string>
     <string name="repo_all_refreshed">All repositories refreshed</string>
     <string name="repo_source_updated">Source for %1$s updated</string>
+    <string name="repo_source_this">(this)</string>
+    <string name="repo_badge_local">Local</string>
+    <string name="repo_badge_remote">Remote</string>
+    <string name="plugin_newer_version_in_other_repo">Newer version (%1$s) available in %2$s</string>
+    <string name="plugin_switch_repo_action">Switch &amp; Update</string>
+    <string name="plugin_switch_repo_title">Switch Repository</string>
+    <string name="plugin_switch_repo_message">A newer version of %1$s (%2$s) is available in \"%3$s\". Would you like to switch your update repository to \"%3$s\" and update now?</string>
+    <string name="plugin_repo_switched_toast">Switched repository source to %1$s</string>
     <string name="repo_plugin_installed">Plugin %1$s installed</string>
     <string name="repo_install_failed">Failed to install %1$s: %2$s</string>
     <string name="repo_url_placeholder">https://.../index.json</string>
