@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -88,7 +87,7 @@ fun DirectExecutionSidebar(
         modifier = modifier
             .width(ToolkitTheme.dimensions.sidebarExpandedWidth)
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clipToBounds()
             .onPointerEvent(PointerEventType.Press) { event ->
                 isShiftPressed = event.keyboardModifiers.isShiftPressed

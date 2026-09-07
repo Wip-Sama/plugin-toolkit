@@ -28,7 +28,6 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -98,7 +97,7 @@ fun PaletteSidebar(
     // Aligns perfectly with standard sidebars
     Surface(
         modifier = modifier.width(ToolkitTheme.dimensions.sidebarExpandedWidth).fillMaxHeight(),
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(
             ToolkitTheme.dimensions.borderUnselected,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.textFieldUnfocusedBorder)

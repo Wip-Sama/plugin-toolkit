@@ -26,7 +26,8 @@ data class AppSettings(
 data class AppearanceSettings(
     val theme: AppTheme = AppTheme.System,
     val accentColor: Long = 0xFF6200EE, // Default purple
-    val followSystemAccent: Boolean = true
+    val followSystemAccent: Boolean = true,
+    val useAccentInTheme: Boolean = false
 )
 
 /**

@@ -24,7 +24,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,7 +78,7 @@ fun <T> NavigationSidebar(
             .fillMaxHeight()
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false },
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(ToolkitTheme.dimensions.borderUnselected),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shadowElevation = if (isHovered && isNavbarCollapsed && canCollapse) ToolkitTheme.spacing.small else ToolkitTheme.spacing.none
     ) {
         Column(

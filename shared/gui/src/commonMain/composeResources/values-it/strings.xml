@@ -17,6 +17,10 @@
     <string name="board_controls">Controlli Lavagna</string>
     <string name="board_reset">Ripristina Lavagna</string>
     <string name="setting_accent_color">Colore Accento</string>
+    <string name="setting_follow_system_accent">Segui Accento di Sistema</string>
+    <string name="setting_follow_system_accent_subtitle">Usa automaticamente il colore di accento del sistema operativo</string>
+    <string name="setting_use_accent_in_theme">Usa accento nel tema</string>
+    <string name="setting_use_accent_in_theme_subtitle">Genera varianti del tema dal colore di accento seguendo le linee guida Material 3</string>
     <string name="setting_theme">Tema</string>
     <string name="setting_language">Lingua</string>
     <string name="setting_use_system_language">Usa Lingua di Sistema</string>

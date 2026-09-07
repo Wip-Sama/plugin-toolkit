@@ -111,4 +111,72 @@ class ThemeTest {
         assertEquals(1.0f, opacity.full)
         assertEquals(0.3f, opacity.glassBackground)
     }
+
+    @Test
+    fun testColorEngineHctConversions() {
+        // Red
+        val redHct = ColorEngine.colorToHct(Color.Red)
+        assertTrue(redHct.hue in 25f..45f || redHct.hue in 350f..360f, "Red hue: ${redHct.hue}")
+        assertTrue(redHct.chroma > 50f, "Red chroma: ${redHct.chroma}")
+
+        // Reconstruct pure tone
+        val darkTone = ColorEngine.hctToColor(redHct.hue, redHct.chroma, 20f)
+        val lightTone = ColorEngine.hctToColor(redHct.hue, redHct.chroma, 80f)
+        assertTrue(darkTone.luminance() < lightTone.luminance())
+    }
+
+    @Test
+    fun testColorEngineExpressiveSchemeContrast() {
+        fun contrastRatio(fg: Color, bg: Color): Float {
+            val l1 = maxOf(fg.luminance(), bg.luminance())
+            val l2 = minOf(fg.luminance(), bg.luminance())
+            return (l1 + 0.05f) / (l2 + 0.05f)
+        }
+
+        // Test multiple seed colors (Red, Blue, Purple, Green)
+        val seeds = listOf(Color(0xFFE91E63), Color(0xFF007ACC), Color(0xFF6200EE), Color(0xFF2E7D32))
+
+        for (seed in seeds) {
+            val lightScheme = ColorEngine.createExpressiveScheme(seed, isDark = false)
+            val darkScheme = ColorEngine.createExpressiveScheme(seed, isDark = true)
+
+            // Primary / OnPrimary contrast in Light mode
+            val lightPrimaryRatio = contrastRatio(lightScheme.onPrimary, lightScheme.primary)
+            assertTrue(lightPrimaryRatio >= 4.0f, "Light primary contrast for seed $seed: $lightPrimaryRatio")
+
+            // PrimaryContainer / OnPrimaryContainer contrast in Light mode
+            val lightContainerRatio = contrastRatio(lightScheme.onPrimaryContainer, lightScheme.primaryContainer)
+            assertTrue(lightContainerRatio >= 4.0f, "Light container contrast for seed $seed: $lightContainerRatio")
+
+            // Primary / OnPrimary contrast in Dark mode
+            val darkPrimaryRatio = contrastRatio(darkScheme.onPrimary, darkScheme.primary)
+            assertTrue(darkPrimaryRatio >= 4.0f, "Dark primary contrast for seed $seed: $darkPrimaryRatio")
+
+            // PrimaryContainer / OnPrimaryContainer contrast in Dark mode
+            val darkContainerRatio = contrastRatio(darkScheme.onPrimaryContainer, darkScheme.primaryContainer)
+            assertTrue(darkContainerRatio >= 4.0f, "Dark container contrast for seed $seed: $darkContainerRatio")
+        }
+    }
+
+    @Test
+    fun testColorEngineAmoledHierarchy() {
+        val amoledScheme = ColorEngine.createExpressiveScheme(Color(0xFF6200EE), isDark = true, isAmoled = true)
+        assertEquals(Color.Black, amoledScheme.background)
+        assertEquals(Color.Black, amoledScheme.surface)
+        assertEquals(Color.Black, amoledScheme.surfaceContainerLowest)
+
+        assertTrue(amoledScheme.surfaceContainerLowest.luminance() <= amoledScheme.surfaceContainerLow.luminance())
+        assertTrue(amoledScheme.surfaceContainerLow.luminance() < amoledScheme.surfaceContainer.luminance())
+        assertTrue(amoledScheme.surfaceContainer.luminance() < amoledScheme.surfaceContainerHigh.luminance())
+        assertTrue(amoledScheme.surfaceContainerHigh.luminance() < amoledScheme.surfaceContainerHighest.luminance())
+    }
+
+    @Test
+    fun testAppearanceSettingsUseAccentInTheme() {
+        val defaultSettings = org.wip.plugintoolkit.features.settings.model.AppearanceSettings()
+        kotlin.test.assertFalse(defaultSettings.useAccentInTheme)
+
+        val updated = defaultSettings.copy(useAccentInTheme = true)
+        assertTrue(updated.useAccentInTheme)
+    }
 }

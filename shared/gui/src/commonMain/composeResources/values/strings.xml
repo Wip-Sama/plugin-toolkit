@@ -17,6 +17,10 @@
     <string name="board_controls">Board Controls</string>
     <string name="board_reset">Reset Board</string>
     <string name="setting_accent_color">Accent Color</string>
+    <string name="setting_follow_system_accent">Follow System Accent</string>
+    <string name="setting_follow_system_accent_subtitle">Automatically use the accent color from your operating system</string>
+    <string name="setting_use_accent_in_theme">Use accent in the theme</string>
+    <string name="setting_use_accent_in_theme_subtitle">Generate theme variants from the accent color following Material 3 guidelines</string>
     <string name="setting_theme">Theme</string>
     <string name="setting_language">Language</string>
     <string name="setting_use_system_language">Use System Language</string>

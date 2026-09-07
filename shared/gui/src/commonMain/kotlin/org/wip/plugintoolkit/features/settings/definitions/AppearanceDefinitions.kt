@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Schedule
 import org.wip.plugintoolkit.features.settings.model.AppLanguage
 import org.wip.plugintoolkit.features.settings.model.AppSettings
@@ -40,9 +41,9 @@ fun SettingsRegistryBuilder.appearanceDefinitions() {
 
                 switch(
                     AppearanceSettings::followSystemAccent,
-                    SettingText.Raw("Follow System Accent"),
+                    Res.string.setting_follow_system_accent,
                     Icons.Default.AutoFixHigh,
-                    subtitle = SettingText.Raw("Automatically use the accent color from your operating system")
+                    subtitle = SettingText.Resource(Res.string.setting_follow_system_accent_subtitle)
                 ) { copy(followSystemAccent = it) }
             }
 
@@ -56,6 +57,15 @@ fun SettingsRegistryBuilder.appearanceDefinitions() {
                     org.wip.plugintoolkit.features.settings.ui.AccentColorControl(settings, onUpdate)
                 }
             )
+
+            bindGroup(AppSettings::appearance, { copy(appearance = it) }) {
+                switch(
+                    AppearanceSettings::useAccentInTheme,
+                    Res.string.setting_use_accent_in_theme,
+                    Icons.Default.Palette,
+                    subtitle = SettingText.Resource(Res.string.setting_use_accent_in_theme_subtitle)
+                ) { copy(useAccentInTheme = it) }
+            }
 
             bindGroup(AppSettings::general, { copy(general = it) }) {
                 slider(

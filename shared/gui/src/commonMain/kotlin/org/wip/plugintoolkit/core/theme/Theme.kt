@@ -317,104 +317,9 @@ object ToolkitTheme {
         get() = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 14.sp)
 }
 
-private val DarkColorScheme =
-    darkColorScheme(
-        primary = Color(0xFFD0BCFF),
-        onPrimary = Color(0xFF381E72),
-        primaryContainer = Color(0xFF4F378B),
-        onPrimaryContainer = Color(0xFFEADDFF),
-        secondary = Color(0xFFCCC2DC),
-        onSecondary = Color(0xFF332D41),
-        secondaryContainer = Color(0xFF4A4458),
-        onSecondaryContainer = Color(0xFFE8DEF8),
-        tertiary = Color(0xFFEFB8C8),
-        onTertiary = Color(0xFF492532),
-        tertiaryContainer = Color(0xFF633B48),
-        onTertiaryContainer = Color(0xFFFFD8E4),
-        background = Color(0xFF141218),
-        onBackground = Color(0xFFE6E0E9),
-        surface = Color(0xFF141218),
-        onSurface = Color(0xFFE6E0E9),
-        surfaceVariant = Color(0xFF49454F),
-        onSurfaceVariant = Color(0xFFCAC4D0),
-        surfaceContainerLowest = Color(0xFF0F0D13),
-        surfaceContainerLow = Color(0xFF1C1A20),
-        surfaceContainer = Color(0xFF201E24),
-        surfaceContainerHigh = Color(0xFF28262C),
-        surfaceContainerHighest = Color(0xFF333038),
-        outline = Color(0xFF948F9A),
-        outlineVariant = Color(0xFF49454F),
-        error = Color(0xFFFFB4AB),
-        onError = Color(0xFF690005),
-        errorContainer = Color(0xFF93000A),
-        onErrorContainer = Color(0xFFFFDAD6)
-    )
-
-private val LightColorScheme =
-    lightColorScheme(
-        primary = Color(0xFF6750A4),
-        onPrimary = Color.White,
-        primaryContainer = Color(0xFFEADDFF),
-        onPrimaryContainer = Color(0xFF21005D),
-        secondary = Color(0xFF625B71),
-        onSecondary = Color.White,
-        secondaryContainer = Color(0xFFE8DEF8),
-        onSecondaryContainer = Color(0xFF1D192B),
-        tertiary = Color(0xFF7D5260),
-        onTertiary = Color.White,
-        tertiaryContainer = Color(0xFFFFD8E4),
-        onTertiaryContainer = Color(0xFF31111D),
-        background = Color(0xFFFAF9FE),
-        onBackground = Color(0xFF1D1B20),
-        surface = Color(0xFFFAF9FE),
-        onSurface = Color(0xFF1D1B20),
-        surfaceVariant = Color(0xFFE7E0EC),
-        onSurfaceVariant = Color(0xFF49454F),
-        surfaceContainerLowest = Color(0xFFFFFFFF),
-        surfaceContainerLow = Color(0xFFF5F3F7),
-        surfaceContainer = Color(0xFFEFECEF),
-        surfaceContainerHigh = Color(0xFFE9E6EA),
-        surfaceContainerHighest = Color(0xFFE3E0E4),
-        outline = Color(0xFF7A757F),
-        outlineVariant = Color(0xFFCAC4D0),
-        error = Color(0xFFBA1A1A),
-        onError = Color.White,
-        errorContainer = Color(0xFFFFDAD6),
-        onErrorContainer = Color(0xFF410002)
-    )
-
-private val AmoledColorScheme =
-    darkColorScheme(
-        primary = Color(0xFFD0BCFF),
-        onPrimary = Color(0xFF381E72),
-        primaryContainer = Color(0xFF4F378B),
-        onPrimaryContainer = Color(0xFFEADDFF),
-        secondary = Color(0xFFCCC2DC),
-        onSecondary = Color(0xFF332D41),
-        secondaryContainer = Color(0xFF4A4458),
-        onSecondaryContainer = Color(0xFFE8DEF8),
-        tertiary = Color(0xFFEFB8C8),
-        onTertiary = Color(0xFF492532),
-        tertiaryContainer = Color(0xFF633B48),
-        onTertiaryContainer = Color(0xFFFFD8E4),
-        background = Color.Black,
-        onBackground = Color(0xFFE6E0E9),
-        surface = Color.Black,
-        onSurface = Color(0xFFE6E0E9),
-        surfaceVariant = Color(0xFF1C1B1F),
-        onSurfaceVariant = Color(0xFFCAC4D0),
-        surfaceContainerLowest = Color(0xFF050505),
-        surfaceContainerLow = Color(0xFF0D0D0D),
-        surfaceContainer = Color(0xFF141414),
-        surfaceContainerHigh = Color(0xFF1F1F1F),
-        surfaceContainerHighest = Color(0xFF2A2A2A),
-        outline = Color(0xFF8E8A94),
-        outlineVariant = Color(0xFF38353D),
-        error = Color(0xFFFFB4AB),
-        onError = Color(0xFF690005),
-        errorContainer = Color(0xFF93000A),
-        onErrorContainer = Color(0xFFFFDAD6)
-    )
+private val DarkColorScheme = ColorEngine.createStandardScheme(Color(0xFF6750A4), isDark = true, isAmoled = false)
+private val LightColorScheme = ColorEngine.createStandardScheme(Color(0xFF6750A4), isDark = false, isAmoled = false)
+private val AmoledColorScheme = ColorEngine.createStandardScheme(Color(0xFF6750A4), isDark = true, isAmoled = true)
 
 @Composable
 fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
@@ -441,45 +346,20 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
             Color(appearance.accentColor)
         }
 
-    val baseScheme =
-        when {
-            appearance.theme == AppTheme.Amoled -> AmoledColorScheme
-            darkTheme -> DarkColorScheme
-            else -> LightColorScheme
-        }
+    val isAmoled = appearance.theme == AppTheme.Amoled
 
-    val isLightPrimary = seedColor.luminance() > 0.5f
-    val onPrimaryColor = if (isLightPrimary) Color.Black else Color.White
-
-    val primaryContainerColor = if (darkTheme) {
-        Color(
-            red = (seedColor.red * 0.25f + baseScheme.surfaceContainer.red * 0.75f).coerceIn(0f, 1f),
-            green = (seedColor.green * 0.25f + baseScheme.surfaceContainer.green * 0.75f).coerceIn(0f, 1f),
-            blue = (seedColor.blue * 0.25f + baseScheme.surfaceContainer.blue * 0.75f).coerceIn(0f, 1f)
-        )
+    val colorScheme = if (appearance.useAccentInTheme) {
+        ColorEngine.createExpressiveScheme(seedColor, isDark = darkTheme, isAmoled = isAmoled)
     } else {
-        Color(
-            red = (seedColor.red * 0.15f + 0.85f).coerceIn(0f, 1f),
-            green = (seedColor.green * 0.15f + 0.85f).coerceIn(0f, 1f),
-            blue = (seedColor.blue * 0.15f + 0.85f).coerceIn(0f, 1f)
-        )
+        ColorEngine.createStandardScheme(seedColor, isDark = darkTheme, isAmoled = isAmoled)
     }
-    val onPrimaryContainerColor = if (darkTheme) Color(0xFFEADDFF) else Color(0xFF21005D)
-
-    val colorScheme =
-        baseScheme.copy(
-            primary = seedColor,
-            onPrimary = onPrimaryColor,
-            primaryContainer = primaryContainerColor,
-            onPrimaryContainer = onPrimaryContainerColor
-        )
 
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
         LocalDimensions provides Dimensions(),
         LocalCustomColors provides CustomColors(
-            validated = seedColor,
-            onValidated = if (seedColor.luminance() > 0.5f) Color.Black else Color.White,
+            validated = colorScheme.primary,
+            onValidated = colorScheme.onPrimary,
             success = if (darkTheme) Color(0xFF81C784) else Color(0xFF2E7D32),
             onSuccess = if (darkTheme) Color(0xFF00390B) else Color.White,
             warning = if (darkTheme) Color(0xFFFFB74D) else Color(0xFFE65100),

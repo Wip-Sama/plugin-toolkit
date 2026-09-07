@@ -40,7 +40,7 @@ fun <T> ExpressiveMenu(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.clip(ToolkitTheme.shapes.large),
         shape = ToolkitTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = ToolkitTheme.dimensions.menuElevation,

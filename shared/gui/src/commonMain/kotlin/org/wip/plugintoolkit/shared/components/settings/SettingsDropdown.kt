@@ -89,59 +89,29 @@ fun <T> ExpressiveMenu(
         }
 
 
-        // Determine container shape
         val containerRadius = ToolkitTheme.spacing.medium
         val itemNormalRadius = ToolkitTheme.spacing.small
-        val itemInnerRadius = ToolkitTheme.spacing.small
-
-        val groups = mutableListOf<List<T>>()
-        var currentGroup = mutableListOf<T>()
-        options.forEach { option ->
-            currentGroup.add(option)
-            if (gapAfter(option)) {
-                groups.add(currentGroup)
-                currentGroup = mutableListOf<T>()
-            }
-        }
-        if (currentGroup.isNotEmpty()) {
-            groups.add(currentGroup)
-        }
 
         ExposedDropdownMenu(
             expanded = expanded,
-            modifier = Modifier,
+            modifier = Modifier.clip(RoundedCornerShape(containerRadius)),
             onDismissRequest = { expanded = false },
             shape = RoundedCornerShape(containerRadius),
-            shadowElevation = ToolkitTheme.spacing.none,
-            containerColor = ToolkitTheme.colors.transparent
+            tonalElevation = ToolkitTheme.spacing.none,
+            shadowElevation = ToolkitTheme.dimensions.menuElevation,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ) {
-            groups.forEachIndexed { groupIndex, group ->
-                val topRadius = if (groupIndex == 0) containerRadius else itemInnerRadius
-                val bottomRadius = if (groupIndex == groups.lastIndex) containerRadius else itemInnerRadius
-                val surfaceShape = RoundedCornerShape(
-                    topStart = topRadius,
-                    topEnd = topRadius,
-                    bottomStart = bottomRadius,
-                    bottomEnd = bottomRadius
-                )
+            Column(
+                modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
+            ) {
+                options.forEachIndexed { index, option ->
+                    val isDisabled = option in disabledOptions
+                    val isSelected = option == selectedOption
+                    val itemSettingKey = disabledOptionTargetKey(option)
 
-                Surface(
-                    shape = surfaceShape,
-                    color = MenuDefaults.containerColor,
-                    shadowElevation = ToolkitTheme.spacing.medium,
-                    modifier = Modifier.padding(bottom = if (groupIndex != groups.lastIndex) ToolkitTheme.spacing.extraSmall else ToolkitTheme.spacing.none)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.small),
-                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.badgeVertical)
-                    ) {
-                        group.forEachIndexed { index, option ->
-                            val isDisabled = option in disabledOptions
-                            val isSelected = option == selectedOption
-                            val itemSettingKey = disabledOptionTargetKey(option)
-
-                            val itemShape = RoundedCornerShape(itemNormalRadius)
-                            var isHovered by remember { mutableStateOf(false) }
+                    val itemShape = RoundedCornerShape(itemNormalRadius)
+                    var isHovered by remember { mutableStateOf(false) }
 
                             DropdownMenuItem(
                                 text = { Text(labelProvider(option)) },
@@ -194,8 +164,12 @@ fun <T> ExpressiveMenu(
                                 enabled = !isDisabled,
                                 contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.none)
                             )
-                        }
-                    }
+                            if (gapAfter(option) && index != options.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+                                )
+                            }
                 }
             }
         }

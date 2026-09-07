@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -101,7 +102,7 @@ fun <T> UnscaledExpressiveMenu(
                 Card(
                     elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.dimensions.cardElevation),
                     shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.width(menuWidthDp)
+                    modifier = Modifier.width(menuWidthDp).clip(MaterialTheme.shapes.medium)
                 ) {
                     Column(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.extraSmall)) {
                         options.forEach { option ->
