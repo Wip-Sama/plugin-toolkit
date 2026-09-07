@@ -35,8 +35,10 @@ import org.wip.plugintoolkit.features.plugin.logic.DefaultExecutionFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.core.utils.FormatUtils
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
 
@@ -618,8 +620,39 @@ class JobWorker(
             }
         })
 
-        val result = pluginManager.installRemote(plugin, targetFolderPath) { progress ->
-            manager.updateJobProgress(job.id, progress)
+        val downloadKey = "Downloading: ${plugin.fileName}"
+        var lastLogTimeMs = 0L
+
+        val result = try {
+            pluginManager.installRemote(
+                plugin = plugin,
+                targetFolderPath = targetFolderPath,
+                onProgress = { progress ->
+                    manager.updateJobProgress(job.id, progress)
+                },
+                onDownloadProgress = { bytesRead, totalBytes, fraction ->
+                    manager.updateCapabilityProgress(job.id, downloadKey, fraction)
+
+                    val now = Clock.System.now().toEpochMilliseconds()
+                    val isComplete = fraction >= 1.0f
+                    // Only update the main progress bar and log periodically (every 3 seconds or on completion)
+                    // since the secondary progress bar displays real-time download progress.
+                    if (now - lastLogTimeMs >= 3000L || isComplete) {
+                        lastLogTimeMs = now
+                        val mappedOverall = (0.05f + fraction * 0.85f).coerceIn(0.05f, 0.90f)
+                        manager.updateJobProgress(job.id, mappedOverall)
+
+                        val formattedCurrent = FormatUtils.formatFileSize(bytesRead)
+                        val formattedTotal = totalBytes?.takeIf { it > 0 }?.let { FormatUtils.formatFileSize(it) } ?: "unknown"
+                        val percentStr = "${(fraction * 100).toInt()}%"
+                        val logMsg = "Downloading ${plugin.fileName}: $formattedCurrent / $formattedTotal ($percentStr)"
+                        manager.addJobLog(job.id, logMsg, "INFO")
+                        Logger.i { "[${job.id}] $logMsg" }
+                    }
+                }
+            )
+        } finally {
+            manager.removeCapabilityProgress(job.id, downloadKey)
         }
 
         if (result.isSuccess) {

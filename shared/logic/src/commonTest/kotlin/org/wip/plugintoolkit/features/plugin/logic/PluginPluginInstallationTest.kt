@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.core.utils.FileSystem
+import org.wip.plugintoolkit.core.utils.FormatUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
@@ -353,6 +354,46 @@ class PluginPluginInstallationTest {
         // Second enqueue should be ignored
         installer.enqueueRemoteInstall(plugin, "target")
         assertEquals(1, jobManager.jobs.value.size, "Duplicate enqueue should be ignored when job is already queued")
+    }
+
+    @Test
+    fun testRemoteInstallationCallsDownloadProgress() = runTest {
+        mockkObject(PluginSecurity)
+        every { PluginSecurity.verify(any(), any()) } returns true
+
+        val (installer, repoManager, _, fileSystem) = createTestInstaller()
+        val repoUrl = "https://example.com/repo/index.json"
+        repoManager.addRepository(repoUrl)
+        val plugin = repoManager.plugins.value[repoUrl]!![0]
+
+        fileSystem.zips["target/org.test/test.jar"] = mapOf(
+            "manifest.json" to """{ "manifestVersion": "1.0", "plugin": { "id": "org.test", "name": "Test", "version": "1.0", "description": "" }, "requirements": { "minMemoryMb": 0, "minExecutionTimeMs": 0 } }"""
+        )
+
+        val downloadUpdates = mutableListOf<Triple<Long, Long?, Float>>()
+        val result = installer.installRemote(
+            plugin = plugin,
+            targetFolderPath = "target",
+            onDownloadProgress = { bytesRead, totalBytes, fraction ->
+                downloadUpdates.add(Triple(bytesRead, totalBytes, fraction))
+            }
+        )
+
+        assertTrue(result.isSuccess)
+        assertTrue(downloadUpdates.isNotEmpty(), "Download progress updates should have been received")
+        assertEquals(1.0f, downloadUpdates.last().third, "Final download progress fraction should be 1.0f")
+        unmockkObject(PluginSecurity)
+    }
+
+    @Test
+    fun testFormatFileSize() {
+        assertEquals("0 B", FormatUtils.formatFileSize(0))
+        assertEquals("500 B", FormatUtils.formatFileSize(500))
+        assertEquals("1.0 KB", FormatUtils.formatFileSize(1024))
+        assertEquals("1.5 KB", FormatUtils.formatFileSize(1536))
+        assertEquals("1.0 MB", FormatUtils.formatFileSize(1024 * 1024))
+        assertEquals("14.2 MB", FormatUtils.formatFileSize((14.2 * 1024 * 1024).toLong()))
+        assertEquals("2.5 GB", FormatUtils.formatFileSize((2.5 * 1024 * 1024 * 1024).toLong()))
     }
 
     private data class TestInstallerComponents(

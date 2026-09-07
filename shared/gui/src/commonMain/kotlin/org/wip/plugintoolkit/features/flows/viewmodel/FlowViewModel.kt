@@ -123,6 +123,7 @@ sealed interface FlowEvent {
 
     data object Save : FlowEvent
     data class SaveAs(val name: String) : FlowEvent
+    data object DiscardChanges : FlowEvent
     data class UpdateInputPortValue(val nodeId: Long, val portId: String, val value: Any?) : FlowEvent
     data class UpdateInputPortDefault(val nodeId: Long, val portId: String, val defaultValue: Any?) : FlowEvent
     data class UpdateBoundaryNode(

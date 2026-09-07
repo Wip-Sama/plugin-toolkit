@@ -46,6 +46,7 @@ class FlowCommandHistoryTest {
         stopKoin()
         every { mockJobManager.jobs } returns MutableStateFlow(emptyList<BackgroundJob>())
         every { mockSettingsRepo.settings } returns MutableStateFlow(AppSettings(flows = FlowSettings(autosave = false)))
+        every { mockSettingsRepo.isLoaded } returns MutableStateFlow(true)
         every { mockFlowRepo.flows } returns MutableStateFlow(emptyList())
 
         startKoin {

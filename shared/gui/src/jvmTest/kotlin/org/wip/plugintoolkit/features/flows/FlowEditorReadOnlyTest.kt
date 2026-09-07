@@ -44,6 +44,7 @@ class FlowEditorReadOnlyTest {
         stopKoin()
         every { mockJobManager.jobs } returns jobsFlow
         every { mockSettingsRepo.settings } returns settingsFlow
+        every { mockSettingsRepo.isLoaded } returns MutableStateFlow(true)
         every { mockFlowRepo.flows } returns MutableStateFlow(emptyList())
 
         startKoin {

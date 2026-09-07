@@ -49,8 +49,9 @@ class PluginManager(
     suspend fun installRemote(
         plugin: ExtensionPlugin,
         targetFolderPath: String,
+        onDownloadProgress: ((bytesRead: Long, totalBytes: Long?, fraction: Float) -> Unit)? = null,
         onProgress: ((Float) -> Unit)? = null
-    ) = installer.installRemote(plugin, targetFolderPath, onProgress).onSuccess { manifest ->
+    ) = installer.installRemote(plugin, targetFolderPath, onDownloadProgress, onProgress).onSuccess { manifest ->
         if (manifest != null) {
             coordinator.handlePostInstall(plugin.pkg, manifest)
         }

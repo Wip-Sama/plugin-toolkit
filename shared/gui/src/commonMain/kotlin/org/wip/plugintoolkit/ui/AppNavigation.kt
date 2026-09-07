@@ -71,7 +71,7 @@ fun AppNavigation(
                         title = dialogUnsavedChangesTitle,
                         message = "All the unsaved data will be lost. Are you sure you want to exit?",
                         onConfirm = {
-                            activeFlowEditorTracker.setHasUnsavedChanges(false)
+                            activeFlowEditorTracker.discardChanges()
                             backStack.add(screen)
                         }
                     )
@@ -86,7 +86,7 @@ fun AppNavigation(
                         title = dialogUnsavedChangesTitle,
                         message = "All the unsaved data will be lost. Are you sure you want to exit?",
                         onConfirm = {
-                            activeFlowEditorTracker.setHasUnsavedChanges(false)
+                            activeFlowEditorTracker.discardChanges()
                             if (backStack.size > 1) {
                                 backStack.removeLast()
                             } else {
@@ -111,7 +111,7 @@ fun AppNavigation(
                         title = dialogUnsavedChangesTitle,
                         message = "All the unsaved data will be lost. Are you sure you want to exit?",
                         onConfirm = {
-                            activeFlowEditorTracker.setHasUnsavedChanges(false)
+                            activeFlowEditorTracker.discardChanges()
                             backStack.clear()
                             backStack.add(screen)
                         }

@@ -20,6 +20,7 @@ import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
@@ -250,7 +251,9 @@ class PluginLifecycleManager(
      * Blocks or cancels jobs based on user settings.
      */
     suspend fun ensureSafeToUnload(pkgs: List<String>): Result<Unit> {
-        val runningJobs = jobManager.jobs.value.filter { it.pluginId in pkgs && it.status == JobStatus.Running }
+        val runningJobs = jobManager.jobs.value.filter {
+            it.pluginId in pkgs && it.status == JobStatus.Running && it.type != JobType.PluginInstallation
+        }
         if (runningJobs.isNotEmpty()) {
             val settings = settingsRepository.loadSettings()
             if (settings.extensions.pluginUnplugBehavior == PluginUnplugBehavior.Block) {

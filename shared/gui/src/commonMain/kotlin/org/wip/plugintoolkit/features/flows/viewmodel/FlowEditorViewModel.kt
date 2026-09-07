@@ -80,7 +80,9 @@ class FlowEditorViewModel(
     }
 
     val isAutoSaveEnabled: Boolean
-        get() = resolvedSettingsRepository?.settings?.value?.flows?.autosave == true
+        get() = resolvedSettingsRepository?.let { repo ->
+            (repo.isLoaded.value as? Boolean ?: false) && repo.settings.value.flows.autosave
+        } == true
 
     private val resolvedActiveFlowEditorTracker: ActiveFlowEditorTracker by lazy {
         activeFlowEditorTracker ?: try {
@@ -142,8 +144,7 @@ class FlowEditorViewModel(
     private val nodeManager = FlowNodeManager()
     private val connectionManager = FlowConnectionManager(
         notificationService = resolvedNotificationService,
-        viewModelScope = viewModelScope,
-        onEvent = ::onEvent
+        viewModelScope = viewModelScope
     )
 
     val historyManager = FlowHistoryManager(maxStackSize = 100)
@@ -169,6 +170,9 @@ class FlowEditorViewModel(
     }
 
     init {
+        resolvedActiveFlowEditorTracker.registerDiscardHandler {
+            discardUnsavedChanges()
+        }
         viewModelScope.launch {
             _state.collect { currentState ->
                 resolvedActiveFlowEditorTracker.setHasUnsavedChanges(currentState.hasUnsavedChanges)
@@ -514,6 +518,7 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.TryConnectPorts -> {
+                val stateBefore = currentState
                 newState = connectionManager.handleTryConnectPorts(
                     currentState,
                     event.sourceNodeId,
@@ -522,6 +527,23 @@ class FlowEditorViewModel(
                     event.targetPortId,
                     event.isShiftPressed
                 )
+                if (newState !== stateBefore && newState.flow.connections != stateBefore.flow.connections) {
+                    shouldRunTypeInference = true
+                    val addedNode = newState.flow.nodes.firstOrNull { it !in stateBefore.flow.nodes }
+                    val addedConns = newState.flow.connections.filter { it !in stateBefore.flow.connections }
+                    val removedConns = stateBefore.flow.connections.filter { it !in newState.flow.connections }
+
+                    if (addedNode != null) {
+                        val commands = mutableListOf<FlowCommand>()
+                        commands.add(AddNodeCommand(addedNode))
+                        addedConns.forEach { conn ->
+                            commands.add(ConnectPortsCommand(conn, if (conn == addedConns.last()) removedConns else emptyList()))
+                        }
+                        pendingCommand = CompositeCommand("Auto convert and connect", commands)
+                    } else if (addedConns.isNotEmpty()) {
+                        pendingCommand = ConnectPortsCommand(addedConns.first(), removedConns)
+                    }
+                }
             }
 
             is FlowEvent.CancelPendingConnection -> {
@@ -706,6 +728,7 @@ class FlowEditorViewModel(
                 }
             }
 
+            is FlowEvent.DiscardChanges -> discardUnsavedChanges()
             else -> {}
         }
 
@@ -722,7 +745,7 @@ class FlowEditorViewModel(
         }
 
         if (_state.value.hasUnsavedChanges && (!_state.value.isReadOnly || bypassReadOnlyForTesting) && event !is FlowEvent.Save && event !is FlowEvent.SaveAs) {
-            if (resolvedSettingsRepository?.settings?.value?.flows?.autosave == true) {
+            if (isAutoSaveEnabled) {
                 handleSave()
             }
         }
@@ -935,4 +958,35 @@ class FlowEditorViewModel(
         return flow.copy(nodes = updatedNodes)
     }
 
+    fun discardUnsavedChanges() {
+        val allFlows = flowRepository.flows.value
+        val activeFlowName = initialFlowName
+        val originalFlow = if (activeFlowName.isBlank()) {
+            Flow("")
+        } else {
+            allFlows.find { it.name == activeFlowName } ?: Flow(activeFlowName)
+        }
+        val syncedFlow = syncSubflowNodes(originalFlow, allFlows)
+        val maxNodeId = syncedFlow.nodes.maxOfOrNull { it.id } ?: -1L
+
+        _state.update { currentState ->
+            currentState.copy(
+                flow = syncedFlow,
+                nextId = maxNodeId + 1,
+                flows = allFlows,
+                pendingConnection = null,
+                selectedNodeIds = emptySet(),
+                hasUnsavedChanges = false
+            )
+        }
+        historyManager.clear()
+        resolvedActiveFlowEditorTracker.setHasUnsavedChanges(false)
+        updateReadOnlyState()
+        runTypeInference()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        resolvedActiveFlowEditorTracker.registerDiscardHandler(null)
+    }
 }

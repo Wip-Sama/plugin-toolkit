@@ -2,11 +2,13 @@ package org.wip.plugintoolkit.features.plugin.logic
 
 import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.timeout
+import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
-import io.ktor.client.statement.readBytes
-import io.ktor.utils.io.readAvailable
+import io.ktor.http.HttpHeaders
 import io.ktor.http.encodeURLPathPart
+import io.ktor.utils.io.readAvailable
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import org.wip.plugintoolkit.api.PluginManifest
@@ -124,6 +126,7 @@ class PluginInstaller(
     suspend fun installRemote(
         plugin: ExtensionPlugin,
         targetFolderPath: String,
+        onDownloadProgress: ((bytesRead: Long, totalBytes: Long?, fraction: Float) -> Unit)? = null,
         onProgress: ((Float) -> Unit)? = null
     ): Result<PluginManifest?> {
         Logger.i { "Installing remote plugin: ${plugin.pkg} from ${plugin.repoUrl}" }
@@ -178,7 +181,7 @@ class PluginInstaller(
                 }
             } else {
                 val pluginFileUrl = "$baseUrl/${plugin.fileName.encodeURLPathPart()}"
-                downloadFile(pluginFileUrl, destFile, onProgress).onFailure { return Result.failure(it) }
+                downloadFile(pluginFileUrl, destFile, onProgress, onDownloadProgress).onFailure { return Result.failure(it) }
 
                 // Download optional assets
                 listOf("icon.png", "icon.webp", "icon.svg", "icon.jpg").forEach {
@@ -186,6 +189,8 @@ class PluginInstaller(
                 }
                 downloadFile("$baseUrl/changelog.md", "$pluginDir/changelog.md")
             }
+
+            onProgress?.invoke(0.90f)
 
             // Signature verification
             val publicKey = repo?.signPublicKey
@@ -205,6 +210,8 @@ class PluginInstaller(
                     return Result.failure(Exception("Plugin signature verification failed (strict checking enabled)"))
                 }
             }
+
+            onProgress?.invoke(0.95f)
 
             val manifest = getManifestFromJar(destFile)
             val (isCompatible, compError) = manifest?.let { checkCompatibility(it) } ?: (true to null as String?)
@@ -228,6 +235,7 @@ class PluginInstaller(
             )
             registry.addOrUpdatePlugin(newPlugin)
             Logger.i { "Successfully installed remote plugin: ${plugin.pkg}" }
+            onProgress?.invoke(1.0f)
             Result.success(getManifestFromJar(destFile))
         } catch (t: Throwable) {
             Logger.e(t) { "Failed remote installation: ${plugin.pkg}" }
@@ -365,36 +373,62 @@ class PluginInstaller(
         return org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils.checkCompatibility(manifest)
     }
 
-    private suspend fun downloadFile(url: String, dest: String, onProgress: ((Float) -> Unit)? = null): Result<Unit> {
+    private suspend fun downloadFile(
+        url: String,
+        dest: String,
+        onProgress: ((Float) -> Unit)? = null,
+        onDownloadProgress: ((bytesRead: Long, totalBytes: Long?, fraction: Float) -> Unit)? = null
+    ): Result<Unit> {
         return try {
-            val response = client.get(url)
-            if (response.status.value !in 200..299) {
-                return Result.failure(Exception("Failed to download: ${response.status}"))
-            }
+            client.prepareGet(url) {
+                timeout {
+                    requestTimeoutMillis = 60 * 60 * 1000L // 1 hour maximum download duration
+                    socketTimeoutMillis = 30000L // 30 seconds inactivity timeout
+                    connectTimeoutMillis = 15000L
+                }
+            }.execute { response ->
+                if (response.status.value !in 200..299) {
+                    return@execute Result.failure(Exception("Failed to download: ${response.status}"))
+                }
 
-            val contentLength = response.headers[io.ktor.http.HttpHeaders.ContentLength]?.toLong()
-            val bytes = if (contentLength != null && contentLength > 0L && onProgress != null) {
+                val contentLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
                 val channel = response.bodyAsChannel()
-                val tempBuffer = ByteArray(8192)
+                val tempBuffer = ByteArray(16384)
                 var totalRead = 0L
-                val packet = kotlinx.io.Buffer()
+                var lastReportedFraction = -1f
+                val packet = Buffer()
+
                 while (!channel.isClosedForRead) {
                     val read = channel.readAvailable(tempBuffer)
                     if (read == -1) break
                     if (read > 0) {
                         totalRead += read
                         packet.write(tempBuffer, 0, read)
-                        onProgress((totalRead.toFloat() / contentLength).coerceIn(0f, 1f))
+                        val fraction = if (contentLength != null && contentLength > 0L) {
+                            (totalRead.toFloat() / contentLength).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+                        if (fraction - lastReportedFraction >= 0.01f || fraction >= 1.0f || contentLength == null) {
+                            lastReportedFraction = fraction
+                            if (onDownloadProgress != null) {
+                                onDownloadProgress(totalRead, contentLength, fraction)
+                            } else {
+                                onProgress?.invoke(fraction)
+                            }
+                        }
                     }
                 }
-                packet.readByteArray()
-            } else {
-                response.readBytes()
-            }
 
-            fileSystem.saveFile(dest, bytes)
-            onProgress?.invoke(1.0f)
-            Result.success(Unit)
+                val bytes = packet.readByteArray()
+                fileSystem.saveFile(dest, bytes)
+                if (onDownloadProgress != null) {
+                    onDownloadProgress(totalRead, contentLength, 1.0f)
+                } else {
+                    onProgress?.invoke(1.0f)
+                }
+                Result.success(Unit)
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

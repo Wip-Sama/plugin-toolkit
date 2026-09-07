@@ -21,8 +21,7 @@ import plugintoolkit.composeapp.generated.resources.flow_editor_same_node_warnin
 
 class FlowConnectionManager(
     private val notificationService: NotificationService?,
-    private val viewModelScope: CoroutineScope,
-    private val onEvent: (FlowEvent) -> Unit
+    private val viewModelScope: CoroutineScope
 ) {
 
     fun handleConnectPorts(
@@ -90,6 +89,7 @@ class FlowConnectionManager(
         val newFlow = currentState.flow.copy(connections = filteredConnections + newConnection)
         return currentState.copy(
             flow = newFlow,
+            pendingConnection = null,
             hasUnsavedChanges = true
         )
     }
@@ -133,12 +133,10 @@ class FlowConnectionManager(
         val semanticsCompatible = semanticCheck !is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible
 
         if (typesCompatible && semanticsCompatible) {
-            onEvent(FlowEvent.ConnectPorts(sourceNodeId, sourcePortId, targetNodeId, targetPortId))
-            return currentState
+            return handleConnectPorts(currentState, sourceNodeId, sourcePortId, targetNodeId, targetPortId)
         } else if (semanticsCompatible && sourceInferredType.canConvert(targetInferredType)) {
             if (isShiftPressed) {
-                onEvent(FlowEvent.AutoConvertAndConnect(sourceNodeId, sourcePortId, targetNodeId, targetPortId))
-                return currentState
+                return handleAutoConvertAndConnect(currentState, sourceNodeId, sourcePortId, targetNodeId, targetPortId)
             } else {
                 return currentState.copy(
                     pendingConnection = PendingConnection(
@@ -223,6 +221,7 @@ class FlowConnectionManager(
         return currentState.copy(
             flow = newFlow,
             nextId = currentState.nextId + 1,
+            pendingConnection = null,
             hasUnsavedChanges = true
         )
     }

@@ -10,9 +10,13 @@ import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
@@ -260,5 +264,57 @@ class PluginLifecycleManagerTest {
         } finally {
             io.mockk.unmockkAll()
         }
+    }
+
+    @Test
+    fun testEnsureSafeToUnloadIgnoresPluginInstallationJobs() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { it.copy(extensions = it.extensions.copy(pluginUnplugBehavior = PluginUnplugBehavior.Block)) }
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+
+        val pkg = "test.installing.plugin"
+        val installJob = BackgroundJob(
+            id = "install_job_1",
+            name = "Installing Test",
+            type = JobType.PluginInstallation,
+            pluginId = pkg,
+            capabilityName = "install"
+        )
+        jobManager.enqueueJob(installJob)
+        jobManager.waitForNextJob()
+
+        val result = lifecycleManager.ensureSafeToUnload(listOf(pkg))
+        kotlin.test.assertTrue(result.isSuccess, "PluginInstallation job must not block unloading")
+    }
+
+    @Test
+    fun testEnsureSafeToUnloadBlocksWhenCapabilityJobRunning() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { it.copy(extensions = it.extensions.copy(pluginUnplugBehavior = PluginUnplugBehavior.Block)) }
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+
+        val pkg = "test.busy.plugin"
+        val capabilityJob = BackgroundJob(
+            id = "cap_job_1",
+            name = "Running Capability",
+            type = JobType.Capability,
+            pluginId = pkg,
+            capabilityName = "process"
+        )
+        jobManager.enqueueJob(capabilityJob)
+        jobManager.waitForNextJob()
+
+        val result = lifecycleManager.ensureSafeToUnload(listOf(pkg))
+        kotlin.test.assertTrue(result.isFailure, "Capability job should block unloading when behavior is Block")
     }
 }

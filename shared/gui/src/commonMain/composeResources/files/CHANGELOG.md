@@ -17,6 +17,7 @@ Fixed:
 	- Fixed plugin repository install/update/downgrade/reinstall actions allowing multiple clicks and enqueuing duplicate installations
 	- Repository items now immediately show queued state upon click and display progress bar once installation starts
 	- Fixed element clipping and overflow in rounded corners for ToolkitCard and custom dropdown menus
+	- Plugin download would expire due to timeout
 ----------------------------------------------------------------------------------------------------
 Version: 2.0.2
 Date: 05-09-2026
