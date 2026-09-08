@@ -5,6 +5,7 @@ Added:
 	- Flow system nodes can now have default values for their parameters
 	- Flow/capability runner now shows a "set as default" button for the parameters
 	- Setting to generate theme variants from accent color according to Material 3 Expressive guidelines
+	- New interface to monitor the memory usage of scripts while they run
 Changes:
 	- Refactored the update available menu
 	- Improved plugin binary backwards compatibility with @JvmOverloads across API data classes
@@ -18,6 +19,9 @@ Fixed:
 	- Repository items now immediately show queued state upon click and display progress bar once installation starts
 	- Fixed element clipping and overflow in rounded corners for ToolkitCard and custom dropdown menus
 	- Plugin download would expire due to timeout
+	- Fixes some strings formatting around the application
+Planned:
+	- Opt-In metricts share to populate some features automatically like estimated resource usages
 ----------------------------------------------------------------------------------------------------
 Version: 2.0.2
 Date: 05-09-2026
@@ -85,7 +89,7 @@ Fixed:
   - Locks are now safely evicted from jarLocks when no active operations remain
   - Fixed an issue where switches required a manual toggle to activate from their default state
 Planned:
-  - A button to clear the sandbox folder
+  - ~~A button to clear the sandbox folder~~ (2.1.0)
   - CLI version of the application, right now only an experimental cli
 Note:
   - Since PluginLoader operates synchronously on URLClassLoader and Java reflection (which are JVM-specific), standard JVM synchronization works. Replacing synchronized with Kotlin's @Synchronized or kotlinx.coroutines.sync.Mutex is cleaner for KMP but it's not a priority.
@@ -170,7 +174,7 @@ Fixed:
   - Parsing of null / empty values in flows
   - Create folder system node not accepting connection in the path port
 Planned:
-  - Create folder would return an error if the folder already existed
+  - ~~Create folder would return an error if the folder already existed~~ (fixed)
 ----------------------------------------------------------------------------------------------------
 Version: 1.6.0
 Date: 12-06-2026

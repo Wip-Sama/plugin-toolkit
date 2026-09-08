@@ -546,7 +546,8 @@ fun JobResultCard(
                         val startedAtLabel = stringResource(Res.string.job_started_at_label)
                         val completedAtLabel = stringResource(Res.string.job_completed_at_label)
                         val durationLabel = stringResource(Res.string.job_duration_label)
-                        val memoryLabel = stringResource(Res.string.job_memory_label)
+                        val memoryLabel = stringResource(Res.string.job_peak_memory_label)
+                        val totalMemoryLabel = stringResource(Res.string.job_total_memory_label)
                         val capBreakdownLabel = stringResource(Res.string.job_capability_breakdown_title)
 
                         TextButton(
@@ -561,7 +562,8 @@ fun JobResultCard(
                                         completedAtLabel = completedAtLabel,
                                         durationLabel = durationLabel,
                                         memoryLabel = memoryLabel,
-                                        capabilityBreakdownLabel = capBreakdownLabel
+                                        capabilityBreakdownLabel = capBreakdownLabel,
+                                        totalMemoryLabel = totalMemoryLabel
                                     )
                                     val savedPath = PlatformUtils.saveFile(baseName, "txt", reportContent.encodeToByteArray())
                                     if (savedPath != null) {

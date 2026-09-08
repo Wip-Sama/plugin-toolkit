@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -48,7 +49,9 @@ import plugintoolkit.composeapp.generated.resources.job_duration_label
 import plugintoolkit.composeapp.generated.resources.job_execution_count_format
 import plugintoolkit.composeapp.generated.resources.job_execution_info_title
 import plugintoolkit.composeapp.generated.resources.job_memory_label
+import plugintoolkit.composeapp.generated.resources.job_peak_memory_label
 import plugintoolkit.composeapp.generated.resources.job_started_at_label
+import plugintoolkit.composeapp.generated.resources.job_total_memory_label
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 
@@ -86,10 +89,30 @@ internal fun ExecutionInfoSection(
         }
     }
 
-    val memoryUsage = if (isRunning) {
-        if (ticker >= 0) MemoryUtils.getCurrentMemoryUsageBytes() else null
+    var runningPeakMemory by remember(job.id) { mutableStateOf<Long?>(null) }
+    val currentMem = if (isRunning && ticker >= 0) {
+        val mem = MemoryUtils.getCurrentMemoryUsageBytes()
+        if (runningPeakMemory == null || mem > (runningPeakMemory ?: 0L)) {
+            runningPeakMemory = mem
+        }
+        mem
+    } else null
+
+    val peakMemoryUsage = if (isRunning) {
+        runningPeakMemory ?: currentMem
     } else {
         metrics?.memoryUsageBytes
+    }
+
+    val totalMemoryUsage = if (isRunning) {
+        val completedCapMem = metrics?.capabilityMetrics?.mapNotNull { it.memoryUsageBytes }?.sum() ?: 0L
+        if (completedCapMem > 0L) {
+            completedCapMem + (currentMem ?: 0L)
+        } else {
+            currentMem
+        }
+    } else {
+        metrics?.effectiveTotalMemoryUsageBytes ?: metrics?.totalMemoryUsageBytes ?: metrics?.memoryUsageBytes
     }
 
     Column(
@@ -137,8 +160,13 @@ internal fun ExecutionInfoSection(
             )
             MetricTile(
                 icon = Icons.Default.Memory,
-                label = stringResource(Res.string.job_memory_label),
-                value = if (memoryUsage != null) MemoryUtils.formatMemoryBytes(memoryUsage) else "—"
+                label = stringResource(Res.string.job_peak_memory_label),
+                value = if (peakMemoryUsage != null) MemoryUtils.formatMemoryBytes(peakMemoryUsage) else "—"
+            )
+            MetricTile(
+                icon = Icons.Default.Storage,
+                label = stringResource(Res.string.job_total_memory_label),
+                value = if (totalMemoryUsage != null) MemoryUtils.formatMemoryBytes(totalMemoryUsage) else "—"
             )
         }
 

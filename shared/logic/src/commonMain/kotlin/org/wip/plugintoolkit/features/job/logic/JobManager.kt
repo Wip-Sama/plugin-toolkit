@@ -202,6 +202,8 @@ class JobManager(
                 val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
                 val peakMem = kotlin.math.max(recordedPeak, currentMem)
                 val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
+                val totalCapMem = capMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
+                val totalMem = totalCapMem ?: if (peakMem > 0L) peakMem else null
                 lastLoggedProgress.remove(jobId)
 
                 val metrics = JobExecutionMetrics(
@@ -209,6 +211,7 @@ class JobManager(
                     completedAt = completedAt,
                     totalDurationMs = totalDuration,
                     memoryUsageBytes = if (peakMem > 0L) peakMem else null,
+                    totalMemoryUsageBytes = totalMem,
                     capabilityMetrics = capMetrics
                 )
 
@@ -435,6 +438,8 @@ class JobManager(
                 val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
                 val peakMem = kotlin.math.max(recordedPeak, currentMem)
                 val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
+                val totalCapMem = capMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
+                val totalMem = totalCapMem ?: if (peakMem > 0L) peakMem else null
                 lastLoggedProgress.remove(jobId)
 
                 val metrics = JobExecutionMetrics(
@@ -442,6 +447,7 @@ class JobManager(
                     completedAt = completedAt,
                     totalDurationMs = totalDuration,
                     memoryUsageBytes = if (peakMem > 0L) peakMem else null,
+                    totalMemoryUsageBytes = totalMem,
                     capabilityMetrics = capMetrics
                 )
 
@@ -488,6 +494,8 @@ class JobManager(
                 val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
                 val peakMem = kotlin.math.max(recordedPeak, currentMem)
                 val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
+                val totalCapMem = capMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
+                val totalMem = totalCapMem ?: if (peakMem > 0L) peakMem else null
                 lastLoggedProgress.remove(jobId)
 
                 val metrics = JobExecutionMetrics(
@@ -495,6 +503,7 @@ class JobManager(
                     completedAt = completedAt,
                     totalDurationMs = totalDuration,
                     memoryUsageBytes = if (peakMem > 0L) peakMem else null,
+                    totalMemoryUsageBytes = totalMem,
                     capabilityMetrics = capMetrics
                 )
 

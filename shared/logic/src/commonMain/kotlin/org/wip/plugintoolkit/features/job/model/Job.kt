@@ -63,6 +63,7 @@ data class JobExecutionMetrics(
     val completedAt: Instant? = null,
     val totalDurationMs: Long = 0L,
     val memoryUsageBytes: Long? = null,
+    val totalMemoryUsageBytes: Long? = null,
     val capabilityMetrics: List<CapabilityExecutionMetric> = emptyList()
 ) {
     val totalDurationPerCapability: Map<String, Long>
@@ -74,6 +75,11 @@ data class JobExecutionMetrics(
         get() = capabilityMetrics
             .groupBy { it.capabilityName }
             .mapValues { (_, metrics) -> metrics.size }
+
+    val effectiveTotalMemoryUsageBytes: Long?
+        get() = totalMemoryUsageBytes
+            ?: capabilityMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
+            ?: memoryUsageBytes
 }
 
 

@@ -332,6 +332,8 @@ class JobManagerTest {
         assertEquals(3, metrics.capabilityMetrics.size)
         assertTrue(metrics.totalDurationMs >= 0L)
         assertTrue(metrics.memoryUsageBytes != null && metrics.memoryUsageBytes >= 4096L)
+        assertEquals(7168L, metrics.totalMemoryUsageBytes)
+        assertEquals(7168L, metrics.effectiveTotalMemoryUsageBytes)
         assertEquals(350L, metrics.totalDurationPerCapability["capabilityA"])
         assertEquals(2, metrics.executionCountPerCapability["capabilityA"])
         assertEquals(300L, metrics.totalDurationPerCapability["capabilityB"])
@@ -365,6 +367,38 @@ class JobManagerTest {
         assertEquals(1, metrics.capabilityMetrics.size)
         assertEquals(500L, metrics.totalDurationPerCapability["test-cap"])
         assertTrue(metrics.memoryUsageBytes != null && metrics.memoryUsageBytes >= 8192L)
+        assertEquals(8192L, metrics.totalMemoryUsageBytes)
+        assertEquals(8192L, metrics.effectiveTotalMemoryUsageBytes)
+    }
+
+    @Test
+    fun testExecutionMetricsPopulatedOnJobFail() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job = BackgroundJob(
+            id = "fail-metrics-job",
+            name = "Fail Metrics Job",
+            type = JobType.Capability,
+            pluginId = "test-plugin",
+            capabilityName = "test-cap"
+        )
+        jobManager.enqueueJob(job)
+        val claimed = jobManager.waitForNextJob()
+
+        jobManager.recordCapabilityMetric(claimed.id, "test-cap", 250L, 5000L)
+        jobManager.tryFailJob(claimed.id, "Error")
+
+        val endedJobs = jobManager.endedJobs.value
+        assertEquals(1, endedJobs.size)
+        val endedJob = endedJobs.first()
+        val metrics = endedJob.executionMetrics
+        assertNotNull(metrics)
+        assertEquals(1, metrics.capabilityMetrics.size)
+        assertTrue(metrics.memoryUsageBytes != null && metrics.memoryUsageBytes >= 5000L)
+        assertEquals(5000L, metrics.totalMemoryUsageBytes)
+        assertEquals(5000L, metrics.effectiveTotalMemoryUsageBytes)
     }
 
     @Test

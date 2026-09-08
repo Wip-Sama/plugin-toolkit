@@ -32,7 +32,8 @@ internal fun buildJobExportReport(
     completedAtLabel: String,
     durationLabel: String,
     memoryLabel: String,
-    capabilityBreakdownLabel: String
+    capabilityBreakdownLabel: String,
+    totalMemoryLabel: String? = null
 ): String {
     val sb = StringBuilder()
     sb.appendLine("================================================================================")
@@ -66,6 +67,10 @@ internal fun buildJobExportReport(
     val memoryUsage = metrics?.memoryUsageBytes
     if (memoryUsage != null) {
         sb.appendLine("$memoryLabel:   ${MemoryUtils.formatMemoryBytes(memoryUsage)}")
+    }
+    val totalMemoryUsage = metrics?.effectiveTotalMemoryUsageBytes
+    if (totalMemoryUsage != null && totalMemoryLabel != null) {
+        sb.appendLine("$totalMemoryLabel: ${MemoryUtils.formatMemoryBytes(totalMemoryUsage)}")
     }
 
     if (metrics != null && metrics.capabilityMetrics.isNotEmpty()) {
