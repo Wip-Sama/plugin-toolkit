@@ -78,6 +78,9 @@ import javax.swing.JOptionPane.showMessageDialog
 import javax.swing.JWindow
 import kotlin.system.exitProcess
 
+private const val WINDOW_MIN_WIDTH = 680
+private const val WINDOW_MIN_HEIGHT = 480
+
 fun detectSystemConfig(): SystemConfig {
     val userDir = File(System.getProperty("user.dir"))
     if (File(userDir, ".portable").exists()) {
@@ -394,7 +397,7 @@ fun runMain(
                 icon = painterResource(Res.drawable.app_logo),
                 state = windowState
             ) {
-                window.minimumSize = Dimension(1000, 600)
+                window.minimumSize = Dimension(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
                 val notificationService = getKoin().get<NotificationService>()
 
                 LaunchedEffect(Unit) {

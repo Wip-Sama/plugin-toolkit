@@ -2,8 +2,13 @@ package org.wip.plugintoolkit.shared.components.sidebar
 
 import org.wip.plugintoolkit.core.model.resolve
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.shared.components.tooltip
 
 @Composable
 fun <T> SidebarItem(
@@ -81,9 +87,10 @@ fun <T> SidebarItem(
             .clip(animatedShape)
             .background(backgroundColor)
             .clickable { onClick() }
-            .padding(if (isExpanded) ToolkitTheme.spacing.mediumSmall else ToolkitTheme.spacing.small),
+            .then(if (!isExpanded) Modifier.tooltip(element.title.resolve()) else Modifier)
+            .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.small),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (isExpanded) Arrangement.Start else Arrangement.Center
+        horizontalArrangement = Arrangement.Start
     ) {
         Box(
             modifier = Modifier
@@ -100,21 +107,33 @@ fun <T> SidebarItem(
             )
         }
 
-        if (isExpanded) {
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
-            Text(
-                text = element.title.resolve(),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = contentColor,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            element.trailingContent(true)
-        } else {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn(tween(150)) + expandHorizontally(tween(200)),
+            exit = fadeOut(tween(100)) + shrinkHorizontally(tween(200)),
+            modifier = Modifier.weight(1f)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+                Text(
+                    text = element.title.resolve(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                element.trailingContent(true)
+            }
+        }
+        if (!isExpanded) {
+            Box(contentAlignment = Alignment.TopEnd) {
                 element.trailingContent(false)
             }
         }

@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -382,7 +383,10 @@ fun PluginCard(
                             ) {
                                 Text(
                                     if (reqAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name
-                                        ?: "Fix Issue")
+                                        ?: "Fix Issue"),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -397,7 +401,12 @@ fun PluginCard(
                                 modifier = modifierSpec,
                                 enabled = readyStatus
                             ) {
-                                Text(stringResource(Res.string.plugin_update))
+                                Text(
+                                    stringResource(Res.string.plugin_update),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         } else if (hasAltUpdate) {
                             Button(
@@ -407,7 +416,12 @@ fun PluginCard(
                                 modifier = modifierSpec,
                                 enabled = readyStatus
                             ) {
-                                Text(stringResource(Res.string.plugin_switch_repo_action))
+                                Text(
+                                    stringResource(Res.string.plugin_switch_repo_action),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         } else {
                             FilledTonalButton(
@@ -416,7 +430,12 @@ fun PluginCard(
                                 modifier = modifierSpec,
                                 enabled = readyStatus
                             ) {
-                                Text(stringResource(Res.string.plugin_update_local))
+                                Text(
+                                    stringResource(Res.string.plugin_update_local),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                     }
@@ -481,7 +500,12 @@ fun PluginCard(
                                 )
                             }
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(text = toggleText)
+                            Text(
+                                text = toggleText,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
 

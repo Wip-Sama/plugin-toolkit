@@ -169,7 +169,7 @@ fun PluginRepoDetails(
                                         enabled = !isRefreshing,
                                         colors = ButtonDefaults.filledTonalButtonColors(),
                                         shape = shape,
-                                        modifier = modifierSpec
+                                        modifier = modifierSpec.tooltip(Res.string.action_refresh)
                                     ) {
                                         Icon(
                                             Icons.Default.Refresh,
@@ -177,14 +177,18 @@ fun PluginRepoDetails(
                                             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                         )
                                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                        Text(stringResource(Res.string.action_refresh))
+                                        Text(
+                                            stringResource(Res.string.action_refresh),
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
                                     }
                                 }
 
                                 item(visible = currentRepo.isLocal) { shape, modifierSpec ->
                                     Button(
                                         onClick = { onOpenLocalFolder(currentRepo.url) },
-                                        modifier = modifierSpec,
+                                        modifier = modifierSpec.tooltip(Res.string.plugin_open_folder),
                                         shape = shape,
                                     ) {
                                         Icon(
@@ -193,7 +197,11 @@ fun PluginRepoDetails(
                                             modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                                         )
                                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                        Text(stringResource(Res.string.plugin_open_folder))
+                                        Text(
+                                            stringResource(Res.string.plugin_open_folder),
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
                                     }
                                 }
                             }

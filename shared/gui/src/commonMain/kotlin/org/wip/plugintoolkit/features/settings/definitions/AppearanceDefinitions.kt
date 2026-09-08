@@ -9,12 +9,17 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.ViewSidebar
+import kotlin.math.round
+import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.features.settings.model.AppLanguage
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.AppTheme
 import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
 import org.wip.plugintoolkit.features.settings.model.GeneralSettings
 import org.wip.plugintoolkit.features.settings.model.LocalizationSettings
+import org.wip.plugintoolkit.features.settings.model.SidebarStartMode
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
 import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
@@ -65,6 +70,21 @@ fun SettingsRegistryBuilder.appearanceDefinitions() {
                     Icons.Default.Palette,
                     subtitle = SettingText.Resource(Res.string.setting_use_accent_in_theme_subtitle)
                 ) { copy(useAccentInTheme = it) }
+
+                dropdown(
+                    AppearanceSettings::sidebarStartMode,
+                    Res.string.setting_sidebar_start_mode,
+                    Icons.Default.ViewSidebar,
+                    options = SidebarStartMode.entries,
+                    subtitle = SettingText.Resource(Res.string.setting_sidebar_start_mode_subtitle),
+                    labelProvider = { mode ->
+                        when (mode) {
+                            SidebarStartMode.Expanded -> stringResource(Res.string.sidebar_start_mode_expanded)
+                            SidebarStartMode.Collapsed -> stringResource(Res.string.sidebar_start_mode_collapsed)
+                            SidebarStartMode.Remember -> stringResource(Res.string.sidebar_start_mode_remember)
+                        }
+                    }
+                ) { copy(sidebarStartMode = it) }
             }
 
             bindGroup(AppSettings::general, { copy(general = it) }) {
@@ -73,9 +93,9 @@ fun SettingsRegistryBuilder.appearanceDefinitions() {
                     Res.string.setting_scaling,
                     Icons.Default.AspectRatio,
                     range = 0.5f..2.0f,
-                    steps = 5,
-                    subtitleProvider = { "${(it.general.scaling * 100).toInt()}%" }
-                ) { copy(scaling = it) }
+                    steps = 29,
+                    subtitleProvider = { "${(it.general.scaling * 100).roundToInt()}%" }
+                ) { copy(scaling = round(it * 20f) / 20f) }
 
                 switch(
                     GeneralSettings::animationsEnabled,

@@ -27,8 +27,20 @@ data class AppearanceSettings(
     val theme: AppTheme = AppTheme.System,
     val accentColor: Long = 0xFF6200EE, // Default purple
     val followSystemAccent: Boolean = true,
-    val useAccentInTheme: Boolean = false
+    val useAccentInTheme: Boolean = false,
+    val sidebarStartMode: SidebarStartMode = SidebarStartMode.Remember,
+    val isSidebarCollapsed: Boolean = false
 )
+
+/**
+ * Sidebar initial display state options on launch.
+ */
+@Serializable
+enum class SidebarStartMode {
+    Expanded,
+    Collapsed,
+    Remember
+}
 
 /**
  * Application theme mode options.

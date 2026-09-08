@@ -38,6 +38,7 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.section_general
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
@@ -65,24 +66,29 @@ fun <T> SidebarSection(
     var isSectionCollapsed by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        if (isExpanded && section.title != null) {
+        if (section.title != null) {
+            val resolvedTitle = section.title.resolve()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(MaterialTheme.shapes.small)
                     .clickable { isSectionCollapsed = !isSectionCollapsed }
-                    .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.small),
+                    .tooltip(resolvedTitle)
+                    .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = if (isExpanded) Arrangement.SpaceBetween else Arrangement.Start
             ) {
-                Text(
-                    text = section.title.resolve(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip
-                )
+                if (isExpanded) {
+                    Text(
+                        text = resolvedTitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
                 Icon(
                     imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
                     contentDescription = stringResource(Res.string.action_toggle_section),

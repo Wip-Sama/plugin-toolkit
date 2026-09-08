@@ -25,6 +25,7 @@ import org.wip.plugintoolkit.features.navigation.model.ScreenNavConfig
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.SidebarStartMode
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import org.wip.plugintoolkit.shared.components.TooltipProvider
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
@@ -177,7 +178,14 @@ private fun AppContentImpl(
                         }
                     },
                     notificationService = notificationService,
-                    dialogService = dialogService
+                    dialogService = dialogService,
+                    onToggleNavbarState = { collapsed ->
+                        if (settings.appearance.sidebarStartMode == SidebarStartMode.Remember) {
+                            viewModel.updateSettings { current ->
+                                current.copy(appearance = current.appearance.copy(isSidebarCollapsed = collapsed))
+                            }
+                        }
+                    }
                 ) {
                     AppNavigation(
                         backStack = backStack,

@@ -23,6 +23,7 @@ import org.wip.plugintoolkit.core.ui.DialogHost
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.settings.model.SidebarStartMode
 import org.wip.plugintoolkit.shared.components.ToastHost
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import plugintoolkit.composeapp.generated.resources.Res
@@ -37,9 +38,17 @@ fun AppScaffold(
     onScreenSelected: (Screen) -> Unit,
     notificationService: NotificationService,
     dialogService: DialogService,
+    onToggleNavbarState: ((Boolean) -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    var isNavbarCollapsed by remember { mutableStateOf(false) }
+    val initialCollapsed = remember {
+        when (settings.appearance.sidebarStartMode) {
+            SidebarStartMode.Expanded -> false
+            SidebarStartMode.Collapsed -> true
+            SidebarStartMode.Remember -> settings.appearance.isSidebarCollapsed
+        }
+    }
+    var isNavbarCollapsed by remember { mutableStateOf(initialCollapsed) }
     val layoutSidebarWidth by animateDpAsState(
         targetValue = if (isNavbarCollapsed) ToolkitTheme.dimensions.sidebarCollapsedWidth else ToolkitTheme.dimensions.sidebarExpandedWidth,
         animationSpec = tween(durationMillis = 200)
@@ -60,7 +69,11 @@ fun AppScaffold(
                 currentScreen = currentScreen,
                 onScreenSelected = onScreenSelected,
                 isNavbarCollapsed = isNavbarCollapsed,
-                onToggleNavbar = { isNavbarCollapsed = !isNavbarCollapsed },
+                onToggleNavbar = {
+                    val newCollapsed = !isNavbarCollapsed
+                    isNavbarCollapsed = newCollapsed
+                    onToggleNavbarState?.invoke(newCollapsed)
+                },
                 modifier = Modifier.fillMaxHeight()
             )
 

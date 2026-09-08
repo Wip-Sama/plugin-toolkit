@@ -571,4 +571,36 @@
     <string name="node_configure_defaults">Configure Node Defaults</string>
     <string name="flow_clear_defaults">Clear Defaults</string>
     <string name="flow_defaults_cleared">Default values cleared for flow \'%1$s\'</string>
+
+    <!-- Sidebar Start Mode -->
+    <string name="setting_sidebar_start_mode">Sidebar Start Mode</string>
+    <string name="setting_sidebar_start_mode_subtitle">Choose whether the sidebar starts expanded, collapsed, or restores its last state</string>
+    <string name="sidebar_start_mode_expanded">Always Expanded</string>
+    <string name="sidebar_start_mode_collapsed">Always Collapsed</string>
+    <string name="sidebar_start_mode_remember">Remember Last State</string>
+
+    <!-- Plugin Manager Search / Filter / Sort -->
+    <string name="plugin_filter_label">Filter:</string>
+    <string name="plugin_filter_all">All</string>
+    <string name="plugin_filter_enabled">Enabled</string>
+    <string name="plugin_filter_disabled">Disabled</string>
+    <string name="plugin_filter_update_available">Update Available</string>
+    <string name="plugin_filter_requires_setup">Needs Setup</string>
+    <string name="plugin_sort_name_asc">Name (A → Z)</string>
+    <string name="plugin_sort_name_desc">Name (Z → A)</string>
+    <string name="plugin_sort_status">Status (Enabled First)</string>
+    <string name="plugin_sort_version">Version (Newest First)</string>
+    <string name="plugin_no_search_results">No plugins match your filter</string>
+    <string name="plugin_no_plugins_installed">No plugins installed</string>
+
+    <!-- Flow Manager Search / Filter / Sort -->
+    <string name="flow_filter_label">Filter:</string>
+    <string name="flow_filter_all">All</string>
+    <string name="flow_filter_ready">Ready</string>
+    <string name="flow_filter_broken">Broken</string>
+    <string name="flow_filter_subflows">Subflows</string>
+    <string name="flow_sort_name_asc">Name (A → Z)</string>
+    <string name="flow_sort_name_desc">Name (Z → A)</string>
+    <string name="flow_sort_nodes_desc">Nodes (High → Low)</string>
+    <string name="flow_sort_nodes_asc">Nodes (Low → High)</string>
 </resources>

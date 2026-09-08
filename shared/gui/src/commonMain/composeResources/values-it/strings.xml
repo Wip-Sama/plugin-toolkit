@@ -571,4 +571,36 @@
     <string name="node_configure_defaults">Configura predefiniti del nodo</string>
     <string name="flow_clear_defaults">Cancella predefiniti</string>
     <string name="flow_defaults_cleared">Valori predefiniti cancellati per il flusso \'%1$s\'</string>
+
+    <!-- Sidebar Start Mode -->
+    <string name="setting_sidebar_start_mode">Modalità Avvio Barra Laterale</string>
+    <string name="setting_sidebar_start_mode_subtitle">Scegli se la barra laterale si avvia espansa, compressa o ripristina l\'ultimo stato</string>
+    <string name="sidebar_start_mode_expanded">Sempre Espansa</string>
+    <string name="sidebar_start_mode_collapsed">Sempre Compressa</string>
+    <string name="sidebar_start_mode_remember">Ricorda Ultimo Stato</string>
+
+    <!-- Plugin Manager Search / Filter / Sort -->
+    <string name="plugin_filter_label">Filtra:</string>
+    <string name="plugin_filter_all">Tutti</string>
+    <string name="plugin_filter_enabled">Abilitati</string>
+    <string name="plugin_filter_disabled">Disabilitati</string>
+    <string name="plugin_filter_update_available">Aggiornamento Disponibile</string>
+    <string name="plugin_filter_requires_setup">Richiede Configurazione</string>
+    <string name="plugin_sort_name_asc">Nome (A → Z)</string>
+    <string name="plugin_sort_name_desc">Nome (Z → A)</string>
+    <string name="plugin_sort_status">Stato (Prima Abilitati)</string>
+    <string name="plugin_sort_version">Versione (Prima Più Recenti)</string>
+    <string name="plugin_no_search_results">Nessun plugin corrisponde al filtro</string>
+    <string name="plugin_no_plugins_installed">Nessun plugin installato</string>
+
+    <!-- Flow Manager Search / Filter / Sort -->
+    <string name="flow_filter_label">Filtra:</string>
+    <string name="flow_filter_all">Tutti</string>
+    <string name="flow_filter_ready">Pronti</string>
+    <string name="flow_filter_broken">Non Validi</string>
+    <string name="flow_filter_subflows">Sottoflussi</string>
+    <string name="flow_sort_name_asc">Nome (A → Z)</string>
+    <string name="flow_sort_name_desc">Nome (Z → A)</string>
+    <string name="flow_sort_nodes_desc">Nodi (Decrescente)</string>
+    <string name="flow_sort_nodes_asc">Nodi (Crescente)</string>
 </resources>

@@ -108,6 +108,8 @@ data class Dimensions(
     val menuElevation: Dp = 4.dp,
     val menuMinWidth: Dp = 180.dp,
     val iconExtraLarge: Dp = 64.dp,
+    val breakpointCompact: Dp = 750.dp,
+    val breakpointWideToolbar: Dp = 900.dp,
     
     // Auto-generated generic/component-specific sized dimensions (deprecated in favor of semantic tokens)
     val ringWidthMedium: Dp = 10.dp,

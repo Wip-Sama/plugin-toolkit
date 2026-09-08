@@ -7,12 +7,16 @@ Added:
 	- Setting to generate theme variants from accent color according to Material 3 Expressive guidelines
 	- Added `ProcessWatcher` interface and `PluginContext.watchProcess(...)` API to monitor memory usage of external child processes (e.g. terminal commands, Python scripts)
 	- Added separate "Peak Memory Usage" and "Total Memory Usage" metric chips with automatic native descendant process memory tracking
+  - Filtering/Sorting capabilities to plugins and flows
 Changes:
 	- Refactored the update available menu
 	- Improved plugin binary backwards compatibility with @JvmOverloads across API data classes
 	- Refactored plugin source selector and added a way to switch to a new version of the plugin in a new repo is available
 	- Restyled the application with Material 3 Expressive surface hierarchy and color engine
 	- Restyled ExpressiveMenu and migrated all dropdown and context menus across the application to Material 3 Expressive (ToolkitDropdownMenu) with unconstrained width expansion
+	- Reworked collapsible sidebar
+	- Improved GUI scaling from step of 25% to step of 5%
+  - Reduced minimum width so the application can live at half screen width
 Fixed:
 	- Plugins breaking with NoSuchMethodError across app updates when optional parameters are added to plugin-api models
 	- PluginLoader now gracefully falls back to manifest.json when older plugin bytecode encounters static manifest linkage errors

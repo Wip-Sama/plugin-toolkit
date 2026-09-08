@@ -57,11 +57,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.FlowChipFilter
+import org.wip.plugintoolkit.features.flows.model.FlowSortMode
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.ui.components.FlowFilterChipsRow
+import org.wip.plugintoolkit.features.flows.ui.components.FlowSortDropdownChip
 import org.wip.plugintoolkit.features.flows.viewmodel.ConflictResolutionAction
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
@@ -119,6 +125,8 @@ fun FlowManagerView(
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFlowName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
+    var chipFilter by remember { mutableStateOf(FlowChipFilter.All) }
+    var sortMode by remember { mutableStateOf(FlowSortMode.NameAsc) }
     var flowToDelete by remember { mutableStateOf<String?>(null) }
     var flowToEditMetadata by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboard.current
@@ -140,69 +148,133 @@ fun FlowManagerView(
         PluginLoader.getPlugins().flatMap { it.getManifest().getOrNull()?.capabilities?.map { cap -> cap.name } ?: emptyList() }.toSet()
     }
 
-    val filteredFlows = remember(state.flows, searchQuery) {
-        state.flows.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    val parentFlowsMap = remember(state.flows) {
+        val map = mutableMapOf<String, MutableList<String>>()
+        state.flows.forEach { parent ->
+            parent.nodes.filterIsInstance<Node.SubFlowNode>().forEach { subNode ->
+                map.getOrPut(subNode.flowName) { mutableListOf() }.add(parent.name)
+            }
+        }
+        map
+    }
+
+    val filteredFlows = remember(
+        state.flows,
+        searchQuery,
+        chipFilter,
+        sortMode,
+        activeCapabilities,
+        pluginLocksState,
+        loadedPlugins,
+        parentFlowsMap
+    ) {
+        state.flows.filter { flow ->
+            val matchesSearch = flow.name.contains(searchQuery, ignoreCase = true) ||
+                (flow.description?.contains(searchQuery, ignoreCase = true) == true)
+
+            val parentFlows = parentFlowsMap[flow.name] ?: emptyList()
+            val missingCapabilities = flow.nodes.filterIsInstance<Node.CapabilityNode>()
+                .map { it.capability.name }
+                .filter { it !in activeCapabilities }
+            val notReadyNodes = flow.nodes.filter { node ->
+                val settings =
+                    if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
+                val locks = if (node is Node.CapabilityNode) {
+                    pluginLocksState[node.pluginInfo.id] ?: pluginLocksState.values.fold(emptyMap()) { acc, m -> acc + m }
+                } else null
+                !node.isReady(flow.connections, settings, locks)
+            }
+            val isReady = missingCapabilities.isEmpty() && notReadyNodes.isEmpty()
+
+            val matchesFilter = when (chipFilter) {
+                FlowChipFilter.All -> true
+                FlowChipFilter.Ready -> isReady
+                FlowChipFilter.Broken -> !isReady
+                FlowChipFilter.Subflows -> parentFlows.isNotEmpty()
+            }
+
+            matchesSearch && matchesFilter
+        }.let { list ->
+            when (sortMode) {
+                FlowSortMode.NameAsc -> list.sortedBy { it.name.lowercase() }
+                FlowSortMode.NameDesc -> list.sortedByDescending { it.name.lowercase() }
+                FlowSortMode.NodeCountDesc -> list.sortedByDescending { it.nodes.size }
+                FlowSortMode.NodeCountAsc -> list.sortedBy { it.nodes.size }
+            }
+        }
     }
 
     Column(modifier = modifier.fillMaxSize().padding(ToolkitTheme.spacing.extraLarge)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SectionHeader(
-                title = stringResource(Res.string.flow_manager_title),
-                icon = Icons.Default.Add,
-                modifier = Modifier.weight(1f)
-            )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val isCompact = maxWidth < ToolkitTheme.dimensions.breakpointCompact
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SectionHeader(
+                    title = stringResource(Res.string.flow_manager_title),
+                    icon = Icons.Default.Add,
+                    modifier = Modifier.weight(1f)
+                )
 
-            ToolkitButtonGroup {
-                item { shape, modifierSpec ->
-                    Button(
-                        onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        ),
-                        shape = shape,
-                        modifier = modifierSpec
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = "Import from file")
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        Text(stringResource(Res.string.flow_import_file))
-                    }
-                }
-
-                item { shape, modifierSpec ->
-                    Button(
-                        onClick = {
-                            val base64 = textClipboardManager.getText()?.text
-                            if (!base64.isNullOrBlank()) {
-                                viewModel.onEvent(FlowEvent.TriggerImportFromClipboard(base64))
+                ToolkitButtonGroup {
+                    item { shape, modifierSpec ->
+                        val label = stringResource(Res.string.flow_import_file)
+                        Button(
+                            onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            shape = shape,
+                            modifier = modifierSpec.tooltip(label)
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = label)
+                            if (!isCompact) {
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                Text(label, maxLines = 1, softWrap = false)
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        ),
-                        shape = shape,
-                        modifier = modifierSpec
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Import from clipboard")
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        Text(stringResource(Res.string.flow_import_clipboard))
+                        }
                     }
-                }
 
-                item { shape, modifierSpec ->
-                    Button(
-                        onClick = { showCreateDialog = true },
-                        shape = shape,
-                        modifier = modifierSpec
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        Text(stringResource(Res.string.flow_create_new))
+                    item { shape, modifierSpec ->
+                        val label = stringResource(Res.string.flow_import_clipboard)
+                        Button(
+                            onClick = {
+                                val base64 = textClipboardManager.getText()?.text
+                                if (!base64.isNullOrBlank()) {
+                                    viewModel.onEvent(FlowEvent.TriggerImportFromClipboard(base64))
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                            ),
+                            shape = shape,
+                            modifier = modifierSpec.tooltip(label)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = label)
+                            if (!isCompact) {
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                Text(label, maxLines = 1, softWrap = false)
+                            }
+                        }
+                    }
+
+                    item { shape, modifierSpec ->
+                        val label = stringResource(Res.string.flow_create_new)
+                        Button(
+                            onClick = { showCreateDialog = true },
+                            shape = shape,
+                            modifier = modifierSpec.tooltip(label)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = label)
+                            if (!isCompact) {
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                Text(label, maxLines = 1, softWrap = false)
+                            }
+                        }
                     }
                 }
             }
@@ -231,6 +303,28 @@ fun FlowManagerView(
             singleLine = true
         )
 
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+
+        // Filter chips and sort row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FlowFilterChipsRow(
+                selectedFilter = chipFilter,
+                onFilterSelected = { chipFilter = it },
+                modifier = Modifier.weight(1f)
+            )
+
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+
+            FlowSortDropdownChip(
+                sortMode = sortMode,
+                onSortModeChange = { sortMode = it }
+            )
+        }
+
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
 
         Column(
@@ -243,9 +337,11 @@ fun FlowManagerView(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (searchQuery.isEmpty()) stringResource(Res.string.flow_no_flows) else stringResource(
-                            Res.string.flow_no_search_results
-                        ),
+                        text = if (searchQuery.isEmpty() && chipFilter == FlowChipFilter.All) {
+                            stringResource(Res.string.flow_no_flows)
+                        } else {
+                            stringResource(Res.string.flow_no_search_results)
+                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -253,10 +349,8 @@ fun FlowManagerView(
             } else {
                 filteredFlows.forEach { flow ->
                     // Calculate parent relationships and missing capabilities reactively
-                    val parentFlows = remember(flow, state.flows) {
-                        state.flows.filter { parent ->
-                            parent.nodes.any { it is Node.SubFlowNode && it.flowName == flow.name }
-                        }.map { it.name }
+                    val parentFlows = remember(flow.name, parentFlowsMap) {
+                        parentFlowsMap[flow.name] ?: emptyList()
                     }
 
                     val missingCapabilities = remember(flow, activeCapabilities) {

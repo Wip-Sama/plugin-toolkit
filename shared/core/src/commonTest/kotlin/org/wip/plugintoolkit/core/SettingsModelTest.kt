@@ -35,4 +35,26 @@ class SettingsModelTest {
         val customSettings = GeneralSettings(maxMemoryMb = 3500)
         assertEquals(3500, customSettings.effectiveMaxMemoryMb(), "Custom values >= 1024 MB should be retained")
     }
+
+    @Test
+    fun testAppearanceSettingsDefaults() {
+        val settings = org.wip.plugintoolkit.features.settings.model.AppearanceSettings()
+        assertEquals(org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Remember, settings.sidebarStartMode)
+        assertEquals(false, settings.isSidebarCollapsed)
+    }
+
+    @Test
+    fun testAppearanceSettingsSerialization() {
+        val original = org.wip.plugintoolkit.features.settings.model.AppearanceSettings(
+            sidebarStartMode = org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Collapsed,
+            isSidebarCollapsed = true
+        )
+        val json = Json { encodeDefaults = true }
+        val serialized = json.encodeToString(org.wip.plugintoolkit.features.settings.model.AppearanceSettings.serializer(), original)
+        val deserialized = json.decodeFromString(org.wip.plugintoolkit.features.settings.model.AppearanceSettings.serializer(), serialized)
+
+        assertEquals(original, deserialized)
+        assertEquals(org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Collapsed, deserialized.sidebarStartMode)
+        assertEquals(true, deserialized.isSidebarCollapsed)
+    }
 }

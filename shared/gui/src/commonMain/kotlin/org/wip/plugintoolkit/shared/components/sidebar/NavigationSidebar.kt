@@ -2,8 +2,13 @@ package org.wip.plugintoolkit.shared.components.sidebar
 
 import org.wip.plugintoolkit.core.model.resolve
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -93,7 +98,7 @@ fun <T> NavigationSidebar(
                         .fillMaxWidth()
                         .padding(bottom = ToolkitTheme.spacing.medium),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = if (isActuallyExpanded) Arrangement.Start else Arrangement.Center
+                    horizontalArrangement = Arrangement.Start
                 ) {
                     if (canCollapse) {
                         IconButton(onClick = onToggleNavbar) {
@@ -102,21 +107,27 @@ fun <T> NavigationSidebar(
                                 contentDescription = stringResource(Res.string.action_toggle_sidebar)
                             )
                         }
-                        if (isActuallyExpanded && resolvedTitle.isNotBlank()) {
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
-                        }
                     }
 
-                    if (isActuallyExpanded && resolvedTitle.isNotBlank()) {
-                        Text(
-                            text = resolvedTitle,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Clip
-                        )
+                    AnimatedVisibility(
+                        visible = isActuallyExpanded && resolvedTitle.isNotBlank(),
+                        enter = fadeIn(tween(150)) + expandHorizontally(tween(200)),
+                        exit = fadeOut(tween(100)) + shrinkHorizontally(tween(200))
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (canCollapse) {
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
+                            }
+                            Text(
+                                text = resolvedTitle,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Clip
+                            )
+                        }
                     }
                 }
             }
