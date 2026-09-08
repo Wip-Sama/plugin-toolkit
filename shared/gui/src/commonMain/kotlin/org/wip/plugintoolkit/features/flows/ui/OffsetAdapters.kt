@@ -15,11 +15,11 @@ operator fun ComposeOffset.minus(other: ModelOffset): ComposeOffset = ComposeOff
 fun ModelOffset.snapToGrid(gridSize: Float = 50f): ModelOffset {
     val snappedX = round(x / gridSize) * gridSize
     val snappedY = round(y / gridSize) * gridSize
-    return ModelOffset(snappedX, snappedY)
+    return ModelOffset(if (snappedX == -0f) 0f else snappedX, if (snappedY == -0f) 0f else snappedY)
 }
 
 fun ComposeOffset.snapToGrid(gridSize: Float = 50f): ComposeOffset {
     val snappedX = round(x / gridSize) * gridSize
     val snappedY = round(y / gridSize) * gridSize
-    return ComposeOffset(snappedX, snappedY)
+    return ComposeOffset(if (snappedX == -0f) 0f else snappedX, if (snappedY == -0f) 0f else snappedY)
 }

@@ -1,9 +1,11 @@
 package org.wip.plugintoolkit.features.flows.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -177,18 +180,26 @@ fun NodeHeader(
             }
 
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-            IconButton(
+            Surface(
                 onClick = { onToggleCollapse(node.id) },
+                shape = ToolkitTheme.shapes.extraSmall,
+                color = onHeaderColor.copy(alpha = 0.15f),
+                border = BorderStroke(
+                    width = ToolkitTheme.dimensions.borderThin,
+                    color = onHeaderColor.copy(alpha = 0.4f)
+                ),
                 modifier = Modifier
                     .size(ToolkitTheme.dimensions.iconMedium)
                     .testTag("collapse_button_${node.id}")
             ) {
-                Icon(
-                    imageVector = if (node.isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                    contentDescription = "Toggle Collapse",
-                    tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (node.isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Toggle Collapse",
+                        tint = onHeaderColor,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                }
             }
         }
 

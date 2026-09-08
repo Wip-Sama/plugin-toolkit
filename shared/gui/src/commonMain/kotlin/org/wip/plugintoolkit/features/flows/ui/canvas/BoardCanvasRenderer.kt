@@ -82,7 +82,11 @@ fun BoardGridAndConnectionsCanvas(
     val gridColor = MaterialTheme.colorScheme.outlineVariant
 
     val connectionAlphas = flow.connections.associateWith { connection ->
-        val isDimmed = interactionState.hoveredConnection != null && interactionState.hoveredConnection != connection
+        val isDimmedByConnectionHover = interactionState.hoveredConnection != null && interactionState.hoveredConnection != connection
+        val isDimmedByNodeHover = interactionState.hoveredNodeId != null &&
+                connection.sourceNodeId != interactionState.hoveredNodeId &&
+                connection.targetNodeId != interactionState.hoveredNodeId
+        val isDimmed = isDimmedByConnectionHover || isDimmedByNodeHover
         val targetAlpha = if (isDimmed) 0.6f else 1f
         animateFloatAsState(
             targetValue = targetAlpha,

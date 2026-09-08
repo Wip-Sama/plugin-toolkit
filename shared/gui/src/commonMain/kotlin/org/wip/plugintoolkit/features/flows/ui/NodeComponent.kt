@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.flows.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,9 +28,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -55,6 +60,7 @@ import plugintoolkit.composeapp.generated.resources.node_hide_advanced_ports
 import plugintoolkit.composeapp.generated.resources.node_parameters_section
 import plugintoolkit.composeapp.generated.resources.node_show_advanced_ports
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun NodeComponent(
     node: Node,
@@ -81,7 +87,9 @@ fun NodeComponent(
     onToggleInputsCollapse: (Long) -> Unit = {},
     onToggleOutputsCollapse: (Long) -> Unit = {},
     highlightedPortId: String? = null,
+    highlightedPortIds: Set<String> = emptySet(),
     highlightedPortColor: Color? = null,
+    onHoverNode: (Long?) -> Unit = {},
     stateScale: Float,
     stateOffset: Offset,
     selectedNodeIds: Set<Long> = emptySet(),
@@ -204,13 +212,24 @@ fun NodeComponent(
         null
     }
 
+    val effectiveHighlightedPortIds = remember(highlightedPortId, highlightedPortIds) {
+        if (highlightedPortId != null) highlightedPortIds + highlightedPortId else highlightedPortIds
+    }
+
     Box(
         modifier = modifier
             .width(ToolkitTheme.dimensions.nodeWidth)
             .testTag("node_card_${node.id}")
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+                .onPointerEvent(PointerEventType.Enter) { onHoverNode(node.id) }
+                .onPointerEvent(PointerEventType.Exit) { onHoverNode(null) }
+                .onPointerEvent(PointerEventType.Press, pass = PointerEventPass.Initial) {
+                    currentOnPress(node.id)
+                },
             elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.spacing.small),
             shape = MaterialTheme.shapes.medium,
             border = cardBorder,
@@ -301,6 +320,7 @@ fun NodeComponent(
                             validationErrors = validationErrors,
                             providedSettings = providedSettings,
                             highlightedPortId = highlightedPortId,
+                            highlightedPortIds = effectiveHighlightedPortIds,
                             highlightedPortColor = highlightedPortColor,
                             isReadOnly = isReadOnly,
                             onStartConnection = onStartConnection,
@@ -334,6 +354,7 @@ fun NodeComponent(
                         inferredSemanticTypes = inferredSemanticTypes,
                         validationErrors = validationErrors,
                         highlightedPortId = highlightedPortId,
+                        highlightedPortIds = effectiveHighlightedPortIds,
                         highlightedPortColor = highlightedPortColor,
                         isReadOnly = isReadOnly,
                         onStartConnection = onStartConnection,

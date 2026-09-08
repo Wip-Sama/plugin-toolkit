@@ -1,19 +1,31 @@
 package org.wip.plugintoolkit.features.flows.ui.node
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -44,7 +56,8 @@ fun NodeInputSection(
     inferredSemanticTypes: Map<Pair<Long, String>, List<SemanticType>>,
     validationErrors: List<ValidationError>,
     providedSettings: Map<String, kotlinx.serialization.json.JsonElement>,
-    highlightedPortId: String?,
+    highlightedPortId: String? = null,
+    highlightedPortIds: Set<String> = emptySet(),
     highlightedPortColor: Color?,
     isReadOnly: Boolean,
     onStartConnection: (Long, String, Boolean) -> Unit,
@@ -75,6 +88,10 @@ fun NodeInputSection(
     }
     val sectionTag = "input_section_${sectionType.name.lowercase()}_${node.id}"
 
+    val effectiveHighlightedPortIds = remember(highlightedPortId, highlightedPortIds) {
+        if (highlightedPortId != null) highlightedPortIds + highlightedPortId else highlightedPortIds
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -87,7 +104,7 @@ fun NodeInputSection(
             if (isSectionCollapsed) {
                 PortCircle(
                     color = headerColor,
-                    isHighlighted = false,
+                    isHighlighted = inputs.any { effectiveHighlightedPortIds.contains(it.id) },
                     onDragStart = {}, onDrag = {}, onDragEnd = {},
                     modifier = Modifier.onGloballyPositioned { coords ->
                         inputs.forEach { input ->
@@ -104,15 +121,29 @@ fun NodeInputSection(
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                contentDescription = "Toggle $title"
-            )
+            Surface(
+                shape = ToolkitTheme.shapes.extraSmall,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                border = BorderStroke(
+                    width = ToolkitTheme.dimensions.borderThin,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                ),
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Toggle $title",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                }
+            }
             if (isSectionCollapsed && sectionType == InputSectionType.OUTPUT_LOCATIONS) {
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 PortCircle(
                     color = headerColor,
-                    isHighlighted = false,
+                    isHighlighted = inputs.any { effectiveHighlightedPortIds.contains(it.id) },
                     onDragStart = {}, onDrag = {}, onDragEnd = {},
                     modifier = Modifier.onGloballyPositioned { coords ->
                         inputs.forEach { input ->
@@ -127,30 +158,39 @@ fun NodeInputSection(
         }
     }
 
-    if (!isSectionCollapsed) {
-        inputs.forEach { input ->
-            InputPortRow(
-                input = input,
-                node = node,
-                headerColor = headerColor,
-                connectedInputPortIds = connectedInputPortIds,
-                inferredTypes = inferredTypes,
-                inferredSemanticTypes = inferredSemanticTypes,
-                validationErrors = validationErrors,
-                providedSettings = providedSettings,
-                highlightedPortId = highlightedPortId,
-                highlightedPortColor = highlightedPortColor,
-                isReadOnly = isReadOnly,
-                onStartConnection = onStartConnection,
-                onDragConnection = onDragConnection,
-                onDropConnection = onDropConnection,
-                onPortPositioned = onPortPositioned,
-                onUpdateValue = onUpdateValue,
-                onFocusLost = onFocusLost,
-                onUpdateInputPortDefault = onUpdateInputPortDefault,
-                isInactiveAndConnected = inactiveConnectedPortIds.contains(input.id),
-                onPortDisposed = onPortDisposed
-            )
+    AnimatedVisibility(
+        visible = !isSectionCollapsed,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically()
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
+        ) {
+            inputs.forEach { input ->
+                InputPortRow(
+                    input = input,
+                    node = node,
+                    headerColor = headerColor,
+                    connectedInputPortIds = connectedInputPortIds,
+                    inferredTypes = inferredTypes,
+                    inferredSemanticTypes = inferredSemanticTypes,
+                    validationErrors = validationErrors,
+                    providedSettings = providedSettings,
+                    highlightedPortId = if (effectiveHighlightedPortIds.contains(input.id)) input.id else null,
+                    highlightedPortColor = highlightedPortColor,
+                    isReadOnly = isReadOnly,
+                    onStartConnection = onStartConnection,
+                    onDragConnection = onDragConnection,
+                    onDropConnection = onDropConnection,
+                    onPortPositioned = onPortPositioned,
+                    onUpdateValue = onUpdateValue,
+                    onFocusLost = onFocusLost,
+                    onUpdateInputPortDefault = onUpdateInputPortDefault,
+                    isInactiveAndConnected = inactiveConnectedPortIds.contains(input.id),
+                    onPortDisposed = onPortDisposed
+                )
+            }
         }
     }
 }

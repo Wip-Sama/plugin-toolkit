@@ -1,26 +1,27 @@
 package org.wip.plugintoolkit.features.flows.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.draw.clip
-import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -45,15 +48,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.features.flows.model.Connection
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.flow_info_button_tooltip
 import plugintoolkit.composeapp.generated.resources.node_port_inactive_connected_warning
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardGridAndConnectionsCanvas
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardInteractionState
@@ -63,10 +66,14 @@ import org.wip.plugintoolkit.features.flows.ui.canvas.boardKeyboardHandler
 import org.wip.plugintoolkit.features.flows.ui.canvas.boardPanGesture
 import org.wip.plugintoolkit.features.flows.ui.canvas.boardPointerEventGesture
 import org.wip.plugintoolkit.features.flows.ui.canvas.boardSelectionBoxGesture
+import org.wip.plugintoolkit.features.flows.ui.components.FlowControlsInfoCard
 import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.shared.components.LocalOverlayHost
+import org.wip.plugintoolkit.shared.components.LocalTooltipState
 import org.wip.plugintoolkit.shared.components.ZoomControls
+import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
+import org.wip.plugintoolkit.shared.components.tooltip
 import kotlin.math.roundToInt
 
 @Composable
@@ -104,7 +111,7 @@ fun BoardCanvas(
     isReadOnly: Boolean = false,
     problematicConnections: Set<Connection> = emptySet(),
     modifier: Modifier = Modifier,
-    content: @Composable BoxScope.(hoveredConnection: Connection?) -> Unit
+    content: @Composable BoxScope.(hoveredConnection: Connection?, hoveredNodeId: Long?, onHoverNode: (Long?) -> Unit) -> Unit
 ) {
     val density = LocalDensity.current
     val focusRequester = remember { FocusRequester() }
@@ -253,7 +260,7 @@ fun BoardCanvas(
         }
 
         // 2. Render main children (nodes, preview)
-        content(interactionState.hoveredConnection)
+        content(interactionState.hoveredConnection, interactionState.hoveredNodeId) { interactionState.hoveredNodeId = it }
 
         // 3. Selection Box overlay drawing
         SelectionBoxCanvas(interactionState = interactionState)
@@ -406,16 +413,55 @@ fun BoardCanvas(
             }
         }
 
-        // 6. Zoom Controls UI - Bottom Right
+        // 6. Bottom Right Controls (Info button + Zoom Controls)
         val centerPosition = Offset(boardSize.width / 2f, boardSize.height / 2f)
-        ZoomControls(
-            scale = state.scale,
-            onZoomIn = { onZoom(-1f, centerPosition, false) },
-            onZoomOut = { onZoom(1f, centerPosition, false) },
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(ToolkitTheme.spacing.medium)
-                .testTag("zoom_controls")
-        )
+                .padding(ToolkitTheme.spacing.medium),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+        ) {
+            val tooltipState = LocalTooltipState.current
+            var infoCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+            val infoTooltipKey = remember { Any() }
+
+            Surface(
+                onClick = {
+                    infoCoordinates?.let { coords ->
+                        tooltipState?.toggle(coords, infoTooltipKey) {
+                            FlowControlsInfoCard()
+                        }
+                    }
+                },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                border = BorderStroke(
+                    width = ToolkitTheme.dimensions.borderUnselected,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                ),
+                modifier = Modifier
+                    .size(ToolkitTheme.dimensions.standardButtonHeight)
+                    .onGloballyPositioned { infoCoordinates = it }
+                    .tooltip { FlowControlsInfoCard() }
+                    .testTag("flow_controls_info_button")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = stringResource(Res.string.flow_info_button_tooltip),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                }
+            }
+
+            ZoomControls(
+                scale = state.scale,
+                onZoomIn = { onZoom(-1f, centerPosition, false) },
+                onZoomOut = { onZoom(1f, centerPosition, false) },
+                modifier = Modifier.testTag("zoom_controls")
+            )
+        }
     }
 }

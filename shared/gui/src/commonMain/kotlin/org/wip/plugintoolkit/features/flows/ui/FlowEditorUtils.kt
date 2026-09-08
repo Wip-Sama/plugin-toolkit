@@ -20,7 +20,7 @@ import org.wip.plugintoolkit.features.flows.model.Node
 @Composable
 internal fun NodeComponentPlaceholder(node: Node, height: Dp = ToolkitTheme.dimensions.heightLarge) {
     Surface(
-        modifier = Modifier.width(ToolkitTheme.dimensions.containerWidthLarge).height(height),
+        modifier = Modifier.width(ToolkitTheme.dimensions.nodeWidth).height(height),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.textFieldContainer),
         border = BorderStroke(ToolkitTheme.dimensions.progressIndicatorStroke, MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.borderLow))

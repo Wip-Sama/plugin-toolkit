@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
@@ -35,9 +36,10 @@ fun NodeCardContainer(
                 scaleY = scale,
                 transformOrigin = TransformOrigin(0f, 0f)
             )
-            .wrapContentSize(unbounded = true)
+            .wrapContentSize(align = Alignment.TopStart, unbounded = true)
             .alpha(alpha)
     ) {
         content()
     }
 }
+

@@ -10,6 +10,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.isTertiaryPressed
@@ -247,7 +248,7 @@ fun Modifier.boardPointerEventGesture(
                 } else if (event.type == PointerEventType.Exit) {
                     interactionState.clearHoveredConnection()
                 } else if (event.type == PointerEventType.Press) {
-                    if (event.buttons.isSecondaryPressed || event.keyboardModifiers.isShiftPressed) {
+                    if (event.keyboardModifiers.isShiftPressed && event.buttons.isPrimaryPressed) {
                         interactionState.hoveredConnection?.let { conn ->
                             currentOnDeleteConnection(conn)
                             interactionState.clearHoveredConnection()

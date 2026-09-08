@@ -10,6 +10,9 @@ Added:
   - Filtering/Sorting capabilities to plugins and flows
   - Dynamic capability parameters
   - Advanced capability parameters
+  - Hovering hover a node for a couple of seconds will highligth all it's connections
+  - Added animations for node collapsing/expanding
+  - Added controls information in the flow editor
 Changes:
 	- Refactored the update available menu
 	- Improved plugin binary backwards compatibility with @JvmOverloads across API data classes
@@ -19,6 +22,8 @@ Changes:
 	- Reworked collapsible sidebar
 	- Improved GUI scaling from step of 25% to step of 5%
   - Reduced minimum width so the application can live at half screen width
+  - Flow editor board snapping is now more precise
+  - Right click no longer delete connections
 Fixed:
 	- Plugins breaking with NoSuchMethodError across app updates when optional parameters are added to plugin-api models
 	- PluginLoader now gracefully falls back to manifest.json when older plugin bytecode encounters static manifest linkage errors

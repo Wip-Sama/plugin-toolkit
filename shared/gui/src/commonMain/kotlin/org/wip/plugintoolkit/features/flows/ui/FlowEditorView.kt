@@ -358,7 +358,7 @@ fun FlowEditorView(
             nodeSizes = nodeSizes,
             isReadOnly = state.isReadOnly,
             problematicConnections = problematicConnections
-        ) { hoveredConnection ->
+        ) { hoveredConnection, hoveredNodeId, onHoverNode ->
             CompositionLocalProvider(LocalOverlayHost provides dropdownOverlay) {
                 // 1.2 Nodes
                 flow.nodes.forEach { node ->
@@ -414,16 +414,46 @@ fun FlowEditorView(
                                 } else null
                             } else null
 
-                        val isDimmedByHover = hoveredConnection != null && 
+                        val nodeHighlightedPortIds = remember(node.id, nodeHighlightedPortId, hoveredConnection) {
+                            val ids = mutableSetOf<String>()
+                            if (nodeHighlightedPortId != null) {
+                                ids.add(nodeHighlightedPortId)
+                            }
+                            if (hoveredConnection != null) {
+                                if (hoveredConnection.sourceNodeId == node.id) {
+                                    ids.add(hoveredConnection.sourcePortId)
+                                }
+                                if (hoveredConnection.targetNodeId == node.id) {
+                                    ids.add(hoveredConnection.targetPortId)
+                                }
+                            }
+                            ids
+                        }
+
+                        val isConnectedToHoveredNode = remember(hoveredNodeId, node.id, flow.connections) {
+                            if (hoveredNodeId == null) false
+                            else flow.connections.any {
+                                (it.sourceNodeId == hoveredNodeId && it.targetNodeId == node.id) ||
+                                (it.targetNodeId == hoveredNodeId && it.sourceNodeId == node.id)
+                            }
+                        }
+
+                        val isDimmedByConnectionHover = hoveredConnection != null && 
                                 hoveredConnection.sourceNodeId != node.id && 
                                 hoveredConnection.targetNodeId != node.id
+
+                        val isDimmedByNodeHover = hoveredNodeId != null &&
+                                hoveredNodeId != node.id &&
+                                !isConnectedToHoveredNode
+
+                        val isDimmed = isDimmedByConnectionHover || isDimmedByNodeHover
                                 
-                        val targetAlpha = if (isDimmedByHover) 0.4f else 1f
+                        val targetAlpha = if (isDimmed) 0.4f else 1f
                         val animatedAlpha by androidx.compose.animation.core.animateFloatAsState(
                             targetValue = targetAlpha,
                             animationSpec = androidx.compose.animation.core.tween(
                                 durationMillis = 200,
-                                delayMillis = if (isDimmedByHover) 500 else 0
+                                delayMillis = if (isDimmed) 500 else 0
                             ),
                             label = "NodeAlpha"
                         )
@@ -568,7 +598,9 @@ fun FlowEditorView(
 
                                 onPress = { id -> viewModel.onEvent(FlowEvent.BringToFront(id)) },
                                 highlightedPortId = nodeHighlightedPortId,
+                                highlightedPortIds = nodeHighlightedPortIds,
                                 highlightedPortColor = nodeHighlightedPortColor,
+                                onHoverNode = onHoverNode,
                                 stateScale = state.scale,
                                 stateOffset = state.offset,
                                 selectedNodeIds = state.selectedNodeIds,

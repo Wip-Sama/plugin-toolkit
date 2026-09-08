@@ -131,13 +131,53 @@ fun Modifier.tooltip(text: String, delay: Duration = Duration.ZERO): Modifier = 
     tooltipImpl(text, delay)
 }
 
+/**
+ * A modifier extension that displays a custom stylized composable tooltip when hovering over the component.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+fun Modifier.tooltip(
+    delay: Duration = Duration.ZERO,
+    content: @Composable () -> Unit
+): Modifier = composed {
+    tooltipCustomImpl(delay, content)
+}
+
 data class TooltipData(
-    val text: String,
-    val coordinates: LayoutCoordinates
-)
+    val coordinates: LayoutCoordinates,
+    val text: String? = null,
+    val content: (@Composable () -> Unit)? = null,
+    val isPinned: Boolean = false,
+    val key: Any? = null
+) {
+    // Secondary constructor for backwards compatibility
+    constructor(text: String, coordinates: LayoutCoordinates) : this(
+        coordinates = coordinates,
+        text = text,
+        content = null,
+        isPinned = false,
+        key = text
+    )
+}
 
 class TooltipState {
     var tooltipData by mutableStateOf<TooltipData?>(null)
+
+    fun toggle(coordinates: LayoutCoordinates, key: Any, content: @Composable () -> Unit) {
+        if (tooltipData?.key == key) {
+            tooltipData = null
+        } else {
+            tooltipData = TooltipData(
+                coordinates = coordinates,
+                content = content,
+                isPinned = true,
+                key = key
+            )
+        }
+    }
+
+    fun dismiss() {
+        tooltipData = null
+    }
 }
 
 val LocalTooltipState = staticCompositionLocalOf<TooltipState?> { null }
@@ -177,21 +217,27 @@ fun TooltipProvider(content: @Composable () -> Unit) {
                     focusable = false,
                     dismissOnClickOutside = true,
                     dismissOnBackPress = true
-                )
+                ),
+                onDismissRequest = {
+                    tooltipState.dismiss()
+                }
             ) {
-                Box(
-
-                    modifier = Modifier
-                        .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.extraSmall)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, ToolkitTheme.shapes.extraSmall)
-                        .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, ToolkitTheme.shapes.extraSmall)
-                        .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
-                ) {
-                    Text(
-                        text = data.text,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (data.content != null) {
+                    data.content.invoke()
+                } else if (data.text != null) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.extraSmall)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, ToolkitTheme.shapes.extraSmall)
+                            .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, ToolkitTheme.shapes.extraSmall)
+                            .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                    ) {
+                        Text(
+                            text = data.text,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -211,7 +257,11 @@ private fun Modifier.tooltipImpl(text: String, delay: Duration): Modifier {
                 delay(delay)
             }
             if (layoutCoordinates != null) {
-                tooltipState?.tooltipData = TooltipData(text, layoutCoordinates!!)
+                tooltipState?.tooltipData = TooltipData(
+                    coordinates = layoutCoordinates!!,
+                    text = text,
+                    key = text
+                )
             }
         } else {
             if (tooltipState?.tooltipData?.text == text && tooltipState.tooltipData?.coordinates == layoutCoordinates) {
@@ -224,6 +274,51 @@ private fun Modifier.tooltipImpl(text: String, delay: Duration): Modifier {
         onDispose {
             if (tooltipState?.tooltipData?.text == text && tooltipState.tooltipData?.coordinates == layoutCoordinates) {
                 tooltipState?.tooltipData = null
+            }
+        }
+    }
+
+    return this
+        .onGloballyPositioned { layoutCoordinates = it }
+        .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+        .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun Modifier.tooltipCustomImpl(
+    delay: Duration,
+    content: @Composable () -> Unit
+): Modifier {
+    val tooltipState = LocalTooltipState.current
+    var isHovered by remember { mutableStateOf(false) }
+    var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val uniqueKey = remember { Any() }
+
+    LaunchedEffect(isHovered, tooltipState) {
+        if (isHovered) {
+            if (delay > Duration.ZERO) {
+                delay(delay)
+            }
+            if (layoutCoordinates != null) {
+                tooltipState?.tooltipData = TooltipData(
+                    coordinates = layoutCoordinates!!,
+                    content = content,
+                    isPinned = false,
+                    key = uniqueKey
+                )
+            }
+        } else {
+            if (tooltipState?.tooltipData?.key == uniqueKey && !tooltipState.tooltipData!!.isPinned) {
+                tooltipState.tooltipData = null
+            }
+        }
+    }
+
+    DisposableEffect(uniqueKey, layoutCoordinates, tooltipState) {
+        onDispose {
+            if (tooltipState?.tooltipData?.key == uniqueKey && !tooltipState.tooltipData!!.isPinned) {
+                tooltipState.tooltipData = null
             }
         }
     }

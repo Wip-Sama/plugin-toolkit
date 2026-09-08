@@ -16,10 +16,15 @@ class BoardInteractionState {
     var lastPointerPosition: Offset by mutableStateOf(Offset.Zero)
     var selectionStart: Offset? by mutableStateOf(null)
     var selectionEnd: Offset? by mutableStateOf(null)
+    var hoveredNodeId: Long? by mutableStateOf(null)
 
     fun clearHoveredConnection() {
         hoveredConnection = null
         hoveredConnectionIsSource = null
+    }
+
+    fun clearHoveredNode() {
+        hoveredNodeId = null
     }
 
     fun clearSelectionBox() {
@@ -30,6 +35,7 @@ class BoardInteractionState {
     fun clearAllInteractions() {
         selectedConnection = null
         clearHoveredConnection()
+        clearHoveredNode()
         clearSelectionBox()
     }
 }

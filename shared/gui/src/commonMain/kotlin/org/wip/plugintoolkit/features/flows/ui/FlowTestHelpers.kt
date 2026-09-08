@@ -49,7 +49,7 @@ fun RenderTestBoardCanvas(
             onUndo = onUndo,
             onRedo = {},
             nodeSizes = emptyMap(),
-            content = @Composable { _ -> }
+            content = @Composable { _, _, _ -> }
         )
     }
 }
