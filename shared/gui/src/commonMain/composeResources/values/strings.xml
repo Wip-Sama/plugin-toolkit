@@ -603,4 +603,11 @@
     <string name="flow_sort_name_desc">Name (Z → A)</string>
     <string name="flow_sort_nodes_desc">Nodes (High → Low)</string>
     <string name="flow_sort_nodes_asc">Nodes (Low → High)</string>
+
+    <!-- GUI Scaling Stepper -->
+    <string name="setting_scaling_subtitle">Adjust application interface scale (Shift + Click for 2x step)</string>
+    <string name="scaling_decrease">Decrease scale (-5%, Shift: -10%)</string>
+    <string name="scaling_decrease_double">Decrease scale (-10%)</string>
+    <string name="scaling_increase">Increase scale (+5%, Shift: +10%)</string>
+    <string name="scaling_increase_double">Increase scale (+10%)</string>
 </resources>

@@ -20,6 +20,7 @@ import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
 import org.wip.plugintoolkit.features.settings.model.GeneralSettings
 import org.wip.plugintoolkit.features.settings.model.LocalizationSettings
 import org.wip.plugintoolkit.features.settings.model.SidebarStartMode
+import org.wip.plugintoolkit.features.settings.ui.ScalingControl
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
 import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
@@ -87,16 +88,22 @@ fun SettingsRegistryBuilder.appearanceDefinitions() {
                 ) { copy(sidebarStartMode = it) }
             }
 
-            bindGroup(AppSettings::general, { copy(general = it) }) {
-                slider(
-                    GeneralSettings::scaling,
-                    Res.string.setting_scaling,
-                    Icons.Default.AspectRatio,
-                    range = 0.5f..2.0f,
-                    steps = 29,
-                    subtitleProvider = { "${(it.general.scaling * 100).roundToInt()}%" }
-                ) { copy(scaling = round(it * 20f) / 20f) }
+            SettingCustom(
+                id = "general.scaling",
+                title = Res.string.setting_scaling,
+                subtitle = SettingText.Resource(Res.string.setting_scaling_subtitle),
+                icon = Icons.Default.AspectRatio,
+                control = { settings, onUpdate ->
+                    ScalingControl(
+                        scaling = settings.general.scaling,
+                        onScalingChange = { newScale ->
+                            onUpdate(settings.copy(general = settings.general.copy(scaling = newScale)))
+                        }
+                    )
+                }
+            )
 
+            bindGroup(AppSettings::general, { copy(general = it) }) {
                 switch(
                     GeneralSettings::animationsEnabled,
                     Res.string.setting_animations_enabled,

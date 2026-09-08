@@ -125,10 +125,9 @@ fun <T> SidebarItem(
                     color = contentColor,
                     maxLines = 1,
                     softWrap = false,
-                    overflow = TextOverflow.Clip,
-                    modifier = Modifier.weight(1f, fill = false)
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.weight(1f))
                 element.trailingContent(true)
             }
         }
