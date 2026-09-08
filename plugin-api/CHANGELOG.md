@@ -11,3 +11,4 @@ All notable changes to the Plugin API will be documented in this file.
 - Added CommonSemanticTypes registry for standardized SemanticType definitions.
 - Added `@JvmOverloads` across manifest and API data classes (`PluginAction`, `Capability`, `ParameterMetadata`, `SettingMetadata`, `PluginManifest`, etc.) to preserve JVM constructor signatures for precompiled plugins.
 - Enhanced generated `PluginEntry.getManifest()` with self-healing fallback to `ManifestLoader.loadFromResources()`.
+- Added `ProcessWatcher` interface and `PluginContext.watchProcess(...)` API to monitor memory usage of external child processes (e.g. terminal commands, Python scripts).

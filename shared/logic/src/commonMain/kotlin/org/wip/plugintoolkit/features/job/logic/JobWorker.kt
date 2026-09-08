@@ -40,6 +40,7 @@ import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import org.wip.plugintoolkit.features.job.utils.ProcessMemoryUtils
 
 
 class JobWorker(
@@ -212,20 +213,49 @@ class JobWorker(
                 try {
                     val startMark = kotlin.time.TimeSource.Monotonic.markNow()
                     val memBefore = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
-                    val processResult = if (timeout == -1L) {
-                        withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            processor.process(request, context)
+                    val procMemBefore = ProcessMemoryUtils.getTotalTrackedMemoryBytes(
+                        context.getActiveProcessWatchers().map { it.pid }
+                    )
+                    var peakMemory = memBefore + procMemBefore
+
+                    val samplingJob = workerScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                        while (isActive) {
+                            val jvmMem = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
+                            val extraPids = context.getActiveProcessWatchers().map { it.pid }
+                            val procMem = ProcessMemoryUtils.getTotalTrackedMemoryBytes(extraPids)
+                            val totalInstant = jvmMem + procMem
+                            if (totalInstant > peakMemory) {
+                                peakMemory = totalInstant
+                                manager.recordLivePeakMemory(job.id, peakMemory)
+                            }
+                            delay(100.milliseconds)
                         }
-                    } else {
-                        withTimeout(timeout.milliseconds) {
+                    }
+
+                    val processResult = try {
+                        if (timeout == -1L) {
                             withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 processor.process(request, context)
                             }
+                        } else {
+                            withTimeout(timeout.milliseconds) {
+                                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    processor.process(request, context)
+                                }
+                            }
                         }
+                    } finally {
+                        samplingJob.cancel()
                     }
+
                     val durationMs = startMark.elapsedNow().inWholeMilliseconds
                     val memAfter = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
-                    manager.recordCapabilityMetric(job.id, job.capabilityName, durationMs, maxOf(memBefore, memAfter))
+                    val procMemAfter = ProcessMemoryUtils.getTotalTrackedMemoryBytes(
+                        context.getActiveProcessWatchers().map { it.pid }
+                    )
+                    val totalAfter = memAfter + procMemAfter
+                    val finalMemory = maxOf(peakMemory, totalAfter)
+                    manager.recordCapabilityMetric(job.id, job.capabilityName, durationMs, finalMemory)
                     return@async processResult
                 } catch (e: TimeoutCancellationException) {
                     lastError = e

@@ -240,5 +240,16 @@ class CompleteExampleTest {
         val successResult = plugin.capabilityWithErrorDetail(triggerError = false)
         assertTrue(successResult is ExecutionResult.Success)
     }
+
+    @Test
+    fun testCapabilityWithProcessWatcher() {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+        val context = TestPluginContext()
+
+        val result = plugin.capabilityWithProcessWatcher("test-param", context)
+        assertTrue(result.contains("Watched process PID"))
+    }
 }
+
 

@@ -516,6 +516,59 @@ interface PluginContext {
     suspend fun updateSetting(key: String, value: Number) {
         updateSetting(key, kotlinx.serialization.json.JsonPrimitive(value))
     }
+
+    /**
+     * Watch an external process spawned by this plugin (e.g. via ProcessBuilder or terminal command).
+     * The monitored memory will automatically contribute to the capability's execution metrics.
+     *
+     * @param pid The operating system Process ID (PID).
+     * @return A [ProcessWatcher] handle.
+     */
+    fun watchProcess(pid: Long): ProcessWatcher = NoOpProcessWatcher(pid)
+
+    /**
+     * Return all active process watchers registered in this context.
+     */
+    fun getActiveProcessWatchers(): List<ProcessWatcher> = emptyList()
+}
+
+/**
+ * Handle to monitor the memory usage of an external process (e.g. terminal command, Python script, CLI binary).
+ */
+interface ProcessWatcher : AutoCloseable {
+    /**
+     * The operating system process ID (PID) of the watched process.
+     */
+    val pid: Long
+
+    /**
+     * Whether the process is currently alive.
+     */
+    val isAlive: Boolean get() = getCurrentMemoryBytes() > 0L
+
+    /**
+     * Current memory consumption in bytes (resident set size / working set) of the process and its child processes.
+     */
+    fun getCurrentMemoryBytes(): Long
+
+    /**
+     * Peak memory consumption in bytes observed since watching started.
+     */
+    fun getPeakMemoryBytes(): Long
+
+    /**
+     * Stop watching the process.
+     */
+    override fun close()
+}
+
+/**
+ * Fallback no-op implementation of [ProcessWatcher].
+ */
+open class NoOpProcessWatcher(override val pid: Long) : ProcessWatcher {
+    override fun getCurrentMemoryBytes(): Long = 0L
+    override fun getPeakMemoryBytes(): Long = 0L
+    override fun close() {}
 }
 
 /**

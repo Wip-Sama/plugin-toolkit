@@ -325,6 +325,7 @@ The `PluginContext` (and focused interfaces like `PluginLogger`, `PluginFileSyst
 - **Plugin Storage**: `PluginStorage` (`context.storage`) provides a persistent, internal key-value store (`get`, `put`, `getAll`, `remove`) for saving plugin-internal state without polluting user settings.
 - **Progress**: `ProgressReporter` (e.g. `progress.report(0.5f)`)
 - **Signals**: `PluginSignalManager` (e.g. `context.signals.onSignal { ... }`)
+- **Process Watcher**: `context.watchProcess(pid: Long)` / `context.watchProcess(process: java.lang.Process)` (Monitors external processes, terminal commands, or Python scripts to include their memory in job metrics and monitoring.)
 
 ### Plugin Actions & Parameters
 
@@ -358,6 +359,48 @@ suspend fun checkLocks(context: PluginContext): Map<String, Boolean> {
     return mapOf("model_downloaded" to isDownloaded)
 }
 ```
+
+### Process Monitoring & External Command Memory Tracking
+
+Plugins often spawn external tools, terminal commands, or language runtimes (such as Python scripts, `ffmpeg`, `curl`, CLI executables). The host application provides dual-layer memory tracking for these processes:
+
+1. **Automatic Descendant Process Tracking**:
+   The host application continuously samples child and grandchild processes spawned by the JVM. All active descendant processes are automatically measured (via native OS APIs on Windows, Linux, and macOS) and aggregated into:
+   - Live execution metrics during capability execution
+   - Peak Memory Usage
+   - Total Memory Usage
+
+2. **Explicit Process Watcher API (`context.watchProcess`)**:
+   For detached processes, long-running worker binaries, or when precise control and instant queries are required, you can explicitly watch a process using `PluginContext.watchProcess`:
+
+```kotlin
+@Capability(name = "Run External Command")
+fun runExternalCommand(
+    @CapabilityParam(description = "Command argument") arg: String,
+    context: PluginContext
+): String {
+    val process = ProcessBuilder("python", "script.py", arg).start()
+    
+    // Register the process with the host monitoring engine
+    // Use try-with-resources / use block to close when done
+    context.watchProcess(process).use { watcher ->
+        context.logger.info("Watching PID ${watcher.pid}, alive: ${watcher.isAlive}")
+        
+        process.waitFor()
+        
+        context.logger.info("Command completed with peak memory: ${watcher.getPeakMemoryBytes()} bytes")
+    }
+    
+    return "Finished"
+}
+```
+
+- **`ProcessWatcher` Interface**:
+  - `val pid: Long`: The OS process ID.
+  - `val isAlive: Boolean`: Whether the process is currently active.
+  - `fun getCurrentMemoryBytes(): Long`: Queries the current working set / RSS of the process.
+  - `fun getPeakMemoryBytes(): Long`: The maximum memory recorded since watching started.
+  - `fun close()`: Unregisters the watcher.
 
 ### Extracting Bundled Resources
 

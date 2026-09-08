@@ -40,6 +40,7 @@ import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.MemoryUtils
+import org.wip.plugintoolkit.features.job.utils.ProcessMemoryUtils
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import plugintoolkit.composeapp.generated.resources.Res
@@ -91,7 +92,9 @@ internal fun ExecutionInfoSection(
 
     var runningPeakMemory by remember(job.id) { mutableStateOf<Long?>(null) }
     val currentMem = if (isRunning && ticker >= 0) {
-        val mem = MemoryUtils.getCurrentMemoryUsageBytes()
+        val jvmMem = MemoryUtils.getCurrentMemoryUsageBytes()
+        val procMem = ProcessMemoryUtils.getAllDescendantsMemoryBytes()
+        val mem = jvmMem + procMem
         if (runningPeakMemory == null || mem > (runningPeakMemory ?: 0L)) {
             runningPeakMemory = mem
         }
@@ -99,7 +102,8 @@ internal fun ExecutionInfoSection(
     } else null
 
     val peakMemoryUsage = if (isRunning) {
-        runningPeakMemory ?: currentMem
+        val recordedJobPeak = metrics?.memoryUsageBytes ?: 0L
+        maxOf(runningPeakMemory ?: 0L, recordedJobPeak, currentMem ?: 0L).takeIf { it > 0L }
     } else {
         metrics?.memoryUsageBytes
     }

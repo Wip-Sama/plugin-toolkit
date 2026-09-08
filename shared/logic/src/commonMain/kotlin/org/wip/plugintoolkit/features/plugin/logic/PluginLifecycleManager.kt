@@ -28,6 +28,9 @@ import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.persistentListOf
+import org.wip.plugintoolkit.api.ProcessWatcher
+import org.wip.plugintoolkit.features.job.utils.LiveProcessWatcher
 
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -546,5 +549,19 @@ class DefaultPluginContext(
     override suspend fun updateSettings(newSettings: Map<String, JsonElement>) {
         _settings.putAll(newSettings)
         onUpdateSettings?.invoke(newSettings)
+    }
+
+    private val activeWatchers = atomic(persistentListOf<ProcessWatcher>())
+
+    override fun watchProcess(pid: Long): ProcessWatcher {
+        val watcher = LiveProcessWatcher(pid) { w ->
+            activeWatchers.update { list -> list.remove(w) }
+        }
+        activeWatchers.update { list -> list.add(watcher) }
+        return watcher
+    }
+
+    override fun getActiveProcessWatchers(): List<ProcessWatcher> {
+        return activeWatchers.value.filter { it.isAlive }
     }
 }

@@ -16,6 +16,7 @@ import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.ProgressReporter
+import org.wip.plugintoolkit.api.watchProcess
 import org.wip.plugintoolkit.api.annotations.Capability
 import org.wip.plugintoolkit.api.annotations.CapabilityContext
 import org.wip.plugintoolkit.api.annotations.CapabilityInput
@@ -374,5 +375,28 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
         } else {
             ExecutionResult.Success(PluginResponse(result = JsonPrimitive("Operation completed successfully")))
         }
+    }
+
+    @Capability(
+        name = "capabilityWithProcessWatcher",
+        description = "Showcase of external process monitoring using PluginContext.watchProcess to track memory."
+    )
+    fun capabilityWithProcessWatcher(
+        @CapabilityParam(description = "External message or argument to simulate CLI work", defaultValue = "echo-test") message: String,
+        context: PluginContext
+    ): String {
+        val isWindows = System.getProperty("os.name").lowercase().contains("win")
+        val process = ProcessBuilder(
+            if (isWindows) listOf("cmd.exe", "/c", "echo", message)
+            else listOf("echo", message)
+        ).start()
+
+        val watcher = context.watchProcess(process)
+        val initialAlive = watcher.isAlive
+        val mem = watcher.getCurrentMemoryBytes()
+        val peak = watcher.getPeakMemoryBytes()
+        process.waitFor()
+        watcher.close()
+        return "Watched process PID ${watcher.pid}: initialAlive=$initialAlive, mem=${mem}B, peak=${peak}B"
     }
 }

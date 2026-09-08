@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -38,6 +39,8 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockStatus
 import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import kotlin.time.Duration.Companion.milliseconds
+import org.wip.plugintoolkit.features.job.utils.ProcessMemoryUtils
 
 class FlowEngine(
     private val manager: JobManager,
@@ -534,20 +537,49 @@ class FlowEngine(
                             try {
                                 val startMark = kotlin.time.TimeSource.Monotonic.markNow()
                                 val memBefore = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
-                                val processResult = if (timeout == -1L) {
-                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        processor.process(request, context)
+                                val procMemBefore = ProcessMemoryUtils.getTotalTrackedMemoryBytes(
+                                    context.getActiveProcessWatchers().map { it.pid }
+                                )
+                                var peakMemory = memBefore + procMemBefore
+
+                                val samplingJob = workerScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                                    while (isActive) {
+                                        val jvmMem = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
+                                        val extraPids = context.getActiveProcessWatchers().map { it.pid }
+                                        val procMem = ProcessMemoryUtils.getTotalTrackedMemoryBytes(extraPids)
+                                        val totalInstant = jvmMem + procMem
+                                        if (totalInstant > peakMemory) {
+                                            peakMemory = totalInstant
+                                            manager.recordLivePeakMemory(job.id, peakMemory)
+                                        }
+                                        kotlinx.coroutines.delay(100.milliseconds)
                                     }
-                                } else {
-                                    kotlinx.coroutines.withTimeout(timeout) {
+                                }
+
+                                val processResult = try {
+                                    if (timeout == -1L) {
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                             processor.process(request, context)
                                         }
+                                    } else {
+                                        kotlinx.coroutines.withTimeout(timeout) {
+                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                processor.process(request, context)
+                                            }
+                                        }
                                     }
+                                } finally {
+                                    samplingJob.cancel()
                                 }
+
                                 val durationMs = startMark.elapsedNow().inWholeMilliseconds
                                 val memAfter = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
-                                manager.recordCapabilityMetric(job.id, node.capability.name, durationMs, maxOf(memBefore, memAfter))
+                                val procMemAfter = ProcessMemoryUtils.getTotalTrackedMemoryBytes(
+                                    context.getActiveProcessWatchers().map { it.pid }
+                                )
+                                val totalAfter = memAfter + procMemAfter
+                                val finalMemory = maxOf(peakMemory, totalAfter)
+                                manager.recordCapabilityMetric(job.id, node.capability.name, durationMs, finalMemory)
                                 return@async processResult
                             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                                 lastError = e

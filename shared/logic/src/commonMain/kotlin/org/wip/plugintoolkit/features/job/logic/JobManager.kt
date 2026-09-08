@@ -29,6 +29,7 @@ import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.core.utils.MemoryUtils
+import org.wip.plugintoolkit.features.job.utils.ProcessMemoryUtils
 import org.wip.plugintoolkit.features.job.model.CapabilityExecutionMetric
 import org.wip.plugintoolkit.features.job.model.JobExecutionMetrics
 import java.util.concurrent.ConcurrentHashMap
@@ -99,6 +100,15 @@ class JobManager(
             }
         }
     }
+
+    fun recordLivePeakMemory(jobId: String, memoryBytes: Long) {
+        if (memoryBytes <= 0L) return
+        activeJobPeakMemory.compute(jobId) { _, current ->
+            kotlin.math.max(current ?: 0L, memoryBytes)
+        }
+    }
+
+    fun getLivePeakMemory(jobId: String): Long? = activeJobPeakMemory[jobId]
 
     init {
         scope.launch {
@@ -198,7 +208,7 @@ class JobManager(
                 val completedAt = Clock.System.now()
                 val startedAt = job.startedAt ?: job.enqueuedAt
                 val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
-                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes()
+                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
                 val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
                 val peakMem = kotlin.math.max(recordedPeak, currentMem)
                 val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
@@ -314,7 +324,7 @@ class JobManager(
 
                 if (candidate != null) {
                     claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
-                    activeJobPeakMemory[candidate.id] = MemoryUtils.getCurrentMemoryUsageBytes()
+                    activeJobPeakMemory[candidate.id] = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
                     currentList.map { if (it.id == candidate.id) claimedJob else it }
                 } else {
                     currentList
@@ -434,7 +444,7 @@ class JobManager(
                 val completedAt = Clock.System.now()
                 val startedAt = job.startedAt ?: job.enqueuedAt
                 val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
-                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes()
+                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
                 val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
                 val peakMem = kotlin.math.max(recordedPeak, currentMem)
                 val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
@@ -490,7 +500,7 @@ class JobManager(
                 val completedAt = Clock.System.now()
                 val startedAt = job.startedAt ?: job.enqueuedAt
                 val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
-                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes()
+                val currentMem = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
                 val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
                 val peakMem = kotlin.math.max(recordedPeak, currentMem)
                 val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()

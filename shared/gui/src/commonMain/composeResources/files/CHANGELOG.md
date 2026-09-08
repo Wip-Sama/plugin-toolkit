@@ -5,7 +5,8 @@ Added:
 	- Flow system nodes can now have default values for their parameters
 	- Flow/capability runner now shows a "set as default" button for the parameters
 	- Setting to generate theme variants from accent color according to Material 3 Expressive guidelines
-	- New interface to monitor the memory usage of scripts while they run
+	- Added `ProcessWatcher` interface and `PluginContext.watchProcess(...)` API to monitor memory usage of external child processes (e.g. terminal commands, Python scripts)
+	- Added separate "Peak Memory Usage" and "Total Memory Usage" metric chips with automatic native descendant process memory tracking
 Changes:
 	- Refactored the update available menu
 	- Improved plugin binary backwards compatibility with @JvmOverloads across API data classes
