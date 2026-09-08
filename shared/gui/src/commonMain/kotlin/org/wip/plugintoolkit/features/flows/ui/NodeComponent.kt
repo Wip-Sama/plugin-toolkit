@@ -4,13 +4,22 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,10 +36,14 @@ import androidx.compose.ui.platform.testTag
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.ParameterConditionEvaluator
 import org.wip.plugintoolkit.api.ParameterRole
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
+import org.wip.plugintoolkit.features.flows.model.OutputPort
 import org.wip.plugintoolkit.features.flows.model.PortConstraints
 import org.wip.plugintoolkit.features.flows.ui.node.InputSectionType
 import org.wip.plugintoolkit.features.flows.ui.node.NodeInputSection
@@ -38,12 +51,15 @@ import org.wip.plugintoolkit.features.flows.ui.node.NodeOutputSection
 import org.wip.plugintoolkit.features.flows.model.ValidationError
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.node_hide_advanced_ports
 import plugintoolkit.composeapp.generated.resources.node_parameters_section
+import plugintoolkit.composeapp.generated.resources.node_show_advanced_ports
 
 @Composable
 fun NodeComponent(
     node: Node,
     connectedInputPortIds: Set<String>,
+    connectedOutputPortIds: Set<String> = emptySet(),
     inferredTypes: Map<Pair<Long, String>, DataType> = emptyMap(),
     inferredSemanticTypes: Map<Pair<Long, String>, List<SemanticType>> = emptyMap(),
     validationErrors: List<ValidationError> = emptyList(),
@@ -56,6 +72,7 @@ fun NodeComponent(
     onDragConnection: (Offset) -> Unit = {},
     onDropConnection: (isShiftPressed: Boolean) -> Unit = {},
     onPortPositioned: (Long, String, Boolean, LayoutCoordinates) -> Unit = { _, _, _, _ -> },
+    onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
     onPress: (Long) -> Unit = {},
     onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean, Any?) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit = { _, _, _, _, _ -> },
@@ -98,6 +115,61 @@ fun NodeComponent(
             pluginManager.loadPluginSettings(node.pluginInfo.id).settings
         } else {
             emptyMap()
+        }
+    }
+
+    val currentParamElements = remember(node.inputs) {
+        node.inputs.associate { input ->
+            input.id to NodeSerializationUtils.anyToJsonElement(input.value ?: input.defaultValue)
+        }
+    }
+
+    val hasAdvancedPorts = remember(node.inputs, node.outputs) {
+        node.inputs.any { it.isAdvanced } || node.outputs.any { it.isAdvanced }
+    }
+
+    var showAdvancedPorts by remember(node.id) { mutableStateOf(false) }
+
+    val inactiveConnectedPortIds = remember(node.inputs, node.outputs, currentParamElements, providedSettings, connectedInputPortIds, connectedOutputPortIds) {
+        val result = mutableSetOf<String>()
+        for (input in node.inputs) {
+            val isConnected = connectedInputPortIds.contains(input.id)
+            val isActive = input.condition == null || ParameterConditionEvaluator.isSatisfied(input.condition, currentParamElements, providedSettings)
+            if (!isActive && isConnected) {
+                result.add(input.id)
+            }
+        }
+        for (output in node.outputs) {
+            val isConnected = connectedOutputPortIds.contains(output.id)
+            val isActive = output.condition == null || ParameterConditionEvaluator.isSatisfied(output.condition, currentParamElements, providedSettings)
+            if (!isActive && isConnected) {
+                result.add(output.id)
+            }
+        }
+        result
+    }
+
+    fun isInputPortVisible(input: InputPort): Boolean {
+        val isConnected = connectedInputPortIds.contains(input.id)
+        val isActive = input.condition == null || ParameterConditionEvaluator.isSatisfied(input.condition, currentParamElements, providedSettings)
+        return if (!isActive) {
+            isConnected
+        } else if (input.isAdvanced) {
+            isConnected || showAdvancedPorts
+        } else {
+            true
+        }
+    }
+
+    fun isOutputPortVisible(output: OutputPort): Boolean {
+        val isConnected = connectedOutputPortIds.contains(output.id)
+        val isActive = output.condition == null || ParameterConditionEvaluator.isSatisfied(output.condition, currentParamElements, providedSettings)
+        return if (!isActive) {
+            isConnected
+        } else if (output.isAdvanced) {
+            isConnected || showAdvancedPorts
+        } else {
+            true
         }
     }
 
@@ -172,14 +244,21 @@ fun NodeComponent(
                 ) {
                     val capNode = node as? Node.CapabilityNode
                     val visibleOutputs = node.outputs.filter { output ->
-                        capNode?.capability?.parameters?.get(output.id)?.role != ParameterRole.OUTPUT_LOCATION
+                        capNode?.capability?.parameters?.get(output.id)?.role != ParameterRole.OUTPUT_LOCATION && isOutputPortVisible(output)
                     }
                     val parameters =
-                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role.let { r -> r == null || r == ParameterRole.STANDARD } }
+                        node.inputs.filter { input ->
+                            val role = capNode?.capability?.parameters?.get(input.id)?.role
+                            (role == null || role == ParameterRole.STANDARD) && isInputPortVisible(input)
+                        }
                     val inputLocations =
-                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == ParameterRole.INPUT_LOCATION }
+                        node.inputs.filter { input ->
+                            capNode?.capability?.parameters?.get(input.id)?.role == ParameterRole.INPUT_LOCATION && isInputPortVisible(input)
+                        }
                     val outputLocations =
-                        node.inputs.filter { capNode?.capability?.parameters?.get(it.id)?.role == ParameterRole.OUTPUT_LOCATION }
+                        node.inputs.filter { input ->
+                            capNode?.capability?.parameters?.get(input.id)?.role == ParameterRole.OUTPUT_LOCATION && isInputPortVisible(input)
+                        }
 
                     val inputSections = listOf(
                         Triple(InputSectionType.PARAMETERS, stringResource(Res.string.node_parameters_section), parameters),
@@ -230,7 +309,9 @@ fun NodeComponent(
                             onPortPositioned = onPortPositioned,
                             onUpdateValue = onUpdateValue,
                             onFocusLost = onFocusLost,
-                            onUpdateInputPortDefault = onUpdateInputPortDefault
+                            onUpdateInputPortDefault = onUpdateInputPortDefault,
+                            inactiveConnectedPortIds = inactiveConnectedPortIds,
+                            onPortDisposed = onPortDisposed
                         )
                     }
 
@@ -258,8 +339,37 @@ fun NodeComponent(
                         onStartConnection = onStartConnection,
                         onDragConnection = onDragConnection,
                         onDropConnection = onDropConnection,
-                        onPortPositioned = onPortPositioned
+                        onPortPositioned = onPortPositioned,
+                        inactiveConnectedPortIds = inactiveConnectedPortIds,
+                        onPortDisposed = onPortDisposed
                     )
+
+                    if (hasAdvancedPorts) {
+                        HorizontalDivider(
+                            Modifier.padding(top = ToolkitTheme.spacing.extraSmall),
+                            thickness = ToolkitTheme.dimensions.borderThin,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        TextButton(
+                            onClick = { showAdvancedPorts = !showAdvancedPorts },
+                            modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.segmentedButtonHeight)
+                        ) {
+                            Icon(
+                                imageVector = if (showAdvancedPorts) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Text(
+                                text = if (showAdvancedPorts) {
+                                    stringResource(Res.string.node_hide_advanced_ports)
+                                } else {
+                                    stringResource(Res.string.node_show_advanced_ports)
+                                },
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
                 }
             }
         }

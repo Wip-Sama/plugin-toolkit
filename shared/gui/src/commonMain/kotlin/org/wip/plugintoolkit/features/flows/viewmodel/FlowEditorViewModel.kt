@@ -287,7 +287,9 @@ class FlowEditorViewModel(
                             defaultValue = meta.defaultValue,
                             constraints = meta.constraints?.let {
                                 PortConstraints(regex = it.regex)
-                            }
+                            },
+                            isAdvanced = meta.isAdvanced,
+                            condition = meta.condition
                         )
                     } ?: emptyList(),
                     outputs = (event.capability.outputs?.map { out ->
@@ -296,7 +298,9 @@ class FlowEditorViewModel(
                             name = out.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
                             description = out.description,
                             dataType = out.type,
-                            semanticTypes = out.semanticTypes
+                            semanticTypes = out.semanticTypes,
+                            isAdvanced = out.isAdvanced,
+                            condition = out.condition
                         )
                     } ?: listOf(
                         OutputPort(
@@ -304,7 +308,9 @@ class FlowEditorViewModel(
                             name = "Result",
                             description = "Capability Result",
                             dataType = event.capability.returnType,
-                            semanticTypes = event.capability.semanticTypes
+                            semanticTypes = event.capability.semanticTypes,
+                            isAdvanced = false,
+                            condition = null
                         )
                     )) + (event.capability.parameters?.filter { it.value.role == org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION }
                         ?.map { (key, meta) ->
@@ -313,7 +319,9 @@ class FlowEditorViewModel(
                                 name = key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
                                 description = meta.description,
                                 dataType = meta.type,
-                                semanticTypes = meta.semanticTypes
+                                semanticTypes = meta.semanticTypes,
+                                isAdvanced = meta.isAdvanced,
+                                condition = meta.condition
                             )
                         } ?: emptyList())
                 )

@@ -51,6 +51,9 @@ object ProcessorConstants {
     const val PLUGIN_LOAD_ANNOTATION = "$ANNOTATION_PACKAGE.PluginLoad"
     const val PLUGIN_UPDATE_ANNOTATION = "$ANNOTATION_PACKAGE.PluginUpdate"
     const val COMPLEX_OBJECT_ANNOTATION = "$ANNOTATION_PACKAGE.ComplexObject"
+    const val DEPENDS_ON_ANNOTATION = "$ANNOTATION_PACKAGE.DependsOn"
+    const val DEPENDS_ON_ANY_ANNOTATION = "$ANNOTATION_PACKAGE.DependsOnAny"
+    const val DEPENDS_ON_ALL_ANNOTATION = "$ANNOTATION_PACKAGE.DependsOnAll"
 
     // API Classes
     val CN_PLUGIN_MANIFEST = PluginManifest::class.asClassName()
@@ -60,6 +63,10 @@ object ProcessorConstants {
     val CN_PLUGIN_ACTION = PluginAction::class.asClassName()
     val CN_PARAMETER_METADATA = ParameterMetadata::class.asClassName()
     val CN_PARAMETER_CONSTRAINTS = ParameterConstraints::class.asClassName()
+    val CN_CONDITION_OPERATOR = org.wip.plugintoolkit.api.ConditionOperator::class.asClassName()
+    val CN_CONDITION_SOURCE = org.wip.plugintoolkit.api.ConditionSource::class.asClassName()
+    val CN_PARAMETER_CONDITION = org.wip.plugintoolkit.api.ParameterCondition::class.asClassName()
+    val CN_CONDITION_GROUP = org.wip.plugintoolkit.api.ConditionGroup::class.asClassName()
     val CN_DATA_PROCESSOR = DataProcessor::class.asClassName()
     val CN_PLUGIN_REQUEST = PluginRequest::class.asClassName()
     val CN_PLUGIN_RESPONSE = PluginResponse::class.asClassName()

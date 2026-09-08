@@ -13,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -53,8 +54,25 @@ fun NodeInputSection(
     onUpdateValue: (Long, String, Any?) -> Unit,
     onFocusLost: () -> Unit,
     onUpdateInputPortDefault: (Long, String, Any?) -> Unit = { _, _, _ -> },
+    inactiveConnectedPortIds: Set<String> = emptySet(),
+    onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
+    DisposableEffect(node.id, isSectionCollapsed, inputs) {
+        onDispose {
+            if (isSectionCollapsed) {
+                inputs.forEach { input ->
+                    onPortDisposed(node.id, input.id, false)
+                    if (sectionType == InputSectionType.OUTPUT_LOCATIONS) {
+                        val correspondingOutput = node.outputs.find { it.id == input.id }
+                        if (correspondingOutput != null) {
+                            onPortDisposed(node.id, correspondingOutput.id, true)
+                        }
+                    }
+                }
+            }
+        }
+    }
     val sectionTag = "input_section_${sectionType.name.lowercase()}_${node.id}"
 
     Row(
@@ -129,7 +147,9 @@ fun NodeInputSection(
                 onPortPositioned = onPortPositioned,
                 onUpdateValue = onUpdateValue,
                 onFocusLost = onFocusLost,
-                onUpdateInputPortDefault = onUpdateInputPortDefault
+                onUpdateInputPortDefault = onUpdateInputPortDefault,
+                isInactiveAndConnected = inactiveConnectedPortIds.contains(input.id),
+                onPortDisposed = onPortDisposed
             )
         }
     }

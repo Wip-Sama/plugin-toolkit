@@ -610,4 +610,12 @@
     <string name="scaling_decrease_double">Riduci scala (-10%)</string>
     <string name="scaling_increase">Aumenta scala (+5%, Maiusc: +10%)</string>
     <string name="scaling_increase_double">Aumenta scala (+10%)</string>
+
+    <!-- Advanced and Dynamic Parameters -->
+    <string name="action_show_advanced">Mostra Opzioni Avanzate</string>
+    <string name="action_hide_advanced">Nascondi Opzioni Avanzate</string>
+    <string name="node_show_advanced_ports">Mostra porte avanzate</string>
+    <string name="node_hide_advanced_ports">Nascondi porte avanzate</string>
+    <string name="node_port_inactive_connected_warning">Questa porta è attualmente inattiva in base alle condizioni dei parametri. Scollega o modifica i parametri per risolvere.</string>
+    <string name="advanced_parameters_section">Parametri Avanzati</string>
 </resources>

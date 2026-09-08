@@ -8,6 +8,8 @@ Added:
 	- Added `ProcessWatcher` interface and `PluginContext.watchProcess(...)` API to monitor memory usage of external child processes (e.g. terminal commands, Python scripts)
 	- Added separate "Peak Memory Usage" and "Total Memory Usage" metric chips with automatic native descendant process memory tracking
   - Filtering/Sorting capabilities to plugins and flows
+  - Dynamic capability parameters
+  - Advanced capability parameters
 Changes:
 	- Refactored the update available menu
 	- Improved plugin binary backwards compatibility with @JvmOverloads across API data classes

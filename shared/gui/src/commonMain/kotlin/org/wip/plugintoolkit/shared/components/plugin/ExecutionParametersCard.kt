@@ -1,5 +1,10 @@
 package org.wip.plugintoolkit.shared.components.plugin
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,11 +14,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -26,9 +41,13 @@ import org.wip.plugintoolkit.api.FileAccess
 import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.api.ParameterRole
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.plugin.logic.ParameterDependencyGraph
 import org.wip.plugintoolkit.shared.components.ToolkitCard
 import org.wip.plugintoolkit.shared.components.SectionHeader
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_hide_advanced
+import plugintoolkit.composeapp.generated.resources.action_show_advanced
+import plugintoolkit.composeapp.generated.resources.advanced_parameters_section
 import plugintoolkit.composeapp.generated.resources.plugin_destructive_warning
 import plugintoolkit.composeapp.generated.resources.plugin_execution_inputs
 import plugintoolkit.composeapp.generated.resources.plugin_input_locations
@@ -62,6 +81,8 @@ fun ExecutionParametersCard(
     onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showAdvanced by rememberSaveable { mutableStateOf(false) }
+
     ToolkitCard(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -122,9 +143,28 @@ fun ExecutionParametersCard(
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
 
         if (parameters.isNotEmpty()) {
-            val standardParams = parameters.filter { it.metadata.role == ParameterRole.STANDARD }
-            val inputParams = parameters.filter { it.metadata.role == ParameterRole.INPUT_LOCATION }
-            val outputParams = parameters.filter { it.metadata.role == ParameterRole.OUTPUT_LOCATION }
+            val currentParamElements = remember(parameters) {
+                parameters.associate {
+                    it.name to org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils.anyToJsonElement(it.value)
+                }
+            }
+            val paramMap = remember(parameters) { parameters.associate { it.name to it.metadata } }
+            val activeParamNames = remember(paramMap, currentParamElements, providedSettings, providedLocks) {
+                ParameterDependencyGraph.computeActiveParameters(
+                    parameters = paramMap,
+                    values = currentParamElements,
+                    settings = providedSettings,
+                    locks = providedLocks
+                )
+            }
+
+            val activeParams = parameters.filter { it.name in activeParamNames }
+            val normalParams = activeParams.filter { !it.metadata.isAdvanced }
+            val advancedParams = activeParams.filter { it.metadata.isAdvanced }
+
+            val standardParams = normalParams.filter { it.metadata.role == ParameterRole.STANDARD }
+            val inputParams = normalParams.filter { it.metadata.role == ParameterRole.INPUT_LOCATION }
+            val outputParams = normalParams.filter { it.metadata.role == ParameterRole.OUTPUT_LOCATION }
 
             if (standardParams.isNotEmpty()) {
                 ParameterGroup(
@@ -160,6 +200,74 @@ fun ExecutionParametersCard(
                     pluginId = pluginId,
                     onNavigateToPluginSetting = onNavigateToPluginSetting
                 )
+            }
+
+            if (advancedParams.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = { showAdvanced = !showAdvanced },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = if (showAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                    Text(
+                        text = if (showAdvanced) {
+                            stringResource(Res.string.action_hide_advanced)
+                        } else {
+                            stringResource(Res.string.action_show_advanced)
+                        }
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = showAdvanced,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.padding(top = ToolkitTheme.spacing.medium)) {
+                        val advStandard = advancedParams.filter { it.metadata.role == ParameterRole.STANDARD }
+                        val advInputLoc = advancedParams.filter { it.metadata.role == ParameterRole.INPUT_LOCATION }
+                        val advOutputLoc = advancedParams.filter { it.metadata.role == ParameterRole.OUTPUT_LOCATION }
+
+                        if (advStandard.isNotEmpty()) {
+                            ParameterGroup(
+                                title = stringResource(Res.string.advanced_parameters_section),
+                                parameters = advStandard,
+                                providedSettings = providedSettings,
+                                providedLocks = providedLocks,
+                                hasUnsavedChanges = hasUnsavedChanges,
+                                pluginId = pluginId,
+                                onNavigateToPluginSetting = onNavigateToPluginSetting
+                            )
+                        }
+
+                        if (advInputLoc.isNotEmpty()) {
+                            ParameterGroup(
+                                title = stringResource(Res.string.plugin_input_locations),
+                                parameters = advInputLoc,
+                                providedSettings = providedSettings,
+                                providedLocks = providedLocks,
+                                hasUnsavedChanges = hasUnsavedChanges,
+                                pluginId = pluginId,
+                                onNavigateToPluginSetting = onNavigateToPluginSetting
+                            )
+                        }
+
+                        if (advOutputLoc.isNotEmpty()) {
+                            ParameterGroup(
+                                title = stringResource(Res.string.plugin_output_locations),
+                                parameters = advOutputLoc,
+                                providedSettings = providedSettings,
+                                providedLocks = providedLocks,
+                                hasUnsavedChanges = hasUnsavedChanges,
+                                pluginId = pluginId,
+                                onNavigateToPluginSetting = onNavigateToPluginSetting
+                            )
+                        }
+                    }
+                }
             }
         }
     }

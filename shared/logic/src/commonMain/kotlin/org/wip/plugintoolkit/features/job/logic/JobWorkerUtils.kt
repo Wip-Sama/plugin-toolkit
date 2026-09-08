@@ -203,12 +203,18 @@ fun convertValue(value: Any?, targetType: DataType): Any? {
 fun validateCapabilityParameters(
     manifest: PluginManifest,
     capabilityName: String,
-    parameters: Map<String, JsonElement>
+    parameters: Map<String, JsonElement>,
+    settings: Map<String, JsonElement> = emptyMap(),
+    locks: Map<String, Boolean> = emptyMap()
 ) {
     val capability = manifest.capabilities.find { it.name == capabilityName } ?: return
     val paramMetadataMap = capability.parameters ?: return
 
     for ((paramName, metadata) in paramMetadataMap) {
+        if (!org.wip.plugintoolkit.api.ParameterConditionEvaluator.isSatisfied(metadata.condition, parameters, settings, locks)) {
+            continue
+        }
+
         val valueElement = parameters[paramName]
 
         // Check if required

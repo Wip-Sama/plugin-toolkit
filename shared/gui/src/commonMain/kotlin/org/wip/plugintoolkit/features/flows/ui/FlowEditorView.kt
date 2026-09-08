@@ -55,8 +55,12 @@ import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.Connection
+import org.wip.plugintoolkit.features.flows.model.InputPort
+import org.wip.plugintoolkit.features.flows.model.OutputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
+import org.wip.plugintoolkit.api.ParameterConditionEvaluator
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
@@ -178,6 +182,78 @@ fun FlowEditorView(
         }
     }
 
+    val problematicConnections = remember(flow.connections, flow.nodes, pluginLocksState) {
+        val result = mutableSetOf<Connection>()
+        val nodeMap = flow.nodes.associateBy { it.id }
+        for (connection in flow.connections) {
+            val sourceNode = nodeMap[connection.sourceNodeId]
+            val targetNode = nodeMap[connection.targetNodeId]
+
+            var isSourceInactive = false
+            if (sourceNode is Node.CapabilityNode) {
+                val outPort = sourceNode.outputs.find { it.id == connection.sourcePortId }
+                if (outPort?.condition != null) {
+                    val currentParams = sourceNode.inputs.associate {
+                        it.id to NodeSerializationUtils.anyToJsonElement(it.value ?: it.defaultValue)
+                    }
+                    val settings = pluginManager.loadPluginSettings(sourceNode.pluginInfo.id).settings
+                    val locks = pluginLocksState[sourceNode.pluginInfo.id] ?: emptyMap()
+                    if (!ParameterConditionEvaluator.isSatisfied(outPort.condition, currentParams, settings, locks)) {
+                        isSourceInactive = true
+                    }
+                }
+            }
+
+            var isTargetInactive = false
+            if (targetNode is Node.CapabilityNode) {
+                val inPort = targetNode.inputs.find { it.id == connection.targetPortId }
+                if (inPort?.condition != null) {
+                    val currentParams = targetNode.inputs.associate {
+                        it.id to NodeSerializationUtils.anyToJsonElement(it.value ?: it.defaultValue)
+                    }
+                    val settings = pluginManager.loadPluginSettings(targetNode.pluginInfo.id).settings
+                    val locks = pluginLocksState[targetNode.pluginInfo.id] ?: emptyMap()
+                    if (!ParameterConditionEvaluator.isSatisfied(inPort.condition, currentParams, settings, locks)) {
+                        isTargetInactive = true
+                    }
+                }
+            }
+
+            if (isSourceInactive || isTargetInactive) {
+                result.add(connection)
+            }
+        }
+        result
+    }
+
+    val isPortTargetable = { node: Node, portId: String, isOutput: Boolean ->
+        if (node is Node.CapabilityNode) {
+            val isConnected = if (isOutput) {
+                flow.connections.any { it.sourceNodeId == node.id && it.sourcePortId == portId }
+            } else {
+                flow.connections.any { it.targetNodeId == node.id && it.targetPortId == portId }
+            }
+            if (isConnected) {
+                true
+            } else {
+                val port = if (isOutput) node.outputs.find { it.id == portId } else node.inputs.find { it.id == portId }
+                val condition = if (isOutput) (port as? OutputPort)?.condition else (port as? InputPort)?.condition
+                if (condition != null) {
+                    val currentParams = node.inputs.associate {
+                        it.id to NodeSerializationUtils.anyToJsonElement(it.value ?: it.defaultValue)
+                    }
+                    val settings = pluginManager.loadPluginSettings(node.pluginInfo.id).settings
+                    val locks = pluginLocksState[node.pluginInfo.id] ?: emptyMap()
+                    ParameterConditionEvaluator.isSatisfied(condition, currentParams, settings, locks)
+                } else {
+                    true
+                }
+            }
+        } else {
+            true
+        }
+    }
+
     // Capture standard error strings for localization
     val sameNodeWarning = stringResource(Res.string.flow_editor_same_node_warning)
     val incompatibleTypesMsg = stringResource(Res.string.flow_editor_incompatible_types)
@@ -234,7 +310,7 @@ fun FlowEditorView(
             onConnectionDrag = { boardPosition ->
                 connectionCurrentPos = boardPosition
                 val (closestNodeId, closestPortId) = findClosestPort(
-                    boardPosition, flow, connectionStartIsOutput, state.scale, getPortBoardPosition
+                    boardPosition, flow, connectionStartIsOutput, state.scale, getPortBoardPosition, isPortTargetable
                 )
                 highlightedNodeId = closestNodeId
                 highlightedPortId = closestPortId
@@ -271,13 +347,17 @@ fun FlowEditorView(
             selectedNodeIds = state.selectedNodeIds,
             onSelectNodes = { viewModel.onEvent(FlowEvent.SelectNodes(it)) },
             onClearSelection = { viewModel.onEvent(FlowEvent.ClearSelection) },
-            onDeleteSelectedNodes = { viewModel.onEvent(FlowEvent.DeleteSelectedNodes) },
+            onDeleteSelectedNodes = {
+                portLayouts.keys.removeAll { state.selectedNodeIds.contains(it.first) }
+                viewModel.onEvent(FlowEvent.DeleteSelectedNodes)
+            },
             onCopy = { viewModel.onEvent(FlowEvent.CopySelectedNodes) },
             onPaste = { viewModel.onEvent(FlowEvent.PasteNodes(it)) },
             onUndo = { viewModel.undo() },
             onRedo = { viewModel.redo() },
             nodeSizes = nodeSizes,
-            isReadOnly = state.isReadOnly
+            isReadOnly = state.isReadOnly,
+            problematicConnections = problematicConnections
         ) { hoveredConnection ->
             CompositionLocalProvider(LocalOverlayHost provides dropdownOverlay) {
                 // 1.2 Nodes
@@ -361,6 +441,8 @@ fun FlowEditorView(
                                 node = node,
                                 connectedInputPortIds = flow.connections.filter { it.targetNodeId == node.id }
                                     .map { it.targetPortId }.toSet(),
+                                connectedOutputPortIds = flow.connections.filter { it.sourceNodeId == node.id }
+                                    .map { it.sourcePortId }.toSet(),
                                 inferredTypes = state.inferredTypes,
                                 inferredSemanticTypes = state.inferredSemanticTypes,
                                 validationErrors = state.validationErrors,
@@ -387,7 +469,10 @@ fun FlowEditorView(
                                     )
                                 },
                                 onEndMove = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
-                                onDelete = { id -> viewModel.onEvent(FlowEvent.DeleteNode(id)) },
+                                onDelete = { id ->
+                                    portLayouts.keys.removeAll { it.first == id }
+                                    viewModel.onEvent(FlowEvent.DeleteNode(id))
+                                },
                                 onExpand = { id -> viewModel.onEvent(FlowEvent.ExpandSubFlow(id)) },
                                 onUpdateValue = { id, portId, value ->
                                     viewModel.onEvent(
@@ -437,6 +522,9 @@ fun FlowEditorView(
                                 onToggleOutputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeOutputsCollapse(id)) },
                                 onPortPositioned = { nodeId, portId, isOutput, coords ->
                                     portLayouts[Triple(nodeId, portId, isOutput)] = coords
+                                },
+                                onPortDisposed = { nodeId, portId, isOutput ->
+                                    portLayouts.remove(Triple(nodeId, portId, isOutput))
                                 },
                                 onStartConnection = { nodeId, portId, isOutput ->
                                     isDrawingConnection = true

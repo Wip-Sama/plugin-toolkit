@@ -74,7 +74,8 @@ internal fun findClosestPort(
     flow: Flow,
     connectionStartIsOutput: Boolean,
     scale: Float,
-    getPortBoardPosition: (Long, String, Boolean) -> Offset?
+    getPortBoardPosition: (Long, String, Boolean) -> Offset?,
+    isPortActiveOrConnected: ((Node, String, Boolean) -> Boolean)? = null
 ): Pair<Long?, String?> {
     var closestPortId: String? = null
     var closestNodeId: Long? = null
@@ -83,7 +84,11 @@ internal fun findClosestPort(
     flow.nodes.forEach { n ->
         val portsToTrack = if (connectionStartIsOutput) n.inputs else n.outputs
         portsToTrack.forEach { port ->
-            val portBoardPos = getPortBoardPosition(n.id, port.id, !connectionStartIsOutput) ?: return@forEach
+            val isOutput = !connectionStartIsOutput
+            if (isPortActiveOrConnected != null && !isPortActiveOrConnected(n, port.id, isOutput)) {
+                return@forEach
+            }
+            val portBoardPos = getPortBoardPosition(n.id, port.id, isOutput) ?: return@forEach
             val dist = (boardPosition - portBoardPos).getDistance()
             if (dist < minDistance) {
                 minDistance = dist

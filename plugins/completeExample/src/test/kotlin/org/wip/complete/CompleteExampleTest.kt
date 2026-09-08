@@ -250,6 +250,27 @@ class CompleteExampleTest {
         val result = plugin.capabilityWithProcessWatcher("test-param", context)
         assertTrue(result.contains("Watched process PID"))
     }
+
+    @Test
+    fun testCapabilityWithDynamicAndAdvancedParams() {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+
+        val defaultResult = plugin.capabilityWithDynamicAndAdvancedParams()
+        assertTrue(defaultResult.contains("FAST_INFERENCE"))
+
+        val customResult = plugin.capabilityWithDynamicAndAdvancedParams(
+            modelArchitecture = AIModelArchitecture.CUSTOM_CHECKPOINT,
+            customWeightsPath = "path/to/weights.bin",
+            batchSize = 32,
+            quantizationBits = 4,
+            remoteEndpoint = "https://api.example.com",
+            debugLogPath = "logs/debug.txt"
+        )
+        assertTrue(customResult.contains("CUSTOM_CHECKPOINT"))
+        assertTrue(customResult.contains("path/to/weights.bin"))
+        assertTrue(customResult.contains("32"))
+    }
 }
 
 

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 
@@ -69,6 +70,7 @@ fun BoardGridAndConnectionsCanvas(
     highlightedPortId: String?,
     highlightedNodeId: Long?,
     getPortBoardPosition: (Long, String, Boolean) -> Offset?,
+    problematicConnections: Set<Connection> = emptySet(),
     modifier: Modifier = Modifier
 ) {
     val gridSize = 50f
@@ -128,13 +130,18 @@ fun BoardGridAndConnectionsCanvas(
                             it.targetNodeId == connection.targetNodeId &&
                             it.targetPortId == connection.targetPortId
                 }
+                val hasProblem = problematicConnections.contains(connection)
                 val isSelected = interactionState.selectedConnection == connection
                 val isHovered = interactionState.hoveredConnection == connection
+                val baseColor = when {
+                    isInvalid -> customColors.red
+                    hasProblem -> customColors.warning
+                    else -> connectionColor
+                }
                 val color = when {
                     isSelected -> { Color(0xFFFF9800) }
                     isHovered && interactionState.hoveredConnectionIsSource == null -> { Color(0xFFFF2D55) }
-                    isInvalid -> { customColors.red }
-                    else -> { connectionColor }
+                    else -> { baseColor }
                 }.copy(alpha = connectionAlphas[connection] ?: 1f)
 
                 if (isHovered && interactionState.hoveredConnectionIsSource == null) {
@@ -147,11 +154,11 @@ fun BoardGridAndConnectionsCanvas(
 
                     val highlightColor = Color(0xFFFF2D55)
                     val sourceColor =
-                        if (interactionState.hoveredConnectionIsSource == true) highlightColor else connectionColor.copy(alpha = opacity.sidebarBackground)
+                        if (interactionState.hoveredConnectionIsSource == true) highlightColor else baseColor.copy(alpha = opacity.sidebarBackground)
                     val sourceStroke = if (interactionState.hoveredConnectionIsSource == true) dimensions.strokeWidthMedium.toPx() else dimensions.borderSelected.toPx()
 
                     val targetColor =
-                        if (interactionState.hoveredConnectionIsSource == false) highlightColor else connectionColor.copy(alpha = opacity.sidebarBackground)
+                        if (interactionState.hoveredConnectionIsSource == false) highlightColor else baseColor.copy(alpha = opacity.sidebarBackground)
                     val targetStroke = if (interactionState.hoveredConnectionIsSource == false) dimensions.strokeWidthMediumSmall.toPx() else dimensions.borderSelected.toPx()
 
                     if (interactionState.hoveredConnectionIsSource == true) {

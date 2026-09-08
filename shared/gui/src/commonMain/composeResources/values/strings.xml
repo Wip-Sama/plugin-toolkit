@@ -610,4 +610,12 @@
     <string name="scaling_decrease_double">Decrease scale (-10%)</string>
     <string name="scaling_increase">Increase scale (+5%, Shift: +10%)</string>
     <string name="scaling_increase_double">Increase scale (+10%)</string>
+
+    <!-- Advanced and Dynamic Parameters -->
+    <string name="action_show_advanced">Show Advanced Options</string>
+    <string name="action_hide_advanced">Hide Advanced Options</string>
+    <string name="node_show_advanced_ports">Show advanced ports</string>
+    <string name="node_hide_advanced_ports">Hide advanced ports</string>
+    <string name="node_port_inactive_connected_warning">This port is currently inactive based on parameter conditions. Disconnect or adjust parameters to resolve.</string>
+    <string name="advanced_parameters_section">Advanced Parameters</string>
 </resources>

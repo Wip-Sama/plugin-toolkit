@@ -20,7 +20,9 @@ object GeneratorUtils {
         val type: DataType,
         val typeName: TypeName,
         val description: String,
-        val semanticTypes: List<SemanticType>
+        val semanticTypes: List<SemanticType>,
+        val isAdvanced: Boolean = false,
+        val condition: org.wip.plugintoolkit.api.ConditionGroup? = null
     )
 
     fun mapKSTypeToDataType(ksType: KSType, visited: Set<String> = emptySet()): DataType {
@@ -225,6 +227,8 @@ object GeneratorUtils {
                 (funcOutputAnn.arguments.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
                     ?: emptyList()
             val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
+            val isAdvanced = funcOutputAnn.arguments.find { it.name?.asString() == "isAdvanced" }?.value as? Boolean ?: false
+            val conditionGroup = extractConditionGroup(func)
             return listOf(
                 OutputInfo(
                     name = name.ifEmpty { "result" },
@@ -232,7 +236,9 @@ object GeneratorUtils {
                     type = mapKSTypeToDataType(returnTypeKS),
                     typeName = returnTypeName,
                     description = desc,
-                    semanticTypes = semanticTypesList
+                    semanticTypes = semanticTypesList,
+                    isAdvanced = isAdvanced,
+                    condition = conditionGroup
                 )
             )
         }
@@ -259,6 +265,8 @@ object GeneratorUtils {
                             ?: emptyList()
                     val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
                     val propTypeKS = prop.type.resolve()
+                    val isAdvanced = propAnn?.arguments?.find { it.name?.asString() == "isAdvanced" }?.value as? Boolean ?: false
+                    val conditionGroup = extractConditionGroup(prop)
 
                     OutputInfo(
                         name = name.ifEmpty { prop.simpleName.asString() },
@@ -266,7 +274,9 @@ object GeneratorUtils {
                         type = mapKSTypeToDataType(propTypeKS),
                         typeName = propTypeKS.toTypeName(),
                         description = desc,
-                        semanticTypes = semanticTypesList
+                        semanticTypes = semanticTypesList,
+                        isAdvanced = isAdvanced,
+                        condition = conditionGroup
                     )
                 }
             }
@@ -280,8 +290,204 @@ object GeneratorUtils {
                 type = mapKSTypeToDataType(returnTypeKS),
                 typeName = returnTypeName,
                 description = "",
-                semanticTypes = emptyList()
+                semanticTypes = emptyList(),
+                isAdvanced = false,
+                condition = null
             )
         )
+    }
+
+    fun parseDependsOnAnnotation(ann: KSAnnotation): org.wip.plugintoolkit.api.ParameterCondition {
+        val param = ann.arguments.find { it.name?.asString() == "param" }?.value as? String ?: ""
+        val setting = ann.arguments.find { it.name?.asString() == "setting" }?.value as? String ?: ""
+        val lock = ann.arguments.find { it.name?.asString() == "lock" }?.value as? String ?: ""
+        val opArg = ann.arguments.find { it.name?.asString() == "operator" }?.value
+        val opName = when (opArg) {
+            is com.google.devtools.ksp.symbol.KSClassDeclaration -> opArg.simpleName.asString()
+            is KSType -> opArg.declaration.simpleName.asString()
+            else -> opArg?.toString()?.substringAfterLast('.')?.substringAfterLast(':')?.trim() ?: "EQUALS"
+        }
+        val op = try {
+            org.wip.plugintoolkit.api.ConditionOperator.valueOf(opName)
+        } catch (e: Exception) {
+            org.wip.plugintoolkit.api.ConditionOperator.EQUALS
+        }
+        val value = ann.arguments.find { it.name?.asString() == "value" }?.value as? String ?: ""
+        val values = (ann.arguments.find { it.name?.asString() == "values" }?.value as? List<*>)
+            ?.filterIsInstance<String>() ?: emptyList()
+
+        val source = when {
+            setting.isNotBlank() -> org.wip.plugintoolkit.api.ConditionSource.SETTING
+            lock.isNotBlank() -> org.wip.plugintoolkit.api.ConditionSource.LOCK
+            else -> org.wip.plugintoolkit.api.ConditionSource.PARAMETER
+        }
+        val target = when {
+            setting.isNotBlank() -> setting
+            lock.isNotBlank() -> lock
+            else -> param
+        }
+        return org.wip.plugintoolkit.api.ParameterCondition(
+            source = source,
+            target = target,
+            operator = op,
+            value = value,
+            values = values
+        )
+    }
+
+    fun extractConditionGroup(annotated: com.google.devtools.ksp.symbol.KSAnnotated): org.wip.plugintoolkit.api.ConditionGroup? {
+        val directDependsOn = annotated.annotations
+            .filter { it.hasQualifiedName(ProcessorConstants.DEPENDS_ON_ANNOTATION) }
+            .map { parseDependsOnAnnotation(it) }
+            .toList()
+
+        val dependsOnAnyAnn = annotated.annotations.find {
+            it.hasQualifiedName(ProcessorConstants.DEPENDS_ON_ANY_ANNOTATION)
+        }
+        val dependsOnAllAnn = annotated.annotations.find {
+            it.hasQualifiedName(ProcessorConstants.DEPENDS_ON_ALL_ANNOTATION)
+        }
+
+        if (dependsOnAnyAnn != null) {
+            val nested = (dependsOnAnyAnn.arguments.find { it.name?.asString() == "conditions" }?.value as? List<*>)
+                ?.filterIsInstance<KSAnnotation>()?.map { parseDependsOnAnnotation(it) } ?: emptyList()
+            val allConditions = directDependsOn + nested
+            if (allConditions.isNotEmpty()) {
+                return org.wip.plugintoolkit.api.ConditionGroup(allConditions, isOr = true)
+            }
+        }
+
+        if (dependsOnAllAnn != null) {
+            val nested = (dependsOnAllAnn.arguments.find { it.name?.asString() == "conditions" }?.value as? List<*>)
+                ?.filterIsInstance<KSAnnotation>()?.map { parseDependsOnAnnotation(it) } ?: emptyList()
+            val allConditions = directDependsOn + nested
+            if (allConditions.isNotEmpty()) {
+                return org.wip.plugintoolkit.api.ConditionGroup(allConditions, isOr = false)
+            }
+        }
+
+        if (directDependsOn.isNotEmpty()) {
+            return org.wip.plugintoolkit.api.ConditionGroup(directDependsOn, isOr = false)
+        }
+
+        return null
+    }
+
+    fun generateConditionGroupCode(group: org.wip.plugintoolkit.api.ConditionGroup?): com.squareup.kotlinpoet.CodeBlock {
+        if (group == null || group.conditions.isEmpty()) {
+            return com.squareup.kotlinpoet.CodeBlock.of("null")
+        }
+        val cnGroup = ProcessorConstants.CN_CONDITION_GROUP
+        val cnCondition = ProcessorConstants.CN_PARAMETER_CONDITION
+        val cnSource = ProcessorConstants.CN_CONDITION_SOURCE
+        val cnOperator = ProcessorConstants.CN_CONDITION_OPERATOR
+
+        val builder = com.squareup.kotlinpoet.CodeBlock.builder()
+        builder.add("%T(conditions = listOf(\n", cnGroup)
+        builder.indent()
+        group.conditions.forEachIndexed { index, cond ->
+            val valuesListCode = if (cond.values.isEmpty()) {
+                "emptyList()"
+            } else {
+                "listOf(" + cond.values.joinToString { "\"$it\"" } + ")"
+            }
+            builder.add(
+                "%T(source = %T.%L, target = %S, operator = %T.%L, value = %S, values = %L)",
+                cnCondition,
+                cnSource,
+                cond.source.name,
+                cond.target,
+                cnOperator,
+                cond.operator.name,
+                cond.value,
+                valuesListCode
+            )
+            if (index < group.conditions.size - 1) builder.add(",\n") else builder.add("\n")
+        }
+        builder.unindent()
+        builder.add("), isOr = %L)", group.isOr)
+        return builder.build()
+    }
+
+    fun validateCapabilityConditions(
+        capabilityName: String,
+        parameters: Map<String, org.wip.plugintoolkit.api.ConditionGroup?>,
+        availableSettings: Set<String>,
+        logger: com.google.devtools.ksp.processing.KSPLogger,
+        originNode: com.google.devtools.ksp.symbol.KSNode
+    ) {
+        val adj = mutableMapOf<String, MutableList<String>>()
+        parameters.keys.forEach { adj[it] = mutableListOf() }
+
+        parameters.forEach { (paramName, conditionGroup) ->
+            conditionGroup?.conditions?.forEach { cond ->
+                when (cond.source) {
+                    org.wip.plugintoolkit.api.ConditionSource.PARAMETER -> {
+                        if (!parameters.containsKey(cond.target)) {
+                            logger.error(
+                                "Parameter '$paramName' in capability '$capabilityName' depends on unknown parameter '${cond.target}'",
+                                originNode
+                            )
+                        } else if (cond.target == paramName) {
+                            logger.error(
+                                "Parameter '$paramName' in capability '$capabilityName' cannot depend on itself",
+                                originNode
+                            )
+                        } else {
+                            adj[paramName]?.add(cond.target)
+                        }
+                    }
+
+                    org.wip.plugintoolkit.api.ConditionSource.SETTING -> {
+                        if (availableSettings.isNotEmpty() && !availableSettings.contains(cond.target)) {
+                            logger.error(
+                                "Parameter '$paramName' in capability '$capabilityName' depends on unknown setting '${cond.target}'",
+                                originNode
+                            )
+                        }
+                    }
+
+                    org.wip.plugintoolkit.api.ConditionSource.LOCK -> {
+                        // Dynamic runtime check
+                    }
+                }
+            }
+        }
+
+        // Cycle detection via DFS
+        val visited = mutableSetOf<String>()
+        val inStack = mutableSetOf<String>()
+        val path = mutableListOf<String>()
+
+        fun dfs(current: String): Boolean {
+            visited.add(current)
+            inStack.add(current)
+            path.add(current)
+
+            for (neighbor in adj[current] ?: emptyList()) {
+                if (neighbor in inStack) {
+                    val cycleStartIndex = path.indexOf(neighbor)
+                    val cyclePath = path.subList(cycleStartIndex, path.size) + neighbor
+                    logger.error(
+                        "Circular parameter dependency detected in capability '$capabilityName': ${cyclePath.joinToString(" -> ")}",
+                        originNode
+                    )
+                    return true
+                }
+                if (neighbor !in visited) {
+                    if (dfs(neighbor)) return true
+                }
+            }
+
+            path.removeAt(path.size - 1)
+            inStack.remove(current)
+            return false
+        }
+
+        for (param in parameters.keys) {
+            if (param !in visited) {
+                dfs(param)
+            }
+        }
     }
 }

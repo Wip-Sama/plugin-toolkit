@@ -172,6 +172,26 @@ class ManifestProcessor(
             }
         }
 
+        // Validate parameter conditions for unknown targets and circular dependencies
+        val availableSettingNames = settingsProperties.map { it.simpleName.asString() }.toSet()
+        functions.forEach { func ->
+            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
+            val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as? String ?: func.simpleName.asString()
+            val paramConditions = func.parameters.filter { param ->
+                val paramType = param.type.resolve().toTypeName()
+                !ProcessorConstants.INFRASTRUCTURE_TYPES.contains(paramType)
+            }.associate { param ->
+                (param.name?.asString() ?: "") to GeneratorUtils.extractConditionGroup(param)
+            }
+            GeneratorUtils.validateCapabilityConditions(
+                capabilityName = capName,
+                parameters = paramConditions,
+                availableSettings = availableSettingNames,
+                logger = logger,
+                originNode = func
+            )
+        }
+
         val actions = classDeclaration.getAllFunctions().filter {
             it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_ACTION_ANNOTATION) }
         }.toList()

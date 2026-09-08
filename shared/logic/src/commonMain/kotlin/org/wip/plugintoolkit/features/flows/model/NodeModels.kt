@@ -22,7 +22,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import org.wip.plugintoolkit.api.Capability
+import org.wip.plugintoolkit.api.ConditionGroup
 import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.ParameterConditionEvaluator
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.parseSemanticTypes
@@ -105,7 +107,9 @@ data class InputPort(
     @Serializable(with = AnySerializer::class) val value: Any? = null,
     val constraints: PortConstraints? = null,
     val isRequired: Boolean = true,
-    override val description: String? = null
+    override val description: String? = null,
+    val isAdvanced: Boolean = false,
+    val condition: ConditionGroup? = null
 ) : Port
 
 object InputPortSerializer : KSerializer<InputPort> {
@@ -122,7 +126,9 @@ object InputPortSerializer : KSerializer<InputPort> {
             value = value.value,
             regex = value.constraints?.regex,
             constraints = value.constraints,
-            isRequired = value.isRequired
+            isRequired = value.isRequired,
+            isAdvanced = value.isAdvanced,
+            condition = value.condition
         )
         encoder.encodeSerializableValue(InputPortSurrogate.serializer(), surrogate)
     }
@@ -139,7 +145,9 @@ object InputPortSerializer : KSerializer<InputPort> {
             defaultValue = surrogate.defaultValue,
             value = surrogate.value,
             constraints = migratedConstraints,
-            isRequired = surrogate.isRequired
+            isRequired = surrogate.isRequired,
+            isAdvanced = surrogate.isAdvanced,
+            condition = surrogate.condition
         )
     }
 }
@@ -157,7 +165,9 @@ private data class InputPortSurrogate(
     val regex: String? = null,
     val constraints: PortConstraints? = null,
     val isRequired: Boolean = true,
-    val description: String? = null
+    val description: String? = null,
+    val isAdvanced: Boolean = false,
+    val condition: ConditionGroup? = null
 )
 
 @Serializable(with = OutputPortSerializer::class)
@@ -166,7 +176,9 @@ data class OutputPort(
     override val name: String,
     override val dataType: DataType,
     override val semanticTypes: List<SemanticType> = emptyList(),
-    override val description: String? = null
+    override val description: String? = null,
+    val isAdvanced: Boolean = false,
+    val condition: ConditionGroup? = null
 ) : Port
 
 object OutputPortSerializer : KSerializer<OutputPort> {
@@ -178,7 +190,9 @@ object OutputPortSerializer : KSerializer<OutputPort> {
             name = value.name,
             description = value.description,
             dataType = value.dataType,
-            semanticTypes = value.semanticTypes
+            semanticTypes = value.semanticTypes,
+            isAdvanced = value.isAdvanced,
+            condition = value.condition
         )
         encoder.encodeSerializableValue(OutputPortSurrogate.serializer(), surrogate)
     }
@@ -206,7 +220,9 @@ object OutputPortSerializer : KSerializer<OutputPort> {
             name = surrogate.name,
             description = surrogate.description,
             dataType = surrogate.dataType,
-            semanticTypes = surrogate.semanticTypes
+            semanticTypes = surrogate.semanticTypes,
+            isAdvanced = surrogate.isAdvanced,
+            condition = surrogate.condition
         )
     }
 }
@@ -218,7 +234,9 @@ private class OutputPortSurrogate(
     val name: String,
     val dataType: DataType,
     val semanticTypes: List<SemanticType> = emptyList(),
-    val description: String? = null
+    val description: String? = null,
+    val isAdvanced: Boolean = false,
+    val condition: ConditionGroup? = null
 )
 
 @Serializable
@@ -286,7 +304,14 @@ sealed class Node {
         ): Boolean {
             if (isBroken) return false
             val parameters = capability.parameters ?: return true
+            val currentParamElements = inputs.associate { input ->
+                input.id to AnySerializer.toJsonElement(input.value ?: input.defaultValue)
+            }
             for ((portId, metadata) in parameters) {
+                if (!ParameterConditionEvaluator.isSatisfied(metadata.condition, currentParamElements, settings ?: emptyMap(), locks ?: emptyMap())) {
+                    continue
+                }
+
                 val inputPort = inputs.find { it.id == portId }
                 val effectiveValue = inputPort?.value ?: inputPort?.defaultValue
 

@@ -17,12 +17,14 @@ import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.watchProcess
+import org.wip.plugintoolkit.api.ConditionOperator
 import org.wip.plugintoolkit.api.annotations.Capability
 import org.wip.plugintoolkit.api.annotations.CapabilityContext
 import org.wip.plugintoolkit.api.annotations.CapabilityInput
 import org.wip.plugintoolkit.api.annotations.CapabilityOutput
 import org.wip.plugintoolkit.api.annotations.CapabilityParam
 import org.wip.plugintoolkit.api.annotations.CapabilityResult
+import org.wip.plugintoolkit.api.annotations.DependsOn
 import org.wip.plugintoolkit.api.annotations.PluginAction
 import org.wip.plugintoolkit.api.annotations.PluginInfo
 import org.wip.plugintoolkit.api.annotations.PluginLoad
@@ -37,6 +39,12 @@ import org.wip.plugintoolkit.api.annotations.RequiresSetting
 import org.wip.plugintoolkit.api.annotations.ResumeState
 import org.wip.plugintoolkit.api.annotations.ComplexObject as ComplexObjectAnnotation
 import java.io.File
+
+enum class AIModelArchitecture {
+    FAST_INFERENCE,
+    HIGH_PRECISION,
+    CUSTOM_CHECKPOINT
+}
 
 data class CompleteExampleSettings(
     @PluginSetting(
@@ -398,5 +406,55 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
         process.waitFor()
         watcher.close()
         return "Watched process PID ${watcher.pid}: initialAlive=$initialAlive, mem=${mem}B, peak=${peak}B"
+    }
+
+    @Capability(
+        name = "capabilityWithDynamicAndAdvancedParams",
+        description = "Showcase of dynamic parameters that depend on other parameters/settings, along with advanced parameters."
+    )
+    fun capabilityWithDynamicAndAdvancedParams(
+        @CapabilityParam(
+            description = "Selected model architecture",
+            defaultValue = "FAST_INFERENCE"
+        ) modelArchitecture: AIModelArchitecture = AIModelArchitecture.FAST_INFERENCE,
+
+        @CapabilityParam(
+            description = "Custom model weights checkpoint file path",
+            defaultValue = "models/custom.bin"
+        )
+        @DependsOn(param = "modelArchitecture", value = "CUSTOM_CHECKPOINT")
+        customWeightsPath: String? = null,
+
+        @CapabilityParam(
+            description = "Inference batch size",
+            defaultValue = "16",
+            isAdvanced = true
+        )
+        batchSize: Int = 16,
+
+        @CapabilityParam(
+            description = "Quantization bits for precision tuning",
+            defaultValue = "8",
+            isAdvanced = true
+        )
+        @DependsOn(param = "modelArchitecture", operator = ConditionOperator.NOT_EQUALS, value = "FAST_INFERENCE")
+        quantizationBits: Int? = 8,
+
+        @CapabilityParam(
+            description = "API Endpoint override when using remote API key setting",
+            isAdvanced = true
+        )
+        @DependsOn(setting = "apiKey", operator = ConditionOperator.IS_NOT_BLANK)
+        remoteEndpoint: String? = null,
+
+        @CapabilityOutput(
+            description = "Debug telemetry logs output",
+            isAdvanced = true,
+            semanticTypes = ["file/text"]
+        )
+        debugLogPath: String? = null
+    ): String {
+        return "Model: $modelArchitecture, customWeights: $customWeightsPath, batchSize: $batchSize, " +
+                "quantization: $quantizationBits, remoteEndpoint: $remoteEndpoint, debugLog: $debugLogPath"
     }
 }

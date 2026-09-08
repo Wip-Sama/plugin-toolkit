@@ -13,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,9 +50,21 @@ fun NodeOutputSection(
     onDragConnection: (Offset) -> Unit,
     onDropConnection: (Boolean) -> Unit,
     onPortPositioned: (Long, String, Boolean, LayoutCoordinates) -> Unit,
+    inactiveConnectedPortIds: Set<String> = emptySet(),
+    onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     if (outputs.isEmpty()) return
+
+    DisposableEffect(node.id, isOutputsCollapsed, outputs) {
+        onDispose {
+            if (isOutputsCollapsed) {
+                outputs.forEach { output ->
+                    onPortDisposed(node.id, output.id, true)
+                }
+            }
+        }
+    }
 
     Row(
         modifier = modifier
@@ -102,7 +115,9 @@ fun NodeOutputSection(
                 onStartConnection = onStartConnection,
                 onDragConnection = onDragConnection,
                 onDropConnection = onDropConnection,
-                onPortPositioned = onPortPositioned
+                onPortPositioned = onPortPositioned,
+                isInactiveAndConnected = inactiveConnectedPortIds.contains(output.id),
+                onPortDisposed = onPortDisposed
             )
         }
     }

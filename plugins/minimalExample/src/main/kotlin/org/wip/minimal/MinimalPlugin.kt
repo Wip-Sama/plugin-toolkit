@@ -16,8 +16,9 @@ class MinimalPlugin {
 
     @Capability(name = "greet", description = "Returns a simple greeting message")
     fun greet(
-        @CapabilityParam(description = "Name of the person to greet", defaultValue = "World") name: String
+        @CapabilityParam(description = "Name of the person to greet", defaultValue = "World") name: String,
+        @CapabilityParam(description = "Include enthusiastic punctuation", defaultValue = "false", isAdvanced = true) enthusiastic: Boolean = false
     ): String {
-        return "Hello, $name!"
+        return if (enthusiastic) "Hello, $name!!!" else "Hello, $name!"
     }
 }

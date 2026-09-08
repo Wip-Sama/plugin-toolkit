@@ -47,6 +47,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Connection
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.node_port_inactive_connected_warning
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardGridAndConnectionsCanvas
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardInteractionState
@@ -95,6 +102,7 @@ fun BoardCanvas(
     onRedo: () -> Unit,
     nodeSizes: Map<Long, IntSize>,
     isReadOnly: Boolean = false,
+    problematicConnections: Set<Connection> = emptySet(),
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.(hoveredConnection: Connection?) -> Unit
 ) {
@@ -103,6 +111,15 @@ fun BoardCanvas(
     val interactionState = remember { BoardInteractionState() }
 
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
+
+    var hoveredConnectionTooltipVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(interactionState.hoveredConnection) {
+        hoveredConnectionTooltipVisible = false
+        if (interactionState.hoveredConnection != null) {
+            delay(1000)
+            hoveredConnectionTooltipVisible = true
+        }
+    }
 
     LaunchedEffect(flow.connections) {
         if (interactionState.hoveredConnection != null && !flow.connections.contains(interactionState.hoveredConnection)) {
@@ -193,8 +210,47 @@ fun BoardCanvas(
             connectionStartIsOutput = connectionStartIsOutput,
             highlightedPortId = highlightedPortId,
             highlightedNodeId = highlightedNodeId,
-            getPortBoardPosition = getPortBoardPosition
+            getPortBoardPosition = getPortBoardPosition,
+            problematicConnections = problematicConnections
         )
+
+        // Connection Hover Tooltip
+        if (hoveredConnectionTooltipVisible && interactionState.hoveredConnection != null) {
+            val conn = interactionState.hoveredConnection!!
+            val isProblem = problematicConnections.contains(conn)
+            val validationError = state.validationErrors.firstOrNull {
+                it.sourceNodeId == conn.sourceNodeId && it.sourcePortId == conn.sourcePortId &&
+                        it.targetNodeId == conn.targetNodeId && it.targetPortId == conn.targetPortId
+            }
+            val tooltipMsg = when {
+                validationError != null -> validationError.message
+                isProblem -> stringResource(Res.string.node_port_inactive_connected_warning)
+                else -> null
+            }
+            if (tooltipMsg != null) {
+                Popup(
+                    offset = IntOffset(
+                        interactionState.lastPointerPosition.x.toInt() + 16,
+                        interactionState.lastPointerPosition.y.toInt() + 16
+                    ),
+                    properties = PopupProperties(focusable = false)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.extraSmall)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, ToolkitTheme.shapes.extraSmall)
+                            .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, ToolkitTheme.shapes.extraSmall)
+                            .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                    ) {
+                        Text(
+                            text = tooltipMsg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
 
         // 2. Render main children (nodes, preview)
         content(interactionState.hoveredConnection)

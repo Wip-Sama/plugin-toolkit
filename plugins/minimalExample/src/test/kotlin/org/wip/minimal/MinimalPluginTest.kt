@@ -16,4 +16,10 @@ class MinimalPluginTest {
         val plugin = MinimalPlugin()
         assertEquals("Hello, Alice!", plugin.greet("Alice"))
     }
+
+    @Test
+    fun testGreetEnthusiastic() {
+        val plugin = MinimalPlugin()
+        assertEquals("Hello, Bob!!!", plugin.greet("Bob", enthusiastic = true))
+    }
 }
