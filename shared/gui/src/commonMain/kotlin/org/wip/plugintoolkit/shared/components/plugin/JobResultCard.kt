@@ -1,6 +1,13 @@
 package org.wip.plugintoolkit.shared.components.plugin
 
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -170,11 +177,10 @@ fun JobResultCard(
         }
     }
 
-    // Outer ToolkitCard with animateContentSize enables extremely smooth expansion transitions!
+    // Outer ToolkitCard wraps content with smooth expansion transitions!
     ToolkitCard(
         modifier = modifier
-            .fillMaxWidth()
-            .animateContentSize(),
+            .fillMaxWidth(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
     ) {
         Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
@@ -299,8 +305,21 @@ fun JobResultCard(
             }
 
             // Expanded Details Section
-            if (expanded) {
-                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(animationSpec = tween(durationMillis = 180, delayMillis = 40, easing = LinearOutSlowInEasing)) +
+                        expandVertically(
+                            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                            expandFrom = Alignment.Top
+                        ),
+                exit = fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)) +
+                       shrinkVertically(
+                           animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                           shrinkTowards = Alignment.Top
+                       )
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
@@ -491,8 +510,9 @@ fun JobResultCard(
                     }
                 }
             }
+        }
 
-            // Action buttons row
+        // Action buttons row
             val hasActions = onPause != null || onResume != null || onCancel != null || onClear != null
             if (hasActions || expanded) {
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
@@ -619,8 +639,8 @@ fun JobResultCard(
                 }
             }
         }
-        }
     }
+}
 }
 
 @Composable

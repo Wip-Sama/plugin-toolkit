@@ -1,7 +1,10 @@
 package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -224,11 +228,14 @@ fun NodeComponent(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
                 .onPointerEvent(PointerEventType.Enter) { onHoverNode(node.id) }
                 .onPointerEvent(PointerEventType.Exit) { onHoverNode(null) }
-                .onPointerEvent(PointerEventType.Press, pass = PointerEventPass.Initial) {
-                    currentOnPress(node.id)
+                .pointerInput(node.id) {
+                    detectTapGestures(
+                        onPress = {
+                            currentOnPress(node.id)
+                        }
+                    )
                 },
             elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.spacing.small),
             shape = MaterialTheme.shapes.medium,
@@ -259,7 +266,7 @@ fun NodeComponent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(ToolkitTheme.spacing.mediumSmall),
-                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                 ) {
                     val capNode = node as? Node.CapabilityNode
                     val visibleOutputs = node.outputs.filter { output ->
@@ -294,7 +301,7 @@ fun NodeComponent(
 
                         if (index > 0) {
                             HorizontalDivider(
-                                Modifier.padding(vertical = ToolkitTheme.spacing.small),
+                                modifier = Modifier.fillMaxWidth(),
                                 thickness = ToolkitTheme.dimensions.borderThin,
                                 color = MaterialTheme.colorScheme.outlineVariant
                             )
@@ -335,9 +342,9 @@ fun NodeComponent(
                         )
                     }
 
-                    if (node.inputs.isNotEmpty() && visibleOutputs.isNotEmpty()) {
+                    if (inputSections.isNotEmpty() && visibleOutputs.isNotEmpty()) {
                         HorizontalDivider(
-                            Modifier,
+                            modifier = Modifier.fillMaxWidth(),
                             thickness = ToolkitTheme.dimensions.borderThin,
                             color = MaterialTheme.colorScheme.outlineVariant
                         )
@@ -367,7 +374,7 @@ fun NodeComponent(
 
                     if (hasAdvancedPorts) {
                         HorizontalDivider(
-                            Modifier.padding(top = ToolkitTheme.spacing.extraSmall),
+                            modifier = Modifier.fillMaxWidth(),
                             thickness = ToolkitTheme.dimensions.borderThin,
                             color = MaterialTheme.colorScheme.outlineVariant
                         )

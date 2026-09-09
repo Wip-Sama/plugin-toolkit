@@ -360,6 +360,26 @@ fun FlowEditorView(
             problematicConnections = problematicConnections
         ) { hoveredConnection, hoveredNodeId, onHoverNode ->
             CompositionLocalProvider(LocalOverlayHost provides dropdownOverlay) {
+                // 1.1 Ghost Preview for Snapping (rendered underneath nodes)
+                state.ghostPosition?.let { ghostPos ->
+                    val draggedNode = state.flow.nodes.find { it.id == state.draggedNodeId }
+                    val heightDp = draggedNode?.let { node ->
+                        nodeSizes[node.id]?.let { size ->
+                            with(density) { size.height.toDp() }
+                        }
+                    } ?: ToolkitTheme.dimensions.containerHeightLarge
+
+                    NodeCardContainer(
+                        nodePosition = ghostPos.toComposeOffset(),
+                        dragOffset = Offset.Zero,
+                        scale = state.scale,
+                        boardOffset = state.offset,
+                        modifier = Modifier.alpha(0.3f)
+                    ) {
+                        draggedNode?.let { NodeComponentPlaceholder(it, heightDp) }
+                    }
+                }
+
                 // 1.2 Nodes
                 flow.nodes.forEach { node ->
                     key(node.id) {
@@ -553,9 +573,17 @@ fun FlowEditorView(
                                 onPortPositioned = { nodeId, portId, isOutput, coords ->
                                     portLayouts[Triple(nodeId, portId, isOutput)] = coords
                                 },
-                                onPortDisposed = { nodeId, portId, isOutput ->
-                                    portLayouts.remove(Triple(nodeId, portId, isOutput))
-                                },
+                                 onPortDisposed = { nodeId, portId, isOutput ->
+                                     val targetNode = flow.nodes.find { it.id == nodeId }
+                                     val portStillExists = if (isOutput) {
+                                         targetNode?.outputs?.any { it.id == portId } == true
+                                     } else {
+                                         targetNode?.inputs?.any { it.id == portId } == true
+                                     }
+                                     if (!portStillExists) {
+                                         portLayouts.remove(Triple(nodeId, portId, isOutput))
+                                     }
+                                 },
                                 onStartConnection = { nodeId, portId, isOutput ->
                                     isDrawingConnection = true
                                     connectionStartNodeId = nodeId
@@ -610,27 +638,6 @@ fun FlowEditorView(
                                 }
                             )
                         }
-                    }
-                }
-
-                // Ghost Preview for Snapping
-                state.ghostPosition?.let { ghostPos ->
-                    val draggedNode = state.flow.nodes.find { it.id == state.draggedNodeId }
-                    val heightDp = draggedNode?.let { node ->
-                        nodeSizes[node.id]?.let { size ->
-                            with(density) { size.height.toDp() }
-                        }
-                    } ?: ToolkitTheme.dimensions.containerHeightLarge
-
-                    NodeCardContainer(
-                        nodePosition = ghostPos.toComposeOffset(),
-                        dragOffset = Offset.Zero,
-                        scale = state.scale,
-                        boardOffset = state.offset,
-                        modifier = Modifier.alpha(0.3f)
-                    ) {
-
-                        draggedNode?.let { NodeComponentPlaceholder(it, heightDp) }
                     }
                 }
             }

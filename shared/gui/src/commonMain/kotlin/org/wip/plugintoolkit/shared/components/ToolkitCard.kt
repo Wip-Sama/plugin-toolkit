@@ -1,6 +1,8 @@
 package org.wip.plugintoolkit.shared.components
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -42,14 +44,21 @@ fun ToolkitCard(
     border: BorderStroke? = null,
     elevation: CardElevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.dimensions.cardElevation),
     contentPadding: PaddingValues = PaddingValues(ToolkitTheme.spacing.md),
+    animateContentSize: Boolean = false,
     onClick: (() -> Unit)? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val cardModifier = if (animateContentSize) {
+        modifier.clip(shape).animateContentSize(animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing))
+    } else {
+        modifier.clip(shape)
+    }
+
     if (onClick != null) {
         Card(
             onClick = onClick,
-            modifier = modifier.clip(shape).animateContentSize(),
+            modifier = cardModifier,
             shape = shape,
             colors = CardDefaults.cardColors(
                 containerColor = containerColor,
@@ -63,7 +72,7 @@ fun ToolkitCard(
         }
     } else {
         Card(
-            modifier = modifier.clip(shape).animateContentSize(),
+            modifier = cardModifier,
             shape = shape,
             colors = CardDefaults.cardColors(
                 containerColor = containerColor,

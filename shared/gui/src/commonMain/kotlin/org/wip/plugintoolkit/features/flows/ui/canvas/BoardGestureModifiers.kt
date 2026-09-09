@@ -27,8 +27,12 @@ fun Modifier.boardConnectionTapGesture(
     offset: Offset,
     getPortBoardPosition: (Long, String, Boolean) -> Offset?,
     focusRequester: FocusRequester,
+    nodes: List<Node> = emptyList(),
+    nodeSizes: Map<Long, IntSize> = emptyMap(),
+    density: Density? = null,
+    defaultNodeWidthPx: Float = 0f,
     onClearSelection: () -> Unit
-): Modifier = this.pointerInput(connections, getPortBoardPosition, scale, offset) {
+): Modifier = this.pointerInput(connections, getPortBoardPosition, scale, offset, nodes, nodeSizes) {
     detectTapGestures { tapOffset ->
         focusRequester.requestFocus()
         val bestConnection = ConnectionHitTester.findClosestConnection(
@@ -40,7 +44,19 @@ fun Modifier.boardConnectionTapGesture(
         )
         interactionState.selectedConnection = bestConnection
         if (bestConnection == null) {
-            onClearSelection()
+            val d = density?.density ?: 1f
+            val modelPoint = (tapOffset - offset) / scale
+            val isOverNode = nodes.any { node ->
+                val nodeLeft = node.position.x
+                val nodeTop = node.position.y
+                val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: defaultNodeWidthPx
+                val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * d)
+                modelPoint.x >= nodeLeft && modelPoint.x <= nodeLeft + nodeWidth &&
+                        modelPoint.y >= nodeTop && modelPoint.y <= nodeTop + nodeHeight
+            }
+            if (!isOverNode) {
+                onClearSelection()
+            }
         }
     }
 }

@@ -173,6 +173,10 @@ fun BoardCanvas(
                 offset = state.offset,
                 getPortBoardPosition = getPortBoardPosition,
                 focusRequester = focusRequester,
+                nodes = flow.nodes,
+                nodeSizes = nodeSizes,
+                density = density,
+                defaultNodeWidthPx = with(density) { dimensions.nodeWidth.toPx() },
                 onClearSelection = onClearSelection
             )
             .boardPanGesture(
