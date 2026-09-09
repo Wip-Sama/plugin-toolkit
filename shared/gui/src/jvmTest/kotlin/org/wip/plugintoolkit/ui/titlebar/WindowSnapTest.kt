@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import javax.swing.JFrame
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class WindowSnapTest {
@@ -25,6 +26,9 @@ class WindowSnapTest {
             WindowFrameUtils.enableUndecoratedDropShadow(frame)
             assertTrue(frame.isUndecorated, "Window must remain undecorated")
 
+            val hwnd = WindowFrameUtils.getHwnd(frame)
+            assertNotNull(hwnd, "HWND must be accessible for visible JFrame")
+
             // Test native title bar theme helper as well
             WindowFrameUtils.setNativeTitleBarTheme(
                 window = frame,
@@ -35,5 +39,15 @@ class WindowSnapTest {
         } finally {
             frame.dispose()
         }
+    }
+
+    @Test
+    fun testDwmapiLibrary() {
+        if (!PlatformUtils.isWindows) {
+            println("Skipping Windows-specific test on non-Windows platform")
+            return
+        }
+
+        assertNotNull(DwmapiLib.INSTANCE, "DwmapiLib should be loaded on Windows")
     }
 }

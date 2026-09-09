@@ -68,6 +68,7 @@ import org.wip.plugintoolkit.features.settings.model.AppTheme
 import org.wip.plugintoolkit.features.settings.model.LogLevel
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.ui.splash.showSplashWindow
 import org.wip.plugintoolkit.ui.titlebar.LocalWindowController
 import org.wip.plugintoolkit.ui.titlebar.LocalWindowScope

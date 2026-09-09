@@ -10,8 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.WindowScope
+import java.awt.Dimension
+import java.awt.GraphicsEnvironment
 import java.awt.MouseInfo
 import java.awt.Point
+import java.awt.Toolkit
 import kotlin.math.hypot
 
 /**
@@ -21,6 +24,7 @@ val LocalWindowScope = compositionLocalOf<WindowScope?> { null }
 
 private const val DOUBLE_CLICK_TIMEOUT_MS = 350L
 private const val DOUBLE_CLICK_MAX_DISTANCE = 10f
+private const val SNAP_EDGE_THRESHOLD_PX = 8
 
 @Composable
 actual fun WindowDraggableArea(
@@ -37,6 +41,7 @@ actual fun WindowDraggableArea(
             modifier = modifier.pointerInput(window, controller, doubleClickHandler) {
                 var lastClickTime = 0L
                 var lastClickPos = Offset.Zero
+                var preSnapSize: Dimension? = null
 
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -86,6 +91,17 @@ actual fun WindowDraggableArea(
                                     window.setLocation(targetX, targetY)
                                     startWindowLoc = Point(targetX, targetY)
                                     startScreenMouse = Point(curX, curY)
+                                } else if (preSnapSize != null) {
+                                    val restoreW = preSnapSize!!.width
+                                    val restoreH = preSnapSize!!.height
+                                    val curX = curScreenMouse.x
+                                    val curY = curScreenMouse.y
+                                    val targetX = (curX - restoreW / 2).coerceAtLeast(0)
+                                    val targetY = (curY - 15).coerceAtLeast(0)
+                                    window.setBounds(targetX, targetY, restoreW, restoreH)
+                                    startWindowLoc = Point(targetX, targetY)
+                                    startScreenMouse = Point(curX, curY)
+                                    preSnapSize = null
                                 }
                             }
 
@@ -105,6 +121,50 @@ actual fun WindowDraggableArea(
                                 change.consume()
                                 val curLoc = window.location
                                 window.setLocation(curLoc.x + delta.x.toInt(), curLoc.y + delta.y.toInt())
+                            }
+                        }
+                    }
+
+                    // On mouse release, apply Aero Snapping if dropped at a screen edge
+                    if (isDragging) {
+                        val releaseMouse = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
+                        if (releaseMouse != null) {
+                            val ge = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                            val screens = ge.screenDevices
+                            val targetScreen = screens.firstOrNull { device ->
+                                device.defaultConfiguration.bounds.contains(releaseMouse)
+                            } ?: ge.defaultScreenDevice
+
+                            val gc = targetScreen.defaultConfiguration
+                            val screenBounds = gc.bounds
+                            val insets = Toolkit.getDefaultToolkit().getScreenInsets(gc)
+
+                            val usableTop = screenBounds.y + insets.top
+                            val usableLeft = screenBounds.x + insets.left
+                            val usableRight = screenBounds.x + screenBounds.width - insets.right
+                            val usableBottom = screenBounds.y + screenBounds.height - insets.bottom
+                            val usableWidth = usableRight - usableLeft
+                            val usableHeight = usableBottom - usableTop
+
+                            if (releaseMouse.y <= usableTop + SNAP_EDGE_THRESHOLD_PX) {
+                                // Top edge -> Maximize
+                                if (controller?.isMaximized == false) {
+                                    controller.onMaximizeToggle()
+                                }
+                            } else if (releaseMouse.x <= usableLeft + SNAP_EDGE_THRESHOLD_PX) {
+                                // Left edge -> Snap left half
+                                if (controller?.isMaximized == true) {
+                                    controller.onMaximizeToggle()
+                                }
+                                preSnapSize = Dimension(window.width, window.height)
+                                window.setBounds(usableLeft, usableTop, usableWidth / 2, usableHeight)
+                            } else if (releaseMouse.x >= usableRight - SNAP_EDGE_THRESHOLD_PX) {
+                                // Right edge -> Snap right half
+                                if (controller?.isMaximized == true) {
+                                    controller.onMaximizeToggle()
+                                }
+                                preSnapSize = Dimension(window.width, window.height)
+                                window.setBounds(usableLeft + usableWidth / 2, usableTop, usableWidth / 2, usableHeight)
                             }
                         }
                     }

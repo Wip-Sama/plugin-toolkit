@@ -273,6 +273,7 @@ private fun StandardWindowControlButton(
     width: Dp,
     height: Dp,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     content: @Composable (iconColor: Color) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -295,7 +296,7 @@ private fun StandardWindowControlButton(
     val iconColor = MaterialTheme.colorScheme.onSurface
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .width(width)
             .height(height)
             .background(bgColor)

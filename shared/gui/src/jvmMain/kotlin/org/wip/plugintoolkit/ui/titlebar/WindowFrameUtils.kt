@@ -125,7 +125,7 @@ object WindowFrameUtils {
         }
     }
 
-    private fun getHwnd(window: Window): WinDef.HWND? {
+    fun getHwnd(window: Window): WinDef.HWND? {
         return try {
             val pointer = Native.getWindowPointer(window)
             if (pointer != null) WinDef.HWND(pointer) else null
@@ -145,3 +145,5 @@ object WindowFrameUtils {
         return (b shl 16) or (g shl 8) or r
     }
 }
+
+
