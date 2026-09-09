@@ -89,6 +89,17 @@ static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
 static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM wParam, LPARAM lParam);
 static void hookWindow(HWND h, bool isChild);
 
+static bool is_in_controls_area(HWND hWnd, POINT ptClient) {
+    RECT rc;
+    GetClientRect(hWnd, &rc);
+    UINT dpi = get_window_dpi(hWnd);
+    int titleHeightPx = (g_titleBarHeightDp * dpi) / 96;
+    int rightControlsWidthPx = (g_rightControlsWidthDp * dpi) / 96;
+
+    return (ptClient.y >= 0 && ptClient.y < titleHeightPx &&
+            ptClient.x >= rc.right - rightControlsWidthPx);
+}
+
 static void hookAllChildren(HWND hParent) {
     EnumChildWindows(hParent, [](HWND hChild, LPARAM lp) -> BOOL {
         hookWindow(hChild, true);
@@ -115,9 +126,12 @@ static void hookWindow(HWND h, bool isChild) {
 
 /**
  * Child window procedure subclass (for SunAwtCanvas / SkiaLayer).
- * Intercepts WM_NCHITTEST: if the cursor is within the title bar draggable region
- * or the 8px resize border of the parent window, returns HTTRANSPARENT so the hit test
- * passes through to the parent JFrame!
+ * Intercepts WM_NCHITTEST:
+ *   - Control buttons area (Minimize, Maximize, Close): strictly kept in client area (HTCLIENT)
+ *     so Compose handles clicks, hover animations, and tooltips directly with zero interference.
+ *   - Outer 8px resize border: returns HTTRANSPARENT so parent JFrame receives resize handles.
+ *   - Title bar draggable region: returns HTTRANSPARENT so parent JFrame receives HTCAPTION
+ *     for 100% native Windows window dragging (Aero Snap, top-edge max, half-screen split).
  */
 static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     WNDPROC oldProc = nullptr;
@@ -144,7 +158,13 @@ static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM w
                 RECT rcParent;
                 GetClientRect(hParent, &rcParent);
 
-                // 1. If in 8px resize border of the parent window (when not maximized),
+                // 1. Controls area (Minimize, Maximize, Close):
+                // Keep strictly in client area so Compose handles clicks and hovers directly!
+                if (is_in_controls_area(hParent, ptParent)) {
+                    return CallWindowProc(oldProc, hWndChild, uMsg, wParam, lParam);
+                }
+
+                // 2. If in 8px resize border of the parent window (when not maximized),
                 // pass through to parent JFrame for native resize handles
                 if (!IsZoomed(hParent)) {
                     const int border = 8;
@@ -154,7 +174,7 @@ static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM w
                     }
                 }
 
-                // 2. If in custom title bar area of the parent window (excluding control buttons):
+                // 3. If in custom title bar area of the parent window (excluding control buttons):
                 UINT dpi = get_window_dpi(hParent);
                 int titleBarHeightPx = (g_titleBarHeightDp * dpi) / 96;
                 int rightControlsWidthPx = (g_rightControlsWidthDp * dpi) / 96;
@@ -188,7 +208,8 @@ static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM w
 /**
  * Top-level JFrame window procedure subclass.
  * Handles WM_NCCALCSIZE (removes native caption while preserving side/bottom borders),
- * WM_NCHITTEST (returns HTCAPTION for title bar), and routes non-client events to DefWindowProc.
+ * WM_NCHITTEST (returns HTCAPTION for title bar, resize handles for outer borders),
+ * and routes non-client drag events to DefWindowProc.
  */
 static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     WNDPROC oldProc = nullptr;
@@ -241,7 +262,12 @@ static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
             RECT rc;
             GetClientRect(hWnd, &rc);
 
-            // On non-maximized windows, provide 8-pixel native resize handles around borders
+            // 1. Controls area: keep as HTCLIENT so Compose processes clicks directly
+            if (is_in_controls_area(hWnd, pt)) {
+                return HTCLIENT;
+            }
+
+            // 2. On non-maximized windows, provide 8-pixel native resize handles around borders
             if (!IsZoomed(hWnd)) {
                 const int border = 8;
                 if (pt.y < border && pt.x < border) return HTTOPLEFT;
@@ -254,12 +280,11 @@ static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
                 if (pt.x >= rc.right - border) return HTRIGHT;
             }
 
-            // Convert DP dimensions to physical pixels for hit testing
+            // 3. Custom title bar area: from left edge to the right control buttons
             UINT dpi = get_window_dpi(hWnd);
             int titleBarHeightPx = (g_titleBarHeightDp * dpi) / 96;
             int rightControlsWidthPx = (g_rightControlsWidthDp * dpi) / 96;
 
-            // Custom title bar area: from left edge to the right control buttons
             if (pt.y >= 0 && pt.y < titleBarHeightPx) {
                 if (pt.x >= 0 && pt.x < rc.right - rightControlsWidthPx) {
                     return HTCAPTION;
