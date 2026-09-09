@@ -2,8 +2,6 @@ package org.wip.plugintoolkit.ui.titlebar
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -32,7 +29,6 @@ import plugintoolkit.composeapp.generated.resources.app_name
 /**
  * Custom draggable application title bar integrating seamlessly with the application theme.
  */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun CustomTitleBar(
     modifier: Modifier = Modifier,
@@ -67,18 +63,13 @@ fun CustomTitleBar(
         WindowDraggableArea(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
+                .fillMaxHeight(),
+            onDoubleClick = { controller?.onMaximizeToggle?.invoke() }
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .combinedClickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                        onDoubleClick = { controller?.onMaximizeToggle?.invoke() }
-                    )
                     .padding(horizontal = ToolkitTheme.spacing.small),
                 verticalAlignment = Alignment.CenterVertically
             ) {

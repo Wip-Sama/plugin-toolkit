@@ -35,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
+import org.wip.plugintoolkit.shared.components.sidebar.SidebarContainer
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -84,257 +85,265 @@ fun PluginRepoSidebar(
     onRefreshRepo: (ExtensionRepo) -> Unit,
     onRefreshAll: () -> Unit,
     onOpenAddDialog: () -> Unit,
-    onOpenLocalFolder: (String) -> Unit
+    onOpenLocalFolder: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboard.current
 
-    Column(
-        modifier = Modifier
-            .width(ToolkitTheme.dimensions.repositorySidebarWidth)
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.sidebarBackground))
-            .padding(ToolkitTheme.spacing.medium),
-        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.smallMedium)
-    ) {
-        // Material 3 Segmented Tabs: All, Remote, Local
-        RepoSegmentedButton(
-            selectedTab = repoTypeTab,
-            totalCount = totalRepoCount,
-            remoteCount = remoteRepoCount,
-            localCount = localRepoCount,
-            onTabSelected = onRepoTypeTabChange
-        )
-
-        // Single Full-Width Add Repository Button
-        Button(
-            onClick = onOpenAddDialog,
-            modifier = Modifier.fillMaxWidth(),
-            shape = CircleShape
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-            )
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-            Text(
-                stringResource(Res.string.repo_btn_add_repository),
-                style = MaterialTheme.typography.labelMedium
-            )
-        }
-
-        // Mini Search Box
-        ToolkitTextField(
-            value = repoSearchQuery,
-            onValueChange = onRepoSearchQueryChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text(
-                    stringResource(Res.string.repo_filter_repositories_placeholder),
-                    style = MaterialTheme.typography.bodySmall
+    SidebarContainer(
+        modifier = modifier,
+        width = ToolkitTheme.dimensions.sidebarExpandedWidth,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        topContent = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.smallMedium)
+            ) {
+                // Material 3 Segmented Tabs: All, Remote, Local
+                RepoSegmentedButton(
+                    selectedTab = repoTypeTab,
+                    totalCount = totalRepoCount,
+                    remoteCount = remoteRepoCount,
+                    localCount = localRepoCount,
+                    onTabSelected = onRepoTypeTabChange
                 )
-            },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            singleLine = true
-        )
 
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
-
-        // Repository List
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-        ) {
-            items(repositories) { repo ->
-                val isSelected = selectedRepo?.url == repo.url
-                var showMenu by remember { mutableStateOf(false) }
-
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.medium)
-                        .clickable { onRepoSelected(repo) },
-                    shape = MaterialTheme.shapes.medium,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    } else {
-                        ToolkitTheme.colors.transparent
-                    }
+                // Single Full-Width Add Repository Button
+                Button(
+                    onClick = onOpenAddDialog,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = CircleShape
                 ) {
-                    Row(
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                    Text(
+                        stringResource(Res.string.repo_btn_add_repository),
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+
+                // Mini Search Box
+                ToolkitTextField(
+                    value = repoSearchQuery,
+                    onValueChange = onRepoSearchQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            stringResource(Res.string.repo_filter_repositories_placeholder),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+            }
+        },
+        bodyContent = {
+            // Repository List
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+            ) {
+                items(repositories) { repo ->
+                    val isSelected = selectedRepo?.url == repo.url
+                    var showMenu by remember { mutableStateOf(false) }
+
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(
-                                horizontal = ToolkitTheme.spacing.smallMedium,
-                                vertical = ToolkitTheme.spacing.small
-                            ),
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable { onRepoSelected(repo) },
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            ToolkitTheme.colors.transparent
+                        }
                     ) {
-                        // Icon Badge (Cloud vs Folder)
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.cardBackground)
-                            },
-                            modifier = Modifier.size(ToolkitTheme.dimensions.progressBoxSize)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = ToolkitTheme.spacing.smallMedium,
+                                    vertical = ToolkitTheme.spacing.small
+                                ),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (repo.isLocal) Icons.Default.FolderOpen else Icons.Default.CloudDone,
-                                    contentDescription = null,
-                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.smallMedium))
-
-                        Column(
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = repo.name,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = repo.url,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.secondaryText),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-
-                        Box {
-                            IconButton(
-                                onClick = { showMenu = true },
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
+                            // Icon Badge (Cloud vs Folder)
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.cardBackground)
+                                },
+                                modifier = Modifier.size(ToolkitTheme.dimensions.progressBoxSize)
                             ) {
-                                Icon(
-                                    Icons.Default.MoreVert,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (repo.isLocal) Icons.Default.FolderOpen else Icons.Default.CloudDone,
+                                        contentDescription = null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.smallMedium))
+
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = repo.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = repo.url,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.secondaryText),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
 
-                            ToolkitDropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
-                            ) {
-                                if (repo.isLocal) {
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+
+                            Box {
+                                IconButton(
+                                    onClick = { showMenu = true },
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
+                                ) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                ToolkitDropdownMenu(
+                                    expanded = showMenu,
+                                    onDismissRequest = { showMenu = false }
+                                ) {
+                                    if (repo.isLocal) {
+                                        ToolkitDropdownMenuItem(
+                                            text = { Text(stringResource(Res.string.repo_action_open_folder)) },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.FolderOpen,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                                )
+                                            },
+                                            onClick = {
+                                                showMenu = false
+                                                onOpenLocalFolder(repo.url)
+                                            }
+                                        )
+                                    }
+
                                     ToolkitDropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.repo_action_open_folder)) },
+                                        text = { Text(stringResource(Res.string.repo_share_link_desc)) },
                                         leadingIcon = {
                                             Icon(
-                                                Icons.Default.FolderOpen,
+                                                Icons.Default.ContentCopy,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                             )
                                         },
                                         onClick = {
                                             showMenu = false
-                                            onOpenLocalFolder(repo.url)
+                                            scope.launch {
+                                                clipboard.setClipEntry(PlatformUtils.clipEntryOf(repo.url))
+                                            }
+                                            onCopyLink(repo.url)
+                                        }
+                                    )
+
+                                    ToolkitDropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.action_refresh)) },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Refresh,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            onRefreshRepo(repo)
+                                        }
+                                    )
+
+                                    ToolkitDropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.action_remove)) },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                            )
+                                        },
+                                        isDestructive = true,
+                                        onClick = {
+                                            showMenu = false
+                                            onRemoveRepo(repo)
                                         }
                                     )
                                 }
-
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.repo_share_link_desc)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.ContentCopy,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        scope.launch {
-                                            clipboard.setClipEntry(PlatformUtils.clipEntryOf(repo.url))
-                                        }
-                                        onCopyLink(repo.url)
-                                    }
-                                )
-
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.action_refresh)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Refresh,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        onRefreshRepo(repo)
-                                    }
-                                )
-
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.action_remove)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                        )
-                                    },
-                                    isDestructive = true,
-                                    onClick = {
-                                        showMenu = false
-                                        onRemoveRepo(repo)
-                                    }
-                                )
                             }
                         }
                     }
                 }
             }
-        }
+        },
+        bottomContent = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-
-        // Refresh All Button
-        OutlinedButton(
-            onClick = onRefreshAll,
-            enabled = !isRefreshing,
-            modifier = Modifier.fillMaxWidth(),
-            shape = CircleShape
-        ) {
-            if (isRefreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
-                    strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            } else {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                )
+                // Refresh All Button
+                OutlinedButton(
+                    onClick = onRefreshAll,
+                    enabled = !isRefreshing,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = CircleShape
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
+                            strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                    Text(stringResource(Res.string.repo_refresh_all))
+                }
             }
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-            Text(stringResource(Res.string.repo_refresh_all))
         }
-    }
+    )
 }

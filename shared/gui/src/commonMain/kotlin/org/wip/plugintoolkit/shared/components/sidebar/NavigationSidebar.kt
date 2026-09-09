@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +52,7 @@ import plugintoolkit.composeapp.generated.resources.app_name
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.action_toggle_sidebar
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
+import org.wip.plugintoolkit.ui.titlebar.WindowDraggableArea
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -63,6 +65,8 @@ fun <T> NavigationSidebar(
     isNavbarCollapsed: Boolean,
     onToggleNavbar: () -> Unit,
     canCollapse: Boolean = true,
+    isSecondary: Boolean = !canCollapse,
+    containerColor: Color = if (isSecondary) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLow,
     headerContent: @Composable () -> Unit = {},
     bottomExtraContent: @Composable ColumnScope.() -> Unit = {},
     modifier: Modifier = Modifier
@@ -83,7 +87,7 @@ fun <T> NavigationSidebar(
             .fillMaxHeight()
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false },
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = containerColor,
         shadowElevation = if (isHovered && isNavbarCollapsed && canCollapse) ToolkitTheme.spacing.small else ToolkitTheme.spacing.none
     ) {
         Column(
@@ -109,25 +113,37 @@ fun <T> NavigationSidebar(
                         }
                     }
 
-                    AnimatedVisibility(
-                        visible = isActuallyExpanded && resolvedTitle.isNotBlank(),
-                        enter = fadeIn(tween(150)) + expandHorizontally(tween(200)),
-                        exit = fadeOut(tween(100)) + shrinkHorizontally(tween(200))
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (canCollapse) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
+                    val titleContent = @Composable {
+                        AnimatedVisibility(
+                            visible = isActuallyExpanded && resolvedTitle.isNotBlank(),
+                            enter = fadeIn(tween(150)) + expandHorizontally(tween(200)),
+                            exit = fadeOut(tween(100)) + shrinkHorizontally(tween(200))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (canCollapse) {
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
+                                }
+                                Text(
+                                    text = resolvedTitle,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Clip
+                                )
                             }
-                            Text(
-                                text = resolvedTitle,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Clip
-                            )
                         }
+                    }
+
+                    if (!isSecondary) {
+                        WindowDraggableArea(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            titleContent()
+                        }
+                    } else {
+                        titleContent()
                     }
                 }
             }
