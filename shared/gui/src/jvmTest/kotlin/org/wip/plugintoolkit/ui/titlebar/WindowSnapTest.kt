@@ -157,4 +157,103 @@ class WindowSnapTest {
             frame.dispose()
         }
     }
+
+    @Test
+    fun testSetLeftOffsetForVisibleWindow() {
+        if (!PlatformUtils.isWindows) {
+            println("Skipping Windows-specific test on non-Windows platform")
+            return
+        }
+
+        val frame = JFrame("LeftOffsetTestFrame")
+        frame.isUndecorated = true
+        frame.setSize(500, 400)
+        frame.isVisible = true
+
+        try {
+            NativeDrag.initWindowFor(frame)
+            val resultCollapsed = NativeDrag.setLeftOffsetFor(frame, 50)
+            assertTrue(resultCollapsed, "setLeftOffsetFor(50) must succeed on Windows")
+
+            val resultExpanded = NativeDrag.setLeftOffsetFor(frame, 220)
+            assertTrue(resultExpanded, "setLeftOffsetFor(220) must succeed on Windows")
+        } finally {
+            frame.dispose()
+        }
+    }
+
+    @Test
+    fun testSetNonDraggableRectsForVisibleWindow() {
+        if (!PlatformUtils.isWindows) {
+            println("Skipping Windows-specific test on non-Windows platform")
+            return
+        }
+
+        val frame = JFrame("NonDraggableRectsTestFrame")
+        frame.isUndecorated = true
+        frame.setSize(500, 400)
+        frame.isVisible = true
+
+        try {
+            NativeDrag.initWindowFor(frame)
+            val rects = listOf(
+                NativeDrag.TitleBarRect(x = 16, y = 10, width = 40, height = 40),
+                NativeDrag.TitleBarRect(x = 100, y = 5, width = 200, height = 30)
+            )
+            val result = NativeDrag.setNonDraggableRectsFor(frame, rects)
+            assertTrue(result, "setNonDraggableRectsFor must succeed on Windows")
+        } finally {
+            frame.dispose()
+        }
+    }
+
+    @Test
+    fun testSetDraggableRectsForVisibleWindow() {
+        if (!PlatformUtils.isWindows) {
+            println("Skipping Windows-specific test on non-Windows platform")
+            return
+        }
+
+        val frame = JFrame("DraggableRectsTestFrame")
+        frame.isUndecorated = true
+        frame.setSize(500, 400)
+        frame.isVisible = true
+
+        try {
+            NativeDrag.initWindowFor(frame)
+            val rects = listOf(
+                NativeDrag.TitleBarRect(x = 220, y = 0, width = 400, height = 38)
+            )
+            val result = NativeDrag.setDraggableRectsFor(frame, rects)
+            assertTrue(result, "setDraggableRectsFor must succeed on Windows")
+        } finally {
+            frame.dispose()
+        }
+    }
+
+    @Test
+    fun testRegisterAndUnregisterNonDraggableArea() {
+        if (!PlatformUtils.isWindows) {
+            println("Skipping Windows-specific test on non-Windows platform")
+            return
+        }
+
+        val frame = JFrame("RegisterAreaTestFrame")
+        frame.isUndecorated = true
+        frame.setSize(500, 400)
+        frame.isVisible = true
+
+        try {
+            NativeDrag.initWindowFor(frame)
+            val key = "test_key"
+            NativeDrag.registerNonDraggableArea(
+                window = frame,
+                key = key,
+                rect = NativeDrag.TitleBarRect(x = 20, y = 10, width = 32, height = 32)
+            )
+            NativeDrag.unregisterNonDraggableArea(frame, key)
+        } finally {
+            frame.dispose()
+        }
+    }
 }

@@ -33,6 +33,8 @@
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "dwmapi.lib")
 
+#include <vector>
+
 #ifndef GET_X_LPARAM
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #endif
@@ -58,9 +60,27 @@ static inline HWND to_hwnd(jlong hwnd) {
     return reinterpret_cast<HWND>(static_cast<LONG_PTR>(hwnd));
 }
 
-// Title bar dimensions in density-independent pixels (DIPs)
+// Title bar dimensions and rectangles in density-independent pixels (DIPs)
 static int g_titleBarHeightDp = 38;
 static int g_rightControlsWidthDp = 138;
+
+struct TitleBarRect {
+    int x;
+    int y;
+    int width;
+    int height;
+};
+
+struct WindowConfig {
+    int titleBarHeightDp = 38;
+    int rightControlsWidthDp = 138;
+    int leftOffsetDp = 0;
+    std::vector<TitleBarRect> nonDraggableRects;
+    std::vector<TitleBarRect> draggableRects;
+};
+
+static std::mutex g_configMutex;
+static std::unordered_map<HWND, WindowConfig> g_windowConfigs;
 
 static UINT get_window_dpi(HWND hWnd) {
     typedef UINT (WINAPI *GetDpiForWindowFn)(HWND);
@@ -90,14 +110,88 @@ static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM w
 static void hookWindow(HWND h, bool isChild);
 
 static bool is_in_controls_area(HWND hWnd, POINT ptClient) {
+    int titleHeightDp = g_titleBarHeightDp;
+    int rightControlsDp = g_rightControlsWidthDp;
+    {
+        std::lock_guard<std::mutex> lock(g_configMutex);
+        auto it = g_windowConfigs.find(hWnd);
+        if (it != g_windowConfigs.end()) {
+            titleHeightDp = it->second.titleBarHeightDp;
+            rightControlsDp = it->second.rightControlsWidthDp;
+        }
+    }
+
     RECT rc;
     GetClientRect(hWnd, &rc);
     UINT dpi = get_window_dpi(hWnd);
-    int titleHeightPx = (g_titleBarHeightDp * dpi) / 96;
-    int rightControlsWidthPx = (g_rightControlsWidthDp * dpi) / 96;
+    int titleHeightPx = (titleHeightDp * dpi) / 96;
+    int rightControlsWidthPx = (rightControlsDp * dpi) / 96;
 
     return (ptClient.y >= 0 && ptClient.y < titleHeightPx &&
             ptClient.x >= rc.right - rightControlsWidthPx);
+}
+
+static bool is_in_draggable_titlebar(HWND hWnd, POINT ptClient) {
+    WindowConfig cfg;
+    {
+        std::lock_guard<std::mutex> lock(g_configMutex);
+        auto it = g_windowConfigs.find(hWnd);
+        if (it != g_windowConfigs.end()) {
+            cfg = it->second;
+        } else {
+            cfg.titleBarHeightDp = g_titleBarHeightDp;
+            cfg.rightControlsWidthDp = g_rightControlsWidthDp;
+            cfg.leftOffsetDp = 0;
+        }
+    }
+
+    UINT dpi = get_window_dpi(hWnd);
+    int titleHeightPx = (cfg.titleBarHeightDp * dpi) / 96;
+    if (ptClient.y < 0 || ptClient.y >= titleHeightPx) {
+        return false;
+    }
+
+    RECT rc;
+    GetClientRect(hWnd, &rc);
+    int rightControlsWidthPx = (cfg.rightControlsWidthDp * dpi) / 96;
+    if (ptClient.x >= rc.right - rightControlsWidthPx) {
+        return false; // In control buttons area -> HTCLIENT
+    }
+
+    // 1. Check non-draggable exclusion rects (interactive buttons, search bar, etc.)
+    for (const auto& r : cfg.nonDraggableRects) {
+        int rx = (r.x * dpi) / 96;
+        int ry = (r.y * dpi) / 96;
+        int rw = (r.width * dpi) / 96;
+        int rh = (r.height * dpi) / 96;
+        if (ptClient.x >= rx && ptClient.x < rx + rw &&
+            ptClient.y >= ry && ptClient.y < ry + rh) {
+            return false; // Point is inside an interactive component -> HTCLIENT
+        }
+    }
+
+    // 2. If explicit draggable rects are set, point must be within one of them
+    if (!cfg.draggableRects.empty()) {
+        for (const auto& r : cfg.draggableRects) {
+            int rx = (r.x * dpi) / 96;
+            int ry = (r.y * dpi) / 96;
+            int rw = (r.width * dpi) / 96;
+            int rh = (r.height * dpi) / 96;
+            if (ptClient.x >= rx && ptClient.x < rx + rw &&
+                ptClient.y >= ry && ptClient.y < ry + rh) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 3. Fallback: draggable area starting from leftOffsetDp to right control buttons
+    int leftOffsetPx = (cfg.leftOffsetDp * dpi) / 96;
+    if (ptClient.x >= leftOffsetPx && ptClient.x < rc.right - rightControlsWidthPx) {
+        return true;
+    }
+
+    return false;
 }
 
 static void hookAllChildren(HWND hParent) {
@@ -174,16 +268,9 @@ static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM w
                     }
                 }
 
-                // 3. If in custom title bar area of the parent window (excluding control buttons):
-                UINT dpi = get_window_dpi(hParent);
-                int titleBarHeightPx = (g_titleBarHeightDp * dpi) / 96;
-                int rightControlsWidthPx = (g_rightControlsWidthDp * dpi) / 96;
-
-                if (ptParent.y >= 0 && ptParent.y < titleBarHeightPx) {
-                    if (ptParent.x >= 0 && ptParent.x < rcParent.right - rightControlsWidthPx) {
-                        // Pass through to parent JFrame so it returns HTCAPTION!
-                        return HTTRANSPARENT;
-                    }
+                // 3. If in custom title bar draggable area:
+                if (is_in_draggable_titlebar(hParent, ptParent)) {
+                    return HTTRANSPARENT;
                 }
             }
             break;
@@ -280,15 +367,9 @@ static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
                 if (pt.x >= rc.right - border) return HTRIGHT;
             }
 
-            // 3. Custom title bar area: from left edge to the right control buttons
-            UINT dpi = get_window_dpi(hWnd);
-            int titleBarHeightPx = (g_titleBarHeightDp * dpi) / 96;
-            int rightControlsWidthPx = (g_rightControlsWidthDp * dpi) / 96;
-
-            if (pt.y >= 0 && pt.y < titleBarHeightPx) {
-                if (pt.x >= 0 && pt.x < rc.right - rightControlsWidthPx) {
-                    return HTCAPTION;
-                }
+            // 3. Custom title bar draggable area
+            if (is_in_draggable_titlebar(hWnd, pt)) {
+                return HTCAPTION;
             }
 
             return HTCLIENT;
@@ -338,6 +419,10 @@ static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
                 std::lock_guard<std::mutex> lock(g_mapMutex);
                 g_wndProcMap.erase(hWnd);
             }
+            {
+                std::lock_guard<std::mutex> lock(g_configMutex);
+                g_windowConfigs.erase(hWnd);
+            }
             return CallWindowProc(oldProc, hWnd, uMsg, wParam, lParam);
         }
 
@@ -380,6 +465,13 @@ Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_initWindow(
         g_rightControlsWidthDp = rightControlsWidthDp;
     }
 
+    {
+        std::lock_guard<std::mutex> lock(g_configMutex);
+        auto& cfg = g_windowConfigs[hWnd];
+        if (titleBarHeightDp > 0) cfg.titleBarHeightDp = titleBarHeightDp;
+        if (rightControlsWidthDp > 0) cfg.rightControlsWidthDp = rightControlsWidthDp;
+    }
+
     // 1. Enable styles required by DefWindowProc for Aero Snap and TrackMoveSize
     LONG style = GetWindowLong(hWnd, GWL_STYLE);
     style |= (WS_THICKFRAME | WS_CAPTION | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
@@ -400,6 +492,93 @@ Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_initWindow(
     DWM_WINDOW_CORNER_PREFERENCE pref = DWMWCP_ROUND;
     DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &pref, sizeof(pref));
 
+    return JNI_TRUE;
+}
+
+/**
+ * Sets the left offset of the draggable title bar in DP.
+ * Any area to the left of this offset is treated as HTCLIENT.
+ */
+JNIEXPORT jboolean JNICALL
+Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_setLeftOffset(
+    JNIEnv* env, jclass cls, jlong hwnd, jint leftOffsetDp)
+{
+    if (hwnd == 0) return JNI_FALSE;
+    HWND hWnd = to_hwnd(hwnd);
+    {
+        std::lock_guard<std::mutex> lock(g_configMutex);
+        g_windowConfigs[hWnd].leftOffsetDp = leftOffsetDp;
+    }
+    return JNI_TRUE;
+}
+
+/**
+ * Sets the non-draggable (interactive) exclusion rectangles in DP.
+ * Points inside these rectangles will return HTCLIENT so Compose handles interaction.
+ *
+ * @param rectsArray Flat array of [x, y, width, height, x, y, width, height, ...] in DP.
+ */
+JNIEXPORT jboolean JNICALL
+Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_setNonDraggableRects(
+    JNIEnv* env, jclass cls, jlong hwnd, jintArray rectsArray)
+{
+    if (hwnd == 0) return JNI_FALSE;
+    HWND hWnd = to_hwnd(hwnd);
+
+    std::vector<TitleBarRect> rects;
+    if (rectsArray != nullptr) {
+        jsize len = env->GetArrayLength(rectsArray);
+        if (len % 4 == 0) {
+            jint* elements = env->GetIntArrayElements(rectsArray, nullptr);
+            if (elements) {
+                rects.reserve(len / 4);
+                for (jsize i = 0; i < len; i += 4) {
+                    rects.push_back({ elements[i], elements[i + 1], elements[i + 2], elements[i + 3] });
+                }
+                env->ReleaseIntArrayElements(rectsArray, elements, JNI_ABORT);
+            }
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_configMutex);
+        g_windowConfigs[hWnd].nonDraggableRects = std::move(rects);
+    }
+    return JNI_TRUE;
+}
+
+/**
+ * Sets explicit draggable rectangles in DP.
+ * When set (non-empty), ONLY points within these rectangles return HTCAPTION.
+ *
+ * @param rectsArray Flat array of [x, y, width, height, ...] in DP.
+ */
+JNIEXPORT jboolean JNICALL
+Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_setDraggableRects(
+    JNIEnv* env, jclass cls, jlong hwnd, jintArray rectsArray)
+{
+    if (hwnd == 0) return JNI_FALSE;
+    HWND hWnd = to_hwnd(hwnd);
+
+    std::vector<TitleBarRect> rects;
+    if (rectsArray != nullptr) {
+        jsize len = env->GetArrayLength(rectsArray);
+        if (len % 4 == 0) {
+            jint* elements = env->GetIntArrayElements(rectsArray, nullptr);
+            if (elements) {
+                rects.reserve(len / 4);
+                for (jsize i = 0; i < len; i += 4) {
+                    rects.push_back({ elements[i], elements[i + 1], elements[i + 2], elements[i + 3] });
+                }
+                env->ReleaseIntArrayElements(rectsArray, elements, JNI_ABORT);
+            }
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_configMutex);
+        g_windowConfigs[hWnd].draggableRects = std::move(rects);
+    }
     return JNI_TRUE;
 }
 

@@ -53,6 +53,7 @@ import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.action_toggle_sidebar
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import org.wip.plugintoolkit.ui.titlebar.WindowDraggableArea
+import org.wip.plugintoolkit.ui.titlebar.nonDraggableTitleBar
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -105,7 +106,10 @@ fun <T> NavigationSidebar(
                     horizontalArrangement = Arrangement.Start
                 ) {
                     if (canCollapse) {
-                        IconButton(onClick = onToggleNavbar) {
+                        IconButton(
+                            onClick = onToggleNavbar,
+                            modifier = Modifier.nonDraggableTitleBar("sidebar_hamburger_button")
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
                                 contentDescription = stringResource(Res.string.action_toggle_sidebar)

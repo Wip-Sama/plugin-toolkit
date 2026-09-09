@@ -34,6 +34,7 @@ import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.ui.titlebar.CustomTitleBar
 import org.wip.plugintoolkit.ui.titlebar.LocalWindowController
 import org.wip.plugintoolkit.ui.titlebar.MacWindowControls
+import org.wip.plugintoolkit.ui.titlebar.TitleBarLeftOffsetSync
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_name
 
@@ -64,6 +65,10 @@ fun AppScaffold(
 
     val useCustomTitleBar = settings.appearance.useCustomTitleBar
     val windowController = LocalWindowController.current
+
+    if (useCustomTitleBar) {
+        TitleBarLeftOffsetSync(leftOffsetDp = layoutSidebarWidth.value.toInt())
+    }
 
     val scaffoldBgColor = if (useCustomTitleBar) {
         MaterialTheme.colorScheme.surfaceContainerLow
