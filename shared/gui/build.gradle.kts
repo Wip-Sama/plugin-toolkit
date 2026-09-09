@@ -67,4 +67,56 @@ compose.resources {
     publicResClass = true
 }
 
+// ── Native DLL build ───────────────────────────────────────────────────────────
+// Builds toolkit-win-drag.dll from src/native/ via CMake and installs it into
+// src/jvmMain/resources/windows/ for bundling in the JAR classpath.
+//
+// Run manually when the C++ source changes:
+//   ./gradlew :shared:gui:buildNativeDll
+//
+// The pre-built DLL committed to resources is used for normal builds.
+tasks.register("buildNativeDll") {
+    group = "build"
+    description = "Compiles toolkit-win-drag.dll via CMake (Windows only, requires CMake in PATH)"
+    onlyIf { org.gradle.internal.os.OperatingSystem.current().isWindows }
 
+    val nativeSrcDir = layout.projectDirectory.dir("src/native").asFile
+    val cmakeBuildDir = layout.buildDirectory.dir("native-cmake").get().asFile
+    val resourceOutputDir = layout.projectDirectory.dir("src/jvmMain/resources/windows").asFile
+    // Use the JDK Gradle is running on for JNI headers (handle jre subdir → JDK root)
+    val rawJavaHome: String = System.getProperty("java.home") ?: System.getenv("JAVA_HOME") ?: ""
+    val javaHome: String = File(rawJavaHome).let { f ->
+        if (f.name == "jre") f.parentFile.absolutePath else f.absolutePath
+    }
+
+    doLast {
+        /** Runs a process and throws if it exits non-zero. */
+        fun runCmd(vararg args: String) {
+            val exitCode = ProcessBuilder(*args)
+                .inheritIO()
+                .start()
+                .waitFor()
+            if (exitCode != 0) error("Command failed (exit $exitCode): ${args.joinToString(" ")}")
+        }
+
+        cmakeBuildDir.mkdirs()
+        resourceOutputDir.mkdirs()
+
+        logger.lifecycle("NativeDll: Configuring (JAVA_HOME=$javaHome)")
+        runCmd(
+            "cmake",
+            "-S", nativeSrcDir.absolutePath,
+            "-B", cmakeBuildDir.absolutePath,
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DJAVA_HOME=$javaHome"
+        )
+
+        logger.lifecycle("NativeDll: Building...")
+        runCmd("cmake", "--build", cmakeBuildDir.absolutePath, "--config", "Release")
+
+        val dll = cmakeBuildDir.walk().firstOrNull { it.name == "toolkit-win-drag.dll" }
+            ?: error("toolkit-win-drag.dll not found under $cmakeBuildDir after build")
+        dll.copyTo(File(resourceOutputDir, "toolkit-win-drag.dll"), overwrite = true)
+        logger.lifecycle("NativeDll: Installed → ${File(resourceOutputDir, "toolkit-win-drag.dll")}")
+    }
+}

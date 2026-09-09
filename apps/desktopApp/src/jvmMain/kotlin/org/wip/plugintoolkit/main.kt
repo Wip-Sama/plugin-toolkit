@@ -72,6 +72,7 @@ import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.ui.splash.showSplashWindow
 import org.wip.plugintoolkit.ui.titlebar.LocalWindowController
 import org.wip.plugintoolkit.ui.titlebar.LocalWindowScope
+import org.wip.plugintoolkit.ui.titlebar.NativeDrag
 import org.wip.plugintoolkit.ui.titlebar.WindowController
 import org.wip.plugintoolkit.ui.titlebar.WindowFrameUtils
 import org.wip.plugintoolkit.ui.titlebar.WindowResizeOverlay
@@ -432,7 +433,10 @@ fun runMain(
 
                     LaunchedEffect(useCustomTitleBar) {
                         if (useCustomTitleBar) {
-                            WindowFrameUtils.enableUndecoratedDropShadow(window)
+                            // Initialize window for custom chrome: enables Win32 styles for Aero Snap,
+                            // subclasses WndProc for WM_NCCALCSIZE (removes native title bar), and
+                            // activates DWM drop shadow + rounded corners via native JNI DLL.
+                            NativeDrag.initWindowFor(window)
                         } else {
                             val isDark = when (appSettings.appearance.theme) {
                                 AppTheme.Dark, AppTheme.Amoled -> true

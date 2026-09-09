@@ -51,7 +51,6 @@ object WindowFrameUtils {
     // DWM window attribute constants
     private const val DWMWA_USE_IMMERSIVE_DARK_MODE = 20
     private const val DWMWA_WINDOW_CORNER_PREFERENCE = 33
-    private const val DWMWA_BORDER_COLOR = 34
     private const val DWMWA_CAPTION_COLOR = 35
     private const val DWMWA_TEXT_COLOR = 36
 
@@ -60,6 +59,7 @@ object WindowFrameUtils {
 
     /**
      * Enables the native Windows drop shadow and rounded corners for an undecorated window.
+     * Uses 1px DWM margins to activate shadow rendering without showing any native frame.
      */
     fun enableUndecoratedDropShadow(window: Window) {
         if (!PlatformUtils.isWindows) return
@@ -67,57 +67,50 @@ object WindowFrameUtils {
 
         try {
             val hwnd = getHwnd(window) ?: return
+
+            // 1px margins enable DWM shadow without visible native frame
             val margins = Margins().apply {
-                cxLeftWidth = 1
-                cxRightWidth = 1
-                cyTopHeight = 1
-                cyBottomHeight = 1
+                cxLeftWidth = 1; cxRightWidth = 1; cyTopHeight = 1; cyBottomHeight = 1
             }
             dwm.DwmExtendFrameIntoClientArea(hwnd, margins)
 
             // Request rounded corners on Windows 11
             val cornerPref = IntByReference(DWMWCP_ROUND)
-            dwm.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_WINDOW_CORNER_PREFERENCE,
-                cornerPref.pointer,
-                4
-            )
-            Logger.d { "DWM: Native drop shadow and corner preference configured for window" }
+            dwm.DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, cornerPref.pointer, 4)
+
+            Logger.d { "DWM: Drop shadow and rounded corners configured" }
         } catch (e: Throwable) {
-            Logger.w(e) { "DWM: Failed to configure drop shadow on window" }
+            Logger.w(e) { "DWM: Failed to configure drop shadow" }
         }
     }
 
     /**
      * Configures dark mode and caption colors for decorated (native) Windows frames.
      */
-    fun setNativeTitleBarTheme(window: Window, isDark: Boolean, captionColor: Color? = null, textColor: Color? = null) {
+    fun setNativeTitleBarTheme(
+        window: Window,
+        isDark: Boolean,
+        captionColor: Color? = null,
+        textColor: Color? = null
+    ) {
         if (!PlatformUtils.isWindows) return
         val dwm = DwmapiLib.INSTANCE ?: return
 
         try {
             val hwnd = getHwnd(window) ?: return
 
-            // 1. Immersive dark mode (Windows 10 18985+ & Windows 11)
+            // Immersive dark mode (Windows 10 18985+ & Windows 11)
             val darkModeVal = IntByReference(if (isDark) 1 else 0)
-            dwm.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_USE_IMMERSIVE_DARK_MODE,
-                darkModeVal.pointer,
-                4
-            )
+            dwm.DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, darkModeVal.pointer, 4)
 
-            // 2. Custom caption & text color (Windows 11 build 22000+)
+            // Custom caption & text color (Windows 11 build 22000+)
             if (captionColor != null) {
-                val colorRef = toColorRef(captionColor)
-                val captionVal = IntByReference(colorRef)
+                val captionVal = IntByReference(toColorRef(captionColor))
                 dwm.DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, captionVal.pointer, 4)
             }
 
             if (textColor != null) {
-                val colorRef = toColorRef(textColor)
-                val textVal = IntByReference(colorRef)
+                val textVal = IntByReference(toColorRef(textColor))
                 dwm.DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, textVal.pointer, 4)
             }
         } catch (e: Throwable) {
@@ -125,6 +118,9 @@ object WindowFrameUtils {
         }
     }
 
+    /**
+     * Returns the Win32 HWND for the given AWT window, or null if unavailable.
+     */
     fun getHwnd(window: Window): WinDef.HWND? {
         return try {
             val pointer = Native.getWindowPointer(window)
@@ -136,6 +132,20 @@ object WindowFrameUtils {
     }
 
     /**
+     * Returns the raw Win32 HWND value as a Long for JNI interop, or 0L if unavailable.
+     */
+    fun getHwndAsLong(window: Window): Long {
+        return try {
+            val pointer = Native.getWindowPointer(window) ?: return 0L
+            Pointer.nativeValue(pointer)
+        } catch (e: Throwable) {
+            0L
+        }
+    }
+
+    // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
      * Converts a Compose Color to Windows COLORREF format (0x00BBGGRR).
      */
     private fun toColorRef(color: Color): Int {
@@ -145,5 +155,3 @@ object WindowFrameUtils {
         return (b shl 16) or (g shl 8) or r
     }
 }
-
-
