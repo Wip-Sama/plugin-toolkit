@@ -3,11 +3,15 @@ package org.wip.plugintoolkit.ui
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -21,11 +25,15 @@ import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.DialogHost
 import org.wip.plugintoolkit.core.ui.DialogService
+import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.SidebarStartMode
 import org.wip.plugintoolkit.shared.components.ToastHost
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
+import org.wip.plugintoolkit.ui.titlebar.CustomTitleBar
+import org.wip.plugintoolkit.ui.titlebar.LocalWindowController
+import org.wip.plugintoolkit.ui.titlebar.MacWindowControls
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_name
 
@@ -54,14 +62,52 @@ fun AppScaffold(
         animationSpec = tween(durationMillis = 200)
     )
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    val useCustomTitleBar = settings.appearance.useCustomTitleBar
+    val windowController = LocalWindowController.current
+
+    val scaffoldBgColor = if (useCustomTitleBar) {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    } else {
+        MaterialTheme.colorScheme.background
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = scaffoldBgColor) {
         Box(modifier = Modifier.fillMaxSize()) {
             Row(modifier = Modifier.fillMaxSize()) {
                 Spacer(modifier = Modifier.width(layoutSidebarWidth))
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    content()
+                if (useCustomTitleBar) {
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        CustomTitleBar(
+                            modifier = Modifier.fillMaxWidth(),
+                            showTitleAndIcon = false
+                        )
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            shape = RoundedCornerShape(
+                                topStart = ToolkitTheme.dimensions.contentCanvasCornerRadius
+                            ),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                content()
+                            }
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        content()
+                    }
                 }
             }
+
+            val macHeaderContent: (@Composable () -> Unit)? = if (useCustomTitleBar && PlatformUtils.isMac && windowController != null) {
+                {
+                    Box(modifier = Modifier.padding(bottom = ToolkitTheme.spacing.small)) {
+                        MacWindowControls(controller = windowController)
+                    }
+                }
+            } else null
+
             NavigationSidebar(
                 title = Res.string.app_name.localized,
                 bodySections = sections,
@@ -74,6 +120,7 @@ fun AppScaffold(
                     isNavbarCollapsed = newCollapsed
                     onToggleNavbarState?.invoke(newCollapsed)
                 },
+                headerContent = macHeaderContent ?: {},
                 modifier = Modifier.fillMaxHeight()
             )
 
@@ -84,3 +131,4 @@ fun AppScaffold(
         }
     }
 }
+

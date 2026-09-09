@@ -642,4 +642,11 @@
     <string name="node_hide_advanced_ports">Nascondi porte avanzate</string>
     <string name="node_port_inactive_connected_warning">Questa porta è attualmente inattiva in base alle condizioni dei parametri. Scollega o modifica i parametri per risolvere.</string>
     <string name="advanced_parameters_section">Parametri Avanzati</string>
+
+    <!-- Window Title Bar -->
+    <string name="setting_custom_title_bar">Barra del Titolo Personalizzata</string>
+    <string name="setting_custom_title_bar_desc">Abilita una barra del titolo integrata con il tema. Disabilita per utilizzare le decorazioni di sistema.</string>
+    <string name="action_minimize">Riduci a icona</string>
+    <string name="action_maximize">Ingrandisci</string>
+    <string name="action_restore">Ripristina</string>
 </resources>

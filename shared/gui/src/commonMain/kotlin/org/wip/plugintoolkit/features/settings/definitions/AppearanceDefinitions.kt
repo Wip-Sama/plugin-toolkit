@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.ViewSidebar
+import androidx.compose.material.icons.filled.WebAsset
 import kotlin.math.round
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
@@ -71,6 +72,13 @@ fun SettingsRegistryBuilder.appearanceDefinitions() {
                     Icons.Default.Palette,
                     subtitle = SettingText.Resource(Res.string.setting_use_accent_in_theme_subtitle)
                 ) { copy(useAccentInTheme = it) }
+
+                switch(
+                    AppearanceSettings::useCustomTitleBar,
+                    Res.string.setting_custom_title_bar,
+                    Icons.Default.WebAsset,
+                    subtitle = SettingText.Resource(Res.string.setting_custom_title_bar_desc)
+                ) { copy(useCustomTitleBar = it) }
 
                 dropdown(
                     AppearanceSettings::sidebarStartMode,

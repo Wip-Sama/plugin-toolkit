@@ -642,4 +642,11 @@
     <string name="node_hide_advanced_ports">Hide advanced ports</string>
     <string name="node_port_inactive_connected_warning">This port is currently inactive based on parameter conditions. Disconnect or adjust parameters to resolve.</string>
     <string name="advanced_parameters_section">Advanced Parameters</string>
+
+    <!-- Window Title Bar -->
+    <string name="setting_custom_title_bar">Custom Title Bar</string>
+    <string name="setting_custom_title_bar_desc">Enable a unified theme-integrated title bar. Disable to use system window decorations.</string>
+    <string name="action_minimize">Minimize</string>
+    <string name="action_maximize">Maximize</string>
+    <string name="action_restore">Restore</string>
 </resources>

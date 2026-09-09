@@ -64,10 +64,16 @@ import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import org.wip.plugintoolkit.features.settings.model.AppTheme
 import org.wip.plugintoolkit.features.settings.model.LogLevel
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import org.wip.plugintoolkit.ui.splash.showSplashWindow
+import org.wip.plugintoolkit.ui.titlebar.LocalWindowController
+import org.wip.plugintoolkit.ui.titlebar.LocalWindowScope
+import org.wip.plugintoolkit.ui.titlebar.WindowController
+import org.wip.plugintoolkit.ui.titlebar.WindowFrameUtils
+import org.wip.plugintoolkit.ui.titlebar.WindowResizeOverlay
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_logo
 import plugintoolkit.composeapp.generated.resources.app_name
@@ -384,49 +390,97 @@ fun runMain(
             )
         }
 
-        if (isVisible) {
-            Window(
-                onCloseRequest = {
-                    if (viewModel.settings.value.general.closeToTray) {
-                        isVisible = false
-                    } else {
-                        exitApplication()
-                    }
-                },
-                title = stringResource(Res.string.app_name),
-                icon = painterResource(Res.drawable.app_logo),
-                state = windowState
-            ) {
-                window.minimumSize = Dimension(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
-                val notificationService = getKoin().get<NotificationService>()
+        val appSettings by viewModel.settings.collectAsState()
+        val useCustomTitleBar = appSettings.appearance.useCustomTitleBar
 
-                LaunchedEffect(Unit) {
-                    kotlinx.coroutines.delay(300)
-                    splashWindow?.dispose()
+        if (isVisible) {
+            key(useCustomTitleBar) {
+                val isMaximized = windowState.placement == WindowPlacement.Maximized
+                val windowController = remember(windowState, isMaximized) {
+                    WindowController(
+                        isMaximized = isMaximized,
+                        onMinimize = { windowState.isMinimized = true },
+                        onMaximizeToggle = {
+                            windowState.placement = if (isMaximized) WindowPlacement.Floating else WindowPlacement.Maximized
+                        },
+                        onClose = {
+                            if (viewModel.settings.value.general.closeToTray) {
+                                isVisible = false
+                            } else {
+                                exitApplication()
+                            }
+                        }
+                    )
                 }
 
-                LaunchedEffect(Unit) {
-                    val currentTrayState = trayState
-                    notificationService.events.collect { event ->
-                        if (event is NotificationEvent.System) {
-                            currentTrayState.sendNotification(
-                                Notification(
-                                    title = event.record.title,
-                                    message = event.record.message,
-                                    type = when (event.record.type) {
-                                        NotificationType.Info -> Notification.Type.Info
-                                        NotificationType.Warning -> Notification.Type.Warning
-                                        NotificationType.Error -> Notification.Type.Error
-                                    }
-                                )
+                Window(
+                    onCloseRequest = {
+                        if (viewModel.settings.value.general.closeToTray) {
+                            isVisible = false
+                        } else {
+                            exitApplication()
+                        }
+                    },
+                    title = stringResource(Res.string.app_name),
+                    icon = painterResource(Res.drawable.app_logo),
+                    state = windowState,
+                    undecorated = useCustomTitleBar
+                ) {
+                    window.minimumSize = Dimension(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
+                    val notificationService = getKoin().get<NotificationService>()
+
+                    LaunchedEffect(useCustomTitleBar) {
+                        if (useCustomTitleBar) {
+                            WindowFrameUtils.enableUndecoratedDropShadow(window)
+                        } else {
+                            val isDark = when (appSettings.appearance.theme) {
+                                AppTheme.Dark, AppTheme.Amoled -> true
+                                AppTheme.Light -> false
+                                AppTheme.System -> true
+                            }
+                            WindowFrameUtils.setNativeTitleBarTheme(
+                                window = window,
+                                isDark = isDark
                             )
                         }
                     }
-                }
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
-                        App(viewModel = viewModel)
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(300)
+                        splashWindow?.dispose()
+                    }
+
+                    LaunchedEffect(Unit) {
+                        val currentTrayState = trayState
+                        notificationService.events.collect { event ->
+                            if (event is NotificationEvent.System) {
+                                currentTrayState.sendNotification(
+                                    Notification(
+                                        title = event.record.title,
+                                        message = event.record.message,
+                                        type = when (event.record.type) {
+                                            NotificationType.Info -> Notification.Type.Info
+                                            NotificationType.Warning -> Notification.Type.Warning
+                                            NotificationType.Error -> Notification.Type.Error
+                                        }
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CompositionLocalProvider(
+                            LocalViewModelStoreOwner provides viewModelStoreOwner,
+                            LocalWindowScope provides this@Window,
+                            LocalWindowController provides windowController
+                        ) {
+                            App(viewModel = viewModel)
+                        }
+
+                        if (useCustomTitleBar) {
+                            WindowResizeOverlay()
+                        }
                     }
                 }
             }

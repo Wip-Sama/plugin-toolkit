@@ -110,6 +110,14 @@ data class Dimensions(
     val iconExtraLarge: Dp = 64.dp,
     val breakpointCompact: Dp = 750.dp,
     val breakpointWideToolbar: Dp = 900.dp,
+    val titleBarHeight: Dp = 38.dp,
+    val windowControlWidth: Dp = 46.dp,
+    val windowControlHeight: Dp = 32.dp,
+    val windowControlMacSize: Dp = 12.dp,
+    val windowControlMacGap: Dp = 8.dp,
+    val contentCanvasCornerRadius: Dp = 16.dp,
+    val windowResizeBorderThickness: Dp = 6.dp,
+    val windowResizeCornerSize: Dp = 14.dp,
     
     // Auto-generated generic/component-specific sized dimensions (deprecated in favor of semantic tokens)
     val ringWidthMedium: Dp = 10.dp,

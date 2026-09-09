@@ -29,7 +29,8 @@ data class AppearanceSettings(
     val followSystemAccent: Boolean = true,
     val useAccentInTheme: Boolean = false,
     val sidebarStartMode: SidebarStartMode = SidebarStartMode.Remember,
-    val isSidebarCollapsed: Boolean = false
+    val isSidebarCollapsed: Boolean = false,
+    val useCustomTitleBar: Boolean = true
 )
 
 /**
