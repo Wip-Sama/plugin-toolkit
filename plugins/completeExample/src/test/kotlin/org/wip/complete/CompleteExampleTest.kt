@@ -271,6 +271,61 @@ class CompleteExampleTest {
         assertTrue(customResult.contains("path/to/weights.bin"))
         assertTrue(customResult.contains("32"))
     }
+
+    @Test
+    fun testCapabilityWithParameterGroup() {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+
+        val defaultResult = plugin.capabilityWithParameterGroup()
+        assertTrue(defaultResult.contains("Engine: LOCAL_LLM"))
+        assertTrue(defaultResult.contains("Temp: 0.7"))
+        assertTrue(defaultResult.contains("MaxTokens: 1024"))
+        assertTrue(defaultResult.contains("Filter: false"))
+
+        val customResult = plugin.capabilityWithParameterGroup(
+            engine = "LOCAL_LLM",
+            inferenceOptions = ModelInferenceOptions(
+                temperature = 0.2,
+                maxTokens = 2048,
+                postProcessing = PostProcessingOptions(
+                    applyFilter = true,
+                    filterIntensity = 0.95
+                )
+            )
+        )
+        assertTrue(customResult.contains("Temp: 0.2"))
+        assertTrue(customResult.contains("MaxTokens: 2048"))
+        assertTrue(customResult.contains("Filter: true"))
+        assertTrue(customResult.contains("Intensity: 0.95"))
+    }
+
+    @Test
+    fun testDispatcherWithUnpackedParameterGroup() = runTest {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+        val dispatcher = CompleteExamplePluginDispatcher(plugin)
+        val context = TestPluginContext()
+
+        val request = org.wip.plugintoolkit.api.PluginRequest(
+            method = "capabilitywithparametergroup",
+            parameters = mapOf(
+                "engine" to kotlinx.serialization.json.JsonPrimitive("LOCAL_LLM"),
+                "llm_temperature" to kotlinx.serialization.json.JsonPrimitive(0.3),
+                "llm_maxTokens" to kotlinx.serialization.json.JsonPrimitive(512),
+                "llm_post_applyFilter" to kotlinx.serialization.json.JsonPrimitive(true),
+                "llm_post_filterIntensity" to kotlinx.serialization.json.JsonPrimitive(0.9)
+            )
+        )
+
+        val response = dispatcher.process(request, context)
+        assertTrue(response is ExecutionResult.Success)
+        val output = (response as ExecutionResult.Success).response.result?.jsonPrimitive?.content ?: ""
+        assertTrue(output.contains("Temp: 0.3"))
+        assertTrue(output.contains("MaxTokens: 512"))
+        assertTrue(output.contains("Filter: true"))
+        assertTrue(output.contains("Intensity: 0.9"))
+    }
 }
 
 

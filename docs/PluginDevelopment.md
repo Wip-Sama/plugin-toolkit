@@ -176,6 +176,167 @@ You can combine `semanticType` with validation constraints. For example, a `colo
 ) color: String
 ```
 
+#### Advanced & Dynamic Parameters
+
+Capabilities often require configuration options that should only be displayed to advanced users or options that dynamically show or hide based on the values of other parameters, settings, or feature locks.
+
+##### 1. Advanced Parameters (`isAdvanced = true`)
+
+Parameters marked with `isAdvanced = true` are flagged as advanced in the plugin manifest. In the host UI and node editors, advanced parameters are collapsed by default into an **Advanced Options** drawer, keeping standard workflows clean and straightforward while leaving full customization available when needed:
+
+```kotlin
+@Capability(name = "Generate Image", description = "Generates an image from prompt")
+fun generateImage(
+    @CapabilityParam(description = "Prompt text") prompt: String,
+    @CapabilityParam(
+        description = "CFG Guidance Scale",
+        defaultValue = "7.5",
+        isAdvanced = true
+    ) cfgScale: Double = 7.5,
+    @CapabilityParam(
+        description = "Random seed (-1 for random)",
+        defaultValue = "-1",
+        isAdvanced = true
+    ) seed: Long = -1L
+): String {
+    // ...
+}
+```
+
+Advanced parameters can also be configured on `@CapabilityInput`, `@CapabilityOutput`, and `@CapabilityResult`.
+
+##### 2. Dynamic Parameters (`@DependsOn`, `@DependsOnAny`, `@DependsOnAll`)
+
+Dynamic parameters are only active and visible in the host UI when their condition is satisfied. You can declare dependencies on:
+- **Other Parameters** (`param = "paramName"`)
+- **Plugin Settings** (`setting = "settingKey"`)
+- **Feature Locks** (`lock = "featureLockId"`)
+
+Supported operators via `ConditionOperator`:
+- `EQUALS` (default), `NOT_EQUALS`
+- `IN`, `NOT_IN`
+- `GREATER_THAN`, `LESS_THAN`, `GREATER_OR_EQUAL`, `LESS_OR_EQUAL`
+- `IS_BLANK`, `IS_NOT_BLANK`
+- `REGEX_MATCH`
+
+**Example:**
+```kotlin
+@Capability(name = "Render Scene", description = "Renders 3D scene")
+fun renderScene(
+    @CapabilityParam(description = "Render engine", defaultValue = "BLENDER_EEVEE")
+    engine: String,
+
+    // Visible only when engine == "CYCLES"
+    @CapabilityParam(description = "Sample count", defaultValue = "128")
+    @DependsOn(param = "engine", value = "CYCLES")
+    cyclesSamples: Int = 128,
+
+    // Visible when highPrecision setting is true AND engine is not EEVEE
+    @CapabilityParam(description = "Bounces limit", defaultValue = "12", isAdvanced = true)
+    @DependsOn(setting = "highPrecision", value = "true")
+    @DependsOn(param = "engine", operator = ConditionOperator.NOT_EQUALS, value = "BLENDER_EEVEE")
+    bounces: Int = 12
+): String {
+    // ...
+}
+```
+
+To express logical OR conditions, use `@DependsOnAny`:
+```kotlin
+@DependsOnAny(
+    DependsOn(param = "model", value = "SDXL"),
+    DependsOn(param = "model", value = "FLUX")
+)
+@CapabilityParam(description = "Refiner pass strength", defaultValue = "0.8")
+refinerStrength: Double = 0.8
+```
+
+Dot notation is supported for targeting properties of complex JSON parameters or settings:
+```kotlin
+@DependsOn(param = "cloudConfig.provider", value = "aws")
+@CapabilityParam(description = "AWS Region")
+awsRegion: String? = null
+```
+
+---
+
+#### Grouping Reusable Parameters with `@ParameterGroup`
+
+When building capabilities for complex operations (e.g. LLMs, inpainting, rendering pipelines), functions frequently require 10–20+ tuning parameters. Writing them directly in every capability signature leads to:
+1. Long, unwieldy method signatures.
+2. Code duplication across multiple capabilities that share the same configuration models.
+3. Inability to reuse parameter definitions across capabilities.
+
+The `@ParameterGroup` annotation solves this by allowing you to group parameters into a reusable `@Serializable` Kotlin `data class`.
+
+##### How `@ParameterGroup` Works
+1. **Manifest Unpacking**: During compilation, KSP unpacks all properties of the data class into individual, first-class capability parameters in the plugin manifest (`manifest.json` and generated Kotlin metadata).
+2. **Transparent Dispatching**: The host application passes individual parameters (or grouped objects) in `request.parameters`. The generated dispatcher automatically reconstructs the nested JSON object and deserializes the typed data class using `kotlinx.serialization`. Default parameter values defined in Kotlin are preserved.
+3. **Condition & Advanced Flag Inheritance**: If the parameter group has `@DependsOn` or `isAdvanced = true`, all unpacked member properties automatically inherit these attributes (combined with their own conditions via logical `AND`).
+
+##### Example
+
+```kotlin
+@Serializable
+data class PostProcessingOptions(
+    @CapabilityParam(description = "Enable color grading", defaultValue = "false")
+    val colorGrading: Boolean = false,
+
+    @CapabilityParam(description = "LUT intensity", defaultValue = "1.0", isAdvanced = true)
+    @DependsOn(param = "colorGrading", value = "true")
+    val lutIntensity: Double = 1.0
+)
+
+@Serializable
+data class InferenceOptions(
+    @CapabilityParam(description = "Sampling temperature", defaultValue = "0.7")
+    val temperature: Double = 0.7,
+
+    @CapabilityParam(description = "Max output tokens", defaultValue = "2048", isAdvanced = true)
+    val maxTokens: Int = 2048,
+
+    // Nested parameter group!
+    @ParameterGroup(prefix = "post_")
+    val postProcessing: PostProcessingOptions = PostProcessingOptions()
+)
+
+@Capability(name = "Generate Text", description = "Generates text via LLM")
+fun generateText(
+    @CapabilityParam(description = "Prompt text") prompt: String,
+
+    @CapabilityParam(description = "Execution engine", defaultValue = "LOCAL")
+    engine: String = "LOCAL",
+
+    // Unpacked into manifest with prefix "llm_"
+    @ParameterGroup(prefix = "llm_")
+    @DependsOn(param = "engine", value = "LOCAL")
+    options: InferenceOptions = InferenceOptions()
+): String {
+    return "Running with temp ${options.temperature}, LUT=${options.postProcessing.lutIntensity}"
+}
+```
+
+The capability manifest will automatically contain the following unpacked parameters:
+- `prompt`
+- `engine`
+- `llm_temperature` (condition: `engine == "LOCAL"`)
+- `llm_maxTokens` (condition: `engine == "LOCAL"`, `isAdvanced = true`)
+- `llm_post_colorGrading` (condition: `engine == "LOCAL"`)
+- `llm_post_lutIntensity` (condition: `engine == "LOCAL"` AND `llm_post_colorGrading == "true"`, `isAdvanced = true`)
+
+##### Nesting, Namespacing, and Error Diagnostics
+
+The KSP processor includes strict compile-time validation to catch common parameter grouping and nesting pitfalls early:
+
+| Error Scenario | Compiler Error Message | Solution |
+|:---|:---|:---|
+| **Duplicate Parameter Names** | `Duplicate parameter name 'foo' detected in capability 'bar'. It was defined by ... and also by ... Use @ParameterGroup(prefix = "...") to namespace the parameter group, or rename the property.` | When reusing data classes or defining multiple parameter groups, specify a `prefix` (e.g. `@ParameterGroup(prefix = "encoder_")`) to guarantee unique parameter names. |
+| **Missing `@Serializable`** | `Class 'MyOptions' used as @ParameterGroup in capability 'bar' must be annotated with @Serializable.` | Ensure any class used as `@ParameterGroup` is annotated with `@Serializable` so that the generated dispatcher can reconstruct and decode it. |
+| **Recursive Type Loops** | `Recursive @ParameterGroup loop detected: TypeA -> TypeB -> TypeA` | Parameter groups are expanded statically at compile time; recursive data structures cannot be unpacked into a finite parameter manifest. |
+| **Sibling Dependency in Prefixed Groups** | (Handled Automatically) Sibling conditions like `@DependsOn(param = "colorGrading")` inside a prefixed group (`prefix = "llm_post_"`) automatically resolve to `llm_post_colorGrading`. | If you target a non-existent parameter, KSP will report: `Parameter '...' in capability '...' depends on unknown parameter '...'`. |
+| **Circular Parameter Dependency** | `Circular parameter dependency detected in capability 'bar': paramA -> paramB -> paramA` | KSP uses a depth-first search (DFS) cycle detector across all parameters (including unpacked group parameters). Ensure your conditions form a Directed Acyclic Graph (DAG). |
+| **Self Dependency** | `Parameter 'paramA' in capability 'bar' cannot depend on itself` | Remove the self-referencing condition. |
+
 #### Customizing Capability Outputs
 
 By default, any capability returning a value (except `Unit`) will expose a single output port named `"result"`. You can customize this behavior using the `@CapabilityResult` annotation.

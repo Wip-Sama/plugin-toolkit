@@ -111,4 +111,30 @@ class ParameterDependencyGraphTest {
         assertFalse("refiner" in activeSd15)
         assertTrue("clipSkip" in activeSd15)
     }
+
+    @Test
+    fun testDotNotationDependency() {
+        val configParam = ParameterMetadata(
+            description = "Config",
+            type = DataType.Primitive(PrimitiveType.STRING)
+        )
+        val apiKeyParam = ParameterMetadata(
+            description = "API Key",
+            type = DataType.Primitive(PrimitiveType.STRING),
+            condition = ConditionGroup.of(
+                ParameterCondition(
+                    source = ConditionSource.PARAMETER,
+                    target = "config.provider",
+                    operator = ConditionOperator.EQUALS,
+                    value = "cloud"
+                )
+            )
+        )
+        val params = mapOf(
+            "apiKey" to apiKeyParam,
+            "config" to configParam
+        )
+        val order = ParameterDependencyGraph.getTopologicalOrder(params)
+        assertTrue(order.indexOf("config") < order.indexOf("apiKey"))
+    }
 }

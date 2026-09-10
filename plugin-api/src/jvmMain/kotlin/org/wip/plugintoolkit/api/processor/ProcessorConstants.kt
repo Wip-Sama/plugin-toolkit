@@ -54,6 +54,7 @@ object ProcessorConstants {
     const val DEPENDS_ON_ANNOTATION = "$ANNOTATION_PACKAGE.DependsOn"
     const val DEPENDS_ON_ANY_ANNOTATION = "$ANNOTATION_PACKAGE.DependsOnAny"
     const val DEPENDS_ON_ALL_ANNOTATION = "$ANNOTATION_PACKAGE.DependsOnAll"
+    const val PARAMETER_GROUP_ANNOTATION = "$ANNOTATION_PACKAGE.ParameterGroup"
 
     // API Classes
     val CN_PLUGIN_MANIFEST = PluginManifest::class.asClassName()

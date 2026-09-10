@@ -12,6 +12,7 @@ import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import org.wip.plugintoolkit.api.processor.GeneratorUtils
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_BOOLEAN
@@ -31,6 +32,7 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PROGRESS_REPORT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_RESULT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_DECODE_FROM_JSON_ELEMENT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.MN_ENCODE_FROM_JSON_ELEMENT
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.PARAMETER_GROUP_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.RESUME_STATE_ANNOTATION
 
 object DispatcherGenerator {
@@ -131,6 +133,32 @@ object DispatcherGenerator {
                             MN_DECODE_FROM_JSON_ELEMENT,
                             paramType
                         )
+                    }
+
+                    param.annotations.any { it.hasQualifiedName(PARAMETER_GROUP_ANNOTATION) } ||
+                            (param.type.resolve().declaration.annotations.any { it.hasQualifiedName(PARAMETER_GROUP_ANNOTATION) }) -> {
+                        val ksType = param.type.resolve()
+                        val groupAnn = param.annotations.find { it.hasQualifiedName(PARAMETER_GROUP_ANNOTATION) }
+                            ?: ksType.declaration.annotations.find { it.hasQualifiedName(PARAMETER_GROUP_ANNOTATION) }
+                        val prefix = groupAnn?.arguments?.find { it.name?.asString() == "prefix" }?.value as? String ?: ""
+                        val groupBlock = GeneratorUtils.generateDispatcherGroupJson(ksType, prefix)
+                        if (isNullable) {
+                            mapCode.add(
+                                "%L.let { obj -> if (obj.isEmpty()) null else %T.%M<%T>(obj) }",
+                                groupBlock,
+                                CN_JSON,
+                                MN_DECODE_FROM_JSON_ELEMENT,
+                                paramType
+                            )
+                        } else {
+                            mapCode.add(
+                                "%L.let { %T.%M<%T>(it) }",
+                                groupBlock,
+                                CN_JSON,
+                                MN_DECODE_FROM_JSON_ELEMENT,
+                                paramType
+                            )
+                        }
                     }
 
                     isNullable -> {

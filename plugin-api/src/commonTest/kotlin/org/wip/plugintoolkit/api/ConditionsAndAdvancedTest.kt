@@ -4,6 +4,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -153,5 +155,57 @@ class ConditionsAndAdvancedTest {
         assertEquals("result", decodedOutput.name)
         assertFalse(decodedOutput.isAdvanced)
         assertNull(decodedOutput.condition)
+    }
+
+    @Test
+    fun testDotNotationPathResolution() {
+        val params = mapOf(
+            "options" to buildJsonObject {
+                put("provider", JsonPrimitive("openai"))
+                put("deep", buildJsonObject {
+                    put("tier", JsonPrimitive("pro"))
+                })
+            },
+            "flat_param" to JsonPrimitive("value")
+        )
+
+        // Target: options.provider == openai
+        val c1 = ParameterCondition(
+            source = ConditionSource.PARAMETER,
+            target = "options.provider",
+            operator = ConditionOperator.EQUALS,
+            value = "openai"
+        )
+        assertTrue(ParameterConditionEvaluator.isSatisfied(ConditionGroup.of(c1), params))
+
+        // Target: options.provider == anthropic (false)
+        val c2 = ParameterCondition(
+            source = ConditionSource.PARAMETER,
+            target = "options.provider",
+            operator = ConditionOperator.EQUALS,
+            value = "anthropic"
+        )
+        assertFalse(ParameterConditionEvaluator.isSatisfied(ConditionGroup.of(c2), params))
+
+        // Deep nested target: options.deep.tier == pro
+        val c3 = ParameterCondition(
+            source = ConditionSource.PARAMETER,
+            target = "options.deep.tier",
+            operator = ConditionOperator.EQUALS,
+            value = "pro"
+        )
+        assertTrue(ParameterConditionEvaluator.isSatisfied(ConditionGroup.of(c3), params))
+
+        // Fallback to flat key with dots if it exists
+        val dottedKeyParams = mapOf(
+            "model.version" to JsonPrimitive("v2")
+        )
+        val c4 = ParameterCondition(
+            source = ConditionSource.PARAMETER,
+            target = "model.version",
+            operator = ConditionOperator.EQUALS,
+            value = "v2"
+        )
+        assertTrue(ParameterConditionEvaluator.isSatisfied(ConditionGroup.of(c4), dottedKeyParams))
     }
 }

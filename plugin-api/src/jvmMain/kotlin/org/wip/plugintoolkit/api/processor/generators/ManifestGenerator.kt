@@ -175,139 +175,70 @@ object ManifestGenerator {
             capabilitiesCode.add("parameters = mapOf(\n")
             capabilitiesCode.indent()
 
-            val paramsList = func.parameters
-            paramsList.forEachIndexed { pIndex, param ->
-                val paramAnn = param.annotations.find { 
-                    it.hasQualifiedName(ProcessorConstants.CAPABILITY_PARAM_ANNOTATION) ||
-                    it.hasQualifiedName(ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) ||
-                    it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION)
+            val unpackedParams = GeneratorUtils.getCapabilityParameters(func)
+            unpackedParams.forEachIndexed { pIndex, param ->
+                val defaultValueCode = if (param.defaultValue.isNotEmpty()) {
+                    try {
+                        kotlinx.serialization.json.Json.parseToJsonElement(param.defaultValue)
+                        CodeBlock.of("%T.parseToJsonElement(%S)", CN_JSON, param.defaultValue)
+                    } catch (e: Exception) {
+                        CodeBlock.of("%T(%S)", ClassName("kotlinx.serialization.json", "JsonPrimitive"), param.defaultValue)
+                    }
+                } else {
+                    CodeBlock.of("%L", "null")
                 }
-                val paramDesc =
-                    paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
-                val defaultValue =
-                    paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
-                val paramNameStr = param.name?.asString() ?: ""
-                val paramType = param.type.resolve().toTypeName()
-                val isInfrastructure = INFRASTRUCTURE_TYPES.any { it == paramType }
 
-                if (!isInfrastructure) {
-                    val defaultValueCode = if (defaultValue.isNotEmpty()) {
-
-
-
-                        try {
-                            kotlinx.serialization.json.Json.parseToJsonElement(defaultValue)
-                            CodeBlock.of("%T.parseToJsonElement(%S)", CN_JSON, defaultValue)
-                        } catch (e: Exception) {
-                            CodeBlock.of("%T(%S)", ClassName("kotlinx.serialization.json", "JsonPrimitive"), defaultValue)
-                        }
-                    } else {
-                        CodeBlock.of("%L", "null")
-                    }
-
-
-                    val minValue =
-                        paramAnn?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
-                    val maxValue =
-                        paramAnn?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
-                    val minLength =
-                        paramAnn?.arguments?.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
-                    val maxLength =
-                        paramAnn?.arguments?.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
-                    val regex = paramAnn?.arguments?.find { it.name?.asString() == "regex" }?.value as? String ?: ""
-                    val multiSelect =
-                        paramAnn?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
-                    val minChoices =
-                        paramAnn?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
-                    val maxChoices =
-                        paramAnn?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
-                    val isNullable = param.type.resolve().isMarkedNullable
-                    val hasDefault = param.hasDefault
-                    val explicitRequired =
-                        paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
-                    val required = explicitRequired || (!isNullable && !hasDefault)
-                    val secret =
-                        paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
-                    val semTypesVal =
-                        (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)?.filterIsInstance<String>()
-                            ?: emptyList()
-
-                    val hasConstraints =
-                        !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 || regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
-
-                    val constraintsCode = if (hasConstraints) {
-                        val regexCode = if (regex.isNotEmpty()) CodeBlock.of("%S", regex) else CodeBlock.of("null")
-                        CodeBlock.of(
-                            "%T(minValue = %L, maxValue = %L, minLength = %L, maxLength = %L, regex = %L, multiSelect = %L, minChoices = %L, maxChoices = %L)",
-                            CN_PARAMETER_CONSTRAINTS,
-                            if (!minValue.isNaN()) minValue else "null",
-                            if (!maxValue.isNaN()) maxValue else "null",
-                            if (minLength != -1) minLength else "null",
-                            if (maxLength != -1) maxLength else "null",
-                            regexCode,
-                            if (multiSelect) "true" else "null",
-                            if (minChoices != -1) minChoices else "null",
-                            if (maxChoices != -1) maxChoices else "null"
-                        )
-                    } else "null"
-
-                    val isInputLoc =
-                        param.annotations.any { it.hasQualifiedName(ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) }
-                    val isOutputLoc =
-                        param.annotations.any { it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION) }
-                    val roleStr = when {
-                        isInputLoc -> "INPUT_LOCATION"
-                        isOutputLoc -> "OUTPUT_LOCATION"
-                        else -> "STANDARD"
-                    }
-                    val roleCode = CodeBlock.of("%T.%L", org.wip.plugintoolkit.api.ParameterRole::class, roleStr)
-
-                    val outputAnn =
-                        param.annotations.find { it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION) }
-                    val autogeneratedPattern = if (isOutputLoc) {
-                        val pattern = outputAnn?.arguments?.find { it.name?.asString() == "autogeneratedPattern" }?.value as? String
-                        if (pattern.isNullOrBlank()) null else pattern
-                    } else null
-
-                    val isDestructive = if (isOutputLoc) {
-                        outputAnn?.arguments?.find { it.name?.asString() == "isDestructive" }?.value as? Boolean
-                            ?: false
-                    } else false
-
-                    val semanticTypesList = semTypesVal.flatMap { org.wip.plugintoolkit.api.parseSemanticTypes(it) }
-                    val semanticTypesCode = generateSemanticTypesCode(semanticTypesList)
-
-                    val paramDataType = GeneratorUtils.mapKSTypeToDataType(param.type.resolve())
-                    val typeCode = GeneratorUtils.generateDataTypeCode(paramDataType)
-
-                    val autogeneratedPatternCode = if (autogeneratedPattern != null) CodeBlock.of(
-                        "%S",
-                        autogeneratedPattern
-                    ) else CodeBlock.of("null")
-
-                    val isAdvanced = paramAnn?.arguments?.find { it.name?.asString() == "isAdvanced" }?.value as? Boolean ?: false
-                    val conditionGroup = org.wip.plugintoolkit.api.processor.GeneratorUtils.extractConditionGroup(param)
-                    val conditionCode = org.wip.plugintoolkit.api.processor.GeneratorUtils.generateConditionGroupCode(conditionGroup)
-
-                    capabilitiesCode.add(
-                        "%S to %T(defaultValue = %L, description = %S, type = %L, constraints = %L, required = %L, secret = %L, semanticTypes = %L, role = %L, autogeneratedPattern = %L, isDestructive = %L, isAdvanced = %L, condition = %L)",
-                        paramNameStr,
-                        CN_PARAMETER_METADATA,
-                        defaultValueCode,
-                        paramDesc,
-                        typeCode,
-                        constraintsCode,
-                        required,
-                        secret,
-                        semanticTypesCode,
-                        roleCode,
-                        autogeneratedPatternCode,
-                        isDestructive,
-                        isAdvanced,
-                        conditionCode
+                val constraintsCode = if (param.constraints != null) {
+                    val c = param.constraints
+                    val regexCode = if (!c.regex.isNullOrEmpty()) CodeBlock.of("%S", c.regex) else CodeBlock.of("null")
+                    CodeBlock.of(
+                        "%T(minValue = %L, maxValue = %L, minLength = %L, maxLength = %L, regex = %L, multiSelect = %L, minChoices = %L, maxChoices = %L)",
+                        CN_PARAMETER_CONSTRAINTS,
+                        if (c.minValue != null) c.minValue else "null",
+                        if (c.maxValue != null) c.maxValue else "null",
+                        if (c.minLength != null) c.minLength else "null",
+                        if (c.maxLength != null) c.maxLength else "null",
+                        regexCode,
+                        if (c.multiSelect == true) "true" else "null",
+                        if (c.minChoices != null) c.minChoices else "null",
+                        if (c.maxChoices != null) c.maxChoices else "null"
                     )
-                    if (pIndex < paramsList.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
+                } else "null"
+
+                val roleStr = when (param.role) {
+                    org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION -> "INPUT_LOCATION"
+                    org.wip.plugintoolkit.api.ParameterRole.OUTPUT_LOCATION -> "OUTPUT_LOCATION"
+                    else -> "STANDARD"
                 }
+                val roleCode = CodeBlock.of("%T.%L", org.wip.plugintoolkit.api.ParameterRole::class, roleStr)
+
+                val autogeneratedPatternCode = if (param.autogeneratedPattern != null) CodeBlock.of(
+                    "%S",
+                    param.autogeneratedPattern
+                ) else CodeBlock.of("null")
+
+                val semanticTypesCode = generateSemanticTypesCode(param.semanticTypes)
+                val typeCode = GeneratorUtils.generateDataTypeCode(param.dataType)
+                val conditionCode = org.wip.plugintoolkit.api.processor.GeneratorUtils.generateConditionGroupCode(param.condition)
+
+                capabilitiesCode.add(
+                    "%S to %T(defaultValue = %L, description = %S, type = %L, constraints = %L, required = %L, secret = %L, semanticTypes = %L, role = %L, autogeneratedPattern = %L, isDestructive = %L, isAdvanced = %L, condition = %L)",
+                    param.name,
+                    CN_PARAMETER_METADATA,
+                    defaultValueCode,
+                    param.description,
+                    typeCode,
+                    constraintsCode,
+                    param.required,
+                    param.secret,
+                    semanticTypesCode,
+                    roleCode,
+                    autogeneratedPatternCode,
+                    param.isDestructive,
+                    param.isAdvanced,
+                    conditionCode
+                )
+                if (pIndex < unpackedParams.size - 1) capabilitiesCode.add(",\n") else capabilitiesCode.add("\n")
             }
             capabilitiesCode.unindent()
             capabilitiesCode.add("),\n")

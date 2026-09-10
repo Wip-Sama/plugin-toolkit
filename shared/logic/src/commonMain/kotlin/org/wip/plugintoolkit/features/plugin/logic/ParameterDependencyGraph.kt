@@ -17,9 +17,12 @@ object ParameterDependencyGraph {
 
         parameters.forEach { (name, meta) ->
             meta.condition?.conditions?.forEach { cond ->
-                if (cond.source == ConditionSource.PARAMETER && parameters.containsKey(cond.target) && cond.target != name) {
-                    // name depends on cond.target (target -> name)
-                    adj[cond.target]?.add(name)
+                if (cond.source == ConditionSource.PARAMETER) {
+                    val rootTarget = if (parameters.containsKey(cond.target)) cond.target else cond.target.substringBefore('.')
+                    if (parameters.containsKey(rootTarget) && rootTarget != name) {
+                        // name depends on rootTarget (rootTarget -> name)
+                        adj[rootTarget]?.add(name)
+                    }
                 }
             }
         }

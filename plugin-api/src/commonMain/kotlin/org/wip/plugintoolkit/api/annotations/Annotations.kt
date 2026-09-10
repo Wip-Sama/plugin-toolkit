@@ -315,3 +315,21 @@ annotation class ComplexObject(
     val description: String = "",
     val version: Int = 1
 )
+
+/**
+ * Marks a capability parameter as a parameter group (wrapper).
+ *
+ * KSP unrolls the properties of this data class into individual top-level
+ * capability parameters in the manifest, while allowing the capability function
+ * to receive a single strongly-typed data class instance.
+ *
+ * Any [@DependsOn], [@DependsOnAny], or [@DependsOnAll] annotations placed on the parameter
+ * will be combined with the conditions of each property in the group.
+ *
+ * @property prefix Optional prefix to prepend to each parameter name (e.g., "options_"). Defaults to empty string (no prefix).
+ */
+@Target(AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.PROPERTY, AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.SOURCE)
+annotation class ParameterGroup(
+    val prefix: String = ""
+)

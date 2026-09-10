@@ -25,6 +25,7 @@ import org.wip.plugintoolkit.api.annotations.CapabilityOutput
 import org.wip.plugintoolkit.api.annotations.CapabilityParam
 import org.wip.plugintoolkit.api.annotations.CapabilityResult
 import org.wip.plugintoolkit.api.annotations.DependsOn
+import org.wip.plugintoolkit.api.annotations.ParameterGroup
 import org.wip.plugintoolkit.api.annotations.PluginAction
 import org.wip.plugintoolkit.api.annotations.PluginInfo
 import org.wip.plugintoolkit.api.annotations.PluginLoad
@@ -108,6 +109,28 @@ data class CustomDataResult(
     @CapabilityResult(name = "message", description = "Summary text message") val message: String
 )
 
+@Serializable
+data class PostProcessingOptions(
+    @CapabilityParam(description = "Apply color grading filter", defaultValue = "false")
+    val applyFilter: Boolean = false,
+
+    @CapabilityParam(description = "Filter intensity level", defaultValue = "0.8", isAdvanced = true)
+    @DependsOn(param = "applyFilter", value = "true")
+    val filterIntensity: Double = 0.8
+)
+
+@Serializable
+data class ModelInferenceOptions(
+    @CapabilityParam(description = "Temperature for sampling", defaultValue = "0.7")
+    val temperature: Double = 0.7,
+
+    @CapabilityParam(description = "Maximum output tokens", defaultValue = "1024", isAdvanced = true)
+    val maxTokens: Int = 1024,
+
+    @ParameterGroup(prefix = "post_")
+    val postProcessing: PostProcessingOptions = PostProcessingOptions()
+)
+
 enum class FeatureMode {
     @RequiresSetting(["apiKey"])
     ONLINE,
@@ -123,7 +146,7 @@ enum class FeatureMode {
 @PluginInfo(
     id = "org.wip.complete",
     name = "Complete Example Plugin",
-    version = "1.0.0",
+    version = "2.1.1",
     description = "Complete showcase of plugin API features including settings, validation, signals, storage, file system, lifecycle hooks, and flow contexts.",
     supportedOs = [OS.WINDOWS, OS.LINUX, OS.MACOS]
 )
@@ -456,5 +479,24 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
     ): String {
         return "Model: $modelArchitecture, customWeights: $customWeightsPath, batchSize: $batchSize, " +
                 "quantization: $quantizationBits, remoteEndpoint: $remoteEndpoint, debugLog: $debugLogPath"
+    }
+
+    @Capability(
+        name = "capabilityWithParameterGroup",
+        description = "Showcase of grouped and nested parameters using @ParameterGroup unpacked into the manifest."
+    )
+    fun capabilityWithParameterGroup(
+        @CapabilityParam(
+            description = "Selected inference engine",
+            defaultValue = "LOCAL_LLM"
+        )
+        engine: String = "LOCAL_LLM",
+
+        @ParameterGroup(prefix = "llm_")
+        @DependsOn(param = "engine", value = "LOCAL_LLM")
+        inferenceOptions: ModelInferenceOptions = ModelInferenceOptions()
+    ): String {
+        return "Engine: $engine, Temp: ${inferenceOptions.temperature}, MaxTokens: ${inferenceOptions.maxTokens}, " +
+                "Filter: ${inferenceOptions.postProcessing.applyFilter}, Intensity: ${inferenceOptions.postProcessing.filterIntensity}"
     }
 }

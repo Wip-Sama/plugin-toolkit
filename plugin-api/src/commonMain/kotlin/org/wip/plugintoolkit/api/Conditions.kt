@@ -6,6 +6,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -115,15 +116,30 @@ object ParameterConditionEvaluator {
             }
 
             ConditionSource.SETTING -> {
-                val element = settings[condition.target]
+                val element = resolveJsonPath(settings, condition.target)
                 evaluateElement(element, condition)
             }
 
             ConditionSource.PARAMETER -> {
-                val element = parameters[condition.target]
+                val element = resolveJsonPath(parameters, condition.target)
                 evaluateElement(element, condition)
             }
         }
+    }
+
+    /**
+     * Resolves a JSON element from a map using direct key lookup or dot notation path (e.g. "config.provider").
+     */
+    fun resolveJsonPath(map: Map<String, JsonElement>, path: String): JsonElement? {
+        if (map.containsKey(path)) return map[path]
+        if (!path.contains('.')) return map[path]
+
+        val segments = path.split('.')
+        var current: JsonElement = map[segments[0]] ?: return null
+        for (i in 1 until segments.size) {
+            current = (current as? JsonObject)?.get(segments[i]) ?: return null
+        }
+        return current
     }
 
     private fun evaluateElement(

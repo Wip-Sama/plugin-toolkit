@@ -1,3 +1,9 @@
+Version: 2.1.1
+Date: 11-09-2026
+Added:
+  - Added capabilityWithDynamicAndAdvancedParams showcase demonstrating @DependsOn conditions and isAdvanced = true parameters.
+  - Added capabilityWithParameterGroup showcase demonstrating @ParameterGroup for unpacking reusable and nested data classes into capability manifests.
+---------------------------------------------------------------------------------
 Version: 1.0.0
 VersionName: Complete Suite Showcase
 Date: 04-08-2026

@@ -177,12 +177,8 @@ class ManifestProcessor(
         functions.forEach { func ->
             val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as? String ?: func.simpleName.asString()
-            val paramConditions = func.parameters.filter { param ->
-                val paramType = param.type.resolve().toTypeName()
-                !ProcessorConstants.INFRASTRUCTURE_TYPES.contains(paramType)
-            }.associate { param ->
-                (param.name?.asString() ?: "") to GeneratorUtils.extractConditionGroup(param)
-            }
+            val unpackedParams = GeneratorUtils.getCapabilityParameters(func, logger)
+            val paramConditions = unpackedParams.associate { it.name to it.condition }
             GeneratorUtils.validateCapabilityConditions(
                 capabilityName = capName,
                 parameters = paramConditions,
