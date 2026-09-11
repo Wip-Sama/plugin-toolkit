@@ -1,3 +1,5 @@
+# Package org.wip.plugintoolkit.api.processor.generators
+
 # Plugin Generators Documentation
 
 This document explains the architecture and responsibilities of the specialized generator classes used in the Plugin Toolkit's KSP (Kotlin Symbol Processing) layer.

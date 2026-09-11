@@ -61,3 +61,17 @@ publishing {
         }
     }
 }
+
+dokka {
+    dokkaSourceSets.configureEach {
+        includes.from(
+            project.rootProject.file("docs/PluginDevelopment.md"),
+            project.rootProject.file("docs/Generators.md"),
+            project.rootProject.file("docs/SemanticTypes.md"),
+            project.rootProject.file("docs/PluginMigrations.md"),
+            project.rootProject.file("docs/plugin_security_and_signing_guide.md"),
+            project.rootProject.file("docs/PluginRepositories.md"),
+            project.rootProject.file("docs/FlowEditor.md")
+        )
+    }
+}

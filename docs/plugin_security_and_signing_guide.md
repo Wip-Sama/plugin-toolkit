@@ -1,3 +1,5 @@
+# Module plugin-api
+
 # Plugin Security & Signing Guide
 
 This guide outlines the security boundaries enforced by the Plugin Toolkit and provides step-by-step instructions on how to properly sign a plugin JAR so it passes runtime verification.

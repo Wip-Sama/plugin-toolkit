@@ -432,9 +432,7 @@ When a new version of a plugin is installed over an existing one, the toolkit fo
 3.  **Replacement (Default)**: If neither handler is defined, the toolkit simply replaces the JAR file.
 
 In all cases, a successful update or setup is followed by an immediate call to the `@PluginLoad` handler (if present) to ensure the plugin is ready for its new version.
-
-> [!CAUTION]
-> If you rely on `@PluginSetup` for updates, be aware that your `files` folder will be wiped. If you need to preserve user data during an update, you **must** use `@PluginUpdate`.
+> **Caution**: If you rely on `@PluginSetup` for updates, be aware that your `files` folder will be wiped. If you need to preserve user data during an update, you **must** use `@PluginUpdate`.
 
 ## State Management (Pause & Resume)
 
@@ -471,10 +469,9 @@ suspend fun longTask(
     return ExecutionResult.Success(PluginResponse("Completed"))
 }
 ```
-> [!NOTE]
-> `PluginPausedException` is deprecated. Use `ExecutionResult` for clean control flow.
-Signals also allow for special handling of cancellation if the plugin need to clean resources.
-While you can set a plugin to "not support cancellation" the host app can force-cancel the execution.
+> **Note**: `PluginPausedException` is deprecated. Use `ExecutionResult` for clean control flow.
+> Signals also allow for special handling of cancellation if the plugin need to clean resources.
+> While you can set a plugin to "not support cancellation" the host app can force-cancel the execution.
 
 ### Working with the Host
 

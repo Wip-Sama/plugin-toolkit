@@ -1,3 +1,5 @@
+# Module plugin-api
+
 # Extension and Plugin Repositories
 
 This document describes how extension repositories are structured and how the host application interacts with them. An extension repository is a static file server hosting an `index.json` file, plugin packages, and reusable flows.

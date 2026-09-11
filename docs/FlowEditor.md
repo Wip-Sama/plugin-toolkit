@@ -1,3 +1,5 @@
+# Module plugin-api
+
 # Flow Editor Features
 
 The CMP Desktop Application includes a powerful visual Flow Editor that allows you to orchestrate capabilities, system nodes, subflows, and inputs/outputs into cohesive workflows. This document details some of the advanced features available in the flow editor UI to manage complex diagrams effectively.

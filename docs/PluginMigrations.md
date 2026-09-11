@@ -1,3 +1,5 @@
+# Module plugin-api
+
 # Plugin Migrations
 
 When developing plugins for the host application, you will eventually release new versions that modify your existing APIs. This can include renaming capabilities, changing port inputs/outputs, updating custom objects, or altering user settings.
@@ -74,8 +76,7 @@ While `migrations.json` handles the configuration of Nodes in the host's Flows, 
 
 To migrate this internal state, your `PluginEntry` can override `suspend fun performUpdate(context: PluginContext)`.
 
-> [!CAUTION]
-> **Version-Agnostic Requirement**
+> **Caution: Version-Agnostic Requirement**
 > The `performUpdate` function must be implemented in a **version-agnostic** way. Users may skip multiple versions during an upgrade (e.g., jumping from `1.0.0` directly to `1.5.0`). 
 > 
 > You cannot assume the user is upgrading from `1.4.0`. Instead, query your current internal state defensively. For example, check if a database table exists or if a file is in the old format, and then upgrade it to the new format.

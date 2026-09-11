@@ -1,3 +1,5 @@
+# Package org.wip.plugintoolkit.api
+
 # Semantic Types Infrastructure
 
 This document defines the architecture, grammar, standard registry, matching compatibility rules, and migration plan for Semantic Types within the Plugin Toolkit.
