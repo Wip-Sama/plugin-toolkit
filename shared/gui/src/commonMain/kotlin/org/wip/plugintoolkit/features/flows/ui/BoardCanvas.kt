@@ -61,6 +61,7 @@ import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowLabel
 import org.wip.plugintoolkit.features.flows.ui.toModelOffset
+import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardGridAndConnectionsCanvas
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardInteractionState
 import org.wip.plugintoolkit.features.flows.ui.canvas.SelectionBoxCanvas
@@ -275,10 +276,42 @@ fun BoardCanvas(
                 roundness = state.connectionRoundness
             )
     ) {
+        val isDraggedInSelection = state.draggedNodeId != null && (
+            state.selectedNodeIds.contains(state.draggedNodeId) ||
+            state.selectedGroupIds.contains(state.draggedNodeId) ||
+            state.selectedLabelIds.contains(state.draggedNodeId)
+        )
+
+        val movingGroupIds = remember(state.draggedNodeId, state.selectedGroupIds, isDraggedInSelection, flow.groups) {
+            if (state.draggedNodeId == null) emptySet()
+            else if (isDraggedInSelection) state.selectedGroupIds + (if (flow.groups.any { it.id == state.draggedNodeId }) setOf(state.draggedNodeId) else emptySet())
+            else if (flow.groups.any { it.id == state.draggedNodeId }) setOf(state.draggedNodeId)
+            else emptySet()
+        }
+
+        val movingLabelIds = remember(state.draggedNodeId, state.selectedLabelIds, isDraggedInSelection, flow.labels) {
+            if (state.draggedNodeId == null) emptySet()
+            else if (isDraggedInSelection) state.selectedLabelIds + (if (flow.labels.any { it.id == state.draggedNodeId }) setOf(state.draggedNodeId) else emptySet())
+            else if (flow.labels.any { it.id == state.draggedNodeId }) setOf(state.draggedNodeId)
+            else emptySet()
+        }
+
+        val renderedGroups = remember(flow.groups, movingGroupIds, state.currentDragOffset) {
+            if (state.currentDragOffset == org.wip.plugintoolkit.features.flows.model.Offset.Zero || movingGroupIds.isEmpty()) {
+                flow.groups
+            } else {
+                flow.groups.map { grp ->
+                    if (movingGroupIds.contains(grp.id)) {
+                        grp.copy(position = grp.position + state.currentDragOffset)
+                    } else grp
+                }
+            }
+        }
+
         // 1. Grid and Connections Canvas
         BoardGridAndConnectionsCanvas(
             state = state,
-            flow = flow,
+            flow = flow.copy(groups = renderedGroups),
             interactionState = interactionState,
             isDrawingConnection = isDrawingConnection,
             connectionStartNodeId = connectionStartNodeId,
@@ -305,37 +338,36 @@ fun BoardCanvas(
                 } ?: false
 
                 val isGroupSelected = state.selectedGroupIds.contains(group.id)
-                val groupPosOffset = if (state.draggedNodeId != null &&
-                    state.selectedNodeIds.contains(state.draggedNodeId) &&
-                    isGroupSelected
+                val isMoving = movingGroupIds.contains(group.id)
+                val groupDragOffset = if (isMoving) state.currentDragOffset.toComposeOffset() else Offset.Zero
+
+                BoardElementContainer(
+                    position = group.position.toComposeOffset(),
+                    dragOffset = groupDragOffset,
+                    scale = state.scale,
+                    boardOffset = state.offset
                 ) {
-                    state.currentDragOffset
-                } else org.wip.plugintoolkit.features.flows.model.Offset.Zero
-
-                val renderedGroup = if (groupPosOffset != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                    group.copy(position = group.position + groupPosOffset)
-                } else group
-
-                FlowGroupComponent(
-                    group = renderedGroup,
-                    stateScale = state.scale,
-                    stateOffset = state.offset,
-                    isReadOnly = isReadOnly,
-                    onUpdateGroup = onUpdateGroup,
-                    onDeleteGroup = onDeleteGroup,
-                    onDragDelta = { delta -> onMoveGroup(group.id, delta.toModelOffset()) },
-                    isSelected = isGroupSelected,
-                    isDropTarget = isDropTarget,
-                    hasIncomingConnections = hasIncoming,
-                    hasOutgoingConnections = hasOutgoing,
-                    isPaintToolActive = state.isPaintToolActive,
-                    isWashToolActive = state.isWashToolActive,
-                    isEyedropperActive = state.isEyedropperActive,
-                    onPaintGroup = onPaintGroup,
-                    onWashGroup = onWashGroup,
-                    onSampleColor = onSampleColor,
-                    onResizeGroup = onResizeGroup
-                )
+                    FlowGroupComponent(
+                        group = group,
+                        stateScale = state.scale,
+                        stateOffset = state.offset,
+                        isReadOnly = isReadOnly,
+                        onUpdateGroup = onUpdateGroup,
+                        onDeleteGroup = onDeleteGroup,
+                        onDragDelta = { delta -> onMoveGroup(group.id, delta.toModelOffset()) },
+                        isSelected = isGroupSelected,
+                        isDropTarget = isDropTarget,
+                        hasIncomingConnections = hasIncoming,
+                        hasOutgoingConnections = hasOutgoing,
+                        isPaintToolActive = state.isPaintToolActive,
+                        isWashToolActive = state.isWashToolActive,
+                        isEyedropperActive = state.isEyedropperActive,
+                        onPaintGroup = onPaintGroup,
+                        onWashGroup = onWashGroup,
+                        onSampleColor = onSampleColor,
+                        onResizeGroup = onResizeGroup
+                    )
+                }
             }
         }
 
@@ -343,33 +375,32 @@ fun BoardCanvas(
         flow.labels.forEach { label ->
             androidx.compose.runtime.key(label.id) {
                 val isLabelSelected = state.selectedLabelIds.contains(label.id)
-                val labelPosOffset = if (state.draggedNodeId != null &&
-                    state.selectedNodeIds.contains(state.draggedNodeId) &&
-                    isLabelSelected
+                val isMoving = movingLabelIds.contains(label.id)
+                val labelDragOffset = if (isMoving) state.currentDragOffset.toComposeOffset() else Offset.Zero
+
+                BoardElementContainer(
+                    position = label.position.toComposeOffset(),
+                    dragOffset = labelDragOffset,
+                    scale = state.scale,
+                    boardOffset = state.offset
                 ) {
-                    state.currentDragOffset
-                } else org.wip.plugintoolkit.features.flows.model.Offset.Zero
-
-                val renderedLabel = if (labelPosOffset != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                    label.copy(position = label.position + labelPosOffset)
-                } else label
-
-                FlowLabelComponent(
-                    label = renderedLabel,
-                    stateScale = state.scale,
-                    stateOffset = state.offset,
-                    isReadOnly = isReadOnly,
-                    onUpdateLabel = onUpdateLabel,
-                    onDeleteLabel = onDeleteLabel,
-                    onDragDelta = { delta -> onMoveLabel(label.id, delta.toModelOffset()) },
-                    isSelected = isLabelSelected,
-                    isPaintToolActive = state.isPaintToolActive,
-                    isWashToolActive = state.isWashToolActive,
-                    isEyedropperActive = state.isEyedropperActive,
-                    onPaintLabel = onPaintLabel,
-                    onWashLabel = onWashLabel,
-                    onSampleColor = onSampleColor
-                )
+                    FlowLabelComponent(
+                        label = label,
+                        stateScale = state.scale,
+                        stateOffset = state.offset,
+                        isReadOnly = isReadOnly,
+                        onUpdateLabel = onUpdateLabel,
+                        onDeleteLabel = onDeleteLabel,
+                        onDragDelta = { delta -> onMoveLabel(label.id, delta.toModelOffset()) },
+                        isSelected = isLabelSelected,
+                        isPaintToolActive = state.isPaintToolActive,
+                        isWashToolActive = state.isWashToolActive,
+                        isEyedropperActive = state.isEyedropperActive,
+                        onPaintLabel = onPaintLabel,
+                        onWashLabel = onWashLabel,
+                        onSampleColor = onSampleColor
+                    )
+                }
             }
         }
 

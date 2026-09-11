@@ -37,8 +37,8 @@ class FlowNodeManager {
         showGhost: Boolean
     ): FlowEditorState {
         val newOffset = currentState.currentDragOffset + delta
-        val node = currentState.flow.nodes.find { it.id == id } ?: return currentState
-        val ghostToSet = if (showGhost) (node.position + newOffset).snapToGrid() else null
+        val node = currentState.flow.nodes.find { it.id == id }
+        val ghostToSet = if (showGhost && node != null) (node.position + newOffset).snapToGrid() else null
 
         return currentState.copy(
             draggedNodeId = id,
@@ -48,11 +48,18 @@ class FlowNodeManager {
     }
 
     fun handleEndMoveNode(currentState: FlowEditorState, id: Long, density: Float): FlowEditorState {
-        val node = currentState.flow.nodes.find { it.id == id } ?: return currentState
         val finalOffset = currentState.currentDragOffset
+        val isSelectedMove = currentState.selectedNodeIds.contains(id) ||
+                currentState.selectedGroupIds.contains(id) ||
+                currentState.selectedLabelIds.contains(id)
 
-        val isSelectedGroupMove = currentState.selectedNodeIds.contains(id)
-        val nodesToMove = if (isSelectedGroupMove) currentState.selectedNodeIds else setOf(id)
+        val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (currentState.flow.nodes.any { it.id == id }) setOf(id) else emptySet()).toMutableSet()
+        val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (currentState.flow.groups.any { it.id == id }) setOf(id) else emptySet()
+        val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (currentState.flow.labels.any { it.id == id }) setOf(id) else emptySet()
+
+        for (grpId in groupsToMove) {
+            currentState.flow.groups.find { it.id == grpId }?.let { nodesToMove.addAll(it.nodeIds) }
+        }
 
         val newPositions = currentState.flow.nodes.associate {
             it.id to if (nodesToMove.contains(it.id)) (it.position + finalOffset).snapToGrid() else it.position
@@ -63,9 +70,21 @@ class FlowNodeManager {
             if (newPos != n.position) n.copyWithPosition(newPos) else n
         }
 
+        val updatedGroups = currentState.flow.groups.map { grp ->
+            if (groupsToMove.contains(grp.id)) {
+                grp.copy(position = (grp.position + finalOffset).snapToGrid())
+            } else grp
+        }
+
+        val updatedLabels = currentState.flow.labels.map { lbl ->
+            if (labelsToMove.contains(lbl.id)) {
+                lbl.copy(position = (lbl.position + finalOffset).snapToGrid())
+            } else lbl
+        }
+
         val reorderedNodes = updatedNodes.filter { !nodesToMove.contains(it.id) } + updatedNodes.filter { nodesToMove.contains(it.id) }
-        val newFlow = currentState.flow.copy(nodes = reorderedNodes)
-        val newSelection = if (isSelectedGroupMove) currentState.selectedNodeIds else setOf(id)
+        val newFlow = currentState.flow.copy(nodes = reorderedNodes, groups = updatedGroups, labels = updatedLabels)
+        val newSelection = if (isSelectedMove) currentState.selectedNodeIds else (if (currentState.flow.nodes.any { it.id == id }) setOf(id) else currentState.selectedNodeIds)
 
         return currentState.copy(
             flow = newFlow,
@@ -74,7 +93,6 @@ class FlowNodeManager {
             draggedNodeId = null,
             currentDragOffset = org.wip.plugintoolkit.features.flows.model.Offset.Zero,
             ghostPosition = null
-
         )
     }
 

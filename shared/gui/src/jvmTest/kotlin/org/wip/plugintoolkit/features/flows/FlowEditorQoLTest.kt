@@ -931,8 +931,8 @@ class FlowEditorQoLTest {
 
         for (scale in testScales) {
             for (density in testDensities) {
-                val expectedCollapsedWidthPx = maxOf(collapsedGroup.size.x * scale, 200f * density)
-                val expectedCollapsedHeightPx = 44f * density
+                val expectedCollapsedWidthPx = maxOf(collapsedGroup.size.x * scale, 200f * density * scale)
+                val expectedCollapsedHeightPx = 44f * density * scale
 
                 // 1. Outgoing connection start must align with the collapsed group's right edge center
                 val outPoints = ConnectionHitTester.getConnectionScreenPoints(

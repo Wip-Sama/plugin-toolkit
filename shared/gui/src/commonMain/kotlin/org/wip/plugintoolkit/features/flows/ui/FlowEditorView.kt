@@ -484,11 +484,18 @@ fun FlowEditorView(
                     if (collapsedGroupNodeIds.contains(node.id)) return@forEach
                     key(node.id) {
                         val isDragged = state.draggedNodeId == node.id
-                        val isPartofSelectedGroupDrag = state.draggedNodeId != null &&
-                                state.selectedNodeIds.contains(state.draggedNodeId) &&
-                                state.selectedNodeIds.contains(node.id)
+                        val isDraggedInSelection = state.draggedNodeId != null && (
+                            state.selectedNodeIds.contains(state.draggedNodeId) ||
+                            state.selectedGroupIds.contains(state.draggedNodeId) ||
+                            state.selectedLabelIds.contains(state.draggedNodeId)
+                        )
+                        val isPartOfSelectionDrag = isDraggedInSelection && state.selectedNodeIds.contains(node.id)
+                        val isContainedInMovingGroup = state.draggedNodeId != null && (
+                            (isDraggedInSelection && state.selectedGroupIds.any { gId -> flow.groups.find { it.id == gId }?.nodeIds?.contains(node.id) == true }) ||
+                            (flow.groups.find { it.id == state.draggedNodeId }?.nodeIds?.contains(node.id) == true)
+                        )
                         val dragOffset =
-                            if (isDragged || isPartofSelectedGroupDrag) state.currentDragOffset.toComposeOffset() else Offset.Zero
+                            if (isDragged || isPartOfSelectionDrag || isContainedInMovingGroup) state.currentDragOffset.toComposeOffset() else Offset.Zero
 
 
                         val isNodeHighlighted = highlightedNodeId == node.id

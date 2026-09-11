@@ -174,8 +174,8 @@ object ConnectionHitTester {
         val startScreenPos = when {
             connection.sourceJunctionId != null -> junctionMap[connection.sourceJunctionId]?.let { (it * scale) + offset }
             srcCollapsedGroup != null -> {
-                val collapsedWidthPx = maxOf(srcCollapsedGroup.size.x * scale, 200f * density)
-                val collapsedHeightPx = 44f * density
+                val collapsedWidthPx = maxOf(srcCollapsedGroup.size.x * scale, 200f * density * scale)
+                val collapsedHeightPx = 44f * density * scale
                 Offset(
                     (srcCollapsedGroup.position.x * scale + offset.x) + collapsedWidthPx,
                     (srcCollapsedGroup.position.y * scale + offset.y) + (collapsedHeightPx / 2f)
@@ -188,7 +188,7 @@ object ConnectionHitTester {
         val endScreenPos = when {
             connection.targetJunctionId != null -> junctionMap[connection.targetJunctionId]?.let { (it * scale) + offset }
             tgtCollapsedGroup != null -> {
-                val collapsedHeightPx = 44f * density
+                val collapsedHeightPx = 44f * density * scale
                 Offset(
                     tgtCollapsedGroup.position.x * scale + offset.x,
                     (tgtCollapsedGroup.position.y * scale + offset.y) + (collapsedHeightPx / 2f)

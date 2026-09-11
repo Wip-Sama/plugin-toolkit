@@ -115,20 +115,19 @@ fun FlowGroupComponent(
         MaterialTheme.colorScheme.primary
     }
 
-    val screenPos = (group.position.toComposeOffset() * stateScale) + stateOffset
     val groupWidthPx = if (group.isCollapsed) {
-        maxOf(group.size.x * stateScale, GROUP_MIN_COLLAPSED_WIDTH_DP * density)
+        maxOf(group.size.x, GROUP_MIN_COLLAPSED_WIDTH_DP * density)
     } else {
-        group.size.x * stateScale
+        group.size.x
     }
     val groupHeightPx = if (group.isCollapsed) {
         GROUP_COLLAPSED_HEIGHT_DP * density
     } else {
-        group.size.y * stateScale
+        group.size.y
     }
     val groupWidthDp = with(LocalDensity.current) { groupWidthPx.toDp() }
     val groupHeightDp = with(LocalDensity.current) { groupHeightPx.toDp() }
-    val cornerShape = RoundedCornerShape((GROUP_CORNER_RADIUS_DP * stateScale).coerceAtLeast(8f).dp)
+    val cornerShape = RoundedCornerShape(GROUP_CORNER_RADIUS_DP.dp)
 
     val borderColor = when {
         isDropTarget -> MaterialTheme.colorScheme.primary
@@ -138,12 +137,11 @@ fun FlowGroupComponent(
     val borderWidth = when {
         isDropTarget -> dimensions.progressIndicatorStroke * 1.5f
         isSelected -> dimensions.progressIndicatorStroke
-        else -> (dimensions.borderUnselected * stateScale).coerceAtLeast(1.dp)
+        else -> dimensions.borderUnselected
     }
 
     Box(
         modifier = modifier
-            .offset { IntOffset(screenPos.x.roundToInt(), screenPos.y.roundToInt()) }
             .width(groupWidthDp)
             .height(groupHeightDp)
             .background(baseColor.copy(alpha = GROUP_BACKGROUND_ALPHA), cornerShape)
@@ -177,11 +175,11 @@ fun FlowGroupComponent(
                     }
                 }
             }
-            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, stateScale) {
+            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
                 if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
-                        onDragDelta(dragAmount / stateScale)
+                        onDragDelta(dragAmount)
                     }
                 }
             }
@@ -353,10 +351,10 @@ fun FlowGroupComponent(
                     .width(RESIZE_HANDLE_THICKNESS_DP.dp)
                     .fillMaxHeight()
                     .pointerHoverIcon(PlatformUtils.horizontalResizePointerIcon())
-                    .pointerInput(group.id, stateScale) {
+                    .pointerInput(group.id) {
                         detectDragGestures { change, dragAmount ->
                             change.consume()
-                            onResizeGroup(group.id, Offset(dragAmount.x / stateScale, 0f))
+                            onResizeGroup(group.id, Offset(dragAmount.x, 0f))
                         }
                     }
             )
@@ -369,10 +367,10 @@ fun FlowGroupComponent(
                         .fillMaxWidth()
                         .height(RESIZE_HANDLE_THICKNESS_DP.dp)
                         .pointerHoverIcon(PlatformUtils.verticalResizePointerIcon())
-                        .pointerInput(group.id, stateScale) {
+                        .pointerInput(group.id) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
-                                onResizeGroup(group.id, Offset(0f, dragAmount.y / stateScale))
+                                onResizeGroup(group.id, Offset(0f, dragAmount.y))
                             }
                         }
                 )
@@ -383,10 +381,10 @@ fun FlowGroupComponent(
                         .align(Alignment.BottomEnd)
                         .size(RESIZE_CORNER_SIZE_DP.dp)
                         .pointerHoverIcon(PlatformUtils.diagonalResizePointerIcon())
-                        .pointerInput(group.id, stateScale) {
+                        .pointerInput(group.id) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
-                                onResizeGroup(group.id, Offset(dragAmount.x / stateScale, dragAmount.y / stateScale))
+                                onResizeGroup(group.id, dragAmount)
                             }
                         }
                 )

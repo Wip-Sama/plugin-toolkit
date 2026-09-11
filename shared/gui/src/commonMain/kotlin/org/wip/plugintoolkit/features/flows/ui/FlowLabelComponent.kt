@@ -95,10 +95,8 @@ fun FlowLabelComponent(
         MaterialTheme.colorScheme.primary
     }
 
-    val cornerShape = RoundedCornerShape((LABEL_CORNER_RADIUS_DP * stateScale).coerceAtLeast(6f).dp)
+    val cornerShape = RoundedCornerShape(LABEL_CORNER_RADIUS_DP.dp)
     val textColor = MaterialTheme.colorScheme.onSurface
-
-    val screenPos = (label.position.toComposeOffset() * stateScale) + stateOffset
 
     val borderColor = if (isSelected) {
         MaterialTheme.colorScheme.primary
@@ -108,12 +106,11 @@ fun FlowLabelComponent(
     val borderWidth = if (isSelected) {
         dimensions.progressIndicatorStroke
     } else {
-        (dimensions.borderUnselected * stateScale).coerceAtLeast(1.dp)
+        dimensions.borderUnselected
     }
 
     Box(
         modifier = modifier
-            .offset { IntOffset(screenPos.x.roundToInt(), screenPos.y.roundToInt()) }
             .background(
                 color = baseColor.copy(alpha = LABEL_BACKGROUND_ALPHA),
                 shape = cornerShape
@@ -149,11 +146,11 @@ fun FlowLabelComponent(
                     }
                 }
             }
-            .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, stateScale) {
+            .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
                 if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
-                        onDragDelta(dragAmount / stateScale)
+                        onDragDelta(dragAmount)
                     }
                 }
             }

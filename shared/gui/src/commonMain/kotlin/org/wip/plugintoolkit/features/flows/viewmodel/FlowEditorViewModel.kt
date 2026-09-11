@@ -31,6 +31,7 @@ import org.wip.plugintoolkit.features.flows.history.DeleteNodesCommand
 import org.wip.plugintoolkit.features.flows.history.DisconnectPortsCommand
 import org.wip.plugintoolkit.features.flows.history.FlowCommand
 import org.wip.plugintoolkit.features.flows.history.FlowHistoryManager
+import org.wip.plugintoolkit.features.flows.history.MoveBoardElementsCommand
 import org.wip.plugintoolkit.features.flows.history.MoveGroupCommand
 import org.wip.plugintoolkit.features.flows.history.MoveJunctionCommand
 import org.wip.plugintoolkit.features.flows.history.MoveLabelCommand
@@ -442,10 +443,17 @@ class FlowEditorViewModel(
                 shouldRunTypeInference = true
                 val finalOffset = currentState.currentDragOffset
                 newState = nodeManager.handleEndMoveNode(currentState, event.id, event.density)
-                val isSelectedGroupMove = currentState.selectedNodeIds.contains(event.id)
-                val nodesToMove = if (isSelectedGroupMove) currentState.selectedNodeIds else setOf(event.id)
-                val groupsToMove = if (isSelectedGroupMove) currentState.selectedGroupIds else emptySet()
-                val labelsToMove = if (isSelectedGroupMove) currentState.selectedLabelIds else emptySet()
+                val isSelectedMove = currentState.selectedNodeIds.contains(event.id) ||
+                        currentState.selectedGroupIds.contains(event.id) ||
+                        currentState.selectedLabelIds.contains(event.id)
+
+                val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (currentState.flow.nodes.any { it.id == event.id }) setOf(event.id) else emptySet()).toMutableSet()
+                val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (currentState.flow.groups.any { it.id == event.id }) setOf(event.id) else emptySet()
+                val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (currentState.flow.labels.any { it.id == event.id }) setOf(event.id) else emptySet()
+
+                for (grpId in groupsToMove) {
+                    currentState.flow.groups.find { it.id == grpId }?.let { nodesToMove.addAll(it.nodeIds) }
+                }
 
                 val moves = mutableMapOf<Long, Pair<ModelOffset, ModelOffset>>()
                 for (nodeId in nodesToMove) {
@@ -455,17 +463,10 @@ class FlowEditorViewModel(
                         moves[nodeId] = oldPos to newPos
                     }
                 }
-                if (moves.isNotEmpty()) {
-                    pendingCommand = MoveNodesCommand(moves)
-                }
 
                 // Check group containment for moved nodes:
                 // Only nodes dropped inside a group become bound, and nodes dropped outside become unbound!
-                val updatedGroups = newState.flow.groups.map { grp ->
-                    val baseGrp = if (grp.id in groupsToMove && finalOffset != ModelOffset.Zero) {
-                        grp.copy(position = grp.position + finalOffset)
-                    } else grp
-
+                val updatedGroups = newState.flow.groups.map { baseGrp ->
                     val currentlyBound = baseGrp.nodeIds.toMutableSet()
                     for (nodeId in nodesToMove) {
                         val node = newState.flow.nodes.find { it.id == nodeId }
@@ -484,14 +485,32 @@ class FlowEditorViewModel(
                     baseGrp.copy(nodeIds = currentlyBound.toList())
                 }
 
-                val updatedLabels = newState.flow.labels.map { lbl ->
-                    if (lbl.id in labelsToMove && finalOffset != ModelOffset.Zero) {
-                        lbl.copy(position = lbl.position + finalOffset)
-                    } else lbl
+                val groupMoves = mutableMapOf<Long, Pair<ModelOffset, ModelOffset>>()
+                for (grpId in groupsToMove) {
+                    val oldPos = currentState.flow.groups.find { it.id == grpId }?.position
+                    val newPos = updatedGroups.find { it.id == grpId }?.position
+                    if (oldPos != null && newPos != null && oldPos != newPos) {
+                        groupMoves[grpId] = oldPos to newPos
+                    }
+                }
+
+                val labelMoves = mutableMapOf<Long, Pair<ModelOffset, ModelOffset>>()
+                for (lblId in labelsToMove) {
+                    val oldPos = currentState.flow.labels.find { it.id == lblId }?.position
+                    val newPos = newState.flow.labels.find { it.id == lblId }?.position
+                    if (oldPos != null && newPos != null && oldPos != newPos) {
+                        labelMoves[lblId] = oldPos to newPos
+                    }
+                }
+
+                if (groupMoves.isNotEmpty() || labelMoves.isNotEmpty()) {
+                    pendingCommand = MoveBoardElementsCommand(nodeMoves = moves, groupMoves = groupMoves, labelMoves = labelMoves)
+                } else if (moves.isNotEmpty()) {
+                    pendingCommand = MoveNodesCommand(moves)
                 }
 
                 newState = newState.copy(
-                    flow = newState.flow.copy(groups = updatedGroups, labels = updatedLabels)
+                    flow = newState.flow.copy(groups = updatedGroups)
                 )
             }
 

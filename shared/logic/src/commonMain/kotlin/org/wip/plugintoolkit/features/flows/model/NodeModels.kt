@@ -245,11 +245,28 @@ data class SubflowPortMapping(
     val boundaryNodeId: Long
 )
 
-@Serializable
-sealed class Node {
-    abstract val id: Long
+/**
+ * Common base interface for all visual and interactive elements placed on the Flow board.
+ */
+interface BoardElement {
+    val id: Long
+    val position: Offset
+    fun copyWithPosition(newPosition: Offset): BoardElement
+}
 
-    abstract val position: Offset
+/**
+ * Interface for board elements that have an explicit width and height on the canvas.
+ */
+interface ResizableBoardElement : BoardElement {
+    val size: Offset
+    fun copyWithSize(newSize: Offset): ResizableBoardElement
+}
+
+@Serializable
+sealed class Node : BoardElement {
+    abstract override val id: Long
+
+    abstract override val position: Offset
     abstract val title: String
     abstract val inputs: List<InputPort>
     abstract val outputs: List<OutputPort>
@@ -258,7 +275,7 @@ sealed class Node {
     abstract val isOutputsCollapsed: Boolean
     abstract val color: String?
 
-    abstract fun copyWithPosition(newPosition: Offset): Node
+    abstract override fun copyWithPosition(newPosition: Offset): Node
     abstract fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node
     abstract fun copyWithUpdatedInputDefault(portId: String, defaultValue: Any?): Node
     abstract fun copyWithId(newId: Long): Node
@@ -542,30 +559,37 @@ sealed class Node {
 
 @Serializable
 data class FlowJunction(
-    val id: Long,
-    val position: Offset,
+    override val id: Long,
+    override val position: Offset,
     val color: String? = null
-)
+) : BoardElement {
+    override fun copyWithPosition(newPosition: Offset): FlowJunction = copy(position = newPosition)
+}
 
 @Serializable
 data class FlowGroup(
-    val id: Long,
+    override val id: Long,
     val title: String,
-    val position: Offset,
-    val size: Offset,
+    override val position: Offset,
+    override val size: Offset,
     val color: String? = null,
     val isCollapsed: Boolean = false,
     val nodeIds: List<Long> = emptyList()
-)
+) : ResizableBoardElement {
+    override fun copyWithPosition(newPosition: Offset): FlowGroup = copy(position = newPosition)
+    override fun copyWithSize(newSize: Offset): FlowGroup = copy(size = newSize)
+}
 
 @Serializable
 data class FlowLabel(
-    val id: Long,
+    override val id: Long,
     val text: String,
-    val position: Offset,
+    override val position: Offset,
     val color: String? = null,
     val fontSize: Float = 14f
-)
+) : BoardElement {
+    override fun copyWithPosition(newPosition: Offset): FlowLabel = copy(position = newPosition)
+}
 
 @Serializable
 data class Connection(
@@ -622,6 +646,21 @@ data class Flow(
     val description: String? = null,
     val defaultValues: Map<String, JsonElement> = emptyMap()
 ) {
+    fun allBoardElements(): List<BoardElement> = nodes + groups + labels + junctions
+    fun findBoardElement(id: Long): BoardElement? =
+        nodes.find { it.id == id }
+            ?: groups.find { it.id == id }
+            ?: labels.find { it.id == id }
+            ?: junctions.find { it.id == id }
+
+    fun withUpdatedBoardElement(element: BoardElement): Flow = when (element) {
+        is Node -> copy(nodes = nodes.map { if (it.id == element.id) element else it })
+        is FlowGroup -> copy(groups = groups.map { if (it.id == element.id) element else it })
+        is FlowLabel -> copy(labels = labels.map { if (it.id == element.id) element else it })
+        is FlowJunction -> copy(junctions = junctions.map { if (it.id == element.id) element else it })
+        else -> this
+    }
+
     fun getEffectiveConnections(): List<Connection> {
         val nonFloating = connections.filter { !it.isFloating }
         if (nonFloating.none { it.sourceJunctionId != null || it.targetJunctionId != null }) {

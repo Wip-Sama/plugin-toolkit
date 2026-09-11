@@ -49,6 +49,55 @@ data class MoveNodesCommand(
 }
 
 /**
+ * Command recording multi-element translations (Nodes, Groups, Labels) in a single atomic transaction.
+ */
+data class MoveBoardElementsCommand(
+    val nodeMoves: Map<Long, Pair<ModelOffset, ModelOffset>> = emptyMap(),
+    val groupMoves: Map<Long, Pair<ModelOffset, ModelOffset>> = emptyMap(),
+    val labelMoves: Map<Long, Pair<ModelOffset, ModelOffset>> = emptyMap()
+) : FlowCommand {
+    override val description: String = "Move ${nodeMoves.size + groupMoves.size + labelMoves.size} element(s)"
+
+    override fun execute(state: FlowEditorState): FlowEditorState {
+        val updatedNodes = state.flow.nodes.map { node ->
+            val move = nodeMoves[node.id]
+            if (move != null) node.copyWithPosition(move.second) else node
+        }
+        val updatedGroups = state.flow.groups.map { group ->
+            val move = groupMoves[group.id]
+            if (move != null) group.copy(position = move.second) else group
+        }
+        val updatedLabels = state.flow.labels.map { label ->
+            val move = labelMoves[label.id]
+            if (move != null) label.copy(position = move.second) else label
+        }
+        return state.copy(
+            flow = state.flow.copy(nodes = updatedNodes, groups = updatedGroups, labels = updatedLabels),
+            hasUnsavedChanges = true
+        )
+    }
+
+    override fun undo(state: FlowEditorState): FlowEditorState {
+        val updatedNodes = state.flow.nodes.map { node ->
+            val move = nodeMoves[node.id]
+            if (move != null) node.copyWithPosition(move.first) else node
+        }
+        val updatedGroups = state.flow.groups.map { group ->
+            val move = groupMoves[group.id]
+            if (move != null) group.copy(position = move.first) else group
+        }
+        val updatedLabels = state.flow.labels.map { label ->
+            val move = labelMoves[label.id]
+            if (move != null) label.copy(position = move.first) else label
+        }
+        return state.copy(
+            flow = state.flow.copy(nodes = updatedNodes, groups = updatedGroups, labels = updatedLabels),
+            hasUnsavedChanges = true
+        )
+    }
+}
+
+/**
  * Command recording node additions.
  */
 data class AddNodeCommand(
