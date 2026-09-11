@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
@@ -20,9 +21,13 @@ fun Modifier.boardKeyboardHandler(
     onRedo: () -> Unit,
     onCopy: () -> Unit,
     onPaste: (Offset) -> Unit,
-    isReadOnly: Boolean = false
+    isReadOnly: Boolean = false,
+    onTogglePaintTool: (() -> Unit)? = null,
+    onToggleWashTool: (() -> Unit)? = null
 ): Modifier = this.onKeyEvent { keyEvent ->
     val newCtrlPressed = keyEvent.isCtrlPressed
+    val newShiftPressed = keyEvent.isShiftPressed
+    interactionState.isShiftModifierPressed = newShiftPressed
     if (interactionState.isCtrlModifierPressed != newCtrlPressed) {
         interactionState.isCtrlModifierPressed = newCtrlPressed
         val hoveredConn = interactionState.hoveredConnection
@@ -75,6 +80,24 @@ fun Modifier.boardKeyboardHandler(
                     onPaste(boardPos)
                 }
                 true
+            }
+
+            !keyEvent.isCtrlPressed && (keyEvent.key == Key.P || keyEvent.key == Key.B) -> {
+                if (!isReadOnly && onTogglePaintTool != null) {
+                    onTogglePaintTool()
+                    true
+                } else {
+                    false
+                }
+            }
+
+            !keyEvent.isCtrlPressed && keyEvent.key == Key.W -> {
+                if (!isReadOnly && onToggleWashTool != null) {
+                    onToggleWashTool()
+                    true
+                } else {
+                    false
+                }
             }
 
             else -> false

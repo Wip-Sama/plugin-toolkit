@@ -58,6 +58,9 @@ import plugintoolkit.composeapp.generated.resources.node_port_inactive_connected
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.FlowGroup
+import org.wip.plugintoolkit.features.flows.model.FlowLabel
+import org.wip.plugintoolkit.features.flows.ui.toModelOffset
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardGridAndConnectionsCanvas
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardInteractionState
 import org.wip.plugintoolkit.features.flows.ui.canvas.SelectionBoxCanvas
@@ -66,12 +69,11 @@ import org.wip.plugintoolkit.features.flows.ui.canvas.boardKeyboardHandler
 import org.wip.plugintoolkit.features.flows.ui.canvas.boardPanGesture
 import org.wip.plugintoolkit.features.flows.ui.canvas.boardPointerEventGesture
 import org.wip.plugintoolkit.features.flows.ui.canvas.boardSelectionBoxGesture
-import org.wip.plugintoolkit.features.flows.ui.components.FlowControlsInfoCard
 import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
+import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.shared.components.LocalOverlayHost
 import org.wip.plugintoolkit.shared.components.LocalTooltipState
-import org.wip.plugintoolkit.shared.components.ZoomControls
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
 import org.wip.plugintoolkit.shared.components.tooltip
 import kotlin.math.roundToInt
@@ -111,6 +113,39 @@ fun BoardCanvas(
     isReadOnly: Boolean = false,
     problematicConnections: Set<Connection> = emptySet(),
     portLayoutVersion: Int = 0,
+    onTogglePaintTool: () -> Unit = {},
+    onToggleWashTool: () -> Unit = {},
+    onSelectPaintColor: (String) -> Unit = {},
+    onAddGroup: () -> Unit = {},
+    onAddLabel: () -> Unit = {},
+    onUpdateGroup: (FlowGroup) -> Unit = {},
+    onDeleteGroup: (FlowGroup) -> Unit = {},
+    onMoveGroup: (Long, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit = { _, _ -> },
+    onUpdateLabel: (FlowLabel) -> Unit = {},
+    onDeleteLabel: (FlowLabel) -> Unit = {},
+    onMoveLabel: (Long, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit = { _, _ -> },
+    onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit = {},
+    onChangeConnectionRoundness: (Float) -> Unit = {},
+    onPaintConnection: ((Connection) -> Unit)? = null,
+    onWashConnection: ((Connection) -> Unit)? = null,
+    onPaintGroup: ((Long) -> Unit)? = null,
+    onWashGroup: ((Long) -> Unit)? = null,
+    onPaintLabel: ((Long) -> Unit)? = null,
+    onWashLabel: ((Long) -> Unit)? = null,
+    onMoveJunction: ((Long, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
+    onDeleteJunction: ((Long) -> Unit)? = null,
+    onSampleColor: (String) -> Unit = {},
+    onResizeGroup: (Long, Offset) -> Unit = { _, _ -> },
+    onSelectLabels: (Set<Long>) -> Unit = {},
+    onSelectGroups: (Set<Long>) -> Unit = {},
+    onAddWaypoint: (Connection, Offset) -> Unit = { _, _ -> },
+    onMoveWaypoint: (Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit = { _, _, _ -> },
+    onDeleteWaypoint: (Connection, Int) -> Unit = { _, _ -> },
+    onAddJunctionAndBranch: (Connection, Offset) -> Unit = { _, _ -> },
+    onToggleEyedropper: () -> Unit = {},
+    onToggleAdvancedConnectionMode: () -> Unit = {},
+    onPaintSelection: () -> Unit = {},
+    onWashSelection: () -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.(hoveredConnection: Connection?, hoveredNodeId: Long?, onHoverNode: (Long?) -> Unit) -> Unit
 ) {
@@ -165,7 +200,9 @@ fun BoardCanvas(
                 onRedo = onRedo,
                 onCopy = onCopy,
                 onPaste = onPaste,
-                isReadOnly = isReadOnly
+                isReadOnly = isReadOnly,
+                onTogglePaintTool = onTogglePaintTool,
+                onToggleWashTool = onToggleWashTool
             )
             .boardConnectionTapGesture(
                 interactionState = interactionState,
@@ -178,7 +215,18 @@ fun BoardCanvas(
                 nodeSizes = nodeSizes,
                 density = density,
                 defaultNodeWidthPx = with(density) { dimensions.nodeWidth.toPx() },
-                onClearSelection = onClearSelection
+                onClearSelection = onClearSelection,
+                isPaintToolActive = state.isPaintToolActive,
+                isWashToolActive = state.isWashToolActive,
+                isEyedropperActive = state.isEyedropperActive,
+                onPaintConnection = onPaintConnection,
+                onWashConnection = onWashConnection,
+                onSampleColor = onSampleColor,
+                onAddJunctionAndBranch = onAddJunctionAndBranch,
+                junctions = flow.junctions,
+                curveStyle = state.connectionCurveStyle,
+                roundness = state.connectionRoundness,
+                groups = flow.groups
             )
             .boardPanGesture(
                 focusRequester = focusRequester,
@@ -194,7 +242,15 @@ fun BoardCanvas(
                 offset = state.offset,
                 defaultNodeWidthPx = with(density) { dimensions.nodeWidth.toPx() },
                 focusRequester = focusRequester,
-                onSelectNodes = onSelectNodes
+                onSelectNodes = onSelectNodes,
+                labels = flow.labels,
+                groups = flow.groups,
+                onSelectLabels = onSelectLabels,
+                onSelectGroups = onSelectGroups,
+                isPaintToolActive = state.isPaintToolActive,
+                isWashToolActive = state.isWashToolActive,
+                onPaintSelection = onPaintSelection,
+                onWashSelection = onWashSelection
             )
             .boardPointerEventGesture(
                 interactionState = interactionState,
@@ -208,7 +264,15 @@ fun BoardCanvas(
                 onConnectionDrag = onConnectionDrag,
                 onConnectionDrop = onConnectionDrop,
                 onDeleteConnection = onDeleteConnection,
-                onDetachConnection = onDetachConnection
+                onDetachConnection = onDetachConnection,
+                junctions = flow.junctions,
+                onMoveJunction = onMoveJunction,
+                onDeleteJunction = onDeleteJunction,
+                onAddWaypoint = onAddWaypoint,
+                onMoveWaypoint = onMoveWaypoint,
+                onDeleteWaypoint = onDeleteWaypoint,
+                curveStyle = state.connectionCurveStyle,
+                roundness = state.connectionRoundness
             )
     ) {
         // 1. Grid and Connections Canvas
@@ -224,8 +288,90 @@ fun BoardCanvas(
             highlightedNodeId = highlightedNodeId,
             getPortBoardPosition = getPortBoardPosition,
             problematicConnections = problematicConnections,
-            portLayoutVersion = portLayoutVersion
+            portLayoutVersion = portLayoutVersion,
+            curveStyle = state.connectionCurveStyle,
+            roundness = state.connectionRoundness
         )
+
+        // 1.1 Groups Layer (Behind nodes and labels)
+        flow.groups.forEach { group ->
+            androidx.compose.runtime.key(group.id) {
+                val hasIncoming = flow.connections.any { it.targetNodeId in group.nodeIds && it.sourceNodeId !in group.nodeIds }
+                val hasOutgoing = flow.connections.any { it.sourceNodeId in group.nodeIds && it.targetNodeId !in group.nodeIds }
+                val isDropTarget = state.draggedNodeId != null && state.flow.nodes.find { it.id == state.draggedNodeId }?.let { dNode ->
+                    val currPos = dNode.position + state.currentDragOffset
+                    currPos.x >= group.position.x && currPos.x <= group.position.x + group.size.x &&
+                    currPos.y >= group.position.y && currPos.y <= group.position.y + group.size.y
+                } ?: false
+
+                val isGroupSelected = state.selectedGroupIds.contains(group.id)
+                val groupPosOffset = if (state.draggedNodeId != null &&
+                    state.selectedNodeIds.contains(state.draggedNodeId) &&
+                    isGroupSelected
+                ) {
+                    state.currentDragOffset
+                } else org.wip.plugintoolkit.features.flows.model.Offset.Zero
+
+                val renderedGroup = if (groupPosOffset != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                    group.copy(position = group.position + groupPosOffset)
+                } else group
+
+                FlowGroupComponent(
+                    group = renderedGroup,
+                    stateScale = state.scale,
+                    stateOffset = state.offset,
+                    isReadOnly = isReadOnly,
+                    onUpdateGroup = onUpdateGroup,
+                    onDeleteGroup = onDeleteGroup,
+                    onDragDelta = { delta -> onMoveGroup(group.id, delta.toModelOffset()) },
+                    isSelected = isGroupSelected,
+                    isDropTarget = isDropTarget,
+                    hasIncomingConnections = hasIncoming,
+                    hasOutgoingConnections = hasOutgoing,
+                    isPaintToolActive = state.isPaintToolActive,
+                    isWashToolActive = state.isWashToolActive,
+                    isEyedropperActive = state.isEyedropperActive,
+                    onPaintGroup = onPaintGroup,
+                    onWashGroup = onWashGroup,
+                    onSampleColor = onSampleColor,
+                    onResizeGroup = onResizeGroup
+                )
+            }
+        }
+
+        // 1.2 Labels Layer
+        flow.labels.forEach { label ->
+            androidx.compose.runtime.key(label.id) {
+                val isLabelSelected = state.selectedLabelIds.contains(label.id)
+                val labelPosOffset = if (state.draggedNodeId != null &&
+                    state.selectedNodeIds.contains(state.draggedNodeId) &&
+                    isLabelSelected
+                ) {
+                    state.currentDragOffset
+                } else org.wip.plugintoolkit.features.flows.model.Offset.Zero
+
+                val renderedLabel = if (labelPosOffset != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                    label.copy(position = label.position + labelPosOffset)
+                } else label
+
+                FlowLabelComponent(
+                    label = renderedLabel,
+                    stateScale = state.scale,
+                    stateOffset = state.offset,
+                    isReadOnly = isReadOnly,
+                    onUpdateLabel = onUpdateLabel,
+                    onDeleteLabel = onDeleteLabel,
+                    onDragDelta = { delta -> onMoveLabel(label.id, delta.toModelOffset()) },
+                    isSelected = isLabelSelected,
+                    isPaintToolActive = state.isPaintToolActive,
+                    isWashToolActive = state.isWashToolActive,
+                    isEyedropperActive = state.isEyedropperActive,
+                    onPaintLabel = onPaintLabel,
+                    onWashLabel = onWashLabel,
+                    onSampleColor = onSampleColor
+                )
+            }
+        }
 
         // Connection Hover Tooltip
         if (hoveredConnectionTooltipVisible && interactionState.hoveredConnection != null) {
@@ -419,55 +565,39 @@ fun BoardCanvas(
             }
         }
 
-        // 6. Bottom Right Controls (Info button + Zoom Controls)
+        // 6. Floating App Bar (M3 Toolbar + Zoom Controls)
         val centerPosition = Offset(boardSize.width / 2f, boardSize.height / 2f)
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(ToolkitTheme.spacing.medium),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-        ) {
-            val tooltipState = LocalTooltipState.current
-            var infoCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-            val infoTooltipKey = remember { Any() }
-
-            Surface(
-                onClick = {
-                    infoCoordinates?.let { coords ->
-                        tooltipState?.toggle(coords, infoTooltipKey) {
-                            FlowControlsInfoCard()
-                        }
-                    }
-                },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                border = BorderStroke(
-                    width = ToolkitTheme.dimensions.borderUnselected,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                ),
-                modifier = Modifier
-                    .size(ToolkitTheme.dimensions.standardButtonHeight)
-                    .onGloballyPositioned { infoCoordinates = it }
-                    .tooltip { FlowControlsInfoCard() }
-                    .testTag("flow_controls_info_button")
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = stringResource(Res.string.flow_info_button_tooltip),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                    )
-                }
-            }
-
-            ZoomControls(
-                scale = state.scale,
-                onZoomIn = { onZoom(-1f, centerPosition, false) },
-                onZoomOut = { onZoom(1f, centerPosition, false) },
-                modifier = Modifier.testTag("zoom_controls")
-            )
+        val colorsInFlow = remember(flow) {
+            val nodeColors = flow.nodes.mapNotNull { it.color }.filter { it.isNotBlank() }
+            val connColors = flow.connections.mapNotNull { it.color }.filter { it.isNotBlank() }
+            val groupColors = flow.groups.mapNotNull { it.color }.filter { it.isNotBlank() }
+            val labelColors = flow.labels.mapNotNull { it.color }.filter { it.isNotBlank() }
+            (nodeColors + connColors + groupColors + labelColors).distinct()
         }
+
+        FlowFloatingAppBar(
+            scale = state.scale,
+            isReadOnly = isReadOnly,
+            isPaintToolActive = state.isPaintToolActive,
+            isWashToolActive = state.isWashToolActive,
+            isEyedropperActive = state.isEyedropperActive,
+            isAdvancedConnectionMode = state.isAdvancedConnectionMode,
+            activePaintColor = state.activePaintColor,
+            colorsInFlow = colorsInFlow,
+            connectionStyle = state.connectionCurveStyle,
+            connectionRoundness = state.connectionRoundness,
+            onTogglePaintTool = onTogglePaintTool,
+            onToggleWashTool = onToggleWashTool,
+            onToggleEyedropper = onToggleEyedropper,
+            onToggleAdvancedConnectionMode = onToggleAdvancedConnectionMode,
+            onSelectPaintColor = onSelectPaintColor,
+            onAddGroup = onAddGroup,
+            onAddLabel = onAddLabel,
+            onChangeConnectionStyle = onChangeConnectionStyle,
+            onChangeConnectionRoundness = onChangeConnectionRoundness,
+            onZoomIn = { onZoom(-1f, centerPosition, false) },
+            onZoomOut = { onZoom(1f, centerPosition, false) },
+            modifier = Modifier.align(Alignment.BottomEnd)
+        )
     }
 }

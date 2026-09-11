@@ -169,6 +169,58 @@ sealed interface FlowEvent {
 
     data object CancelImport : FlowEvent
     data class ExportFlow(val flowName: String) : FlowEvent
+
+    // Paint Tool
+    data object TogglePaintTool : FlowEvent
+    data object ToggleWashTool : FlowEvent
+    data object ToggleEyedropper : FlowEvent
+    data class SampleColor(val color: String) : FlowEvent
+    data object ToggleAdvancedConnectionMode : FlowEvent
+    data class SetActivePaintColor(val color: String) : FlowEvent
+    data class PaintNode(val nodeId: Long, val isForce: Boolean = false) : FlowEvent
+    data class PaintConnection(val connection: Connection) : FlowEvent
+    data class PaintGroup(val groupId: Long) : FlowEvent
+    data class PaintLabel(val labelId: Long) : FlowEvent
+    data class WashNode(val nodeId: Long) : FlowEvent
+    data class WashConnection(val connection: Connection) : FlowEvent
+    data class WashGroup(val groupId: Long) : FlowEvent
+    data class WashLabel(val labelId: Long) : FlowEvent
+    data object PaintSelection : FlowEvent
+    data object WashSelection : FlowEvent
+
+    // Selection
+    data class SelectLabels(val ids: Set<Long>) : FlowEvent
+    data class SelectGroups(val ids: Set<Long>) : FlowEvent
+
+    // Groups & Labels
+    data class AddGroup(val position: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class UpdateGroup(val group: org.wip.plugintoolkit.features.flows.model.FlowGroup) : FlowEvent
+    data class DeleteGroup(val group: org.wip.plugintoolkit.features.flows.model.FlowGroup) : FlowEvent
+    data class MoveGroup(val groupId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class ResizeGroup(val groupId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+
+    data class AddLabel(val position: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class UpdateLabel(val label: org.wip.plugintoolkit.features.flows.model.FlowLabel) : FlowEvent
+    data class DeleteLabel(val label: org.wip.plugintoolkit.features.flows.model.FlowLabel) : FlowEvent
+    data class MoveLabel(val labelId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+
+    // Junctions, Waypoints & Splines
+    data class AddJunctionAndBranch(
+        val connection: Connection,
+        val splitPosition: org.wip.plugintoolkit.features.flows.model.Offset,
+        val branchSourceNodeId: Long? = null,
+        val branchSourcePortId: String? = null,
+        val branchTargetNodeId: Long? = null,
+        val branchTargetPortId: String? = null
+    ) : FlowEvent
+    data class MoveJunction(val junctionId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class DeleteJunction(val junctionId: Long) : FlowEvent
+    data class AddWaypoint(val connection: Connection, val point: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class MoveWaypoint(val connection: Connection, val index: Int, val newPoint: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class DeleteWaypoint(val connection: Connection, val index: Int) : FlowEvent
+    data class CreateFloatingConnection(val sourceNodeId: Long, val sourcePortId: String, val floatingTarget: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class UpdateConnectionCurveStyle(val style: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle) : FlowEvent
+    data class UpdateConnectionRoundness(val roundness: Float) : FlowEvent
 }
 
 class FlowViewModel(

@@ -16,10 +16,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Connection
+import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
 import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
+import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
+import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
+import org.wip.plugintoolkit.shared.components.plugin.inputs.parseColorString
 
 private val sharedBezierPath = Path()
 
@@ -72,6 +76,8 @@ fun BoardGridAndConnectionsCanvas(
     getPortBoardPosition: (Long, String, Boolean) -> Offset?,
     problematicConnections: Set<Connection> = emptySet(),
     portLayoutVersion: Int = 0,
+    curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
+    roundness: Float = 0.5f,
     modifier: Modifier = Modifier
 ) {
     val gridSize = 50f
@@ -81,6 +87,8 @@ fun BoardGridAndConnectionsCanvas(
 
     val connectionColor = MaterialTheme.colorScheme.primary
     val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val junctionMap = flow.junctions.associate { it.id to it.position.toComposeOffset() }
 
     val connectionAlphas = flow.connections.associateWith { connection ->
         val isDimmedByConnectionHover = interactionState.hoveredConnection != null && interactionState.hoveredConnection != connection
@@ -88,15 +96,7 @@ fun BoardGridAndConnectionsCanvas(
                 connection.sourceNodeId != interactionState.hoveredNodeId &&
                 connection.targetNodeId != interactionState.hoveredNodeId
         val isDimmed = isDimmedByConnectionHover || isDimmedByNodeHover
-        val targetAlpha = if (isDimmed) 0.6f else 1f
-        animateFloatAsState(
-            targetValue = targetAlpha,
-            animationSpec = tween(
-                durationMillis = 200,
-                delayMillis = if (isDimmed) 500 else 0
-            ),
-            label = "ConnectionAlpha"
-        ).value
+        if (isDimmed) opacity.disabled else 1f
     }
 
     Canvas(modifier = modifier.fillMaxSize().testTag("board_grid")) {
@@ -123,14 +123,45 @@ fun BoardGridAndConnectionsCanvas(
             }
         }
 
-        // Draw connections
-        flow.connections.forEach { connection ->
-            val sourcePortBoardPos = getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId, true)
-            val targetPortBoardPos = getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
+        // Draw junctions (Blue ramification points)
+        flow.junctions.forEach { junction ->
+            val center = (junction.position.toComposeOffset() * state.scale) + state.offset
+            val isHovered = interactionState.hoveredJunctionId == junction.id
+            val juncColor = junction.color
+            val jColor = if (!juncColor.isNullOrBlank()) {
+                parseColorString(juncColor)
+            } else {
+                Color(0xFF2196F3)
+            }
+            val isSelected = interactionState.selectedJunctionId == junction.id
+            val radius = (if (isHovered || isSelected) 8f else 5.5f) * state.scale
 
-            if (sourcePortBoardPos != null && targetPortBoardPos != null) {
-                val startPos = (sourcePortBoardPos * state.scale) + state.offset
-                val endPos = (targetPortBoardPos * state.scale) + state.offset
+            drawCircle(
+                color = jColor,
+                radius = radius,
+                center = center
+            )
+            drawCircle(
+                color = surfaceColor,
+                radius = radius,
+                center = center,
+                style = Stroke(width = 2f * state.scale)
+            )
+        }
+
+        // Draw connections and waypoints
+        flow.connections.forEach { connection ->
+            val screenPoints = ConnectionHitTester.getConnectionScreenPoints(
+                connection = connection,
+                getPortBoardPosition = getPortBoardPosition,
+                junctionMap = junctionMap,
+                scale = state.scale,
+                offset = state.offset,
+                groups = flow.groups,
+                density = this.density
+            )
+
+            if (screenPoints != null && screenPoints.size >= 2) {
                 val isInvalid = state.validationErrors.any {
                     it.sourceNodeId == connection.sourceNodeId &&
                             it.sourcePortId == connection.sourcePortId &&
@@ -140,53 +171,84 @@ fun BoardGridAndConnectionsCanvas(
                 val hasProblem = problematicConnections.contains(connection)
                 val isSelected = interactionState.selectedConnection == connection
                 val isHovered = interactionState.hoveredConnection == connection
+                val isGroupHighlighted = flow.groups.any { group ->
+                    state.selectedGroupIds.contains(group.id) &&
+                            (connection.sourceNodeId in group.nodeIds || connection.targetNodeId in group.nodeIds)
+                }
+                val connColor = connection.color
                 val baseColor = when {
                     isInvalid -> customColors.red
                     hasProblem -> customColors.warning
+                    !connColor.isNullOrBlank() -> parseColorString(connColor)
                     else -> connectionColor
                 }
                 val color = when {
                     isSelected -> { Color(0xFFFF9800) }
                     isHovered && interactionState.hoveredConnectionIsSource == null -> { Color(0xFFFF2D55) }
+                    isGroupHighlighted -> { baseColor }
                     else -> { baseColor }
                 }.copy(alpha = connectionAlphas[connection] ?: 1f)
 
-                if (isHovered && interactionState.hoveredConnectionIsSource == null) {
-                    drawBezierCurve(startPos, endPos, color.copy(alpha = opacity.settingsItemDefault), strokeWidth = dimensions.strokeWidthMedium.toPx())
+                val strokeWidth = if (isSelected || isHovered || isGroupHighlighted) {
+                    dimensions.strokeWidthMedium.toPx()
+                } else {
+                    dimensions.strokeWidthThin.toPx()
+                }
+                val path = SplineMathUtils.buildConnectionPath(screenPoints, curveStyle, roundness)
+                drawPath(
+                    path = path,
+                    color = color,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+
+                // When holding Ctrl to reattach, indicate which end will detach with a prominent ring cap
+                if (isHovered && interactionState.hoveredConnectionIsSource != null) {
+                    val detachEndPos = if (interactionState.hoveredConnectionIsSource == true) screenPoints.first() else screenPoints.last()
+                    drawCircle(
+                        color = Color(0xFFFF2D55),
+                        radius = 9f * state.scale,
+                        center = detachEndPos
+                    )
+                    drawCircle(
+                        color = surfaceColor,
+                        radius = 5.5f * state.scale,
+                        center = detachEndPos
+                    )
                 }
 
-                if (isHovered && interactionState.hoveredConnectionIsSource != null) {
-                    // Custom drawing for split bezier
-                    val (sourceHalf, targetHalf) = BoardMathUtils.splitCubicBezierInHalf(startPos, endPos)
+                // If floating connection, draw an open ring cap at the floating target end
+                if (connection.isFloating) {
+                    val endPos = screenPoints.last()
+                    drawCircle(
+                        color = surfaceColor,
+                        radius = 6f * state.scale,
+                        center = endPos
+                    )
+                    drawCircle(
+                        color = color,
+                        radius = 6f * state.scale,
+                        center = endPos,
+                        style = Stroke(width = 2.5f * state.scale)
+                    )
+                }
 
-                    val highlightColor = Color(0xFFFF2D55)
-                    val sourceColor =
-                        if (interactionState.hoveredConnectionIsSource == true) highlightColor else baseColor.copy(alpha = opacity.sidebarBackground)
-                    val sourceStroke = if (interactionState.hoveredConnectionIsSource == true) dimensions.strokeWidthMedium.toPx() else dimensions.borderSelected.toPx()
-
-                    val targetColor =
-                        if (interactionState.hoveredConnectionIsSource == false) highlightColor else baseColor.copy(alpha = opacity.sidebarBackground)
-                    val targetStroke = if (interactionState.hoveredConnectionIsSource == false) dimensions.strokeWidthMediumSmall.toPx() else dimensions.borderSelected.toPx()
-
-                    if (interactionState.hoveredConnectionIsSource == true) {
-                        drawBezierCurveSegment(
-                            sourceHalf,
-                            sourceColor.copy(alpha = opacity.settingsItemDefault),
-                            strokeWidth = dimensions.strokeWidthMedium.toPx()
-                        )
-                    } else {
-                        drawBezierCurveSegment(
-                            targetHalf,
-                            targetColor.copy(alpha = opacity.settingsItemDefault),
-                            strokeWidth = dimensions.strokeWidthThick.toPx()
-                        )
-                    }
-
-                    drawBezierCurveSegment(sourceHalf, sourceColor, strokeWidth = sourceStroke)
-                    drawBezierCurveSegment(targetHalf, targetColor, strokeWidth = targetStroke)
-                } else {
-                    val strokeWidth = if (isSelected || isHovered) dimensions.strokeWidthMedium.toPx() else dimensions.strokeWidthThin.toPx()
-                    drawBezierCurve(startPos, endPos, color, strokeWidth)
+                // Draw Waypoints (Green routing points)
+                connection.waypoints.forEachIndexed { index, wp ->
+                    val center = (wp.toComposeOffset() * state.scale) + state.offset
+                    val isWpHovered = interactionState.hoveredWaypoint?.first == connection &&
+                            interactionState.hoveredWaypoint?.second == index
+                    val wpRadius = (if (isWpHovered) 7.5f else 5f) * state.scale
+                    drawCircle(
+                        color = Color(0xFF4CAF50),
+                        radius = wpRadius,
+                        center = center
+                    )
+                    drawCircle(
+                        color = surfaceColor,
+                        radius = wpRadius,
+                        center = center,
+                        style = Stroke(width = 1.5f * state.scale)
+                    )
                 }
             }
         }
@@ -195,10 +257,14 @@ fun BoardGridAndConnectionsCanvas(
         if (isDrawingConnection && connectionStartNodeId != null && connectionStartPortId != null) {
             val startBoardPos = getPortBoardPosition(connectionStartNodeId, connectionStartPortId, connectionStartIsOutput)
             if (startBoardPos != null) {
-                val currentPos = if (highlightedPortId != null && highlightedNodeId != null) {
-                    getPortBoardPosition(highlightedNodeId, highlightedPortId, !connectionStartIsOutput)!!
+                var currentPos = if (highlightedPortId != null && highlightedNodeId != null) {
+                    getPortBoardPosition(highlightedNodeId, highlightedPortId, !connectionStartIsOutput) ?: ((interactionState.lastPointerPosition - state.offset) / state.scale)
                 } else {
                     (interactionState.lastPointerPosition - state.offset) / state.scale
+                }
+
+                if (interactionState.isShiftModifierPressed) {
+                    currentPos = SplineMathUtils.snapToStraightAngle(startBoardPos, currentPos)
                 }
 
                 val (startPos, endPos) = if (connectionStartIsOutput) {
@@ -207,11 +273,12 @@ fun BoardGridAndConnectionsCanvas(
                     currentPos to startBoardPos
                 }
 
-                drawBezierCurve(
-                    (startPos * state.scale) + state.offset,
-                    (endPos * state.scale) + state.offset,
-                    connectionColor.copy(alpha = opacity.disabled),
-                    dimensions.strokeWidthThick.toPx()
+                val pts = listOf((startPos * state.scale) + state.offset, (endPos * state.scale) + state.offset)
+                val path = SplineMathUtils.buildConnectionPath(pts, curveStyle, roundness)
+                drawPath(
+                    path = path,
+                    color = connectionColor.copy(alpha = opacity.disabled),
+                    style = Stroke(width = dimensions.strokeWidthThick.toPx(), cap = StrokeCap.Round)
                 )
             }
         }

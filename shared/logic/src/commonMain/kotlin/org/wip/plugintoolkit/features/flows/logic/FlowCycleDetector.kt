@@ -10,8 +10,9 @@ object FlowCycleDetector {
     fun wouldCreateCycle(sourceNodeId: Long, targetNodeId: Long, connections: List<Connection>): Boolean {
         if (sourceNodeId == targetNodeId) return true
 
+        val nonFloating = connections.filter { !it.isFloating }
         val adjacencyList =
-            connections.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
+            nonFloating.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
         val visited = mutableSetOf<Long>()
         val queue = ArrayDeque<Long>()
 
@@ -35,8 +36,9 @@ object FlowCycleDetector {
     }
 
     fun hasCycle(connections: List<Connection>): Boolean {
+        val nonFloating = connections.filter { !it.isFloating }
         val adjacencyList =
-            connections.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
+            nonFloating.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
         val visited = mutableSetOf<Long>()
         val visiting = mutableSetOf<Long>()
 

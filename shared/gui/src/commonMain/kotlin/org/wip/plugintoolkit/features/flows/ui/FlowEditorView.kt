@@ -60,6 +60,8 @@ import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.OutputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
+import org.wip.plugintoolkit.features.flows.ui.toModelOffset
+import org.wip.plugintoolkit.features.flows.ui.canvas.ConnectionHitTester
 import org.wip.plugintoolkit.api.ParameterConditionEvaluator
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
@@ -261,6 +263,71 @@ fun FlowEditorView(
     val incompatibleSemanticsMsg = stringResource(Res.string.flow_editor_incompatible_semantics)
     val duplicateFlowMsg = stringResource(Res.string.flow_editor_duplicate_error)
 
+    val handleConnectionDrop: (Boolean) -> Unit = { isShiftPressed ->
+        if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
+            val sourceNodeId =
+                if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
+            val sourcePortId =
+                if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
+            val targetNodeId =
+                if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
+            val targetPortId =
+                if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
+
+            viewModel.onEvent(
+                FlowEvent.TryConnectPorts(
+                    sourceNodeId,
+                    sourcePortId,
+                    targetNodeId,
+                    targetPortId,
+                    isShiftPressed
+                )
+            )
+        } else if (connectionStartNodeId != null && connectionStartPortId != null) {
+            val dropScreenPos = (connectionCurrentPos * state.scale) + state.offset
+            val closestConnAndProj = ConnectionHitTester.findClosestConnectionWithProjection(
+                position = dropScreenPos,
+                connections = flow.connections,
+                getPortBoardPosition = getPortBoardPosition,
+                scale = state.scale,
+                offset = state.offset,
+                junctions = flow.junctions,
+                curveStyle = state.connectionCurveStyle,
+                roundness = state.connectionRoundness
+            )
+            if (closestConnAndProj != null) {
+                val (closestConn, splitPos) = closestConnAndProj
+                val branchSrcNodeId = if (connectionStartIsOutput) connectionStartNodeId else null
+                val branchSrcPortId = if (connectionStartIsOutput) connectionStartPortId else null
+                val branchTgtNodeId = if (!connectionStartIsOutput) connectionStartNodeId else null
+                val branchTgtPortId = if (!connectionStartIsOutput) connectionStartPortId else null
+                viewModel.onEvent(
+                    FlowEvent.AddJunctionAndBranch(
+                        connection = closestConn,
+                        splitPosition = splitPos.toModelOffset(),
+                        branchSourceNodeId = branchSrcNodeId,
+                        branchSourcePortId = branchSrcPortId,
+                        branchTargetNodeId = branchTgtNodeId,
+                        branchTargetPortId = branchTgtPortId
+                    )
+                )
+            } else if (connectionStartIsOutput) {
+                viewModel.onEvent(
+                    FlowEvent.CreateFloatingConnection(
+                        sourceNodeId = connectionStartNodeId!!,
+                        sourcePortId = connectionStartPortId!!,
+                        floatingTarget = connectionCurrentPos.toModelOffset()
+                    )
+                )
+            }
+        }
+        isDrawingConnection = false
+        connectionStartNodeId = null
+        connectionStartPortId = null
+        highlightedPortId = null
+        highlightedNodeId = null
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -316,33 +383,7 @@ fun FlowEditorView(
                 highlightedNodeId = closestNodeId
                 highlightedPortId = closestPortId
             },
-            onConnectionDrop = { isShiftPressed ->
-                if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
-                    val sourceNodeId =
-                        if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
-                    val sourcePortId =
-                        if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
-                    val targetNodeId =
-                        if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
-                    val targetPortId =
-                        if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
-
-                    viewModel.onEvent(
-                        FlowEvent.TryConnectPorts(
-                            sourceNodeId,
-                            sourcePortId,
-                            targetNodeId,
-                            targetPortId,
-                            isShiftPressed
-                        )
-                    )
-                }
-                isDrawingConnection = false
-                connectionStartNodeId = null
-                connectionStartPortId = null
-                highlightedPortId = null
-                highlightedNodeId = null
-            },
+            onConnectionDrop = handleConnectionDrop,
             onMoveConnectionFirst = { viewModel.onEvent(FlowEvent.MoveConnectionFirst(it)) },
             onMoveConnectionLast = { viewModel.onEvent(FlowEvent.MoveConnectionLast(it)) },
             selectedNodeIds = state.selectedNodeIds,
@@ -359,7 +400,52 @@ fun FlowEditorView(
             nodeSizes = nodeSizes,
             isReadOnly = state.isReadOnly,
             problematicConnections = problematicConnections,
-            portLayoutVersion = portLayoutVersion
+            portLayoutVersion = portLayoutVersion,
+            onTogglePaintTool = { viewModel.onEvent(FlowEvent.TogglePaintTool) },
+            onToggleWashTool = { viewModel.onEvent(FlowEvent.ToggleWashTool) },
+            onSelectPaintColor = { viewModel.onEvent(FlowEvent.SetActivePaintColor(it)) },
+            onAddGroup = {
+                val centerPos = (Offset(boardSize.width / 2f, boardSize.height / 2f) - state.offset) / state.scale
+                viewModel.onEvent(FlowEvent.AddGroup(centerPos.toModelOffset()))
+            },
+            onAddLabel = {
+                val centerPos = (Offset(boardSize.width / 2f, boardSize.height / 2f) - state.offset) / state.scale
+                viewModel.onEvent(FlowEvent.AddLabel(centerPos.toModelOffset()))
+            },
+            onUpdateGroup = { viewModel.onEvent(FlowEvent.UpdateGroup(it)) },
+            onDeleteGroup = { viewModel.onEvent(FlowEvent.DeleteGroup(it)) },
+            onMoveGroup = { id, delta -> viewModel.onEvent(FlowEvent.MoveGroup(id, delta)) },
+            onUpdateLabel = { viewModel.onEvent(FlowEvent.UpdateLabel(it)) },
+            onDeleteLabel = { viewModel.onEvent(FlowEvent.DeleteLabel(it)) },
+            onMoveLabel = { id, delta -> viewModel.onEvent(FlowEvent.MoveLabel(id, delta)) },
+            onChangeConnectionStyle = { viewModel.onEvent(FlowEvent.UpdateConnectionCurveStyle(it)) },
+            onChangeConnectionRoundness = { viewModel.onEvent(FlowEvent.UpdateConnectionRoundness(it)) },
+            onPaintConnection = { viewModel.onEvent(FlowEvent.PaintConnection(it)) },
+            onWashConnection = { viewModel.onEvent(FlowEvent.WashConnection(it)) },
+            onPaintGroup = { viewModel.onEvent(FlowEvent.PaintGroup(it)) },
+            onWashGroup = { viewModel.onEvent(FlowEvent.WashGroup(it)) },
+            onPaintLabel = { viewModel.onEvent(FlowEvent.PaintLabel(it)) },
+            onWashLabel = { viewModel.onEvent(FlowEvent.WashLabel(it)) },
+            onMoveJunction = { id, delta -> viewModel.onEvent(FlowEvent.MoveJunction(id, delta)) },
+            onDeleteJunction = { viewModel.onEvent(FlowEvent.DeleteJunction(it)) },
+            onSampleColor = { viewModel.onEvent(FlowEvent.SampleColor(it)) },
+            onResizeGroup = { id, delta -> viewModel.onEvent(FlowEvent.ResizeGroup(id, delta.toModelOffset())) },
+            onSelectLabels = { viewModel.onEvent(FlowEvent.SelectLabels(it)) },
+            onSelectGroups = { viewModel.onEvent(FlowEvent.SelectGroups(it)) },
+            onAddWaypoint = { conn, pos -> viewModel.onEvent(FlowEvent.AddWaypoint(conn, pos.toModelOffset())) },
+            onMoveWaypoint = { conn, index, delta ->
+                val currentWp = conn.waypoints.getOrNull(index) ?: org.wip.plugintoolkit.features.flows.model.Offset(0f, 0f)
+                val newPoint = org.wip.plugintoolkit.features.flows.model.Offset(currentWp.x + delta.x, currentWp.y + delta.y)
+                viewModel.onEvent(FlowEvent.MoveWaypoint(conn, index, newPoint))
+            },
+            onDeleteWaypoint = { conn, index -> viewModel.onEvent(FlowEvent.DeleteWaypoint(conn, index)) },
+            onAddJunctionAndBranch = { conn, pos ->
+                viewModel.onEvent(FlowEvent.AddJunctionAndBranch(conn, pos.toModelOffset()))
+            },
+            onToggleEyedropper = { viewModel.onEvent(FlowEvent.ToggleEyedropper) },
+            onToggleAdvancedConnectionMode = { viewModel.onEvent(FlowEvent.ToggleAdvancedConnectionMode) },
+            onPaintSelection = { viewModel.onEvent(FlowEvent.PaintSelection) },
+            onWashSelection = { viewModel.onEvent(FlowEvent.WashSelection) }
         ) { hoveredConnection, hoveredNodeId, onHoverNode ->
             CompositionLocalProvider(LocalOverlayHost provides dropdownOverlay) {
                 // 1.1 Ghost Preview for Snapping (rendered underneath nodes)
@@ -383,7 +469,19 @@ fun FlowEditorView(
                 }
 
                 // 1.2 Nodes
+                val collapsedGroupNodeIds = remember(flow.groups, flow.nodes) {
+                    flow.groups.filter { it.isCollapsed }.flatMap { group ->
+                        group.nodeIds + flow.nodes.filter { node ->
+                            node.position.x >= group.position.x &&
+                            node.position.x <= group.position.x + group.size.x &&
+                            node.position.y >= group.position.y &&
+                            node.position.y <= group.position.y + group.size.y
+                        }.map { it.id }
+                    }.toSet()
+                }
+
                 flow.nodes.forEach { node ->
+                    if (collapsedGroupNodeIds.contains(node.id)) return@forEach
                     key(node.id) {
                         val isDragged = state.draggedNodeId == node.id
                         val isPartofSelectedGroupDrag = state.draggedNodeId != null &&
@@ -600,34 +698,7 @@ fun FlowEditorView(
                                 onDragConnection = {
                                     // Ignored, BoardCanvas handles it
                                 },
-                                onDropConnection = { isShiftPressed ->
-                                    if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
-                                        val sourceNodeId =
-                                            if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
-                                        val sourcePortId =
-                                            if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
-                                        val targetNodeId =
-                                            if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
-                                        val targetPortId =
-                                            if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
-
-                                        viewModel.onEvent(
-                                            FlowEvent.TryConnectPorts(
-                                                sourceNodeId,
-                                                sourcePortId,
-                                                targetNodeId,
-                                                targetPortId,
-                                                isShiftPressed
-                                            )
-                                        )
-                                    }
-                                    isDrawingConnection = false
-                                    connectionStartNodeId = null
-                                    connectionStartPortId = null
-                                    highlightedPortId = null
-                                    highlightedNodeId = null
-                                },
-
+                                 onDropConnection = handleConnectionDrop,
                                 onPress = { id -> viewModel.onEvent(FlowEvent.BringToFront(id)) },
                                 highlightedPortId = nodeHighlightedPortId,
                                 highlightedPortIds = nodeHighlightedPortIds,
@@ -637,6 +708,10 @@ fun FlowEditorView(
                                 stateOffset = state.offset,
                                 selectedNodeIds = state.selectedNodeIds,
                                 isReadOnly = state.isReadOnly,
+                                isPaintToolActive = state.isPaintToolActive,
+                                isWashToolActive = state.isWashToolActive,
+                                onPaintNode = { nodeId, isForce -> viewModel.onEvent(FlowEvent.PaintNode(nodeId, isForce)) },
+                                onWashNode = { nodeId -> viewModel.onEvent(FlowEvent.WashNode(nodeId)) },
                                 modifier = Modifier.onSizeChanged { size ->
                                     nodeSizes[node.id] = size
                                 }

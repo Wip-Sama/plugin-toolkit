@@ -41,13 +41,17 @@ class SettingsModelTest {
         val settings = org.wip.plugintoolkit.features.settings.model.AppearanceSettings()
         assertEquals(org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Remember, settings.sidebarStartMode)
         assertEquals(false, settings.isSidebarCollapsed)
+        assertEquals(org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline, settings.connectionStyle)
+        assertEquals(0.5f, settings.connectionRoundness)
     }
 
     @Test
     fun testAppearanceSettingsSerialization() {
         val original = org.wip.plugintoolkit.features.settings.model.AppearanceSettings(
             sidebarStartMode = org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Collapsed,
-            isSidebarCollapsed = true
+            isSidebarCollapsed = true,
+            connectionStyle = org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.Straight,
+            connectionRoundness = 0.8f
         )
         val json = Json { encodeDefaults = true }
         val serialized = json.encodeToString(org.wip.plugintoolkit.features.settings.model.AppearanceSettings.serializer(), original)
@@ -56,5 +60,7 @@ class SettingsModelTest {
         assertEquals(original, deserialized)
         assertEquals(org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Collapsed, deserialized.sidebarStartMode)
         assertEquals(true, deserialized.isSidebarCollapsed)
+        assertEquals(org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.Straight, deserialized.connectionStyle)
+        assertEquals(0.8f, deserialized.connectionRoundness)
     }
 }

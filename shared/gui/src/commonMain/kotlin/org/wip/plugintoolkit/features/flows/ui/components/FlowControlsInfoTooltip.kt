@@ -29,7 +29,44 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import plugintoolkit.composeapp.generated.resources.*
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.flow_info_title
+import plugintoolkit.composeapp.generated.resources.flow_info_pan_label
+import plugintoolkit.composeapp.generated.resources.flow_info_pan_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_zoom_label
+import plugintoolkit.composeapp.generated.resources.flow_info_zoom_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_select_label
+import plugintoolkit.composeapp.generated.resources.flow_info_select_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_box_select_label
+import plugintoolkit.composeapp.generated.resources.flow_info_box_select_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_move_label
+import plugintoolkit.composeapp.generated.resources.flow_info_move_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_connect_label
+import plugintoolkit.composeapp.generated.resources.flow_info_connect_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_detach_label
+import plugintoolkit.composeapp.generated.resources.flow_info_detach_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_branch_label
+import plugintoolkit.composeapp.generated.resources.flow_info_branch_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_waypoint_label
+import plugintoolkit.composeapp.generated.resources.flow_info_waypoint_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_paint_label
+import plugintoolkit.composeapp.generated.resources.flow_info_paint_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_wash_label
+import plugintoolkit.composeapp.generated.resources.flow_info_wash_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_pipette_label
+import plugintoolkit.composeapp.generated.resources.flow_info_pipette_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_rename_label
+import plugintoolkit.composeapp.generated.resources.flow_info_rename_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_resize_label
+import plugintoolkit.composeapp.generated.resources.flow_info_resize_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_order_label
+import plugintoolkit.composeapp.generated.resources.flow_info_order_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_hover_label
+import plugintoolkit.composeapp.generated.resources.flow_info_hover_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_delete_label
+import plugintoolkit.composeapp.generated.resources.flow_info_delete_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_undo_redo_label
+import plugintoolkit.composeapp.generated.resources.flow_info_undo_redo_desc
 
 @Composable
 fun FlowControlsInfoCard(
@@ -105,6 +142,34 @@ fun FlowControlsInfoCard(
                 ShortcutRow(
                     badgeText = stringResource(Res.string.flow_info_detach_label),
                     description = stringResource(Res.string.flow_info_detach_desc)
+                )
+                ShortcutRow(
+                    badgeText = stringResource(Res.string.flow_info_branch_label),
+                    description = stringResource(Res.string.flow_info_branch_desc)
+                )
+                ShortcutRow(
+                    badgeText = stringResource(Res.string.flow_info_waypoint_label),
+                    description = stringResource(Res.string.flow_info_waypoint_desc)
+                )
+                ShortcutRow(
+                    badgeText = stringResource(Res.string.flow_info_paint_label),
+                    description = stringResource(Res.string.flow_info_paint_desc)
+                )
+                ShortcutRow(
+                    badgeText = stringResource(Res.string.flow_info_wash_label),
+                    description = stringResource(Res.string.flow_info_wash_desc)
+                )
+                ShortcutRow(
+                    badgeText = stringResource(Res.string.flow_info_pipette_label),
+                    description = stringResource(Res.string.flow_info_pipette_desc)
+                )
+                ShortcutRow(
+                    badgeText = stringResource(Res.string.flow_info_rename_label),
+                    description = stringResource(Res.string.flow_info_rename_desc)
+                )
+                ShortcutRow(
+                    badgeText = stringResource(Res.string.flow_info_resize_label),
+                    description = stringResource(Res.string.flow_info_resize_desc)
                 )
                 ShortcutRow(
                     badgeText = stringResource(Res.string.flow_info_order_label),

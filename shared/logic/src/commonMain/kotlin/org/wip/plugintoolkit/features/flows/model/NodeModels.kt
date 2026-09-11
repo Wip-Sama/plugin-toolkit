@@ -256,6 +256,7 @@ sealed class Node {
     abstract val isCollapsed: Boolean
     abstract val isInputsCollapsed: Boolean
     abstract val isOutputsCollapsed: Boolean
+    abstract val color: String?
 
     abstract fun copyWithPosition(newPosition: Offset): Node
     abstract fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node
@@ -264,6 +265,7 @@ sealed class Node {
     abstract fun copyWithCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithInputsCollapsedState(isCollapsed: Boolean): Node
     abstract fun copyWithOutputsCollapsedState(isCollapsed: Boolean): Node
+    abstract fun copyWithColor(color: String?): Node
     abstract fun isReady(connections: List<Connection>, settings: Map<String, JsonElement>? = null, locks: Map<String, Boolean>? = null): Boolean
 
     @Serializable
@@ -278,7 +280,8 @@ sealed class Node {
         override val isCollapsed: Boolean = false,
         override val isInputsCollapsed: Boolean = false,
         override val isOutputsCollapsed: Boolean = false,
-        val isBroken: Boolean = false
+        val isBroken: Boolean = false,
+        override val color: String? = null
     ) : Node() {
         override val title: String get() = capability.name
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
@@ -286,6 +289,7 @@ sealed class Node {
         override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
+        override fun copyWithColor(color: String?): Node = copy(color = color)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -382,13 +386,15 @@ sealed class Node {
         override val outputs: List<OutputPort>,
         override val isCollapsed: Boolean = false,
         override val isInputsCollapsed: Boolean = false,
-        override val isOutputsCollapsed: Boolean = false
+        override val isOutputsCollapsed: Boolean = false,
+        override val color: String? = null
     ) : Node() {
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
         override fun copyWithId(newId: Long) = copy(id = newId)
         override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
+        override fun copyWithColor(color: String?): Node = copy(color = color)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -436,7 +442,8 @@ sealed class Node {
         @Serializable(with = AnySerializer::class) val defaultValue: Any? = null,
         override val isCollapsed: Boolean = false,
         override val isInputsCollapsed: Boolean = false,
-        override val isOutputsCollapsed: Boolean = false
+        override val isOutputsCollapsed: Boolean = false,
+        override val color: String? = null
     ) : Node() {
         override val title: String get() = "Flow Input (${outputs.firstOrNull()?.name ?: "input_data"})"
         override val inputs: List<InputPort> = emptyList() // Uses outputs to provide data into the flow
@@ -445,6 +452,7 @@ sealed class Node {
         override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
+        override fun copyWithColor(color: String?): Node = copy(color = color)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node = this
         override fun copyWithUpdatedInputDefault(portId: String, defaultValue: Any?): Node = copy(defaultValue = defaultValue)
         override fun isReady(
@@ -462,7 +470,8 @@ sealed class Node {
         override val inputs: List<InputPort>,
         override val isCollapsed: Boolean = false,
         override val isInputsCollapsed: Boolean = false,
-        override val isOutputsCollapsed: Boolean = false
+        override val isOutputsCollapsed: Boolean = false,
+        override val color: String? = null
     ) : Node() {
         override val title: String get() = "Flow Output (${inputs.firstOrNull()?.name ?: "output_data"})"
         override val outputs: List<OutputPort> = emptyList() // Uses inputs to collect data from the flow
@@ -471,6 +480,7 @@ sealed class Node {
         override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
+        override fun copyWithColor(color: String?): Node = copy(color = color)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -501,7 +511,8 @@ sealed class Node {
         val outputMappings: List<SubflowPortMapping> = emptyList(),
         override val isCollapsed: Boolean = false,
         override val isInputsCollapsed: Boolean = false,
-        override val isOutputsCollapsed: Boolean = false
+        override val isOutputsCollapsed: Boolean = false,
+        override val color: String? = null
     ) : Node() {
         override val title: String get() = flowName
         override fun copyWithPosition(newPosition: Offset) = copy(position = newPosition)
@@ -509,6 +520,7 @@ sealed class Node {
         override fun copyWithCollapsedState(isCollapsed: Boolean) = copy(isCollapsed = isCollapsed)
         override fun copyWithInputsCollapsedState(isCollapsed: Boolean) = copy(isInputsCollapsed = isCollapsed)
         override fun copyWithOutputsCollapsedState(isCollapsed: Boolean) = copy(isOutputsCollapsed = isCollapsed)
+        override fun copyWithColor(color: String?): Node = copy(color = color)
         override fun copyWithUpdatedInput(portId: String, value: JsonElement?): Node {
             return copy(inputs = inputs.map { input ->
                 if (input.id == portId) input.copy(value = value) else input
@@ -529,23 +541,153 @@ sealed class Node {
 }
 
 @Serializable
+data class FlowJunction(
+    val id: Long,
+    val position: Offset,
+    val color: String? = null
+)
+
+@Serializable
+data class FlowGroup(
+    val id: Long,
+    val title: String,
+    val position: Offset,
+    val size: Offset,
+    val color: String? = null,
+    val isCollapsed: Boolean = false,
+    val nodeIds: List<Long> = emptyList()
+)
+
+@Serializable
+data class FlowLabel(
+    val id: Long,
+    val text: String,
+    val position: Offset,
+    val color: String? = null,
+    val fontSize: Float = 14f
+)
+
+@Serializable
 data class Connection(
     val sourceNodeId: Long,
     val sourcePortId: String,
     val targetNodeId: Long,
     val targetPortId: String,
-    val orderIndex: Int? = null
-)
+    val orderIndex: Int? = null,
+    val color: String? = null,
+    val waypoints: List<Offset> = emptyList(),
+    val junctionIds: List<Long> = emptyList(),
+    val sourceJunctionId: Long? = null,
+    val targetJunctionId: Long? = null,
+    val floatingTarget: Offset? = null
+) {
+    val isFloating: Boolean
+        get() = floatingTarget != null ||
+                (targetNodeId == FLOATING_NODE_ID && targetJunctionId == null) ||
+                (sourceNodeId == FLOATING_NODE_ID && sourceJunctionId == null)
+
+    companion object {
+        const val FLOATING_NODE_ID: Long = -1L
+        const val FLOATING_PORT_ID: String = ""
+
+        fun createFloating(
+            sourceNodeId: Long,
+            sourcePortId: String,
+            floatingTarget: Offset,
+            color: String? = null,
+            junctionIds: List<Long> = emptyList(),
+            waypoints: List<Offset> = emptyList()
+        ): Connection = Connection(
+            sourceNodeId = sourceNodeId,
+            sourcePortId = sourcePortId,
+            targetNodeId = FLOATING_NODE_ID,
+            targetPortId = FLOATING_PORT_ID,
+            color = color,
+            waypoints = waypoints,
+            junctionIds = junctionIds,
+            floatingTarget = floatingTarget
+        )
+    }
+}
 
 @Serializable
 data class Flow(
     val name: String,
     val nodes: List<Node> = emptyList(),
     val connections: List<Connection> = emptyList(),
+    val groups: List<FlowGroup> = emptyList(),
+    val labels: List<FlowLabel> = emptyList(),
+    val junctions: List<FlowJunction> = emptyList(),
     val version: String = "1.0.0",
     val description: String? = null,
     val defaultValues: Map<String, JsonElement> = emptyMap()
 ) {
+    fun getEffectiveConnections(): List<Connection> {
+        val nonFloating = connections.filter { !it.isFloating }
+        if (nonFloating.none { it.sourceJunctionId != null || it.targetJunctionId != null }) {
+            return nonFloating
+        }
+
+        val directConnections = nonFloating.filter { it.sourceJunctionId == null && it.targetJunctionId == null }
+        val outFromJunction = nonFloating.filter { it.sourceJunctionId != null }.groupBy { it.sourceJunctionId }
+        val inToJunction = nonFloating.filter { it.targetJunctionId != null }
+
+        val resolved = mutableListOf<Connection>()
+        resolved.addAll(directConnections)
+
+        fun traceJunction(
+            currentJunctionId: Long,
+            originSourceNodeId: Long,
+            originSourcePortId: String,
+            color: String?,
+            accumulatedJunctions: List<Long>,
+            visited: Set<Long>
+        ) {
+            if (currentJunctionId in visited) return
+            val nextVisited = visited + currentJunctionId
+            val outgoing = outFromJunction[currentJunctionId].orEmpty()
+            for (outConn in outgoing) {
+                val nextJunctions = accumulatedJunctions + currentJunctionId
+                if (outConn.targetJunctionId != null) {
+                    traceJunction(
+                        outConn.targetJunctionId,
+                        originSourceNodeId,
+                        originSourcePortId,
+                        outConn.color ?: color,
+                        nextJunctions,
+                        nextVisited
+                    )
+                } else if (outConn.targetNodeId >= 0L) {
+                    resolved.add(
+                        Connection(
+                            sourceNodeId = originSourceNodeId,
+                            sourcePortId = originSourcePortId,
+                            targetNodeId = outConn.targetNodeId,
+                            targetPortId = outConn.targetPortId,
+                            orderIndex = outConn.orderIndex,
+                            color = outConn.color ?: color,
+                            junctionIds = nextJunctions
+                        )
+                    )
+                }
+            }
+        }
+
+        for (inConn in inToJunction) {
+            if (inConn.sourceNodeId >= 0L && inConn.targetJunctionId != null) {
+                traceJunction(
+                    currentJunctionId = inConn.targetJunctionId,
+                    originSourceNodeId = inConn.sourceNodeId,
+                    originSourcePortId = inConn.sourcePortId,
+                    color = inConn.color,
+                    accumulatedJunctions = emptyList(),
+                    visited = emptySet()
+                )
+            }
+        }
+
+        return resolved
+    }
     fun getInferredDataTypeForOutput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
         val baseArray = fallbackType as? DataType.Array
         val baseItems = baseArray?.items

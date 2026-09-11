@@ -277,6 +277,15 @@ actual object PlatformUtils {
             Logger.e(e) { "Failed to open folder $path" }
         }
     }
+
+    actual fun horizontalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon =
+        androidx.compose.ui.input.pointer.PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.E_RESIZE_CURSOR))
+
+    actual fun verticalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon =
+        androidx.compose.ui.input.pointer.PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.S_RESIZE_CURSOR))
+
+    actual fun diagonalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon =
+        androidx.compose.ui.input.pointer.PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.SE_RESIZE_CURSOR))
 }
 
 interface PortalSettings : DBusInterface {

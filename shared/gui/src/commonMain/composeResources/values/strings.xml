@@ -649,4 +649,49 @@
     <string name="action_minimize">Minimize</string>
     <string name="action_maximize">Maximize</string>
     <string name="action_restore">Restore</string>
+    
+    <!-- Flow Editor QoL Tools & Floating Toolbar -->
+    <string name="flow_toolbar_paint">Paint Tool</string>
+    <string name="flow_toolbar_wash">Wash Brush</string>
+    <string name="flow_toolbar_pick_color">Pick Color</string>
+    <string name="flow_toolbar_add_group">Add Group</string>
+    <string name="flow_toolbar_add_label">Add Label</string>
+    <string name="flow_toolbar_spline_style">Connection Style</string>
+    <string name="flow_toolbar_roundness">Roundness</string>
+    <string name="flow_group_default_title">New Group</string>
+    <string name="flow_group_collapse">Collapse Group</string>
+    <string name="flow_group_expand">Expand Group</string>
+    <string name="flow_group_delete">Delete Group</string>
+    <string name="flow_group_color">Group Color</string>
+    <string name="flow_label_default_text">Text Note</string>
+    <string name="flow_label_edit">Edit Note</string>
+    <string name="flow_label_delete">Delete Note</string>
+    <string name="flow_label_color">Note Color</string>
+    <string name="flow_connection_style_cardinal">Cardinal Spline</string>
+    <string name="flow_connection_style_bezier">Cubic Bézier</string>
+    <string name="flow_connection_style_straight">Straight</string>
+    <string name="flow_connection_style_orthogonal">Orthogonal</string>
+
+    <!-- Flow Info additions -->
+    <string name="flow_info_paint_label">P / B</string>
+    <string name="flow_info_paint_desc">Paint elements (Shift to color all outgoing wires)</string>
+    <string name="flow_info_wash_label">W</string>
+    <string name="flow_info_wash_desc">Wash elements back to theme default color</string>
+    <string name="flow_info_pipette_label">I</string>
+    <string name="flow_info_pipette_desc">Sample and copy element color (Eyedropper)</string>
+    <string name="flow_info_branch_label">Double-Click / Drop</string>
+    <string name="flow_info_branch_desc">Create junction or branch from connection wire</string>
+    <string name="flow_info_waypoint_label">Alt + Click</string>
+    <string name="flow_info_waypoint_desc">Add waypoint to bend/route connection curve</string>
+    <string name="flow_info_rename_label">Shift + Click</string>
+    <string name="flow_info_rename_desc">Rename group title or text note</string>
+    <string name="flow_info_resize_label">Drag Borders</string>
+    <string name="flow_info_resize_desc">Resize group window width and height</string>
+
+    <!-- Flow Toolbar additions -->
+    <string name="flow_toolbar_eyedropper">Eyedropper (Sample Color)</string>
+    <string name="flow_toolbar_colors_in_flow">Colors in Flow</string>
+    <string name="flow_toolbar_palette_quick">Preset Palette</string>
+    <string name="flow_toolbar_advanced_connections">Advanced Connection Tool</string>
+    <string name="flow_group_nodes_count">%1$d nodes</string>
 </resources>

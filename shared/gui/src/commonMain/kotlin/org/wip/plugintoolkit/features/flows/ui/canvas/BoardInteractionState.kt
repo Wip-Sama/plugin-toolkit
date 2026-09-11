@@ -13,10 +13,17 @@ class BoardInteractionState {
     var hoveredConnection: Connection? by mutableStateOf(null)
     var hoveredConnectionIsSource: Boolean? by mutableStateOf(null)
     var isCtrlModifierPressed: Boolean by mutableStateOf(false)
+    var isShiftModifierPressed: Boolean by mutableStateOf(false)
+    var isAltModifierPressed: Boolean by mutableStateOf(false)
     var lastPointerPosition: Offset by mutableStateOf(Offset.Zero)
     var selectionStart: Offset? by mutableStateOf(null)
     var selectionEnd: Offset? by mutableStateOf(null)
     var hoveredNodeId: Long? by mutableStateOf(null)
+    var hoveredJunctionId: Long? by mutableStateOf(null)
+    var selectedJunctionId: Long? by mutableStateOf(null)
+    var draggingJunctionId: Long? by mutableStateOf(null)
+    var hoveredWaypoint: Pair<Connection, Int>? by mutableStateOf(null)
+    var draggingWaypoint: Pair<Connection, Int>? by mutableStateOf(null)
 
     fun clearHoveredConnection() {
         hoveredConnection = null
@@ -27,6 +34,14 @@ class BoardInteractionState {
         hoveredNodeId = null
     }
 
+    fun clearHoveredJunction() {
+        hoveredJunctionId = null
+    }
+
+    fun clearHoveredWaypoint() {
+        hoveredWaypoint = null
+    }
+
     fun clearSelectionBox() {
         selectionStart = null
         selectionEnd = null
@@ -34,8 +49,13 @@ class BoardInteractionState {
 
     fun clearAllInteractions() {
         selectedConnection = null
+        selectedJunctionId = null
+        draggingJunctionId = null
+        draggingWaypoint = null
         clearHoveredConnection()
         clearHoveredNode()
+        clearHoveredJunction()
+        clearHoveredWaypoint()
         clearSelectionBox()
     }
 }

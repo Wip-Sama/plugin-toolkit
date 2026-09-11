@@ -35,7 +35,16 @@ data class FlowEditorState(
     val inferredSemanticTypes: Map<Pair<Long, String>, List<SemanticType>> = emptyMap(),
     val validationErrors: List<ValidationError> = emptyList(),
     val selectedNodeIds: Set<Long> = emptySet(),
+    val selectedLabelIds: Set<Long> = emptySet(),
+    val selectedGroupIds: Set<Long> = emptySet(),
     val isReadOnly: Boolean = false,
     val readOnlyReasons: List<ReadOnlyReason> = emptyList(),
-    val pendingConnection: PendingConnection? = null
+    val pendingConnection: PendingConnection? = null,
+    val isPaintToolActive: Boolean = false,
+    val isWashToolActive: Boolean = false,
+    val isEyedropperActive: Boolean = false,
+    val isAdvancedConnectionMode: Boolean = false,
+    val activePaintColor: String? = "#4CAF50",
+    val connectionCurveStyle: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle = org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline,
+    val connectionRoundness: Float = 0.5f
 )

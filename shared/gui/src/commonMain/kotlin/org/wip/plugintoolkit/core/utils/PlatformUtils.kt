@@ -32,4 +32,7 @@ expect object PlatformUtils {
     fun clipEntryOf(text: String): androidx.compose.ui.platform.ClipEntry
     fun calculateFileChecksum(path: String, algorithm: String = "SHA-256"): String?
     fun openFolder(path: String)
+    fun horizontalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon
+    fun verticalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon
+    fun diagonalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon
 }

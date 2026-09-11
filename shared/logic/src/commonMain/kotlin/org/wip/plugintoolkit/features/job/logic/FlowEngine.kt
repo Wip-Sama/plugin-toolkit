@@ -157,8 +157,9 @@ class FlowEngine(
     ): Map<String, Any?> {
         val runtimeInferred = FlowTypeInferenceCache.getOrCreate(flow) { runRuntimeTypeInference(flow) }
         val nodesById = flow.nodes.associateBy { it.id }
-        val connectionsByTarget = flow.connections.groupBy { Pair(it.targetNodeId, it.targetPortId) }
-        val connectionsBySource = flow.connections.groupBy { Pair(it.sourceNodeId, it.sourcePortId) }
+        val effectiveConnections = flow.getEffectiveConnections()
+        val connectionsByTarget = effectiveConnections.groupBy { Pair(it.targetNodeId, it.targetPortId) }
+        val connectionsBySource = effectiveConnections.groupBy { Pair(it.sourceNodeId, it.sourcePortId) }
 
         val computedValues = mutableMapOf<Pair<Long, String>, Any?>()
         val flowOutputs = mutableMapOf<String, Any?>()
@@ -220,7 +221,7 @@ class FlowEngine(
             inDegree[node.id] = 0
             adj[node.id] = mutableListOf()
         }
-        flow.connections.forEach { conn ->
+        effectiveConnections.forEach { conn ->
             if (inDegree.containsKey(conn.targetNodeId) && inDegree.containsKey(conn.sourceNodeId)) {
                 adj[conn.sourceNodeId]?.add(conn.targetNodeId)
                 inDegree[conn.targetNodeId] = (inDegree[conn.targetNodeId] ?: 0) + 1
@@ -294,7 +295,7 @@ class FlowEngine(
                 "Resuming flow execution from saved state. Executed nodes: ${executedNodeIds.size}"
             )
         } else {
-            val nodesWithIncoming = flow.connections.map { it.targetNodeId }.toSet()
+            val nodesWithIncoming = effectiveConnections.map { it.targetNodeId }.toSet()
             flow.nodes.forEach { n ->
                 if (!nodesWithIncoming.contains(n.id)) activeNodes.add(n.id)
             }
@@ -492,7 +493,7 @@ class FlowEngine(
                         )
                     }
                     val isReady = try {
-                        node.isReady(flow.connections, pluginSettings, pluginLocks)
+                        node.isReady(effectiveConnections, pluginSettings, pluginLocks)
                     } catch (e: Exception) {
                         true
                     }

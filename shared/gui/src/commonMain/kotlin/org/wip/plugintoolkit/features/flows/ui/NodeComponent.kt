@@ -100,6 +100,11 @@ fun NodeComponent(
     isReadOnly: Boolean = false,
     isReady: Boolean = true,
     onFocusLost: () -> Unit = {},
+    isPaintToolActive: Boolean = false,
+    isWashToolActive: Boolean = false,
+    isShiftPressed: Boolean = false,
+    onPaintNode: ((Long, Boolean) -> Unit)? = null,
+    onWashNode: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -185,7 +190,16 @@ fun NodeComponent(
         }
     }
 
-    val (headerColor, onHeaderColor) = when (node) {
+    val customNodeColor = remember(node.color) {
+        val nColor = node.color
+        if (!nColor.isNullOrBlank()) {
+            org.wip.plugintoolkit.shared.components.plugin.inputs.parseColorString(nColor)
+        } else null
+    }
+
+    val (headerColor, onHeaderColor) = if (customNodeColor != null) {
+        Pair(customNodeColor, Color.White)
+    } else when (node) {
         is Node.CapabilityNode -> {
             if (node.isBroken) {
                 Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
@@ -230,8 +244,15 @@ fun NodeComponent(
                 .fillMaxWidth()
                 .onPointerEvent(PointerEventType.Enter) { onHoverNode(node.id) }
                 .onPointerEvent(PointerEventType.Exit) { onHoverNode(null) }
-                .pointerInput(node.id) {
+                .pointerInput(node.id, isPaintToolActive, isWashToolActive, isShiftPressed) {
                     detectTapGestures(
+                        onTap = {
+                            if (isPaintToolActive && onPaintNode != null) {
+                                onPaintNode(node.id, isShiftPressed)
+                            } else if (isWashToolActive && onWashNode != null) {
+                                onWashNode(node.id)
+                            }
+                        },
                         onPress = {
                             currentOnPress(node.id)
                         }

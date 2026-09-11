@@ -18,19 +18,33 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.features.flows.history.AddGroupCommand
+import org.wip.plugintoolkit.features.flows.history.AddJunctionCommand
+import org.wip.plugintoolkit.features.flows.history.AddLabelCommand
 import org.wip.plugintoolkit.features.flows.history.AddNodeCommand
 import org.wip.plugintoolkit.features.flows.history.CompositeCommand
 import org.wip.plugintoolkit.features.flows.history.ConnectPortsCommand
+import org.wip.plugintoolkit.features.flows.history.DeleteGroupCommand
+import org.wip.plugintoolkit.features.flows.history.DeleteJunctionCommand
+import org.wip.plugintoolkit.features.flows.history.DeleteLabelCommand
 import org.wip.plugintoolkit.features.flows.history.DeleteNodesCommand
 import org.wip.plugintoolkit.features.flows.history.DisconnectPortsCommand
 import org.wip.plugintoolkit.features.flows.history.FlowCommand
 import org.wip.plugintoolkit.features.flows.history.FlowHistoryManager
+import org.wip.plugintoolkit.features.flows.history.MoveGroupCommand
+import org.wip.plugintoolkit.features.flows.history.MoveJunctionCommand
+import org.wip.plugintoolkit.features.flows.history.MoveLabelCommand
 import org.wip.plugintoolkit.features.flows.history.MoveNodesCommand
+import org.wip.plugintoolkit.features.flows.history.PaintElementsCommand
+import org.wip.plugintoolkit.features.flows.history.ResizeGroupCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateBoundaryNodeCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateConnectionOrderCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateGroupCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateInputPortDefaultCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateInputPortValueCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateLabelCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateNodeCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateWaypointsCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateSystemNodeSettingsCommand
 import org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
@@ -38,6 +52,9 @@ import org.wip.plugintoolkit.features.flows.logic.FlowTypeInference
 import org.wip.plugintoolkit.features.flows.logic.SystemNodesRegistry
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.FlowGroup
+import org.wip.plugintoolkit.features.flows.model.FlowJunction
+import org.wip.plugintoolkit.features.flows.model.FlowLabel
 import org.wip.plugintoolkit.features.flows.model.FlowUnpacker
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
@@ -69,6 +86,8 @@ class FlowEditorViewModel(
     companion object {
         private var clipboardNodes: List<Node> = emptyList()
         private var clipboardConnections: List<Connection> = emptyList()
+        private var clipboardGroups: List<FlowGroup> = emptyList()
+        private var clipboardLabels: List<FlowLabel> = emptyList()
     }
 
     private val resolvedSettingsRepository: SettingsRepository? by lazy {
@@ -421,9 +440,13 @@ class FlowEditorViewModel(
 
             is FlowEvent.EndMoveNode -> {
                 shouldRunTypeInference = true
+                val finalOffset = currentState.currentDragOffset
                 newState = nodeManager.handleEndMoveNode(currentState, event.id, event.density)
                 val isSelectedGroupMove = currentState.selectedNodeIds.contains(event.id)
                 val nodesToMove = if (isSelectedGroupMove) currentState.selectedNodeIds else setOf(event.id)
+                val groupsToMove = if (isSelectedGroupMove) currentState.selectedGroupIds else emptySet()
+                val labelsToMove = if (isSelectedGroupMove) currentState.selectedLabelIds else emptySet()
+
                 val moves = mutableMapOf<Long, Pair<ModelOffset, ModelOffset>>()
                 for (nodeId in nodesToMove) {
                     val oldPos = currentState.flow.nodes.find { it.id == nodeId }?.position
@@ -435,6 +458,41 @@ class FlowEditorViewModel(
                 if (moves.isNotEmpty()) {
                     pendingCommand = MoveNodesCommand(moves)
                 }
+
+                // Check group containment for moved nodes:
+                // Only nodes dropped inside a group become bound, and nodes dropped outside become unbound!
+                val updatedGroups = newState.flow.groups.map { grp ->
+                    val baseGrp = if (grp.id in groupsToMove && finalOffset != ModelOffset.Zero) {
+                        grp.copy(position = grp.position + finalOffset)
+                    } else grp
+
+                    val currentlyBound = baseGrp.nodeIds.toMutableSet()
+                    for (nodeId in nodesToMove) {
+                        val node = newState.flow.nodes.find { it.id == nodeId }
+                        if (node != null) {
+                            val isInside = node.position.x >= baseGrp.position.x &&
+                                    node.position.x <= baseGrp.position.x + baseGrp.size.x &&
+                                    node.position.y >= baseGrp.position.y &&
+                                    node.position.y <= baseGrp.position.y + baseGrp.size.y
+                            if (isInside) {
+                                currentlyBound.add(nodeId)
+                            } else {
+                                currentlyBound.remove(nodeId)
+                            }
+                        }
+                    }
+                    baseGrp.copy(nodeIds = currentlyBound.toList())
+                }
+
+                val updatedLabels = newState.flow.labels.map { lbl ->
+                    if (lbl.id in labelsToMove && finalOffset != ModelOffset.Zero) {
+                        lbl.copy(position = lbl.position + finalOffset)
+                    } else lbl
+                }
+
+                newState = newState.copy(
+                    flow = newState.flow.copy(groups = updatedGroups, labels = updatedLabels)
+                )
             }
 
             is FlowEvent.DeleteNode -> {
@@ -447,16 +505,27 @@ class FlowEditorViewModel(
                 }
             }
             is FlowEvent.CopySelectedNodes -> {
-                val selected = currentState.selectedNodeIds
-                if (selected.isNotEmpty()) {
-                    clipboardNodes = currentState.flow.nodes.filter { it.id in selected }
+                val selectedNodes = currentState.selectedNodeIds
+                val selectedGroups = currentState.selectedGroupIds
+                val selectedLabels = currentState.selectedLabelIds
+
+                if (selectedNodes.isNotEmpty() || selectedGroups.isNotEmpty() || selectedLabels.isNotEmpty()) {
+                    val groupContainedNodeIds = currentState.flow.groups
+                        .filter { it.id in selectedGroups }
+                        .flatMap { it.nodeIds }
+                        .toSet()
+                    val allNodesToCopy = selectedNodes + groupContainedNodeIds
+
+                    clipboardNodes = currentState.flow.nodes.filter { it.id in allNodesToCopy }
                     clipboardConnections = currentState.flow.connections.filter { 
-                        it.sourceNodeId in selected && it.targetNodeId in selected 
+                        it.sourceNodeId in allNodesToCopy && it.targetNodeId in allNodesToCopy 
                     }
+                    clipboardGroups = currentState.flow.groups.filter { it.id in selectedGroups }
+                    clipboardLabels = currentState.flow.labels.filter { it.id in selectedLabels }
                 }
             }
             is FlowEvent.PasteNodes -> {
-                if (clipboardNodes.isNotEmpty()) {
+                if (clipboardNodes.isNotEmpty() || clipboardGroups.isNotEmpty() || clipboardLabels.isNotEmpty()) {
                     shouldRunTypeInference = true
                     
                     var nextId = currentState.nextId
@@ -468,15 +537,17 @@ class FlowEditorViewModel(
                         node.copyWithId(newId)
                     }
                     
-                    // Calculate bounding box center to offset nodes to cursor position
-                    val minX = newNodes.minOfOrNull { it.position.x } ?: 0f
-                    val minY = newNodes.minOfOrNull { it.position.y } ?: 0f
-                    val maxX = newNodes.maxOfOrNull { it.position.x } ?: 0f
-                    val maxY = newNodes.maxOfOrNull { it.position.y } ?: 0f
-                    val centerX = minX + (maxX - minX) / 2f
-                    val centerY = minY + (maxY - minY) / 2f
-                    
-                    val offsetDelta = ModelOffset(event.position.x - centerX, event.position.y - centerY)
+                    val offsetDelta = if (newNodes.isNotEmpty()) {
+                        val minX = newNodes.minOfOrNull { it.position.x } ?: 0f
+                        val minY = newNodes.minOfOrNull { it.position.y } ?: 0f
+                        val maxX = newNodes.maxOfOrNull { it.position.x } ?: 0f
+                        val maxY = newNodes.maxOfOrNull { it.position.y } ?: 0f
+                        val centerX = minX + (maxX - minX) / 2f
+                        val centerY = minY + (maxY - minY) / 2f
+                        ModelOffset(event.position.x - centerX, event.position.y - centerY)
+                    } else {
+                        ModelOffset(30f, 30f)
+                    }
                     
                     val positionedNodes = newNodes.map { node ->
                         node.copyWithPosition((node.position + offsetDelta).snapToGrid())
@@ -492,18 +563,45 @@ class FlowEditorViewModel(
                             )
                         } else null
                     }
+
+                    var nextGroupId = (currentState.flow.groups.maxOfOrNull { it.id } ?: 0L) + 1L
+                    val positionedGroups = clipboardGroups.map { grp ->
+                        val newGId = nextGroupId++
+                        val remappedNodeIds = grp.nodeIds.mapNotNull { idMapping[it] }
+                        grp.copy(
+                            id = newGId,
+                            position = (grp.position + offsetDelta).snapToGrid(),
+                            nodeIds = remappedNodeIds
+                        )
+                    }
+
+                    var nextLabelId = (currentState.flow.labels.maxOfOrNull { it.id } ?: 0L) + 1L
+                    val positionedLabels = clipboardLabels.map { lbl ->
+                        val newLId = nextLabelId++
+                        lbl.copy(
+                            id = newLId,
+                            position = (lbl.position + offsetDelta).snapToGrid()
+                        )
+                    }
                     
                     newState = currentState.copy(
                         nextId = nextId,
                         flow = currentState.flow.copy(
                             nodes = currentState.flow.nodes + positionedNodes,
-                            connections = currentState.flow.connections + newConnections
+                            connections = currentState.flow.connections + newConnections,
+                            groups = currentState.flow.groups + positionedGroups,
+                            labels = currentState.flow.labels + positionedLabels
                         ),
-                        selectedNodeIds = positionedNodes.map { it.id }.toSet()
+                        selectedNodeIds = positionedNodes.map { it.id }.toSet(),
+                        selectedGroupIds = positionedGroups.map { it.id }.toSet(),
+                        selectedLabelIds = positionedLabels.map { it.id }.toSet(),
+                        hasUnsavedChanges = true
                     )
                     val addNodeCommands = positionedNodes.map { AddNodeCommand(it) }
                     val addConnCommands = newConnections.map { ConnectPortsCommand(it) }
-                    pendingCommand = CompositeCommand("Paste ${positionedNodes.size} node(s)", addNodeCommands + addConnCommands)
+                    val addGroupCommands = positionedGroups.map { AddGroupCommand(it) }
+                    val addLabelCommands = positionedLabels.map { AddLabelCommand(it) }
+                    pendingCommand = CompositeCommand("Paste elements", addNodeCommands + addConnCommands + addGroupCommands + addLabelCommands)
                 }
             }
 
@@ -668,8 +766,20 @@ class FlowEditorViewModel(
                 newState = currentState.copy(selectedNodeIds = event.ids)
             }
 
+            is FlowEvent.SelectLabels -> {
+                newState = currentState.copy(selectedLabelIds = event.ids)
+            }
+
+            is FlowEvent.SelectGroups -> {
+                newState = currentState.copy(selectedGroupIds = event.ids)
+            }
+
             is FlowEvent.ClearSelection -> {
-                newState = currentState.copy(selectedNodeIds = emptySet())
+                newState = currentState.copy(
+                    selectedNodeIds = emptySet(),
+                    selectedLabelIds = emptySet(),
+                    selectedGroupIds = emptySet()
+                )
             }
 
             is FlowEvent.DeleteSelectedNodes -> {
@@ -678,9 +788,34 @@ class FlowEditorViewModel(
                 val cascadeConns = currentState.flow.connections.filter {
                     it.sourceNodeId in currentState.selectedNodeIds || it.targetNodeId in currentState.selectedNodeIds
                 }
-                newState = nodeManager.handleDeleteSelectedNodes(currentState)
-                if (deletedNodes.isNotEmpty()) {
-                    pendingCommand = DeleteNodesCommand(deletedNodes, cascadeConns)
+                val deletedLabels = currentState.flow.labels.filter { it.id in currentState.selectedLabelIds }
+                val deletedGroups = currentState.flow.groups.filter { it.id in currentState.selectedGroupIds }
+
+                val updatedFlow = currentState.flow.copy(
+                    nodes = currentState.flow.nodes.filter { it.id !in currentState.selectedNodeIds },
+                    connections = currentState.flow.connections.filter { it !in cascadeConns },
+                    labels = currentState.flow.labels.filter { it.id !in currentState.selectedLabelIds },
+                    groups = currentState.flow.groups.filter { it.id !in currentState.selectedGroupIds }
+                )
+                newState = currentState.copy(
+                    flow = updatedFlow,
+                    selectedNodeIds = emptySet(),
+                    selectedLabelIds = emptySet(),
+                    selectedGroupIds = emptySet(),
+                    hasUnsavedChanges = true
+                )
+                val commands = mutableListOf<FlowCommand>()
+                if (deletedNodes.isNotEmpty() || cascadeConns.isNotEmpty()) {
+                    commands.add(DeleteNodesCommand(deletedNodes, cascadeConns))
+                }
+                for (lbl in deletedLabels) {
+                    commands.add(DeleteLabelCommand(lbl))
+                }
+                for (grp in deletedGroups) {
+                    commands.add(DeleteGroupCommand(grp))
+                }
+                if (commands.isNotEmpty()) {
+                    pendingCommand = CompositeCommand("Delete selected elements", commands)
                 }
             }
 
@@ -737,6 +872,516 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.DiscardChanges -> discardUnsavedChanges()
+
+            // Paint Tool, Wash Tool, Eyedropper & Advanced Connection Mode
+            is FlowEvent.TogglePaintTool -> {
+                newState = currentState.copy(
+                    isPaintToolActive = !currentState.isPaintToolActive,
+                    isWashToolActive = false,
+                    isEyedropperActive = false
+                )
+            }
+
+            is FlowEvent.ToggleWashTool -> {
+                newState = currentState.copy(
+                    isWashToolActive = !currentState.isWashToolActive,
+                    isPaintToolActive = false,
+                    isEyedropperActive = false
+                )
+            }
+
+            is FlowEvent.ToggleEyedropper -> {
+                newState = currentState.copy(
+                    isEyedropperActive = !currentState.isEyedropperActive,
+                    isPaintToolActive = false,
+                    isWashToolActive = false
+                )
+            }
+
+            is FlowEvent.SampleColor -> {
+                newState = currentState.copy(
+                    activePaintColor = event.color,
+                    isEyedropperActive = false
+                )
+                resolvedNotificationService?.toast("Sampled color: ${event.color}")
+            }
+
+            is FlowEvent.ToggleAdvancedConnectionMode -> {
+                newState = currentState.copy(
+                    isAdvancedConnectionMode = !currentState.isAdvancedConnectionMode
+                )
+            }
+
+            is FlowEvent.SetActivePaintColor -> {
+                newState = currentState.copy(activePaintColor = event.color)
+            }
+
+            is FlowEvent.PaintNode -> {
+                val isSelected = currentState.selectedNodeIds.contains(event.nodeId)
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                if (isSelected && totalSelected > 1) {
+                    val newSt = applyPaintToSelection(currentState, currentState.activePaintColor, event.isForce)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                } else {
+                    val color = currentState.activePaintColor
+                    val updatedNodes = currentState.flow.nodes.map {
+                        if (it.id == event.nodeId) it.copyWithColor(color) else it
+                    }
+                    val updatedConnections = currentState.flow.connections.map { conn ->
+                        if (conn.sourceNodeId == event.nodeId) {
+                            if (event.isForce || conn.color == null) {
+                                conn.copy(color = color)
+                            } else {
+                                conn
+                            }
+                        } else {
+                            conn
+                        }
+                    }
+                    val newFlow = currentState.flow.copy(nodes = updatedNodes, connections = updatedConnections)
+                    newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                    pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+                }
+            }
+
+            is FlowEvent.PaintConnection -> {
+                val color = currentState.activePaintColor
+                val updatedConnections = currentState.flow.connections.map {
+                    if (it == event.connection) it.copy(color = color) else it
+                }
+                val newFlow = currentState.flow.copy(connections = updatedConnections)
+                newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+            }
+
+            is FlowEvent.PaintGroup -> {
+                val isSelected = currentState.selectedGroupIds.contains(event.groupId)
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                if (isSelected && totalSelected > 1) {
+                    val newSt = applyPaintToSelection(currentState, currentState.activePaintColor)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                } else {
+                    val color = currentState.activePaintColor
+                    val updatedGroups = currentState.flow.groups.map {
+                        if (it.id == event.groupId) it.copy(color = color) else it
+                    }
+                    val newFlow = currentState.flow.copy(groups = updatedGroups)
+                    newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                    pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+                }
+            }
+
+            is FlowEvent.PaintLabel -> {
+                val isSelected = currentState.selectedLabelIds.contains(event.labelId)
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                if (isSelected && totalSelected > 1) {
+                    val newSt = applyPaintToSelection(currentState, currentState.activePaintColor)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                } else {
+                    val color = currentState.activePaintColor
+                    val updatedLabels = currentState.flow.labels.map {
+                        if (it.id == event.labelId) it.copy(color = color) else it
+                    }
+                    val newFlow = currentState.flow.copy(labels = updatedLabels)
+                    newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                    pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+                }
+            }
+
+            is FlowEvent.WashNode -> {
+                val isSelected = currentState.selectedNodeIds.contains(event.nodeId)
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                if (isSelected && totalSelected > 1) {
+                    val newSt = applyPaintToSelection(currentState, null)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                } else {
+                    val updatedNodes = currentState.flow.nodes.map {
+                        if (it.id == event.nodeId) it.copyWithColor(null) else it
+                    }
+                    val newFlow = currentState.flow.copy(nodes = updatedNodes)
+                    newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                    pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+                }
+            }
+
+            is FlowEvent.WashConnection -> {
+                val updatedConnections = currentState.flow.connections.map {
+                    if (it == event.connection) it.copy(color = null) else it
+                }
+                val newFlow = currentState.flow.copy(connections = updatedConnections)
+                newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+            }
+
+            is FlowEvent.WashGroup -> {
+                val isSelected = currentState.selectedGroupIds.contains(event.groupId)
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                if (isSelected && totalSelected > 1) {
+                    val newSt = applyPaintToSelection(currentState, null)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                } else {
+                    val updatedGroups = currentState.flow.groups.map {
+                        if (it.id == event.groupId) it.copy(color = null) else it
+                    }
+                    val newFlow = currentState.flow.copy(groups = updatedGroups)
+                    newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                    pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+                }
+            }
+
+            is FlowEvent.WashLabel -> {
+                val isSelected = currentState.selectedLabelIds.contains(event.labelId)
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                if (isSelected && totalSelected > 1) {
+                    val newSt = applyPaintToSelection(currentState, null)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                } else {
+                    val updatedLabels = currentState.flow.labels.map {
+                        if (it.id == event.labelId) it.copy(color = null) else it
+                    }
+                    val newFlow = currentState.flow.copy(labels = updatedLabels)
+                    newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                    pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+                }
+            }
+
+            is FlowEvent.PaintSelection -> {
+                if (currentState.selectedNodeIds.isNotEmpty() || currentState.selectedGroupIds.isNotEmpty() || currentState.selectedLabelIds.isNotEmpty()) {
+                    val newSt = applyPaintToSelection(currentState, currentState.activePaintColor)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                }
+            }
+
+            is FlowEvent.WashSelection -> {
+                if (currentState.selectedNodeIds.isNotEmpty() || currentState.selectedGroupIds.isNotEmpty() || currentState.selectedLabelIds.isNotEmpty()) {
+                    val newSt = applyPaintToSelection(currentState, null)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                }
+            }
+
+            // Groups
+            is FlowEvent.AddGroup -> {
+                val newId = (currentState.flow.groups.maxOfOrNull { it.id } ?: 0L) + 1L
+                val newGroup = FlowGroup(id = newId, title = "New Group", position = event.position, size = ModelOffset(320f, 240f))
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(groups = currentState.flow.groups + newGroup),
+                    hasUnsavedChanges = true
+                )
+                pendingCommand = AddGroupCommand(newGroup)
+            }
+
+            is FlowEvent.UpdateGroup -> {
+                val old = currentState.flow.groups.find { it.id == event.group.id }
+                if (old != null) {
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(groups = currentState.flow.groups.map { if (it.id == event.group.id) event.group else it }),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = UpdateGroupCommand(old, event.group)
+                }
+            }
+
+            is FlowEvent.DeleteGroup -> {
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(groups = currentState.flow.groups.filter { it.id != event.group.id }),
+                    hasUnsavedChanges = true
+                )
+                pendingCommand = DeleteGroupCommand(event.group)
+            }
+
+            is FlowEvent.MoveGroup -> {
+                val grp = currentState.flow.groups.find { it.id == event.groupId }
+                if (grp != null) {
+                    val isSelected = currentState.selectedGroupIds.contains(event.groupId)
+                    val groupsToMove = if (isSelected) currentState.selectedGroupIds else setOf(event.groupId)
+                    val labelsToMove = if (isSelected) currentState.selectedLabelIds else emptySet()
+                    val nodeIdsToMove = (if (isSelected) currentState.selectedNodeIds else emptySet()).toMutableSet()
+                    for (gId in groupsToMove) {
+                        currentState.flow.groups.find { it.id == gId }?.let { nodeIdsToMove.addAll(it.nodeIds) }
+                    }
+
+                    val updatedNodes = currentState.flow.nodes.map { node ->
+                        if (node.id in nodeIdsToMove) {
+                            node.copyWithPosition(node.position + event.delta)
+                        } else node
+                    }
+
+                    val updatedGroups = currentState.flow.groups.map { g ->
+                        if (g.id in groupsToMove) {
+                            g.copy(position = g.position + event.delta)
+                        } else g
+                    }
+
+                    val updatedLabels = currentState.flow.labels.map { l ->
+                        if (l.id in labelsToMove) {
+                            l.copy(position = l.position + event.delta)
+                        } else l
+                    }
+
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(
+                            groups = updatedGroups,
+                            labels = updatedLabels,
+                            nodes = updatedNodes
+                        ),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = MoveGroupCommand(event.groupId, grp.position, grp.position + event.delta, nodeIdsToMove)
+                }
+            }
+
+            is FlowEvent.ResizeGroup -> {
+                val grp = currentState.flow.groups.find { it.id == event.groupId }
+                if (grp != null) {
+                    val newSize = org.wip.plugintoolkit.features.flows.model.Offset(
+                        (grp.size.x + event.delta.x).coerceAtLeast(150f),
+                        (grp.size.y + event.delta.y).coerceAtLeast(100f)
+                    )
+                    val updatedGroup = grp.copy(size = newSize)
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(
+                            groups = currentState.flow.groups.map { if (it.id == event.groupId) updatedGroup else it }
+                        ),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = ResizeGroupCommand(event.groupId, grp.size, newSize)
+                }
+            }
+
+            // Labels
+            is FlowEvent.AddLabel -> {
+                val newId = (currentState.flow.labels.maxOfOrNull { it.id } ?: 0L) + 1L
+                val newLabel = FlowLabel(id = newId, text = "Text Note", position = event.position)
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(labels = currentState.flow.labels + newLabel),
+                    hasUnsavedChanges = true
+                )
+                pendingCommand = AddLabelCommand(newLabel)
+            }
+
+            is FlowEvent.UpdateLabel -> {
+                val old = currentState.flow.labels.find { it.id == event.label.id }
+                if (old != null) {
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(labels = currentState.flow.labels.map { if (it.id == event.label.id) event.label else it }),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = UpdateLabelCommand(old, event.label)
+                }
+            }
+
+            is FlowEvent.DeleteLabel -> {
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(labels = currentState.flow.labels.filter { it.id != event.label.id }),
+                    hasUnsavedChanges = true
+                )
+                pendingCommand = DeleteLabelCommand(event.label)
+            }
+
+            is FlowEvent.MoveLabel -> {
+                val lbl = currentState.flow.labels.find { it.id == event.labelId }
+                if (lbl != null) {
+                    val isSelected = currentState.selectedLabelIds.contains(event.labelId)
+                    val labelsToMove = if (isSelected) currentState.selectedLabelIds else setOf(event.labelId)
+                    val groupsToMove = if (isSelected) currentState.selectedGroupIds else emptySet()
+                    val nodeIdsToMove = (if (isSelected) currentState.selectedNodeIds else emptySet()).toMutableSet()
+                    for (gId in groupsToMove) {
+                        currentState.flow.groups.find { it.id == gId }?.let { nodeIdsToMove.addAll(it.nodeIds) }
+                    }
+
+                    val updatedLabels = currentState.flow.labels.map { l ->
+                        if (l.id in labelsToMove) {
+                            l.copy(position = l.position + event.delta)
+                        } else l
+                    }
+
+                    val updatedGroups = currentState.flow.groups.map { g ->
+                        if (g.id in groupsToMove) {
+                            g.copy(position = g.position + event.delta)
+                        } else g
+                    }
+
+                    val updatedNodes = currentState.flow.nodes.map { node ->
+                        if (node.id in nodeIdsToMove) {
+                            node.copyWithPosition(node.position + event.delta)
+                        } else node
+                    }
+
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(
+                            labels = updatedLabels,
+                            groups = updatedGroups,
+                            nodes = updatedNodes
+                        ),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = MoveLabelCommand(event.labelId, lbl.position, lbl.position + event.delta)
+                }
+            }
+
+            // Junctions, Waypoints & Branching
+            is FlowEvent.AddJunctionAndBranch -> {
+                val newJunctionId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
+                val junction = FlowJunction(id = newJunctionId, position = event.splitPosition, color = event.connection.color)
+                val conn1 = event.connection.copy(targetNodeId = -1L, targetPortId = "", targetJunctionId = newJunctionId)
+                val conn2 = Connection(
+                    sourceNodeId = -1L,
+                    sourcePortId = "",
+                    sourceJunctionId = newJunctionId,
+                    targetNodeId = event.connection.targetNodeId,
+                    targetPortId = event.connection.targetPortId,
+                    targetJunctionId = event.connection.targetJunctionId,
+                    color = event.connection.color
+                )
+                val branchConns = mutableListOf<Connection>()
+                if (event.branchSourceNodeId != null && event.branchSourcePortId != null) {
+                    branchConns.add(
+                        Connection(
+                            sourceNodeId = event.branchSourceNodeId,
+                            sourcePortId = event.branchSourcePortId,
+                            targetNodeId = -1L,
+                            targetPortId = "",
+                            targetJunctionId = newJunctionId,
+                            color = event.connection.color
+                        )
+                    )
+                } else if (event.branchTargetNodeId != null && event.branchTargetPortId != null) {
+                    branchConns.add(
+                        Connection(
+                            sourceNodeId = -1L,
+                            sourcePortId = "",
+                            sourceJunctionId = newJunctionId,
+                            targetNodeId = event.branchTargetNodeId,
+                            targetPortId = event.branchTargetPortId,
+                            color = event.connection.color
+                        )
+                    )
+                }
+                val createdConnections = listOf(conn1, conn2) + branchConns
+                val newConnections = currentState.flow.connections.filter { it != event.connection } + createdConnections
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(
+                        junctions = currentState.flow.junctions + junction,
+                        connections = newConnections
+                    ),
+                    hasUnsavedChanges = true
+                )
+                pendingCommand = AddJunctionCommand(
+                    junction = junction,
+                    originalConnection = event.connection,
+                    createdConnections = createdConnections
+                )
+            }
+
+            is FlowEvent.AddWaypoint -> {
+                val conn = currentState.flow.connections.find {
+                    it == event.connection || (it.sourceNodeId == event.connection.sourceNodeId && it.sourcePortId == event.connection.sourcePortId && it.targetNodeId == event.connection.targetNodeId && it.targetPortId == event.connection.targetPortId)
+                }
+                if (conn != null) {
+                    val oldWps = conn.waypoints
+                    val newWps = oldWps + event.point
+                    val newConnections = currentState.flow.connections.map {
+                        if (it == conn) it.copy(waypoints = newWps) else it
+                    }
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(connections = newConnections),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = UpdateWaypointsCommand(conn, oldWps, newWps)
+                }
+            }
+
+            is FlowEvent.MoveWaypoint -> {
+                val conn = currentState.flow.connections.find {
+                    it == event.connection || (it.sourceNodeId == event.connection.sourceNodeId && it.sourcePortId == event.connection.sourcePortId && it.targetNodeId == event.connection.targetNodeId && it.targetPortId == event.connection.targetPortId)
+                }
+                if (conn != null && event.index in conn.waypoints.indices) {
+                    val oldWps = conn.waypoints
+                    val newWps = oldWps.toMutableList().apply { set(event.index, event.newPoint) }
+                    val newConnections = currentState.flow.connections.map {
+                        if (it == conn) it.copy(waypoints = newWps) else it
+                    }
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(connections = newConnections),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = UpdateWaypointsCommand(conn, oldWps, newWps)
+                }
+            }
+
+            is FlowEvent.DeleteWaypoint -> {
+                val conn = currentState.flow.connections.find {
+                    it == event.connection || (it.sourceNodeId == event.connection.sourceNodeId && it.sourcePortId == event.connection.sourcePortId && it.targetNodeId == event.connection.targetNodeId && it.targetPortId == event.connection.targetPortId)
+                }
+                if (conn != null && event.index in conn.waypoints.indices) {
+                    val oldWps = conn.waypoints
+                    val newWps = oldWps.toMutableList().apply { removeAt(event.index) }
+                    val newConnections = currentState.flow.connections.map {
+                        if (it == conn) it.copy(waypoints = newWps) else it
+                    }
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(connections = newConnections),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = UpdateWaypointsCommand(conn, oldWps, newWps)
+                }
+            }
+
+            is FlowEvent.MoveJunction -> {
+                val junc = currentState.flow.junctions.find { it.id == event.junctionId }
+                if (junc != null) {
+                    val newPos = junc.position + event.delta
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(junctions = currentState.flow.junctions.map { if (it.id == event.junctionId) it.copy(position = newPos) else it }),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = MoveJunctionCommand(event.junctionId, junc.position, newPos)
+                }
+            }
+
+            is FlowEvent.DeleteJunction -> {
+                val junc = currentState.flow.junctions.find { it.id == event.junctionId }
+                if (junc != null) {
+                    val cascading = currentState.flow.connections.filter { it.sourceJunctionId == event.junctionId || it.targetJunctionId == event.junctionId }
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(
+                            junctions = currentState.flow.junctions.filter { it.id != event.junctionId },
+                            connections = currentState.flow.connections - cascading.toSet()
+                        ),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = DeleteJunctionCommand(junc, cascading)
+                }
+            }
+
+            is FlowEvent.CreateFloatingConnection -> {
+                val floating = Connection.createFloating(
+                    sourceNodeId = event.sourceNodeId,
+                    sourcePortId = event.sourcePortId,
+                    floatingTarget = event.floatingTarget
+                )
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(connections = currentState.flow.connections + floating),
+                    hasUnsavedChanges = true
+                )
+            }
+
+            is FlowEvent.UpdateConnectionCurveStyle -> {
+                newState = currentState.copy(connectionCurveStyle = event.style)
+            }
+
+            is FlowEvent.UpdateConnectionRoundness -> {
+                newState = currentState.copy(connectionRoundness = event.roundness)
+            }
+
             else -> {}
         }
 
@@ -991,6 +1636,40 @@ class FlowEditorViewModel(
         resolvedActiveFlowEditorTracker.setHasUnsavedChanges(false)
         updateReadOnlyState()
         runTypeInference()
+    }
+
+    private fun applyPaintToSelection(
+        currentState: FlowEditorState,
+        color: String?,
+        forceConnections: Boolean = false
+    ): FlowEditorState {
+        val selectedNodeIds = currentState.selectedNodeIds
+        val selectedGroupIds = currentState.selectedGroupIds
+        val selectedLabelIds = currentState.selectedLabelIds
+
+        val updatedNodes = currentState.flow.nodes.map { node ->
+            if (node.id in selectedNodeIds) node.copyWithColor(color) else node
+        }
+        val updatedGroups = currentState.flow.groups.map { grp ->
+            if (grp.id in selectedGroupIds) grp.copy(color = color) else grp
+        }
+        val updatedLabels = currentState.flow.labels.map { lbl ->
+            if (lbl.id in selectedLabelIds) lbl.copy(color = color) else lbl
+        }
+        val updatedConnections = currentState.flow.connections.map { conn ->
+            if (conn.sourceNodeId in selectedNodeIds) {
+                if (forceConnections || conn.color == null || color == null) {
+                    conn.copy(color = color)
+                } else conn
+            } else conn
+        }
+        val newFlow = currentState.flow.copy(
+            nodes = updatedNodes,
+            groups = updatedGroups,
+            labels = updatedLabels,
+            connections = updatedConnections
+        )
+        return currentState.copy(flow = newFlow, hasUnsavedChanges = true)
     }
 
     override fun onCleared() {

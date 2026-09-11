@@ -46,7 +46,7 @@ object FlowTypeInference {
             changed = false
             iteration++
 
-            flow.connections.forEach { conn ->
+            flow.getEffectiveConnections().forEach { conn ->
                 val srcKey = Pair(conn.sourceNodeId, conn.sourcePortId)
                 val tgtKey = Pair(conn.targetNodeId, conn.targetPortId)
 
@@ -97,7 +97,7 @@ object FlowTypeInference {
 
         // Now compute validation errors using inferred types and semantic types!
         val errors = mutableListOf<ValidationError>()
-        flow.connections.forEach { conn ->
+        flow.getEffectiveConnections().forEach { conn ->
             val srcType = inferred[Pair(conn.sourceNodeId, conn.sourcePortId)]
             val tgtType = inferred[Pair(conn.targetNodeId, conn.targetPortId)]
             val srcSemantic = inferredSemantic[Pair(conn.sourceNodeId, conn.sourcePortId)].orEmpty()
@@ -207,7 +207,7 @@ object FlowTypeInference {
         while (changed && iteration < 10) {
             changed = false
             iteration++
-            targetFlow.connections.forEach { conn ->
+            targetFlow.getEffectiveConnections().forEach { conn ->
                 val srcKey = Pair(conn.sourceNodeId, conn.sourcePortId)
                 val tgtKey = Pair(conn.targetNodeId, conn.targetPortId)
                 val srcType = inferred[srcKey]

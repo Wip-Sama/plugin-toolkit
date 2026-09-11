@@ -649,4 +649,49 @@
     <string name="action_minimize">Riduci a icona</string>
     <string name="action_maximize">Ingrandisci</string>
     <string name="action_restore">Ripristina</string>
+    
+    <!-- Flow Editor QoL Tools & Floating Toolbar -->
+    <string name="flow_toolbar_paint">Strumento Colore</string>
+    <string name="flow_toolbar_wash">Pennello Cancella Colore</string>
+    <string name="flow_toolbar_pick_color">Scegli Colore</string>
+    <string name="flow_toolbar_add_group">Aggiungi Gruppo</string>
+    <string name="flow_toolbar_add_label">Aggiungi Nota</string>
+    <string name="flow_toolbar_spline_style">Stile Connessione</string>
+    <string name="flow_toolbar_roundness">Arrotondamento</string>
+    <string name="flow_group_default_title">Nuovo Gruppo</string>
+    <string name="flow_group_collapse">Comprimi Gruppo</string>
+    <string name="flow_group_expand">Espandi Gruppo</string>
+    <string name="flow_group_delete">Elimina Gruppo</string>
+    <string name="flow_group_color">Colore Gruppo</string>
+    <string name="flow_label_default_text">Nota di Testo</string>
+    <string name="flow_label_edit">Modifica Nota</string>
+    <string name="flow_label_delete">Elimina Nota</string>
+    <string name="flow_label_color">Colore Nota</string>
+    <string name="flow_connection_style_cardinal">Spline Cardinale</string>
+    <string name="flow_connection_style_bezier">Bézier Cubica</string>
+    <string name="flow_connection_style_straight">Lineare</string>
+    <string name="flow_connection_style_orthogonal">Ortogonale</string>
+
+    <!-- Flow Info additions -->
+    <string name="flow_info_paint_label">P / B</string>
+    <string name="flow_info_paint_desc">Colora elementi (Shift per colorare tutte le connessioni in uscita)</string>
+    <string name="flow_info_wash_label">W</string>
+    <string name="flow_info_wash_desc">Ripristina colore predefinito degli elementi</string>
+    <string name="flow_info_pipette_label">I</string>
+    <string name="flow_info_pipette_desc">Campiona e copia colore dell\'elemento (Contagocce)</string>
+    <string name="flow_info_branch_label">Doppio Click / Rilascia</string>
+    <string name="flow_info_branch_desc">Crea giunzione o ramificazione da un cavo</string>
+    <string name="flow_info_waypoint_label">Alt + Click</string>
+    <string name="flow_info_waypoint_desc">Aggiungi punto di passaggio per piegare il percorso</string>
+    <string name="flow_info_rename_label">Shift + Click</string>
+    <string name="flow_info_rename_desc">Rinomina titolo del gruppo o nota di testo</string>
+    <string name="flow_info_resize_label">Trascina Bordi</string>
+    <string name="flow_info_resize_desc">Ridimensiona larghezza e altezza del gruppo</string>
+
+    <!-- Flow Toolbar additions -->
+    <string name="flow_toolbar_eyedropper">Contagocce (Campiona Colore)</string>
+    <string name="flow_toolbar_colors_in_flow">Colori nel Flusso</string>
+    <string name="flow_toolbar_palette_quick">Tavolozza Rapida</string>
+    <string name="flow_toolbar_advanced_connections">Strumento Connessioni Avanzate</string>
+    <string name="flow_group_nodes_count">%1$d nodi</string>
 </resources>
