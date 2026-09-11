@@ -1393,7 +1393,8 @@ class FlowEditorViewModel(
                     targetPortId = Connection.FLOATING_PORT_ID,
                     waypoints = event.waypoints,
                     sourceJunctionId = event.sourceJunctionId,
-                    floatingTarget = event.floatingTarget
+                    floatingTarget = event.floatingTarget,
+                    isStructured = event.isStructured
                 )
                 newState = currentState.copy(
                     flow = currentState.flow.copy(connections = currentState.flow.connections + floating),
@@ -1408,7 +1409,8 @@ class FlowEditorViewModel(
                     targetNodeId = event.targetNodeId,
                     targetPortId = event.targetPortId,
                     waypoints = event.waypoints,
-                    sourceJunctionId = event.sourceJunctionId
+                    sourceJunctionId = event.sourceJunctionId,
+                    isStructured = event.isStructured
                 )
                 newState = currentState.copy(
                     flow = currentState.flow.copy(connections = currentState.flow.connections + conn),

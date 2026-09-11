@@ -160,4 +160,43 @@ class ConnectionHitTesterTest {
         )
         assertEquals(conn, result)
     }
+
+    @Test
+    fun testFindClosestConnectionWithProjectionSegmentIndex() {
+        // Wire: Start (0, 0) -> Waypoint (100, 0) -> End (200, 0)
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(org.wip.plugintoolkit.features.flows.model.Offset(100f, 0f))
+        )
+        val getPortBoardPos: (Long, String, Boolean) -> Offset? = { nodeId, _, isOutput ->
+            if (nodeId == 1L && isOutput) Offset(0f, 0f)
+            else if (nodeId == 2L && !isOutput) Offset(200f, 0f)
+            else null
+        }
+
+        // Test click in first half (near 40, 2) -> should be segment 0
+        val res0 = ConnectionHitTester.findClosestConnectionWithProjection(
+            position = Offset(40f, 2f),
+            connections = listOf(conn),
+            getPortBoardPosition = getPortBoardPos,
+            scale = 1f,
+            offset = Offset.Zero
+        )
+        kotlin.test.assertNotNull(res0)
+        assertEquals(0, res0.segmentIndex)
+
+        // Test click in second half (near 160, 2) -> should be segment 1
+        val res1 = ConnectionHitTester.findClosestConnectionWithProjection(
+            position = Offset(160f, 2f),
+            connections = listOf(conn),
+            getPortBoardPosition = getPortBoardPos,
+            scale = 1f,
+            offset = Offset.Zero
+        )
+        kotlin.test.assertNotNull(res1)
+        assertEquals(1, res1.segmentIndex)
+    }
 }

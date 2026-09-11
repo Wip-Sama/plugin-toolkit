@@ -25,6 +25,8 @@ class BoardInteractionState {
     var hoveredWaypoint: Pair<Connection, Int>? by mutableStateOf(null)
     var draggingWaypoint: Pair<Connection, Int>? by mutableStateOf(null)
     var hoveredMidpoint: Pair<Connection, Int>? by mutableStateOf(null)
+    var pendingMidpoint: Pair<Connection, Int>? by mutableStateOf(null)
+    var pendingMidpointPressPos: Offset by mutableStateOf(Offset.Zero)
 
     // Structured / Multi-point connection drawing session
     var isDrawingStructuredConnection: Boolean by mutableStateOf(false)
@@ -76,6 +78,8 @@ class BoardInteractionState {
         selectedJunctionId = null
         draggingJunctionId = null
         draggingWaypoint = null
+        pendingMidpoint = null
+        pendingMidpointPressPos = Offset.Zero
         clearHoveredConnection()
         clearHoveredNode()
         clearHoveredJunction()

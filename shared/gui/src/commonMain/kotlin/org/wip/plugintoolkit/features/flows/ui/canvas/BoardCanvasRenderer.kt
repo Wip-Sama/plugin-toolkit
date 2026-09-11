@@ -194,7 +194,8 @@ fun BoardGridAndConnectionsCanvas(
                 } else {
                     dimensions.strokeWidthThin.toPx()
                 }
-                val path = SplineMathUtils.buildConnectionPath(screenPoints, curveStyle, roundness)
+                val effectiveStyle = if (connection.isStructured) ConnectionCurveStyle.Orthogonal else curveStyle
+                val path = SplineMathUtils.buildConnectionPath(screenPoints, effectiveStyle, roundness)
                 drawPath(
                     path = path,
                     color = color,
@@ -254,16 +255,16 @@ fun BoardGridAndConnectionsCanvas(
                     )
                 }
 
-                // Draw Midpoints (Interactive splitting handles)
+                // Draw Midpoints (Interactive splitting handles - 3x bigger)
                 val isConnHovered = interactionState.hoveredConnection == connection
-                val midpoints = SplineMathUtils.computeSegmentMidpoints(screenPoints, curveStyle, roundness)
+                val midpoints = SplineMathUtils.computeSegmentMidpoints(screenPoints, effectiveStyle, roundness)
                 midpoints.forEachIndexed { segIndex, midPt ->
                     val isMidpointHovered = interactionState.hoveredMidpoint?.first == connection &&
                             interactionState.hoveredMidpoint?.second == segIndex
                     if (isConnHovered || isMidpointHovered) {
-                        val midRadius = (if (isMidpointHovered) 6.5f else 4f) * state.scale
+                        val midRadius = (if (isMidpointHovered) 18f else 12f) * state.scale
                         val midColor = (if (!connColor.isNullOrBlank()) parseColorString(connColor) else connectionColor)
-                            .copy(alpha = if (isMidpointHovered) 1f else 0.8f)
+                            .copy(alpha = if (isMidpointHovered) 1f else 0.85f)
                         drawCircle(
                             color = midColor,
                             radius = midRadius,
@@ -273,7 +274,7 @@ fun BoardGridAndConnectionsCanvas(
                             color = surfaceColor,
                             radius = midRadius,
                             center = midPt,
-                            style = Stroke(width = 1.2f * state.scale)
+                            style = Stroke(width = 2.5f * state.scale)
                         )
                     }
                 }

@@ -141,6 +141,7 @@ fun FlowEditorView(
     var connectionStartPortId by remember { mutableStateOf<String?>(null) }
     var connectionStartIsOutput by remember { mutableStateOf(true) }
     var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
+    var structuredConnectionStartInfo by remember { mutableStateOf<Triple<Long, String, Boolean>?>(null) }
     var portLayoutVersion by remember { mutableStateOf(0) }
     val portLayouts = remember { mutableStateMapOf<Triple<Long, String, Boolean>, LayoutCoordinates>() }
     val getPortBoardPosition = { nodeId: Long, portId: String, isOutput: Boolean ->
@@ -433,10 +434,8 @@ fun FlowEditorView(
             onSelectLabels = { viewModel.onEvent(FlowEvent.SelectLabels(it)) },
             onSelectGroups = { viewModel.onEvent(FlowEvent.SelectGroups(it)) },
             onAddWaypoint = { conn, pos -> viewModel.onEvent(FlowEvent.AddWaypoint(conn, pos.toModelOffset())) },
-            onMoveWaypoint = { conn, index, delta ->
-                val currentWp = conn.waypoints.getOrNull(index) ?: org.wip.plugintoolkit.features.flows.model.Offset(0f, 0f)
-                val newPoint = org.wip.plugintoolkit.features.flows.model.Offset(currentWp.x + delta.x, currentWp.y + delta.y)
-                viewModel.onEvent(FlowEvent.MoveWaypoint(conn, index, newPoint))
+            onMoveWaypoint = { conn, index, newPos ->
+                viewModel.onEvent(FlowEvent.MoveWaypoint(conn, index, newPos))
             },
             onDeleteWaypoint = { conn, index -> viewModel.onEvent(FlowEvent.DeleteWaypoint(conn, index)) },
             onInsertWaypoint = { conn, index, pos ->
@@ -451,7 +450,8 @@ fun FlowEditorView(
                             targetNodeId = tgtNodeId,
                             targetPortId = tgtPortId,
                             waypoints = waypoints,
-                            sourceJunctionId = srcJuncId
+                            sourceJunctionId = srcJuncId,
+                            isStructured = true
                         )
                     )
                 }
@@ -466,11 +466,14 @@ fun FlowEditorView(
                             sourcePortId = srcPortId,
                             floatingTarget = lastPt,
                             waypoints = intermediateWaypoints,
-                            sourceJunctionId = srcJuncId
+                            sourceJunctionId = srcJuncId,
+                            isStructured = true
                         )
                     )
                 }
             },
+            structuredConnectionStartInfo = structuredConnectionStartInfo,
+            onClearStructuredConnectionStartInfo = { structuredConnectionStartInfo = null },
             onToggleStructuredConnectionMode = {
                 viewModel.onEvent(FlowEvent.ToggleStructuredConnectionMode)
             },
@@ -728,15 +731,19 @@ fun FlowEditorView(
                                          portLayoutVersion++
                                      }
                                  },
-                                onStartConnection = { nodeId, portId, isOutput ->
-                                    isDrawingConnection = true
-                                    connectionStartNodeId = nodeId
-                                    connectionStartPortId = portId
-                                    connectionStartIsOutput = isOutput
-                                    getPortBoardPosition(nodeId, portId, isOutput)?.let {
-                                        connectionCurrentPos = it
-                                    }
-                                },
+                                 onStartConnection = { nodeId, portId, isOutput ->
+                                     if (state.isAdvancedConnectionMode) {
+                                         structuredConnectionStartInfo = Triple(nodeId, portId, isOutput)
+                                     } else {
+                                         isDrawingConnection = true
+                                         connectionStartNodeId = nodeId
+                                         connectionStartPortId = portId
+                                         connectionStartIsOutput = isOutput
+                                         getPortBoardPosition(nodeId, portId, isOutput)?.let {
+                                             connectionCurrentPos = it
+                                         }
+                                     }
+                                 },
                                 onDragConnection = {
                                     // Ignored, BoardCanvas handles it
                                 },

@@ -227,7 +227,8 @@ sealed interface FlowEvent {
         val sourcePortId: String,
         val floatingTarget: org.wip.plugintoolkit.features.flows.model.Offset,
         val waypoints: List<org.wip.plugintoolkit.features.flows.model.Offset> = emptyList(),
-        val sourceJunctionId: Long? = null
+        val sourceJunctionId: Long? = null,
+        val isStructured: Boolean = false
     ) : FlowEvent
     data class ConnectPortsWithWaypoints(
         val sourceNodeId: Long,
@@ -235,7 +236,8 @@ sealed interface FlowEvent {
         val targetNodeId: Long,
         val targetPortId: String,
         val waypoints: List<org.wip.plugintoolkit.features.flows.model.Offset> = emptyList(),
-        val sourceJunctionId: Long? = null
+        val sourceJunctionId: Long? = null,
+        val isStructured: Boolean = false
     ) : FlowEvent
     data class UpdateConnectionCurveStyle(val style: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle) : FlowEvent
     data class UpdateConnectionRoundness(val roundness: Float) : FlowEvent

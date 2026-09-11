@@ -328,6 +328,9 @@ fun Modifier.boardPointerEventGesture(
     onDeleteWaypoint: ((Connection, Int) -> Unit)? = null,
     onInsertWaypoint: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
     onFinalizeStructuredConnection: ((Long?, String?, Long?, Long, String, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit)? = null,
+    connectionStartNodeId: Long? = null,
+    connectionStartPortId: String? = null,
+    connectionStartIsOutput: Boolean = true,
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
     roundness: Float = 0.5f
 ): Modifier {
@@ -350,6 +353,9 @@ fun Modifier.boardPointerEventGesture(
     val currentOnDeleteWaypoint by rememberUpdatedState(onDeleteWaypoint)
     val currentOnInsertWaypoint by rememberUpdatedState(onInsertWaypoint)
     val currentOnFinalizeStructuredConnection by rememberUpdatedState(onFinalizeStructuredConnection)
+    val currentConnectionStartNodeId by rememberUpdatedState(connectionStartNodeId)
+    val currentConnectionStartPortId by rememberUpdatedState(connectionStartPortId)
+    val currentConnectionStartIsOutput by rememberUpdatedState(connectionStartIsOutput)
     val currentCurveStyle by rememberUpdatedState(curveStyle)
     val currentRoundness by rememberUpdatedState(roundness)
 
@@ -381,17 +387,54 @@ fun Modifier.boardPointerEventGesture(
 
                     val draggingWp = interactionState.draggingWaypoint
                     if (draggingWp != null) {
-                        val delta = (position - prevPointerPosition) / currentScale
-                        currentOnMoveWaypoint?.invoke(draggingWp.first, draggingWp.second, delta.toModelOffset())
+                        val boardPos = (position - currentOffset) / currentScale
+                        currentOnMoveWaypoint?.invoke(draggingWp.first, draggingWp.second, boardPos.toModelOffset())
+                    }
+
+                    if (interactionState.pendingMidpoint != null && interactionState.draggingWaypoint == null) {
+                        val dist = (position - interactionState.pendingMidpointPressPos).getDistance()
+                        if (dist > 4f) {
+                            val (conn, segIdx) = interactionState.pendingMidpoint!!
+                            val boardPos = (position - currentOffset) / currentScale
+                            currentOnInsertWaypoint?.invoke(conn, segIdx, boardPos.toModelOffset())
+                            interactionState.draggingWaypoint = Pair(conn, segIdx)
+                            interactionState.pendingMidpoint = null
+                        }
                     }
 
                     if (currentIsDrawingConnection) {
-                        val boardPos = (position - currentOffset) / currentScale
+                        var boardPos = (position - currentOffset) / currentScale
+                        val startBoardPos = if (currentConnectionStartNodeId != null && currentConnectionStartPortId != null) {
+                            currentGetPortBoardPosition(currentConnectionStartNodeId!!, currentConnectionStartPortId!!, currentConnectionStartIsOutput)
+                        } else null
+                        if (startBoardPos != null) {
+                            if (event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed) {
+                                boardPos = SplineMathUtils.snapToStraightAngle(startBoardPos, boardPos)
+                            } else if (event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed) {
+                                boardPos = SplineMathUtils.snapToOrthogonal(startBoardPos, boardPos)
+                            }
+                        }
                         currentOnConnectionDrag(boardPos)
                     }
 
                     if (interactionState.isDrawingStructuredConnection) {
-                        interactionState.structuredConnectionLivePos = (position - currentOffset) / currentScale
+                        var livePos = (position - currentOffset) / currentScale
+                        val lastPoint = if (interactionState.structuredConnectionPoints.isNotEmpty()) {
+                            interactionState.structuredConnectionPoints.last()
+                        } else {
+                            val startBoardPos = if (interactionState.structuredConnectionSourceJunctionId != null) {
+                                currentJunctions.find { it.id == interactionState.structuredConnectionSourceJunctionId }?.position?.toComposeOffset()
+                            } else if (interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null) {
+                                currentGetPortBoardPosition(interactionState.structuredConnectionStartNodeId!!, interactionState.structuredConnectionStartPortId!!, interactionState.structuredConnectionStartIsOutput)
+                            } else null
+                            startBoardPos ?: livePos
+                        }
+                        if (event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed) {
+                            livePos = SplineMathUtils.snapToStraightAngle(lastPoint, livePos)
+                        } else if (event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed) {
+                            livePos = SplineMathUtils.snapToOrthogonal(lastPoint, livePos)
+                        }
+                        interactionState.structuredConnectionLivePos = livePos
                     }
 
                     val closestJunc = ConnectionHitTester.findClosestJunction(
@@ -526,10 +569,10 @@ fun Modifier.boardPointerEventGesture(
                             }
 
                             var committedPos = (position - currentOffset) / currentScale
-                            if (interactionState.isShiftModifierPressed) {
-                                committedPos = SplineMathUtils.snapToOrthogonal(lastPoint, committedPos)
-                            } else if (interactionState.isCtrlModifierPressed) {
+                            if (interactionState.isShiftModifierPressed || event.keyboardModifiers.isShiftPressed) {
                                 committedPos = SplineMathUtils.snapToStraightAngle(lastPoint, committedPos)
+                            } else if (interactionState.isCtrlModifierPressed || event.keyboardModifiers.isCtrlPressed) {
+                                committedPos = SplineMathUtils.snapToOrthogonal(lastPoint, committedPos)
                             }
                             interactionState.structuredConnectionPoints = (interactionState.structuredConnectionPoints + committedPos).toMutableList()
                             event.changes.forEach { it.consume() }
@@ -545,8 +588,12 @@ fun Modifier.boardPointerEventGesture(
                             curveStyle = currentCurveStyle,
                             roundness = currentRoundness
                         )
-                        if (connProj != null && currentOnAddWaypoint != null) {
-                            currentOnAddWaypoint?.invoke(connProj.first, connProj.second)
+                        if (connProj != null) {
+                            if (currentOnInsertWaypoint != null) {
+                                currentOnInsertWaypoint?.invoke(connProj.connection, connProj.segmentIndex, connProj.projectedPoint.toModelOffset())
+                            } else if (currentOnAddWaypoint != null) {
+                                currentOnAddWaypoint?.invoke(connProj.connection, connProj.projectedPoint)
+                            }
                             event.changes.forEach { it.consume() }
                         }
                     } else if (event.keyboardModifiers.isShiftPressed && event.buttons.isPrimaryPressed) {
@@ -579,23 +626,8 @@ fun Modifier.boardPointerEventGesture(
                         }
                     } else if (event.buttons.isPrimaryPressed) {
                         if (interactionState.hoveredMidpoint != null) {
-                            val (conn, segIdx) = interactionState.hoveredMidpoint!!
-                            val junctionMap = currentJunctions.associate { it.id to it.position.toComposeOffset() }
-                            val screenPts = ConnectionHitTester.getConnectionScreenPoints(
-                                connection = conn,
-                                getPortBoardPosition = currentGetPortBoardPosition,
-                                junctionMap = junctionMap,
-                                scale = currentScale,
-                                offset = currentOffset
-                            )
-                            if (screenPts != null) {
-                                val midpoints = SplineMathUtils.computeSegmentMidpoints(screenPts, currentCurveStyle, currentRoundness)
-                                val midScreenPt = midpoints.getOrNull(segIdx) ?: position
-                                val midBoardPt = (midScreenPt - currentOffset) / currentScale
-                                currentOnInsertWaypoint?.invoke(conn, segIdx, midBoardPt.toModelOffset())
-                                interactionState.draggingWaypoint = Pair(conn, segIdx)
-                                event.changes.forEach { it.consume() }
-                            }
+                            interactionState.pendingMidpoint = interactionState.hoveredMidpoint
+                            interactionState.pendingMidpointPressPos = position
                         } else if (interactionState.hoveredWaypoint != null) {
                             interactionState.draggingWaypoint = interactionState.hoveredWaypoint
                             event.changes.forEach { it.consume() }
@@ -607,6 +639,7 @@ fun Modifier.boardPointerEventGesture(
                 } else if (event.type == PointerEventType.Release) {
                     interactionState.draggingJunctionId = null
                     interactionState.draggingWaypoint = null
+                    interactionState.pendingMidpoint = null
                     if (currentIsDrawingConnection && !event.buttons.isPrimaryPressed) {
                         currentOnConnectionDrop(event.keyboardModifiers.isShiftPressed)
                     }

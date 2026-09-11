@@ -1089,6 +1089,60 @@ class FlowEditorQoLTest {
         vm.onEvent(FlowEvent.ToggleStructuredConnectionMode)
         assertFalse(vm.state.value.isAdvancedConnectionMode)
     }
+
+    @Test
+    fun testStructuredConnectionFlagPersistence() {
+        val flow = Flow(name = "TestStructuredFlag")
+        val vm = createViewModel(flow)
+
+        vm.onEvent(
+            FlowEvent.ConnectPortsWithWaypoints(
+                sourceNodeId = 1L,
+                sourcePortId = "out",
+                targetNodeId = 2L,
+                targetPortId = "in",
+                waypoints = listOf(ModelOffset(50f, 50f)),
+                isStructured = true
+            )
+        )
+
+        val conn = vm.state.value.flow.connections.first()
+        assertTrue(conn.isStructured)
+
+        // Floating structured connection
+        vm.onEvent(
+            FlowEvent.CreateFloatingConnection(
+                sourceNodeId = 1L,
+                sourcePortId = "out2",
+                floatingTarget = ModelOffset(100f, 100f),
+                isStructured = true
+            )
+        )
+        val floatingConn = vm.state.value.flow.connections.find { it.sourcePortId == "out2" }
+        assertNotNull(floatingConn)
+        assertTrue(floatingConn.isStructured)
+    }
+
+    @Test
+    fun testMoveWaypointDirectlyToAbsolutePosition() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(10f, 10f), ModelOffset(50f, 50f))
+        )
+        val flow = Flow(name = "TestMoveWpAbsolute", connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Move waypoint 0 directly to (200, 300)
+        val targetPos = ModelOffset(200f, 300f)
+        vm.onEvent(FlowEvent.MoveWaypoint(conn, 0, targetPos))
+
+        val updatedConn = vm.state.value.flow.connections.first()
+        assertEquals(targetPos, updatedConn.waypoints[0])
+        assertEquals(ModelOffset(50f, 50f), updatedConn.waypoints[1])
+    }
 }
 
 

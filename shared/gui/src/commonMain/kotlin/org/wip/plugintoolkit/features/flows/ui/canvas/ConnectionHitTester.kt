@@ -47,9 +47,10 @@ object ConnectionHitTester {
                 continue
             }
 
+            val effectiveStyle = if (connection.isStructured) ConnectionCurveStyle.Orthogonal else curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
-                style = curveStyle,
+                style = effectiveStyle,
                 tension = roundness
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
@@ -59,6 +60,16 @@ object ConnectionHitTester {
             }
         }
         return bestConnection
+    }
+
+    data class ConnectionProjection(
+        val connection: Connection,
+        val projectedPoint: Offset,
+        val segmentIndex: Int
+    ) {
+        val first: Connection get() = connection
+        val second: Offset get() = projectedPoint
+        val third: Int get() = segmentIndex
     }
 
     /**
@@ -77,10 +88,11 @@ object ConnectionHitTester {
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f
-    ): Pair<Connection, Offset>? {
+    ): ConnectionProjection? {
         val junctionMap = junctions.associate { it.id to it.position.toComposeOffset() }
         var bestConnection: Connection? = null
         var bestProjected: Offset? = null
+        var bestSegmentIndex = 0
         var minDistance = if (initialMinDistance < 15f) 15f else initialMinDistance
 
         for (connection in connections) {
@@ -103,9 +115,10 @@ object ConnectionHitTester {
                 continue
             }
 
+            val effectiveStyle = if (connection.isStructured) ConnectionCurveStyle.Orthogonal else curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
-                style = curveStyle,
+                style = effectiveStyle,
                 tension = roundness
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
@@ -114,10 +127,21 @@ object ConnectionHitTester {
                 bestConnection = connection
                 val proj = SplineMathUtils.findClosestPointOnPath(position, sampledPoints)
                 bestProjected = (proj - offset) / scale
+
+                var closestSegDist = Float.MAX_VALUE
+                var bestSeg = 0
+                for (i in 0 until screenPoints.size - 1) {
+                    val segD = SplineMathUtils.distanceToSegment(proj, screenPoints[i], screenPoints[i + 1])
+                    if (segD < closestSegDist) {
+                        closestSegDist = segD
+                        bestSeg = i
+                    }
+                }
+                bestSegmentIndex = bestSeg
             }
         }
         return if (bestConnection != null && bestProjected != null) {
-            Pair(bestConnection, bestProjected)
+            ConnectionProjection(bestConnection, bestProjected, bestSegmentIndex)
         } else null
     }
 
@@ -252,10 +276,10 @@ object ConnectionHitTester {
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f,
-        hitRadius: Float = 16f * scale
+        hitRadius: Float = 28f * scale
     ): Triple<Connection, Int, Offset>? {
         var closest: Triple<Connection, Int, Offset>? = null
-        var minDistance = if (hitRadius < 14f) 14f else hitRadius
+        var minDistance = if (hitRadius < 24f) 24f else hitRadius
 
         for (connection in connections) {
             val screenPoints = getConnectionScreenPoints(
@@ -270,9 +294,10 @@ object ConnectionHitTester {
 
             if (screenPoints.size < 2) continue
 
+            val effectiveStyle = if (connection.isStructured) ConnectionCurveStyle.Orthogonal else curveStyle
             val midpoints = SplineMathUtils.computeSegmentMidpoints(
                 points = screenPoints,
-                style = curveStyle,
+                style = effectiveStyle,
                 tension = roundness
             )
 

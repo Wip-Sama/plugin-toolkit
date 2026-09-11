@@ -603,7 +603,8 @@ data class Connection(
     val junctionIds: List<Long> = emptyList(),
     val sourceJunctionId: Long? = null,
     val targetJunctionId: Long? = null,
-    val floatingTarget: Offset? = null
+    val floatingTarget: Offset? = null,
+    val isStructured: Boolean = false
 ) {
     val isFloating: Boolean
         get() = floatingTarget != null ||
@@ -620,7 +621,8 @@ data class Connection(
             floatingTarget: Offset,
             color: String? = null,
             junctionIds: List<Long> = emptyList(),
-            waypoints: List<Offset> = emptyList()
+            waypoints: List<Offset> = emptyList(),
+            isStructured: Boolean = false
         ): Connection = Connection(
             sourceNodeId = sourceNodeId,
             sourcePortId = sourcePortId,
@@ -629,7 +631,8 @@ data class Connection(
             color = color,
             waypoints = waypoints,
             junctionIds = junctionIds,
-            floatingTarget = floatingTarget
+            floatingTarget = floatingTarget,
+            isStructured = isStructured
         )
     }
 }

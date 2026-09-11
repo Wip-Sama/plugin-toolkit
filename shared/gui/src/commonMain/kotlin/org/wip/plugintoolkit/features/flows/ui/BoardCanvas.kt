@@ -151,6 +151,8 @@ fun BoardCanvas(
     onToggleAdvancedConnectionMode: () -> Unit = {},
     onPaintSelection: () -> Unit = {},
     onWashSelection: () -> Unit = {},
+    structuredConnectionStartInfo: Triple<Long, String, Boolean>? = null,
+    onClearStructuredConnectionStartInfo: () -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.(hoveredConnection: Connection?, hoveredNodeId: Long?, onHoverNode: (Long?) -> Unit) -> Unit
 ) {
@@ -177,6 +179,20 @@ fun BoardCanvas(
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    LaunchedEffect(structuredConnectionStartInfo) {
+        structuredConnectionStartInfo?.let { (nodeId, portId, isOutput) ->
+            interactionState.isDrawingStructuredConnection = true
+            interactionState.structuredConnectionStartNodeId = nodeId
+            interactionState.structuredConnectionStartPortId = portId
+            interactionState.structuredConnectionStartIsOutput = isOutput
+            interactionState.structuredConnectionSourceJunctionId = null
+            interactionState.structuredConnectionPoints = mutableListOf()
+            val portPos = getPortBoardPosition(nodeId, portId, isOutput) ?: Offset.Zero
+            interactionState.structuredConnectionLivePos = portPos
+            onClearStructuredConnectionStartInfo()
+        }
     }
 
     val dimensions = ToolkitTheme.dimensions
@@ -282,6 +298,9 @@ fun BoardCanvas(
                 onDeleteWaypoint = onDeleteWaypoint,
                 onInsertWaypoint = onInsertWaypoint,
                 onFinalizeStructuredConnection = onFinalizeStructuredConnection,
+                connectionStartNodeId = connectionStartNodeId,
+                connectionStartPortId = connectionStartPortId,
+                connectionStartIsOutput = connectionStartIsOutput,
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness
             )
