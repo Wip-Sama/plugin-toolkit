@@ -71,11 +71,13 @@ fun Modifier.boardPanGesture(
             val isPanButtonPressed = event.buttons.isSecondaryPressed || event.buttons.isTertiaryPressed
             if (event.type == PointerEventType.Press && isPanButtonPressed) {
                 val change = event.changes.firstOrNull()
-                if (change == null || change.isConsumed) continue
+                if (change == null) continue
 
                 focusRequester.requestFocus()
                 var lastPoint = change.position
-                change.consume()
+                if (!event.buttons.isPrimaryPressed) {
+                    change.consume()
+                }
 
                 while (true) {
                     val dragEvent = awaitPointerEvent()
@@ -84,11 +86,13 @@ fun Modifier.boardPanGesture(
                         break
                     }
                     if (dragEvent.type == PointerEventType.Move) {
-                        val currentPoint = dragEvent.changes.first().position
+                        val currentPoint = dragEvent.changes.firstOrNull()?.position ?: lastPoint
                         val delta = currentPoint - lastPoint
                         onPan(delta)
                         lastPoint = currentPoint
-                        dragEvent.changes.forEach { it.consume() }
+                        if (!dragEvent.buttons.isPrimaryPressed) {
+                            dragEvent.changes.forEach { it.consume() }
+                        }
                     }
                 }
             }
@@ -281,7 +285,7 @@ fun Modifier.boardPointerEventGesture(
                         }
                     }
                 } else if (event.type == PointerEventType.Release) {
-                    if (currentIsDrawingConnection) {
+                    if (currentIsDrawingConnection && !event.buttons.isPrimaryPressed) {
                         currentOnConnectionDrop(event.keyboardModifiers.isShiftPressed)
                     }
                 }

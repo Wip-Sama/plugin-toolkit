@@ -139,6 +139,7 @@ fun FlowEditorView(
     var connectionStartPortId by remember { mutableStateOf<String?>(null) }
     var connectionStartIsOutput by remember { mutableStateOf(true) }
     var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
+    var portLayoutVersion by remember { mutableStateOf(0) }
     val portLayouts = remember { mutableStateMapOf<Triple<Long, String, Boolean>, LayoutCoordinates>() }
     val getPortBoardPosition = { nodeId: Long, portId: String, isOutput: Boolean ->
         val coords = portLayouts[Triple(nodeId, portId, isOutput)]
@@ -357,7 +358,8 @@ fun FlowEditorView(
             onRedo = { viewModel.redo() },
             nodeSizes = nodeSizes,
             isReadOnly = state.isReadOnly,
-            problematicConnections = problematicConnections
+            problematicConnections = problematicConnections,
+            portLayoutVersion = portLayoutVersion
         ) { hoveredConnection, hoveredNodeId, onHoverNode ->
             CompositionLocalProvider(LocalOverlayHost provides dropdownOverlay) {
                 // 1.1 Ghost Preview for Snapping (rendered underneath nodes)
@@ -572,6 +574,7 @@ fun FlowEditorView(
                                 onToggleOutputsCollapse = { id -> viewModel.onEvent(FlowEvent.ToggleNodeOutputsCollapse(id)) },
                                 onPortPositioned = { nodeId, portId, isOutput, coords ->
                                     portLayouts[Triple(nodeId, portId, isOutput)] = coords
+                                    portLayoutVersion++
                                 },
                                  onPortDisposed = { nodeId, portId, isOutput ->
                                      val targetNode = flow.nodes.find { it.id == nodeId }
@@ -582,6 +585,7 @@ fun FlowEditorView(
                                      }
                                      if (!portStillExists) {
                                          portLayouts.remove(Triple(nodeId, portId, isOutput))
+                                         portLayoutVersion++
                                      }
                                  },
                                 onStartConnection = { nodeId, portId, isOutput ->

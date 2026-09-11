@@ -110,6 +110,7 @@ fun BoardCanvas(
     nodeSizes: Map<Long, IntSize>,
     isReadOnly: Boolean = false,
     problematicConnections: Set<Connection> = emptySet(),
+    portLayoutVersion: Int = 0,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.(hoveredConnection: Connection?, hoveredNodeId: Long?, onHoverNode: (Long?) -> Unit) -> Unit
 ) {
@@ -222,7 +223,8 @@ fun BoardCanvas(
             highlightedPortId = highlightedPortId,
             highlightedNodeId = highlightedNodeId,
             getPortBoardPosition = getPortBoardPosition,
-            problematicConnections = problematicConnections
+            problematicConnections = problematicConnections,
+            portLayoutVersion = portLayoutVersion
         )
 
         // Connection Hover Tooltip

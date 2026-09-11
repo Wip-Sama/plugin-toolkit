@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonElement
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 
 class PluginSettingsViewModel(
     val pkg: String,
@@ -88,7 +89,18 @@ class PluginSettingsViewModel(
     }
 
     fun save() {
-        pluginManager.savePluginSettings(pkg, _store.value)
+        val currentStore = _store.value
+        val mergedSettings = currentStore.settings.toMutableMap()
+        manifest?.settings?.forEach { (key, meta) ->
+            if (!mergedSettings.containsKey(key)) {
+                val eff = SettingsUtils.resolveEffectiveJson(null, meta.defaultValue, meta.type)
+                if (eff != null) {
+                    mergedSettings[key] = eff
+                }
+            }
+        }
+        val toSave = currentStore.copy(settings = mergedSettings)
+        pluginManager.savePluginSettings(pkg, toSave)
         viewModelScope.launch {
             pluginManager.checkAndResumeSetup(pkg)
         }

@@ -1,3 +1,11 @@
+Version: 2.1.1
+Date: xx-09-2026
+Fixed:
+	- Connection Detachment During Canvas Pan
+	- When a capability definition changed without migration the flow still appeared valid even if it was not
+  - Required parameters with default values in failed validation and required toggling on and off before proceeding
+  - Expanding a collapsed node did not immediately re-render the connections until the cursor moved
+----------------------------------------------------------------------------------------------------
 Version: 2.1.0
 Date: 10-09-2026
 Added:

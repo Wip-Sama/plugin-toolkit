@@ -3,7 +3,6 @@ package org.wip.plugintoolkit.features.flows.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -80,21 +80,28 @@ fun PortCircle(
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
-                        val down = awaitFirstDown()
-                        cumulativeOffset = Offset.Zero
-                        currentOnDragStart()
+                        awaitFirstDown(requireUnconsumed = false)
+                        if (currentEvent.buttons.isPrimaryPressed) {
+                            cumulativeOffset = Offset.Zero
+                            currentOnDragStart()
 
-                        var isShift = false
+                            var isShift = currentEvent.keyboardModifiers.isShiftPressed
 
-                        drag(down.id) { change ->
-                            change.consume()
-                            cumulativeOffset += change.position - change.previousPosition
-                            currentOnDrag(cumulativeOffset)
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                isShift = event.keyboardModifiers.isShiftPressed
+                                if (!event.buttons.isPrimaryPressed) {
+                                    break
+                                }
+                                val change = event.changes.firstOrNull()
+                                if (change != null) {
+                                    cumulativeOffset += change.position - change.previousPosition
+                                    currentOnDrag(cumulativeOffset)
+                                }
+                            }
 
-                            isShift = currentEvent.keyboardModifiers.isShiftPressed
+                            currentOnDragEnd(isShift)
                         }
-
-                        currentOnDragEnd(isShift)
                     }
                 }
             }

@@ -125,22 +125,76 @@ object SettingsUtils {
     }
 
     /**
+     * Resolves the effective string value for a parameter or setting.
+     * If the raw value is non-blank, it is returned.
+     * Otherwise, fallback is checked: explicit defaultValue, implicit boolean false, or enum first option.
+     */
+    fun resolveEffectiveValue(
+        value: String?,
+        defaultValue: JsonElement? = null,
+        type: DataType? = null
+    ): String {
+        if (!value.isNullOrBlank()) return value
+        if (defaultValue != null && defaultValue !is JsonNull) {
+            return when (defaultValue) {
+                is JsonPrimitive -> defaultValue.content
+                else -> defaultValue.toString()
+            }
+        }
+        if (type is DataType.Primitive && type.primitiveType == PrimitiveType.BOOLEAN) {
+            return "false"
+        }
+        if (type is DataType.Enum && type.options.isNotEmpty()) {
+            return type.options.first()
+        }
+        return ""
+    }
+
+    /**
+     * Resolves the effective JsonElement value for a setting or parameter.
+     */
+    fun resolveEffectiveJson(
+        value: JsonElement?,
+        defaultValue: JsonElement? = null,
+        type: DataType? = null
+    ): JsonElement? {
+        if (value != null && value !is JsonNull) {
+            if (value !is JsonPrimitive || value.content.isNotBlank()) {
+                return value
+            }
+        }
+        if (defaultValue != null && defaultValue !is JsonNull) {
+            return defaultValue
+        }
+        if (type is DataType.Primitive && type.primitiveType == PrimitiveType.BOOLEAN) {
+            return JsonPrimitive(false)
+        }
+        if (type is DataType.Enum && type.options.isNotEmpty()) {
+            return JsonPrimitive(type.options.first())
+        }
+        return null
+    }
+
+    /**
      * Validates a parameter value against its metadata constraints.
      *
      * @param value The raw string value from the text field.
      * @param isRequired Whether the parameter is required.
      * @param type The DataType of the parameter.
      * @param constraints The parameter constraints (regex, minLength, etc.).
+     * @param defaultValue Optional default value fallback for required checks.
      * @return null if the value is valid, or an error message string if validation fails.
      */
     fun validateParameter(
         value: String,
         isRequired: Boolean,
         type: DataType,
-        constraints: ParameterConstraints? = null
+        constraints: ParameterConstraints? = null,
+        defaultValue: JsonElement? = null
     ): String? {
-        if (isRequired && value.isBlank()) return "Required"
-        if (value.isBlank()) return null
+        val effective = resolveEffectiveValue(value, defaultValue, type)
+        if (isRequired && effective.isBlank()) return "Required"
+        if (effective.isBlank()) return null
 
         if (constraints == null) return null
 
@@ -152,9 +206,9 @@ object SettingsUtils {
 
         val isArray = type is DataType.Array
         val items = if (isArray) {
-            getLeafStrings(value, type)
+            getLeafStrings(effective, type)
         } else {
-            listOf(value)
+            listOf(effective)
         }
 
         for (item in items) {
@@ -227,7 +281,7 @@ object SettingsUtils {
         val errors = mutableMapOf<String, String>()
         for ((name, meta) in parameters) {
             val value = parameterValues[name] ?: ""
-            val error = validateParameter(value, meta.required, meta.type, meta.constraints)
+            val error = validateParameter(value, meta.required, meta.type, meta.constraints, meta.defaultValue)
             if (error != null) {
                 errors[name] = error
             }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import kotlinx.serialization.json.JsonElement
@@ -96,9 +97,16 @@ fun EnumDropdownInput(
         }
 
         if (options.isNotEmpty()) {
+            val effectiveSelected = if (value in options) value else (options.firstOrNull() ?: "")
+            LaunchedEffect(effectiveSelected) {
+                if (value !in options && effectiveSelected.isNotBlank()) {
+                    onValueChange(effectiveSelected)
+                }
+            }
+
             ExpressiveMenu<String>(
                 options = options,
-                selectedOption = if (value in options) value else (options.firstOrNull() ?: ""),
+                selectedOption = effectiveSelected,
                 onOptionSelected = { onValueChange(it) },
                 labelProvider = { it },
                 enabled = enabled,

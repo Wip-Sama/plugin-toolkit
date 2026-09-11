@@ -216,7 +216,7 @@ fun FlowRunnerView(
                                         ?: node.defaultValue?.let {
                                             if (it is kotlinx.serialization.json.JsonElement) SettingsUtils.jsonToString(it, inferredType) else it.toString()
                                         }
-                                        ?: ""
+                                        ?: SettingsUtils.resolveEffectiveValue("", null, inferredType)
 
                                     listOf(
                                         FlowParameter(
@@ -372,7 +372,8 @@ fun FlowRunnerView(
                     val map = mutableStateMapOf<String, String>()
                     flowParameters.forEach { param ->
                         if (param.type != ParameterType.OUTPUT) {
-                            map["${param.nodeId}_${param.portId}"] = param.defaultValue
+                            val eff = SettingsUtils.resolveEffectiveValue(param.defaultValue, null, param.dataType)
+                            map["${param.nodeId}_${param.portId}"] = eff
                         }
                     }
                     map
@@ -516,8 +517,9 @@ fun FlowRunnerView(
                     val allParams = flowParameters.filter { it.type != ParameterType.OUTPUT }
                     allParams.all { param ->
                         val value = parameterValues["${param.nodeId}_${param.portId}"] ?: param.defaultValue
+                        val effective = SettingsUtils.resolveEffectiveValue(value, null, param.dataType)
                         val error = SettingsUtils.validateParameter(
-                            value = value,
+                            value = effective,
                             isRequired = param.isRequired,
                             type = param.dataType,
                             constraints = param.constraints

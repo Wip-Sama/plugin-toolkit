@@ -111,25 +111,17 @@ class FlowRepository(
                             val content = SystemFileSystem.source(file).buffered().use { it.readString() }
                             val flow = json.decodeFromString<Flow>(content)
 
-                            val updatedNodes = flow.nodes.map { node ->
-                                if (node is Node.CapabilityNode) {
-                                    val currentManifest = manifests[node.pluginInfo.id]
-                                    val actualCapability =
-                                        currentManifest?.capabilities?.find { it.name == node.capability.name }
-                                    if (currentManifest == null || actualCapability == null) {
-                                        node.copy(isBroken = true)
-                                    } else {
-                                        node.copy(
-                                            isBroken = false,
-                                            capability = actualCapability,
-                                            pluginInfo = currentManifest.plugin
-                                        )
-                                    }
-                                } else {
-                                    node
-                                }
+                            val migResult = MigrationEngine.migrateFlow(
+                                flow = flow,
+                                currentManifests = manifests,
+                                getMigrations = { pluginManager.getMigrations(it) }
+                            )
+                            val finalFlow = migResult.migratedFlow
+                            if (finalFlow != flow) {
+                                val flowContent = json.encodeToString(Flow.serializer(), finalFlow)
+                                SystemFileSystem.sink(file).buffered().use { it.writeString(flowContent) }
                             }
-                            loadedFlows.add(flow.copy(nodes = updatedNodes))
+                            loadedFlows.add(finalFlow)
                         } catch (e: Exception) {
                             Logger.e(e) { "Failed to parse flow file: ${file.name}" }
                         }

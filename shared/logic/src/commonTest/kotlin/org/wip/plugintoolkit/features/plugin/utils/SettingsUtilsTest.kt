@@ -154,4 +154,102 @@ class SettingsUtilsTest {
         )
         assertNull(emptyOptionalResult, "Empty optional input with regex constraint should be valid")
     }
+
+    @Test
+    fun testResolveEffectiveValue() {
+        val stringType = DataType.Primitive(PrimitiveType.STRING)
+        val boolType = DataType.Primitive(PrimitiveType.BOOLEAN)
+        val enumType = DataType.Enum("MyEnum", listOf("OptionA", "OptionB"))
+
+        // Null value with defaultValue
+        assertEquals("defaultVal", SettingsUtils.resolveEffectiveValue(null, JsonPrimitive("defaultVal"), stringType))
+        // Blank string with defaultValue
+        assertEquals("defaultVal", SettingsUtils.resolveEffectiveValue("", JsonPrimitive("defaultVal"), stringType))
+        // Explicit value takes precedence
+        assertEquals("explicitVal", SettingsUtils.resolveEffectiveValue("explicitVal", JsonPrimitive("defaultVal"), stringType))
+
+        // Boolean implicit default is false
+        assertEquals("false", SettingsUtils.resolveEffectiveValue(null, null, boolType))
+        assertEquals("false", SettingsUtils.resolveEffectiveValue("", null, boolType))
+        assertEquals("true", SettingsUtils.resolveEffectiveValue("true", null, boolType))
+
+        // Enum implicit default is first option
+        assertEquals("OptionA", SettingsUtils.resolveEffectiveValue(null, null, enumType))
+        assertEquals("OptionA", SettingsUtils.resolveEffectiveValue("", null, enumType))
+        assertEquals("OptionB", SettingsUtils.resolveEffectiveValue("OptionB", null, enumType))
+    }
+
+    @Test
+    fun testResolveEffectiveJson() {
+        val stringType = DataType.Primitive(PrimitiveType.STRING)
+        val boolType = DataType.Primitive(PrimitiveType.BOOLEAN)
+        val enumType = DataType.Enum("MyEnum", listOf("FIRST", "SECOND"))
+
+        // Null json with defaultValue
+        assertEquals(
+            JsonPrimitive("def"),
+            SettingsUtils.resolveEffectiveJson(null, JsonPrimitive("def"), stringType)
+        )
+
+        // Boolean null json defaults to JsonPrimitive(false)
+        assertEquals(
+            JsonPrimitive(false),
+            SettingsUtils.resolveEffectiveJson(null, null, boolType)
+        )
+
+        // Enum null json defaults to JsonPrimitive("FIRST")
+        assertEquals(
+            JsonPrimitive("FIRST"),
+            SettingsUtils.resolveEffectiveJson(null, null, enumType)
+        )
+
+        // Explicit value takes precedence
+        assertEquals(
+            JsonPrimitive("SECOND"),
+            SettingsUtils.resolveEffectiveJson(JsonPrimitive("SECOND"), null, enumType)
+        )
+    }
+
+    @Test
+    fun testValidateParameter_withDefaultValue() {
+        val stringType = DataType.Primitive(PrimitiveType.STRING)
+        val boolType = DataType.Primitive(PrimitiveType.BOOLEAN)
+        val enumType = DataType.Enum("MyEnum", listOf("Option1", "Option2"))
+
+        // Empty string but defaultValue provided -> valid!
+        val withDefaultResult = SettingsUtils.validateParameter(
+            value = "",
+            isRequired = true,
+            type = stringType,
+            defaultValue = JsonPrimitive("myDefault")
+        )
+        assertNull(withDefaultResult, "Parameter with default value should be valid even if current input is empty")
+
+        // Empty string without defaultValue -> "Required"
+        val withoutDefaultResult = SettingsUtils.validateParameter(
+            value = "",
+            isRequired = true,
+            type = stringType,
+            defaultValue = null
+        )
+        assertEquals("Required", withoutDefaultResult)
+
+        // Boolean without explicit value has implicit default false -> valid!
+        val boolResult = SettingsUtils.validateParameter(
+            value = "",
+            isRequired = true,
+            type = boolType,
+            defaultValue = null
+        )
+        assertNull(boolResult, "Boolean parameter has implicit false default and should be valid")
+
+        // Enum without explicit value has implicit default to first option -> valid!
+        val enumResult = SettingsUtils.validateParameter(
+            value = "",
+            isRequired = true,
+            type = enumType,
+            defaultValue = null
+        )
+        assertNull(enumResult, "Enum parameter has implicit first option default and should be valid")
+    }
 }

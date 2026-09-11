@@ -71,6 +71,7 @@ fun BoardGridAndConnectionsCanvas(
     highlightedNodeId: Long?,
     getPortBoardPosition: (Long, String, Boolean) -> Offset?,
     problematicConnections: Set<Connection> = emptySet(),
+    portLayoutVersion: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val gridSize = 50f
@@ -99,6 +100,8 @@ fun BoardGridAndConnectionsCanvas(
     }
 
     Canvas(modifier = modifier.fillMaxSize().testTag("board_grid")) {
+        // Read portLayoutVersion to ensure canvas redraws when node expansion or port layout completes
+        if (portLayoutVersion < 0) return@Canvas
         val scaledGridSize = gridSize * state.scale
         val startX = (state.offset.x % scaledGridSize) - scaledGridSize
         val startY = (state.offset.y % scaledGridSize) - scaledGridSize

@@ -10,6 +10,7 @@ import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.model.PluginLifecycleStatus
+import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import kotlin.time.Clock
 
 sealed interface LifecycleAction {
@@ -753,7 +754,7 @@ class PluginLifecycleCoordinator(
         val store = lifecycleManager.loadPluginSettings(pkg)
         return actualManifest.settings!!.any { (key, meta) ->
             if (!meta.required) return@any false
-            val value = store.settings[key] ?: return@any true
+            val value = SettingsUtils.resolveEffectiveJson(store.settings[key], meta.defaultValue, meta.type) ?: return@any true
             if (!meta.type.isProvided(value)) return@any true
             false
         }

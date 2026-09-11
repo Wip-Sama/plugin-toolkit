@@ -31,7 +31,7 @@ data class MyPluginSettings(
 
 #### Plugin Settings Validation
 
-The `@PluginSetting` annotation supports identical validation constraints to those used for capabilities (see below). When users configure your plugin's settings via the host application, these rules are actively enforced. 
+The `@PluginSetting` annotation supports identical validation constraints to those used for capabilities (see below). If a value violates the validation constraints, the UI will visually indicate the error and prevent the saving of invalid settings.
 
 ```kotlin
 data class MyAdvancedSettings(
@@ -77,7 +77,7 @@ The host application will automatically infer the required file access permissio
 
 When using complex objects (custom `@Serializable` data classes) as parameters or return types, keep the following in mind:
 
-1. **Lenient Serialization (Ignoring Extra Fields)**: When a plugin receives a complex object from the host (or another plugin in a flow), the deserialization process is inherently lenient. This means that **if the provided JSON object contains more fields than the receiving data class expects, the unused fields are simply ignored and dropped**. It will not throw an error. This is particularly useful for building robust flows where an upstream capability might output a rich object, but your capability only needs a few specific properties from it.
+1. **Lenient Serialization (Ignoring Extra Fields)**: When a plugin receives a complex object from the host (or another plugin in a flow), its deserialization is lenient. This means that fields in the JSON not present in the data class are simply dropped, without throwing an error.
 2. **The `@ComplexObject` Annotation**: Multiple plugins might define complex objects with the same class name (e.g., `Config` or `UserData`). To help the host application differentiate these and to provide better metadata, you should annotate your data classes with `@ComplexObject` alongside `@Serializable`. 
    - `id`: An optional identifier (defaults to the class name if not provided). You might want to prefix this with your plugin ID (e.g., `my-plugin/Config`).
    - `description`: A helpful description of the object.
