@@ -24,6 +24,16 @@ class BoardInteractionState {
     var draggingJunctionId: Long? by mutableStateOf(null)
     var hoveredWaypoint: Pair<Connection, Int>? by mutableStateOf(null)
     var draggingWaypoint: Pair<Connection, Int>? by mutableStateOf(null)
+    var hoveredMidpoint: Pair<Connection, Int>? by mutableStateOf(null)
+
+    // Structured / Multi-point connection drawing session
+    var isDrawingStructuredConnection: Boolean by mutableStateOf(false)
+    var structuredConnectionStartNodeId: Long? by mutableStateOf(null)
+    var structuredConnectionStartPortId: String? by mutableStateOf(null)
+    var structuredConnectionStartIsOutput: Boolean by mutableStateOf(true)
+    var structuredConnectionSourceJunctionId: Long? by mutableStateOf(null)
+    var structuredConnectionPoints: MutableList<Offset> by mutableStateOf(mutableListOf())
+    var structuredConnectionLivePos: Offset by mutableStateOf(Offset.Zero)
 
     fun clearHoveredConnection() {
         hoveredConnection = null
@@ -42,6 +52,20 @@ class BoardInteractionState {
         hoveredWaypoint = null
     }
 
+    fun clearHoveredMidpoint() {
+        hoveredMidpoint = null
+    }
+
+    fun resetStructuredConnection() {
+        isDrawingStructuredConnection = false
+        structuredConnectionStartNodeId = null
+        structuredConnectionStartPortId = null
+        structuredConnectionStartIsOutput = true
+        structuredConnectionSourceJunctionId = null
+        structuredConnectionPoints = mutableListOf()
+        structuredConnectionLivePos = Offset.Zero
+    }
+
     fun clearSelectionBox() {
         selectionStart = null
         selectionEnd = null
@@ -56,6 +80,8 @@ class BoardInteractionState {
         clearHoveredNode()
         clearHoveredJunction()
         clearHoveredWaypoint()
+        clearHoveredMidpoint()
         clearSelectionBox()
+        resetStructuredConnection()
     }
 }

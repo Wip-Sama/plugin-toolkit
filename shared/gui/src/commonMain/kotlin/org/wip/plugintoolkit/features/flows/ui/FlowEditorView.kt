@@ -439,6 +439,41 @@ fun FlowEditorView(
                 viewModel.onEvent(FlowEvent.MoveWaypoint(conn, index, newPoint))
             },
             onDeleteWaypoint = { conn, index -> viewModel.onEvent(FlowEvent.DeleteWaypoint(conn, index)) },
+            onInsertWaypoint = { conn, index, pos ->
+                viewModel.onEvent(FlowEvent.AddWaypoint(conn, pos, index))
+            },
+            onFinalizeStructuredConnection = { srcNodeId, srcPortId, srcJuncId, tgtNodeId, tgtPortId, waypoints ->
+                if (srcNodeId != null && srcPortId != null) {
+                    viewModel.onEvent(
+                        FlowEvent.ConnectPortsWithWaypoints(
+                            sourceNodeId = srcNodeId,
+                            sourcePortId = srcPortId,
+                            targetNodeId = tgtNodeId,
+                            targetPortId = tgtPortId,
+                            waypoints = waypoints,
+                            sourceJunctionId = srcJuncId
+                        )
+                    )
+                }
+            },
+            onLeaveStructuredConnectionAtLastPoint = { srcNodeId, srcPortId, srcJuncId, waypoints ->
+                if (srcNodeId != null && srcPortId != null && waypoints.isNotEmpty()) {
+                    val lastPt = waypoints.last()
+                    val intermediateWaypoints = waypoints.dropLast(1)
+                    viewModel.onEvent(
+                        FlowEvent.CreateFloatingConnection(
+                            sourceNodeId = srcNodeId,
+                            sourcePortId = srcPortId,
+                            floatingTarget = lastPt,
+                            waypoints = intermediateWaypoints,
+                            sourceJunctionId = srcJuncId
+                        )
+                    )
+                }
+            },
+            onToggleStructuredConnectionMode = {
+                viewModel.onEvent(FlowEvent.ToggleStructuredConnectionMode)
+            },
             onAddJunctionAndBranch = { conn, pos ->
                 viewModel.onEvent(FlowEvent.AddJunctionAndBranch(conn, pos.toModelOffset()))
             },

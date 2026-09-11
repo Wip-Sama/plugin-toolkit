@@ -23,7 +23,9 @@ fun Modifier.boardKeyboardHandler(
     onPaste: (Offset) -> Unit,
     isReadOnly: Boolean = false,
     onTogglePaintTool: (() -> Unit)? = null,
-    onToggleWashTool: (() -> Unit)? = null
+    onToggleWashTool: (() -> Unit)? = null,
+    onToggleStructuredConnectionMode: (() -> Unit)? = null,
+    onLeaveStructuredConnectionAtLastPoint: ((Long?, String?, Long?, List<Offset>) -> Unit)? = null
 ): Modifier = this.onKeyEvent { keyEvent ->
     val newCtrlPressed = keyEvent.isCtrlPressed
     val newShiftPressed = keyEvent.isShiftPressed
@@ -50,6 +52,23 @@ fun Modifier.boardKeyboardHandler(
 
     if (keyEvent.type == KeyEventType.KeyDown) {
         when {
+            keyEvent.key == Key.Escape -> {
+                if (interactionState.isDrawingStructuredConnection) {
+                    if (interactionState.structuredConnectionPoints.isNotEmpty()) {
+                        onLeaveStructuredConnectionAtLastPoint?.invoke(
+                            interactionState.structuredConnectionStartNodeId,
+                            interactionState.structuredConnectionStartPortId,
+                            interactionState.structuredConnectionSourceJunctionId,
+                            interactionState.structuredConnectionPoints.toList()
+                        )
+                    }
+                    interactionState.resetStructuredConnection()
+                    true
+                } else {
+                    false
+                }
+            }
+
             keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> {
                 if (selectedNodeIds.isNotEmpty() && !isReadOnly) {
                     onDeleteSelectedNodes()
@@ -94,6 +113,15 @@ fun Modifier.boardKeyboardHandler(
             !keyEvent.isCtrlPressed && keyEvent.key == Key.W -> {
                 if (!isReadOnly && onToggleWashTool != null) {
                     onToggleWashTool()
+                    true
+                } else {
+                    false
+                }
+            }
+
+            !keyEvent.isCtrlPressed && keyEvent.key == Key.M -> {
+                if (!isReadOnly && onToggleStructuredConnectionMode != null) {
+                    onToggleStructuredConnectionMode()
                     true
                 } else {
                     false

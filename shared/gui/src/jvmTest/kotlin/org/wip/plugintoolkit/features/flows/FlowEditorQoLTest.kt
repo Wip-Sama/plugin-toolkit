@@ -998,6 +998,97 @@ class FlowEditorQoLTest {
         assertEquals("Fixed Size Card", currentLabel.text)
         assertEquals(ModelOffset(50f, 50f), currentLabel.position)
     }
+
+    @Test
+    fun testMidpointWaypointInsertionAtSpecificIndex() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(50f, 50f), ModelOffset(150f, 150f))
+        )
+        val flow = Flow(name = "TestMidpointInsertion", connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Insert at index 1 (between 50,50 and 150,150)
+        val insertedPoint = ModelOffset(100f, 100f)
+        vm.onEvent(FlowEvent.AddWaypoint(conn, insertedPoint, index = 1))
+
+        val updatedConn = vm.state.value.flow.connections.first()
+        assertEquals(3, updatedConn.waypoints.size)
+        assertEquals(ModelOffset(50f, 50f), updatedConn.waypoints[0])
+        assertEquals(ModelOffset(100f, 100f), updatedConn.waypoints[1])
+        assertEquals(ModelOffset(150f, 150f), updatedConn.waypoints[2])
+
+        // Undo properly reverts the insertion
+        vm.undo()
+        assertEquals(2, vm.state.value.flow.connections.first().waypoints.size)
+    }
+
+    @Test
+    fun testStructuredConnectionCreationWithWaypoints() {
+        val flow = Flow(name = "TestStructuredConn")
+        val vm = createViewModel(flow)
+
+        val waypoints = listOf(
+            ModelOffset(100f, 100f),
+            ModelOffset(200f, 100f),
+            ModelOffset(200f, 300f)
+        )
+        vm.onEvent(
+            FlowEvent.ConnectPortsWithWaypoints(
+                sourceNodeId = 1L,
+                sourcePortId = "out",
+                targetNodeId = 2L,
+                targetPortId = "in",
+                waypoints = waypoints
+            )
+        )
+
+        val connections = vm.state.value.flow.connections
+        assertEquals(1, connections.size)
+        val conn = connections.first()
+        assertEquals(1L, conn.sourceNodeId)
+        assertEquals(2L, conn.targetNodeId)
+        assertEquals(3, conn.waypoints.size)
+        assertEquals(waypoints, conn.waypoints)
+    }
+
+    @Test
+    fun testStructuredConnectionFloatingTargetOnEscape() {
+        val flow = Flow(name = "TestFloatingStructuredConn")
+        val vm = createViewModel(flow)
+
+        val intermediate = listOf(ModelOffset(100f, 100f), ModelOffset(200f, 100f))
+        val lastPoint = ModelOffset(200f, 300f)
+
+        vm.onEvent(
+            FlowEvent.CreateFloatingConnection(
+                sourceNodeId = 1L,
+                sourcePortId = "out",
+                floatingTarget = lastPoint,
+                waypoints = intermediate
+            )
+        )
+
+        val conn = vm.state.value.flow.connections.first()
+        assertTrue(conn.isFloating)
+        assertEquals(lastPoint, conn.floatingTarget)
+        assertEquals(intermediate, conn.waypoints)
+    }
+
+    @Test
+    fun testToggleStructuredConnectionMode() {
+        val flow = Flow(name = "TestToggleStructured")
+        val vm = createViewModel(flow)
+
+        assertFalse(vm.state.value.isAdvancedConnectionMode)
+        vm.onEvent(FlowEvent.ToggleStructuredConnectionMode)
+        assertTrue(vm.state.value.isAdvancedConnectionMode)
+        vm.onEvent(FlowEvent.ToggleStructuredConnectionMode)
+        assertFalse(vm.state.value.isAdvancedConnectionMode)
+    }
 }
 
 

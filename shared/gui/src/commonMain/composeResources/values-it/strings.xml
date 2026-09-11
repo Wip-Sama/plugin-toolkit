@@ -681,10 +681,12 @@
     <string name="flow_info_wash_desc">Ripristina colore predefinito degli elementi</string>
     <string name="flow_info_pipette_label">I</string>
     <string name="flow_info_pipette_desc">Campiona e copia colore dell\'elemento (Contagocce)</string>
-    <string name="flow_info_branch_label">Doppio Click / Rilascia</string>
-    <string name="flow_info_branch_desc">Crea giunzione o ramificazione da un cavo</string>
-    <string name="flow_info_waypoint_label">Alt + Click</string>
-    <string name="flow_info_waypoint_desc">Aggiungi punto di passaggio per piegare il percorso</string>
+    <string name="flow_info_branch_label">Doppio Click</string>
+    <string name="flow_info_branch_desc">Crea giunzione e dirama dal cavo di connessione</string>
+    <string name="flow_info_waypoint_label">Trascina Punto Medio / Alt+Click</string>
+    <string name="flow_info_waypoint_desc">Trascina il punto medio o Alt+Click per inserire un punto di passaggio</string>
+    <string name="flow_info_structured_mode_label">M / Click</string>
+    <string name="flow_info_structured_mode_desc">Modalità cavo strutturato: clicca per posizionare punti, Shift=Dritto, Ctrl=45°, Esc=Fine</string>
     <string name="flow_info_rename_label">Shift + Click</string>
     <string name="flow_info_rename_desc">Rinomina titolo del gruppo o nota di testo</string>
     <string name="flow_info_resize_label">Trascina Bordi</string>

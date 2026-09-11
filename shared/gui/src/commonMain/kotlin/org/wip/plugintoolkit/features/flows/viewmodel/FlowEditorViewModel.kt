@@ -1306,7 +1306,11 @@ class FlowEditorViewModel(
                 }
                 if (conn != null) {
                     val oldWps = conn.waypoints
-                    val newWps = oldWps + event.point
+                    val newWps = if (event.index != null && event.index in 0..oldWps.size) {
+                        oldWps.toMutableList().apply { add(event.index, event.point) }
+                    } else {
+                        oldWps + event.point
+                    }
                     val newConnections = currentState.flow.connections.map {
                         if (it == conn) it.copy(waypoints = newWps) else it
                     }
@@ -1382,13 +1386,32 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.CreateFloatingConnection -> {
-                val floating = Connection.createFloating(
+                val floating = Connection(
                     sourceNodeId = event.sourceNodeId,
                     sourcePortId = event.sourcePortId,
+                    targetNodeId = Connection.FLOATING_NODE_ID,
+                    targetPortId = Connection.FLOATING_PORT_ID,
+                    waypoints = event.waypoints,
+                    sourceJunctionId = event.sourceJunctionId,
                     floatingTarget = event.floatingTarget
                 )
                 newState = currentState.copy(
                     flow = currentState.flow.copy(connections = currentState.flow.connections + floating),
+                    hasUnsavedChanges = true
+                )
+            }
+
+            is FlowEvent.ConnectPortsWithWaypoints -> {
+                val conn = Connection(
+                    sourceNodeId = event.sourceNodeId,
+                    sourcePortId = event.sourcePortId,
+                    targetNodeId = event.targetNodeId,
+                    targetPortId = event.targetPortId,
+                    waypoints = event.waypoints,
+                    sourceJunctionId = event.sourceJunctionId
+                )
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(connections = currentState.flow.connections + conn),
                     hasUnsavedChanges = true
                 )
             }
@@ -1399,6 +1422,10 @@ class FlowEditorViewModel(
 
             is FlowEvent.UpdateConnectionRoundness -> {
                 newState = currentState.copy(connectionRoundness = event.roundness)
+            }
+
+            is FlowEvent.ToggleStructuredConnectionMode -> {
+                newState = currentState.copy(isAdvancedConnectionMode = !currentState.isAdvancedConnectionMode)
             }
 
             else -> {}

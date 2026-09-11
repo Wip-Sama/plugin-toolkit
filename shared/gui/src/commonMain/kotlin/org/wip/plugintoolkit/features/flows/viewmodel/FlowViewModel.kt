@@ -215,12 +215,31 @@ sealed interface FlowEvent {
     ) : FlowEvent
     data class MoveJunction(val junctionId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
     data class DeleteJunction(val junctionId: Long) : FlowEvent
-    data class AddWaypoint(val connection: Connection, val point: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class AddWaypoint(
+        val connection: Connection,
+        val point: org.wip.plugintoolkit.features.flows.model.Offset,
+        val index: Int? = null
+    ) : FlowEvent
     data class MoveWaypoint(val connection: Connection, val index: Int, val newPoint: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
     data class DeleteWaypoint(val connection: Connection, val index: Int) : FlowEvent
-    data class CreateFloatingConnection(val sourceNodeId: Long, val sourcePortId: String, val floatingTarget: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class CreateFloatingConnection(
+        val sourceNodeId: Long,
+        val sourcePortId: String,
+        val floatingTarget: org.wip.plugintoolkit.features.flows.model.Offset,
+        val waypoints: List<org.wip.plugintoolkit.features.flows.model.Offset> = emptyList(),
+        val sourceJunctionId: Long? = null
+    ) : FlowEvent
+    data class ConnectPortsWithWaypoints(
+        val sourceNodeId: Long,
+        val sourcePortId: String,
+        val targetNodeId: Long,
+        val targetPortId: String,
+        val waypoints: List<org.wip.plugintoolkit.features.flows.model.Offset> = emptyList(),
+        val sourceJunctionId: Long? = null
+    ) : FlowEvent
     data class UpdateConnectionCurveStyle(val style: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle) : FlowEvent
     data class UpdateConnectionRoundness(val roundness: Float) : FlowEvent
+    object ToggleStructuredConnectionMode : FlowEvent
 }
 
 class FlowViewModel(

@@ -681,10 +681,12 @@
     <string name="flow_info_wash_desc">Wash elements back to theme default color</string>
     <string name="flow_info_pipette_label">I</string>
     <string name="flow_info_pipette_desc">Sample and copy element color (Eyedropper)</string>
-    <string name="flow_info_branch_label">Double-Click / Drop</string>
-    <string name="flow_info_branch_desc">Create junction or branch from connection wire</string>
-    <string name="flow_info_waypoint_label">Alt + Click</string>
-    <string name="flow_info_waypoint_desc">Add waypoint to bend/route connection curve</string>
+    <string name="flow_info_branch_label">Double-Click</string>
+    <string name="flow_info_branch_desc">Create junction &amp; branch from connection wire</string>
+    <string name="flow_info_waypoint_label">Drag Midpoint / Alt+Click</string>
+    <string name="flow_info_waypoint_desc">Drag midpoint handle or Alt+Click to add waypoint &amp; split section</string>
+    <string name="flow_info_structured_mode_label">M / Click</string>
+    <string name="flow_info_structured_mode_desc">Structured wire mode: click to place points, Shift=Straight, Ctrl=45°, Esc=Done</string>
     <string name="flow_info_rename_label">Shift + Click</string>
     <string name="flow_info_rename_desc">Rename group title or text note</string>
     <string name="flow_info_resize_label">Drag Borders</string>

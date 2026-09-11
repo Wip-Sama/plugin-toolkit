@@ -236,5 +236,55 @@ object ConnectionHitTester {
         }
         return closest
     }
+
+    /**
+     * Finds the closest segment midpoint on any visible connection within [hitRadius] screen distance of [position].
+     * Returns Triple(Connection, segmentIndex, screenPosition).
+     */
+    fun findClosestMidpoint(
+        position: Offset,
+        connections: List<Connection>,
+        getPortBoardPosition: (Long, String, Boolean) -> Offset?,
+        junctionMap: Map<Long, Offset>,
+        scale: Float,
+        offset: Offset,
+        curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
+        roundness: Float = 0.5f,
+        groups: List<FlowGroup> = emptyList(),
+        density: Float = 1f,
+        hitRadius: Float = 16f * scale
+    ): Triple<Connection, Int, Offset>? {
+        var closest: Triple<Connection, Int, Offset>? = null
+        var minDistance = if (hitRadius < 14f) 14f else hitRadius
+
+        for (connection in connections) {
+            val screenPoints = getConnectionScreenPoints(
+                connection = connection,
+                getPortBoardPosition = getPortBoardPosition,
+                junctionMap = junctionMap,
+                scale = scale,
+                offset = offset,
+                groups = groups,
+                density = density
+            ) ?: continue
+
+            if (screenPoints.size < 2) continue
+
+            val midpoints = SplineMathUtils.computeSegmentMidpoints(
+                points = screenPoints,
+                style = curveStyle,
+                tension = roundness
+            )
+
+            midpoints.forEachIndexed { segIdx, midPt ->
+                val dist = (position - midPt).getDistance()
+                if (dist < minDistance) {
+                    minDistance = dist
+                    closest = Triple(connection, segIdx, midPt)
+                }
+            }
+        }
+        return closest
+    }
 }
 

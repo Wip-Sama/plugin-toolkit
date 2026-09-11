@@ -49,6 +49,8 @@ import plugintoolkit.composeapp.generated.resources.flow_info_branch_label
 import plugintoolkit.composeapp.generated.resources.flow_info_branch_desc
 import plugintoolkit.composeapp.generated.resources.flow_info_waypoint_label
 import plugintoolkit.composeapp.generated.resources.flow_info_waypoint_desc
+import plugintoolkit.composeapp.generated.resources.flow_info_structured_mode_label
+import plugintoolkit.composeapp.generated.resources.flow_info_structured_mode_desc
 import plugintoolkit.composeapp.generated.resources.flow_info_paint_label
 import plugintoolkit.composeapp.generated.resources.flow_info_paint_desc
 import plugintoolkit.composeapp.generated.resources.flow_info_wash_label
@@ -150,6 +152,10 @@ fun FlowControlsInfoCard(
                 ShortcutRow(
                     badgeText = stringResource(Res.string.flow_info_waypoint_label),
                     description = stringResource(Res.string.flow_info_waypoint_desc)
+                )
+                ShortcutRow(
+                    badgeText = stringResource(Res.string.flow_info_structured_mode_label),
+                    description = stringResource(Res.string.flow_info_structured_mode_desc)
                 )
                 ShortcutRow(
                     badgeText = stringResource(Res.string.flow_info_paint_label),

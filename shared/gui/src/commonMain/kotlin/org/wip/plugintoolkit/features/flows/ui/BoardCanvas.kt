@@ -142,6 +142,10 @@ fun BoardCanvas(
     onAddWaypoint: (Connection, Offset) -> Unit = { _, _ -> },
     onMoveWaypoint: (Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit = { _, _, _ -> },
     onDeleteWaypoint: (Connection, Int) -> Unit = { _, _ -> },
+    onInsertWaypoint: (Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit = { _, _, _ -> },
+    onFinalizeStructuredConnection: (Long?, String?, Long?, Long, String, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit = { _, _, _, _, _, _ -> },
+    onLeaveStructuredConnectionAtLastPoint: (Long?, String?, Long?, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit = { _, _, _, _ -> },
+    onToggleStructuredConnectionMode: () -> Unit = {},
     onAddJunctionAndBranch: (Connection, Offset) -> Unit = { _, _ -> },
     onToggleEyedropper: () -> Unit = {},
     onToggleAdvancedConnectionMode: () -> Unit = {},
@@ -203,7 +207,11 @@ fun BoardCanvas(
                 onPaste = onPaste,
                 isReadOnly = isReadOnly,
                 onTogglePaintTool = onTogglePaintTool,
-                onToggleWashTool = onToggleWashTool
+                onToggleWashTool = onToggleWashTool,
+                onToggleStructuredConnectionMode = onToggleStructuredConnectionMode,
+                onLeaveStructuredConnectionAtLastPoint = { sNodeId, sPortId, sJuncId, pts ->
+                    onLeaveStructuredConnectionAtLastPoint(sNodeId, sPortId, sJuncId, pts.map { it.toModelOffset() })
+                }
             )
             .boardConnectionTapGesture(
                 interactionState = interactionState,
@@ -272,6 +280,8 @@ fun BoardCanvas(
                 onAddWaypoint = onAddWaypoint,
                 onMoveWaypoint = onMoveWaypoint,
                 onDeleteWaypoint = onDeleteWaypoint,
+                onInsertWaypoint = onInsertWaypoint,
+                onFinalizeStructuredConnection = onFinalizeStructuredConnection,
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness
             )
@@ -546,51 +556,6 @@ fun BoardCanvas(
                                 }
                             }
                         }
-                    }
-                }
-            }
-        }
-
-        // 5. Selected Connection Delete Button Bubble
-        interactionState.selectedConnection?.let { conn ->
-            val sourcePortBoardPos = getPortBoardPosition(conn.sourceNodeId, conn.sourcePortId, true)
-            val targetPortBoardPos = getPortBoardPosition(conn.targetNodeId, conn.targetPortId, false)
-            if (sourcePortBoardPos != null && targetPortBoardPos != null) {
-                Surface(
-                    onClick = {
-                        onDeleteConnection(conn)
-                        interactionState.selectedConnection = null
-                    },
-                    modifier = Modifier
-                        .testTag("delete_wire_button")
-                        .offset {
-                            val currentSourcePortBoardPos = getPortBoardPosition(conn.sourceNodeId, conn.sourcePortId, true)
-                            val currentTargetPortBoardPos = getPortBoardPosition(conn.targetNodeId, conn.targetPortId, false)
-                            if (currentSourcePortBoardPos != null && currentTargetPortBoardPos != null) {
-                                val currentStartPos = (currentSourcePortBoardPos * state.scale) + state.offset
-                                val currentEndPos = (currentTargetPortBoardPos * state.scale) + state.offset
-                                val currentMidPoint = BoardMathUtils.getBezierMidpoint(currentStartPos, currentEndPos)
-                                IntOffset(
-                                    (currentMidPoint.x - dimensions.offsetLarge.toPx()).roundToInt(),
-                                    (currentMidPoint.y - dimensions.offsetLarge.toPx()).roundToInt()
-                                )
-                            } else {
-                                IntOffset(-1000, -1000)
-                            }
-                        }
-                        .size(dimensions.progressBoxSize),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.error,
-                    tonalElevation = dimensions.elevationHigh,
-                    shadowElevation = dimensions.elevationMedium
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Wire",
-                            tint = MaterialTheme.colorScheme.onError,
-                            modifier = Modifier.size(dimensions.iconMediumSmall)
-                        )
                     }
                 }
             }

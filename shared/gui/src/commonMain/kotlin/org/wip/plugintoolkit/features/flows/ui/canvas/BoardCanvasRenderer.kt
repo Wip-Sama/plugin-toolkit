@@ -123,7 +123,7 @@ fun BoardGridAndConnectionsCanvas(
             }
         }
 
-        // Draw junctions (Blue ramification points)
+        // Draw junctions (Unified connection points)
         flow.junctions.forEach { junction ->
             val center = (junction.position.toComposeOffset() * state.scale) + state.offset
             val isHovered = interactionState.hoveredJunctionId == junction.id
@@ -131,10 +131,10 @@ fun BoardGridAndConnectionsCanvas(
             val jColor = if (!juncColor.isNullOrBlank()) {
                 parseColorString(juncColor)
             } else {
-                Color(0xFF2196F3)
+                connectionColor
             }
             val isSelected = interactionState.selectedJunctionId == junction.id
-            val radius = (if (isHovered || isSelected) 8f else 5.5f) * state.scale
+            val radius = (if (isHovered || isSelected) 7.5f else 5.5f) * state.scale
 
             drawCircle(
                 color = jColor,
@@ -145,11 +145,11 @@ fun BoardGridAndConnectionsCanvas(
                 color = surfaceColor,
                 radius = radius,
                 center = center,
-                style = Stroke(width = 2f * state.scale)
+                style = Stroke(width = 1.5f * state.scale)
             )
         }
 
-        // Draw connections and waypoints
+        // Draw connections, waypoints, and midpoints
         flow.connections.forEach { connection ->
             val screenPoints = ConnectionHitTester.getConnectionScreenPoints(
                 connection = connection,
@@ -232,14 +232,17 @@ fun BoardGridAndConnectionsCanvas(
                     )
                 }
 
-                // Draw Waypoints (Green routing points)
+                // Draw Waypoints (Unified connection points)
                 connection.waypoints.forEachIndexed { index, wp ->
                     val center = (wp.toComposeOffset() * state.scale) + state.offset
                     val isWpHovered = interactionState.hoveredWaypoint?.first == connection &&
                             interactionState.hoveredWaypoint?.second == index
-                    val wpRadius = (if (isWpHovered) 7.5f else 5f) * state.scale
+                    val isWpDragging = interactionState.draggingWaypoint?.first == connection &&
+                            interactionState.draggingWaypoint?.second == index
+                    val wpRadius = (if (isWpHovered || isWpDragging) 7.5f else 5.5f) * state.scale
+                    val wpColor = if (!connColor.isNullOrBlank()) parseColorString(connColor) else connectionColor
                     drawCircle(
-                        color = Color(0xFF4CAF50),
+                        color = wpColor,
                         radius = wpRadius,
                         center = center
                     )
@@ -250,10 +253,34 @@ fun BoardGridAndConnectionsCanvas(
                         style = Stroke(width = 1.5f * state.scale)
                     )
                 }
+
+                // Draw Midpoints (Interactive splitting handles)
+                val isConnHovered = interactionState.hoveredConnection == connection
+                val midpoints = SplineMathUtils.computeSegmentMidpoints(screenPoints, curveStyle, roundness)
+                midpoints.forEachIndexed { segIndex, midPt ->
+                    val isMidpointHovered = interactionState.hoveredMidpoint?.first == connection &&
+                            interactionState.hoveredMidpoint?.second == segIndex
+                    if (isConnHovered || isMidpointHovered) {
+                        val midRadius = (if (isMidpointHovered) 6.5f else 4f) * state.scale
+                        val midColor = (if (!connColor.isNullOrBlank()) parseColorString(connColor) else connectionColor)
+                            .copy(alpha = if (isMidpointHovered) 1f else 0.8f)
+                        drawCircle(
+                            color = midColor,
+                            radius = midRadius,
+                            center = midPt
+                        )
+                        drawCircle(
+                            color = surfaceColor,
+                            radius = midRadius,
+                            center = midPt,
+                            style = Stroke(width = 1.2f * state.scale)
+                        )
+                    }
+                }
             }
         }
 
-        // Draw temporary connection line
+        // Draw temporary drag connection line
         if (isDrawingConnection && connectionStartNodeId != null && connectionStartPortId != null) {
             val startBoardPos = getPortBoardPosition(connectionStartNodeId, connectionStartPortId, connectionStartIsOutput)
             if (startBoardPos != null) {
@@ -280,6 +307,65 @@ fun BoardGridAndConnectionsCanvas(
                     color = connectionColor.copy(alpha = opacity.disabled),
                     style = Stroke(width = dimensions.strokeWidthThick.toPx(), cap = StrokeCap.Round)
                 )
+            }
+        }
+
+        // Draw structured connection drawing preview (point-by-point creation)
+        if (interactionState.isDrawingStructuredConnection) {
+            val startBoardPos = when {
+                interactionState.structuredConnectionSourceJunctionId != null ->
+                    junctionMap[interactionState.structuredConnectionSourceJunctionId]?.let { (it - state.offset) / state.scale }
+                interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null ->
+                    getPortBoardPosition(
+                        interactionState.structuredConnectionStartNodeId!!,
+                        interactionState.structuredConnectionStartPortId!!,
+                        interactionState.structuredConnectionStartIsOutput
+                    )
+                else -> null
+            }
+            if (startBoardPos != null) {
+                val allBoardPts = mutableListOf<Offset>()
+                allBoardPts.add(startBoardPos)
+                allBoardPts.addAll(interactionState.structuredConnectionPoints)
+
+                var liveBoardPos = if (highlightedPortId != null && highlightedNodeId != null) {
+                    getPortBoardPosition(highlightedNodeId, highlightedPortId, !interactionState.structuredConnectionStartIsOutput)
+                        ?: interactionState.structuredConnectionLivePos
+                } else {
+                    interactionState.structuredConnectionLivePos
+                }
+
+                val lastCommitted = allBoardPts.last()
+                if (interactionState.isShiftModifierPressed) {
+                    liveBoardPos = SplineMathUtils.snapToOrthogonal(lastCommitted, liveBoardPos)
+                } else if (interactionState.isCtrlModifierPressed) {
+                    liveBoardPos = SplineMathUtils.snapToStraightAngle(lastCommitted, liveBoardPos)
+                }
+                allBoardPts.add(liveBoardPos)
+
+                val previewScreenPts = allBoardPts.map { (it * state.scale) + state.offset }
+                val previewPath = SplineMathUtils.buildRoundedPolylinePath(previewScreenPts, cornerRadius = 8f * state.scale)
+                drawPath(
+                    path = previewPath,
+                    color = connectionColor.copy(alpha = 0.9f),
+                    style = Stroke(width = dimensions.strokeWidthThick.toPx(), cap = StrokeCap.Round)
+                )
+
+                // Draw dots at committed intermediate points
+                interactionState.structuredConnectionPoints.forEach { pt ->
+                    val scrPt = (pt * state.scale) + state.offset
+                    drawCircle(
+                        color = connectionColor,
+                        radius = 5.5f * state.scale,
+                        center = scrPt
+                    )
+                    drawCircle(
+                        color = surfaceColor,
+                        radius = 5.5f * state.scale,
+                        center = scrPt,
+                        style = Stroke(width = 1.5f * state.scale)
+                    )
+                }
             }
         }
     }

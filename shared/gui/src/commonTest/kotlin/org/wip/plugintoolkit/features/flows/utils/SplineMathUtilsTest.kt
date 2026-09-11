@@ -160,4 +160,75 @@ class SplineMathUtilsTest {
         val dy = snappedDiag.y - start.y
         assertEquals(dx, dy, 0.01f)
     }
+
+    @Test
+    fun testHarmonizedSplineTangents() {
+        val points = listOf(
+            Offset(0f, 100f),
+            Offset(100f, 200f),
+            Offset(200f, 100f)
+        )
+        val segments = SplineMathUtils.computeHarmonizedSplineSegments(points, tension = 0.5f, startHorizontal = true, endHorizontal = true)
+        assertEquals(2, segments.size)
+
+        val seg0 = segments[0]
+        val seg1 = segments[1]
+
+        // Start must depart horizontally (y identical to start.y)
+        assertEquals(seg0.start.y, seg0.control1.y, 0.001f)
+
+        // End must arrive horizontally (y identical to end.y)
+        assertEquals(seg1.end.y, seg1.control2.y, 0.001f)
+
+        // Intermediate point must be C1 continuous: tangent vector (p2 - p0) has dy = 0, so both controls at p1 have y == p1.y
+        assertEquals(points[1].y, seg0.control2.y, 0.001f)
+        assertEquals(points[1].y, seg1.control1.y, 0.001f)
+    }
+
+    @Test
+    fun testSnapToOrthogonal() {
+        val start = Offset(50f, 50f)
+
+        // Horizontal dominance
+        val currH = Offset(120f, 60f)
+        val snappedH = SplineMathUtils.snapToOrthogonal(start, currH)
+        assertEquals(120f, snappedH.x)
+        assertEquals(50f, snappedH.y)
+
+        // Vertical dominance
+        val currV = Offset(60f, 150f)
+        val snappedV = SplineMathUtils.snapToOrthogonal(start, currV)
+        assertEquals(50f, snappedV.x)
+        assertEquals(150f, snappedV.y)
+    }
+
+    @Test
+    fun testComputeSegmentMidpoints() {
+        val points = listOf(
+            Offset(0f, 0f),
+            Offset(100f, 0f),
+            Offset(100f, 100f)
+        )
+
+        val straightMidpoints = SplineMathUtils.computeSegmentMidpoints(points, ConnectionCurveStyle.Straight)
+        assertEquals(2, straightMidpoints.size)
+        assertEquals(Offset(50f, 0f), straightMidpoints[0])
+        assertEquals(Offset(100f, 50f), straightMidpoints[1])
+
+        val splineMidpoints = SplineMathUtils.computeSegmentMidpoints(points, ConnectionCurveStyle.CardinalSpline)
+        assertEquals(2, splineMidpoints.size)
+        assertTrue(splineMidpoints[0].x in 0f..100f)
+        assertTrue(splineMidpoints[1].y in 0f..100f)
+    }
+
+    @Test
+    fun testBuildRoundedPolylinePath() {
+        val points = listOf(
+            Offset(0f, 0f),
+            Offset(100f, 0f),
+            Offset(100f, 100f)
+        )
+        val path = SplineMathUtils.buildRoundedPolylinePath(points, cornerRadius = 8f)
+        assertTrue(!path.isEmpty)
+    }
 }
