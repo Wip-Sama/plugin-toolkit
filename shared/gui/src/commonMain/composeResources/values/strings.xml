@@ -663,10 +663,12 @@
     <string name="flow_group_expand">Expand Group</string>
     <string name="flow_group_delete">Delete Group</string>
     <string name="flow_group_color">Group Color</string>
+    <string name="flow_group_confirm">Confirm Group Title</string>
     <string name="flow_label_default_text">Text Note</string>
     <string name="flow_label_edit">Edit Note</string>
     <string name="flow_label_delete">Delete Note</string>
     <string name="flow_label_color">Note Color</string>
+    <string name="flow_label_confirm">Confirm Note Text</string>
     <string name="flow_connection_style_cardinal">Cardinal Spline</string>
     <string name="flow_connection_style_bezier">Cubic Bézier</string>
     <string name="flow_connection_style_straight">Straight</string>

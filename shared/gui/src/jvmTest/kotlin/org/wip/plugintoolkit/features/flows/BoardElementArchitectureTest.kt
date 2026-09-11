@@ -3,6 +3,8 @@ package org.wip.plugintoolkit.features.flows
 import androidx.compose.ui.geometry.Offset as ComposeOffset
 import kotlinx.coroutines.test.runTest
 import org.wip.plugintoolkit.features.flows.history.MoveBoardElementsCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateGroupCommand
+import org.wip.plugintoolkit.features.flows.history.UpdateLabelCommand
 import org.wip.plugintoolkit.features.flows.model.BoardElement
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -262,5 +264,31 @@ class BoardElementArchitectureTest {
         // Expected start: y = (200 * 0.5 + 20) + (44 * 1 * 0.5 / 2) = 120 + 11 = 131
         assertEquals(210f, startHalfX.x)
         assertEquals(131f, startHalfX.y)
+    }
+
+    @Test
+    fun testLabelAndGroupTextUpdateOnConfirm() {
+        val label = FlowLabel(id = 1L, text = "Original Label", position = ModelOffset(50f, 50f))
+        val group = FlowGroup(id = 2L, title = "Original Title", position = ModelOffset(100f, 100f), size = ModelOffset(200f, 200f))
+        val flow = Flow(name = "Test", labels = listOf(label), groups = listOf(group))
+        val state = FlowEditorState(flow = flow)
+
+        // Label update command
+        val updatedLabel = label.copy(text = "Confirmed Label Edit")
+        val labelCmd = UpdateLabelCommand(label, updatedLabel)
+        val stateAfterLabel = labelCmd.execute(state)
+        assertEquals("Confirmed Label Edit", stateAfterLabel.flow.labels.first().text)
+
+        val stateRevertedLabel = labelCmd.undo(stateAfterLabel)
+        assertEquals("Original Label", stateRevertedLabel.flow.labels.first().text)
+
+        // Group title update command
+        val updatedGroup = group.copy(title = "Confirmed Group Title")
+        val groupCmd = UpdateGroupCommand(group, updatedGroup)
+        val stateAfterGroup = groupCmd.execute(state)
+        assertEquals("Confirmed Group Title", stateAfterGroup.flow.groups.first().title)
+
+        val stateRevertedGroup = groupCmd.undo(stateAfterGroup)
+        assertEquals("Original Title", stateRevertedGroup.flow.groups.first().title)
     }
 }

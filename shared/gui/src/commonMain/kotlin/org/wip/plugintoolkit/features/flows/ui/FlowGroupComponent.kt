@@ -29,13 +29,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -65,6 +67,7 @@ import org.wip.plugintoolkit.shared.components.plugin.inputs.parseColorString
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_group_collapse
 import plugintoolkit.composeapp.generated.resources.flow_group_color
+import plugintoolkit.composeapp.generated.resources.flow_group_confirm
 import plugintoolkit.composeapp.generated.resources.flow_group_default_title
 import plugintoolkit.composeapp.generated.resources.flow_group_delete
 import plugintoolkit.composeapp.generated.resources.flow_group_expand
@@ -106,7 +109,21 @@ fun FlowGroupComponent(
     val density = LocalDensity.current.density
     var showColorPicker by remember { mutableStateOf(false) }
     var isEditingTitle by remember { mutableStateOf(false) }
-    var titleText by remember(group.title) { mutableStateOf(group.title) }
+    var titleText by remember(group.title, isEditingTitle) { mutableStateOf(group.title) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isEditingTitle) {
+        if (isEditingTitle) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    val confirmGroupTitle = {
+        if (titleText != group.title) {
+            onUpdateGroup(group.copy(title = titleText))
+        }
+        isEditingTitle = false
+    }
 
     val grpColor = group.color
     val baseColor = if (!grpColor.isNullOrBlank()) {
@@ -225,10 +242,7 @@ fun FlowGroupComponent(
                     ) {
                         BasicTextField(
                             value = titleText,
-                            onValueChange = {
-                                titleText = it
-                                onUpdateGroup(group.copy(title = it))
-                            },
+                            onValueChange = { titleText = it },
                             textStyle = MaterialTheme.typography.titleMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 14.sp
@@ -237,14 +251,24 @@ fun FlowGroupComponent(
                             singleLine = false,
                             modifier = Modifier
                                 .testTag("flow_group_title_field_${group.id}")
-                                .onFocusChanged { if (!it.isFocused) isEditingTitle = false }
+                                .focusRequester(focusRequester)
                                 .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
-                                        if (keyEvent.isShiftPressed) {
-                                            false
-                                        } else {
-                                            isEditingTitle = false
-                                            true
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.key) {
+                                            Key.Enter -> {
+                                                if (keyEvent.isShiftPressed) {
+                                                    false
+                                                } else {
+                                                    confirmGroupTitle()
+                                                    true
+                                                }
+                                            }
+                                            Key.Escape -> {
+                                                titleText = group.title
+                                                isEditingTitle = false
+                                                true
+                                            }
+                                            else -> false
                                         }
                                     } else {
                                         false
@@ -252,12 +276,12 @@ fun FlowGroupComponent(
                                 }
                         )
                         IconButton(
-                            onClick = { isEditingTitle = false },
+                            onClick = { confirmGroupTitle() },
                             modifier = Modifier.size(dimensions.iconSmall)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Check,
-                                contentDescription = null,
+                                contentDescription = stringResource(Res.string.flow_group_confirm),
                                 tint = baseColor,
                                 modifier = Modifier.size(dimensions.iconSmall)
                             )
@@ -273,7 +297,12 @@ fun FlowGroupComponent(
                             style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = if (!isReadOnly) {
+                                Modifier.pointerInput(Unit) {
+                                    detectTapGestures(onDoubleTap = { isEditingTitle = true })
+                                }
+                            } else Modifier
                         )
                         if (group.isCollapsed) {
                             Text(
