@@ -4,11 +4,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import org.wip.plugintoolkit.features.shortcuts.logic.ShortcutManager
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
 
 fun Modifier.boardKeyboardHandler(
     interactionState: BoardInteractionState,
@@ -25,7 +28,8 @@ fun Modifier.boardKeyboardHandler(
     onTogglePaintTool: (() -> Unit)? = null,
     onToggleWashTool: (() -> Unit)? = null,
     onToggleStructuredConnectionMode: (() -> Unit)? = null,
-    onLeaveStructuredConnectionAtLastPoint: ((Long?, String?, Long?, List<Offset>) -> Unit)? = null
+    onLeaveStructuredConnectionAtLastPoint: ((Long?, String?, Long?, List<Offset>) -> Unit)? = null,
+    shortcutManager: ShortcutManager? = null
 ): Modifier = this.onKeyEvent { keyEvent ->
     val newCtrlPressed = keyEvent.isCtrlPressed
     val newShiftPressed = keyEvent.isShiftPressed
@@ -51,6 +55,54 @@ fun Modifier.boardKeyboardHandler(
     }
 
     if (keyEvent.type == KeyEventType.KeyDown) {
+        val isUndo = shortcutManager?.isKeyActionTriggered(
+            ShortcutActionId.FLOW_UNDO,
+            keyEvent.key,
+            keyEvent.isCtrlPressed,
+            keyEvent.isShiftPressed,
+            keyEvent.isAltPressed
+        ) ?: (keyEvent.isCtrlPressed && keyEvent.key == Key.Z)
+
+        val isRedo = shortcutManager?.isKeyActionTriggered(
+            ShortcutActionId.FLOW_REDO,
+            keyEvent.key,
+            keyEvent.isCtrlPressed,
+            keyEvent.isShiftPressed,
+            keyEvent.isAltPressed
+        ) ?: (keyEvent.isCtrlPressed && keyEvent.key == Key.Y)
+
+        val isDelete = shortcutManager?.isKeyActionTriggered(
+            ShortcutActionId.FLOW_DELETE_SELECTED,
+            keyEvent.key,
+            keyEvent.isCtrlPressed,
+            keyEvent.isShiftPressed,
+            keyEvent.isAltPressed
+        ) ?: (keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace)
+
+        val isPaint = shortcutManager?.isKeyActionTriggered(
+            ShortcutActionId.FLOW_PAINT_TOOL,
+            keyEvent.key,
+            keyEvent.isCtrlPressed,
+            keyEvent.isShiftPressed,
+            keyEvent.isAltPressed
+        ) ?: (!keyEvent.isCtrlPressed && (keyEvent.key == Key.P || keyEvent.key == Key.B))
+
+        val isWash = shortcutManager?.isKeyActionTriggered(
+            ShortcutActionId.FLOW_WASH_TOOL,
+            keyEvent.key,
+            keyEvent.isCtrlPressed,
+            keyEvent.isShiftPressed,
+            keyEvent.isAltPressed
+        ) ?: (!keyEvent.isCtrlPressed && keyEvent.key == Key.W)
+
+        val isStructured = shortcutManager?.isKeyActionTriggered(
+            ShortcutActionId.FLOW_STRUCTURED_MODE,
+            keyEvent.key,
+            keyEvent.isCtrlPressed,
+            keyEvent.isShiftPressed,
+            keyEvent.isAltPressed
+        ) ?: (!keyEvent.isCtrlPressed && keyEvent.key == Key.M)
+
         when {
             keyEvent.key == Key.Escape -> {
                 if (interactionState.isDrawingStructuredConnection) {
@@ -69,7 +121,7 @@ fun Modifier.boardKeyboardHandler(
                 }
             }
 
-            keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> {
+            isDelete -> {
                 if (selectedNodeIds.isNotEmpty() && !isReadOnly) {
                     onDeleteSelectedNodes()
                     true
@@ -78,12 +130,12 @@ fun Modifier.boardKeyboardHandler(
                 }
             }
 
-            keyEvent.isCtrlPressed && keyEvent.key == Key.Z -> {
+            isUndo -> {
                 if (!isReadOnly) onUndo()
                 true
             }
 
-            keyEvent.isCtrlPressed && keyEvent.key == Key.Y -> {
+            isRedo -> {
                 if (!isReadOnly) onRedo()
                 true
             }
@@ -101,7 +153,7 @@ fun Modifier.boardKeyboardHandler(
                 true
             }
 
-            !keyEvent.isCtrlPressed && (keyEvent.key == Key.P || keyEvent.key == Key.B) -> {
+            isPaint -> {
                 if (!isReadOnly && onTogglePaintTool != null) {
                     onTogglePaintTool()
                     true
@@ -110,7 +162,7 @@ fun Modifier.boardKeyboardHandler(
                 }
             }
 
-            !keyEvent.isCtrlPressed && keyEvent.key == Key.W -> {
+            isWash -> {
                 if (!isReadOnly && onToggleWashTool != null) {
                     onToggleWashTool()
                     true
@@ -119,7 +171,7 @@ fun Modifier.boardKeyboardHandler(
                 }
             }
 
-            !keyEvent.isCtrlPressed && keyEvent.key == Key.M -> {
+            isStructured -> {
                 if (!isReadOnly && onToggleStructuredConnectionMode != null) {
                     onToggleStructuredConnectionMode()
                     true

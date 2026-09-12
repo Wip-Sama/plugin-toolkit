@@ -43,6 +43,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
+import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -239,10 +241,11 @@ fun NodeHeader(
             }
 
             if (!isReadOnly) {
-                var isShiftPressedLocal by remember { mutableStateOf(false) }
+                val shortcutManager = LocalShortcutManager.current
+                var isSkipConfirmationPressed by remember { mutableStateOf(false) }
                 IconButton(
                     onClick = {
-                        if (isShiftPressedLocal) {
+                        if (isSkipConfirmationPressed) {
                             onDelete(node.id)
                         } else {
                             onShowDeleteConfirmation()
@@ -256,7 +259,11 @@ fun NodeHeader(
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     if (event.type == PointerEventType.Press) {
-                                        isShiftPressedLocal = event.keyboardModifiers.isShiftPressed
+                                        val isSkip = shortcutManager?.isActionTriggered(
+                                            ShortcutActionId.SKIP_CONFIRMATION,
+                                            event.keyboardModifiers
+                                        ) ?: event.keyboardModifiers.isShiftPressed
+                                        isSkipConfirmationPressed = isSkip
                                     }
                                 }
                             }

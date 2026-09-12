@@ -11,19 +11,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -48,6 +52,7 @@ import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.features.settings.model.SettingDefinition
 import org.wip.plugintoolkit.features.settings.model.SettingsEvent
 import org.wip.plugintoolkit.features.settings.model.SettingsToast
@@ -58,6 +63,12 @@ import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.resolve
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import org.wip.plugintoolkit.features.shortcuts.logic.ShortcutManager
+import org.wip.plugintoolkit.features.shortcuts.ui.ShortcutsSettingsView
+import plugintoolkit.composeapp.generated.resources.nav_shortcuts
+import plugintoolkit.composeapp.generated.resources.shortcuts_reset_all
+import plugintoolkit.composeapp.generated.resources.shortcuts_reset_all_confirm
+import plugintoolkit.composeapp.generated.resources.shortcuts_title
 import org.wip.plugintoolkit.shared.components.settings.SettingsGroup
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
@@ -103,6 +114,9 @@ sealed interface SettingNavKey : NavKey {
     data object NotificationHistory : SettingNavKey
 
     @Serializable
+    data object Shortcuts : SettingNavKey
+
+    @Serializable
     data object About : SettingNavKey
 
     @Serializable
@@ -118,6 +132,7 @@ val SettingNavConfig = SavedStateConfiguration {
             subclass(SettingNavKey.PluginRepo::class, SettingNavKey.PluginRepo.serializer())
             subclass(SettingNavKey.PluginManager::class, SettingNavKey.PluginManager.serializer())
             subclass(SettingNavKey.NotificationHistory::class, SettingNavKey.NotificationHistory.serializer())
+            subclass(SettingNavKey.Shortcuts::class, SettingNavKey.Shortcuts.serializer())
             subclass(SettingNavKey.About::class, SettingNavKey.About.serializer())
             subclass(SettingNavKey.BroadSearch::class, SettingNavKey.BroadSearch.serializer())
         }
@@ -129,7 +144,9 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinInject(),
     searchViewModel: SettingsSearchViewModel = koinInject(),
-    notificationService: NotificationService = koinInject()
+    notificationService: NotificationService = koinInject(),
+    shortcutManager: ShortcutManager = koinInject(),
+    dialogService: DialogService = koinInject()
 ) {
     val settings by viewModel.settings.collectAsState()
 
@@ -168,6 +185,7 @@ fun SettingsScreen(
         title = Res.string.section_general.localized, elements = listOf(
             SidebarElement(SettingNavKey.Appearance, Icons.Default.Palette, Res.string.setting_appearance.localized),
             SidebarElement(SettingNavKey.SystemSettings, Icons.Default.Settings, Res.string.section_system.localized),
+            SidebarElement(SettingNavKey.Shortcuts, Icons.Default.Keyboard, Res.string.nav_shortcuts.localized),
             SidebarElement(
                 SettingNavKey.NotificationHistory,
                 Icons.Default.History,
@@ -220,6 +238,7 @@ fun SettingsScreen(
             val titleText = when (currentKey) {
                 SettingNavKey.Appearance -> stringResource(Res.string.setting_appearance)
                 SettingNavKey.SystemSettings -> stringResource(Res.string.section_system)
+                SettingNavKey.Shortcuts -> stringResource(Res.string.shortcuts_title)
                 SettingNavKey.NotificationHistory -> stringResource(Res.string.nav_notification_history)
                 SettingNavKey.PluginRepo -> stringResource(Res.string.section_plugins_repositories)
                 SettingNavKey.PluginManager -> stringResource(Res.string.section_plugins_manager)
@@ -228,11 +247,43 @@ fun SettingsScreen(
                 else -> "Error"
             }
 
-            Text(
-                text = titleText,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = titleText,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                if (currentKey == SettingNavKey.Shortcuts) {
+                    val resetTitle = stringResource(Res.string.shortcuts_reset_all)
+                    val resetMsg = stringResource(Res.string.shortcuts_reset_all_confirm)
+                    val hasCustomBindings = settings.shortcuts.customBindings.isNotEmpty() ||
+                        settings.shortcuts.customRelativePriorities.isNotEmpty()
+
+                    OutlinedButton(
+                        onClick = {
+                            dialogService.showConfirmation(
+                                title = resetTitle,
+                                message = resetMsg,
+                                onConfirm = { shortcutManager.resetAllToDefaults() }
+                            )
+                        },
+                        enabled = hasCustomBindings
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Restore,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                        Spacer(Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(resetTitle)
+                    }
+                }
+            }
             HorizontalDivider(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.medium))
 
             CompositionLocalProvider(
@@ -280,6 +331,14 @@ fun SettingsScreen(
                                 AutoSettingsView(key as SettingNavKey, viewModel, registry)
                             }
 
+                            SettingNavKey.Shortcuts -> NavEntry(key) {
+                                ShortcutsSettingsView(
+                                    shortcutManager = shortcutManager,
+                                    settingsViewModel = viewModel,
+                                    dialogService = dialogService
+                                )
+                            }
+
                             SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
                             SettingNavKey.About -> NavEntry(key) { AboutView() }
                             SettingNavKey.BroadSearch -> NavEntry(key) {
@@ -325,8 +384,8 @@ fun BroadSearchResultsView(
             SettingsGroup(title = sectionName) {
                 items.forEachIndexed { index, definition ->
                     SettingsItem(
-                        title = resolvedStrings[definition.title] ?: "",
-                        subtitle = definition.subtitle?.let { resolvedStrings[it] },
+                        title = resolvedStrings[definition.title] ?: (definition.title as? SettingText.Raw)?.text ?: "",
+                        subtitle = definition.subtitle?.let { resolvedStrings[it] ?: (it as? SettingText.Raw)?.text },
                         icon = definition.icon,
                         shape = getGroupedShape(index, items.size),
                         onClick = {

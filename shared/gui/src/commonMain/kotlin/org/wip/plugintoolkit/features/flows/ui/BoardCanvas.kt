@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -74,12 +77,15 @@ import org.wip.plugintoolkit.features.flows.ui.canvas.boardSelectionBoxGesture
 import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutSituation
+import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
 import org.wip.plugintoolkit.shared.components.LocalOverlayHost
 import org.wip.plugintoolkit.shared.components.LocalTooltipState
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
 import org.wip.plugintoolkit.shared.components.tooltip
 import kotlin.math.roundToInt
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun BoardCanvas(
     state: FlowEditorState,
@@ -161,6 +167,7 @@ fun BoardCanvas(
 ) {
     val density = LocalDensity.current
     val focusRequester = remember { FocusRequester() }
+    val shortcutManager = LocalShortcutManager.current
 
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
 
@@ -199,6 +206,62 @@ fun BoardCanvas(
         }
     }
 
+    LaunchedEffect(
+        shortcutManager,
+        interactionState.hoveredConnection,
+        interactionState.hoveredNodeId,
+        interactionState.hoveredJunctionId,
+        interactionState.hoveredWaypoint,
+        interactionState.hoveredMidpoint,
+        interactionState.selectedConnection,
+        interactionState.selectedJunctionId,
+        selectedNodeIds,
+        state.selectedLabelIds,
+        state.selectedGroupIds
+    ) {
+        if (shortcutManager != null) {
+            val zones = mutableSetOf(ShortcutSituation.Global, ShortcutSituation.FlowBoard)
+            val hasSelection = selectedNodeIds.isNotEmpty() ||
+                state.selectedLabelIds.isNotEmpty() ||
+                state.selectedGroupIds.isNotEmpty() ||
+                interactionState.selectedConnection != null ||
+                interactionState.selectedJunctionId != null
+            if (hasSelection) {
+                zones.add(ShortcutSituation.FlowSelection)
+            }
+            if (interactionState.hoveredNodeId != null) {
+                zones.add(ShortcutSituation.FlowNode)
+            }
+            if (interactionState.hoveredConnection != null) {
+                zones.add(ShortcutSituation.FlowWire)
+            }
+            if (interactionState.hoveredJunctionId != null ||
+                interactionState.hoveredWaypoint != null ||
+                interactionState.hoveredMidpoint != null
+            ) {
+                zones.add(ShortcutSituation.FlowConnectionPoint)
+            }
+            shortcutManager.setActiveSituations(zones)
+
+            val pointer = when {
+                interactionState.hoveredJunctionId != null ||
+                interactionState.hoveredWaypoint != null ||
+                interactionState.hoveredMidpoint != null -> ShortcutSituation.FlowConnectionPoint
+                interactionState.hoveredNodeId != null -> ShortcutSituation.FlowNode
+                interactionState.hoveredConnection != null -> ShortcutSituation.FlowWire
+                else -> ShortcutSituation.FlowBoard
+            }
+            shortcutManager.setPointerSituation(pointer)
+        }
+    }
+
+    DisposableEffect(shortcutManager) {
+        onDispose {
+            shortcutManager?.setActiveSituations(setOf(ShortcutSituation.Global))
+            shortcutManager?.setPointerSituation(null)
+        }
+    }
+
     val dimensions = ToolkitTheme.dimensions
     val spacing = ToolkitTheme.spacing
 
@@ -210,6 +273,9 @@ fun BoardCanvas(
             .onSizeChanged {
                 boardSize = it
                 onBoardSizeChanged(it)
+            }
+            .onPointerEvent(PointerEventType.Exit) {
+                shortcutManager?.setPointerSituation(null)
             }
             .background(MaterialTheme.colorScheme.background)
             .focusRequester(focusRequester)
@@ -231,7 +297,8 @@ fun BoardCanvas(
                 onToggleStructuredConnectionMode = onToggleStructuredConnectionMode,
                 onLeaveStructuredConnectionAtLastPoint = { sNodeId, sPortId, sJuncId, pts ->
                     onLeaveStructuredConnectionAtLastPoint(sNodeId, sPortId, sJuncId, pts.map { it.toModelOffset() })
-                }
+                },
+                shortcutManager = shortcutManager
             )
             .boardConnectionTapGesture(
                 interactionState = interactionState,
@@ -258,27 +325,8 @@ fun BoardCanvas(
             )
             .boardPanGesture(
                 focusRequester = focusRequester,
+                shortcutManager = shortcutManager,
                 onPan = onPan
-            )
-            .boardSelectionBoxGesture(
-                interactionState = interactionState,
-                isDrawingConnection = isDrawingConnection,
-                nodes = flow.nodes,
-                nodeSizes = nodeSizes,
-                density = density,
-                scale = state.scale,
-                offset = state.offset,
-                defaultNodeWidthPx = with(density) { dimensions.nodeWidth.toPx() },
-                focusRequester = focusRequester,
-                onSelectNodes = onSelectNodes,
-                labels = flow.labels,
-                groups = flow.groups,
-                onSelectLabels = onSelectLabels,
-                onSelectGroups = onSelectGroups,
-                isPaintToolActive = state.isPaintToolActive,
-                isWashToolActive = state.isWashToolActive,
-                onPaintSelection = onPaintSelection,
-                onWashSelection = onWashSelection
             )
             .boardPointerEventGesture(
                 interactionState = interactionState,
@@ -308,7 +356,29 @@ fun BoardCanvas(
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness,
                 isAdvancedConnectionMode = state.isAdvancedConnectionMode,
-                onAddJunctionAndBranch = onAddJunctionAndBranch
+                onAddJunctionAndBranch = onAddJunctionAndBranch,
+                shortcutManager = shortcutManager
+            )
+            .boardSelectionBoxGesture(
+                interactionState = interactionState,
+                isDrawingConnection = isDrawingConnection,
+                nodes = flow.nodes,
+                nodeSizes = nodeSizes,
+                density = density,
+                scale = state.scale,
+                offset = state.offset,
+                defaultNodeWidthPx = with(density) { dimensions.nodeWidth.toPx() },
+                focusRequester = focusRequester,
+                onSelectNodes = onSelectNodes,
+                labels = flow.labels,
+                groups = flow.groups,
+                onSelectLabels = onSelectLabels,
+                onSelectGroups = onSelectGroups,
+                isPaintToolActive = state.isPaintToolActive,
+                isWashToolActive = state.isWashToolActive,
+                onPaintSelection = onPaintSelection,
+                onWashSelection = onWashSelection,
+                shortcutManager = shortcutManager
             )
     ) {
         val isDraggedInSelection = state.draggedNodeId != null && (

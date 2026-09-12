@@ -70,10 +70,64 @@ import plugintoolkit.composeapp.generated.resources.flow_info_delete_desc
 import plugintoolkit.composeapp.generated.resources.flow_info_undo_redo_label
 import plugintoolkit.composeapp.generated.resources.flow_info_undo_redo_desc
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
+import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
+
 @Composable
 fun FlowControlsInfoCard(
     modifier: Modifier = Modifier
 ) {
+    val shortcutManager = LocalShortcutManager.current
+    val settings by (shortcutManager?.settings ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
+
+    val panLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_PAN_CANVAS)
+    }
+    val zoomLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_ZOOM_CANVAS)
+    }
+    val selectLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_SELECT_NODE)
+    }
+    val boxSelectLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_BOX_SELECT)
+    }
+    val moveLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_MOVE_NODE)
+    }
+    val connectLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_CONNECT_PORT)
+    }
+    val detachLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_DETACH_CONNECTION)
+    }
+    val branchLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_BRANCH_WIRE)
+    }
+    val structuredModeLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_STRUCTURED_MODE)?.let { "$it / Click" }
+    }
+    val paintLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_PAINT_TOOL)
+    }
+    val washLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_WASH_TOOL)
+    }
+    val eyedropperLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_EYEDROPPER)
+    }
+    val deleteLabel = remember(settings) {
+        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_DELETE_SELECTED)
+    }
+    val undoRedoLabel = remember(settings) {
+        val undoStr = shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_UNDO) ?: "Ctrl+Z"
+        val redoStr = shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_REDO) ?: "Ctrl+Y"
+        "$undoStr / $redoStr"
+    }
+
     Surface(
         modifier = modifier
             .widthIn(min = ToolkitTheme.dimensions.nodeWidth, max = ToolkitTheme.dimensions.nodeWidth)
@@ -118,35 +172,35 @@ fun FlowControlsInfoCard(
                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
             ) {
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_pan_label),
+                    badgeText = panLabel ?: stringResource(Res.string.flow_info_pan_label),
                     description = stringResource(Res.string.flow_info_pan_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_zoom_label),
+                    badgeText = zoomLabel ?: stringResource(Res.string.flow_info_zoom_label),
                     description = stringResource(Res.string.flow_info_zoom_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_select_label),
+                    badgeText = selectLabel ?: stringResource(Res.string.flow_info_select_label),
                     description = stringResource(Res.string.flow_info_select_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_box_select_label),
+                    badgeText = boxSelectLabel ?: stringResource(Res.string.flow_info_box_select_label),
                     description = stringResource(Res.string.flow_info_box_select_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_move_label),
+                    badgeText = moveLabel ?: stringResource(Res.string.flow_info_move_label),
                     description = stringResource(Res.string.flow_info_move_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_connect_label),
+                    badgeText = connectLabel ?: stringResource(Res.string.flow_info_connect_label),
                     description = stringResource(Res.string.flow_info_connect_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_detach_label),
+                    badgeText = detachLabel ?: stringResource(Res.string.flow_info_detach_label),
                     description = stringResource(Res.string.flow_info_detach_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_branch_label),
+                    badgeText = branchLabel ?: stringResource(Res.string.flow_info_branch_label),
                     description = stringResource(Res.string.flow_info_branch_desc)
                 )
                 ShortcutRow(
@@ -154,19 +208,19 @@ fun FlowControlsInfoCard(
                     description = stringResource(Res.string.flow_info_waypoint_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_structured_mode_label),
+                    badgeText = structuredModeLabel ?: stringResource(Res.string.flow_info_structured_mode_label),
                     description = stringResource(Res.string.flow_info_structured_mode_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_paint_label),
+                    badgeText = paintLabel ?: stringResource(Res.string.flow_info_paint_label),
                     description = stringResource(Res.string.flow_info_paint_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_wash_label),
+                    badgeText = washLabel ?: stringResource(Res.string.flow_info_wash_label),
                     description = stringResource(Res.string.flow_info_wash_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_pipette_label),
+                    badgeText = eyedropperLabel ?: stringResource(Res.string.flow_info_pipette_label),
                     description = stringResource(Res.string.flow_info_pipette_desc)
                 )
                 ShortcutRow(
@@ -186,11 +240,11 @@ fun FlowControlsInfoCard(
                     description = stringResource(Res.string.flow_info_hover_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_delete_label),
+                    badgeText = deleteLabel ?: stringResource(Res.string.flow_info_delete_label),
                     description = stringResource(Res.string.flow_info_delete_desc)
                 )
                 ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_undo_redo_label),
+                    badgeText = undoRedoLabel,
                     description = stringResource(Res.string.flow_info_undo_redo_desc)
                 )
             }

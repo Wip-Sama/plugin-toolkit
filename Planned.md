@@ -11,6 +11,10 @@ Replace Throwable in ExecutionResult.Error with a structured ErrorDetail class c
 
 - [x] **Undo/Redo Command Pattern:** Implemented bounded diff-based Command pattern (`FlowCommand`, `MoveNodesCommand`, `AddNodeCommand`, `DeleteNodesCommand`, `ConnectPortsCommand`, `DisconnectPortsCommand`, `UpdateNodeCommand`, `CompositeCommand`, `FlowHistoryManager`) storing delta differences instead of deep state snapshots. Bounded to 100 history items with O(diff) heap footprint.
 
+### Central Shortcut Management System [COMPLETED]
+
+- [x] **Central Shortcut Management & Remapping:** Implemented extensible application-wide shortcut system (`ShortcutModel`, `ShortcutManager`, `DefaultShortcutCatalog`, `ShortcutsSettingsView`, `RemapShortcutDialog`) supporting situation-scoped conflict detection, customizable trigger remapping, canonical trigger formatting (`[ modifier + button + gesture ]`), and persistence in `AppSettings`.
+
 ### Support for local repositories
 
 A way to insert a local folder as local repository on the system

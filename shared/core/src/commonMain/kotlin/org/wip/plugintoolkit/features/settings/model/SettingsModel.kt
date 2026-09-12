@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.settings.model
 
 import kotlinx.serialization.Serializable
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutSettings
 
 /**
  * Root data structure aggregating all setting groups.
@@ -16,7 +17,9 @@ data class AppSettings(
     val extensions: ExtensionSettings = ExtensionSettings(),
     val jobs: JobSettings = JobSettings(),
     val autoUpdate: AutoUpdateSettings = AutoUpdateSettings(),
-    val flows: FlowSettings = FlowSettings()
+    val flows: FlowSettings = FlowSettings(),
+    val shortcuts: ShortcutSettings = ShortcutSettings(),
+    val debug: DebugSettings = DebugSettings()
 )
 
 /**
@@ -245,4 +248,13 @@ data class AutoUpdateSettings(
 @Serializable
 data class FlowSettings(
     val autosave: Boolean = true
+)
+
+/**
+ * Developer and debugging diagnostics settings.
+ */
+@Serializable
+data class DebugSettings(
+    val liveShortcutZoning: Boolean = false,
+    val showPointerZone: Boolean = false
 )

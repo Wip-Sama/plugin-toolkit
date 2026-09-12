@@ -27,6 +27,8 @@ import kotlin.math.round
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
+import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
@@ -43,6 +45,7 @@ fun ScalingControl(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val shortcutManager = LocalShortcutManager.current
     var isShiftPressed by remember { mutableStateOf(false) }
 
     val step = if (isShiftPressed) 0.10f else 0.05f
@@ -76,10 +79,12 @@ fun ScalingControl(
             modifier = Modifier
                 .size(ToolkitTheme.dimensions.pluginIcon)
                 .onPointerEvent(PointerEventType.Press) {
-                    isShiftPressed = it.keyboardModifiers.isShiftPressed
+                    isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
+                        ?: it.keyboardModifiers.isShiftPressed
                 }
                 .onPointerEvent(PointerEventType.Move) {
-                    isShiftPressed = it.keyboardModifiers.isShiftPressed
+                    isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
+                        ?: it.keyboardModifiers.isShiftPressed
                 }
                 .tooltip(decreaseTooltip)
         ) {
@@ -111,10 +116,12 @@ fun ScalingControl(
             modifier = Modifier
                 .size(ToolkitTheme.dimensions.pluginIcon)
                 .onPointerEvent(PointerEventType.Press) {
-                    isShiftPressed = it.keyboardModifiers.isShiftPressed
+                    isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
+                        ?: it.keyboardModifiers.isShiftPressed
                 }
                 .onPointerEvent(PointerEventType.Move) {
-                    isShiftPressed = it.keyboardModifiers.isShiftPressed
+                    isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
+                        ?: it.keyboardModifiers.isShiftPressed
                 }
                 .tooltip(increaseTooltip)
         ) {

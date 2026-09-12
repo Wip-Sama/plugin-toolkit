@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
@@ -18,6 +19,9 @@ import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
+import org.wip.plugintoolkit.features.shortcuts.logic.ShortcutManager
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutGesture
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowJunction
@@ -111,25 +115,31 @@ fun Modifier.boardConnectionTapGesture(
 
 fun Modifier.boardPanGesture(
     focusRequester: FocusRequester,
+    shortcutManager: ShortcutManager? = null,
     onPan: (Offset) -> Unit
-): Modifier = this.pointerInput(Unit) {
+): Modifier = this.pointerInput(shortcutManager) {
     awaitPointerEventScope {
         while (true) {
             val event = awaitPointerEvent()
-            val isPanButtonPressed = event.buttons.isSecondaryPressed || event.buttons.isTertiaryPressed
+            val isPanButtonPressed = if (shortcutManager != null) {
+                shortcutManager.matchesPointer(ShortcutActionId.FLOW_PAN_CANVAS, event, ShortcutGesture.Drag)
+            } else {
+                event.buttons.isSecondaryPressed || event.buttons.isTertiaryPressed
+            }
             if (event.type == PointerEventType.Press && isPanButtonPressed) {
-                val change = event.changes.firstOrNull()
-                if (change == null) continue
+                val change = event.changes.firstOrNull() ?: continue
 
                 focusRequester.requestFocus()
                 var lastPoint = change.position
-                if (!event.buttons.isPrimaryPressed) {
-                    change.consume()
-                }
+                shortcutManager?.eat(event, ShortcutActionId.FLOW_PAN_CANVAS) ?: change.consume()
 
                 while (true) {
                     val dragEvent = awaitPointerEvent()
-                    val isStillPanning = dragEvent.buttons.isSecondaryPressed || dragEvent.buttons.isTertiaryPressed
+                    val isStillPanning = if (shortcutManager != null) {
+                        shortcutManager.matchesPointer(ShortcutActionId.FLOW_PAN_CANVAS, dragEvent, ShortcutGesture.Drag, allowConsumed = true)
+                    } else {
+                        dragEvent.buttons.isSecondaryPressed || dragEvent.buttons.isTertiaryPressed
+                    }
                     if (!isStillPanning) {
                         break
                     }
@@ -138,9 +148,7 @@ fun Modifier.boardPanGesture(
                         val delta = currentPoint - lastPoint
                         onPan(delta)
                         lastPoint = currentPoint
-                        if (!dragEvent.buttons.isPrimaryPressed) {
-                            dragEvent.changes.forEach { it.consume() }
-                        }
+                        shortcutManager?.eat(dragEvent, ShortcutActionId.FLOW_PAN_CANVAS) ?: dragEvent.changes.forEach { it.consume() }
                     }
                 }
             }
@@ -166,122 +174,163 @@ fun Modifier.boardSelectionBoxGesture(
     isPaintToolActive: Boolean = false,
     isWashToolActive: Boolean = false,
     onPaintSelection: (() -> Unit)? = null,
-    onWashSelection: (() -> Unit)? = null
-): Modifier = this.pointerInput(nodes, nodeSizes, labels, groups, density, scale, offset, isDrawingConnection, isPaintToolActive, isWashToolActive) {
-    detectDragGestures(
-        onDragStart = { startOffset ->
-            if (!isDrawingConnection) {
-                val modelPoint = (startOffset - offset) / scale
-                val isOverNode = nodes.any { node ->
-                    val nodeLeft = node.position.x
-                    val nodeTop = node.position.y
-                    val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: defaultNodeWidthPx
-                    val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
-                    modelPoint.x >= nodeLeft && modelPoint.x <= nodeLeft + nodeWidth &&
-                            modelPoint.y >= nodeTop && modelPoint.y <= nodeTop + nodeHeight
-                }
-                val isOverGroupHeader = groups.any { group ->
-                    val gLeft = group.position.x
-                    val gTop = group.position.y
-                    val gWidth = group.size.x
-                    val headerHeight = 48f
-                    modelPoint.x >= gLeft && modelPoint.x <= gLeft + gWidth &&
-                            modelPoint.y >= gTop && modelPoint.y <= gTop + headerHeight
-                }
-                val isOverLabel = labels.any { label ->
-                    val lLeft = label.position.x
-                    val lTop = label.position.y
-                    val lWidth = maxOf(80f, label.text.length * 9f)
-                    val lHeight = 36f
-                    modelPoint.x >= lLeft && modelPoint.x <= lLeft + lWidth &&
-                            modelPoint.y >= lTop && modelPoint.y <= lTop + lHeight
-                }
-                if (!isOverNode && !isOverGroupHeader && !isOverLabel) {
-                    focusRequester.requestFocus()
-                    interactionState.selectionStart = startOffset
-                    interactionState.selectionEnd = startOffset
-                }
+    onWashSelection: (() -> Unit)? = null,
+    shortcutManager: ShortcutManager? = null
+): Modifier = this.pointerInput(nodes, nodeSizes, labels, groups, density, scale, offset, isDrawingConnection, isPaintToolActive, isWashToolActive, shortcutManager) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent()
+            val isBoxSelectTriggered = if (shortcutManager != null) {
+                shortcutManager.matchesPointer(ShortcutActionId.FLOW_BOX_SELECT, event, ShortcutGesture.Drag)
+            } else {
+                !event.keyboardModifiers.isCtrlPressed &&
+                !event.keyboardModifiers.isShiftPressed &&
+                !event.keyboardModifiers.isAltPressed &&
+                !event.keyboardModifiers.isMetaPressed &&
+                event.buttons.isPrimaryPressed &&
+                !event.buttons.isSecondaryPressed &&
+                !event.buttons.isTertiaryPressed
             }
-        },
-        onDragEnd = {
-            if (isPaintToolActive) {
-                onPaintSelection?.invoke()
-            } else if (isWashToolActive) {
-                onWashSelection?.invoke()
-            }
-            interactionState.clearSelectionBox()
-        },
-        onDragCancel = {
-            interactionState.clearSelectionBox()
-        },
-        onDrag = { change, _ ->
-            if (!isDrawingConnection && interactionState.selectionStart != null) {
-                interactionState.selectionEnd = change.position
 
-                val modelStart = (interactionState.selectionStart!! - offset) / scale
-                val modelEnd = (interactionState.selectionEnd!! - offset) / scale
-                val selectLeft = minOf(modelStart.x, modelEnd.x)
-                val selectRight = maxOf(modelStart.x, modelEnd.x)
-                val selectTop = minOf(modelStart.y, modelEnd.y)
-                val selectBottom = maxOf(modelStart.y, modelEnd.y)
+            if (event.type == PointerEventType.Press && isBoxSelectTriggered) {
+                val startChange = event.changes.firstOrNull() ?: continue
+                if (startChange.isConsumed) continue
 
-                val selectedNodeIds = mutableSetOf<Long>()
-                nodes.forEach { node ->
-                    val nodeLeft = node.position.x
-                    val nodeTop = node.position.y
-                    val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: defaultNodeWidthPx
-                    val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
-                    val nodeRight = nodeLeft + nodeWidth
-                    val nodeBottom = nodeTop + nodeHeight
+                val isOverConnectionPointOrWire = interactionState.hoveredJunctionId != null ||
+                    interactionState.hoveredWaypoint != null ||
+                    interactionState.hoveredMidpoint != null ||
+                    interactionState.hoveredConnection != null ||
+                    interactionState.draggingJunctionId != null ||
+                    interactionState.draggingWaypoint != null ||
+                    interactionState.pendingMidpoint != null
+                if (isOverConnectionPointOrWire) continue
 
-                    if (selectLeft < nodeRight && selectRight > nodeLeft &&
-                        selectTop < nodeBottom && selectBottom > nodeTop
-                    ) {
-                        selectedNodeIds.add(node.id)
+                val startOffset = startChange.position
+
+                if (!isDrawingConnection && !interactionState.isDrawingStructuredConnection) {
+                    val modelPoint = (startOffset - offset) / scale
+                    val isOverNode = nodes.any { node ->
+                        val nodeLeft = node.position.x
+                        val nodeTop = node.position.y
+                        val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: defaultNodeWidthPx
+                        val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
+                        modelPoint.x >= nodeLeft && modelPoint.x <= nodeLeft + nodeWidth &&
+                                modelPoint.y >= nodeTop && modelPoint.y <= nodeTop + nodeHeight
                     }
-                }
-                onSelectNodes(selectedNodeIds)
-
-                if (onSelectLabels != null) {
-                    val selectedLabelIds = mutableSetOf<Long>()
-                    labels.forEach { label ->
+                    val isOverGroupHeader = groups.any { group ->
+                        val gLeft = group.position.x
+                        val gTop = group.position.y
+                        val gWidth = group.size.x
+                        val headerHeight = 48f
+                        modelPoint.x >= gLeft && modelPoint.x <= gLeft + gWidth &&
+                                modelPoint.y >= gTop && modelPoint.y <= gTop + headerHeight
+                    }
+                    val isOverLabel = labels.any { label ->
                         val lLeft = label.position.x
                         val lTop = label.position.y
                         val lWidth = maxOf(80f, label.text.length * 9f)
                         val lHeight = 36f
-                        val lRight = lLeft + lWidth
-                        val lBottom = lTop + lHeight
+                        modelPoint.x >= lLeft && modelPoint.x <= lLeft + lWidth &&
+                                modelPoint.y >= lTop && modelPoint.y <= lTop + lHeight
+                    }
+                    if (!isOverNode && !isOverGroupHeader && !isOverLabel) {
+                        focusRequester.requestFocus()
+                        interactionState.selectionStart = startOffset
+                        interactionState.selectionEnd = startOffset
+                        shortcutManager?.eat(event, ShortcutActionId.FLOW_BOX_SELECT) ?: startChange.consume()
 
-                        if (selectLeft < lRight && selectRight > lLeft &&
-                            selectTop < lBottom && selectBottom > lTop
-                        ) {
-                            selectedLabelIds.add(label.id)
+                        while (true) {
+                            val dragEvent = awaitPointerEvent()
+                            val isStillSelecting = if (shortcutManager != null) {
+                                shortcutManager.matchesPointer(ShortcutActionId.FLOW_BOX_SELECT, dragEvent, ShortcutGesture.Drag, allowConsumed = true)
+                            } else {
+                                dragEvent.buttons.isPrimaryPressed && !dragEvent.buttons.isSecondaryPressed && !dragEvent.buttons.isTertiaryPressed
+                            }
+                            if (!isStillSelecting) {
+                                if (isPaintToolActive) {
+                                    onPaintSelection?.invoke()
+                                } else if (isWashToolActive) {
+                                    onWashSelection?.invoke()
+                                }
+                                interactionState.clearSelectionBox()
+                                break
+                            }
+
+                            if (dragEvent.type == PointerEventType.Move) {
+                                val currentChange = dragEvent.changes.firstOrNull()
+                                if (currentChange != null && !isDrawingConnection && interactionState.selectionStart != null) {
+                                    interactionState.selectionEnd = currentChange.position
+
+                                    val modelStart = (interactionState.selectionStart!! - offset) / scale
+                                    val modelEnd = (interactionState.selectionEnd!! - offset) / scale
+                                    val selectLeft = minOf(modelStart.x, modelEnd.x)
+                                    val selectRight = maxOf(modelStart.x, modelEnd.x)
+                                    val selectTop = minOf(modelStart.y, modelEnd.y)
+                                    val selectBottom = maxOf(modelStart.y, modelEnd.y)
+
+                                    val selectedNodeIds = mutableSetOf<Long>()
+                                    nodes.forEach { node ->
+                                        val nodeLeft = node.position.x
+                                        val nodeTop = node.position.y
+                                        val nodeWidth = nodeSizes[node.id]?.width?.toFloat() ?: defaultNodeWidthPx
+                                        val nodeHeight = nodeSizes[node.id]?.height?.toFloat() ?: (180f * density.density)
+                                        val nodeRight = nodeLeft + nodeWidth
+                                        val nodeBottom = nodeTop + nodeHeight
+
+                                        if (selectLeft < nodeRight && selectRight > nodeLeft &&
+                                            selectTop < nodeBottom && selectBottom > nodeTop
+                                        ) {
+                                            selectedNodeIds.add(node.id)
+                                        }
+                                    }
+                                    onSelectNodes(selectedNodeIds)
+
+                                    if (onSelectLabels != null) {
+                                        val selectedLabelIds = mutableSetOf<Long>()
+                                        labels.forEach { label ->
+                                            val lLeft = label.position.x
+                                            val lTop = label.position.y
+                                            val lWidth = maxOf(80f, label.text.length * 9f)
+                                            val lHeight = 36f
+                                            val lRight = lLeft + lWidth
+                                            val lBottom = lTop + lHeight
+
+                                            if (selectLeft < lRight && selectRight > lLeft &&
+                                                selectTop < lBottom && selectBottom > lTop
+                                            ) {
+                                                selectedLabelIds.add(label.id)
+                                            }
+                                        }
+                                        onSelectLabels(selectedLabelIds)
+                                    }
+
+                                    if (onSelectGroups != null) {
+                                        val selectedGroupIds = mutableSetOf<Long>()
+                                        groups.forEach { group ->
+                                            val gLeft = group.position.x
+                                            val gTop = group.position.y
+                                            val gWidth = group.size.x
+                                            val gHeight = if (group.isCollapsed) 48f else group.size.y
+                                            val gRight = gLeft + gWidth
+                                            val gBottom = gTop + gHeight
+
+                                            if (selectLeft < gRight && selectRight > gLeft &&
+                                                selectTop < gBottom && selectBottom > gTop
+                                            ) {
+                                                selectedGroupIds.add(group.id)
+                                            }
+                                        }
+                                        onSelectGroups(selectedGroupIds)
+                                    }
+                                    shortcutManager?.eat(dragEvent, ShortcutActionId.FLOW_BOX_SELECT) ?: currentChange.consume()
+                                }
+                            }
                         }
                     }
-                    onSelectLabels(selectedLabelIds)
-                }
-
-                if (onSelectGroups != null) {
-                    val selectedGroupIds = mutableSetOf<Long>()
-                    groups.forEach { group ->
-                        val gLeft = group.position.x
-                        val gTop = group.position.y
-                        val gWidth = group.size.x
-                        val gHeight = if (group.isCollapsed) 48f else group.size.y
-                        val gRight = gLeft + gWidth
-                        val gBottom = gTop + gHeight
-
-                        if (selectLeft < gRight && selectRight > gLeft &&
-                            selectTop < gBottom && selectBottom > gTop
-                        ) {
-                            selectedGroupIds.add(group.id)
-                        }
-                    }
-                    onSelectGroups(selectedGroupIds)
                 }
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -313,7 +362,8 @@ fun Modifier.boardPointerEventGesture(
     roundness: Float = 0.5f,
     isAdvancedConnectionMode: Boolean = false,
     onAddJunctionAndBranch: ((Connection, Offset, Int) -> Unit)? = null,
-    onDeleteConnectionSegment: ((Connection, Int) -> Unit)? = null
+    onDeleteConnectionSegment: ((Connection, Int) -> Unit)? = null,
+    shortcutManager: ShortcutManager? = null
 ): Modifier {
     val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
     val currentScale by rememberUpdatedState(scale)
@@ -342,6 +392,7 @@ fun Modifier.boardPointerEventGesture(
     val currentRoundness by rememberUpdatedState(roundness)
     val currentIsAdvancedConnectionMode by rememberUpdatedState(isAdvancedConnectionMode)
     val currentOnAddJunctionAndBranch by rememberUpdatedState(onAddJunctionAndBranch)
+    val currentShortcutManager by rememberUpdatedState(shortcutManager)
 
     return this.pointerInput(Unit) {
         awaitPointerEventScope {
@@ -367,12 +418,14 @@ fun Modifier.boardPointerEventGesture(
                     if (draggingJuncId != null) {
                         val delta = (position - prevPointerPosition) / currentScale
                         currentOnMoveJunction?.invoke(draggingJuncId, delta.toModelOffset())
+                        currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
                     }
 
                     val draggingWp = interactionState.draggingWaypoint
                     if (draggingWp != null) {
                         val boardPos = (position - currentOffset) / currentScale
                         currentOnMoveWaypoint?.invoke(draggingWp.first, draggingWp.second, boardPos.toModelOffset())
+                        currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
                     }
 
                     if (interactionState.pendingMidpoint != null && interactionState.draggingWaypoint == null) {
@@ -405,11 +458,13 @@ fun Modifier.boardPointerEventGesture(
                                 interactionState.structuredConnectionLivePos = boardPos
                                 interactionState.pendingMidpoint = null
                                 interactionState.pendingMidpointWasAltPressed = false
+                                currentShortcutManager?.eat(event, ShortcutActionId.FLOW_CREATE_RAMIFICATION) ?: event.changes.forEach { it.consume() }
                             } else {
                                 currentOnInsertWaypoint?.invoke(conn, segIdx, boardPos.toModelOffset())
                                 interactionState.draggingWaypoint = Pair(conn, segIdx)
                                 interactionState.pendingMidpoint = null
                                 interactionState.pendingMidpointWasAltPressed = false
+                                currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
                             }
                         }
                     }
@@ -447,6 +502,7 @@ fun Modifier.boardPointerEventGesture(
                             livePos = SplineMathUtils.snapToOrthogonal(lastPoint, livePos)
                         }
                         interactionState.structuredConnectionLivePos = livePos
+                        event.changes.forEach { it.consume() }
                     }
 
                     val closestJunc = ConnectionHitTester.findClosestJunction(
@@ -634,8 +690,10 @@ fun Modifier.boardPointerEventGesture(
                             interactionState.pendingMidpoint = interactionState.hoveredMidpoint
                             interactionState.pendingMidpointPressPos = position
                             interactionState.pendingMidpointWasAltPressed = isAlt
-                            event.changes.forEach { it.consume() }
+                            val actId = if (isAlt) ShortcutActionId.FLOW_CREATE_RAMIFICATION else ShortcutActionId.FLOW_MOVE_POINT
+                            currentShortcutManager?.eat(event, actId) ?: event.changes.forEach { it.consume() }
                         } else if (interactionState.hoveredWaypoint != null) {
+                            val actId = if (isShift) ShortcutActionId.FLOW_DELETE_SELECTED else ShortcutActionId.FLOW_MOVE_POINT
                             if (isShift) {
                                 val wp = interactionState.hoveredWaypoint!!
                                 currentOnDeleteWaypoint?.invoke(wp.first, wp.second)
@@ -643,8 +701,9 @@ fun Modifier.boardPointerEventGesture(
                             } else {
                                 interactionState.draggingWaypoint = interactionState.hoveredWaypoint
                             }
-                            event.changes.forEach { it.consume() }
+                            currentShortcutManager?.eat(event, actId) ?: event.changes.forEach { it.consume() }
                         } else if (interactionState.hoveredJunctionId != null) {
+                            val actId = if (isShift) ShortcutActionId.FLOW_DELETE_SELECTED else ShortcutActionId.FLOW_MOVE_POINT
                             if (isShift) {
                                 val juncId = interactionState.hoveredJunctionId!!
                                 currentOnDeleteJunction?.invoke(juncId)
@@ -652,7 +711,7 @@ fun Modifier.boardPointerEventGesture(
                             } else {
                                 interactionState.draggingJunctionId = interactionState.hoveredJunctionId
                             }
-                            event.changes.forEach { it.consume() }
+                            currentShortcutManager?.eat(event, actId) ?: event.changes.forEach { it.consume() }
                         } else if (isShift) {
                             val connProj = ConnectionHitTester.findClosestConnectionWithProjection(
                                 position = position,

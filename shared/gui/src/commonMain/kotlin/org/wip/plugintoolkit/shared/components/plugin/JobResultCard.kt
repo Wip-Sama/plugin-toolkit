@@ -43,6 +43,8 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
+import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Pause
@@ -612,18 +614,27 @@ fun JobResultCard(
                         }
                     }
                     if (job.status != JobStatus.Completed && job.status != JobStatus.Cancelled && job.status != JobStatus.Failed && onCancel != null) {
+                        val shortcutManager = LocalShortcutManager.current
                         @OptIn(ExperimentalComposeUiApi::class)
-                        var isShiftPressed by remember { mutableStateOf(false) }
+                        var isForceCancelPressed by remember { mutableStateOf(false) }
                         TextButton(
-                            onClick = { onCancel(isShiftPressed) },
+                            onClick = { onCancel(isForceCancelPressed) },
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             modifier = Modifier.onPointerEvent(PointerEventType.Press) {
-                                isShiftPressed = it.keyboardModifiers.isShiftPressed
+                                val isForce = shortcutManager?.isActionTriggered(
+                                    ShortcutActionId.JOB_FORCE_CANCEL,
+                                    it.keyboardModifiers
+                                ) ?: false
+                                val isSkip = shortcutManager?.isActionTriggered(
+                                    ShortcutActionId.SKIP_CONFIRMATION,
+                                    it.keyboardModifiers
+                                ) ?: false
+                                isForceCancelPressed = isForce || isSkip || (shortcutManager == null && it.keyboardModifiers.isShiftPressed)
                             }
                         ) {
-                            Icon(Icons.Default.Cancel, contentDescription = if (isShiftPressed) stringResource(Res.string.action_force_cancel) else stringResource(Res.string.dialog_cancel))
+                            Icon(Icons.Default.Cancel, contentDescription = if (isForceCancelPressed) stringResource(Res.string.action_force_cancel) else stringResource(Res.string.dialog_cancel))
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(if (isShiftPressed) stringResource(Res.string.action_force_cancel) else stringResource(Res.string.dialog_cancel))
+                            Text(if (isForceCancelPressed) stringResource(Res.string.action_force_cancel) else stringResource(Res.string.dialog_cancel))
                         }
                     }
                     if ((job.status == JobStatus.Completed || job.status == JobStatus.Cancelled || job.status == JobStatus.Failed) && onClear != null) {

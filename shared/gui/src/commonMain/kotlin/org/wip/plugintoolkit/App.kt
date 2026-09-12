@@ -2,11 +2,16 @@ package org.wip.plugintoolkit
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -27,6 +32,10 @@ import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.SidebarStartMode
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import org.wip.plugintoolkit.features.shortcuts.logic.ShortcutManager
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutSituation
+import org.wip.plugintoolkit.features.shortcuts.ui.LiveShortcutZoningOverlay
+import org.wip.plugintoolkit.features.shortcuts.ui.ShortcutProvider
 import org.wip.plugintoolkit.shared.components.TooltipProvider
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.ui.AppNavigation
@@ -43,7 +52,8 @@ fun App(
     notificationService: NotificationService = koinInject(),
     dialogService: DialogService = koinInject(),
     flowViewModel: FlowViewModel = koinInject(),
-    activeFlowEditorTracker: ActiveFlowEditorTracker = koinInject()
+    activeFlowEditorTracker: ActiveFlowEditorTracker = koinInject(),
+    shortcutManager: ShortcutManager = koinInject()
 ) {
     val settings by viewModel.settings.collectAsState()
     val languageCode by viewModel.currentLanguageCode.collectAsState()
@@ -64,7 +74,8 @@ fun App(
             notificationService = notificationService,
             dialogService = dialogService,
             flowViewModel = flowViewModel,
-            activeFlowEditorTracker = activeFlowEditorTracker
+            activeFlowEditorTracker = activeFlowEditorTracker,
+            shortcutManager = shortcutManager
         )
     }
 }
@@ -79,7 +90,8 @@ private fun AppContentImpl(
     notificationService: NotificationService,
     dialogService: DialogService,
     flowViewModel: FlowViewModel,
-    activeFlowEditorTracker: ActiveFlowEditorTracker
+    activeFlowEditorTracker: ActiveFlowEditorTracker,
+    shortcutManager: ShortcutManager
 ) {
     // Read from LocalLanguage to make this composable recompose when language changes
     val currentLanguage = LocalLanguage.current
@@ -95,9 +107,22 @@ private fun AppContentImpl(
 
     CompositionLocalProvider(LocalDensity provides customDensity) {
         AppTheme(appearance = settings.appearance) {
-            TooltipProvider {
+            ShortcutProvider(shortcutManager) {
+                TooltipProvider {
                 val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
                 val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
+
+                LaunchedEffect(currentScreen) {
+                    if (currentScreen !is Screen.FlowEditor) {
+                        val zones = when (currentScreen) {
+                            is Screen.Settings -> setOf(ShortcutSituation.Global, ShortcutSituation.Settings)
+                            is Screen.JobDashboard -> setOf(ShortcutSituation.Global, ShortcutSituation.JobTerminal)
+                            else -> setOf(ShortcutSituation.Global)
+                        }
+                        shortcutManager.setActiveSituations(zones)
+                        shortcutManager.setPointerSituation(null)
+                    }
+                }
 
                 val pluginManagerViewModel: org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel = koinInject()
                 androidx.compose.runtime.LaunchedEffect(pluginManagerViewModel) {
@@ -154,52 +179,63 @@ private fun AppContentImpl(
                 // Recomposition is triggered reactively since the screens and localized strings
                 // read from LocalLanguage / trigger recomposition.
                 val dialogUnsavedChangesTitle = stringResource(Res.string.dialog_unsaved_changes)
-                AppScaffold(
-                    settings = settings,
-                    sections = sections,
-                    bottomSections = bottomSections,
-                    currentScreen = displayScreen,
-                    onScreenSelected = { screen ->
-                        if (currentScreen != screen) {
-                            if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
-                                dialogService.showConfirmation(
-                                    title = dialogUnsavedChangesTitle,
-                                    message = "All the unsaved data will be lost. Are you sure you want to exit?",
-                                    onConfirm = {
-                                        activeFlowEditorTracker.setHasUnsavedChanges(false)
-                                        backStack.clear()
-                                        backStack.add(screen)
-                                    }
-                                )
-                            } else {
-                                backStack.clear()
-                                backStack.add(screen)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AppScaffold(
+                        settings = settings,
+                        sections = sections,
+                        bottomSections = bottomSections,
+                        currentScreen = displayScreen,
+                        onScreenSelected = { screen ->
+                            if (currentScreen != screen) {
+                                if (currentScreen is Screen.FlowEditor && hasUnsavedChanges) {
+                                    dialogService.showConfirmation(
+                                        title = dialogUnsavedChangesTitle,
+                                        message = "All the unsaved data will be lost. Are you sure you want to exit?",
+                                        onConfirm = {
+                                            activeFlowEditorTracker.setHasUnsavedChanges(false)
+                                            backStack.clear()
+                                            backStack.add(screen)
+                                        }
+                                    )
+                                } else {
+                                    backStack.clear()
+                                    backStack.add(screen)
+                                }
                             }
-                        }
-                    },
-                    notificationService = notificationService,
-                    dialogService = dialogService,
-                    onToggleNavbarState = { collapsed ->
-                        if (settings.appearance.sidebarStartMode == SidebarStartMode.Remember) {
-                            viewModel.updateSettings { current ->
-                                current.copy(appearance = current.appearance.copy(isSidebarCollapsed = collapsed))
-                            }
-                        }
-                    }
-                ) {
-                    AppNavigation(
-                        backStack = backStack,
-                        currentScreen = currentScreen,
-                        activeFlowEditorTracker = activeFlowEditorTracker,
-                        dialogService = dialogService,
+                        },
                         notificationService = notificationService,
-                        flowViewModel = flowViewModel,
-                        settingsViewModel = viewModel
-                    )
+                        dialogService = dialogService,
+                        onToggleNavbarState = { collapsed ->
+                            if (settings.appearance.sidebarStartMode == SidebarStartMode.Remember) {
+                                viewModel.updateSettings { current ->
+                                    current.copy(appearance = current.appearance.copy(isSidebarCollapsed = collapsed))
+                                }
+                            }
+                        }
+                    ) {
+                        AppNavigation(
+                            backStack = backStack,
+                            currentScreen = currentScreen,
+                            activeFlowEditorTracker = activeFlowEditorTracker,
+                            dialogService = dialogService,
+                            notificationService = notificationService,
+                            flowViewModel = flowViewModel,
+                            settingsViewModel = viewModel
+                        )
+                    }
+
+                    if (settings.debug.liveShortcutZoning) {
+                        LiveShortcutZoningOverlay(
+                            shortcutManager = shortcutManager,
+                            showPointerZone = settings.debug.showPointerZone,
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        )
+                    }
                 }
     
                 AppUpdateDialogs(viewModel = viewModel)
             }
         }
     }
+}
 }

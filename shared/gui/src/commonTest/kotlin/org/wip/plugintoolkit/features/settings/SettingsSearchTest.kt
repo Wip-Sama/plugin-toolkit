@@ -111,4 +111,22 @@ class SettingsSearchTest {
         // BroadSearch always returns true
         assertTrue(viewModel.hasLocalMatches(SettingNavKey.BroadSearch, registry.definitions.value, resolvedStrings))
     }
+
+    @Test
+    fun testBroadSearchIncludesShortcuts() {
+        val registry = SettingsRegistry(emptyList())
+        val viewModel = SettingsSearchViewModel(registry)
+
+        // Search for "Pan" - should match FLOW_PAN_CANVAS shortcut
+        viewModel.searchQuery = "Pan"
+        val results = viewModel.getBroadSearchResults(emptyList(), emptyMap())
+        val items = results.values.flatten()
+        assertTrue(items.any { it.id == "shortcut.flow.board.pan" })
+
+        // Search for "Drag" - matches gestures
+        viewModel.searchQuery = "Drag"
+        val results2 = viewModel.getBroadSearchResults(emptyList(), emptyMap())
+        val items2 = results2.values.flatten()
+        assertTrue(items2.isNotEmpty())
+    }
 }

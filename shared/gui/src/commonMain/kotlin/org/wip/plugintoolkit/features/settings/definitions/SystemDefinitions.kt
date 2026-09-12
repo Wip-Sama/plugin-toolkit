@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.Window
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.NearMe
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.model.localized
@@ -21,6 +23,7 @@ import org.wip.plugintoolkit.core.utils.StartupManager
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.AutoUpdateSettings
 import org.wip.plugintoolkit.features.settings.model.CacheManagementMode
+import org.wip.plugintoolkit.features.settings.model.DebugSettings
 import org.wip.plugintoolkit.features.settings.model.FlowSettings
 import org.wip.plugintoolkit.features.settings.model.GeneralSettings
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
@@ -181,6 +184,26 @@ fun SettingsRegistryBuilder.systemDefinitions(
                         org.wip.plugintoolkit.features.settings.ui.CheckForUpdatesControl(viewModel)
                     }
                 )
+            }
+        }
+
+        // ── Debug ─────────────────────────────────────────────────────
+        section(Res.string.section_debug) {
+            bindGroup(AppSettings::debug, { copy(debug = it) }) {
+                switch(
+                    DebugSettings::liveShortcutZoning,
+                    Res.string.setting_live_shortcut_zoning,
+                    Icons.Default.BugReport,
+                    subtitle = SettingText.Resource(Res.string.setting_live_shortcut_zoning_subtitle)
+                ) { copy(liveShortcutZoning = it) }
+
+                switch(
+                    DebugSettings::showPointerZone,
+                    Res.string.setting_show_pointer_zone,
+                    Icons.Default.NearMe,
+                    subtitle = SettingText.Resource(Res.string.setting_show_pointer_zone_subtitle),
+                    enabled = { it.debug.liveShortcutZoning }
+                ) { copy(showPointerZone = it) }
             }
         }
     }
