@@ -1250,7 +1250,17 @@ class FlowEditorViewModel(
             is FlowEvent.AddJunctionAndBranch -> {
                 val newJunctionId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
                 val junction = FlowJunction(id = newJunctionId, position = event.splitPosition, color = event.connection.color)
-                val conn1 = event.connection.copy(targetNodeId = -1L, targetPortId = "", targetJunctionId = newJunctionId)
+
+                val segIdx = event.segmentIndex ?: 0
+                val waypointsBefore = event.connection.waypoints.take(segIdx)
+                val waypointsAfter = event.connection.waypoints.drop(segIdx)
+
+                val conn1 = event.connection.copy(
+                    targetNodeId = -1L,
+                    targetPortId = "",
+                    targetJunctionId = newJunctionId,
+                    waypoints = waypointsBefore
+                )
                 val conn2 = Connection(
                     sourceNodeId = -1L,
                     sourcePortId = "",
@@ -1258,6 +1268,9 @@ class FlowEditorViewModel(
                     targetNodeId = event.connection.targetNodeId,
                     targetPortId = event.connection.targetPortId,
                     targetJunctionId = event.connection.targetJunctionId,
+                    waypoints = waypointsAfter,
+                    isStructured = event.connection.isStructured,
+                    orderIndex = event.connection.orderIndex,
                     color = event.connection.color
                 )
                 val branchConns = mutableListOf<Connection>()
@@ -1269,6 +1282,7 @@ class FlowEditorViewModel(
                             targetNodeId = -1L,
                             targetPortId = "",
                             targetJunctionId = newJunctionId,
+                            isStructured = event.connection.isStructured,
                             color = event.connection.color
                         )
                     )
@@ -1280,6 +1294,7 @@ class FlowEditorViewModel(
                             sourceJunctionId = newJunctionId,
                             targetNodeId = event.branchTargetNodeId,
                             targetPortId = event.branchTargetPortId,
+                            isStructured = event.connection.isStructured,
                             color = event.connection.color
                         )
                     )
@@ -1403,19 +1418,31 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.ConnectPortsWithWaypoints -> {
-                val conn = Connection(
-                    sourceNodeId = event.sourceNodeId,
-                    sourcePortId = event.sourcePortId,
-                    targetNodeId = event.targetNodeId,
-                    targetPortId = event.targetPortId,
-                    waypoints = event.waypoints,
-                    sourceJunctionId = event.sourceJunctionId,
-                    isStructured = event.isStructured
+                val stateBefore = currentState
+                val targetNode = currentState.flow.nodes.find { it.id == event.targetNodeId }
+                val targetPort = targetNode?.inputs?.find { it.id == event.targetPortId }
+                val isList = targetPort?.dataType is DataType.Array
+                val removedConns = if (isList) emptyList() else currentState.flow.connections.filter {
+                    it.targetNodeId == event.targetNodeId && it.targetPortId == event.targetPortId
+                }
+
+                newState = connectionManager.handleConnectPortsWithWaypoints(
+                    currentState,
+                    event.sourceNodeId,
+                    event.sourcePortId,
+                    event.sourceJunctionId,
+                    event.targetNodeId,
+                    event.targetPortId,
+                    event.waypoints,
+                    event.isStructured
                 )
-                newState = currentState.copy(
-                    flow = currentState.flow.copy(connections = currentState.flow.connections + conn),
-                    hasUnsavedChanges = true
-                )
+                if (newState !== stateBefore && newState.flow.connections != stateBefore.flow.connections) {
+                    shouldRunTypeInference = true
+                    val addedConn = newState.flow.connections.lastOrNull()
+                    if (addedConn != null) {
+                        pendingCommand = ConnectPortsCommand(addedConn, removedConns)
+                    }
+                }
             }
 
             is FlowEvent.UpdateConnectionCurveStyle -> {

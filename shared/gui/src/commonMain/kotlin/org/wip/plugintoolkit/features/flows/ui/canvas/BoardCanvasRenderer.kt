@@ -315,7 +315,7 @@ fun BoardGridAndConnectionsCanvas(
         if (interactionState.isDrawingStructuredConnection) {
             val startBoardPos = when {
                 interactionState.structuredConnectionSourceJunctionId != null ->
-                    junctionMap[interactionState.structuredConnectionSourceJunctionId]?.let { (it - state.offset) / state.scale }
+                    junctionMap[interactionState.structuredConnectionSourceJunctionId]
                 interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null ->
                     getPortBoardPosition(
                         interactionState.structuredConnectionStartNodeId!!,

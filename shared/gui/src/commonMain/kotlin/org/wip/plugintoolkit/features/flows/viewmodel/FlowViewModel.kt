@@ -208,6 +208,7 @@ sealed interface FlowEvent {
     data class AddJunctionAndBranch(
         val connection: Connection,
         val splitPosition: org.wip.plugintoolkit.features.flows.model.Offset,
+        val segmentIndex: Int? = null,
         val branchSourceNodeId: Long? = null,
         val branchSourcePortId: String? = null,
         val branchTargetNodeId: Long? = null,

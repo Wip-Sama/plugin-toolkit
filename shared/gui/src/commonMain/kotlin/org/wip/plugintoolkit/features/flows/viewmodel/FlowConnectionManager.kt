@@ -13,6 +13,7 @@ import org.wip.plugintoolkit.features.flows.logic.SystemNodesRegistry
 import org.wip.plugintoolkit.features.flows.logic.format
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.Offset as ModelOffset
 import org.wip.plugintoolkit.features.flows.ui.snapToGrid
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_semantics
@@ -85,6 +86,88 @@ class FlowConnectionManager(
         } else null
 
         val newConnection = Connection(sourceNodeId, sourcePortId, targetNodeId, targetPortId, orderIndex)
+
+        val newFlow = currentState.flow.copy(connections = filteredConnections + newConnection)
+        return currentState.copy(
+            flow = newFlow,
+            pendingConnection = null,
+            hasUnsavedChanges = true
+        )
+    }
+
+    fun handleConnectPortsWithWaypoints(
+        currentState: FlowEditorState,
+        sourceNodeId: Long,
+        sourcePortId: String,
+        sourceJunctionId: Long?,
+        targetNodeId: Long,
+        targetPortId: String,
+        waypoints: List<ModelOffset>,
+        isStructured: Boolean
+    ): FlowEditorState {
+        if (sourceNodeId == targetNodeId && sourceNodeId != -1L) return currentState
+
+        val targetNode = currentState.flow.nodes.find { it.id == targetNodeId }
+        val targetPort = targetNode?.inputs?.find { it.id == targetPortId }
+
+        val sourceNode = if (sourceNodeId != -1L) currentState.flow.nodes.find { it.id == sourceNodeId } else null
+        val sourcePort = sourceNode?.outputs?.find { it.id == sourcePortId }
+
+        if (sourcePort != null && targetPort != null) {
+            val isTypeAllowed = sourcePort.dataType.isCompatibleWith(targetPort.dataType) ||
+                    sourcePort.dataType.canConvert(targetPort.dataType)
+            if (!isTypeAllowed) {
+                return currentState
+            }
+
+            val semanticCheck =
+                org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, targetPort.semanticTypes)
+            if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+                return currentState
+            } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
+                notificationService?.toast("Warning: ${semanticCheck.message}")
+            }
+        }
+
+        val isList = targetPort?.dataType is DataType.Array
+        val filteredConnections = if (isList) {
+            currentState.flow.connections
+        } else {
+            currentState.flow.connections.filterNot {
+                it.targetNodeId == targetNodeId && it.targetPortId == targetPortId
+            }
+        }
+
+        if (sourceNodeId != -1L && sourcePortId.isNotEmpty() &&
+            filteredConnections.any { it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId && it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }
+        ) {
+            return currentState // Already connected exactly
+        }
+
+        if (sourceNodeId != -1L && FlowCycleDetector.wouldCreateCycle(
+                sourceNodeId,
+                targetNodeId,
+                filteredConnections
+            )
+        ) {
+            notificationService?.toast("Cannot connect: Connecting these ports would create a loop (Directed Cyclic Graph). Enforcing Directed Acyclic Graph (DAG).")
+            return currentState
+        }
+
+        val orderIndex = if (isList) {
+            filteredConnections.count { it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }
+        } else null
+
+        val newConnection = Connection(
+            sourceNodeId = sourceNodeId,
+            sourcePortId = sourcePortId,
+            targetNodeId = targetNodeId,
+            targetPortId = targetPortId,
+            orderIndex = orderIndex,
+            waypoints = waypoints,
+            sourceJunctionId = sourceJunctionId,
+            isStructured = isStructured
+        )
 
         val newFlow = currentState.flow.copy(connections = filteredConnections + newConnection)
         return currentState.copy(

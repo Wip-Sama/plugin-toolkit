@@ -1143,6 +1143,115 @@ class FlowEditorQoLTest {
         assertEquals(targetPos, updatedConn.waypoints[0])
         assertEquals(ModelOffset(50f, 50f), updatedConn.waypoints[1])
     }
+
+    @Test
+    fun testConnectPortsWithWaypointsReplacesExistingNonListConnection() {
+        val node1 = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            title = "Node 1",
+            systemAction = "action1",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out", "Out", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val node2 = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(200f, 0f),
+            title = "Node 2",
+            systemAction = "action2",
+            inputs = listOf(InputPort("in", "In", dataType = DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+        val node3 = Node.SystemNode(
+            id = 3L,
+            position = ModelOffset(100f, 200f),
+            title = "Node 3",
+            systemAction = "action3",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out", "Out", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val initialConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val flow = Flow(name = "TestSingleConnection", nodes = listOf(node1, node2, node3), connections = listOf(initialConn))
+        val vm = createViewModel(flow)
+
+        // Connect node3:out to node2:in with waypoints. Node 2's "in" port is String (not List), so it must replace initialConn!
+        vm.onEvent(
+            FlowEvent.ConnectPortsWithWaypoints(
+                sourceNodeId = 3L,
+                sourcePortId = "out",
+                targetNodeId = 2L,
+                targetPortId = "in",
+                waypoints = listOf(ModelOffset(150f, 100f)),
+                isStructured = true
+            )
+        )
+
+        val connections = vm.state.value.flow.connections
+        assertEquals(1, connections.size)
+        val newConn = connections.first()
+        assertEquals(3L, newConn.sourceNodeId)
+        assertEquals(2L, newConn.targetNodeId)
+        assertTrue(newConn.isStructured)
+        assertEquals(listOf(ModelOffset(150f, 100f)), newConn.waypoints)
+
+        // Undo restores initialConn
+        vm.undo()
+        val afterUndo = vm.state.value.flow.connections
+        assertEquals(1, afterUndo.size)
+        assertEquals(1L, afterUndo.first().sourceNodeId)
+    }
+
+    @Test
+    fun testAddJunctionAndBranchPreservesStructuredFlagAndWaypoints() {
+        val wp0 = ModelOffset(50f, 50f)
+        val wp1 = ModelOffset(100f, 100f)
+        val wp2 = ModelOffset(150f, 150f)
+        val structuredConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(wp0, wp1, wp2),
+            isStructured = true,
+            orderIndex = 0
+        )
+        val flow = Flow(name = "TestBranchStructured", connections = listOf(structuredConn))
+        val vm = createViewModel(flow)
+
+        val splitPos = ModelOffset(75f, 75f)
+        // Split at segmentIndex = 1 (between wp0 and wp1)
+        vm.onEvent(
+            FlowEvent.AddJunctionAndBranch(
+                connection = structuredConn,
+                splitPosition = splitPos,
+                segmentIndex = 1
+            )
+        )
+
+        val connections = vm.state.value.flow.connections
+        assertEquals(2, connections.size)
+        val junctions = vm.state.value.flow.junctions
+        assertEquals(1, junctions.size)
+        val junc = junctions.first()
+        assertEquals(splitPos, junc.position)
+
+        val conn1 = connections.find { it.targetJunctionId == junc.id }
+        val conn2 = connections.find { it.sourceJunctionId == junc.id }
+        assertNotNull(conn1)
+        assertNotNull(conn2)
+
+        assertTrue(conn1.isStructured)
+        assertEquals(listOf(wp0), conn1.waypoints)
+
+        assertTrue(conn2.isStructured)
+        assertEquals(listOf(wp1, wp2), conn2.waypoints)
+        assertEquals(0, conn2.orderIndex)
+    }
 }
 
 

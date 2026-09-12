@@ -61,7 +61,9 @@ import org.wip.plugintoolkit.features.flows.model.OutputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.NodeSerializationUtils
 import org.wip.plugintoolkit.features.flows.ui.toModelOffset
+import org.wip.plugintoolkit.features.flows.ui.canvas.BoardInteractionState
 import org.wip.plugintoolkit.features.flows.ui.canvas.ConnectionHitTester
+import org.wip.plugintoolkit.features.flows.ui.canvas.StructuredConnectionStartInfo
 import org.wip.plugintoolkit.api.ParameterConditionEvaluator
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
@@ -141,7 +143,8 @@ fun FlowEditorView(
     var connectionStartPortId by remember { mutableStateOf<String?>(null) }
     var connectionStartIsOutput by remember { mutableStateOf(true) }
     var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
-    var structuredConnectionStartInfo by remember { mutableStateOf<Triple<Long, String, Boolean>?>(null) }
+    val interactionState = remember { BoardInteractionState() }
+    var structuredConnectionStartInfo by remember { mutableStateOf<StructuredConnectionStartInfo?>(null) }
     var portLayoutVersion by remember { mutableStateOf(0) }
     val portLayouts = remember { mutableStateMapOf<Triple<Long, String, Boolean>, LayoutCoordinates>() }
     val getPortBoardPosition = { nodeId: Long, portId: String, isOutput: Boolean ->
@@ -265,7 +268,9 @@ fun FlowEditorView(
     val duplicateFlowMsg = stringResource(Res.string.flow_editor_duplicate_error)
 
     val handleConnectionDrop: (Boolean) -> Unit = { isShiftPressed ->
-        if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
+        if (interactionState.isDrawingStructuredConnection) {
+            // Do not handle normal drop during structured connection drawing
+        } else if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
             val sourceNodeId =
                 if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
             val sourcePortId =
@@ -363,17 +368,33 @@ fun FlowEditorView(
             onDetachConnection = { connection, isSource, offset ->
                 if (!state.isReadOnly) {
                     viewModel.onEvent(FlowEvent.DeleteConnection(connection))
-                    if (isSource) {
-                        connectionStartNodeId = connection.targetNodeId
-                        connectionStartPortId = connection.targetPortId
-                        connectionStartIsOutput = false
+                    if (connection.isStructured) {
+                        val wps = if (isSource) {
+                            connection.waypoints.asReversed().map { it.toComposeOffset() }
+                        } else {
+                            connection.waypoints.map { it.toComposeOffset() }
+                        }
+                        structuredConnectionStartInfo = StructuredConnectionStartInfo(
+                            nodeId = if (isSource) connection.targetNodeId else connection.sourceNodeId,
+                            portId = if (isSource) connection.targetPortId else connection.sourcePortId,
+                            isOutput = !isSource,
+                            sourceJunctionId = if (isSource) connection.targetJunctionId else connection.sourceJunctionId,
+                            initialWaypoints = wps,
+                            livePos = offset
+                        )
                     } else {
-                        connectionStartNodeId = connection.sourceNodeId
-                        connectionStartPortId = connection.sourcePortId
-                        connectionStartIsOutput = true
+                        if (isSource) {
+                            connectionStartNodeId = connection.targetNodeId
+                            connectionStartPortId = connection.targetPortId
+                            connectionStartIsOutput = false
+                        } else {
+                            connectionStartNodeId = connection.sourceNodeId
+                            connectionStartPortId = connection.sourcePortId
+                            connectionStartIsOutput = true
+                        }
+                        connectionCurrentPos = offset
+                        isDrawingConnection = true
                     }
-                    connectionCurrentPos = offset
-                    isDrawingConnection = true
                 }
             },
             onConnectionDrag = { boardPosition ->
@@ -474,11 +495,12 @@ fun FlowEditorView(
             },
             structuredConnectionStartInfo = structuredConnectionStartInfo,
             onClearStructuredConnectionStartInfo = { structuredConnectionStartInfo = null },
+            interactionState = interactionState,
             onToggleStructuredConnectionMode = {
                 viewModel.onEvent(FlowEvent.ToggleStructuredConnectionMode)
             },
-            onAddJunctionAndBranch = { conn, pos ->
-                viewModel.onEvent(FlowEvent.AddJunctionAndBranch(conn, pos.toModelOffset()))
+            onAddJunctionAndBranch = { conn, pos, segIdx ->
+                viewModel.onEvent(FlowEvent.AddJunctionAndBranch(conn, pos.toModelOffset(), segIdx))
             },
             onToggleEyedropper = { viewModel.onEvent(FlowEvent.ToggleEyedropper) },
             onToggleAdvancedConnectionMode = { viewModel.onEvent(FlowEvent.ToggleAdvancedConnectionMode) },
@@ -731,19 +753,43 @@ fun FlowEditorView(
                                          portLayoutVersion++
                                      }
                                  },
-                                 onStartConnection = { nodeId, portId, isOutput ->
-                                     if (state.isAdvancedConnectionMode) {
-                                         structuredConnectionStartInfo = Triple(nodeId, portId, isOutput)
-                                     } else {
-                                         isDrawingConnection = true
-                                         connectionStartNodeId = nodeId
-                                         connectionStartPortId = portId
-                                         connectionStartIsOutput = isOutput
-                                         getPortBoardPosition(nodeId, portId, isOutput)?.let {
-                                             connectionCurrentPos = it
-                                         }
-                                     }
-                                 },
+                                  onStartConnection = { nodeId, portId, isOutput ->
+                                      if (interactionState.isDrawingStructuredConnection) {
+                                          if (interactionState.structuredConnectionStartIsOutput != isOutput) {
+                                              val finalTargetNodeId = if (interactionState.structuredConnectionStartIsOutput) nodeId else (interactionState.structuredConnectionStartNodeId ?: -1L)
+                                              val finalTargetPortId = if (interactionState.structuredConnectionStartIsOutput) portId else (interactionState.structuredConnectionStartPortId ?: "")
+                                              val finalSourceNodeId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else nodeId
+                                              val finalSourcePortId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else portId
+
+                                              viewModel.onEvent(
+                                                  FlowEvent.ConnectPortsWithWaypoints(
+                                                      sourceNodeId = finalSourceNodeId,
+                                                      sourcePortId = finalSourcePortId,
+                                                      sourceJunctionId = interactionState.structuredConnectionSourceJunctionId,
+                                                      targetNodeId = finalTargetNodeId,
+                                                      targetPortId = finalTargetPortId,
+                                                      waypoints = interactionState.structuredConnectionPoints.map { it.toModelOffset() },
+                                                      isStructured = true
+                                                  )
+                                              )
+                                              interactionState.resetStructuredConnection()
+                                          }
+                                      } else if (state.isAdvancedConnectionMode) {
+                                          structuredConnectionStartInfo = StructuredConnectionStartInfo(
+                                              nodeId = nodeId,
+                                              portId = portId,
+                                              isOutput = isOutput
+                                          )
+                                      } else {
+                                          isDrawingConnection = true
+                                          connectionStartNodeId = nodeId
+                                          connectionStartPortId = portId
+                                          connectionStartIsOutput = isOutput
+                                          getPortBoardPosition(nodeId, portId, isOutput)?.let {
+                                              connectionCurrentPos = it
+                                          }
+                                      }
+                                  },
                                 onDragConnection = {
                                     // Ignored, BoardCanvas handles it
                                 },

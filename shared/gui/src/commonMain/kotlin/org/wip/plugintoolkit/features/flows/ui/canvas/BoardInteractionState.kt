@@ -7,6 +7,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import org.wip.plugintoolkit.features.flows.model.Connection
 
+data class StructuredConnectionStartInfo(
+    val nodeId: Long? = null,
+    val portId: String? = null,
+    val isOutput: Boolean = true,
+    val sourceJunctionId: Long? = null,
+    val initialWaypoints: List<Offset> = emptyList(),
+    val livePos: Offset? = null
+)
+
 @Stable
 class BoardInteractionState {
     var selectedConnection: Connection? by mutableStateOf(null)

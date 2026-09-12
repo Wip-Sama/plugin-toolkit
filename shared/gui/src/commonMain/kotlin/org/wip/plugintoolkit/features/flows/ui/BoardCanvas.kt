@@ -64,6 +64,7 @@ import org.wip.plugintoolkit.features.flows.ui.toModelOffset
 import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardGridAndConnectionsCanvas
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardInteractionState
+import org.wip.plugintoolkit.features.flows.ui.canvas.StructuredConnectionStartInfo
 import org.wip.plugintoolkit.features.flows.ui.canvas.SelectionBoxCanvas
 import org.wip.plugintoolkit.features.flows.ui.canvas.boardConnectionTapGesture
 import org.wip.plugintoolkit.features.flows.ui.canvas.boardKeyboardHandler
@@ -146,19 +147,19 @@ fun BoardCanvas(
     onFinalizeStructuredConnection: (Long?, String?, Long?, Long, String, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit = { _, _, _, _, _, _ -> },
     onLeaveStructuredConnectionAtLastPoint: (Long?, String?, Long?, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit = { _, _, _, _ -> },
     onToggleStructuredConnectionMode: () -> Unit = {},
-    onAddJunctionAndBranch: (Connection, Offset) -> Unit = { _, _ -> },
+    onAddJunctionAndBranch: (Connection, Offset, Int) -> Unit = { _, _, _ -> },
     onToggleEyedropper: () -> Unit = {},
     onToggleAdvancedConnectionMode: () -> Unit = {},
     onPaintSelection: () -> Unit = {},
     onWashSelection: () -> Unit = {},
-    structuredConnectionStartInfo: Triple<Long, String, Boolean>? = null,
+    structuredConnectionStartInfo: StructuredConnectionStartInfo? = null,
     onClearStructuredConnectionStartInfo: () -> Unit = {},
+    interactionState: BoardInteractionState = remember { BoardInteractionState() },
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.(hoveredConnection: Connection?, hoveredNodeId: Long?, onHoverNode: (Long?) -> Unit) -> Unit
 ) {
     val density = LocalDensity.current
     val focusRequester = remember { FocusRequester() }
-    val interactionState = remember { BoardInteractionState() }
 
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
 
@@ -182,15 +183,17 @@ fun BoardCanvas(
     }
 
     LaunchedEffect(structuredConnectionStartInfo) {
-        structuredConnectionStartInfo?.let { (nodeId, portId, isOutput) ->
+        structuredConnectionStartInfo?.let { info ->
             interactionState.isDrawingStructuredConnection = true
-            interactionState.structuredConnectionStartNodeId = nodeId
-            interactionState.structuredConnectionStartPortId = portId
-            interactionState.structuredConnectionStartIsOutput = isOutput
-            interactionState.structuredConnectionSourceJunctionId = null
-            interactionState.structuredConnectionPoints = mutableListOf()
-            val portPos = getPortBoardPosition(nodeId, portId, isOutput) ?: Offset.Zero
-            interactionState.structuredConnectionLivePos = portPos
+            interactionState.structuredConnectionStartNodeId = info.nodeId
+            interactionState.structuredConnectionStartPortId = info.portId
+            interactionState.structuredConnectionStartIsOutput = info.isOutput
+            interactionState.structuredConnectionSourceJunctionId = info.sourceJunctionId
+            interactionState.structuredConnectionPoints = info.initialWaypoints.toMutableList()
+            val portPos = if (info.nodeId != null && info.portId != null) {
+                getPortBoardPosition(info.nodeId, info.portId, info.isOutput) ?: Offset.Zero
+            } else Offset.Zero
+            interactionState.structuredConnectionLivePos = info.livePos ?: portPos
             onClearStructuredConnectionStartInfo()
         }
     }
@@ -247,7 +250,6 @@ fun BoardCanvas(
                 onPaintConnection = onPaintConnection,
                 onWashConnection = onWashConnection,
                 onSampleColor = onSampleColor,
-                onAddJunctionAndBranch = onAddJunctionAndBranch,
                 junctions = flow.junctions,
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness,
@@ -302,7 +304,9 @@ fun BoardCanvas(
                 connectionStartPortId = connectionStartPortId,
                 connectionStartIsOutput = connectionStartIsOutput,
                 curveStyle = state.connectionCurveStyle,
-                roundness = state.connectionRoundness
+                roundness = state.connectionRoundness,
+                isAdvancedConnectionMode = state.isAdvancedConnectionMode,
+                onAddJunctionAndBranch = onAddJunctionAndBranch
             )
     ) {
         val isDraggedInSelection = state.draggedNodeId != null && (
