@@ -194,7 +194,7 @@ fun BoardGridAndConnectionsCanvas(
                 } else {
                     dimensions.strokeWidthThin.toPx()
                 }
-                val effectiveStyle = if (connection.isStructured) ConnectionCurveStyle.Orthogonal else curveStyle
+                val effectiveStyle = curveStyle
                 val path = SplineMathUtils.buildConnectionPath(screenPoints, effectiveStyle, roundness)
                 drawPath(
                     path = path,
@@ -287,12 +287,16 @@ fun BoardGridAndConnectionsCanvas(
             if (startBoardPos != null) {
                 var currentPos = if (highlightedPortId != null && highlightedNodeId != null) {
                     getPortBoardPosition(highlightedNodeId, highlightedPortId, !connectionStartIsOutput) ?: ((interactionState.lastPointerPosition - state.offset) / state.scale)
+                } else if (interactionState.hoveredJunctionId != null) {
+                    junctionMap[interactionState.hoveredJunctionId] ?: ((interactionState.lastPointerPosition - state.offset) / state.scale)
                 } else {
                     (interactionState.lastPointerPosition - state.offset) / state.scale
                 }
 
                 if (interactionState.isShiftModifierPressed) {
                     currentPos = SplineMathUtils.snapToStraightAngle(startBoardPos, currentPos)
+                } else if (interactionState.isCtrlModifierPressed) {
+                    currentPos = SplineMathUtils.snapToOrthogonal(startBoardPos, currentPos)
                 }
 
                 val (startPos, endPos) = if (connectionStartIsOutput) {
@@ -332,20 +336,22 @@ fun BoardGridAndConnectionsCanvas(
                 var liveBoardPos = if (highlightedPortId != null && highlightedNodeId != null) {
                     getPortBoardPosition(highlightedNodeId, highlightedPortId, !interactionState.structuredConnectionStartIsOutput)
                         ?: interactionState.structuredConnectionLivePos
+                } else if (interactionState.hoveredJunctionId != null) {
+                    junctionMap[interactionState.hoveredJunctionId] ?: interactionState.structuredConnectionLivePos
                 } else {
                     interactionState.structuredConnectionLivePos
                 }
 
                 val lastCommitted = allBoardPts.last()
                 if (interactionState.isShiftModifierPressed) {
-                    liveBoardPos = SplineMathUtils.snapToOrthogonal(lastCommitted, liveBoardPos)
-                } else if (interactionState.isCtrlModifierPressed) {
                     liveBoardPos = SplineMathUtils.snapToStraightAngle(lastCommitted, liveBoardPos)
+                } else if (interactionState.isCtrlModifierPressed) {
+                    liveBoardPos = SplineMathUtils.snapToOrthogonal(lastCommitted, liveBoardPos)
                 }
                 allBoardPts.add(liveBoardPos)
 
                 val previewScreenPts = allBoardPts.map { (it * state.scale) + state.offset }
-                val previewPath = SplineMathUtils.buildRoundedPolylinePath(previewScreenPts, cornerRadius = 8f * state.scale)
+                val previewPath = SplineMathUtils.buildConnectionPath(previewScreenPts, curveStyle, roundness)
                 drawPath(
                     path = previewPath,
                     color = connectionColor.copy(alpha = 0.9f),

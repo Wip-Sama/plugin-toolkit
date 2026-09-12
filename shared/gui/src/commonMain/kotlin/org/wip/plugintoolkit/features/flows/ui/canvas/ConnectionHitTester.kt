@@ -47,7 +47,7 @@ object ConnectionHitTester {
                 continue
             }
 
-            val effectiveStyle = if (connection.isStructured) ConnectionCurveStyle.Orthogonal else curveStyle
+            val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
                 style = effectiveStyle,
@@ -115,7 +115,7 @@ object ConnectionHitTester {
                 continue
             }
 
-            val effectiveStyle = if (connection.isStructured) ConnectionCurveStyle.Orthogonal else curveStyle
+            val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
                 style = effectiveStyle,
@@ -294,7 +294,7 @@ object ConnectionHitTester {
 
             if (screenPoints.size < 2) continue
 
-            val effectiveStyle = if (connection.isStructured) ConnectionCurveStyle.Orthogonal else curveStyle
+            val effectiveStyle = curveStyle
             val midpoints = SplineMathUtils.computeSegmentMidpoints(
                 points = screenPoints,
                 style = effectiveStyle,

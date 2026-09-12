@@ -196,6 +196,8 @@ object SplineMathUtils {
         return path
     }
 
+    enum class Orientation { Horizontal, Vertical }
+
     /**
      * Evaluates parametric midpoints (t = 0.5) for each segment of the connection path.
      */
@@ -213,11 +215,37 @@ object SplineMathUtils {
                 }
             }
             ConnectionCurveStyle.Orthogonal -> {
+                val orthoPoints = computeOrthogonalPoints(points)
                 (0 until points.size - 1).map { i ->
                     val p0 = points[i]
                     val p1 = points[i + 1]
-                    val midX = (p0.x + p1.x) * 0.5f
-                    Offset(midX, (p0.y + p1.y) * 0.5f)
+                    val idx0 = orthoPoints.indexOfFirst { (it - p0).getDistance() < 0.5f }
+                    val idx1 = orthoPoints.indexOfLast { (it - p1).getDistance() < 0.5f }
+                    if (idx0 != -1 && idx1 != -1 && idx1 > idx0) {
+                        val subPoints = orthoPoints.subList(idx0, idx1 + 1)
+                        var totalLen = 0f
+                        for (k in 0 until subPoints.size - 1) {
+                            totalLen += (subPoints[k + 1] - subPoints[k]).getDistance()
+                        }
+                        val halfLen = totalLen * 0.5f
+                        var accumulated = 0f
+                        var foundMid: Offset? = null
+                        for (k in 0 until subPoints.size - 1) {
+                            val segLen = (subPoints[k + 1] - subPoints[k]).getDistance()
+                            if (accumulated + segLen >= halfLen && segLen > 0f) {
+                                val t = (halfLen - accumulated) / segLen
+                                foundMid = Offset(
+                                    subPoints[k].x + (subPoints[k + 1].x - subPoints[k].x) * t,
+                                    subPoints[k].y + (subPoints[k + 1].y - subPoints[k].y) * t
+                                )
+                                break
+                            }
+                            accumulated += segLen
+                        }
+                        foundMid ?: Offset((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f)
+                    } else {
+                        Offset((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f)
+                    }
                 }
             }
             ConnectionCurveStyle.Bezier,
@@ -226,6 +254,109 @@ object SplineMathUtils {
                 segments.map { it.evaluate(0.5f) }
             }
         }
+    }
+
+    /**
+     * Expands a sequence of points into a single continuous orthogonal (horizontal and vertical) path.
+     * Respects port launch and arrival directions (leaving horizontally from outputs, arriving horizontally into inputs),
+     * and preserves directional continuity through intermediate waypoints (a horizontal pass-through enters and leaves
+     * horizontally; a vertical pass-through enters and leaves vertically) rather than inserting redundant middle staircases.
+     */
+    fun computeOrthogonalPoints(points: List<Offset>): List<Offset> {
+        if (points.size < 2) return points
+        if (points.size == 2) {
+            val p0 = points[0]
+            val p1 = points[1]
+            if (p0.x == p1.x || p0.y == p1.y) {
+                return listOf(p0, p1)
+            }
+            val midX = (p0.x + p1.x) / 2f
+            return listOf(p0, Offset(midX, p0.y), Offset(midX, p1.y), p1)
+        }
+
+        val n = points.size
+        val waypointOrientations = Array(n) { Orientation.Horizontal }
+        waypointOrientations[0] = Orientation.Horizontal
+        waypointOrientations[n - 1] = Orientation.Horizontal
+
+        for (i in 1 until n - 1) {
+            val prev = points[i - 1]
+            val curr = points[i]
+            val next = points[i + 1]
+
+            val dyIn = curr.y - prev.y
+            val dyOut = next.y - curr.y
+            val dxIn = curr.x - prev.x
+            val dxOut = next.x - curr.x
+
+            if (dyIn * dyOut < -0.01f) {
+                waypointOrientations[i] = Orientation.Horizontal
+            } else if (dxIn * dxOut < -0.01f) {
+                waypointOrientations[i] = Orientation.Vertical
+            } else {
+                waypointOrientations[i] = if (abs(dxOut) >= abs(dyOut)) Orientation.Horizontal else Orientation.Vertical
+            }
+        }
+
+        val result = mutableListOf<Offset>()
+        result.add(points[0])
+
+        for (i in 0 until n - 1) {
+            val pA = points[i]
+            val pB = points[i + 1]
+            val dirA = waypointOrientations[i]
+            val dirB = waypointOrientations[i + 1]
+
+            if (pA.x == pB.x || pA.y == pB.y) {
+                result.add(pB)
+            } else {
+                when {
+                    dirA == Orientation.Horizontal && dirB == Orientation.Vertical -> {
+                        result.add(Offset(pB.x, pA.y))
+                        result.add(pB)
+                    }
+                    dirA == Orientation.Vertical && dirB == Orientation.Horizontal -> {
+                        result.add(Offset(pA.x, pB.y))
+                        result.add(pB)
+                    }
+                    dirA == Orientation.Horizontal && dirB == Orientation.Horizontal -> {
+                        val midX = (pA.x + pB.x) / 2f
+                        result.add(Offset(midX, pA.y))
+                        result.add(Offset(midX, pB.y))
+                        result.add(pB)
+                    }
+                    dirA == Orientation.Vertical && dirB == Orientation.Vertical -> {
+                        val midY = (pA.y + pB.y) / 2f
+                        result.add(Offset(pA.x, midY))
+                        result.add(Offset(pB.x, midY))
+                        result.add(pB)
+                    }
+                }
+            }
+        }
+
+        return simplifyOrthogonalPath(result)
+    }
+
+    private fun simplifyOrthogonalPath(points: List<Offset>): List<Offset> {
+        if (points.size <= 2) return points
+        val simplified = mutableListOf<Offset>()
+        simplified.add(points[0])
+        for (i in 1 until points.size - 1) {
+            val prev = simplified.last()
+            val curr = points[i]
+            val next = points[i + 1]
+
+            val isCollinearH = abs(prev.y - curr.y) < 0.01f && abs(curr.y - next.y) < 0.01f
+            val isCollinearV = abs(prev.x - curr.x) < 0.01f && abs(curr.x - next.x) < 0.01f
+            val isDuplicate = (curr - prev).getDistance() < 0.01f
+
+            if (!isCollinearH && !isCollinearV && !isDuplicate) {
+                simplified.add(curr)
+            }
+        }
+        simplified.add(points.last())
+        return simplified
     }
 
     /**
@@ -275,17 +406,8 @@ object SplineMathUtils {
             }
 
             ConnectionCurveStyle.Orthogonal -> {
-                if (points.size == 2) {
-                    path.moveTo(points[0].x, points[0].y)
-                    val p0 = points[0]
-                    val p1 = points[1]
-                    val midX = (p0.x + p1.x) / 2f
-                    path.lineTo(midX, p0.y)
-                    path.lineTo(midX, p1.y)
-                    path.lineTo(p1.x, p1.y)
-                } else {
-                    return buildRoundedPolylinePath(points, cornerRadius = 8f)
-                }
+                val orthoPoints = computeOrthogonalPoints(points)
+                return buildRoundedPolylinePath(orthoPoints, cornerRadius = 8f)
             }
         }
 
@@ -312,17 +434,7 @@ object SplineMathUtils {
             }
 
             ConnectionCurveStyle.Orthogonal -> {
-                if (points.size == 2) {
-                    sampled.add(points[0])
-                    val p0 = points[0]
-                    val p1 = points[1]
-                    val midX = (p0.x + p1.x) / 2f
-                    sampled.add(Offset(midX, p0.y))
-                    sampled.add(Offset(midX, p1.y))
-                    sampled.add(p1)
-                } else {
-                    sampled.addAll(points)
-                }
+                sampled.addAll(computeOrthogonalPoints(points))
             }
 
             ConnectionCurveStyle.Bezier,

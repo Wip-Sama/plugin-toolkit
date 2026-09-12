@@ -1373,6 +1373,74 @@ class FlowEditorViewModel(
                 }
             }
 
+            is FlowEvent.DeleteConnectionSegment -> {
+                val conn = currentState.flow.connections.find {
+                    it == event.connection || (it.sourceNodeId == event.connection.sourceNodeId && it.sourcePortId == event.connection.sourcePortId && it.targetNodeId == event.connection.targetNodeId && it.targetPortId == event.connection.targetPortId)
+                }
+                if (conn != null) {
+                    val wps = conn.waypoints
+                    val count = wps.size
+                    val segIdx = event.segmentIndex
+                    if (count == 0) {
+                        newState = connectionManager.handleDeleteConnection(currentState, conn)
+                    } else if (segIdx == 0) {
+                        val newJuncId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
+                        val newJunc = FlowJunction(newJuncId, wps[0], conn.color)
+                        val remConn = conn.copy(
+                            sourceNodeId = -1L,
+                            sourcePortId = "",
+                            sourceJunctionId = newJuncId,
+                            waypoints = wps.drop(1)
+                        )
+                        val newConnections = currentState.flow.connections.filter { it != conn } + remConn
+                        newState = currentState.copy(
+                            flow = currentState.flow.copy(
+                                junctions = currentState.flow.junctions + newJunc,
+                                connections = newConnections
+                            ),
+                            hasUnsavedChanges = true
+                        )
+                    } else if (segIdx >= count) {
+                        val remConn = conn.copy(
+                            targetNodeId = -1L,
+                            targetPortId = "",
+                            targetJunctionId = null,
+                            floatingTarget = wps[count - 1],
+                            waypoints = wps.take(count - 1)
+                        )
+                        val newConnections = currentState.flow.connections.filter { it != conn } + remConn
+                        newState = currentState.copy(
+                            flow = currentState.flow.copy(connections = newConnections),
+                            hasUnsavedChanges = true
+                        )
+                    } else {
+                        val conn1 = conn.copy(
+                            targetNodeId = -1L,
+                            targetPortId = "",
+                            targetJunctionId = null,
+                            floatingTarget = wps[segIdx - 1],
+                            waypoints = wps.take(segIdx - 1)
+                        )
+                        val newJuncId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
+                        val newJunc = FlowJunction(newJuncId, wps[segIdx], conn.color)
+                        val conn2 = conn.copy(
+                            sourceNodeId = -1L,
+                            sourcePortId = "",
+                            sourceJunctionId = newJuncId,
+                            waypoints = wps.drop(segIdx + 1)
+                        )
+                        val newConnections = currentState.flow.connections.filter { it != conn } + conn1 + conn2
+                        newState = currentState.copy(
+                            flow = currentState.flow.copy(
+                                junctions = currentState.flow.junctions + newJunc,
+                                connections = newConnections
+                            ),
+                            hasUnsavedChanges = true
+                        )
+                    }
+                }
+            }
+
             is FlowEvent.MoveJunction -> {
                 val junc = currentState.flow.junctions.find { it.id == event.junctionId }
                 if (junc != null) {
@@ -1434,7 +1502,8 @@ class FlowEditorViewModel(
                     event.targetNodeId,
                     event.targetPortId,
                     event.waypoints,
-                    event.isStructured
+                    event.isStructured,
+                    event.targetJunctionId
                 )
                 if (newState !== stateBefore && newState.flow.connections != stateBefore.flow.connections) {
                     shouldRunTypeInference = true

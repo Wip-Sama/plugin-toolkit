@@ -42,6 +42,8 @@ import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import androidx.compose.ui.geometry.Offset
+import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.features.settings.model.FlowSettings
 import kotlin.test.AfterTest
@@ -1251,6 +1253,274 @@ class FlowEditorQoLTest {
         assertTrue(conn2.isStructured)
         assertEquals(listOf(wp1, wp2), conn2.waypoints)
         assertEquals(0, conn2.orderIndex)
+    }
+
+    @Test
+    fun testOrthogonalSplineWithWaypointsRemainsOrthogonal() {
+        val p0 = Offset(100f, 100f)
+        val p1 = Offset(250f, 180f)
+        val p2 = Offset(400f, 300f)
+        val orthoPoints = SplineMathUtils.computeOrthogonalPoints(listOf(p0, p1, p2))
+        assertTrue(orthoPoints.size > 3)
+        // Verify every segment is strictly axis-aligned (either dx == 0 or dy == 0)
+        for (i in 0 until orthoPoints.size - 1) {
+            val a = orthoPoints[i]
+            val b = orthoPoints[i + 1]
+            assertTrue(a.x == b.x || a.y == b.y, "Segment from $a to $b must be strictly orthogonal")
+        }
+        val path = SplineMathUtils.buildConnectionPath(listOf(p0, p1, p2), ConnectionCurveStyle.Orthogonal)
+        assertFalse(path.isEmpty)
+    }
+
+    @Test
+    fun testShiftSnapsAt45DegreesAndCtrlSnapsAt90Degrees() {
+        val start = Offset(100f, 100f)
+        val current = Offset(180f, 120f) // roughly 14 degrees
+        val shiftSnapped = SplineMathUtils.snapToStraightAngle(start, current)
+        val dx = kotlin.math.abs(shiftSnapped.x - start.x)
+        val dy = kotlin.math.abs(shiftSnapped.y - start.y)
+        // At 45 degrees, dx is either 0, dy is 0, or dx is equal to dy
+        val isHorizontal = dy < 0.01f
+        val isVertical = dx < 0.01f
+        val isDiagonal = kotlin.math.abs(dx - dy) < 0.01f
+        assertTrue(isHorizontal || isVertical || isDiagonal, "Shift snap must produce 45 degree angle increment")
+
+        val ctrlSnapped = SplineMathUtils.snapToOrthogonal(start, current)
+        assertTrue(ctrlSnapped.x == start.x || ctrlSnapped.y == start.y, "Ctrl snap must be strictly horizontal or vertical (90 deg)")
+    }
+
+    @Test
+    fun testDeleteConnectionCleansUpOrphanJunction() {
+        val junc = FlowJunction(id = 50L, position = ModelOffset(100f, 100f))
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 50L
+        )
+        val flow = Flow(name = "TestOrphanJunction", junctions = listOf(junc), connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        vm.onEvent(FlowEvent.DeleteConnection(conn))
+        // Since no other connections connect to junction 50, it must be cleaned up
+        assertEquals(0, vm.state.value.flow.junctions.size)
+        assertEquals(0, vm.state.value.flow.connections.size)
+    }
+
+    @Test
+    fun testDeleteConnectionKeepsJunctionIfOtherConnectionsRemain() {
+        val junc = FlowJunction(id = 50L, position = ModelOffset(100f, 100f))
+        val conn1 = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 50L
+        )
+        val conn2 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 50L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val flow = Flow(name = "TestJunctionKept", junctions = listOf(junc), connections = listOf(conn1, conn2))
+        val vm = createViewModel(flow)
+
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        vm.onEvent(FlowEvent.DeleteConnection(conn1))
+        // conn2 still connects to junction 50, so junction must remain
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        assertEquals(1, vm.state.value.flow.connections.size)
+        assertEquals(conn2, vm.state.value.flow.connections.first())
+    }
+
+    @Test
+    fun testConnectPortsWithWaypointsToExistingJunction() {
+        val junc = FlowJunction(id = 99L, position = ModelOffset(200f, 200f))
+        val flow = Flow(name = "TestConnectToJunction", junctions = listOf(junc))
+        val vm = createViewModel(flow)
+
+        vm.onEvent(
+            FlowEvent.ConnectPortsWithWaypoints(
+                sourceNodeId = 10L,
+                sourcePortId = "out",
+                targetNodeId = -1L,
+                targetPortId = "",
+                targetJunctionId = 99L,
+                waypoints = listOf(ModelOffset(150f, 150f)),
+                isStructured = true
+            )
+        )
+
+        val connections = vm.state.value.flow.connections
+        assertEquals(1, connections.size)
+        val conn = connections.first()
+        assertEquals(10L, conn.sourceNodeId)
+        assertEquals("out", conn.sourcePortId)
+        assertEquals(99L, conn.targetJunctionId)
+        assertEquals(listOf(ModelOffset(150f, 150f)), conn.waypoints)
+        assertTrue(conn.isStructured)
+    }
+
+    @Test
+    fun testComputeOrthogonalPointsContinuousRouting() {
+        // Test an L-corner path: (0,0) -> (100,0) -> (100,100)
+        val lPoints = listOf(Offset(0f, 0f), Offset(100f, 0f), Offset(100f, 100f))
+        val orthoL = SplineMathUtils.computeOrthogonalPoints(lPoints)
+        // Should only have 3 points without extra midX insertions
+        assertEquals(3, orthoL.size)
+        assertEquals(Offset(0f, 0f), orthoL[0])
+        assertEquals(Offset(100f, 0f), orthoL[1])
+        assertEquals(Offset(100f, 100f), orthoL[2])
+
+        // Verify that all segments in an arbitrary orthogonal path are strictly horizontal or vertical
+        val steppedPoints = listOf(Offset(0f, 0f), Offset(100f, 50f), Offset(200f, 100f))
+        val orthoStepped = SplineMathUtils.computeOrthogonalPoints(steppedPoints)
+        for (i in 0 until orthoStepped.size - 1) {
+            val pA = orthoStepped[i]
+            val pB = orthoStepped[i + 1]
+            val isHorizontal = kotlin.math.abs(pA.y - pB.y) < 0.01f
+            val isVertical = kotlin.math.abs(pA.x - pB.x) < 0.01f
+            assertTrue(isHorizontal || isVertical, "Segment from $pA to $pB must be orthogonal")
+        }
+    }
+
+    @Test
+    fun testComputeOrthogonalPointsDirectionalContinuity() {
+        val points = listOf(
+            Offset(0f, 0f),
+            Offset(50f, 100f),
+            Offset(50f, 200f),
+            Offset(150f, 200f)
+        )
+        val ortho = SplineMathUtils.computeOrthogonalPoints(points)
+        // Ensure strictly orthogonal
+        for (i in 0 until ortho.size - 1) {
+            val pA = ortho[i]
+            val pB = ortho[i + 1]
+            val isHorizontal = kotlin.math.abs(pA.y - pB.y) < 0.01f
+            val isVertical = kotlin.math.abs(pA.x - pB.x) < 0.01f
+            assertTrue(isHorizontal || isVertical, "Segment $pA -> $pB must be orthogonal")
+        }
+        assertEquals(Offset(0f, 0f), ortho.first())
+        assertEquals(Offset(150f, 200f), ortho.last())
+    }
+
+    @Test
+    fun testStructuredConnectionRetainsCurveStyle() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(50f, 50f)),
+            isStructured = true
+        )
+        val getPortPos: (Long, String, Boolean) -> Offset? = { id, _, _ ->
+            if (id == 1L) Offset(0f, 0f) else Offset(100f, 100f)
+        }
+        val proj = ConnectionHitTester.findClosestConnectionWithProjection(
+            position = Offset(25f, 25f),
+            connections = listOf(conn),
+            getPortBoardPosition = getPortPos,
+            scale = 1f,
+            offset = Offset.Zero,
+            junctions = emptyList(),
+            curveStyle = ConnectionCurveStyle.Straight
+        )
+        assertNotNull(proj)
+        assertEquals(conn, proj.connection)
+        // With Straight style, (25, 25) lies exactly on the segment (0,0) -> (50,50)
+        assertEquals(25f, proj.projectedPoint.x, 0.5f)
+        assertEquals(25f, proj.projectedPoint.y, 0.5f)
+        assertEquals(0, proj.segmentIndex)
+    }
+
+    @Test
+    fun testDeleteConnectionSegmentSplitsConnectionInMiddle() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(100f, 50f), ModelOffset(200f, 150f)),
+            color = "#FF00FF"
+        )
+        val flow = Flow(name = "TestSplitConn", connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Delete middle segment (segmentIndex = 1)
+        vm.onEvent(FlowEvent.DeleteConnectionSegment(conn, segmentIndex = 1))
+
+        val conns = vm.state.value.flow.connections
+        assertEquals(2, conns.size)
+
+        // Part 1: sourceNodeId = 1L, floatingTarget = (100, 50), empty waypoints
+        val conn1 = conns.find { it.sourceNodeId == 1L }
+        assertNotNull(conn1)
+        assertEquals(ModelOffset(100f, 50f), conn1.floatingTarget)
+        assertEquals(emptyList(), conn1.waypoints)
+        assertEquals(-1L, conn1.targetNodeId)
+
+        // Part 2: starts from new junction at (200, 150), targets node 2
+        val createdJunc = vm.state.value.flow.junctions.firstOrNull()
+        assertNotNull(createdJunc)
+        assertEquals(ModelOffset(200f, 150f), createdJunc.position)
+
+        val conn2 = conns.find { it.targetNodeId == 2L }
+        assertNotNull(conn2)
+        assertEquals(createdJunc.id, conn2.sourceJunctionId)
+        assertEquals(emptyList(), conn2.waypoints)
+    }
+
+    @Test
+    fun testDeleteConnectionSegmentFirstAndLastSegments() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(100f, 50f))
+        )
+        val flow = Flow(name = "TestSegDelete", connections = listOf(conn))
+
+        // Case 1: Deleting last segment (segmentIndex = 1) turns connection into floating at waypoint 0
+        val vm1 = createViewModel(flow)
+        vm1.onEvent(FlowEvent.DeleteConnectionSegment(conn, segmentIndex = 1))
+        val conns1 = vm1.state.value.flow.connections
+        assertEquals(1, conns1.size)
+        val floatConn = conns1.first()
+        assertEquals(1L, floatConn.sourceNodeId)
+        assertEquals(-1L, floatConn.targetNodeId)
+        assertEquals(ModelOffset(100f, 50f), floatConn.floatingTarget)
+        assertTrue(floatConn.waypoints.isEmpty())
+
+        // Case 2: Deleting first segment (segmentIndex = 0) creates junction at waypoint 0 and connects junction to target
+        val vm2 = createViewModel(flow)
+        vm2.onEvent(FlowEvent.DeleteConnectionSegment(conn, segmentIndex = 0))
+        val conns2 = vm2.state.value.flow.connections
+        assertEquals(1, conns2.size)
+        val juncConn = conns2.first()
+        assertEquals(2L, juncConn.targetNodeId)
+        assertNotNull(juncConn.sourceJunctionId)
+        val junc = vm2.state.value.flow.junctions.firstOrNull()
+        assertNotNull(junc)
+        assertEquals(ModelOffset(100f, 50f), junc.position)
+        assertEquals(junc.id, juncConn.sourceJunctionId)
+    }
+
+    @Test
+    fun testComputeSegmentMidpointsOrthogonal() {
+        val points = listOf(Offset(0f, 0f), Offset(100f, 0f), Offset(100f, 100f))
+        val midpoints = SplineMathUtils.computeSegmentMidpoints(points, ConnectionCurveStyle.Orthogonal)
+        assertEquals(2, midpoints.size)
+        assertEquals(50f, midpoints[0].x, 0.5f)
+        assertEquals(0f, midpoints[0].y, 0.5f)
+        assertEquals(100f, midpoints[1].x, 0.5f)
+        assertEquals(50f, midpoints[1].y, 0.5f)
     }
 }
 

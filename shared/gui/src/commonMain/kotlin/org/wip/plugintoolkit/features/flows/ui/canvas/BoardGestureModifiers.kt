@@ -305,14 +305,15 @@ fun Modifier.boardPointerEventGesture(
     onMoveWaypoint: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
     onDeleteWaypoint: ((Connection, Int) -> Unit)? = null,
     onInsertWaypoint: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
-    onFinalizeStructuredConnection: ((Long?, String?, Long?, Long, String, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit)? = null,
+    onFinalizeStructuredConnection: ((Long?, String?, Long?, Long, String, List<org.wip.plugintoolkit.features.flows.model.Offset>, Long?) -> Unit)? = null,
     connectionStartNodeId: Long? = null,
     connectionStartPortId: String? = null,
     connectionStartIsOutput: Boolean = true,
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
     roundness: Float = 0.5f,
     isAdvancedConnectionMode: Boolean = false,
-    onAddJunctionAndBranch: ((Connection, Offset, Int) -> Unit)? = null
+    onAddJunctionAndBranch: ((Connection, Offset, Int) -> Unit)? = null,
+    onDeleteConnectionSegment: ((Connection, Int) -> Unit)? = null
 ): Modifier {
     val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
     val currentScale by rememberUpdatedState(scale)
@@ -331,6 +332,7 @@ fun Modifier.boardPointerEventGesture(
     val currentOnAddWaypoint by rememberUpdatedState(onAddWaypoint)
     val currentOnMoveWaypoint by rememberUpdatedState(onMoveWaypoint)
     val currentOnDeleteWaypoint by rememberUpdatedState(onDeleteWaypoint)
+    val currentOnDeleteConnectionSegment by rememberUpdatedState(onDeleteConnectionSegment)
     val currentOnInsertWaypoint by rememberUpdatedState(onInsertWaypoint)
     val currentOnFinalizeStructuredConnection by rememberUpdatedState(onFinalizeStructuredConnection)
     val currentConnectionStartNodeId by rememberUpdatedState(connectionStartNodeId)
@@ -378,13 +380,14 @@ fun Modifier.boardPointerEventGesture(
                         if (dist > 4f) {
                             val (conn, segIdx) = interactionState.pendingMidpoint!!
                             val boardPos = (position - currentOffset) / currentScale
+                            val isAlt = event.keyboardModifiers.isAltPressed || interactionState.isAltModifierPressed || interactionState.pendingMidpointWasAltPressed
 
-                            if (conn.isStructured || currentIsAdvancedConnectionMode) {
+                            if (isAlt) {
                                 val junctionMap = currentJunctions.associate { it.id to it.position.toComposeOffset() }
                                 val screenPoints = ConnectionHitTester.getConnectionScreenPoints(
                                     conn, currentGetPortBoardPosition, junctionMap, currentScale, currentOffset
                                 )
-                                val effectiveStyle = if (conn.isStructured) ConnectionCurveStyle.Orthogonal else currentCurveStyle
+                                val effectiveStyle = currentCurveStyle
                                 val midpoints = if (screenPoints != null) {
                                     SplineMathUtils.computeSegmentMidpoints(screenPoints, effectiveStyle, currentRoundness)
                                 } else null
@@ -401,10 +404,12 @@ fun Modifier.boardPointerEventGesture(
                                 interactionState.structuredConnectionPoints = mutableListOf()
                                 interactionState.structuredConnectionLivePos = boardPos
                                 interactionState.pendingMidpoint = null
+                                interactionState.pendingMidpointWasAltPressed = false
                             } else {
                                 currentOnInsertWaypoint?.invoke(conn, segIdx, boardPos.toModelOffset())
                                 interactionState.draggingWaypoint = Pair(conn, segIdx)
                                 interactionState.pendingMidpoint = null
+                                interactionState.pendingMidpointWasAltPressed = false
                             }
                         }
                     }
@@ -528,92 +533,144 @@ fun Modifier.boardPointerEventGesture(
                     interactionState.hoveredJunctionId = null
                     interactionState.clearHoveredWaypoint()
                     interactionState.clearHoveredMidpoint()
+                    interactionState.draggingWaypoint = null
+                    interactionState.draggingJunctionId = null
+                    interactionState.pendingMidpoint = null
+                    interactionState.pendingMidpointWasAltPressed = false
                 } else if (event.type == PointerEventType.Press) {
-                    if (interactionState.isDrawingStructuredConnection && event.buttons.isPrimaryPressed) {
-                        // Check if over a port to finalize
-                        var clickedPortNodeId: Long? = null
-                        var clickedPortId: String? = null
-                        currentNodes.forEach { node ->
-                            val portsToCheck = if (interactionState.structuredConnectionStartIsOutput) node.inputs else node.outputs
-                            portsToCheck.forEach { port ->
-                                val portBoardPos = currentGetPortBoardPosition(node.id, port.id, !interactionState.structuredConnectionStartIsOutput) ?: return@forEach
-                                val portScreenPos = (portBoardPos * currentScale) + currentOffset
-                                if ((position - portScreenPos).getDistance() < 32f) {
-                                    clickedPortNodeId = node.id
-                                    clickedPortId = port.id
-                                }
-                            }
+                    if (event.buttons.isSecondaryPressed) {
+                        // Right-click cancels ongoing drawing sessions cleanly
+                        if (interactionState.isDrawingStructuredConnection) {
+                            interactionState.resetStructuredConnection()
+                            event.changes.forEach { it.consume() }
+                        } else if (currentIsDrawingConnection) {
+                            currentOnConnectionDrop(false)
+                            event.changes.forEach { it.consume() }
                         }
-
-                        if (clickedPortNodeId != null && clickedPortId != null) {
-                            val finalTargetNodeId = if (interactionState.structuredConnectionStartIsOutput) clickedPortNodeId!! else (interactionState.structuredConnectionStartNodeId ?: -1L)
-                            val finalTargetPortId = if (interactionState.structuredConnectionStartIsOutput) clickedPortId!! else (interactionState.structuredConnectionStartPortId ?: "")
-                            val finalSourceNodeId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else clickedPortNodeId!!
-                            val finalSourcePortId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else clickedPortId!!
+                    } else if (interactionState.isDrawingStructuredConnection && event.buttons.isPrimaryPressed) {
+                        // Check if over an existing junction to finalize
+                        val targetJuncId = interactionState.hoveredJunctionId
+                        if (targetJuncId != null && targetJuncId != interactionState.structuredConnectionSourceJunctionId) {
+                            val finalSourceNodeId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else -1L
+                            val finalSourcePortId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else ""
+                            val finalTargetNodeId = if (!interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else -1L
+                            val finalTargetPortId = if (!interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else ""
+                            val finalSrcJuncId = if (!interactionState.structuredConnectionStartIsOutput) targetJuncId else interactionState.structuredConnectionSourceJunctionId
+                            val finalTgtJuncId = if (interactionState.structuredConnectionStartIsOutput) targetJuncId else null
 
                             currentOnFinalizeStructuredConnection?.invoke(
                                 finalSourceNodeId,
                                 finalSourcePortId,
-                                interactionState.structuredConnectionSourceJunctionId,
+                                finalSrcJuncId,
                                 finalTargetNodeId,
                                 finalTargetPortId,
-                                interactionState.structuredConnectionPoints.map { it.toModelOffset() }
+                                interactionState.structuredConnectionPoints.map { it.toModelOffset() },
+                                finalTgtJuncId
                             )
                             interactionState.resetStructuredConnection()
                             event.changes.forEach { it.consume() }
                         } else {
-                            // Commit point to structured connection
-                            val startBoardPos = if (interactionState.structuredConnectionSourceJunctionId != null) {
-                                currentJunctions.find { it.id == interactionState.structuredConnectionSourceJunctionId }?.position?.toComposeOffset()
-                            } else if (interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null) {
-                                currentGetPortBoardPosition(interactionState.structuredConnectionStartNodeId!!, interactionState.structuredConnectionStartPortId!!, interactionState.structuredConnectionStartIsOutput)
-                            } else null
+                            // Check if over a port to finalize
+                            var clickedPortNodeId: Long? = null
+                            var clickedPortId: String? = null
+                            currentNodes.forEach { node ->
+                                val portsToCheck = if (interactionState.structuredConnectionStartIsOutput) node.inputs else node.outputs
+                                portsToCheck.forEach { port ->
+                                    val portBoardPos = currentGetPortBoardPosition(node.id, port.id, !interactionState.structuredConnectionStartIsOutput) ?: return@forEach
+                                    val portScreenPos = (portBoardPos * currentScale) + currentOffset
+                                    if ((position - portScreenPos).getDistance() < 32f) {
+                                        clickedPortNodeId = node.id
+                                        clickedPortId = port.id
+                                    }
+                                }
+                            }
 
-                            val lastPoint = if (interactionState.structuredConnectionPoints.isNotEmpty()) {
-                                interactionState.structuredConnectionPoints.last()
+                            if (clickedPortNodeId != null && clickedPortId != null) {
+                                val finalTargetNodeId = if (interactionState.structuredConnectionStartIsOutput) clickedPortNodeId!! else (interactionState.structuredConnectionStartNodeId ?: -1L)
+                                val finalTargetPortId = if (interactionState.structuredConnectionStartIsOutput) clickedPortId!! else (interactionState.structuredConnectionStartPortId ?: "")
+                                val finalSourceNodeId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else clickedPortNodeId!!
+                                val finalSourcePortId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else clickedPortId!!
+
+                                currentOnFinalizeStructuredConnection?.invoke(
+                                    finalSourceNodeId,
+                                    finalSourcePortId,
+                                    interactionState.structuredConnectionSourceJunctionId,
+                                    finalTargetNodeId,
+                                    finalTargetPortId,
+                                    interactionState.structuredConnectionPoints.map { it.toModelOffset() },
+                                    null
+                                )
+                                interactionState.resetStructuredConnection()
+                                event.changes.forEach { it.consume() }
                             } else {
-                                startBoardPos ?: ((position - currentOffset) / currentScale)
-                            }
+                                // Commit point to structured connection
+                                val startBoardPos = if (interactionState.structuredConnectionSourceJunctionId != null) {
+                                    currentJunctions.find { it.id == interactionState.structuredConnectionSourceJunctionId }?.position?.toComposeOffset()
+                                } else if (interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null) {
+                                    currentGetPortBoardPosition(interactionState.structuredConnectionStartNodeId!!, interactionState.structuredConnectionStartPortId!!, interactionState.structuredConnectionStartIsOutput)
+                                } else null
 
-                            var committedPos = (position - currentOffset) / currentScale
-                            if (interactionState.isShiftModifierPressed || event.keyboardModifiers.isShiftPressed) {
-                                committedPos = SplineMathUtils.snapToStraightAngle(lastPoint, committedPos)
-                            } else if (interactionState.isCtrlModifierPressed || event.keyboardModifiers.isCtrlPressed) {
-                                committedPos = SplineMathUtils.snapToOrthogonal(lastPoint, committedPos)
+                                val lastPoint = if (interactionState.structuredConnectionPoints.isNotEmpty()) {
+                                    interactionState.structuredConnectionPoints.last()
+                                } else {
+                                    startBoardPos ?: ((position - currentOffset) / currentScale)
+                                }
+
+                                var committedPos = (position - currentOffset) / currentScale
+                                if (interactionState.isShiftModifierPressed || event.keyboardModifiers.isShiftPressed) {
+                                    committedPos = SplineMathUtils.snapToStraightAngle(lastPoint, committedPos)
+                                } else if (interactionState.isCtrlModifierPressed || event.keyboardModifiers.isCtrlPressed) {
+                                    committedPos = SplineMathUtils.snapToOrthogonal(lastPoint, committedPos)
+                                }
+                                interactionState.structuredConnectionPoints = (interactionState.structuredConnectionPoints + committedPos).toMutableList()
+                                event.changes.forEach { it.consume() }
                             }
-                            interactionState.structuredConnectionPoints = (interactionState.structuredConnectionPoints + committedPos).toMutableList()
-                            event.changes.forEach { it.consume() }
                         }
-                    } else if (event.keyboardModifiers.isAltPressed && event.buttons.isPrimaryPressed) {
-                        val connProj = ConnectionHitTester.findClosestConnectionWithProjection(
-                            position = position,
-                            connections = currentConnections,
-                            getPortBoardPosition = currentGetPortBoardPosition,
-                            scale = currentScale,
-                            offset = currentOffset,
-                            junctions = currentJunctions,
-                            curveStyle = currentCurveStyle,
-                            roundness = currentRoundness
-                        )
-                        if (connProj != null) {
-                            if (currentOnInsertWaypoint != null) {
-                                currentOnInsertWaypoint?.invoke(connProj.connection, connProj.segmentIndex, connProj.projectedPoint.toModelOffset())
-                            } else if (currentOnAddWaypoint != null) {
-                                currentOnAddWaypoint?.invoke(connProj.connection, connProj.projectedPoint)
+                    } else if (event.buttons.isPrimaryPressed) {
+                        val isAlt = event.keyboardModifiers.isAltPressed || interactionState.isAltModifierPressed
+                        val isShift = event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed
+
+                        if (interactionState.hoveredMidpoint != null) {
+                            interactionState.pendingMidpoint = interactionState.hoveredMidpoint
+                            interactionState.pendingMidpointPressPos = position
+                            interactionState.pendingMidpointWasAltPressed = isAlt
+                            event.changes.forEach { it.consume() }
+                        } else if (interactionState.hoveredWaypoint != null) {
+                            if (isShift) {
+                                val wp = interactionState.hoveredWaypoint!!
+                                currentOnDeleteWaypoint?.invoke(wp.first, wp.second)
+                                interactionState.hoveredWaypoint = null
+                            } else {
+                                interactionState.draggingWaypoint = interactionState.hoveredWaypoint
                             }
                             event.changes.forEach { it.consume() }
-                        }
-                    } else if (event.keyboardModifiers.isShiftPressed && event.buttons.isPrimaryPressed) {
-                        val wp = interactionState.hoveredWaypoint
-                        if (wp != null && currentOnDeleteWaypoint != null) {
-                            currentOnDeleteWaypoint?.invoke(wp.first, wp.second)
-                            interactionState.hoveredWaypoint = null
-                            event.changes.forEach { it.consume() }
-                        } else {
-                            val juncId = interactionState.hoveredJunctionId
-                            if (juncId != null && currentOnDeleteJunction != null) {
+                        } else if (interactionState.hoveredJunctionId != null) {
+                            if (isShift) {
+                                val juncId = interactionState.hoveredJunctionId!!
                                 currentOnDeleteJunction?.invoke(juncId)
                                 interactionState.hoveredJunctionId = null
+                            } else {
+                                interactionState.draggingJunctionId = interactionState.hoveredJunctionId
+                            }
+                            event.changes.forEach { it.consume() }
+                        } else if (isShift) {
+                            val connProj = ConnectionHitTester.findClosestConnectionWithProjection(
+                                position = position,
+                                connections = currentConnections,
+                                getPortBoardPosition = currentGetPortBoardPosition,
+                                scale = currentScale,
+                                offset = currentOffset,
+                                junctions = currentJunctions,
+                                curveStyle = currentCurveStyle,
+                                roundness = currentRoundness
+                            )
+                            if (connProj != null && connProj.connection.waypoints.isNotEmpty() && currentOnDeleteConnectionSegment != null) {
+                                currentOnDeleteConnectionSegment?.invoke(connProj.connection, connProj.segmentIndex)
+                                interactionState.clearHoveredConnection()
+                                if (interactionState.selectedConnection == connProj.connection) {
+                                    interactionState.selectedConnection = null
+                                }
+                                event.changes.forEach { it.consume() }
                             } else {
                                 interactionState.hoveredConnection?.let { conn ->
                                     currentOnDeleteConnection(conn)
@@ -622,6 +679,26 @@ fun Modifier.boardPointerEventGesture(
                                         interactionState.selectedConnection = null
                                     }
                                 }
+                                event.changes.forEach { it.consume() }
+                            }
+                        } else if (isAlt) {
+                            val connProj = ConnectionHitTester.findClosestConnectionWithProjection(
+                                position = position,
+                                connections = currentConnections,
+                                getPortBoardPosition = currentGetPortBoardPosition,
+                                scale = currentScale,
+                                offset = currentOffset,
+                                junctions = currentJunctions,
+                                curveStyle = currentCurveStyle,
+                                roundness = currentRoundness
+                            )
+                            if (connProj != null) {
+                                if (currentOnInsertWaypoint != null) {
+                                    currentOnInsertWaypoint?.invoke(connProj.connection, connProj.segmentIndex, connProj.projectedPoint.toModelOffset())
+                                } else if (currentOnAddWaypoint != null) {
+                                    currentOnAddWaypoint?.invoke(connProj.connection, connProj.projectedPoint)
+                                }
+                                event.changes.forEach { it.consume() }
                             }
                         }
                     } else if (event.keyboardModifiers.isCtrlPressed) {
@@ -631,27 +708,17 @@ fun Modifier.boardPointerEventGesture(
                             currentOnDetachConnection(conn, isSrc, boardPos)
                             event.changes.forEach { it.consume() }
                         }
-                    } else if (event.buttons.isPrimaryPressed) {
-                        if (interactionState.hoveredMidpoint != null) {
-                            interactionState.pendingMidpoint = interactionState.hoveredMidpoint
-                            interactionState.pendingMidpointPressPos = position
-                        } else if (interactionState.hoveredWaypoint != null) {
-                            interactionState.draggingWaypoint = interactionState.hoveredWaypoint
-                            event.changes.forEach { it.consume() }
-                        } else if (interactionState.hoveredJunctionId != null) {
-                            interactionState.draggingJunctionId = interactionState.hoveredJunctionId
-                            event.changes.forEach { it.consume() }
-                        }
                     }
                 } else if (event.type == PointerEventType.Release) {
                     if (interactionState.pendingMidpoint != null) {
                         val (conn, segIdx) = interactionState.pendingMidpoint!!
-                        if (conn.isStructured || currentIsAdvancedConnectionMode) {
+                        val isAlt = event.keyboardModifiers.isAltPressed || interactionState.isAltModifierPressed || interactionState.pendingMidpointWasAltPressed
+                        if (isAlt) {
                             val junctionMap = currentJunctions.associate { it.id to it.position.toComposeOffset() }
                             val screenPoints = ConnectionHitTester.getConnectionScreenPoints(
                                 conn, currentGetPortBoardPosition, junctionMap, currentScale, currentOffset
                             )
-                            val effectiveStyle = if (conn.isStructured) ConnectionCurveStyle.Orthogonal else currentCurveStyle
+                            val effectiveStyle = currentCurveStyle
                             val midpoints = if (screenPoints != null) {
                                 SplineMathUtils.computeSegmentMidpoints(screenPoints, effectiveStyle, currentRoundness)
                             } else null
@@ -669,6 +736,7 @@ fun Modifier.boardPointerEventGesture(
                             interactionState.structuredConnectionLivePos = midBoardPos
                         }
                         interactionState.pendingMidpoint = null
+                        interactionState.pendingMidpointWasAltPressed = false
                     }
                     interactionState.draggingJunctionId = null
                     interactionState.draggingWaypoint = null

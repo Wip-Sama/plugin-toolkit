@@ -103,7 +103,8 @@ class FlowConnectionManager(
         targetNodeId: Long,
         targetPortId: String,
         waypoints: List<ModelOffset>,
-        isStructured: Boolean
+        isStructured: Boolean,
+        targetJunctionId: Long? = null
     ): FlowEditorState {
         if (sourceNodeId == targetNodeId && sourceNodeId != -1L) return currentState
 
@@ -130,7 +131,7 @@ class FlowConnectionManager(
         }
 
         val isList = targetPort?.dataType is DataType.Array
-        val filteredConnections = if (isList) {
+        val filteredConnections = if (isList || targetJunctionId != null) {
             currentState.flow.connections
         } else {
             currentState.flow.connections.filterNot {
@@ -139,12 +140,12 @@ class FlowConnectionManager(
         }
 
         if (sourceNodeId != -1L && sourcePortId.isNotEmpty() &&
-            filteredConnections.any { it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId && it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }
+            filteredConnections.any { it.sourceNodeId == sourceNodeId && it.sourcePortId == sourcePortId && it.targetNodeId == targetNodeId && it.targetPortId == targetPortId && it.targetJunctionId == targetJunctionId }
         ) {
             return currentState // Already connected exactly
         }
 
-        if (sourceNodeId != -1L && FlowCycleDetector.wouldCreateCycle(
+        if (sourceNodeId != -1L && targetNodeId != -1L && FlowCycleDetector.wouldCreateCycle(
                 sourceNodeId,
                 targetNodeId,
                 filteredConnections
@@ -166,6 +167,7 @@ class FlowConnectionManager(
             orderIndex = orderIndex,
             waypoints = waypoints,
             sourceJunctionId = sourceJunctionId,
+            targetJunctionId = targetJunctionId,
             isStructured = isStructured
         )
 
@@ -319,8 +321,14 @@ class FlowConnectionManager(
                 conn
             }
         }
+        val remainingJunctions = currentState.flow.junctions.filter { junc ->
+            remainingConnections.any { it.sourceJunctionId == junc.id || it.targetJunctionId == junc.id }
+        }
         return currentState.copy(
-            flow = currentState.flow.copy(connections = remainingConnections),
+            flow = currentState.flow.copy(
+                connections = remainingConnections,
+                junctions = remainingJunctions
+            ),
             hasUnsavedChanges = true
         )
     }

@@ -268,70 +268,101 @@ fun FlowEditorView(
     val duplicateFlowMsg = stringResource(Res.string.flow_editor_duplicate_error)
 
     val handleConnectionDrop: (Boolean) -> Unit = { isShiftPressed ->
-        if (interactionState.isDrawingStructuredConnection) {
-            // Do not handle normal drop during structured connection drawing
-        } else if (highlightedPortId != null && highlightedNodeId != null && connectionStartNodeId != null && connectionStartPortId != null) {
-            val sourceNodeId =
-                if (connectionStartIsOutput) connectionStartNodeId!! else highlightedNodeId!!
-            val sourcePortId =
-                if (connectionStartIsOutput) connectionStartPortId!! else highlightedPortId!!
-            val targetNodeId =
-                if (connectionStartIsOutput) highlightedNodeId!! else connectionStartNodeId!!
-            val targetPortId =
-                if (connectionStartIsOutput) highlightedPortId!! else connectionStartPortId!!
+        if (interactionState.isDrawingStructuredConnection || !isDrawingConnection) {
+            // Do not handle normal drop during structured connection drawing or if not actively drawing
+        } else {
+            isDrawingConnection = false
+            val startNodeId = connectionStartNodeId
+            val startPortId = connectionStartPortId
+            val startIsOutput = connectionStartIsOutput
+            val hlPortId = highlightedPortId
+            val hlNodeId = highlightedNodeId
+            val hJuncId = interactionState.hoveredJunctionId
+            val currPos = connectionCurrentPos
 
-            viewModel.onEvent(
-                FlowEvent.TryConnectPorts(
-                    sourceNodeId,
-                    sourcePortId,
-                    targetNodeId,
-                    targetPortId,
-                    isShiftPressed
-                )
-            )
-        } else if (connectionStartNodeId != null && connectionStartPortId != null) {
-            val dropScreenPos = (connectionCurrentPos * state.scale) + state.offset
-            val closestConnAndProj = ConnectionHitTester.findClosestConnectionWithProjection(
-                position = dropScreenPos,
-                connections = flow.connections,
-                getPortBoardPosition = getPortBoardPosition,
-                scale = state.scale,
-                offset = state.offset,
-                junctions = flow.junctions,
-                curveStyle = state.connectionCurveStyle,
-                roundness = state.connectionRoundness
-            )
-            if (closestConnAndProj != null) {
-                val (closestConn, splitPos) = closestConnAndProj
-                val branchSrcNodeId = if (connectionStartIsOutput) connectionStartNodeId else null
-                val branchSrcPortId = if (connectionStartIsOutput) connectionStartPortId else null
-                val branchTgtNodeId = if (!connectionStartIsOutput) connectionStartNodeId else null
-                val branchTgtPortId = if (!connectionStartIsOutput) connectionStartPortId else null
+            connectionStartNodeId = null
+            connectionStartPortId = null
+            highlightedPortId = null
+            highlightedNodeId = null
+
+            if (hlPortId != null && hlNodeId != null && startNodeId != null && startPortId != null) {
+                val sourceNodeId = if (startIsOutput) startNodeId else hlNodeId
+                val sourcePortId = if (startIsOutput) startPortId else hlPortId
+                val targetNodeId = if (startIsOutput) hlNodeId else startNodeId
+                val targetPortId = if (startIsOutput) hlPortId else startPortId
+
                 viewModel.onEvent(
-                    FlowEvent.AddJunctionAndBranch(
-                        connection = closestConn,
-                        splitPosition = splitPos.toModelOffset(),
-                        branchSourceNodeId = branchSrcNodeId,
-                        branchSourcePortId = branchSrcPortId,
-                        branchTargetNodeId = branchTgtNodeId,
-                        branchTargetPortId = branchTgtPortId
+                    FlowEvent.TryConnectPorts(
+                        sourceNodeId,
+                        sourcePortId,
+                        targetNodeId,
+                        targetPortId,
+                        isShiftPressed
                     )
                 )
-            } else if (connectionStartIsOutput) {
-                viewModel.onEvent(
-                    FlowEvent.CreateFloatingConnection(
-                        sourceNodeId = connectionStartNodeId!!,
-                        sourcePortId = connectionStartPortId!!,
-                        floatingTarget = connectionCurrentPos.toModelOffset()
+            } else if (hJuncId != null && startNodeId != null && startPortId != null) {
+                if (startIsOutput) {
+                    viewModel.onEvent(
+                        FlowEvent.ConnectPortsWithWaypoints(
+                            sourceNodeId = startNodeId,
+                            sourcePortId = startPortId,
+                            targetNodeId = -1L,
+                            targetPortId = "",
+                            targetJunctionId = hJuncId,
+                            isStructured = false
+                        )
                     )
+                } else {
+                    viewModel.onEvent(
+                        FlowEvent.ConnectPortsWithWaypoints(
+                            sourceNodeId = -1L,
+                            sourcePortId = "",
+                            targetNodeId = startNodeId,
+                            targetPortId = startPortId,
+                            sourceJunctionId = hJuncId,
+                            isStructured = false
+                        )
+                    )
+                }
+            } else if (startNodeId != null && startPortId != null) {
+                val dropScreenPos = (currPos * state.scale) + state.offset
+                val closestConnAndProj = ConnectionHitTester.findClosestConnectionWithProjection(
+                    position = dropScreenPos,
+                    connections = flow.connections,
+                    getPortBoardPosition = getPortBoardPosition,
+                    scale = state.scale,
+                    offset = state.offset,
+                    junctions = flow.junctions,
+                    curveStyle = state.connectionCurveStyle,
+                    roundness = state.connectionRoundness
                 )
+                if (closestConnAndProj != null) {
+                    val (closestConn, splitPos) = closestConnAndProj
+                    val branchSrcNodeId = if (startIsOutput) startNodeId else null
+                    val branchSrcPortId = if (startIsOutput) startPortId else null
+                    val branchTgtNodeId = if (!startIsOutput) startNodeId else null
+                    val branchTgtPortId = if (!startIsOutput) startPortId else null
+                    viewModel.onEvent(
+                        FlowEvent.AddJunctionAndBranch(
+                            connection = closestConn,
+                            splitPosition = splitPos.toModelOffset(),
+                            branchSourceNodeId = branchSrcNodeId,
+                            branchSourcePortId = branchSrcPortId,
+                            branchTargetNodeId = branchTgtNodeId,
+                            branchTargetPortId = branchTgtPortId
+                        )
+                    )
+                } else if (startIsOutput) {
+                    viewModel.onEvent(
+                        FlowEvent.CreateFloatingConnection(
+                            sourceNodeId = startNodeId,
+                            sourcePortId = startPortId,
+                            floatingTarget = currPos.toModelOffset()
+                        )
+                    )
+                }
             }
         }
-        isDrawingConnection = false
-        connectionStartNodeId = null
-        connectionStartPortId = null
-        highlightedPortId = null
-        highlightedNodeId = null
     }
 
     Box(
@@ -459,23 +490,25 @@ fun FlowEditorView(
                 viewModel.onEvent(FlowEvent.MoveWaypoint(conn, index, newPos))
             },
             onDeleteWaypoint = { conn, index -> viewModel.onEvent(FlowEvent.DeleteWaypoint(conn, index)) },
+            onDeleteConnectionSegment = { conn, index ->
+                viewModel.onEvent(FlowEvent.DeleteConnectionSegment(conn, index))
+            },
             onInsertWaypoint = { conn, index, pos ->
                 viewModel.onEvent(FlowEvent.AddWaypoint(conn, pos, index))
             },
-            onFinalizeStructuredConnection = { srcNodeId, srcPortId, srcJuncId, tgtNodeId, tgtPortId, waypoints ->
-                if (srcNodeId != null && srcPortId != null) {
-                    viewModel.onEvent(
-                        FlowEvent.ConnectPortsWithWaypoints(
-                            sourceNodeId = srcNodeId,
-                            sourcePortId = srcPortId,
-                            targetNodeId = tgtNodeId,
-                            targetPortId = tgtPortId,
-                            waypoints = waypoints,
-                            sourceJunctionId = srcJuncId,
-                            isStructured = true
-                        )
+            onFinalizeStructuredConnection = { srcNodeId, srcPortId, srcJuncId, tgtNodeId, tgtPortId, waypoints, tgtJuncId ->
+                viewModel.onEvent(
+                    FlowEvent.ConnectPortsWithWaypoints(
+                        sourceNodeId = srcNodeId ?: -1L,
+                        sourcePortId = srcPortId ?: "",
+                        targetNodeId = tgtNodeId,
+                        targetPortId = tgtPortId,
+                        waypoints = waypoints,
+                        sourceJunctionId = srcJuncId,
+                        targetJunctionId = tgtJuncId,
+                        isStructured = true
                     )
-                }
+                )
             },
             onLeaveStructuredConnectionAtLastPoint = { srcNodeId, srcPortId, srcJuncId, waypoints ->
                 if (srcNodeId != null && srcPortId != null && waypoints.isNotEmpty()) {
