@@ -146,6 +146,7 @@ fun BoardCanvas(
     onResizeGroup: (Long, Offset) -> Unit = { _, _ -> },
     onSelectLabels: (Set<Long>) -> Unit = {},
     onSelectGroups: (Set<Long>) -> Unit = {},
+    onSelectPoints: (Set<Long>) -> Unit = {},
     onAddWaypoint: (Connection, Offset) -> Unit = { _, _ -> },
     onMoveWaypoint: (Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit = { _, _, _ -> },
     onDeleteWaypoint: (Connection, Int) -> Unit = { _, _ -> },
@@ -153,6 +154,8 @@ fun BoardCanvas(
     onInsertWaypoint: (Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit = { _, _, _ -> },
     onFinalizeStructuredConnection: (Long?, String?, Long?, Long, String, List<org.wip.plugintoolkit.features.flows.model.Offset>, Long?) -> Unit = { _, _, _, _, _, _, _ -> },
     onLeaveStructuredConnectionAtLastPoint: (Long?, String?, Long?, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit = { _, _, _, _ -> },
+    onSplitConnectionAndConnect: ((Connection, org.wip.plugintoolkit.features.flows.model.Offset, Long?, String?, Long?, Long?, String?, Long?, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit)? = null,
+    onResetDrawingConnection: () -> Unit = {},
     onToggleStructuredConnectionMode: () -> Unit = {},
     onAddJunctionAndBranch: (Connection, Offset, Int) -> Unit = { _, _, _ -> },
     onToggleEyedropper: () -> Unit = {},
@@ -357,6 +360,10 @@ fun BoardCanvas(
                 roundness = state.connectionRoundness,
                 isAdvancedConnectionMode = state.isAdvancedConnectionMode,
                 onAddJunctionAndBranch = onAddJunctionAndBranch,
+                selectedPointIds = state.selectedPointIds,
+                onSelectPoints = onSelectPoints,
+                onSplitConnectionAndConnect = onSplitConnectionAndConnect,
+                onResetDrawingConnection = onResetDrawingConnection,
                 shortcutManager = shortcutManager
             )
             .boardSelectionBoxGesture(
@@ -372,8 +379,10 @@ fun BoardCanvas(
                 onSelectNodes = onSelectNodes,
                 labels = flow.labels,
                 groups = flow.groups,
+                junctions = flow.junctions,
                 onSelectLabels = onSelectLabels,
                 onSelectGroups = onSelectGroups,
+                onSelectPoints = onSelectPoints,
                 isPaintToolActive = state.isPaintToolActive,
                 isWashToolActive = state.isWashToolActive,
                 onPaintSelection = onPaintSelection,
@@ -384,7 +393,8 @@ fun BoardCanvas(
         val isDraggedInSelection = state.draggedNodeId != null && (
             state.selectedNodeIds.contains(state.draggedNodeId) ||
             state.selectedGroupIds.contains(state.draggedNodeId) ||
-            state.selectedLabelIds.contains(state.draggedNodeId)
+            state.selectedLabelIds.contains(state.draggedNodeId) ||
+            state.selectedPointIds.contains(state.draggedNodeId)
         )
 
         val movingGroupIds = remember(state.draggedNodeId, state.selectedGroupIds, isDraggedInSelection, flow.groups) {

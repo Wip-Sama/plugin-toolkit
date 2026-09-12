@@ -344,6 +344,10 @@
     <string name="flow_editor_incompatible_semantics">Cannot connect: Incompatible semantic types. '%1$s' cannot connect to '%2$s'.</string>
     <string name="flow_editor_btn_exit">Exit</string>
     <string name="flow_info_title">Canvas Shortcuts &amp; Controls</string>
+    <string name="flow_info_cat_navigation">Navigation &amp; Board</string>
+    <string name="flow_info_cat_selection">Selection &amp; Nodes</string>
+    <string name="flow_info_cat_connections">Connections &amp; Points</string>
+    <string name="flow_info_cat_tools">Colors &amp; Tools</string>
     <string name="flow_info_pan_label">Right / Middle Drag</string>
     <string name="flow_info_pan_desc">Pan canvas</string>
     <string name="flow_info_zoom_label">Scroll / Buttons</string>

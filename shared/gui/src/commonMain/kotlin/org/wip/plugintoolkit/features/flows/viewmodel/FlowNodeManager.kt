@@ -51,11 +51,13 @@ class FlowNodeManager {
         val finalOffset = currentState.currentDragOffset
         val isSelectedMove = currentState.selectedNodeIds.contains(id) ||
                 currentState.selectedGroupIds.contains(id) ||
-                currentState.selectedLabelIds.contains(id)
+                currentState.selectedLabelIds.contains(id) ||
+                currentState.selectedPointIds.contains(id)
 
         val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (currentState.flow.nodes.any { it.id == id }) setOf(id) else emptySet()).toMutableSet()
         val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (currentState.flow.groups.any { it.id == id }) setOf(id) else emptySet()
         val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (currentState.flow.labels.any { it.id == id }) setOf(id) else emptySet()
+        val pointsToMove = if (isSelectedMove) currentState.selectedPointIds else if (currentState.flow.junctions.any { it.id == id }) setOf(id) else emptySet()
 
         for (grpId in groupsToMove) {
             currentState.flow.groups.find { it.id == grpId }?.let { nodesToMove.addAll(it.nodeIds) }
@@ -82,8 +84,14 @@ class FlowNodeManager {
             } else lbl
         }
 
+        val updatedJunctions = currentState.flow.junctions.map { junc ->
+            if (pointsToMove.contains(junc.id)) {
+                junc.copy(position = (junc.position + finalOffset).snapToGrid())
+            } else junc
+        }
+
         val reorderedNodes = updatedNodes.filter { !nodesToMove.contains(it.id) } + updatedNodes.filter { nodesToMove.contains(it.id) }
-        val newFlow = currentState.flow.copy(nodes = reorderedNodes, groups = updatedGroups, labels = updatedLabels)
+        val newFlow = currentState.flow.copy(nodes = reorderedNodes, groups = updatedGroups, labels = updatedLabels, junctions = updatedJunctions)
         val newSelection = if (isSelectedMove) currentState.selectedNodeIds else (if (currentState.flow.nodes.any { it.id == id }) setOf(id) else currentState.selectedNodeIds)
 
         return currentState.copy(

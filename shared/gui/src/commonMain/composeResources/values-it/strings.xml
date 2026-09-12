@@ -344,6 +344,10 @@
     <string name="flow_editor_incompatible_semantics">Impossibile connettere: tipi semantici incompatibili. \'%1$s\' non può connettersi a \'%2$s\'.</string>
     <string name="flow_editor_btn_exit">Esci</string>
     <string name="flow_info_title">Scorciatoie e Controlli</string>
+    <string name="flow_info_cat_navigation">Navigazione e Tavola</string>
+    <string name="flow_info_cat_selection">Selezione e Nodi</string>
+    <string name="flow_info_cat_connections">Connessioni e Punti</string>
+    <string name="flow_info_cat_tools">Colori e Strumenti</string>
     <string name="flow_info_pan_label">Trascina DX / Centrale</string>
     <string name="flow_info_pan_desc">Sposta l\'area di lavoro</string>
     <string name="flow_info_zoom_label">Rotella / Pulsanti</string>

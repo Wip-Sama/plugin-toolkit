@@ -558,13 +558,15 @@ sealed class Node : BoardElement {
 }
 
 @Serializable
-data class FlowJunction(
+data class ConnectionPoint(
     override val id: Long,
     override val position: Offset,
     val color: String? = null
 ) : BoardElement {
-    override fun copyWithPosition(newPosition: Offset): FlowJunction = copy(position = newPosition)
+    override fun copyWithPosition(newPosition: Offset): ConnectionPoint = copy(position = newPosition)
 }
+
+typealias FlowJunction = ConnectionPoint
 
 @Serializable
 data class FlowGroup(
@@ -649,6 +651,8 @@ data class Flow(
     val description: String? = null,
     val defaultValues: Map<String, JsonElement> = emptyMap()
 ) {
+    val connectionPoints: List<ConnectionPoint> get() = junctions
+
     fun allBoardElements(): List<BoardElement> = nodes + groups + labels + junctions
     fun findBoardElement(id: Long): BoardElement? =
         nodes.find { it.id == id }
@@ -660,8 +664,142 @@ data class Flow(
         is Node -> copy(nodes = nodes.map { if (it.id == element.id) element else it })
         is FlowGroup -> copy(groups = groups.map { if (it.id == element.id) element else it })
         is FlowLabel -> copy(labels = labels.map { if (it.id == element.id) element else it })
-        is FlowJunction -> copy(junctions = junctions.map { if (it.id == element.id) element else it })
+        is ConnectionPoint -> copy(junctions = junctions.map { if (it.id == element.id) element else it })
         else -> this
+    }
+
+    /**
+     * Detects and purges stray/dangling points (intermediate waypoints or junction nodes
+     * that have lost their incoming source or outgoing target connections).
+     * Disallows persisting points that do not belong to an active wire path.
+     */
+    fun purgeStrayPoints(): Flow {
+        val validNodeIds = nodes.map { it.id }.toSet()
+        val hasNodes = validNodeIds.isNotEmpty()
+
+        var currentConns = connections.filter { conn ->
+            val sourceValid = (conn.sourceNodeId < 0L && conn.sourceJunctionId != null) ||
+                    (if (hasNodes) conn.sourceNodeId in validNodeIds else conn.sourceNodeId >= 0L)
+            val targetValid = (conn.targetNodeId < 0L && (conn.targetJunctionId != null || conn.floatingTarget != null)) ||
+                    (if (hasNodes) conn.targetNodeId in validNodeIds else conn.targetNodeId >= 0L)
+            sourceValid && targetValid
+        }
+
+        val currentJunctions = junctions.associateBy { it.id }.toMutableMap()
+
+        var changed = true
+        while (changed) {
+            changed = false
+
+            // 1. Forward reachability from active source nodes
+            val reachableFromSource = mutableSetOf<Long>()
+            val forwardQueue = ArrayDeque<Long>()
+
+            for (conn in currentConns) {
+                val isSourceNode = if (hasNodes) conn.sourceNodeId in validNodeIds else conn.sourceNodeId >= 0L
+                if (isSourceNode && conn.targetJunctionId != null && conn.targetJunctionId in currentJunctions) {
+                    if (reachableFromSource.add(conn.targetJunctionId)) {
+                        forwardQueue.add(conn.targetJunctionId)
+                    }
+                }
+            }
+
+            val outFromJunc = currentConns.filter { it.sourceJunctionId != null }.groupBy { it.sourceJunctionId!! }
+            while (forwardQueue.isNotEmpty()) {
+                val jId = forwardQueue.removeFirst()
+                val outList = outFromJunc[jId].orEmpty()
+                for (conn in outList) {
+                    val tgtJuncId = conn.targetJunctionId
+                    if (tgtJuncId != null && tgtJuncId in currentJunctions && reachableFromSource.add(tgtJuncId)) {
+                        forwardQueue.add(tgtJuncId)
+                    }
+                }
+            }
+
+            // Junctions with 0 connections in currentConns are always stray
+            val connectedJunctionIds = currentConns.flatMap { listOfNotNull(it.sourceJunctionId, it.targetJunctionId) }.toSet()
+
+            // An active junction belongs to an active wire path originating from a source node and is connected
+            val activeJunctionIds = reachableFromSource.intersect(connectedJunctionIds)
+            val strayJunctionIds = currentJunctions.keys - activeJunctionIds
+
+            if (strayJunctionIds.isNotEmpty()) {
+                for (id in strayJunctionIds) {
+                    currentJunctions.remove(id)
+                }
+                currentConns = currentConns.filter { conn ->
+                    (conn.sourceJunctionId == null || conn.sourceJunctionId !in strayJunctionIds) &&
+                    (conn.targetJunctionId == null || conn.targetJunctionId !in strayJunctionIds)
+                }
+                changed = true
+            }
+        }
+
+        return copy(
+            junctions = junctions.filter { it.id in currentJunctions.keys },
+            connections = currentConns
+        )
+    }
+
+    /**
+     * Converts legacy connection waypoints into first-class ConnectionPoint instances.
+     */
+    fun normalizeWirePoints(): Flow {
+        if (connections.none { it.waypoints.isNotEmpty() }) return this
+
+        var nextPointId = (junctions.maxOfOrNull { it.id } ?: 0L) + 1L
+        val newJunctions = junctions.toMutableList()
+        val newConnections = mutableListOf<Connection>()
+
+        for (conn in connections) {
+            if (conn.waypoints.isEmpty()) {
+                newConnections.add(conn)
+            } else {
+                var prevSourceNodeId = conn.sourceNodeId
+                var prevSourcePortId = conn.sourcePortId
+                var prevSourceJunctionId = conn.sourceJunctionId
+
+                conn.waypoints.forEachIndexed { index, wp ->
+                    val pointId = nextPointId++
+                    val cp = ConnectionPoint(id = pointId, position = wp, color = conn.color)
+                    newJunctions.add(cp)
+
+                    newConnections.add(
+                        Connection(
+                            sourceNodeId = prevSourceNodeId,
+                            sourcePortId = prevSourcePortId,
+                            targetNodeId = -1L,
+                            targetPortId = "",
+                            targetJunctionId = pointId,
+                            color = conn.color,
+                            sourceJunctionId = prevSourceJunctionId,
+                            isStructured = conn.isStructured
+                        )
+                    )
+
+                    prevSourceNodeId = -1L
+                    prevSourcePortId = ""
+                    prevSourceJunctionId = pointId
+                }
+
+                newConnections.add(
+                    Connection(
+                        sourceNodeId = -1L,
+                        sourcePortId = "",
+                        targetNodeId = conn.targetNodeId,
+                        targetPortId = conn.targetPortId,
+                        orderIndex = conn.orderIndex,
+                        color = conn.color,
+                        sourceJunctionId = prevSourceJunctionId,
+                        targetJunctionId = conn.targetJunctionId,
+                        floatingTarget = conn.floatingTarget,
+                        isStructured = conn.isStructured
+                    )
+                )
+            }
+        }
+
+        return copy(junctions = newJunctions, connections = newConnections)
     }
 
     fun getEffectiveConnections(): List<Connection> {

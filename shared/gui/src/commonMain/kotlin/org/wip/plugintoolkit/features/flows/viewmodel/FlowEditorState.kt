@@ -37,6 +37,7 @@ data class FlowEditorState(
     val selectedNodeIds: Set<Long> = emptySet(),
     val selectedLabelIds: Set<Long> = emptySet(),
     val selectedGroupIds: Set<Long> = emptySet(),
+    val selectedPointIds: Set<Long> = emptySet(),
     val isReadOnly: Boolean = false,
     val readOnlyReasons: List<ReadOnlyReason> = emptyList(),
     val pendingConnection: PendingConnection? = null,

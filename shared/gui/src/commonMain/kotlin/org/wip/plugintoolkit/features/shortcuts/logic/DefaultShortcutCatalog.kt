@@ -282,6 +282,11 @@ object DefaultShortcutCatalog {
                     isAlt = true,
                     pointerButton = ShortcutPointerButton.Left,
                     gesture = ShortcutGesture.Click
+                ),
+                ShortcutTrigger(
+                    isShift = true,
+                    pointerButton = ShortcutPointerButton.Left,
+                    gesture = ShortcutGesture.Drag
                 )
             ),
             relativePriority = ShortcutPriorities.Relative.NORMAL

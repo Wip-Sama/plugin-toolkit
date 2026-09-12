@@ -321,14 +321,11 @@ class FlowConnectionManager(
                 conn
             }
         }
-        val remainingJunctions = currentState.flow.junctions.filter { junc ->
-            remainingConnections.any { it.sourceJunctionId == junc.id || it.targetJunctionId == junc.id }
-        }
+        val purgedFlow = currentState.flow.copy(
+            connections = remainingConnections
+        ).purgeStrayPoints()
         return currentState.copy(
-            flow = currentState.flow.copy(
-                connections = remainingConnections,
-                junctions = remainingJunctions
-            ),
+            flow = purgedFlow,
             hasUnsavedChanges = true
         )
     }

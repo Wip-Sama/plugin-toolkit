@@ -230,4 +230,177 @@ class FlowJunctionResolutionTest {
         val effective = flow.getEffectiveConnections()
         assertEquals(0, effective.size)
     }
+
+    @Test
+    fun testPurgeStrayPointsEliminatesDisconnectedJunctions() {
+        val isolatedJunction = FlowJunction(100L, Offset(50f, 50f))
+        val flow = Flow(
+            name = "isolated_flow",
+            junctions = listOf(isolatedJunction),
+            connections = emptyList()
+        )
+
+        val purged = flow.purgeStrayPoints()
+        assertTrue(purged.junctions.isEmpty())
+        assertTrue(purged.connections.isEmpty())
+    }
+
+    @Test
+    fun testPurgeStrayPointsEliminatesJunctionWithoutIncomingSource() {
+        val junction = FlowJunction(100L, Offset(50f, 50f))
+        val deadEndOut = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 100L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val flow = Flow(
+            name = "no_source_flow",
+            junctions = listOf(junction),
+            connections = listOf(deadEndOut)
+        )
+
+        val purged = flow.purgeStrayPoints()
+        assertTrue(purged.junctions.isEmpty())
+        assertTrue(purged.connections.isEmpty())
+    }
+
+    @Test
+    fun testPurgeStrayPointsRetainsValidWireSegmentReachableFromSourceNode() {
+        val j1 = FlowJunction(101L, Offset(50f, 50f))
+        val j2 = FlowJunction(102L, Offset(100f, 100f))
+        val conn1 = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 101L
+        )
+        val conn2 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 101L,
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 102L
+        )
+        val flow = Flow(
+            name = "valid_segment_flow",
+            junctions = listOf(j1, j2),
+            connections = listOf(conn1, conn2)
+        )
+
+        val purged = flow.purgeStrayPoints()
+        // The left part originating from source node 1 with 2 valid points must remain alive!
+        assertEquals(2, purged.junctions.size)
+        assertEquals(2, purged.connections.size)
+    }
+
+    @Test
+    fun testPurgeStrayPointsRetainsValidJunctionChain() {
+        val j1 = FlowJunction(101L, Offset(50f, 50f))
+        val j2 = FlowJunction(102L, Offset(100f, 100f))
+        val conn1 = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 101L
+        )
+        val conn2 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 101L,
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 102L
+        )
+        val conn3 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 102L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+
+        val flow = Flow(
+            name = "chain_flow",
+            junctions = listOf(j1, j2),
+            connections = listOf(conn1, conn2, conn3)
+        )
+
+        val purged = flow.purgeStrayPoints()
+        assertEquals(2, purged.junctions.size)
+        assertEquals(3, purged.connections.size)
+    }
+
+    @Test
+    fun testPurgeStrayPointsRetainsBranchingJunction() {
+        val j1 = FlowJunction(101L, Offset(50f, 50f))
+        val connIn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 101L
+        )
+        val connOut1 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 101L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val connOut2 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 101L,
+            targetNodeId = 3L,
+            targetPortId = "in"
+        )
+
+        val flow = Flow(
+            name = "branching_flow",
+            junctions = listOf(j1),
+            connections = listOf(connIn, connOut1, connOut2)
+        )
+
+        val purged = flow.purgeStrayPoints()
+        assertEquals(1, purged.junctions.size)
+        assertEquals(3, purged.connections.size)
+    }
+
+    @Test
+    fun testNormalizeWirePointsConvertsWaypointsToConnectionPoints() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(Offset(100f, 100f), Offset(200f, 200f)),
+            color = "#00AAFF",
+            isStructured = true
+        )
+
+        val flow = Flow(
+            name = "waypoints_flow",
+            connections = listOf(conn)
+        )
+
+        val normalized = flow.normalizeWirePoints()
+        assertEquals(2, normalized.junctions.size)
+        assertEquals(3, normalized.connections.size)
+
+        // Verify waypoints are cleared on the resulting connections
+        assertTrue(normalized.connections.all { it.waypoints.isEmpty() })
+        assertTrue(normalized.connections.all { it.isStructured })
+        assertTrue(normalized.connections.all { it.color == "#00AAFF" })
+
+        // Verify points can be resolved back to effective connections
+        val effective = normalized.getEffectiveConnections()
+        assertEquals(1, effective.size)
+        assertEquals(1L, effective[0].sourceNodeId)
+        assertEquals(2L, effective[0].targetNodeId)
+    }
 }

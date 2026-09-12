@@ -1,19 +1,12 @@
 package org.wip.plugintoolkit.features.flows.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.HorizontalDivider
@@ -21,116 +14,37 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import org.jetbrains.compose.resources.stringResource
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.flow_info_title
-import plugintoolkit.composeapp.generated.resources.flow_info_pan_label
-import plugintoolkit.composeapp.generated.resources.flow_info_pan_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_zoom_label
-import plugintoolkit.composeapp.generated.resources.flow_info_zoom_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_select_label
-import plugintoolkit.composeapp.generated.resources.flow_info_select_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_box_select_label
-import plugintoolkit.composeapp.generated.resources.flow_info_box_select_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_move_label
-import plugintoolkit.composeapp.generated.resources.flow_info_move_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_connect_label
-import plugintoolkit.composeapp.generated.resources.flow_info_connect_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_detach_label
-import plugintoolkit.composeapp.generated.resources.flow_info_detach_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_branch_label
-import plugintoolkit.composeapp.generated.resources.flow_info_branch_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_waypoint_label
-import plugintoolkit.composeapp.generated.resources.flow_info_waypoint_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_structured_mode_label
-import plugintoolkit.composeapp.generated.resources.flow_info_structured_mode_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_paint_label
-import plugintoolkit.composeapp.generated.resources.flow_info_paint_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_wash_label
-import plugintoolkit.composeapp.generated.resources.flow_info_wash_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_pipette_label
-import plugintoolkit.composeapp.generated.resources.flow_info_pipette_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_rename_label
-import plugintoolkit.composeapp.generated.resources.flow_info_rename_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_resize_label
-import plugintoolkit.composeapp.generated.resources.flow_info_resize_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_order_label
-import plugintoolkit.composeapp.generated.resources.flow_info_order_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_hover_label
-import plugintoolkit.composeapp.generated.resources.flow_info_hover_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_delete_label
-import plugintoolkit.composeapp.generated.resources.flow_info_delete_desc
-import plugintoolkit.composeapp.generated.resources.flow_info_undo_redo_label
-import plugintoolkit.composeapp.generated.resources.flow_info_undo_redo_desc
-
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.font.FontWeight
+import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.core.model.resolve
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
 import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.flow_info_cat_connections
+import plugintoolkit.composeapp.generated.resources.flow_info_cat_navigation
+import plugintoolkit.composeapp.generated.resources.flow_info_cat_selection
+import plugintoolkit.composeapp.generated.resources.flow_info_cat_tools
+import plugintoolkit.composeapp.generated.resources.flow_info_title
 
 @Composable
 fun FlowControlsInfoCard(
     modifier: Modifier = Modifier
 ) {
-    val shortcutManager = LocalShortcutManager.current
-    val settings by (shortcutManager?.settings ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
-
-    val panLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_PAN_CANVAS)
-    }
-    val zoomLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_ZOOM_CANVAS)
-    }
-    val selectLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_SELECT_NODE)
-    }
-    val boxSelectLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_BOX_SELECT)
-    }
-    val moveLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_MOVE_NODE)
-    }
-    val connectLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_CONNECT_PORT)
-    }
-    val detachLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_DETACH_CONNECTION)
-    }
-    val branchLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_BRANCH_WIRE)
-    }
-    val structuredModeLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_STRUCTURED_MODE)?.let { "$it / Click" }
-    }
-    val paintLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_PAINT_TOOL)
-    }
-    val washLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_WASH_TOOL)
-    }
-    val eyedropperLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_EYEDROPPER)
-    }
-    val deleteLabel = remember(settings) {
-        shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_DELETE_SELECTED)
-    }
-    val undoRedoLabel = remember(settings) {
-        val undoStr = shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_UNDO) ?: "Ctrl+Z"
-        val redoStr = shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_REDO) ?: "Ctrl+Y"
-        "$undoStr / $redoStr"
-    }
-
     Surface(
         modifier = modifier
-            .widthIn(min = ToolkitTheme.dimensions.nodeWidth, max = ToolkitTheme.dimensions.nodeWidth)
+            .widthIn(
+                min = ToolkitTheme.dimensions.emptyStateTextWidth * 1.8f,
+                max = ToolkitTheme.dimensions.emptyStateTextWidth * 2.2f
+            )
             .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.medium),
         shape = ToolkitTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -140,13 +54,13 @@ fun FlowControlsInfoCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+            modifier = Modifier.padding(ToolkitTheme.spacing.small),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
         ) {
             // Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
             ) {
                 Icon(
                     imageVector = Icons.Default.Info,
@@ -167,85 +81,73 @@ fun FlowControlsInfoCard(
                 color = MaterialTheme.colorScheme.outlineVariant
             )
 
-            // Shortcut list
-            Column(
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
+            // Categorized 4-column layout
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
             ) {
-                ShortcutRow(
-                    badgeText = panLabel ?: stringResource(Res.string.flow_info_pan_label),
-                    description = stringResource(Res.string.flow_info_pan_desc)
+                // Column 1: Navigation & Board
+                InfoCategoryColumn(
+                    title = stringResource(Res.string.flow_info_cat_navigation),
+                    actionIds = listOf(
+                        ShortcutActionId.FLOW_PAN_CANVAS,
+                        ShortcutActionId.FLOW_ZOOM_CANVAS,
+                        ShortcutActionId.FLOW_UNDO,
+                        ShortcutActionId.FLOW_REDO
+                    ),
+                    modifier = Modifier.weight(1f)
                 )
-                ShortcutRow(
-                    badgeText = zoomLabel ?: stringResource(Res.string.flow_info_zoom_label),
-                    description = stringResource(Res.string.flow_info_zoom_desc)
+
+                VerticalDivider(
+                    thickness = ToolkitTheme.dimensions.borderThin,
+                    color = MaterialTheme.colorScheme.outlineVariant
                 )
-                ShortcutRow(
-                    badgeText = selectLabel ?: stringResource(Res.string.flow_info_select_label),
-                    description = stringResource(Res.string.flow_info_select_desc)
+
+                // Column 2: Selection & Nodes
+                InfoCategoryColumn(
+                    title = stringResource(Res.string.flow_info_cat_selection),
+                    actionIds = listOf(
+                        ShortcutActionId.FLOW_SELECT_NODE,
+                        ShortcutActionId.FLOW_BOX_SELECT,
+                        ShortcutActionId.FLOW_MOVE_NODE,
+                        ShortcutActionId.FLOW_DELETE_SELECTED
+                    ),
+                    modifier = Modifier.weight(1f)
                 )
-                ShortcutRow(
-                    badgeText = boxSelectLabel ?: stringResource(Res.string.flow_info_box_select_label),
-                    description = stringResource(Res.string.flow_info_box_select_desc)
+
+                VerticalDivider(
+                    thickness = ToolkitTheme.dimensions.borderThin,
+                    color = MaterialTheme.colorScheme.outlineVariant
                 )
-                ShortcutRow(
-                    badgeText = moveLabel ?: stringResource(Res.string.flow_info_move_label),
-                    description = stringResource(Res.string.flow_info_move_desc)
+
+                // Column 3: Connections & Points
+                InfoCategoryColumn(
+                    title = stringResource(Res.string.flow_info_cat_connections),
+                    actionIds = listOf(
+                        ShortcutActionId.FLOW_CONNECT_PORT,
+                        ShortcutActionId.FLOW_DETACH_CONNECTION,
+                        ShortcutActionId.FLOW_BRANCH_WIRE,
+                        ShortcutActionId.FLOW_MOVE_POINT,
+                        ShortcutActionId.FLOW_CREATE_RAMIFICATION,
+                        ShortcutActionId.FLOW_STRUCTURED_MODE
+                    ),
+                    modifier = Modifier.weight(1f)
                 )
-                ShortcutRow(
-                    badgeText = connectLabel ?: stringResource(Res.string.flow_info_connect_label),
-                    description = stringResource(Res.string.flow_info_connect_desc)
+
+                VerticalDivider(
+                    thickness = ToolkitTheme.dimensions.borderThin,
+                    color = MaterialTheme.colorScheme.outlineVariant
                 )
-                ShortcutRow(
-                    badgeText = detachLabel ?: stringResource(Res.string.flow_info_detach_label),
-                    description = stringResource(Res.string.flow_info_detach_desc)
-                )
-                ShortcutRow(
-                    badgeText = branchLabel ?: stringResource(Res.string.flow_info_branch_label),
-                    description = stringResource(Res.string.flow_info_branch_desc)
-                )
-                ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_waypoint_label),
-                    description = stringResource(Res.string.flow_info_waypoint_desc)
-                )
-                ShortcutRow(
-                    badgeText = structuredModeLabel ?: stringResource(Res.string.flow_info_structured_mode_label),
-                    description = stringResource(Res.string.flow_info_structured_mode_desc)
-                )
-                ShortcutRow(
-                    badgeText = paintLabel ?: stringResource(Res.string.flow_info_paint_label),
-                    description = stringResource(Res.string.flow_info_paint_desc)
-                )
-                ShortcutRow(
-                    badgeText = washLabel ?: stringResource(Res.string.flow_info_wash_label),
-                    description = stringResource(Res.string.flow_info_wash_desc)
-                )
-                ShortcutRow(
-                    badgeText = eyedropperLabel ?: stringResource(Res.string.flow_info_pipette_label),
-                    description = stringResource(Res.string.flow_info_pipette_desc)
-                )
-                ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_rename_label),
-                    description = stringResource(Res.string.flow_info_rename_desc)
-                )
-                ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_resize_label),
-                    description = stringResource(Res.string.flow_info_resize_desc)
-                )
-                ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_order_label),
-                    description = stringResource(Res.string.flow_info_order_desc)
-                )
-                ShortcutRow(
-                    badgeText = stringResource(Res.string.flow_info_hover_label),
-                    description = stringResource(Res.string.flow_info_hover_desc)
-                )
-                ShortcutRow(
-                    badgeText = deleteLabel ?: stringResource(Res.string.flow_info_delete_label),
-                    description = stringResource(Res.string.flow_info_delete_desc)
-                )
-                ShortcutRow(
-                    badgeText = undoRedoLabel,
-                    description = stringResource(Res.string.flow_info_undo_redo_desc)
+
+                // Column 4: Colors & Tools
+                InfoCategoryColumn(
+                    title = stringResource(Res.string.flow_info_cat_tools),
+                    actionIds = listOf(
+                        ShortcutActionId.FLOW_PAINT_TOOL,
+                        ShortcutActionId.FLOW_WASH_TOOL,
+                        ShortcutActionId.FLOW_EYEDROPPER
+                    ),
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -253,43 +155,104 @@ fun FlowControlsInfoCard(
 }
 
 @Composable
-private fun ShortcutRow(
-    badgeText: String,
-    description: String,
+private fun InfoCategoryColumn(
+    title: String,
+    actionIds: List<String>,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+    val shortcutManager = LocalShortcutManager.current
+    val settings by (shortcutManager?.settings ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
     ) {
-        Surface(
-            shape = ToolkitTheme.shapes.extraSmall,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            border = androidx.compose.foundation.BorderStroke(
-                width = ToolkitTheme.dimensions.borderThin,
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-        ) {
-            Text(
-                text = badgeText,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(
-                    horizontal = ToolkitTheme.spacing.extraSmall,
-                    vertical = ToolkitTheme.spacing.extraExtraSmall
-                )
-            )
-        }
-
-        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-
         Text(
-            text = description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
         )
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
+        ) {
+            actionIds.forEach { actionId ->
+                val action = remember(actionId, settings) { shortcutManager?.getAction(actionId) }
+                val triggerFormatted = remember(actionId, settings) {
+                    shortcutManager?.formatEffectiveTriggers(actionId) ?: "[ None ]"
+                }
+                val situationLabel = remember(action) {
+                    action?.situation?.displayLabel?.let { "($it)" } ?: ""
+                }
+                val behaviorLabel = action?.title?.resolve() ?: actionId
+
+                ShortcutItemView(
+                    triggerText = triggerFormatted,
+                    situationText = situationLabel,
+                    behaviorText = behaviorLabel
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShortcutItemView(
+    triggerText: String,
+    situationText: String,
+    behaviorText: String,
+    modifier: Modifier = Modifier
+) {
+    val triggers = remember(triggerText) {
+        triggerText.split(" / ").map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
+    ) {
+        Text(
+            text = behaviorText,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
+        ) {
+            triggers.forEach { trig ->
+                Surface(
+                    shape = ToolkitTheme.shapes.extraSmall,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = ToolkitTheme.dimensions.borderThin,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                ) {
+                    Text(
+                        text = trig,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(
+                            horizontal = ToolkitTheme.spacing.extraSmall,
+                            vertical = ToolkitTheme.spacing.extraExtraSmall
+                        )
+                    )
+                }
+            }
+            if (situationText.isNotEmpty()) {
+                Text(
+                    text = situationText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    softWrap = false,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
+            }
+        }
     }
 }

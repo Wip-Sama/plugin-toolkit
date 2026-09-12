@@ -78,6 +78,30 @@ class BoardInteractionState {
         structuredConnectionLivePos = Offset.Zero
     }
 
+    // Unified point aliases
+    var hoveredPointId: Long?
+        get() = hoveredJunctionId
+        set(value) { hoveredJunctionId = value }
+
+    var selectedPointId: Long?
+        get() = selectedJunctionId
+        set(value) { selectedJunctionId = value }
+
+    var draggingPointId: Long?
+        get() = draggingJunctionId
+        set(value) { draggingJunctionId = value }
+
+    // Dynamic line snapping during connection drag
+    var snappedWirePoint: Offset? by mutableStateOf(null)
+    var snappedWireConnection: Connection? by mutableStateOf(null)
+    var snappedWireSegmentIndex: Int? by mutableStateOf(null)
+
+    fun clearSnapping() {
+        snappedWirePoint = null
+        snappedWireConnection = null
+        snappedWireSegmentIndex = null
+    }
+
     fun clearSelectionBox() {
         selectionStart = null
         selectionEnd = null
@@ -98,5 +122,6 @@ class BoardInteractionState {
         clearHoveredMidpoint()
         clearSelectionBox()
         resetStructuredConnection()
+        clearSnapping()
     }
 }

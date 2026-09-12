@@ -133,7 +133,7 @@ fun BoardGridAndConnectionsCanvas(
             } else {
                 connectionColor
             }
-            val isSelected = interactionState.selectedJunctionId == junction.id
+            val isSelected = interactionState.selectedJunctionId == junction.id || junction.id in state.selectedPointIds
             val radius = (if (isHovered || isSelected) 7.5f else 5.5f) * state.scale
 
             drawCircle(
@@ -147,6 +147,14 @@ fun BoardGridAndConnectionsCanvas(
                 center = center,
                 style = Stroke(width = 1.5f * state.scale)
             )
+            if (isSelected) {
+                drawCircle(
+                    color = Color(0xFFFF9800),
+                    radius = radius + 3.5f * state.scale,
+                    center = center,
+                    style = Stroke(width = 2f * state.scale)
+                )
+            }
         }
 
         // Draw connections, waypoints, and midpoints
@@ -281,6 +289,27 @@ fun BoardGridAndConnectionsCanvas(
             }
         }
 
+        // Draw snapping indicator on wire
+        interactionState.snappedWirePoint?.let { snapPt ->
+            val center = (snapPt * state.scale) + state.offset
+            drawCircle(
+                color = Color(0xFF00E676).copy(alpha = 0.35f),
+                radius = 13f * state.scale,
+                center = center
+            )
+            drawCircle(
+                color = Color(0xFF00E676),
+                radius = 8.5f * state.scale,
+                center = center,
+                style = Stroke(width = 2.5f * state.scale)
+            )
+            drawCircle(
+                color = surfaceColor,
+                radius = 3.5f * state.scale,
+                center = center
+            )
+        }
+
         // Draw temporary drag connection line
         if (isDrawingConnection && connectionStartNodeId != null && connectionStartPortId != null) {
             val startBoardPos = getPortBoardPosition(connectionStartNodeId, connectionStartPortId, connectionStartIsOutput)
@@ -289,14 +318,18 @@ fun BoardGridAndConnectionsCanvas(
                     getPortBoardPosition(highlightedNodeId, highlightedPortId, !connectionStartIsOutput) ?: ((interactionState.lastPointerPosition - state.offset) / state.scale)
                 } else if (interactionState.hoveredJunctionId != null) {
                     junctionMap[interactionState.hoveredJunctionId] ?: ((interactionState.lastPointerPosition - state.offset) / state.scale)
+                } else if (interactionState.snappedWirePoint != null) {
+                    interactionState.snappedWirePoint!!
                 } else {
                     (interactionState.lastPointerPosition - state.offset) / state.scale
                 }
 
-                if (interactionState.isShiftModifierPressed) {
-                    currentPos = SplineMathUtils.snapToStraightAngle(startBoardPos, currentPos)
-                } else if (interactionState.isCtrlModifierPressed) {
-                    currentPos = SplineMathUtils.snapToOrthogonal(startBoardPos, currentPos)
+                if (interactionState.snappedWirePoint == null) {
+                    if (interactionState.isShiftModifierPressed) {
+                        currentPos = SplineMathUtils.snapToStraightAngle(startBoardPos, currentPos)
+                    } else if (interactionState.isCtrlModifierPressed) {
+                        currentPos = SplineMathUtils.snapToOrthogonal(startBoardPos, currentPos)
+                    }
                 }
 
                 val (startPos, endPos) = if (connectionStartIsOutput) {
@@ -338,15 +371,19 @@ fun BoardGridAndConnectionsCanvas(
                         ?: interactionState.structuredConnectionLivePos
                 } else if (interactionState.hoveredJunctionId != null) {
                     junctionMap[interactionState.hoveredJunctionId] ?: interactionState.structuredConnectionLivePos
+                } else if (interactionState.snappedWirePoint != null) {
+                    interactionState.snappedWirePoint!!
                 } else {
                     interactionState.structuredConnectionLivePos
                 }
 
                 val lastCommitted = allBoardPts.last()
-                if (interactionState.isShiftModifierPressed) {
-                    liveBoardPos = SplineMathUtils.snapToStraightAngle(lastCommitted, liveBoardPos)
-                } else if (interactionState.isCtrlModifierPressed) {
-                    liveBoardPos = SplineMathUtils.snapToOrthogonal(lastCommitted, liveBoardPos)
+                if (interactionState.snappedWirePoint == null) {
+                    if (interactionState.isShiftModifierPressed) {
+                        liveBoardPos = SplineMathUtils.snapToStraightAngle(lastCommitted, liveBoardPos)
+                    } else if (interactionState.isCtrlModifierPressed) {
+                        liveBoardPos = SplineMathUtils.snapToOrthogonal(lastCommitted, liveBoardPos)
+                    }
                 }
                 allBoardPts.add(liveBoardPos)
 

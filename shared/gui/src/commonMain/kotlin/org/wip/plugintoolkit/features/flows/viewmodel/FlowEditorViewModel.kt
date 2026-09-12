@@ -226,11 +226,13 @@ class FlowEditorViewModel(
 
                 val activeFlowWithSyncedSubflows = syncSubflowNodes(activeFlow, allFlows)
                 val maxNodeId = activeFlowWithSyncedSubflows.nodes.maxOfOrNull { it.id } ?: -1L
+                val maxPointId = activeFlowWithSyncedSubflows.junctions.maxOfOrNull { it.id } ?: -1L
+                val maxId = maxOf(maxNodeId, maxPointId)
 
                 _state.update { currentState ->
                     currentState.copy(
                         flow = activeFlowWithSyncedSubflows,
-                        nextId = maxNodeId + 1,
+                        nextId = maxId + 1,
                         flows = allFlows,
                         hasUnsavedChanges = false
                     )
@@ -445,11 +447,13 @@ class FlowEditorViewModel(
                 newState = nodeManager.handleEndMoveNode(currentState, event.id, event.density)
                 val isSelectedMove = currentState.selectedNodeIds.contains(event.id) ||
                         currentState.selectedGroupIds.contains(event.id) ||
-                        currentState.selectedLabelIds.contains(event.id)
+                        currentState.selectedLabelIds.contains(event.id) ||
+                        currentState.selectedPointIds.contains(event.id)
 
                 val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (currentState.flow.nodes.any { it.id == event.id }) setOf(event.id) else emptySet()).toMutableSet()
                 val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (currentState.flow.groups.any { it.id == event.id }) setOf(event.id) else emptySet()
                 val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (currentState.flow.labels.any { it.id == event.id }) setOf(event.id) else emptySet()
+                val pointsToMove = if (isSelectedMove) currentState.selectedPointIds else if (currentState.flow.junctions.any { it.id == event.id }) setOf(event.id) else emptySet()
 
                 for (grpId in groupsToMove) {
                     currentState.flow.groups.find { it.id == grpId }?.let { nodesToMove.addAll(it.nodeIds) }
@@ -503,14 +507,29 @@ class FlowEditorViewModel(
                     }
                 }
 
-                if (groupMoves.isNotEmpty() || labelMoves.isNotEmpty()) {
-                    pendingCommand = MoveBoardElementsCommand(nodeMoves = moves, groupMoves = groupMoves, labelMoves = labelMoves)
+                val updatedPoints = newState.flow.junctions.map { point ->
+                    if (pointsToMove.contains(point.id) && finalOffset != ModelOffset.Zero) {
+                        point.copy(position = point.position + finalOffset)
+                    } else point
+                }
+
+                val pointMoves = mutableMapOf<Long, Pair<ModelOffset, ModelOffset>>()
+                for (ptId in pointsToMove) {
+                    val oldPos = currentState.flow.junctions.find { it.id == ptId }?.position
+                    val newPos = updatedPoints.find { it.id == ptId }?.position
+                    if (oldPos != null && newPos != null && oldPos != newPos) {
+                        pointMoves[ptId] = oldPos to newPos
+                    }
+                }
+
+                if (groupMoves.isNotEmpty() || labelMoves.isNotEmpty() || pointMoves.isNotEmpty()) {
+                    pendingCommand = MoveBoardElementsCommand(nodeMoves = moves, groupMoves = groupMoves, labelMoves = labelMoves, pointMoves = pointMoves)
                 } else if (moves.isNotEmpty()) {
                     pendingCommand = MoveNodesCommand(moves)
                 }
 
                 newState = newState.copy(
-                    flow = newState.flow.copy(groups = updatedGroups)
+                    flow = newState.flow.copy(groups = updatedGroups, junctions = updatedPoints)
                 )
             }
 
@@ -793,11 +812,16 @@ class FlowEditorViewModel(
                 newState = currentState.copy(selectedGroupIds = event.ids)
             }
 
+            is FlowEvent.SelectPoints -> {
+                newState = currentState.copy(selectedPointIds = event.ids)
+            }
+
             is FlowEvent.ClearSelection -> {
                 newState = currentState.copy(
                     selectedNodeIds = emptySet(),
                     selectedLabelIds = emptySet(),
-                    selectedGroupIds = emptySet()
+                    selectedGroupIds = emptySet(),
+                    selectedPointIds = emptySet()
                 )
             }
 
@@ -805,22 +829,28 @@ class FlowEditorViewModel(
                 shouldRunTypeInference = true
                 val deletedNodes = currentState.flow.nodes.filter { it.id in currentState.selectedNodeIds }
                 val cascadeConns = currentState.flow.connections.filter {
-                    it.sourceNodeId in currentState.selectedNodeIds || it.targetNodeId in currentState.selectedNodeIds
+                    it.sourceNodeId in currentState.selectedNodeIds || it.targetNodeId in currentState.selectedNodeIds ||
+                    (it.sourceJunctionId != null && it.sourceJunctionId in currentState.selectedPointIds) ||
+                    (it.targetJunctionId != null && it.targetJunctionId in currentState.selectedPointIds)
                 }
                 val deletedLabels = currentState.flow.labels.filter { it.id in currentState.selectedLabelIds }
                 val deletedGroups = currentState.flow.groups.filter { it.id in currentState.selectedGroupIds }
+                val deletedPoints = currentState.flow.junctions.filter { it.id in currentState.selectedPointIds }
 
                 val updatedFlow = currentState.flow.copy(
                     nodes = currentState.flow.nodes.filter { it.id !in currentState.selectedNodeIds },
                     connections = currentState.flow.connections.filter { it !in cascadeConns },
                     labels = currentState.flow.labels.filter { it.id !in currentState.selectedLabelIds },
-                    groups = currentState.flow.groups.filter { it.id !in currentState.selectedGroupIds }
-                )
+                    groups = currentState.flow.groups.filter { it.id !in currentState.selectedGroupIds },
+                    junctions = currentState.flow.junctions.filter { it.id !in currentState.selectedPointIds }
+                ).purgeStrayPoints()
+
                 newState = currentState.copy(
                     flow = updatedFlow,
                     selectedNodeIds = emptySet(),
                     selectedLabelIds = emptySet(),
                     selectedGroupIds = emptySet(),
+                    selectedPointIds = emptySet(),
                     hasUnsavedChanges = true
                 )
                 val commands = mutableListOf<FlowCommand>()
@@ -832,6 +862,9 @@ class FlowEditorViewModel(
                 }
                 for (grp in deletedGroups) {
                     commands.add(DeleteGroupCommand(grp))
+                }
+                for (pt in deletedPoints) {
+                    commands.add(DeleteJunctionCommand(pt, cascadeConns.filter { it.sourceJunctionId == pt.id || it.targetJunctionId == pt.id }))
                 }
                 if (commands.isNotEmpty()) {
                     pendingCommand = CompositeCommand("Delete selected elements", commands)
@@ -1313,6 +1346,193 @@ class FlowEditorViewModel(
                     originalConnection = event.connection,
                     createdConnections = createdConnections
                 )
+            }
+
+            is FlowEvent.SplitConnectionAndConnect -> {
+                val newJunctionId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
+                val junction = FlowJunction(id = newJunctionId, position = event.splitPosition, color = event.connection.color)
+
+                val conn1 = event.connection.copy(
+                    targetNodeId = -1L,
+                    targetPortId = "",
+                    targetJunctionId = newJunctionId,
+                    floatingTarget = null
+                )
+                val conn2 = Connection(
+                    sourceNodeId = -1L,
+                    sourcePortId = "",
+                    sourceJunctionId = newJunctionId,
+                    targetNodeId = event.connection.targetNodeId,
+                    targetPortId = event.connection.targetPortId,
+                    targetJunctionId = event.connection.targetJunctionId,
+                    orderIndex = event.connection.orderIndex,
+                    color = event.connection.color,
+                    floatingTarget = event.connection.floatingTarget,
+                    isStructured = event.connection.isStructured
+                )
+
+                val branchConns = mutableListOf<Connection>()
+                val intermediateJunctions = mutableListOf<FlowJunction>()
+                var nextJuncId = newJunctionId + 1L
+
+                if (event.targetNodeId != null) {
+                    // Branch flows FROM wire (newJunctionId) TO target node
+                    var prevSrcNodeId = -1L
+                    var prevSrcPortId = ""
+                    var prevSrcJuncId: Long? = newJunctionId
+
+                    for (pt in event.intermediatePoints) {
+                        val interJunc = FlowJunction(id = nextJuncId, position = pt, color = event.connection.color)
+                        intermediateJunctions.add(interJunc)
+                        branchConns.add(
+                            Connection(
+                                sourceNodeId = prevSrcNodeId,
+                                sourcePortId = prevSrcPortId,
+                                sourceJunctionId = prevSrcJuncId,
+                                targetNodeId = -1L,
+                                targetPortId = "",
+                                targetJunctionId = nextJuncId,
+                                isStructured = true,
+                                color = event.connection.color
+                            )
+                        )
+                        prevSrcNodeId = -1L
+                        prevSrcPortId = ""
+                        prevSrcJuncId = nextJuncId
+                        nextJuncId++
+                    }
+
+                    branchConns.add(
+                        Connection(
+                            sourceNodeId = prevSrcNodeId,
+                            sourcePortId = prevSrcPortId,
+                            sourceJunctionId = prevSrcJuncId,
+                            targetNodeId = event.targetNodeId,
+                            targetPortId = event.targetPortId ?: "",
+                            targetJunctionId = event.targetJunctionId,
+                            isStructured = event.intermediatePoints.isNotEmpty(),
+                            color = event.connection.color
+                        )
+                    )
+                } else if (event.sourceNodeId != null || event.sourceJunctionId != null) {
+                    // Branch flows FROM source node/junction TO wire (newJunctionId)
+                    var prevSrcNodeId = event.sourceNodeId ?: -1L
+                    var prevSrcPortId = event.sourcePortId ?: ""
+                    var prevSrcJuncId = event.sourceJunctionId
+
+                    for (pt in event.intermediatePoints) {
+                        val interJunc = FlowJunction(id = nextJuncId, position = pt, color = event.connection.color)
+                        intermediateJunctions.add(interJunc)
+                        branchConns.add(
+                            Connection(
+                                sourceNodeId = prevSrcNodeId,
+                                sourcePortId = prevSrcPortId,
+                                sourceJunctionId = prevSrcJuncId,
+                                targetNodeId = -1L,
+                                targetPortId = "",
+                                targetJunctionId = nextJuncId,
+                                isStructured = true,
+                                color = event.connection.color
+                            )
+                        )
+                        prevSrcNodeId = -1L
+                        prevSrcPortId = ""
+                        prevSrcJuncId = nextJuncId
+                        nextJuncId++
+                    }
+
+                    branchConns.add(
+                        Connection(
+                            sourceNodeId = prevSrcNodeId,
+                            sourcePortId = prevSrcPortId,
+                            sourceJunctionId = prevSrcJuncId,
+                            targetNodeId = -1L,
+                            targetPortId = "",
+                            targetJunctionId = newJunctionId,
+                            isStructured = event.intermediatePoints.isNotEmpty(),
+                            color = event.connection.color
+                        )
+                    )
+                }
+
+                val createdConnections = listOf(conn1, conn2) + branchConns
+                val newConnections = currentState.flow.connections.filter { it != event.connection } + createdConnections
+                val newJunctions = currentState.flow.junctions + junction + intermediateJunctions
+
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(
+                        junctions = newJunctions,
+                        connections = newConnections
+                    ).purgeStrayPoints(),
+                    hasUnsavedChanges = true
+                )
+                pendingCommand = AddJunctionCommand(
+                    junction = junction,
+                    originalConnection = event.connection,
+                    createdConnections = createdConnections
+                )
+                shouldRunTypeInference = true
+            }
+
+            is FlowEvent.FinalizeStructuredConnectionWithPoints -> {
+                var nextJuncId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
+                val newJunctions = mutableListOf<FlowJunction>()
+                val segmentConns = mutableListOf<Connection>()
+                var prevSrcNodeId = event.sourceNodeId ?: -1L
+                var prevSrcPortId = event.sourcePortId ?: ""
+                var prevSrcJuncId = event.sourceJunctionId
+
+                for (pt in event.points) {
+                    val junc = FlowJunction(id = nextJuncId, position = pt)
+                    newJunctions.add(junc)
+                    segmentConns.add(
+                        Connection(
+                            sourceNodeId = prevSrcNodeId,
+                            sourcePortId = prevSrcPortId,
+                            sourceJunctionId = prevSrcJuncId,
+                            targetNodeId = -1L,
+                            targetPortId = "",
+                            targetJunctionId = nextJuncId,
+                            isStructured = true
+                        )
+                    )
+                    prevSrcNodeId = -1L
+                    prevSrcPortId = ""
+                    prevSrcJuncId = nextJuncId
+                    nextJuncId++
+                }
+
+                segmentConns.add(
+                    Connection(
+                        sourceNodeId = prevSrcNodeId,
+                        sourcePortId = prevSrcPortId,
+                        sourceJunctionId = prevSrcJuncId,
+                        targetNodeId = event.targetNodeId,
+                        targetPortId = event.targetPortId,
+                        targetJunctionId = event.targetJunctionId,
+                        isStructured = true
+                    )
+                )
+
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(
+                        junctions = currentState.flow.junctions + newJunctions,
+                        connections = currentState.flow.connections + segmentConns
+                    ),
+                    hasUnsavedChanges = true
+                )
+                shouldRunTypeInference = true
+            }
+
+            is FlowEvent.NormalizeWirePoints -> {
+                val normalizedFlow = currentState.flow.normalizeWirePoints()
+                if (normalizedFlow != currentState.flow) {
+                    newState = currentState.copy(
+                        flow = normalizedFlow,
+                        hasUnsavedChanges = true
+                    )
+                    shouldRunTypeInference = true
+                }
             }
 
             is FlowEvent.AddWaypoint -> {

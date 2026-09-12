@@ -191,6 +191,7 @@ sealed interface FlowEvent {
     // Selection
     data class SelectLabels(val ids: Set<Long>) : FlowEvent
     data class SelectGroups(val ids: Set<Long>) : FlowEvent
+    data class SelectPoints(val ids: Set<Long>) : FlowEvent
 
     // Groups & Labels
     data class AddGroup(val position: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
@@ -214,8 +215,29 @@ sealed interface FlowEvent {
         val branchTargetNodeId: Long? = null,
         val branchTargetPortId: String? = null
     ) : FlowEvent
+    data class SplitConnectionAndConnect(
+        val connection: Connection,
+        val splitPosition: org.wip.plugintoolkit.features.flows.model.Offset,
+        val sourceNodeId: Long? = null,
+        val sourcePortId: String? = null,
+        val sourceJunctionId: Long? = null,
+        val targetNodeId: Long? = null,
+        val targetPortId: String? = null,
+        val targetJunctionId: Long? = null,
+        val intermediatePoints: List<org.wip.plugintoolkit.features.flows.model.Offset> = emptyList()
+    ) : FlowEvent
     data class MoveJunction(val junctionId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
     data class DeleteJunction(val junctionId: Long) : FlowEvent
+    data class FinalizeStructuredConnectionWithPoints(
+        val sourceNodeId: Long? = null,
+        val sourcePortId: String? = null,
+        val sourceJunctionId: Long? = null,
+        val targetNodeId: Long,
+        val targetPortId: String,
+        val targetJunctionId: Long? = null,
+        val points: List<org.wip.plugintoolkit.features.flows.model.Offset>
+    ) : FlowEvent
+    object NormalizeWirePoints : FlowEvent
     data class AddWaypoint(
         val connection: Connection,
         val point: org.wip.plugintoolkit.features.flows.model.Offset,

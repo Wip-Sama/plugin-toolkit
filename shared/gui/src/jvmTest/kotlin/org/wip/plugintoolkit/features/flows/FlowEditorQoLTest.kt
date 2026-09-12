@@ -25,10 +25,15 @@ import org.wip.plugintoolkit.features.flows.history.UpdateWaypointsCommand
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.ConnectionPoint
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowJunction
 import org.wip.plugintoolkit.features.flows.model.FlowLabel
 import org.wip.plugintoolkit.features.flows.model.InputPort
+import org.wip.plugintoolkit.features.shortcuts.logic.DefaultShortcutCatalog
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutGesture
+import org.wip.plugintoolkit.features.shortcuts.model.ShortcutPointerButton
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.Offset as ModelOffset
 import org.wip.plugintoolkit.features.flows.model.OutputPort
@@ -1326,15 +1331,51 @@ class FlowEditorQoLTest {
             targetNodeId = 2L,
             targetPortId = "in"
         )
-        val flow = Flow(name = "TestJunctionKept", junctions = listOf(junc), connections = listOf(conn1, conn2))
+        val conn3 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 50L,
+            targetNodeId = 3L,
+            targetPortId = "in"
+        )
+        val flow = Flow(name = "TestJunctionKept", junctions = listOf(junc), connections = listOf(conn1, conn2, conn3))
+        val vm = createViewModel(flow)
+
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        assertEquals(3, vm.state.value.flow.connections.size)
+        vm.onEvent(FlowEvent.DeleteConnection(conn2))
+        // conn1 and conn3 still connect through junction 50, so junction and remaining connections must remain
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        assertEquals(2, vm.state.value.flow.connections.size)
+        assertTrue(vm.state.value.flow.connections.contains(conn1))
+        assertTrue(vm.state.value.flow.connections.contains(conn3))
+    }
+
+    @Test
+    fun testDeleteConnectionPurgesJunctionWhenSourceLost() {
+        val junc = FlowJunction(id = 50L, position = ModelOffset(100f, 100f))
+        val conn1 = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 50L
+        )
+        val conn2 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 50L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val flow = Flow(name = "TestJunctionPurged", junctions = listOf(junc), connections = listOf(conn1, conn2))
         val vm = createViewModel(flow)
 
         assertEquals(1, vm.state.value.flow.junctions.size)
         vm.onEvent(FlowEvent.DeleteConnection(conn1))
-        // conn2 still connects to junction 50, so junction must remain
-        assertEquals(1, vm.state.value.flow.junctions.size)
-        assertEquals(1, vm.state.value.flow.connections.size)
-        assertEquals(conn2, vm.state.value.flow.connections.first())
+        // Since junction 50 lost its source connection, it is a stray point and must be purged along with conn2
+        assertEquals(0, vm.state.value.flow.junctions.size)
+        assertEquals(0, vm.state.value.flow.connections.size)
     }
 
     @Test
@@ -1521,6 +1562,249 @@ class FlowEditorQoLTest {
         assertEquals(0f, midpoints[0].y, 0.5f)
         assertEquals(100f, midpoints[1].x, 0.5f)
         assertEquals(50f, midpoints[1].y, 0.5f)
+    }
+
+    @Test
+    fun testSelectPointsAndClearSelection() {
+        val junc1 = FlowJunction(id = 101L, position = ModelOffset(100f, 100f))
+        val junc2 = FlowJunction(id = 102L, position = ModelOffset(200f, 200f))
+        val flow = Flow(name = "TestPointSelection", junctions = listOf(junc1, junc2))
+        val vm = createViewModel(flow)
+
+        assertEquals(emptySet(), vm.state.value.selectedPointIds)
+
+        vm.onEvent(FlowEvent.SelectPoints(setOf(101L)))
+        assertEquals(setOf(101L), vm.state.value.selectedPointIds)
+
+        vm.onEvent(FlowEvent.SelectPoints(setOf(101L, 102L)))
+        assertEquals(setOf(101L, 102L), vm.state.value.selectedPointIds)
+
+        vm.onEvent(FlowEvent.ClearSelection)
+        assertTrue(vm.state.value.selectedPointIds.isEmpty())
+    }
+
+    @Test
+    fun testDeleteSelectedPointsRemovesPointsAndTheirConnections() {
+        val junc1 = FlowJunction(id = 101L, position = ModelOffset(100f, 100f))
+        val conn1 = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 101L
+        )
+        val conn2 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 101L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val flow = Flow(name = "TestDeletePoints", junctions = listOf(junc1), connections = listOf(conn1, conn2))
+        val vm = createViewModel(flow)
+
+        vm.onEvent(FlowEvent.SelectPoints(setOf(101L)))
+        assertEquals(setOf(101L), vm.state.value.selectedPointIds)
+
+        vm.onEvent(FlowEvent.DeleteSelectedNodes)
+        assertTrue(vm.state.value.selectedPointIds.isEmpty())
+        assertTrue(vm.state.value.flow.junctions.isEmpty())
+        assertTrue(vm.state.value.flow.connections.isEmpty())
+    }
+
+    @Test
+    fun testSplitConnectionAndConnectCreatesConnectionPointAndBranch() {
+        val originalConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            color = "#00FFCC",
+            isStructured = true
+        )
+        val flow = Flow(name = "TestSplitWire", connections = listOf(originalConn))
+        val vm = createViewModel(flow)
+
+        // Split connection at (150, 150) and branch from node 3 ("out")
+        vm.onEvent(
+            FlowEvent.SplitConnectionAndConnect(
+                connection = originalConn,
+                splitPosition = ModelOffset(150f, 150f),
+                sourceNodeId = 3L,
+                sourcePortId = "out",
+                intermediatePoints = listOf(ModelOffset(120f, 150f))
+            )
+        )
+
+        val resultFlow = vm.state.value.flow
+        // Should have created 2 junctions (intermediate point + split point)
+        assertEquals(2, resultFlow.junctions.size)
+        val splitJunc = resultFlow.junctions.find { it.position == ModelOffset(150f, 150f) }
+        assertNotNull(splitJunc)
+
+        // Connections: 2 for split wire (1 -> junc, junc -> 2) + 2 for branch (3 -> interJunc, interJunc -> junc) = 4 connections
+        assertEquals(4, resultFlow.connections.size)
+        // Verify split segments connect to splitJunc
+        val incomingSplit = resultFlow.connections.find { it.sourceNodeId == 1L && it.targetJunctionId == splitJunc.id }
+        assertNotNull(incomingSplit)
+        val outgoingSplit = resultFlow.connections.find { it.sourceJunctionId == splitJunc.id && it.targetNodeId == 2L }
+        assertNotNull(outgoingSplit)
+        // Verify branch segment connects to splitJunc
+        val branchEnd = resultFlow.connections.find { it.targetJunctionId == splitJunc.id && it.sourceNodeId != 1L }
+        assertNotNull(branchEnd)
+    }
+
+    @Test
+    fun testPointShortcutCatalogMappings() {
+        val actions = DefaultShortcutCatalog.actions
+
+        val movePointAction = actions.find { it.id == ShortcutActionId.FLOW_MOVE_POINT }
+        assertNotNull(movePointAction)
+        assertTrue(
+            movePointAction.defaultTriggers.any {
+                it.pointerButton == ShortcutPointerButton.Left && it.gesture == ShortcutGesture.Drag &&
+                        !it.isAlt && !it.isShift && !it.isCtrl
+            }
+        )
+
+        val ramificationAction = actions.find { it.id == ShortcutActionId.FLOW_CREATE_RAMIFICATION }
+        assertNotNull(ramificationAction)
+        assertTrue(
+            ramificationAction.defaultTriggers.any {
+                it.pointerButton == ShortcutPointerButton.Left && it.gesture == ShortcutGesture.Drag && it.isAlt
+            }
+        )
+
+        val branchWireAction = actions.find { it.id == ShortcutActionId.FLOW_BRANCH_WIRE }
+        assertNotNull(branchWireAction)
+        assertTrue(
+            branchWireAction.defaultTriggers.any {
+                it.pointerButton == ShortcutPointerButton.Left && it.gesture == ShortcutGesture.Drag && it.isShift
+            }
+        )
+    }
+
+    @Test
+    fun testSplitConnectionAndConnectFromInputPortToWire() {
+        val originalConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            color = "#FF0055"
+        )
+        val flow = Flow(name = "TestSplitWireInput", connections = listOf(originalConn))
+        val vm = createViewModel(flow)
+
+        // Drag from input port of node 3 ("in") and snap onto originalConn at (200, 200)
+        vm.onEvent(
+            FlowEvent.SplitConnectionAndConnect(
+                connection = originalConn,
+                splitPosition = ModelOffset(200f, 200f),
+                targetNodeId = 3L,
+                targetPortId = "in",
+                intermediatePoints = listOf(ModelOffset(200f, 250f))
+            )
+        )
+
+        val resultFlow = vm.state.value.flow
+        // Intermediate point + split point = 2 junctions
+        assertEquals(2, resultFlow.junctions.size)
+        val splitJunc = resultFlow.junctions.find { it.position == ModelOffset(200f, 200f) }
+        assertNotNull(splitJunc)
+
+        // Original wire split into 2: (1 -> splitJunc) and (splitJunc -> 2)
+        val splitIn = resultFlow.connections.find { it.sourceNodeId == 1L && it.targetJunctionId == splitJunc.id }
+        assertNotNull(splitIn)
+        val splitOut = resultFlow.connections.find { it.sourceJunctionId == splitJunc.id && it.targetNodeId == 2L }
+        assertNotNull(splitOut)
+
+        // Branch starts from splitJunc and feeds into Node 3 input
+        val branchStart = resultFlow.connections.find { it.sourceJunctionId == splitJunc.id && it.targetJunctionId != null }
+        assertNotNull(branchStart)
+        val branchTarget = resultFlow.connections.find { it.targetNodeId == 3L && it.targetPortId == "in" }
+        assertNotNull(branchTarget)
+        // Ensure no invalid floating nodes
+        assertTrue(resultFlow.connections.none { it.sourceNodeId == -1L && it.sourceJunctionId == null })
+    }
+
+    @Test
+    fun testFinalizeStructuredConnectionWithPointsCreatesConnectionPoints() {
+        val flow = Flow(name = "TestStructuredWithPoints")
+        val vm = createViewModel(flow)
+
+        vm.onEvent(
+            FlowEvent.FinalizeStructuredConnectionWithPoints(
+                sourceNodeId = 1L,
+                sourcePortId = "out",
+                targetNodeId = 2L,
+                targetPortId = "in",
+                points = listOf(ModelOffset(50f, 50f), ModelOffset(100f, 50f))
+            )
+        )
+
+        val resultFlow = vm.state.value.flow
+        // 2 intermediate points created as unified ConnectionPoints (junctions)
+        assertEquals(2, resultFlow.junctions.size)
+        // 3 connection segments created, none with legacy waypoints
+        assertEquals(3, resultFlow.connections.size)
+        assertTrue(resultFlow.connections.all { it.waypoints.isEmpty() })
+
+        val pt1 = resultFlow.junctions.find { it.position == ModelOffset(50f, 50f) }
+        val pt2 = resultFlow.junctions.find { it.position == ModelOffset(100f, 50f) }
+        assertNotNull(pt1)
+        assertNotNull(pt2)
+
+        // Verify connectivity: 1 -> pt1 -> pt2 -> 2
+        assertTrue(resultFlow.connections.any { it.sourceNodeId == 1L && it.targetJunctionId == pt1.id })
+        assertTrue(resultFlow.connections.any { it.sourceJunctionId == pt1.id && it.targetJunctionId == pt2.id })
+        assertTrue(resultFlow.connections.any { it.sourceJunctionId == pt2.id && it.targetNodeId == 2L })
+    }
+
+    @Test
+    fun testDeleteDownstreamSegmentKeepsUpstreamPointsAndConnectionsAlive() {
+        val j1 = FlowJunction(101L, ModelOffset(50f, 50f))
+        val j2 = FlowJunction(102L, ModelOffset(100f, 50f))
+        val seg1 = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = -1L, targetPortId = "", targetJunctionId = 101L)
+        val seg2 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 101L, targetNodeId = -1L, targetPortId = "", targetJunctionId = 102L)
+        val seg3 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 102L, targetNodeId = 2L, targetPortId = "in")
+
+        val flow = Flow(name = "TestCascade", junctions = listOf(j1, j2), connections = listOf(seg1, seg2, seg3))
+        val vm = createViewModel(flow)
+
+        // Delete seg3 (downstream segment)
+        vm.onEvent(FlowEvent.DeleteConnection(seg3))
+
+        val resultFlow = vm.state.value.flow
+        // Seg1 and Seg2 as well as J1 and J2 must still exist
+        assertEquals(2, resultFlow.junctions.size)
+        assertEquals(2, resultFlow.connections.size)
+        assertTrue(resultFlow.junctions.any { it.id == 101L })
+        assertTrue(resultFlow.junctions.any { it.id == 102L })
+        assertTrue(resultFlow.connections.any { it.targetJunctionId == 101L })
+        assertTrue(resultFlow.connections.any { it.targetJunctionId == 102L })
+    }
+
+    @Test
+    fun testNormalizeWirePointsConvertsLegacyWaypointsToConnectionPoints() {
+        val legacyConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(40f, 60f), ModelOffset(80f, 100f))
+        )
+        val flow = Flow(name = "TestNormalize", connections = listOf(legacyConn))
+        val vm = createViewModel(flow)
+
+        vm.onEvent(FlowEvent.NormalizeWirePoints)
+
+        val resultFlow = vm.state.value.flow
+        // Waypoints converted to 2 junctions
+        assertEquals(2, resultFlow.junctions.size)
+        // 3 connection segments without waypoints
+        assertEquals(3, resultFlow.connections.size)
+        assertTrue(resultFlow.connections.all { it.waypoints.isEmpty() })
     }
 }
 

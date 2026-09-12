@@ -49,14 +49,15 @@ data class MoveNodesCommand(
 }
 
 /**
- * Command recording multi-element translations (Nodes, Groups, Labels) in a single atomic transaction.
+ * Command recording multi-element translations (Nodes, Groups, Labels, Connection Points) in a single atomic transaction.
  */
 data class MoveBoardElementsCommand(
     val nodeMoves: Map<Long, Pair<ModelOffset, ModelOffset>> = emptyMap(),
     val groupMoves: Map<Long, Pair<ModelOffset, ModelOffset>> = emptyMap(),
-    val labelMoves: Map<Long, Pair<ModelOffset, ModelOffset>> = emptyMap()
+    val labelMoves: Map<Long, Pair<ModelOffset, ModelOffset>> = emptyMap(),
+    val pointMoves: Map<Long, Pair<ModelOffset, ModelOffset>> = emptyMap()
 ) : FlowCommand {
-    override val description: String = "Move ${nodeMoves.size + groupMoves.size + labelMoves.size} element(s)"
+    override val description: String = "Move ${nodeMoves.size + groupMoves.size + labelMoves.size + pointMoves.size} element(s)"
 
     override fun execute(state: FlowEditorState): FlowEditorState {
         val updatedNodes = state.flow.nodes.map { node ->
@@ -71,8 +72,12 @@ data class MoveBoardElementsCommand(
             val move = labelMoves[label.id]
             if (move != null) label.copy(position = move.second) else label
         }
+        val updatedPoints = state.flow.junctions.map { point ->
+            val move = pointMoves[point.id]
+            if (move != null) point.copyWithPosition(move.second) else point
+        }
         return state.copy(
-            flow = state.flow.copy(nodes = updatedNodes, groups = updatedGroups, labels = updatedLabels),
+            flow = state.flow.copy(nodes = updatedNodes, groups = updatedGroups, labels = updatedLabels, junctions = updatedPoints),
             hasUnsavedChanges = true
         )
     }
@@ -90,8 +95,12 @@ data class MoveBoardElementsCommand(
             val move = labelMoves[label.id]
             if (move != null) label.copy(position = move.first) else label
         }
+        val updatedPoints = state.flow.junctions.map { point ->
+            val move = pointMoves[point.id]
+            if (move != null) point.copyWithPosition(move.first) else point
+        }
         return state.copy(
-            flow = state.flow.copy(nodes = updatedNodes, groups = updatedGroups, labels = updatedLabels),
+            flow = state.flow.copy(nodes = updatedNodes, groups = updatedGroups, labels = updatedLabels, junctions = updatedPoints),
             hasUnsavedChanges = true
         )
     }

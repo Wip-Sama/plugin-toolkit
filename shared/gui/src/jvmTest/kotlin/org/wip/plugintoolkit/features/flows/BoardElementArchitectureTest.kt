@@ -172,30 +172,38 @@ class BoardElementArchitectureTest {
             text = "Test",
             position = ModelOffset(50f, 50f)
         )
+        val point = FlowJunction(
+            id = 4L,
+            position = ModelOffset(300f, 300f)
+        )
 
         val flow = Flow(
             name = "Test",
             nodes = listOf(node),
             groups = listOf(group),
-            labels = listOf(label)
+            labels = listOf(label),
+            junctions = listOf(point)
         )
         val initialState = FlowEditorState(flow = flow)
 
         val cmd = MoveBoardElementsCommand(
             nodeMoves = mapOf(1L to Pair(ModelOffset(100f, 100f), ModelOffset(150f, 160f))),
             groupMoves = mapOf(2L to Pair(ModelOffset(200f, 200f), ModelOffset(250f, 260f))),
-            labelMoves = mapOf(3L to Pair(ModelOffset(50f, 50f), ModelOffset(100f, 110f)))
+            labelMoves = mapOf(3L to Pair(ModelOffset(50f, 50f), ModelOffset(100f, 110f))),
+            pointMoves = mapOf(4L to Pair(ModelOffset(300f, 300f), ModelOffset(320f, 330f)))
         )
 
         val executed = cmd.execute(initialState)
         assertEquals(ModelOffset(150f, 160f), executed.flow.nodes.first().position)
         assertEquals(ModelOffset(250f, 260f), executed.flow.groups.first().position)
         assertEquals(ModelOffset(100f, 110f), executed.flow.labels.first().position)
+        assertEquals(ModelOffset(320f, 330f), executed.flow.junctions.first().position)
 
         val undone = cmd.undo(executed)
         assertEquals(ModelOffset(100f, 100f), undone.flow.nodes.first().position)
         assertEquals(ModelOffset(200f, 200f), undone.flow.groups.first().position)
         assertEquals(ModelOffset(50f, 50f), undone.flow.labels.first().position)
+        assertEquals(ModelOffset(300f, 300f), undone.flow.junctions.first().position)
     }
 
     @Test

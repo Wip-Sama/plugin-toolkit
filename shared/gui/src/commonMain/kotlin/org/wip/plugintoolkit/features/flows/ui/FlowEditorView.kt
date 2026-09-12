@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -266,6 +267,11 @@ fun FlowEditorView(
     val incompatibleTypesMsg = stringResource(Res.string.flow_editor_incompatible_types)
     val incompatibleSemanticsMsg = stringResource(Res.string.flow_editor_incompatible_semantics)
     val duplicateFlowMsg = stringResource(Res.string.flow_editor_duplicate_error)
+    LaunchedEffect(state.flow.connections) {
+        if (state.flow.connections.any { it.waypoints.isNotEmpty() }) {
+            viewModel.onEvent(FlowEvent.NormalizeWirePoints)
+        }
+    }
 
     val handleConnectionDrop: (Boolean) -> Unit = { isShiftPressed ->
         if (interactionState.isDrawingStructuredConnection || !isDrawingConnection) {
@@ -485,6 +491,7 @@ fun FlowEditorView(
             onResizeGroup = { id, delta -> viewModel.onEvent(FlowEvent.ResizeGroup(id, delta.toModelOffset())) },
             onSelectLabels = { viewModel.onEvent(FlowEvent.SelectLabels(it)) },
             onSelectGroups = { viewModel.onEvent(FlowEvent.SelectGroups(it)) },
+            onSelectPoints = { viewModel.onEvent(FlowEvent.SelectPoints(it)) },
             onAddWaypoint = { conn, pos -> viewModel.onEvent(FlowEvent.AddWaypoint(conn, pos.toModelOffset())) },
             onMoveWaypoint = { conn, index, newPos ->
                 viewModel.onEvent(FlowEvent.MoveWaypoint(conn, index, newPos))
@@ -494,21 +501,35 @@ fun FlowEditorView(
                 viewModel.onEvent(FlowEvent.DeleteConnectionSegment(conn, index))
             },
             onInsertWaypoint = { conn, index, pos ->
-                viewModel.onEvent(FlowEvent.AddWaypoint(conn, pos, index))
+                viewModel.onEvent(FlowEvent.AddJunctionAndBranch(conn, pos, index))
             },
             onFinalizeStructuredConnection = { srcNodeId, srcPortId, srcJuncId, tgtNodeId, tgtPortId, waypoints, tgtJuncId ->
-                viewModel.onEvent(
-                    FlowEvent.ConnectPortsWithWaypoints(
-                        sourceNodeId = srcNodeId ?: -1L,
-                        sourcePortId = srcPortId ?: "",
-                        targetNodeId = tgtNodeId,
-                        targetPortId = tgtPortId,
-                        waypoints = waypoints,
-                        sourceJunctionId = srcJuncId,
-                        targetJunctionId = tgtJuncId,
-                        isStructured = true
+                if (waypoints.isNotEmpty()) {
+                    viewModel.onEvent(
+                        FlowEvent.FinalizeStructuredConnectionWithPoints(
+                            sourceNodeId = srcNodeId,
+                            sourcePortId = srcPortId,
+                            targetNodeId = tgtNodeId,
+                            targetPortId = tgtPortId,
+                            points = waypoints,
+                            sourceJunctionId = srcJuncId,
+                            targetJunctionId = tgtJuncId
+                        )
                     )
-                )
+                } else {
+                    viewModel.onEvent(
+                        FlowEvent.ConnectPortsWithWaypoints(
+                            sourceNodeId = srcNodeId ?: -1L,
+                            sourcePortId = srcPortId ?: "",
+                            targetNodeId = tgtNodeId,
+                            targetPortId = tgtPortId,
+                            waypoints = emptyList(),
+                            sourceJunctionId = srcJuncId,
+                            targetJunctionId = tgtJuncId,
+                            isStructured = true
+                        )
+                    )
+                }
             },
             onLeaveStructuredConnectionAtLastPoint = { srcNodeId, srcPortId, srcJuncId, waypoints ->
                 if (srcNodeId != null && srcPortId != null && waypoints.isNotEmpty()) {
@@ -525,6 +546,30 @@ fun FlowEditorView(
                         )
                     )
                 }
+            },
+            onSplitConnectionAndConnect = { conn, splitPos, srcNodeId, srcPortId, srcJuncId, tgtNodeId, tgtPortId, tgtJuncId, interPts ->
+                viewModel.onEvent(
+                    FlowEvent.SplitConnectionAndConnect(
+                        connection = conn,
+                        splitPosition = splitPos,
+                        sourceNodeId = srcNodeId,
+                        sourcePortId = srcPortId,
+                        sourceJunctionId = srcJuncId,
+                        targetNodeId = tgtNodeId,
+                        targetPortId = tgtPortId,
+                        targetJunctionId = tgtJuncId,
+                        intermediatePoints = interPts
+                    )
+                )
+            },
+            onResetDrawingConnection = {
+                isDrawingConnection = false
+                connectionStartNodeId = null
+                connectionStartPortId = null
+                connectionStartIsOutput = true
+                connectionCurrentPos = Offset.Zero
+                highlightedPortId = null
+                highlightedNodeId = null
             },
             structuredConnectionStartInfo = structuredConnectionStartInfo,
             onClearStructuredConnectionStartInfo = { structuredConnectionStartInfo = null },
