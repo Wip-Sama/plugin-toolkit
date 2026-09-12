@@ -182,29 +182,72 @@ Accessible via **Settings -> Debug -> Live Shortcut Zoning**:
 
 ## 4. Developer Integration Guide
 
-### Checking Keyboard Shortcuts
-```kotlin
-Box(
-    modifier = Modifier.onKeyEvent { keyEvent ->
-        if (keyEvent.type == KeyEventType.KeyDown) {
-            val isPaintTriggered = shortcutManager?.isKeyActionTriggered(
-                actionId = ShortcutActionId.FLOW_PAINT_TOOL,
-                key = keyEvent.key,
-                isCtrl = keyEvent.isCtrlPressed,
-                isShift = keyEvent.isShiftPressed,
-                isAlt = keyEvent.isAltPressed
-            ) ?: false
+### A. Declarative Modifiers (Recommended for UI Components)
+Instead of manually intercepting low-level key/pointer events and checking booleans, components can attach declarative modifiers provided by `ShortcutModifiers.kt`:
 
-            if (isPaintTriggered) {
-                togglePaintTool()
-                true
-            } else false
+#### Declarative Multi-Action Scope (`Modifier.shortcutHandler`)
+Automatically listens for triggers, matches active user bindings (or catalog defaults), consumes events (`eat`), updates live telemetry, and runs callbacks:
+```kotlin
+Modifier.shortcutHandler(shortcutManager) {
+    onKey(ShortcutActionId.FLOW_UNDO, enabled = !isReadOnly) { onUndo() }
+    onKey(ShortcutActionId.FLOW_REDO, enabled = !isReadOnly) { onRedo() }
+    onKey(ShortcutActionId.FLOW_DELETE_SELECTED, enabled = !isReadOnly && hasSelection) {
+        onDeleteSelected()
+    }
+    onKey(ShortcutActionId.FLOW_PAINT_TOOL) { onTogglePaintTool() }
+
+    // Pointer gesture
+    onPointer(ShortcutActionId.SKIP_CONFIRMATION, ShortcutGesture.Click) { position ->
+        onFastDelete(position)
+    }
+
+    // Drag gesture
+    onDrag(ShortcutActionId.FLOW_PAN_CANVAS) { delta ->
+        onPan(delta)
+    }
+
+    // Fallback for custom ad-hoc keys
+    onRawKey { event ->
+        if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+            cancelOperation()
+            true
         } else false
     }
+}
+```
+
+#### Dedicated Drag Modifier (`Modifier.shortcutDrag`)
+For actions requiring drag tracking (such as canvas panning):
+```kotlin
+Modifier.shortcutDrag(
+    shortcutManager = shortcutManager,
+    actionId = ShortcutActionId.FLOW_PAN_CANVAS,
+    onDragStart = { focusRequester.requestFocus() },
+    onDrag = { delta -> onPan(delta) }
 )
 ```
 
-### Checking Pointer Gestures & Modifiers
+#### Single-Action Convenience Modifiers
+- `Modifier.onShortcutKey(shortcutManager, actionId, enabled = true) { ... }`
+- `Modifier.onShortcutPointer(shortcutManager, actionId, gesture = ShortcutGesture.Click) { offset -> ... }`
+
+---
+
+### B. Direct Low-Level Query API (For Complex Custom State Machines)
+For intricate interactions (e.g. `boardPointerEventGesture` with spline hit-testing and dynamic waypoints), components can query `ShortcutManager` directly:
+
+#### Checking Keyboard Shortcuts
+```kotlin
+val isPaintTriggered = shortcutManager?.isKeyActionTriggered(
+    actionId = ShortcutActionId.FLOW_PAINT_TOOL,
+    key = keyEvent.key,
+    isCtrl = keyEvent.isCtrlPressed,
+    isShift = keyEvent.isShiftPressed,
+    isAlt = keyEvent.isAltPressed
+) ?: false
+```
+
+#### Checking Pointer Gestures & Modifiers
 ```kotlin
 val isConfirmationBypassed = shortcutManager?.isActionTriggered(
     actionId = ShortcutActionId.SKIP_CONFIRMATION,
@@ -214,7 +257,7 @@ val isConfirmationBypassed = shortcutManager?.isActionTriggered(
 ) ?: event.keyboardModifiers.isShiftPressed
 ```
 
-### Populating Dynamic Contextual Tooltips
+#### Populating Dynamic Contextual Tooltips
 ```kotlin
 val panBadgeText = shortcutManager?.formatEffectiveTriggersCompact(ShortcutActionId.FLOW_PAN_CANVAS)
     ?: "Right / Middle Drag"
@@ -249,4 +292,5 @@ The test suite in [ShortcutManagerTest.kt](file:///c:/Users/sgroo/AndroidStudioP
 14. Dynamic situation elevation / z-index overrides (`setSituationElevation`).
 15. Intra-element relative priority tie-breaking (`testRelativePriorityWithinSameElement`) verifying shadow resolution when two actions share the same element and base elevation.
 16. Priority resolution mode switching (`testPriorityResolutionModes`) between `PriorityOnly` and `ZIndexAndPriority`.
+17. Declarative shortcut modifiers (`ShortcutModifiersTest`) verifying `Modifier.shortcutHandler`, `Modifier.shortcutDrag`, catalog fallback when manager is null, pointer event consumption, and modifier chaining.
 

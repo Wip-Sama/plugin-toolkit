@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.IntSize
 import org.wip.plugintoolkit.features.shortcuts.logic.ShortcutManager
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutGesture
+import org.wip.plugintoolkit.features.shortcuts.ui.shortcutDrag
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowJunction
@@ -117,44 +118,12 @@ fun Modifier.boardPanGesture(
     focusRequester: FocusRequester,
     shortcutManager: ShortcutManager? = null,
     onPan: (Offset) -> Unit
-): Modifier = this.pointerInput(shortcutManager) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent()
-            val isPanButtonPressed = if (shortcutManager != null) {
-                shortcutManager.matchesPointer(ShortcutActionId.FLOW_PAN_CANVAS, event, ShortcutGesture.Drag)
-            } else {
-                event.buttons.isSecondaryPressed || event.buttons.isTertiaryPressed
-            }
-            if (event.type == PointerEventType.Press && isPanButtonPressed) {
-                val change = event.changes.firstOrNull() ?: continue
-
-                focusRequester.requestFocus()
-                var lastPoint = change.position
-                shortcutManager?.eat(event, ShortcutActionId.FLOW_PAN_CANVAS) ?: change.consume()
-
-                while (true) {
-                    val dragEvent = awaitPointerEvent()
-                    val isStillPanning = if (shortcutManager != null) {
-                        shortcutManager.matchesPointer(ShortcutActionId.FLOW_PAN_CANVAS, dragEvent, ShortcutGesture.Drag, allowConsumed = true)
-                    } else {
-                        dragEvent.buttons.isSecondaryPressed || dragEvent.buttons.isTertiaryPressed
-                    }
-                    if (!isStillPanning) {
-                        break
-                    }
-                    if (dragEvent.type == PointerEventType.Move) {
-                        val currentPoint = dragEvent.changes.firstOrNull()?.position ?: lastPoint
-                        val delta = currentPoint - lastPoint
-                        onPan(delta)
-                        lastPoint = currentPoint
-                        shortcutManager?.eat(dragEvent, ShortcutActionId.FLOW_PAN_CANVAS) ?: dragEvent.changes.forEach { it.consume() }
-                    }
-                }
-            }
-        }
-    }
-}
+): Modifier = this.shortcutDrag(
+    shortcutManager = shortcutManager,
+    actionId = ShortcutActionId.FLOW_PAN_CANVAS,
+    onDragStart = { focusRequester.requestFocus() },
+    onDrag = onPan
+)
 
 fun Modifier.boardSelectionBoxGesture(
     interactionState: BoardInteractionState,
