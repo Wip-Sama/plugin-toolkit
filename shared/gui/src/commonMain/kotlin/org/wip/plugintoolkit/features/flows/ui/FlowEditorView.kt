@@ -485,7 +485,10 @@ fun FlowEditorView(
             onWashGroup = { viewModel.onEvent(FlowEvent.WashGroup(it)) },
             onPaintLabel = { viewModel.onEvent(FlowEvent.PaintLabel(it)) },
             onWashLabel = { viewModel.onEvent(FlowEvent.WashLabel(it)) },
-            onMoveJunction = { id, delta -> viewModel.onEvent(FlowEvent.MoveJunction(id, delta)) },
+            onMoveJunction = { id, delta -> viewModel.onEvent(FlowEvent.MoveJunction(id, delta, isTransient = true)) },
+            onEndMoveJunction = { pointMoves, nodeMoves, groupMoves, labelMoves ->
+                viewModel.onEvent(FlowEvent.EndMoveJunction(pointMoves, nodeMoves, groupMoves, labelMoves))
+            },
             onDeleteJunction = { viewModel.onEvent(FlowEvent.DeleteJunction(it)) },
             onSampleColor = { viewModel.onEvent(FlowEvent.SampleColor(it)) },
             onResizeGroup = { id, delta -> viewModel.onEvent(FlowEvent.ResizeGroup(id, delta.toModelOffset())) },
@@ -625,7 +628,8 @@ fun FlowEditorView(
                         val isDraggedInSelection = state.draggedNodeId != null && (
                             state.selectedNodeIds.contains(state.draggedNodeId) ||
                             state.selectedGroupIds.contains(state.draggedNodeId) ||
-                            state.selectedLabelIds.contains(state.draggedNodeId)
+                            state.selectedLabelIds.contains(state.draggedNodeId) ||
+                            state.selectedPointIds.contains(state.draggedNodeId)
                         )
                         val isPartOfSelectionDrag = isDraggedInSelection && state.selectedNodeIds.contains(node.id)
                         val isContainedInMovingGroup = state.draggedNodeId != null && (

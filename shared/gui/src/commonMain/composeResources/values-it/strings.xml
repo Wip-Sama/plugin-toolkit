@@ -799,4 +799,7 @@
     <string name="shortcut_priority_mode_static">Solo Priorità Statica</string>
     <string name="shortcuts_relative_priority">Priorità Relativa</string>
     <string name="shortcuts_relative_priority_desc">Regola la precedenza quando più scorciatoie condividono lo stesso elemento o situazione</string>
+
+    <string name="flow_editor_single_entrypoint_error">Le connessioni devono avere un unico punto di ingresso</string>
+    <string name="flow_editor_incompatible_types_error">Impossibile connettere: tipi di dati non compatibili (%1$s non può connettersi a %2$s)</string>
 </resources>

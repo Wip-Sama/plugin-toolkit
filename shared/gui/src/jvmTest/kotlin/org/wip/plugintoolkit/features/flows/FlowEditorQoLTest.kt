@@ -761,18 +761,18 @@ class FlowEditorQoLTest {
     fun testBranchAttachmentOnWireDrop() {
         val n1 = Node.FlowInputNode(id = 1L, position = ModelOffset(0f, 0f), outputs = listOf(OutputPort("out", "Out", DataType.Primitive(PrimitiveType.STRING))))
         val n2 = Node.FlowOutputNode(id = 2L, position = ModelOffset(400f, 0f), inputs = listOf(InputPort("in", "In", DataType.Primitive(PrimitiveType.STRING))))
-        val n3 = Node.FlowInputNode(id = 3L, position = ModelOffset(200f, 300f), outputs = listOf(OutputPort("branchOut", "BOut", DataType.Primitive(PrimitiveType.STRING))))
+        val n3 = Node.FlowOutputNode(id = 3L, position = ModelOffset(200f, 300f), inputs = listOf(InputPort("branchIn", "BIn", DataType.Primitive(PrimitiveType.STRING))))
         val mainConn = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = 2L, targetPortId = "in")
         val initialFlow = Flow(name = "TestBranch", nodes = listOf(n1, n2, n3), connections = listOf(mainConn))
         val vm = createViewModel(initialFlow)
 
-        // Dropping wire from n3:branchOut onto mainConn at (200, 50)
+        // Dropping wire from n3:branchIn onto mainConn at (200, 50)
         vm.onEvent(
             FlowEvent.AddJunctionAndBranch(
                 connection = mainConn,
                 splitPosition = ModelOffset(200f, 50f),
-                branchSourceNodeId = 3L,
-                branchSourcePortId = "branchOut"
+                branchTargetNodeId = 3L,
+                branchTargetPortId = "branchIn"
             )
         )
 
@@ -780,10 +780,10 @@ class FlowEditorQoLTest {
         val junc = vm.state.value.flow.junctions.first()
         assertEquals(ModelOffset(200f, 50f), junc.position)
 
-        // 3 connections now: 1 -> junction, junction -> 2, AND 3 -> junction!
+        // 3 connections now: 1 -> junction, junction -> 2, AND junction -> 3!
         assertEquals(3, vm.state.value.flow.connections.size)
-        val cBranch = vm.state.value.flow.connections.find { it.sourceNodeId == 3L && it.targetJunctionId == junc.id }
-        assertNotNull(cBranch, "Branch connection from node 3 to junction must exist")
+        val cBranch = vm.state.value.flow.connections.find { it.sourceJunctionId == junc.id && it.targetNodeId == 3L }
+        assertNotNull(cBranch, "Branch connection from junction to node 3 must exist")
 
         // Undo restores single main connection
         vm.undo()
@@ -1613,7 +1613,7 @@ class FlowEditorQoLTest {
     }
 
     @Test
-    fun testSplitConnectionAndConnectCreatesConnectionPointAndBranch() {
+    fun testSplitConnectionAndConnectRejectsMultipleEntrypoints() {
         val originalConn = Connection(
             sourceNodeId = 1L,
             sourcePortId = "out",
@@ -1625,7 +1625,7 @@ class FlowEditorQoLTest {
         val flow = Flow(name = "TestSplitWire", connections = listOf(originalConn))
         val vm = createViewModel(flow)
 
-        // Split connection at (150, 150) and branch from node 3 ("out")
+        // Split connection at (150, 150) and attempt to branch from node 3 ("out") into already-sourced wire
         vm.onEvent(
             FlowEvent.SplitConnectionAndConnect(
                 connection = originalConn,
@@ -1637,21 +1637,9 @@ class FlowEditorQoLTest {
         )
 
         val resultFlow = vm.state.value.flow
-        // Should have created 2 junctions (intermediate point + split point)
-        assertEquals(2, resultFlow.junctions.size)
-        val splitJunc = resultFlow.junctions.find { it.position == ModelOffset(150f, 150f) }
-        assertNotNull(splitJunc)
-
-        // Connections: 2 for split wire (1 -> junc, junc -> 2) + 2 for branch (3 -> interJunc, interJunc -> junc) = 4 connections
-        assertEquals(4, resultFlow.connections.size)
-        // Verify split segments connect to splitJunc
-        val incomingSplit = resultFlow.connections.find { it.sourceNodeId == 1L && it.targetJunctionId == splitJunc.id }
-        assertNotNull(incomingSplit)
-        val outgoingSplit = resultFlow.connections.find { it.sourceJunctionId == splitJunc.id && it.targetNodeId == 2L }
-        assertNotNull(outgoingSplit)
-        // Verify branch segment connects to splitJunc
-        val branchEnd = resultFlow.connections.find { it.targetJunctionId == splitJunc.id && it.sourceNodeId != 1L }
-        assertNotNull(branchEnd)
+        // Multi-entrypoint split is rejected!
+        assertEquals(1, resultFlow.connections.size)
+        assertTrue(resultFlow.junctions.isEmpty())
     }
 
     @Test
@@ -1805,6 +1793,224 @@ class FlowEditorQoLTest {
         // 3 connection segments without waypoints
         assertEquals(3, resultFlow.connections.size)
         assertTrue(resultFlow.connections.all { it.waypoints.isEmpty() })
+    }
+
+    @Test
+    fun testDeleteSelectedNodesDeletesPointsWhenOnlyPointsSelected() {
+        val j1 = FlowJunction(101L, ModelOffset(50f, 50f))
+        val conn1 = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = -1L, targetPortId = "", targetJunctionId = 101L)
+        val conn2 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 101L, targetNodeId = 2L, targetPortId = "in")
+
+        val flow = Flow(name = "TestDeletePointsOnly", junctions = listOf(j1), connections = listOf(conn1, conn2))
+        val vm = createViewModel(flow)
+
+        // Select ONLY the junction point, no nodes selected
+        vm.onEvent(FlowEvent.SelectPoints(setOf(101L)))
+        assertTrue(vm.state.value.selectedPointIds.contains(101L))
+        assertTrue(vm.state.value.selectedNodeIds.isEmpty())
+
+        // Trigger DeleteSelectedNodes (triggered by Canc / Del)
+        vm.onEvent(FlowEvent.DeleteSelectedNodes)
+
+        val resultFlow = vm.state.value.flow
+        assertTrue(resultFlow.junctions.isEmpty(), "Junction should be deleted")
+        assertTrue(resultFlow.connections.isEmpty(), "Cascading connections should be purged")
+        assertTrue(vm.state.value.selectedPointIds.isEmpty())
+    }
+
+    @Test
+    fun testNodeAndPointMoveDoesNotDoubleOffset() {
+        val node = Node.FlowInputNode(
+            id = 1L,
+            position = ModelOffset(100f, 100f),
+            outputs = listOf(OutputPort("out", "Output", DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val junc = FlowJunction(10L, ModelOffset(200f, 200f))
+        val flow = Flow(name = "TestMoveNoDoubleOffset", nodes = listOf(node), junctions = listOf(junc))
+        val vm = createViewModel(flow)
+
+        // Select both node and point
+        vm.onEvent(FlowEvent.SelectNodes(setOf(1L)))
+        vm.onEvent(FlowEvent.SelectPoints(setOf(10L)))
+
+        // Move node by (50, 50)
+        vm.onEvent(FlowEvent.MoveNode(1L, Offset(50f, 50f), snap = false, showGhost = false))
+        vm.onEvent(FlowEvent.EndMoveNode(1L, density = 1f))
+
+        val movedNode = vm.state.value.flow.nodes.find { it.id == 1L }
+        val movedJunc = vm.state.value.flow.junctions.find { it.id == 10L }
+        assertNotNull(movedNode)
+        assertNotNull(movedJunc)
+        // Both should move by +50, not +100
+        assertEquals(150f, movedNode.position.x)
+        assertEquals(150f, movedNode.position.y)
+        assertEquals(250f, movedJunc.position.x)
+        assertEquals(250f, movedJunc.position.y)
+    }
+
+    @Test
+    fun testMoveJunctionMovesSelectedNodesTogether() {
+        val node = Node.FlowInputNode(
+            id = 1L,
+            position = ModelOffset(100f, 100f),
+            outputs = listOf(OutputPort("out", "Output", DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val junc = FlowJunction(10L, ModelOffset(200f, 200f))
+        val flow = Flow(name = "TestMoveJuncWithNodes", nodes = listOf(node), junctions = listOf(junc))
+        val vm = createViewModel(flow)
+
+        // Select both node and point
+        vm.onEvent(FlowEvent.SelectNodes(setOf(1L)))
+        vm.onEvent(FlowEvent.SelectPoints(setOf(10L)))
+
+        // Move junction transiently during drag
+        vm.onEvent(FlowEvent.MoveJunction(10L, ModelOffset(30f, 40f), isTransient = true))
+
+        val movingNode = vm.state.value.flow.nodes.find { it.id == 1L }
+        val movingJunc = vm.state.value.flow.junctions.find { it.id == 10L }
+        assertNotNull(movingNode)
+        assertNotNull(movingJunc)
+        assertEquals(130f, movingNode.position.x)
+        assertEquals(140f, movingNode.position.y)
+        assertEquals(230f, movingJunc.position.x)
+        assertEquals(240f, movingJunc.position.y)
+
+        // Transient move should NOT record command
+        assertFalse(vm.canUndo.value)
+
+        // Finish move with EndMoveJunction
+        vm.onEvent(
+            FlowEvent.EndMoveJunction(
+                pointMoves = mapOf(10L to (ModelOffset(200f, 200f) to ModelOffset(230f, 240f))),
+                nodeMoves = mapOf(1L to (ModelOffset(100f, 100f) to ModelOffset(130f, 140f)))
+            )
+        )
+
+        // Now exactly 1 undo step exists
+        assertTrue(vm.canUndo.value)
+
+        // Undo should restore both
+        vm.undo()
+        val undoneNode = vm.state.value.flow.nodes.find { it.id == 1L }
+        val undoneJunc = vm.state.value.flow.junctions.find { it.id == 10L }
+        assertEquals(100f, undoneNode?.position?.x)
+        assertEquals(100f, undoneNode?.position?.y)
+        assertEquals(200f, undoneJunc?.position?.x)
+        assertEquals(200f, undoneJunc?.position?.y)
+    }
+
+    @Test
+    fun testWireBranchRejectsIncompatibleDataTypes() {
+        val srcNode = Node.FlowInputNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            outputs = listOf(OutputPort("out_str", "String Out", DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val tgtNode1 = Node.FlowOutputNode(
+            id = 2L,
+            position = ModelOffset(200f, 0f),
+            inputs = listOf(InputPort("in_str", "String In", DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val tgtNode2 = Node.FlowOutputNode(
+            id = 3L,
+            position = ModelOffset(200f, 100f),
+            inputs = listOf(InputPort("in_bool", "Bool In", DataType.Primitive(PrimitiveType.BOOLEAN)))
+        )
+        val conn = Connection(sourceNodeId = 1L, sourcePortId = "out_str", targetNodeId = 2L, targetPortId = "in_str")
+        val flow = Flow(name = "TestIncompatibleBranch", nodes = listOf(srcNode, tgtNode1, tgtNode2), connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Try to branch conn to tgtNode2 which expects BOOLEAN
+        vm.onEvent(
+            FlowEvent.AddJunctionAndBranch(
+                connection = conn,
+                splitPosition = ModelOffset(100f, 50f),
+                segmentIndex = 0,
+                branchTargetNodeId = 3L,
+                branchTargetPortId = "in_bool"
+            )
+        )
+
+        // Connection should be rejected!
+        val resultFlow = vm.state.value.flow
+        assertEquals(1, resultFlow.connections.size)
+        assertTrue(resultFlow.junctions.isEmpty())
+    }
+
+    @Test
+    fun testWireNetworkRejectsMultipleEntrypoints() {
+        val srcNode1 = Node.FlowInputNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            outputs = listOf(OutputPort("out1", "Out 1", DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val srcNode2 = Node.FlowInputNode(
+            id = 2L,
+            position = ModelOffset(0f, 100f),
+            outputs = listOf(OutputPort("out2", "Out 2", DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val tgtNode = Node.FlowOutputNode(
+            id = 3L,
+            position = ModelOffset(200f, 0f),
+            inputs = listOf(InputPort("in", "In", DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val conn = Connection(sourceNodeId = 1L, sourcePortId = "out1", targetNodeId = 3L, targetPortId = "in")
+        val flow = Flow(name = "TestMultiEntrypoint", nodes = listOf(srcNode1, srcNode2, tgtNode), connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Try to connect srcNode2 into the existing connection wire (creating a second source/entrypoint)
+        vm.onEvent(
+            FlowEvent.AddJunctionAndBranch(
+                connection = conn,
+                splitPosition = ModelOffset(100f, 50f),
+                segmentIndex = 0,
+                branchSourceNodeId = 2L,
+                branchSourcePortId = "out2"
+            )
+        )
+
+        // Connection must be rejected
+        val resultFlow = vm.state.value.flow
+        assertEquals(1, resultFlow.connections.size)
+        assertTrue(resultFlow.junctions.isEmpty())
+    }
+
+    @Test
+    fun testWireBranchAllowsMissingSemanticTypes() {
+        val srcNode = Node.FlowInputNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            outputs = listOf(OutputPort("out_path", "Path Out", DataType.Primitive(PrimitiveType.STRING), semanticTypes = emptyList()))
+        )
+        val tgtNode1 = Node.FlowOutputNode(
+            id = 2L,
+            position = ModelOffset(200f, 0f),
+            inputs = listOf(InputPort("in_path1", "Path In 1", DataType.Primitive(PrimitiveType.STRING), semanticTypes = emptyList()))
+        )
+        val tgtNode2 = Node.FlowOutputNode(
+            id = 3L,
+            position = ModelOffset(200f, 100f),
+            inputs = listOf(InputPort("in_path2", "Path In 2", DataType.Primitive(PrimitiveType.STRING), semanticTypes = emptyList()))
+        )
+        val conn = Connection(sourceNodeId = 1L, sourcePortId = "out_path", targetNodeId = 2L, targetPortId = "in_path1")
+        val flow = Flow(name = "TestMissingSemanticsAllowed", nodes = listOf(srcNode, tgtNode1, tgtNode2), connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Branching wire when semantic types are absent on both sides must succeed!
+        vm.onEvent(
+            FlowEvent.AddJunctionAndBranch(
+                connection = conn,
+                splitPosition = ModelOffset(100f, 50f),
+                segmentIndex = 0,
+                branchTargetNodeId = 3L,
+                branchTargetPortId = "in_path2"
+            )
+        )
+
+        val resultFlow = vm.state.value.flow
+        assertEquals(1, resultFlow.junctions.size)
+        // Splits into 2 segments + 1 branch = 3 connections
+        assertEquals(3, resultFlow.connections.size)
     }
 }
 

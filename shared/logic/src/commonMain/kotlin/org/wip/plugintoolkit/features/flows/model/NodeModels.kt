@@ -868,6 +868,72 @@ data class Flow(
 
         return resolved
     }
+
+    fun findJunctionEntrypoint(junctionId: Long): Pair<Long, String>? {
+        val visited = mutableSetOf<Long>()
+        fun trace(jId: Long): Pair<Long, String>? {
+            if (jId in visited) return null
+            visited.add(jId)
+            val incoming = connections.filter { it.targetJunctionId == jId }
+            for (conn in incoming) {
+                if (conn.sourceNodeId >= 0L && conn.sourcePortId.isNotEmpty()) {
+                    return Pair(conn.sourceNodeId, conn.sourcePortId)
+                }
+                if (conn.sourceJunctionId != null) {
+                    val found = trace(conn.sourceJunctionId)
+                    if (found != null) return found
+                }
+            }
+            return null
+        }
+        return trace(junctionId)
+    }
+
+    fun findConnectionEntrypoint(connection: Connection): Pair<Long, String>? {
+        if (connection.sourceNodeId >= 0L && connection.sourcePortId.isNotEmpty()) {
+            return Pair(connection.sourceNodeId, connection.sourcePortId)
+        }
+        if (connection.sourceJunctionId != null) {
+            return findJunctionEntrypoint(connection.sourceJunctionId)
+        }
+        return null
+    }
+
+    fun hasExistingEntrypoint(connection: Connection): Boolean = findConnectionEntrypoint(connection) != null
+
+    fun hasExistingEntrypoint(junctionId: Long): Boolean = findJunctionEntrypoint(junctionId) != null
+
+    fun findDownstreamTargets(junctionId: Long): List<Pair<Long, String>> {
+        val visited = mutableSetOf<Long>()
+        val result = mutableListOf<Pair<Long, String>>()
+        fun trace(jId: Long) {
+            if (jId in visited) return
+            visited.add(jId)
+            val outgoing = connections.filter { it.sourceJunctionId == jId }
+            for (conn in outgoing) {
+                if (conn.targetNodeId >= 0L && conn.targetPortId.isNotEmpty()) {
+                    result.add(Pair(conn.targetNodeId, conn.targetPortId))
+                }
+                if (conn.targetJunctionId != null) {
+                    trace(conn.targetJunctionId)
+                }
+            }
+        }
+        trace(junctionId)
+        return result
+    }
+
+    fun findDownstreamTargets(connection: Connection): List<Pair<Long, String>> {
+        val result = mutableListOf<Pair<Long, String>>()
+        if (connection.targetNodeId >= 0L && connection.targetPortId.isNotEmpty()) {
+            result.add(Pair(connection.targetNodeId, connection.targetPortId))
+        }
+        if (connection.targetJunctionId != null) {
+            result.addAll(findDownstreamTargets(connection.targetJunctionId))
+        }
+        return result
+    }
+
     fun getInferredDataTypeForOutput(nodeId: Long, portId: String, fallbackType: DataType): DataType {
         val baseArray = fallbackType as? DataType.Array
         val baseItems = baseArray?.items

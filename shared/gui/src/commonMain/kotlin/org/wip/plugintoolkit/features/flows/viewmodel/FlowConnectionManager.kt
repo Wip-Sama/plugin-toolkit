@@ -47,15 +47,19 @@ class FlowConnectionManager(
         val isTypeAllowed = sourcePort.dataType.isCompatibleWith(targetPort.dataType) ||
                 sourcePort.dataType.canConvert(targetPort.dataType)
         if (!isTypeAllowed) {
+            notificationService?.toast("Cannot connect: incompatible data types (${sourcePort.dataType.format()} cannot connect to ${targetPort.dataType.format()})")
             return currentState
         }
 
-        val semanticCheck =
-            org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, targetPort.semanticTypes)
-        if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
-            return currentState
-        } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
-            notificationService?.toast("Warning: ${semanticCheck.message}")
+        if (sourcePort.semanticTypes.isNotEmpty() && targetPort.semanticTypes.isNotEmpty()) {
+            val semanticCheck =
+                org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, targetPort.semanticTypes)
+            if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+                notificationService?.toast("Cannot connect: semantic types are incompatible")
+                return currentState
+            } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
+                notificationService?.toast("Warning: ${semanticCheck.message}")
+            }
         }
 
         val isList = targetPort.dataType is DataType.Array
@@ -114,19 +118,54 @@ class FlowConnectionManager(
         val sourceNode = if (sourceNodeId != -1L) currentState.flow.nodes.find { it.id == sourceNodeId } else null
         val sourcePort = sourceNode?.outputs?.find { it.id == sourcePortId }
 
-        if (sourcePort != null && targetPort != null) {
-            val isTypeAllowed = sourcePort.dataType.isCompatibleWith(targetPort.dataType) ||
-                    sourcePort.dataType.canConvert(targetPort.dataType)
+        val effectiveSource = if (sourcePort != null && sourceNode != null) {
+            Pair(sourceNode, sourcePort)
+        } else if (sourceJunctionId != null) {
+            val epInfo = currentState.flow.findJunctionEntrypoint(sourceJunctionId)
+            if (epInfo != null) {
+                val sNode = currentState.flow.nodes.find { it.id == epInfo.first }
+                val sPort = sNode?.outputs?.find { it.id == epInfo.second }
+                if (sNode != null && sPort != null) Pair(sNode, sPort) else null
+            } else null
+        } else null
+
+        if (effectiveSource != null && targetPort != null) {
+            val isTypeAllowed = effectiveSource.second.dataType.isCompatibleWith(targetPort.dataType)
             if (!isTypeAllowed) {
+                notificationService?.toast("Cannot connect: incompatible data types (${effectiveSource.second.dataType.format()} cannot connect to ${targetPort.dataType.format()})")
                 return currentState
             }
 
-            val semanticCheck =
-                org.wip.plugintoolkit.api.checkSemanticCompatibility(sourcePort.semanticTypes, targetPort.semanticTypes)
-            if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+            if (effectiveSource.second.semanticTypes.isNotEmpty() && targetPort.semanticTypes.isNotEmpty()) {
+                val semanticCheck =
+                    org.wip.plugintoolkit.api.checkSemanticCompatibility(effectiveSource.second.semanticTypes, targetPort.semanticTypes)
+                if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+                    notificationService?.toast("Cannot connect: semantic types are incompatible")
+                    return currentState
+                } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
+                    notificationService?.toast("Warning: ${semanticCheck.message}")
+                }
+            }
+        }
+
+        if (targetJunctionId != null) {
+            if (effectiveSource != null && currentState.flow.hasExistingEntrypoint(targetJunctionId)) {
+                notificationService?.toast("Connections must have a single entrypoint")
                 return currentState
-            } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
-                notificationService?.toast("Warning: ${semanticCheck.message}")
+            }
+            if (effectiveSource != null) {
+                val downstream = currentState.flow.findDownstreamTargets(targetJunctionId)
+                for (tgt in downstream) {
+                    val tNode = currentState.flow.nodes.find { it.id == tgt.first }
+                    val tPort = tNode?.inputs?.find { it.id == tgt.second }
+                    if (tPort != null) {
+                        val allowed = effectiveSource.second.dataType.isCompatibleWith(tPort.dataType)
+                        if (!allowed) {
+                            notificationService?.toast("Cannot connect: incompatible data types (${effectiveSource.second.dataType.format()} cannot connect to ${tPort.dataType.format()})")
+                            return currentState
+                        }
+                    }
+                }
             }
         }
 

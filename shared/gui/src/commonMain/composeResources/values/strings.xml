@@ -799,4 +799,7 @@
     <string name="shortcut_priority_mode_static">Static Priority Only</string>
     <string name="shortcuts_relative_priority">Relative Priority</string>
     <string name="shortcuts_relative_priority_desc">Fine-tune precedence when multiple shortcuts share the same element or situation</string>
+
+    <string name="flow_editor_single_entrypoint_error">Connections must have a single entrypoint</string>
+    <string name="flow_editor_incompatible_types_error">Cannot connect: incompatible data types (%1$s cannot connect to %2$s)</string>
 </resources>

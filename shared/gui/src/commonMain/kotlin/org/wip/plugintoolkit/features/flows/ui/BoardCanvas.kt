@@ -141,6 +141,7 @@ fun BoardCanvas(
     onPaintLabel: ((Long) -> Unit)? = null,
     onWashLabel: ((Long) -> Unit)? = null,
     onMoveJunction: ((Long, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
+    onEndMoveJunction: ((Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>) -> Unit)? = null,
     onDeleteJunction: ((Long) -> Unit)? = null,
     onSampleColor: (String) -> Unit = {},
     onResizeGroup: (Long, Offset) -> Unit = { _, _ -> },
@@ -219,12 +220,14 @@ fun BoardCanvas(
         interactionState.selectedConnection,
         interactionState.selectedJunctionId,
         selectedNodeIds,
+        state.selectedPointIds,
         state.selectedLabelIds,
         state.selectedGroupIds
     ) {
         if (shortcutManager != null) {
             val zones = mutableSetOf(ShortcutSituation.Global, ShortcutSituation.FlowBoard)
             val hasSelection = selectedNodeIds.isNotEmpty() ||
+                state.selectedPointIds.isNotEmpty() ||
                 state.selectedLabelIds.isNotEmpty() ||
                 state.selectedGroupIds.isNotEmpty() ||
                 interactionState.selectedConnection != null ||
@@ -289,6 +292,9 @@ fun BoardCanvas(
                 offset = state.offset,
                 getPortBoardPosition = getPortBoardPosition,
                 selectedNodeIds = selectedNodeIds,
+                selectedPointIds = state.selectedPointIds,
+                selectedLabelIds = state.selectedLabelIds,
+                selectedGroupIds = state.selectedGroupIds,
                 onDeleteSelectedNodes = onDeleteSelectedNodes,
                 onUndo = onUndo,
                 onRedo = onRedo,
@@ -346,6 +352,7 @@ fun BoardCanvas(
                 onDetachConnection = onDetachConnection,
                 junctions = flow.junctions,
                 onMoveJunction = onMoveJunction,
+                onEndMoveJunction = onEndMoveJunction,
                 onDeleteJunction = onDeleteJunction,
                 onAddWaypoint = onAddWaypoint,
                 onMoveWaypoint = onMoveWaypoint,
@@ -361,6 +368,11 @@ fun BoardCanvas(
                 isAdvancedConnectionMode = state.isAdvancedConnectionMode,
                 onAddJunctionAndBranch = onAddJunctionAndBranch,
                 selectedPointIds = state.selectedPointIds,
+                selectedNodeIds = selectedNodeIds,
+                selectedGroupIds = state.selectedGroupIds,
+                selectedLabelIds = state.selectedLabelIds,
+                groups = flow.groups,
+                labels = flow.labels,
                 onSelectPoints = onSelectPoints,
                 onSplitConnectionAndConnect = onSplitConnectionAndConnect,
                 onResetDrawingConnection = onResetDrawingConnection,
@@ -411,6 +423,13 @@ fun BoardCanvas(
             else emptySet()
         }
 
+        val movingPointIds = remember(state.draggedNodeId, state.selectedPointIds, isDraggedInSelection, flow.junctions) {
+            if (state.draggedNodeId == null) emptySet()
+            else if (isDraggedInSelection) state.selectedPointIds + (if (flow.junctions.any { it.id == state.draggedNodeId }) setOf(state.draggedNodeId) else emptySet())
+            else if (flow.junctions.any { it.id == state.draggedNodeId }) setOf(state.draggedNodeId)
+            else emptySet()
+        }
+
         val renderedGroups = remember(flow.groups, movingGroupIds, state.currentDragOffset) {
             if (state.currentDragOffset == org.wip.plugintoolkit.features.flows.model.Offset.Zero || movingGroupIds.isEmpty()) {
                 flow.groups
@@ -423,10 +442,22 @@ fun BoardCanvas(
             }
         }
 
+        val renderedJunctions = remember(flow.junctions, movingPointIds, state.currentDragOffset) {
+            if (state.currentDragOffset == org.wip.plugintoolkit.features.flows.model.Offset.Zero || movingPointIds.isEmpty()) {
+                flow.junctions
+            } else {
+                flow.junctions.map { junc ->
+                    if (movingPointIds.contains(junc.id)) {
+                        junc.copy(position = junc.position + state.currentDragOffset)
+                    } else junc
+                }
+            }
+        }
+
         // 1. Grid and Connections Canvas
         BoardGridAndConnectionsCanvas(
             state = state,
-            flow = flow.copy(groups = renderedGroups),
+            flow = flow.copy(groups = renderedGroups, junctions = renderedJunctions),
             interactionState = interactionState,
             isDrawingConnection = isDrawingConnection,
             connectionStartNodeId = connectionStartNodeId,

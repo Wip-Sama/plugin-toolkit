@@ -4,7 +4,10 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
@@ -334,6 +337,7 @@ fun Modifier.boardPointerEventGesture(
     onDetachConnection: (Connection, Boolean, Offset) -> Unit,
     junctions: List<FlowJunction> = emptyList(),
     onMoveJunction: ((Long, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
+    onEndMoveJunction: ((Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>) -> Unit)? = null,
     onDeleteJunction: ((Long) -> Unit)? = null,
     onAddWaypoint: ((Connection, Offset) -> Unit)? = null,
     onMoveWaypoint: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
@@ -349,6 +353,11 @@ fun Modifier.boardPointerEventGesture(
     onAddJunctionAndBranch: ((Connection, Offset, Int) -> Unit)? = null,
     onDeleteConnectionSegment: ((Connection, Int) -> Unit)? = null,
     selectedPointIds: Set<Long> = emptySet(),
+    selectedNodeIds: Set<Long> = emptySet(),
+    selectedGroupIds: Set<Long> = emptySet(),
+    selectedLabelIds: Set<Long> = emptySet(),
+    groups: List<FlowGroup> = emptyList(),
+    labels: List<FlowLabel> = emptyList(),
     onSelectPoints: ((Set<Long>) -> Unit)? = null,
     onSplitConnectionAndConnect: ((Connection, org.wip.plugintoolkit.features.flows.model.Offset, Long?, String?, Long?, Long?, String?, Long?, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit)? = null,
     onResetDrawingConnection: (() -> Unit)? = null,
@@ -367,6 +376,7 @@ fun Modifier.boardPointerEventGesture(
     val currentOnDetachConnection by rememberUpdatedState(onDetachConnection)
     val currentJunctions by rememberUpdatedState(junctions)
     val currentOnMoveJunction by rememberUpdatedState(onMoveJunction)
+    val currentOnEndMoveJunction by rememberUpdatedState(onEndMoveJunction)
     val currentOnDeleteJunction by rememberUpdatedState(onDeleteJunction)
     val currentOnAddWaypoint by rememberUpdatedState(onAddWaypoint)
     val currentOnMoveWaypoint by rememberUpdatedState(onMoveWaypoint)
@@ -382,10 +392,20 @@ fun Modifier.boardPointerEventGesture(
     val currentIsAdvancedConnectionMode by rememberUpdatedState(isAdvancedConnectionMode)
     val currentOnAddJunctionAndBranch by rememberUpdatedState(onAddJunctionAndBranch)
     val currentSelectedPointIds by rememberUpdatedState(selectedPointIds)
+    val currentSelectedNodeIds by rememberUpdatedState(selectedNodeIds)
+    val currentSelectedGroupIds by rememberUpdatedState(selectedGroupIds)
+    val currentSelectedLabelIds by rememberUpdatedState(selectedLabelIds)
+    val currentGroups by rememberUpdatedState(groups)
+    val currentLabels by rememberUpdatedState(labels)
     val currentOnSelectPoints by rememberUpdatedState(onSelectPoints)
     val currentOnSplitConnectionAndConnect by rememberUpdatedState(onSplitConnectionAndConnect)
     val currentOnResetDrawingConnection by rememberUpdatedState(onResetDrawingConnection)
     val currentShortcutManager by rememberUpdatedState(shortcutManager)
+
+    var junctionDragStartPointPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
+    var junctionDragStartNodePositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
+    var junctionDragStartGroupPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
+    var junctionDragStartLabelPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
 
     return this.pointerInput(Unit) {
         awaitPointerEventScope {
@@ -410,13 +430,7 @@ fun Modifier.boardPointerEventGesture(
                     val draggingJuncId = interactionState.draggingJunctionId
                     if (draggingJuncId != null) {
                         val delta = (position - prevPointerPosition) / currentScale
-                        if (currentSelectedPointIds.contains(draggingJuncId)) {
-                            currentSelectedPointIds.forEach { ptId ->
-                                currentOnMoveJunction?.invoke(ptId, delta.toModelOffset())
-                            }
-                        } else {
-                            currentOnMoveJunction?.invoke(draggingJuncId, delta.toModelOffset())
-                        }
+                        currentOnMoveJunction?.invoke(draggingJuncId, delta.toModelOffset())
                         currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
                     }
 
@@ -774,18 +788,22 @@ fun Modifier.boardPointerEventGesture(
                                 interactionState.structuredConnectionLivePos = (position - currentOffset) / currentScale
                                 currentShortcutManager?.eat(event, ShortcutActionId.FLOW_CREATE_RAMIFICATION) ?: event.changes.forEach { it.consume() }
                             } else if (isShift) {
-                                // Shift-click selection toggle
-                                val newSelection = if (juncId in currentSelectedPointIds) {
-                                    currentSelectedPointIds - juncId
-                                } else {
-                                    currentSelectedPointIds + juncId
-                                }
-                                currentOnSelectPoints?.invoke(newSelection)
-                                interactionState.draggingJunctionId = juncId
-                                currentShortcutManager?.eat(event, ShortcutActionId.FLOW_SELECT_NODE) ?: event.changes.forEach { it.consume() }
+                                currentOnDeleteJunction?.invoke(juncId)
+                                interactionState.hoveredJunctionId = null
+                                currentShortcutManager?.eat(event, ShortcutActionId.FLOW_DELETE_SELECTED) ?: event.changes.forEach { it.consume() }
                             } else {
-                                if (juncId !in currentSelectedPointIds) {
+                                val isSelected = juncId in currentSelectedPointIds
+                                if (!isSelected) {
                                     currentOnSelectPoints?.invoke(setOf(juncId))
+                                    junctionDragStartPointPositions = currentJunctions.find { it.id == juncId }?.let { mapOf(juncId to it.position) } ?: emptyMap()
+                                    junctionDragStartNodePositions = emptyMap()
+                                    junctionDragStartGroupPositions = emptyMap()
+                                    junctionDragStartLabelPositions = emptyMap()
+                                } else {
+                                    junctionDragStartPointPositions = currentJunctions.filter { it.id in currentSelectedPointIds }.associate { it.id to it.position }
+                                    junctionDragStartNodePositions = currentNodes.filter { it.id in currentSelectedNodeIds }.associate { it.id to it.position }
+                                    junctionDragStartGroupPositions = currentGroups.filter { it.id in currentSelectedGroupIds }.associate { it.id to it.position }
+                                    junctionDragStartLabelPositions = currentLabels.filter { it.id in currentSelectedLabelIds }.associate { it.id to it.position }
                                 }
                                 interactionState.draggingJunctionId = juncId
                                 currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
@@ -874,7 +892,33 @@ fun Modifier.boardPointerEventGesture(
                         interactionState.pendingMidpoint = null
                         interactionState.pendingMidpointWasAltPressed = false
                     }
-                    interactionState.draggingJunctionId = null
+                    if (interactionState.draggingJunctionId != null) {
+                        val pointMoves = junctionDragStartPointPositions.mapValues { (id, startPos) ->
+                            startPos to (currentJunctions.find { it.id == id }?.position ?: startPos)
+                        }.filter { it.value.first != it.value.second }
+
+                        val nodeMoves = junctionDragStartNodePositions.mapValues { (id, startPos) ->
+                            startPos to (currentNodes.find { it.id == id }?.position ?: startPos)
+                        }.filter { it.value.first != it.value.second }
+
+                        val groupMoves = junctionDragStartGroupPositions.mapValues { (id, startPos) ->
+                            startPos to (currentGroups.find { it.id == id }?.position ?: startPos)
+                        }.filter { it.value.first != it.value.second }
+
+                        val labelMoves = junctionDragStartLabelPositions.mapValues { (id, startPos) ->
+                            startPos to (currentLabels.find { it.id == id }?.position ?: startPos)
+                        }.filter { it.value.first != it.value.second }
+
+                        if (pointMoves.isNotEmpty() || nodeMoves.isNotEmpty() || groupMoves.isNotEmpty() || labelMoves.isNotEmpty()) {
+                            currentOnEndMoveJunction?.invoke(pointMoves, nodeMoves, groupMoves, labelMoves)
+                        }
+
+                        junctionDragStartPointPositions = emptyMap()
+                        junctionDragStartNodePositions = emptyMap()
+                        junctionDragStartGroupPositions = emptyMap()
+                        junctionDragStartLabelPositions = emptyMap()
+                        interactionState.draggingJunctionId = null
+                    }
                     interactionState.draggingWaypoint = null
                     if (currentIsDrawingConnection && !event.buttons.isPrimaryPressed) {
                         if (interactionState.snappedWirePoint != null && interactionState.snappedWireConnection != null) {

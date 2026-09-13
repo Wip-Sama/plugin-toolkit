@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +65,7 @@ import org.wip.plugintoolkit.shared.components.ZoomControls
 import org.wip.plugintoolkit.shared.components.plugin.inputs.parseColorString
 import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_close
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_bezier
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_cardinal
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_orthogonal
@@ -341,23 +343,28 @@ fun FlowFloatingAppBar(
             }
 
             // 6. Info Button
-            val tooltipState = LocalTooltipState.current
-            var infoCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-            val infoTooltipKey = remember { Any() }
+            var showInfoDialog by remember { mutableStateOf(false) }
+
+            if (showInfoDialog) {
+                AlertDialog(
+                    onDismissRequest = { showInfoDialog = false },
+                    confirmButton = {
+                        TextButton(onClick = { showInfoDialog = false }) {
+                            Text(stringResource(Res.string.action_close))
+                        }
+                    },
+                    text = {
+                        FlowControlsInfoCard(isDialog = true)
+                    }
+                )
+            }
 
             Surface(
-                onClick = {
-                    infoCoordinates?.let { coords ->
-                        tooltipState?.toggle(coords, infoTooltipKey) {
-                            FlowControlsInfoCard()
-                        }
-                    }
-                },
+                onClick = { showInfoDialog = true },
                 shape = CircleShape,
                 color = Color.Transparent,
                 modifier = Modifier
                     .size(dimensions.standardButtonHeight)
-                    .onGloballyPositioned { infoCoordinates = it }
                     .tooltip { FlowControlsInfoCard() }
                     .testTag("flow_controls_info_button")
             ) {

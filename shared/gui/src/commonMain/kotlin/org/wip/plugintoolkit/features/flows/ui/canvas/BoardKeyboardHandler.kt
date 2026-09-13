@@ -19,6 +19,9 @@ fun Modifier.boardKeyboardHandler(
     offset: Offset,
     getPortBoardPosition: (Long, String, Boolean) -> Offset?,
     selectedNodeIds: Set<Long>,
+    selectedPointIds: Set<Long> = emptySet(),
+    selectedLabelIds: Set<Long> = emptySet(),
+    selectedGroupIds: Set<Long> = emptySet(),
     onDeleteSelectedNodes: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
@@ -57,6 +60,13 @@ fun Modifier.boardKeyboardHandler(
         false
     }
     .shortcutHandler(shortcutManager) {
+        val hasSelection = selectedNodeIds.isNotEmpty() ||
+            selectedPointIds.isNotEmpty() ||
+            selectedLabelIds.isNotEmpty() ||
+            selectedGroupIds.isNotEmpty() ||
+            interactionState.selectedConnection != null ||
+            interactionState.selectedJunctionId != null
+
         onKey(ShortcutActionId.FLOW_UNDO, enabled = !isReadOnly) {
             onUndo()
         }
@@ -67,7 +77,7 @@ fun Modifier.boardKeyboardHandler(
 
         onKey(
             ShortcutActionId.FLOW_DELETE_SELECTED,
-            enabled = !isReadOnly && selectedNodeIds.isNotEmpty()
+            enabled = !isReadOnly && hasSelection
         ) {
             onDeleteSelectedNodes()
         }
@@ -107,6 +117,13 @@ fun Modifier.boardKeyboardHandler(
                                 )
                             }
                             interactionState.resetStructuredConnection()
+                            true
+                        } else false
+                    }
+
+                    (keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace) -> {
+                        if (!isReadOnly && hasSelection) {
+                            onDeleteSelectedNodes()
                             true
                         } else false
                     }

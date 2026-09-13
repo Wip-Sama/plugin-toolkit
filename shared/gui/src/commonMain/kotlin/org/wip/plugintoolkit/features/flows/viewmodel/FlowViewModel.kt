@@ -226,7 +226,17 @@ sealed interface FlowEvent {
         val targetJunctionId: Long? = null,
         val intermediatePoints: List<org.wip.plugintoolkit.features.flows.model.Offset> = emptyList()
     ) : FlowEvent
-    data class MoveJunction(val junctionId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class MoveJunction(
+        val junctionId: Long,
+        val delta: org.wip.plugintoolkit.features.flows.model.Offset,
+        val isTransient: Boolean = false
+    ) : FlowEvent
+    data class EndMoveJunction(
+        val pointMoves: Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>,
+        val nodeMoves: Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>> = emptyMap(),
+        val groupMoves: Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>> = emptyMap(),
+        val labelMoves: Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>> = emptyMap()
+    ) : FlowEvent
     data class DeleteJunction(val junctionId: Long) : FlowEvent
     data class FinalizeStructuredConnectionWithPoints(
         val sourceNodeId: Long? = null,
@@ -237,7 +247,7 @@ sealed interface FlowEvent {
         val targetJunctionId: Long? = null,
         val points: List<org.wip.plugintoolkit.features.flows.model.Offset>
     ) : FlowEvent
-    object NormalizeWirePoints : FlowEvent
+    data object NormalizeWirePoints : FlowEvent
     data class AddWaypoint(
         val connection: Connection,
         val point: org.wip.plugintoolkit.features.flows.model.Offset,

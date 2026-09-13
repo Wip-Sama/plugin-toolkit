@@ -37,25 +37,29 @@ import plugintoolkit.composeapp.generated.resources.flow_info_title
 
 @Composable
 fun FlowControlsInfoCard(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDialog: Boolean = false
 ) {
     Surface(
         modifier = modifier
             .widthIn(
-                min = ToolkitTheme.dimensions.emptyStateTextWidth * 1.8f,
-                max = ToolkitTheme.dimensions.emptyStateTextWidth * 2.2f
+                min = ToolkitTheme.dimensions.emptyStateTextWidth * 1.5f,
+                max = ToolkitTheme.dimensions.emptyStateTextWidth * 1.9f
             )
-            .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.medium),
+            .then(
+                if (isDialog) Modifier
+                else Modifier.shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.medium)
+            ),
         shape = ToolkitTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = androidx.compose.foundation.BorderStroke(
+        color = if (isDialog) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = if (isDialog) null else androidx.compose.foundation.BorderStroke(
             width = ToolkitTheme.dimensions.borderThin,
             color = MaterialTheme.colorScheme.outlineVariant
         )
     ) {
         Column(
-            modifier = Modifier.padding(ToolkitTheme.spacing.small),
-            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
         ) {
             // Header
             Row(
@@ -81,81 +85,85 @@ fun FlowControlsInfoCard(
                 color = MaterialTheme.colorScheme.outlineVariant
             )
 
-            // Categorized 4-column layout
+            // Balanced 2-column layout
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
-                // Column 1: Navigation & Board
-                InfoCategoryColumn(
-                    title = stringResource(Res.string.flow_info_cat_navigation),
-                    actionIds = listOf(
-                        ShortcutActionId.FLOW_PAN_CANVAS,
-                        ShortcutActionId.FLOW_ZOOM_CANVAS,
-                        ShortcutActionId.FLOW_UNDO,
-                        ShortcutActionId.FLOW_REDO
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
+                // Column 1: Navigation & Board + Tools
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                ) {
+                    InfoCategorySection(
+                        title = stringResource(Res.string.flow_info_cat_navigation),
+                        actionIds = listOf(
+                            ShortcutActionId.FLOW_PAN_CANVAS,
+                            ShortcutActionId.FLOW_ZOOM_CANVAS,
+                            ShortcutActionId.FLOW_UNDO,
+                            ShortcutActionId.FLOW_REDO
+                        )
+                    )
+
+                    HorizontalDivider(
+                        thickness = ToolkitTheme.dimensions.borderThin,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+
+                    InfoCategorySection(
+                        title = stringResource(Res.string.flow_info_cat_tools),
+                        actionIds = listOf(
+                            ShortcutActionId.FLOW_PAINT_TOOL,
+                            ShortcutActionId.FLOW_WASH_TOOL,
+                            ShortcutActionId.FLOW_EYEDROPPER
+                        )
+                    )
+                }
 
                 VerticalDivider(
                     thickness = ToolkitTheme.dimensions.borderThin,
                     color = MaterialTheme.colorScheme.outlineVariant
                 )
 
-                // Column 2: Selection & Nodes
-                InfoCategoryColumn(
-                    title = stringResource(Res.string.flow_info_cat_selection),
-                    actionIds = listOf(
-                        ShortcutActionId.FLOW_SELECT_NODE,
-                        ShortcutActionId.FLOW_BOX_SELECT,
-                        ShortcutActionId.FLOW_MOVE_NODE,
-                        ShortcutActionId.FLOW_DELETE_SELECTED
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
+                // Column 2: Connections & Points + Selection
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                ) {
+                    InfoCategorySection(
+                        title = stringResource(Res.string.flow_info_cat_connections),
+                        actionIds = listOf(
+                            ShortcutActionId.FLOW_CONNECT_PORT,
+                            ShortcutActionId.FLOW_DETACH_CONNECTION,
+                            ShortcutActionId.FLOW_BRANCH_WIRE,
+                            ShortcutActionId.FLOW_MOVE_POINT,
+                            ShortcutActionId.FLOW_CREATE_RAMIFICATION,
+                            ShortcutActionId.FLOW_STRUCTURED_MODE
+                        )
+                    )
 
-                VerticalDivider(
-                    thickness = ToolkitTheme.dimensions.borderThin,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
+                    HorizontalDivider(
+                        thickness = ToolkitTheme.dimensions.borderThin,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
 
-                // Column 3: Connections & Points
-                InfoCategoryColumn(
-                    title = stringResource(Res.string.flow_info_cat_connections),
-                    actionIds = listOf(
-                        ShortcutActionId.FLOW_CONNECT_PORT,
-                        ShortcutActionId.FLOW_DETACH_CONNECTION,
-                        ShortcutActionId.FLOW_BRANCH_WIRE,
-                        ShortcutActionId.FLOW_MOVE_POINT,
-                        ShortcutActionId.FLOW_CREATE_RAMIFICATION,
-                        ShortcutActionId.FLOW_STRUCTURED_MODE
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-
-                VerticalDivider(
-                    thickness = ToolkitTheme.dimensions.borderThin,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-
-                // Column 4: Colors & Tools
-                InfoCategoryColumn(
-                    title = stringResource(Res.string.flow_info_cat_tools),
-                    actionIds = listOf(
-                        ShortcutActionId.FLOW_PAINT_TOOL,
-                        ShortcutActionId.FLOW_WASH_TOOL,
-                        ShortcutActionId.FLOW_EYEDROPPER
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
+                    InfoCategorySection(
+                        title = stringResource(Res.string.flow_info_cat_selection),
+                        actionIds = listOf(
+                            ShortcutActionId.FLOW_SELECT_NODE,
+                            ShortcutActionId.FLOW_BOX_SELECT,
+                            ShortcutActionId.FLOW_MOVE_NODE,
+                            ShortcutActionId.FLOW_DELETE_SELECTED
+                        )
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun InfoCategoryColumn(
+private fun InfoCategorySection(
     title: String,
     actionIds: List<String>,
     modifier: Modifier = Modifier
@@ -164,8 +172,8 @@ private fun InfoCategoryColumn(
     val settings by (shortcutManager?.settings ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
 
     Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
     ) {
         Text(
             text = title,
@@ -208,16 +216,29 @@ private fun ShortcutItemView(
         triggerText.split(" / ").map { it.trim() }.filter { it.isNotEmpty() }
     }
 
-    Column(
+    Row(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = behaviorText,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Column(
+            modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.extraSmall),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
+        ) {
+            Text(
+                text = behaviorText,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (situationText.isNotEmpty()) {
+                Text(
+                    text = situationText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                )
+            }
+        }
 
         androidx.compose.foundation.layout.FlowRow(
             horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
@@ -243,15 +264,6 @@ private fun ShortcutItemView(
                         )
                     )
                 }
-            }
-            if (situationText.isNotEmpty()) {
-                Text(
-                    text = situationText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                    softWrap = false,
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                )
             }
         }
     }

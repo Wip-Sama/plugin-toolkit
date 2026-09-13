@@ -17,6 +17,9 @@ import org.koin.mp.KoinPlatform.getKoin
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.api.canConvert
+import org.wip.plugintoolkit.api.format
+import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.flows.history.AddGroupCommand
 import org.wip.plugintoolkit.features.flows.history.AddJunctionCommand
@@ -507,16 +510,10 @@ class FlowEditorViewModel(
                     }
                 }
 
-                val updatedPoints = newState.flow.junctions.map { point ->
-                    if (pointsToMove.contains(point.id) && finalOffset != ModelOffset.Zero) {
-                        point.copy(position = point.position + finalOffset)
-                    } else point
-                }
-
                 val pointMoves = mutableMapOf<Long, Pair<ModelOffset, ModelOffset>>()
                 for (ptId in pointsToMove) {
                     val oldPos = currentState.flow.junctions.find { it.id == ptId }?.position
-                    val newPos = updatedPoints.find { it.id == ptId }?.position
+                    val newPos = newState.flow.junctions.find { it.id == ptId }?.position
                     if (oldPos != null && newPos != null && oldPos != newPos) {
                         pointMoves[ptId] = oldPos to newPos
                     }
@@ -529,7 +526,7 @@ class FlowEditorViewModel(
                 }
 
                 newState = newState.copy(
-                    flow = newState.flow.copy(groups = updatedGroups, junctions = updatedPoints)
+                    flow = newState.flow.copy(groups = updatedGroups)
                 )
             }
 
@@ -1281,6 +1278,39 @@ class FlowEditorViewModel(
 
             // Junctions, Waypoints & Branching
             is FlowEvent.AddJunctionAndBranch -> {
+                if (event.branchSourceNodeId != null && event.branchSourcePortId != null) {
+                    if (currentState.flow.hasExistingEntrypoint(event.connection)) {
+                        resolvedNotificationService?.toast("Connections must have a single entrypoint")
+                        return
+                    }
+                } else if (event.branchTargetNodeId != null && event.branchTargetPortId != null) {
+                    val epInfo = currentState.flow.findConnectionEntrypoint(event.connection)
+                    if (epInfo != null) {
+                        val srcNode = currentState.flow.nodes.find { it.id == epInfo.first }
+                        val srcPort = srcNode?.outputs?.find { it.id == epInfo.second }
+                        val tgtNode = currentState.flow.nodes.find { it.id == event.branchTargetNodeId }
+                        val tgtPort = tgtNode?.inputs?.find { it.id == event.branchTargetPortId }
+                        if (srcPort != null && tgtPort != null) {
+                            val allowed = srcPort.dataType.isCompatibleWith(tgtPort.dataType)
+                            if (!allowed) {
+                                resolvedNotificationService?.toast("Cannot connect: incompatible data types (${srcPort.dataType.format()} cannot connect to ${tgtPort.dataType.format()})")
+                                return
+                            }
+                            if (srcPort.semanticTypes.isNotEmpty() && tgtPort.semanticTypes.isNotEmpty()) {
+                                val semCheck = org.wip.plugintoolkit.api.checkSemanticCompatibility(srcPort.semanticTypes, tgtPort.semanticTypes)
+                                if (semCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+                                    resolvedNotificationService?.toast("Cannot connect: semantic types are incompatible")
+                                    return
+                                }
+                            }
+                            if (FlowCycleDetector.wouldCreateCycle(srcNode.id, tgtNode.id, currentState.flow.connections)) {
+                                resolvedNotificationService?.toast("Cannot connect: Connecting these ports would create a loop (Directed Cyclic Graph). Enforcing Directed Acyclic Graph (DAG).")
+                                return
+                            }
+                        }
+                    }
+                }
+
                 val newJunctionId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
                 val junction = FlowJunction(id = newJunctionId, position = event.splitPosition, color = event.connection.color)
 
@@ -1349,6 +1379,39 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.SplitConnectionAndConnect -> {
+                if (event.targetNodeId != null) {
+                    val epInfo = currentState.flow.findConnectionEntrypoint(event.connection)
+                    if (epInfo != null) {
+                        val srcNode = currentState.flow.nodes.find { it.id == epInfo.first }
+                        val srcPort = srcNode?.outputs?.find { it.id == epInfo.second }
+                        val tgtNode = currentState.flow.nodes.find { it.id == event.targetNodeId }
+                        val tgtPort = tgtNode?.inputs?.find { it.id == event.targetPortId }
+                        if (srcPort != null && tgtPort != null) {
+                            val allowed = srcPort.dataType.isCompatibleWith(tgtPort.dataType)
+                            if (!allowed) {
+                                resolvedNotificationService?.toast("Cannot connect: incompatible data types (${srcPort.dataType.format()} cannot connect to ${tgtPort.dataType.format()})")
+                                return
+                            }
+                            if (srcPort.semanticTypes.isNotEmpty() && tgtPort.semanticTypes.isNotEmpty()) {
+                                val semCheck = org.wip.plugintoolkit.api.checkSemanticCompatibility(srcPort.semanticTypes, tgtPort.semanticTypes)
+                                if (semCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+                                    resolvedNotificationService?.toast("Cannot connect: semantic types are incompatible")
+                                    return
+                                }
+                            }
+                            if (FlowCycleDetector.wouldCreateCycle(srcNode.id, tgtNode.id, currentState.flow.connections)) {
+                                resolvedNotificationService?.toast("Cannot connect: Connecting these ports would create a loop (Directed Cyclic Graph). Enforcing Directed Acyclic Graph (DAG).")
+                                return
+                            }
+                        }
+                    }
+                } else if (event.sourceNodeId != null) {
+                    if (currentState.flow.hasExistingEntrypoint(event.connection)) {
+                        resolvedNotificationService?.toast("Connections must have a single entrypoint")
+                        return
+                    }
+                }
+
                 val newJunctionId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
                 val junction = FlowJunction(id = newJunctionId, position = event.splitPosition, color = event.connection.color)
 
@@ -1475,6 +1538,70 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.FinalizeStructuredConnectionWithPoints -> {
+                val sNodeId = event.sourceNodeId ?: -1L
+                val sPortId = event.sourcePortId ?: ""
+                val sJuncId = event.sourceJunctionId
+                val tNodeId = event.targetNodeId
+                val tPortId = event.targetPortId
+                val tJuncId = event.targetJunctionId
+
+                val effectiveSource = if (sNodeId != -1L && sPortId.isNotEmpty()) {
+                    val sNode = currentState.flow.nodes.find { it.id == sNodeId }
+                    val sPort = sNode?.outputs?.find { it.id == sPortId }
+                    if (sNode != null && sPort != null) Pair(sNode, sPort) else null
+                } else if (sJuncId != null) {
+                    val epInfo = currentState.flow.findJunctionEntrypoint(sJuncId)
+                    if (epInfo != null) {
+                        val sNode = currentState.flow.nodes.find { it.id == epInfo.first }
+                        val sPort = sNode?.outputs?.find { it.id == epInfo.second }
+                        if (sNode != null && sPort != null) Pair(sNode, sPort) else null
+                    } else null
+                } else null
+
+                if (tNodeId >= 0L && tPortId.isNotEmpty()) {
+                    val tNode = currentState.flow.nodes.find { it.id == tNodeId }
+                    val tPort = tNode?.inputs?.find { it.id == tPortId }
+                    if (effectiveSource != null && tPort != null) {
+                        val allowed = effectiveSource.second.dataType.isCompatibleWith(tPort.dataType)
+                        if (!allowed) {
+                            resolvedNotificationService?.toast("Cannot connect: incompatible data types (${effectiveSource.second.dataType.format()} cannot connect to ${tPort.dataType.format()})")
+                            return
+                        }
+                        if (effectiveSource.second.semanticTypes.isNotEmpty() && tPort.semanticTypes.isNotEmpty()) {
+                            val semCheck = org.wip.plugintoolkit.api.checkSemanticCompatibility(effectiveSource.second.semanticTypes, tPort.semanticTypes)
+                            if (semCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+                                resolvedNotificationService?.toast("Cannot connect: semantic types are incompatible")
+                                return
+                            }
+                        }
+                        if (FlowCycleDetector.wouldCreateCycle(effectiveSource.first.id, tNode.id, currentState.flow.connections)) {
+                            resolvedNotificationService?.toast("Cannot connect: Connecting these ports would create a loop (Directed Cyclic Graph). Enforcing Directed Acyclic Graph (DAG).")
+                            return
+                        }
+                    }
+                }
+
+                if (tJuncId != null) {
+                    if (effectiveSource != null && currentState.flow.hasExistingEntrypoint(tJuncId)) {
+                        resolvedNotificationService?.toast("Connections must have a single entrypoint")
+                        return
+                    }
+                    if (effectiveSource != null) {
+                        val downstream = currentState.flow.findDownstreamTargets(tJuncId)
+                        for (tgt in downstream) {
+                            val tNode = currentState.flow.nodes.find { it.id == tgt.first }
+                            val tPort = tNode?.inputs?.find { it.id == tgt.second }
+                            if (tPort != null) {
+                                val allowed = effectiveSource.second.dataType.isCompatibleWith(tPort.dataType)
+                                if (!allowed) {
+                                    resolvedNotificationService?.toast("Cannot connect: incompatible data types (${effectiveSource.second.dataType.format()} cannot connect to ${tPort.dataType.format()})")
+                                    return
+                                }
+                            }
+                        }
+                    }
+                }
+
                 var nextJuncId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
                 val newJunctions = mutableListOf<FlowJunction>()
                 val segmentConns = mutableListOf<Connection>()
@@ -1664,12 +1791,56 @@ class FlowEditorViewModel(
             is FlowEvent.MoveJunction -> {
                 val junc = currentState.flow.junctions.find { it.id == event.junctionId }
                 if (junc != null) {
-                    val newPos = junc.position + event.delta
+                    val isSelected = currentState.selectedPointIds.contains(event.junctionId)
+                    val pointsToMove = if (isSelected) currentState.selectedPointIds else setOf(event.junctionId)
+                    val nodesToMove = if (isSelected) currentState.selectedNodeIds else emptySet()
+                    val groupsToMove = if (isSelected) currentState.selectedGroupIds else emptySet()
+                    val labelsToMove = if (isSelected) currentState.selectedLabelIds else emptySet()
+
+                    val updatedJunctions = currentState.flow.junctions.map {
+                        if (it.id in pointsToMove) it.copy(position = it.position + event.delta) else it
+                    }
+                    val updatedNodes = currentState.flow.nodes.map {
+                        if (it.id in nodesToMove) it.copyWithPosition(it.position + event.delta) else it
+                    }
+                    val updatedGroups = currentState.flow.groups.map {
+                        if (it.id in groupsToMove) it.copy(position = it.position + event.delta) else it
+                    }
+                    val updatedLabels = currentState.flow.labels.map {
+                        if (it.id in labelsToMove) it.copy(position = it.position + event.delta) else it
+                    }
+
                     newState = currentState.copy(
-                        flow = currentState.flow.copy(junctions = currentState.flow.junctions.map { if (it.id == event.junctionId) it.copy(position = newPos) else it }),
+                        flow = currentState.flow.copy(
+                            junctions = updatedJunctions,
+                            nodes = updatedNodes,
+                            groups = updatedGroups,
+                            labels = updatedLabels
+                        ),
                         hasUnsavedChanges = true
                     )
-                    pendingCommand = MoveJunctionCommand(event.junctionId, junc.position, newPos)
+                    if (!event.isTransient) {
+                        val newPos = junc.position + event.delta
+                        pendingCommand = MoveJunctionCommand(event.junctionId, junc.position, newPos)
+                    }
+                }
+            }
+
+            is FlowEvent.EndMoveJunction -> {
+                if (event.nodeMoves.isNotEmpty() || event.groupMoves.isNotEmpty() || event.labelMoves.isNotEmpty()) {
+                    pendingCommand = MoveBoardElementsCommand(
+                        nodeMoves = event.nodeMoves,
+                        groupMoves = event.groupMoves,
+                        labelMoves = event.labelMoves,
+                        pointMoves = event.pointMoves
+                    )
+                } else if (event.pointMoves.size == 1) {
+                    val (jId, pair) = event.pointMoves.entries.first()
+                    pendingCommand = MoveJunctionCommand(jId, pair.first, pair.second)
+                } else if (event.pointMoves.isNotEmpty()) {
+                    pendingCommand = MoveBoardElementsCommand(
+                        pointMoves = event.pointMoves
+                    )
                 }
             }
 
