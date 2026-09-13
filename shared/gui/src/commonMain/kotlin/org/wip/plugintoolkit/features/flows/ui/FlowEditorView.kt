@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.api.isCompatibleWith
@@ -193,9 +194,24 @@ fun FlowEditorView(
     val problematicConnections = remember(flow.connections, flow.nodes, pluginLocksState) {
         val result = mutableSetOf<Connection>()
         val nodeMap = flow.nodes.associateBy { it.id }
+        val effectiveConns = flow.getEffectiveConnections()
+        val multiConnectedInputs = effectiveConns.groupBy { Pair(it.targetNodeId, it.targetPortId) }
+            .filter { (targetPair, conns) ->
+                if (conns.size <= 1) false
+                else {
+                    val targetNode = nodeMap[targetPair.first]
+                    val targetPort = targetNode?.inputs?.find { it.id == targetPair.second }
+                    targetPort != null && targetPort.dataType !is DataType.Array
+                }
+            }.keys
+
         for (connection in flow.connections) {
             val sourceNode = nodeMap[connection.sourceNodeId]
             val targetNode = nodeMap[connection.targetNodeId]
+
+            if (Pair(connection.targetNodeId, connection.targetPortId) in multiConnectedInputs) {
+                result.add(connection)
+            }
 
             var isSourceInactive = false
             if (sourceNode is Node.CapabilityNode) {
@@ -235,17 +251,38 @@ fun FlowEditorView(
     }
 
     val isPortTargetable = { node: Node, portId: String, isOutput: Boolean ->
-        if (node is Node.CapabilityNode) {
-            val isConnected = if (isOutput) {
-                flow.connections.any { it.sourceNodeId == node.id && it.sourcePortId == portId }
+        if (!isOutput) {
+            val inPort = node.inputs.find { it.id == portId }
+            if (inPort != null && inPort.dataType !is DataType.Array && flow.isInputPortAlreadyConnected(node.id, portId)) {
+                false
+            } else if (node is Node.CapabilityNode) {
+                val isConnected = flow.connections.any { it.targetNodeId == node.id && it.targetPortId == portId }
+                if (isConnected) {
+                    true
+                } else {
+                    val port = node.inputs.find { it.id == portId }
+                    val condition = (port as? InputPort)?.condition
+                    if (condition != null) {
+                        val currentParams = node.inputs.associate {
+                            it.id to NodeSerializationUtils.anyToJsonElement(it.value ?: it.defaultValue)
+                        }
+                        val settings = pluginManager.loadPluginSettings(node.pluginInfo.id).settings
+                        val locks = pluginLocksState[node.pluginInfo.id] ?: emptyMap()
+                        ParameterConditionEvaluator.isSatisfied(condition, currentParams, settings, locks)
+                    } else {
+                        true
+                    }
+                }
             } else {
-                flow.connections.any { it.targetNodeId == node.id && it.targetPortId == portId }
+                true
             }
+        } else if (node is Node.CapabilityNode) {
+            val isConnected = flow.connections.any { it.sourceNodeId == node.id && it.sourcePortId == portId }
             if (isConnected) {
                 true
             } else {
-                val port = if (isOutput) node.outputs.find { it.id == portId } else node.inputs.find { it.id == portId }
-                val condition = if (isOutput) (port as? OutputPort)?.condition else (port as? InputPort)?.condition
+                val port = node.outputs.find { it.id == portId }
+                val condition = (port as? OutputPort)?.condition
                 if (condition != null) {
                     val currentParams = node.inputs.associate {
                         it.id to NodeSerializationUtils.anyToJsonElement(it.value ?: it.defaultValue)
@@ -436,8 +473,13 @@ fun FlowEditorView(
             },
             onConnectionDrag = { boardPosition ->
                 connectionCurrentPos = boardPosition
+                val isOutput = if (interactionState.isDrawingStructuredConnection) {
+                    interactionState.structuredConnectionStartIsOutput
+                } else {
+                    connectionStartIsOutput
+                }
                 val (closestNodeId, closestPortId) = findClosestPort(
-                    boardPosition, flow, connectionStartIsOutput, state.scale, getPortBoardPosition, isPortTargetable
+                    boardPosition, flow, isOutput, state.scale, getPortBoardPosition, isPortTargetable
                 )
                 highlightedNodeId = closestNodeId
                 highlightedPortId = closestPortId

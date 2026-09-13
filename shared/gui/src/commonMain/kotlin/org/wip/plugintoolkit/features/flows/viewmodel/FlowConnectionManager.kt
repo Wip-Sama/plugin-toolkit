@@ -18,6 +18,7 @@ import org.wip.plugintoolkit.features.flows.ui.snapToGrid
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_semantics
 import plugintoolkit.composeapp.generated.resources.flow_editor_incompatible_types
+import plugintoolkit.composeapp.generated.resources.flow_editor_input_already_connected_error
 import plugintoolkit.composeapp.generated.resources.flow_editor_same_node_warning
 
 class FlowConnectionManager(
@@ -158,6 +159,12 @@ class FlowConnectionManager(
                 for (tgt in downstream) {
                     val tNode = currentState.flow.nodes.find { it.id == tgt.first }
                     val tPort = tNode?.inputs?.find { it.id == tgt.second }
+                    if (tPort != null && tPort.dataType !is DataType.Array && currentState.flow.isInputPortAlreadyConnected(tgt.first, tgt.second)) {
+                        viewModelScope.launch {
+                            notificationService?.toast(Res.string.flow_editor_input_already_connected_error.localizedWithArgs(tgt.second))
+                        }
+                        return currentState
+                    }
                     if (tPort != null) {
                         val allowed = effectiveSource.second.dataType.isCompatibleWith(tPort.dataType)
                         if (!allowed) {
@@ -167,6 +174,13 @@ class FlowConnectionManager(
                     }
                 }
             }
+        }
+
+        if (sourceJunctionId != null && targetPort != null && targetPort.dataType !is DataType.Array && currentState.flow.isInputPortAlreadyConnected(targetNodeId, targetPortId)) {
+            viewModelScope.launch {
+                notificationService?.toast(Res.string.flow_editor_input_already_connected_error.localizedWithArgs(targetPortId))
+            }
+            return currentState
         }
 
         val isList = targetPort?.dataType is DataType.Array

@@ -74,8 +74,11 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
+import org.wip.plugintoolkit.core.model.localizedWithArgs
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.flow_editor_input_already_connected_error
 
 class FlowEditorViewModel(
     private val initialFlowName: String,
@@ -1284,6 +1287,12 @@ class FlowEditorViewModel(
                         return
                     }
                 } else if (event.branchTargetNodeId != null && event.branchTargetPortId != null) {
+                    val tgtNode = currentState.flow.nodes.find { it.id == event.branchTargetNodeId }
+                    val tgtPort = tgtNode?.inputs?.find { it.id == event.branchTargetPortId }
+                    if (tgtPort != null && tgtPort.dataType !is DataType.Array && currentState.flow.isInputPortAlreadyConnected(event.branchTargetNodeId, event.branchTargetPortId)) {
+                        resolvedNotificationService?.toast(Res.string.flow_editor_input_already_connected_error.localizedWithArgs(event.branchTargetPortId))
+                        return
+                    }
                     val epInfo = currentState.flow.findConnectionEntrypoint(event.connection)
                     if (epInfo != null) {
                         val srcNode = currentState.flow.nodes.find { it.id == epInfo.first }
@@ -1379,7 +1388,13 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.SplitConnectionAndConnect -> {
-                if (event.targetNodeId != null) {
+                if (event.targetNodeId != null && event.targetPortId != null) {
+                    val tgtNode = currentState.flow.nodes.find { it.id == event.targetNodeId }
+                    val tgtPort = tgtNode?.inputs?.find { it.id == event.targetPortId }
+                    if (tgtPort != null && tgtPort.dataType !is DataType.Array && currentState.flow.isInputPortAlreadyConnected(event.targetNodeId, event.targetPortId)) {
+                        resolvedNotificationService?.toast(Res.string.flow_editor_input_already_connected_error.localizedWithArgs(event.targetPortId))
+                        return
+                    }
                     val epInfo = currentState.flow.findConnectionEntrypoint(event.connection)
                     if (epInfo != null) {
                         val srcNode = currentState.flow.nodes.find { it.id == epInfo.first }
@@ -1561,6 +1576,10 @@ class FlowEditorViewModel(
                 if (tNodeId >= 0L && tPortId.isNotEmpty()) {
                     val tNode = currentState.flow.nodes.find { it.id == tNodeId }
                     val tPort = tNode?.inputs?.find { it.id == tPortId }
+                    if (tPort != null && tPort.dataType !is DataType.Array && currentState.flow.isInputPortAlreadyConnected(tNodeId, tPortId)) {
+                        resolvedNotificationService?.toast(Res.string.flow_editor_input_already_connected_error.localizedWithArgs(tPortId))
+                        return
+                    }
                     if (effectiveSource != null && tPort != null) {
                         val allowed = effectiveSource.second.dataType.isCompatibleWith(tPort.dataType)
                         if (!allowed) {
@@ -1591,6 +1610,10 @@ class FlowEditorViewModel(
                         for (tgt in downstream) {
                             val tNode = currentState.flow.nodes.find { it.id == tgt.first }
                             val tPort = tNode?.inputs?.find { it.id == tgt.second }
+                            if (tPort != null && tPort.dataType !is DataType.Array && currentState.flow.isInputPortAlreadyConnected(tgt.first, tgt.second)) {
+                                resolvedNotificationService?.toast(Res.string.flow_editor_input_already_connected_error.localizedWithArgs(tgt.second))
+                                return
+                            }
                             if (tPort != null) {
                                 val allowed = effectiveSource.second.dataType.isCompatibleWith(tPort.dataType)
                                 if (!allowed) {

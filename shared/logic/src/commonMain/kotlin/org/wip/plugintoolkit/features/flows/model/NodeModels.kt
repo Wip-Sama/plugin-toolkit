@@ -994,7 +994,24 @@ data class Flow(
             val locks = locksMap?.get(node.id)
             !node.isReady(connections, settings, locks)
         }
-        return hasBrokenNode || hasMissingCapability || hasMissingRequiredPort || hasNotReadyNode
+        val hasMultiConnectedInput = getEffectiveConnections()
+            .groupBy { Pair(it.targetNodeId, it.targetPortId) }
+            .any { (targetPair, conns) ->
+                if (conns.size <= 1) false
+                else {
+                    val targetNode = nodes.find { it.id == targetPair.first }
+                    val targetPort = targetNode?.inputs?.find { it.id == targetPair.second }
+                    targetPort != null && targetPort.dataType !is DataType.Array
+                }
+            }
+        return hasBrokenNode || hasMissingCapability || hasMissingRequiredPort || hasNotReadyNode || hasMultiConnectedInput
+    }
+
+    fun isInputPortAlreadyConnected(targetNodeId: Long, targetPortId: String): Boolean {
+        val targetNode = nodes.find { it.id == targetNodeId } ?: return false
+        val targetPort = targetNode.inputs.find { it.id == targetPortId } ?: return false
+        if (targetPort.dataType is DataType.Array) return false
+        return getEffectiveConnections().any { it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }
     }
 
     fun isDestructive(): Boolean {

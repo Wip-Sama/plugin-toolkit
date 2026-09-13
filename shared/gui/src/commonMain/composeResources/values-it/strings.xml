@@ -802,4 +802,5 @@
 
     <string name="flow_editor_single_entrypoint_error">Le connessioni devono avere un unico punto di ingresso</string>
     <string name="flow_editor_incompatible_types_error">Impossibile connettere: tipi di dati non compatibili (%1$s non può connettersi a %2$s)</string>
+    <string name="flow_editor_input_already_connected_error">Impossibile connettere: la porta di ingresso &apos;%1$s&apos; ha già una connessione in entrata</string>
 </resources>

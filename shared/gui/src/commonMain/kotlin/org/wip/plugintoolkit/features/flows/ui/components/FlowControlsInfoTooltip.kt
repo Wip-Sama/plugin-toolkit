@@ -35,24 +35,21 @@ import plugintoolkit.composeapp.generated.resources.flow_info_cat_selection
 import plugintoolkit.composeapp.generated.resources.flow_info_cat_tools
 import plugintoolkit.composeapp.generated.resources.flow_info_title
 
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+
 @Composable
 fun FlowControlsInfoCard(
-    modifier: Modifier = Modifier,
-    isDialog: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
-            .widthIn(
-                min = ToolkitTheme.dimensions.emptyStateTextWidth * 1.5f,
-                max = ToolkitTheme.dimensions.emptyStateTextWidth * 1.9f
-            )
-            .then(
-                if (isDialog) Modifier
-                else Modifier.shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.medium)
-            ),
+            .width(ToolkitTheme.dimensions.flowControlsTooltipWidth)
+            .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.medium),
         shape = ToolkitTheme.shapes.medium,
-        color = if (isDialog) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = if (isDialog) null else androidx.compose.foundation.BorderStroke(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = androidx.compose.foundation.BorderStroke(
             width = ToolkitTheme.dimensions.borderThin,
             color = MaterialTheme.colorScheme.outlineVariant
         )
@@ -87,7 +84,9 @@ fun FlowControlsInfoCard(
 
             // Balanced 2-column layout
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
                 // Column 1: Navigation & Board + Tools
@@ -222,7 +221,9 @@ private fun ShortcutItemView(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
-            modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.extraSmall),
+            modifier = Modifier
+                .weight(0.44f)
+                .padding(end = ToolkitTheme.spacing.extraSmall),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
         ) {
             Text(
@@ -241,7 +242,8 @@ private fun ShortcutItemView(
         }
 
         androidx.compose.foundation.layout.FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+            modifier = Modifier.weight(0.56f),
+            horizontalArrangement = Arrangement.End,
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
         ) {
             triggers.forEach { trig ->

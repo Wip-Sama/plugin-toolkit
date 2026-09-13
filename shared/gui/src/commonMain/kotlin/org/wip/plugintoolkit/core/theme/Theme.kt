@@ -118,6 +118,7 @@ data class Dimensions(
     val contentCanvasCornerRadius: Dp = 16.dp,
     val windowResizeBorderThickness: Dp = 6.dp,
     val windowResizeCornerSize: Dp = 14.dp,
+    val flowControlsTooltipWidth: Dp = 660.dp,
     
     // Auto-generated generic/component-specific sized dimensions (deprecated in favor of semantic tokens)
     val ringWidthMedium: Dp = 10.dp,

@@ -19,6 +19,7 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
+import org.wip.plugintoolkit.features.flows.ui.snapToGrid
 import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
@@ -328,7 +329,7 @@ fun BoardGridAndConnectionsCanvas(
                     if (interactionState.isShiftModifierPressed) {
                         currentPos = SplineMathUtils.snapToStraightAngle(startBoardPos, currentPos)
                     } else if (interactionState.isCtrlModifierPressed) {
-                        currentPos = SplineMathUtils.snapToOrthogonal(startBoardPos, currentPos)
+                        currentPos = currentPos.snapToGrid()
                     }
                 }
 
@@ -382,7 +383,7 @@ fun BoardGridAndConnectionsCanvas(
                     if (interactionState.isShiftModifierPressed) {
                         liveBoardPos = SplineMathUtils.snapToStraightAngle(lastCommitted, liveBoardPos)
                     } else if (interactionState.isCtrlModifierPressed) {
-                        liveBoardPos = SplineMathUtils.snapToOrthogonal(lastCommitted, liveBoardPos)
+                        liveBoardPos = liveBoardPos.snapToGrid()
                     }
                 }
                 allBoardPts.add(liveBoardPos)

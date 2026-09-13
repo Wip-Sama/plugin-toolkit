@@ -343,24 +343,7 @@ fun FlowFloatingAppBar(
             }
 
             // 6. Info Button
-            var showInfoDialog by remember { mutableStateOf(false) }
-
-            if (showInfoDialog) {
-                AlertDialog(
-                    onDismissRequest = { showInfoDialog = false },
-                    confirmButton = {
-                        TextButton(onClick = { showInfoDialog = false }) {
-                            Text(stringResource(Res.string.action_close))
-                        }
-                    },
-                    text = {
-                        FlowControlsInfoCard(isDialog = true)
-                    }
-                )
-            }
-
             Surface(
-                onClick = { showInfoDialog = true },
                 shape = CircleShape,
                 color = Color.Transparent,
                 modifier = Modifier

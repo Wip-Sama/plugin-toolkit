@@ -802,4 +802,5 @@
 
     <string name="flow_editor_single_entrypoint_error">Connections must have a single entrypoint</string>
     <string name="flow_editor_incompatible_types_error">Cannot connect: incompatible data types (%1$s cannot connect to %2$s)</string>
+    <string name="flow_editor_input_already_connected_error">Cannot connect: input port &apos;%1$s&apos; already has an incoming connection</string>
 </resources>

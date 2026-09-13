@@ -23,6 +23,8 @@ import org.wip.plugintoolkit.features.flows.history.UpdateGroupCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateLabelCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateWaypointsCommand
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
+import org.wip.plugintoolkit.features.flows.logic.FlowTypeInference
+import org.wip.plugintoolkit.features.flows.ui.snapToGrid
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.ConnectionPoint
@@ -2011,6 +2013,197 @@ class FlowEditorQoLTest {
         assertEquals(1, resultFlow.junctions.size)
         // Splits into 2 segments + 1 branch = 3 connections
         assertEquals(3, resultFlow.connections.size)
+    }
+
+    @Test
+    fun testGridSnappingForPointsAndDragging() {
+        val rawModel = ModelOffset(123f, 287f)
+        val snappedModel = rawModel.snapToGrid(50f)
+        assertEquals(ModelOffset(100f, 300f), snappedModel)
+
+        val rawCompose = Offset(74f, 168f)
+        val snappedCompose = rawCompose.snapToGrid(50f)
+        assertEquals(Offset(50f, 150f), snappedCompose)
+    }
+
+    @Test
+    fun testRejectMultipleIncomingConnectionsToNonArrayInput() {
+        val srcNode1 = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            title = "Src 1",
+            systemAction = "act1",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out1", "Out 1", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val tgtNode = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(200f, 0f),
+            title = "Tgt",
+            systemAction = "act2",
+            inputs = listOf(InputPort("in_single", "In Single", dataType = DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+        val srcNode2 = Node.SystemNode(
+            id = 3L,
+            position = ModelOffset(0f, 200f),
+            title = "Src 2",
+            systemAction = "act3",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out2", "Out 2", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val otherTgtNode = Node.SystemNode(
+            id = 4L,
+            position = ModelOffset(200f, 200f),
+            title = "Other Tgt",
+            systemAction = "act4",
+            inputs = listOf(InputPort("in_other", "In Other", dataType = DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+
+        // Existing connection: 1:out1 -> 2:in_single
+        val conn1 = Connection(sourceNodeId = 1L, sourcePortId = "out1", targetNodeId = 2L, targetPortId = "in_single")
+        // Existing connection: 3:out2 -> 4:in_other
+        val conn2 = Connection(sourceNodeId = 3L, sourcePortId = "out2", targetNodeId = 4L, targetPortId = "in_other")
+
+        val flow = Flow(
+            name = "TestMultiConnectionReject",
+            nodes = listOf(srcNode1, tgtNode, srcNode2, otherTgtNode),
+            connections = listOf(conn1, conn2)
+        )
+        val vm = createViewModel(flow)
+
+        // Verify isInputPortAlreadyConnected is true for 2:in_single and 4:in_other
+        assertTrue(vm.state.value.flow.isInputPortAlreadyConnected(2L, "in_single"))
+        assertTrue(vm.state.value.flow.isInputPortAlreadyConnected(4L, "in_other"))
+
+        // 1. Attempt AddJunctionAndBranch from conn2 into already connected 2:in_single
+        vm.onEvent(
+            FlowEvent.AddJunctionAndBranch(
+                connection = conn2,
+                splitPosition = ModelOffset(100f, 200f),
+                branchTargetNodeId = 2L,
+                branchTargetPortId = "in_single"
+            )
+        )
+        // Must be rejected! Connections count stays 2
+        assertEquals(2, vm.state.value.flow.connections.size)
+        assertEquals(0, vm.state.value.flow.junctions.size)
+
+        // 2. Attempt SplitConnectionAndConnect into 2:in_single
+        vm.onEvent(
+            FlowEvent.SplitConnectionAndConnect(
+                connection = conn2,
+                splitPosition = ModelOffset(100f, 200f),
+                targetNodeId = 2L,
+                targetPortId = "in_single"
+            )
+        )
+        assertEquals(2, vm.state.value.flow.connections.size)
+        assertEquals(0, vm.state.value.flow.junctions.size)
+
+        // 3. Attempt FinalizeStructuredConnectionWithPoints into 2:in_single
+        vm.onEvent(
+            FlowEvent.FinalizeStructuredConnectionWithPoints(
+                sourceNodeId = 3L,
+                sourcePortId = "out2",
+                targetNodeId = 2L,
+                targetPortId = "in_single",
+                points = listOf(ModelOffset(100f, 100f))
+            )
+        )
+        assertEquals(2, vm.state.value.flow.connections.size)
+        assertEquals(0, vm.state.value.flow.junctions.size)
+    }
+
+    @Test
+    fun testFlowBrokenAndTypeInferenceValidationOnMultipleInputs() {
+        val srcNode1 = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            title = "Src 1",
+            systemAction = "act1",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out1", "Out 1", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val srcNode2 = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(0f, 100f),
+            title = "Src 2",
+            systemAction = "act2",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out2", "Out 2", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val tgtNode = Node.SystemNode(
+            id = 3L,
+            position = ModelOffset(200f, 50f),
+            title = "Tgt",
+            systemAction = "act3",
+            inputs = listOf(InputPort("in_single", "In Single", dataType = DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+        val conn1 = Connection(sourceNodeId = 1L, sourcePortId = "out1", targetNodeId = 3L, targetPortId = "in_single")
+        val conn2 = Connection(sourceNodeId = 2L, sourcePortId = "out2", targetNodeId = 3L, targetPortId = "in_single")
+
+        val multiConnectedFlow = Flow(
+            name = "TestMultiFlowBroken",
+            nodes = listOf(srcNode1, srcNode2, tgtNode),
+            connections = listOf(conn1, conn2)
+        )
+
+        // Flow.isBroken should report true because a non-array input has > 1 incoming connection
+        assertTrue(multiConnectedFlow.isBroken(setOf("act1", "act2", "act3")))
+
+        // FlowTypeInference should emit a ValidationError
+        val inferenceResult = FlowTypeInference.runTypeInference(multiConnectedFlow)
+        val multiConnErrors = inferenceResult.validationErrors.filter { it.targetPortId == "in_single" }
+        assertTrue(multiConnErrors.isNotEmpty(), "Validation errors must contain error for multi-connected input port")
+    }
+
+    @Test
+    fun testArrayInputPortAllowsMultipleConnections() {
+        val srcNode1 = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            title = "Src 1",
+            systemAction = "act1",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out1", "Out 1", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val srcNode2 = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(0f, 100f),
+            title = "Src 2",
+            systemAction = "act2",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out2", "Out 2", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val tgtNode = Node.SystemNode(
+            id = 3L,
+            position = ModelOffset(200f, 50f),
+            title = "Tgt Array",
+            systemAction = "act3",
+            inputs = listOf(InputPort("in_list", "In List", dataType = DataType.Array(DataType.Primitive(PrimitiveType.STRING)))),
+            outputs = emptyList()
+        )
+        val conn1 = Connection(sourceNodeId = 1L, sourcePortId = "out1", targetNodeId = 3L, targetPortId = "in_list", orderIndex = 0)
+        val conn2 = Connection(sourceNodeId = 2L, sourcePortId = "out2", targetNodeId = 3L, targetPortId = "in_list", orderIndex = 1)
+
+        val arrayFlow = Flow(
+            name = "TestArrayListAllowed",
+            nodes = listOf(srcNode1, srcNode2, tgtNode),
+            connections = listOf(conn1, conn2)
+        )
+
+        // isInputPortAlreadyConnected is false for Array ports because they accept lists
+        assertFalse(arrayFlow.isInputPortAlreadyConnected(3L, "in_list"))
+
+        // Flow is NOT broken for array multiple inputs
+        assertFalse(arrayFlow.isBroken(setOf("act1", "act2", "act3")))
+
+        val inferenceResult = FlowTypeInference.runTypeInference(arrayFlow)
+        val errors = inferenceResult.validationErrors.filter { it.targetPortId == "in_list" }
+        assertTrue(errors.isEmpty(), "Array ports should have no validation errors for multiple connections")
     }
 }
 

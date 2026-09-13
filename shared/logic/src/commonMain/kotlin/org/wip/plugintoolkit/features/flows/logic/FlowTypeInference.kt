@@ -133,6 +133,29 @@ object FlowTypeInference {
             }
         }
 
+        // Check for non-array input ports receiving multiple incoming connections
+        val effectiveConns = flow.getEffectiveConnections()
+        effectiveConns.groupBy { Pair(it.targetNodeId, it.targetPortId) }
+            .forEach { (targetPair, conns) ->
+                if (conns.size > 1) {
+                    val targetNode = flow.nodes.find { it.id == targetPair.first }
+                    val targetPort = targetNode?.inputs?.find { it.id == targetPair.second }
+                    if (targetPort != null && targetPort.dataType !is DataType.Array) {
+                        for (conn in conns.drop(1)) {
+                            errors.add(
+                                ValidationError(
+                                    sourceNodeId = conn.sourceNodeId,
+                                    sourcePortId = conn.sourcePortId,
+                                    targetNodeId = targetPair.first,
+                                    targetPortId = targetPair.second,
+                                    message = "Input port '${targetPair.second}' cannot have multiple incoming connections (${conns.size})"
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
         // Check input ports regex validation
         flow.nodes.forEach { node ->
             node.inputs.forEach { input ->

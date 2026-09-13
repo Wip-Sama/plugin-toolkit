@@ -376,7 +376,9 @@ fun BoardCanvas(
                 onSelectPoints = onSelectPoints,
                 onSplitConnectionAndConnect = onSplitConnectionAndConnect,
                 onResetDrawingConnection = onResetDrawingConnection,
-                shortcutManager = shortcutManager
+                shortcutManager = shortcutManager,
+                highlightedNodeId = highlightedNodeId,
+                highlightedPortId = highlightedPortId
             )
             .boardSelectionBoxGesture(
                 interactionState = interactionState,
