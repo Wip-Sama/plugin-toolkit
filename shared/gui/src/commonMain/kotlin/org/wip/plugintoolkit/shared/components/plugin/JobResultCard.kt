@@ -382,7 +382,7 @@ fun JobResultCard(
                                                         else -> element.toString()
                                                     },
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    fontFamily = FontFamily.Monospace,
+                                                    fontFamily = ToolkitTheme.codeFontFamily,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             }
@@ -419,7 +419,7 @@ fun JobResultCard(
                                     Text(
                                         text = jsonResult.toString(),
                                         style = MaterialTheme.typography.bodyMedium,
-                                        fontFamily = FontFamily.Monospace,
+                                        fontFamily = ToolkitTheme.codeFontFamily,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.padding(ToolkitTheme.spacing.medium)
                                     )

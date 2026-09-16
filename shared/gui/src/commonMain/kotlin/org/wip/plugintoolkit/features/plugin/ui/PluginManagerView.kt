@@ -237,7 +237,7 @@ fun PluginManagerView(
             }
         }
         // Toolbar with responsive compact collapsing
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(ToolkitTheme.spacing.small)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val isCompact = maxWidth < ToolkitTheme.dimensions.breakpointWideToolbar
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -340,7 +340,7 @@ fun PluginManagerView(
 
         // Search & Filter Row
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = ToolkitTheme.spacing.small),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
         ) {
             ToolkitTextField(
@@ -415,7 +415,6 @@ fun PluginManagerView(
                     )
                     .weight(1f),
                 contentPadding = PaddingValues(
-                    horizontal = ToolkitTheme.spacing.medium,
                     vertical = ToolkitTheme.spacing.small
                 ),
                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)

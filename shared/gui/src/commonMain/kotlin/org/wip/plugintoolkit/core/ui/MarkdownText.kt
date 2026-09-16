@@ -32,8 +32,9 @@ fun MarkdownText(
     val gray = org.wip.plugintoolkit.core.theme.ToolkitTheme.colors.gray
     val buttonBg = org.wip.plugintoolkit.core.theme.ToolkitTheme.opacity.buttonBackground
     val info = org.wip.plugintoolkit.core.theme.ToolkitTheme.colors.info
-    val annotatedString = remember(text, gray, buttonBg, info) {
-        parseMarkdown(text, gray, buttonBg, info)
+    val codeFont = org.wip.plugintoolkit.core.theme.ToolkitTheme.codeFontFamily
+    val annotatedString = remember(text, gray, buttonBg, info, codeFont) {
+        parseMarkdown(text, gray, buttonBg, info, codeFont)
     }
 
     ClickableText(
@@ -49,7 +50,7 @@ fun MarkdownText(
     )
 }
 
-private fun parseMarkdown(text: String, gray: Color, buttonBg: Float, info: Color): AnnotatedString {
+private fun parseMarkdown(text: String, gray: Color, buttonBg: Float, info: Color, codeFont: FontFamily): AnnotatedString {
     return buildAnnotatedString {
         var i = 0
         while (i < text.length) {
@@ -64,7 +65,7 @@ private fun parseMarkdown(text: String, gray: Color, buttonBg: Float, info: Colo
                     val end = findClosing(text, i + 2, "**")
                     if (end != -1) {
                         val start = length
-                        append(parseMarkdown(text.substring(i + 2, end), gray, buttonBg, info))
+                        append(parseMarkdown(text.substring(i + 2, end), gray, buttonBg, info, codeFont))
                         addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, length)
                         i = end + 2
                     } else {
@@ -77,7 +78,7 @@ private fun parseMarkdown(text: String, gray: Color, buttonBg: Float, info: Colo
                     val end = findClosing(text, i + 1, "_")
                     if (end != -1) {
                         val start = length
-                        append(parseMarkdown(text.substring(i + 1, end), gray, buttonBg, info))
+                        append(parseMarkdown(text.substring(i + 1, end), gray, buttonBg, info, codeFont))
                         addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, length)
                         i = end + 1
                     } else {
@@ -90,7 +91,7 @@ private fun parseMarkdown(text: String, gray: Color, buttonBg: Float, info: Colo
                     val end = findClosing(text, i + 2, "~~")
                     if (end != -1) {
                         val start = length
-                        append(parseMarkdown(text.substring(i + 2, end), gray, buttonBg, info))
+                        append(parseMarkdown(text.substring(i + 2, end), gray, buttonBg, info, codeFont))
                         addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), start, length)
                         i = end + 2
                     } else {
@@ -106,7 +107,7 @@ private fun parseMarkdown(text: String, gray: Color, buttonBg: Float, info: Colo
                         append(text.substring(i + 1, end))
                         addStyle(
                             SpanStyle(
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = codeFont,
                                 background = gray.copy(alpha = buttonBg)
                             ), start, length
                         )
@@ -125,7 +126,7 @@ private fun parseMarkdown(text: String, gray: Color, buttonBg: Float, info: Colo
                             val linkText = text.substring(i + 1, linkEnd)
                             val url = text.substring(linkEnd + 2, urlEnd)
                             val start = length
-                            append(parseMarkdown(linkText, gray, buttonBg, info))
+                            append(parseMarkdown(linkText, gray, buttonBg, info, codeFont))
                             addStyle(
                                 SpanStyle(
                                     color = info,

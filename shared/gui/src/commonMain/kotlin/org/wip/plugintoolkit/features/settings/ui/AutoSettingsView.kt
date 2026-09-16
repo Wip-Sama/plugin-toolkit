@@ -24,6 +24,8 @@ import org.wip.plugintoolkit.shared.components.settings.SettingsNumericInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsSlider
 import org.wip.plugintoolkit.shared.components.settings.SettingsSwitch
 
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 
 /**
@@ -61,8 +63,18 @@ fun AutoSettingsView(
     val grouped = filteredDefinitions.groupBy { it.sectionTitle }
     val settings by viewModel.settings.collectAsState()
     val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
 
-    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalFadingEdges(
+                scrollState = scrollState,
+                topFadeLength = ToolkitTheme.spacing.medium,
+                bottomFadeLength = ToolkitTheme.spacing.medium
+            )
+            .verticalScroll(scrollState)
+    ) {
         grouped.forEach { (sectionTitle, definitions) ->
             val sectionName = sectionTitle.resolve()
             SettingsGroup(title = sectionName) {

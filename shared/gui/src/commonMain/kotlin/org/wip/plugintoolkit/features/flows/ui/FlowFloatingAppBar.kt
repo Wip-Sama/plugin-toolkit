@@ -118,6 +118,7 @@ fun FlowFloatingAppBar(
     val dimensions = ToolkitTheme.dimensions
     val spacing = ToolkitTheme.spacing
     val shapes = ToolkitTheme.shapes
+    val tooltipState = LocalTooltipState.current
 
     var showColorPicker by remember { mutableStateOf(false) }
     var showSplineSettings by remember { mutableStateOf(false) }
@@ -202,7 +203,6 @@ fun FlowFloatingAppBar(
                     }
 
                     // Color swatch indicator with hover/click Quick Palette popup
-                    val tooltipState = LocalTooltipState.current
                     var colorSwatchCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
                     val swatchTooltipKey = remember { Any() }
 
@@ -343,11 +343,23 @@ fun FlowFloatingAppBar(
             }
 
             // 6. Info Button
+            var infoButtonCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+            val infoTooltipKey = remember { Any() }
+
             Surface(
                 shape = CircleShape,
                 color = Color.Transparent,
                 modifier = Modifier
                     .size(dimensions.standardButtonHeight)
+                    .clip(CircleShape)
+                    .onGloballyPositioned { infoButtonCoordinates = it }
+                    .clickable {
+                        infoButtonCoordinates?.let { coords ->
+                            tooltipState?.toggle(coords, infoTooltipKey) {
+                                FlowControlsInfoCard()
+                            }
+                        }
+                    }
                     .tooltip { FlowControlsInfoCard() }
                     .testTag("flow_controls_info_button")
             ) {

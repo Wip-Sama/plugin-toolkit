@@ -24,7 +24,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import org.jetbrains.compose.resources.Font
+import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.jetbrains_mono_bold
+import plugintoolkit.composeapp.generated.resources.jetbrains_mono_italic
+import plugintoolkit.composeapp.generated.resources.jetbrains_mono_medium
+import plugintoolkit.composeapp.generated.resources.jetbrains_mono_regular
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -267,6 +274,7 @@ data class ToolkitShapes(
     val medium: CornerBasedShape = RoundedCornerShape(12.dp),
     val large: CornerBasedShape = RoundedCornerShape(16.dp),
     val extraLarge: CornerBasedShape = RoundedCornerShape(24.dp),
+    val pill: CornerBasedShape = RoundedCornerShape(percent = 50),
     val startActionRow: CornerBasedShape = RoundedCornerShape(
         topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp
     ),
@@ -318,15 +326,22 @@ object ToolkitTheme {
         @ReadOnlyComposable
         get() = MaterialTheme.typography
 
+    val codeFontFamily: FontFamily
+        @Composable
+        get() = FontFamily(
+            Font(Res.font.jetbrains_mono_regular, FontWeight.Normal),
+            Font(Res.font.jetbrains_mono_medium, FontWeight.Medium),
+            Font(Res.font.jetbrains_mono_bold, FontWeight.Bold),
+            Font(Res.font.jetbrains_mono_italic, FontWeight.Normal, FontStyle.Italic)
+        )
+
     val codeMedium: TextStyle
         @Composable
-        @ReadOnlyComposable
-        get() = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
+        get() = TextStyle(fontFamily = codeFontFamily, fontSize = 12.sp, lineHeight = 16.sp)
 
     val codeSmall: TextStyle
         @Composable
-        @ReadOnlyComposable
-        get() = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 14.sp)
+        get() = TextStyle(fontFamily = codeFontFamily, fontSize = 11.sp, lineHeight = 14.sp)
 }
 
 private val DarkColorScheme = ColorEngine.createStandardScheme(Color(0xFF6750A4), isDark = true, isAmoled = false)

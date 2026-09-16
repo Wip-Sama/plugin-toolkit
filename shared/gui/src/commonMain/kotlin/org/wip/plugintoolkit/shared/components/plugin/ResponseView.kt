@@ -33,7 +33,7 @@ fun ResponseView(response: PluginResponse) {
             Text(
                 text = response.result.toString(),
                 style = MaterialTheme.typography.bodyMedium,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                fontFamily = ToolkitTheme.codeFontFamily,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }

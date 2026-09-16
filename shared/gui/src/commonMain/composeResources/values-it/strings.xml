@@ -209,6 +209,8 @@
     <string name="settings_search_by_section">Per Sezione</string>
     <string name="settings_no_results">Nessun risultato trovato</string>
     <string name="settings_search_whole">Cerca in tutte le impostazioni</string>
+    <string name="settings_global_search_notice">Nessun risultato in %1$s. Risultati globali da tutte le impostazioni.</string>
+    <string name="settings_no_global_results">Nessuna impostazione trovata per \"%1$s\"</string>
     <string name="settings_feature_placeholder">Il contenuto per %1$s apparirà qui.</string>
     <string name="plugin_settings_actions">Azioni</string>
     <string name="plugin_settings_custom">Impostazioni Personalizzate</string>

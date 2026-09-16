@@ -187,4 +187,11 @@ class ThemeTest {
         assertEquals(4.dp, dimensions.menuElevation)
         assertEquals(40.dp, dimensions.standardButtonHeight)
     }
+
+    @Test
+    fun testPillShapeToken() {
+        val shapes = ToolkitShapes()
+        assertNotNull(shapes.pill)
+        assertEquals(androidx.compose.foundation.shape.RoundedCornerShape(percent = 50), shapes.pill)
+    }
 }

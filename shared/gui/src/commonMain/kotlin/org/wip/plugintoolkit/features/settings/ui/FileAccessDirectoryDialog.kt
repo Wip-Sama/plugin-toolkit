@@ -317,7 +317,7 @@ fun FileAccessDirectoryDialog(
                                         Text(
                                             text = pathStr,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            fontFamily = FontFamily.Monospace,
+                                            fontFamily = ToolkitTheme.codeFontFamily,
                                             modifier = Modifier.weight(1f)
                                         )
                                         IconButton(

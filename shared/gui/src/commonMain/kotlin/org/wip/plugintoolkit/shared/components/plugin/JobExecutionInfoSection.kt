@@ -216,7 +216,7 @@ internal fun ExecutionInfoSection(
                                     text = capName,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Medium,
-                                    fontFamily = FontFamily.Monospace,
+                                    fontFamily = ToolkitTheme.codeFontFamily,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 if (count > 1) {

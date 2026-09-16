@@ -6,8 +6,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
@@ -143,314 +147,67 @@ fun PluginCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = if (isLoaded) onClick else null
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Icon Placeholder
-            Box(
-                modifier = Modifier
-                    .size(ToolkitTheme.dimensions.pluginIcon)
-                    .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
-                contentAlignment = Alignment.Center
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val isCompact = maxWidth < ToolkitTheme.dimensions.breakpointCompact
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.Extension,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(plugin.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (!plugin.isCompatible) {
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        ToolkitChip(
-                            text = plugin.compatibilityError ?: "Incompatible",
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                    } else if (plugin.loadError != null) {
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        ToolkitChip(
-                            text = stringResource(Res.string.plugin_broken),
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                    } else if (isLoaded) {
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        ToolkitChip(
-                            stringResource(Res.string.plugin_loaded),
-                            containerColor = ToolkitTheme.colors.success,
-                            contentColor = ToolkitTheme.colors.onSuccess, //TODO: do not like having the same color here
-                        )
-                    }
-
-                    if (plugin.requiredAction != null) {
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        val badgeText =
-                            if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Setup Required" else "Action Required"
-                        ToolkitChip(
-                            badgeText,
-                            containerColor = ToolkitTheme.colors.warning,
-                            contentColor = ToolkitTheme.colors.onWarning //TODO: not liking having the same color here
-                        )
-                    }
-
-                    if (activity != null) {
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        val chipText = when (activity.type) {
-                            JobType.Setup -> if (isDeterminate) {
-                                stringResource(Res.string.plugin_state_setting_up_percent, (progress * 100).toInt().coerceIn(0, 100))
-                            } else {
-                                stringResource(Res.string.plugin_state_setting_up)
-                            }
-                            JobType.Validation -> stringResource(Res.string.plugin_state_validating)
-                            JobType.Update -> stringResource(Res.string.plugin_state_updating, (progress * 100).toInt().coerceIn(0, 100))
-                            else -> stringResource(Res.string.plugin_state_activating)
-                        }
-                        ToolkitChip(
-                            text = chipText,
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    } else if (plugin.isCompatible && plugin.loadError == null) {
-                        if (plugin.isValidated) {
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            ToolkitChip(
-                                text = stringResource(Res.string.plugin_validated),
-                                contentColor = ToolkitTheme.colors.validated,
-                                containerColor = ToolkitTheme.colors.onValidated
-                            )
-                        } else if (plugin.isSetupCompleted) {
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            ToolkitChip(
-                                text = stringResource(Res.string.plugin_status_validation_failed),
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            ToolkitChip(
-                                text = stringResource(Res.string.plugin_validation_pending),
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                    }
-                }
-                Text(
-                    stringResource(Res.string.plugin_version_pkg_format, plugin.version, plugin.pkg),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (plugin.loadError != null || !plugin.isCompatible) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (plugin.supportedOs.isNotEmpty()) {
-                    Text(
-                        "Supported OS: ${plugin.supportedOs.joinToString { it.name }}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                val compatError = plugin.compatibilityError
-                val loadError = plugin.loadError
-                if (!plugin.isCompatible && compatError != null) {
-                    Text(
-                        compatError,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
-                    )
-                } else if (loadError != null) {
-                    Text(
-                        loadError,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
+                // Icon Placeholder
+                Box(
+                    modifier = Modifier
+                        .size(ToolkitTheme.dimensions.pluginIcon)
+                        .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Extension,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
 
-                if (alternateUpdate != null) {
-                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                        modifier = Modifier
-                            .clickable { onSwitchRepo(plugin.pkg) }
-                            .padding(top = ToolkitTheme.spacing.extraSmall / 2)
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(
-                                horizontal = ToolkitTheme.spacing.small,
-                                vertical = ToolkitTheme.spacing.badgeVertical
+                        Text(plugin.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        if (!plugin.isCompatible) {
+                            ToolkitChip(
+                                text = plugin.compatibilityError ?: "Incompatible",
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
                             )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Upgrade,
-                                contentDescription = null,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
-                                tint = MaterialTheme.colorScheme.primary
+                        } else if (plugin.loadError != null) {
+                            ToolkitChip(
+                                text = stringResource(Res.string.plugin_broken),
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
                             )
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                stringResource(
-                                    Res.string.plugin_newer_version_in_other_repo,
-                                    alternateUpdate.newerVersion,
-                                    alternateUpdate.repo.name
-                                ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                "•",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                stringResource(Res.string.plugin_switch_repo_action),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                        } else if (isLoaded) {
+                            ToolkitChip(
+                                stringResource(Res.string.plugin_loaded),
+                                containerColor = ToolkitTheme.colors.success,
+                                contentColor = ToolkitTheme.colors.onSuccess,
                             )
                         }
-                    }
-                }
 
-                if (activity != null) {
-                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
-                    val stepText = when (activity.type) {
-                        JobType.Setup -> stringResource(Res.string.plugin_step_setup)
-                        JobType.Validation -> stringResource(Res.string.plugin_step_validation)
-                        JobType.Update -> stringResource(Res.string.plugin_step_update)
-                        else -> activity.step ?: stringResource(Res.string.plugin_state_activating)
-                    }
-                    Text(
-                        text = stepText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = ToolkitTheme.spacing.extraSmall / 2)
-                    )
-                    if (isDeterminate) {
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(ToolkitTheme.spacing.extraSmall),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    } else {
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(ToolkitTheme.spacing.extraSmall),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-            }
-
-            // Actions
-            var expanded by remember { mutableStateOf(false) }
-
-            val buttonState = CardButtonState(plugin.requiredAction, hasUpdate, alternateUpdate != null, enabled)
-            AnimatedContent(
-                targetState = buttonState,
-                transitionSpec = { fadeIn() togetherWith fadeOut() }
-            ) { state ->
-                val (reqAction, isUpdateAvailable, hasAltUpdate, readyStatus) = state
-                ToolkitButtonGroup {
-                    if (reqAction != null) {
-                        val action = customActions.find { it.functionName == reqAction }
-                        item { shape, modifierSpec ->
-                            Button(
-                                onClick = {
-                                    if (reqAction == "CONFIGURE_SETTINGS") {
-                                        onAction(PluginStatusAction.Settings)
-                                    } else {
-                                        onAction(PluginStatusAction.Custom(reqAction))
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
-                                shape = shape,
-                                modifier = modifierSpec,
-                                enabled = readyStatus
-                            ) {
-                                Text(
-                                    if (reqAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name
-                                        ?: "Fix Issue"),
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-
-                    item { shape, modifierSpec ->
-                        if (isUpdateAvailable) {
-                            Button(
-                                onClick = { onAction(PluginStatusAction.Update) },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                                shape = shape,
-                                modifier = modifierSpec,
-                                enabled = readyStatus
-                            ) {
-                                Text(
-                                    stringResource(Res.string.plugin_update),
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        } else if (hasAltUpdate) {
-                            Button(
-                                onClick = { onSwitchRepo(plugin.pkg) },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                shape = shape,
-                                modifier = modifierSpec,
-                                enabled = readyStatus
-                            ) {
-                                Text(
-                                    stringResource(Res.string.plugin_switch_repo_action),
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        } else {
-                            FilledTonalButton(
-                                onClick = { onAction(PluginStatusAction.Update) },
-                                shape = shape,
-                                modifier = modifierSpec,
-                                enabled = readyStatus
-                            ) {
-                                Text(
-                                    stringResource(Res.string.plugin_update_local),
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-
-                    item { shape, modifierSpec ->
-                        val toggleColor = if (plugin.isEnabled) {
-                            ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        if (plugin.requiredAction != null) {
+                            val badgeText =
+                                if (plugin.requiredAction == "CONFIGURE_SETTINGS") "Setup Required" else "Action Required"
+                            ToolkitChip(
+                                badgeText,
+                                containerColor = ToolkitTheme.colors.warning,
+                                contentColor = ToolkitTheme.colors.onWarning
                             )
-                        } else {
-                            ButtonDefaults.filledTonalButtonColors()
                         }
-                        val toggleText = when {
-                            activity != null -> when (activity.type) {
+
+                        if (activity != null) {
+                            val chipText = when (activity.type) {
                                 JobType.Setup -> if (isDeterminate) {
                                     stringResource(Res.string.plugin_state_setting_up_percent, (progress * 100).toInt().coerceIn(0, 100))
                                 } else {
@@ -458,160 +215,453 @@ fun PluginCard(
                                 }
                                 JobType.Validation -> stringResource(Res.string.plugin_state_validating)
                                 JobType.Update -> stringResource(Res.string.plugin_state_updating, (progress * 100).toInt().coerceIn(0, 100))
-                                else -> if (plugin.isEnabled) {
-                                    stringResource(Res.string.plugin_state_activating)
-                                } else {
-                                    stringResource(Res.string.plugin_state_deactivating)
-                                }
+                                else -> stringResource(Res.string.plugin_state_activating)
                             }
-                            else -> if (plugin.isEnabled) {
-                                stringResource(Res.string.plugin_state_active)
+                            ToolkitChip(
+                                text = chipText,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        } else if (plugin.isCompatible && plugin.loadError == null) {
+                            if (plugin.isValidated) {
+                                ToolkitChip(
+                                    text = stringResource(Res.string.plugin_validated),
+                                    contentColor = ToolkitTheme.colors.validated,
+                                    containerColor = ToolkitTheme.colors.onValidated
+                                )
+                            } else if (plugin.isSetupCompleted) {
+                                ToolkitChip(
+                                    text = stringResource(Res.string.plugin_status_validation_failed),
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                )
                             } else {
-                                stringResource(Res.string.plugin_state_disabled)
-                            }
-                        }
-                        FilledTonalButton(
-                            onClick = { onToggle(!plugin.isEnabled) },
-                            colors = toggleColor,
-                            shape = shape,
-                            modifier = modifierSpec,
-                            enabled = readyStatus && !isBusy
-                        ) {
-                            if (isBusy) {
-                                if (isDeterminate) {
-                                    CircularProgressIndicator(
-                                        progress = { progress },
-                                        modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
-                                        strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
-                                        color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                } else {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
-                                        strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
-                                        color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            } else {
-                                Icon(
-                                    imageVector = if (plugin.isEnabled) Icons.Default.CheckCircle else Icons.Default.Extension,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.toggleButtonIconSize)
+                                ToolkitChip(
+                                    text = stringResource(Res.string.plugin_validation_pending),
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                text = toggleText,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
-                            )
                         }
                     }
+                    Text(
+                        stringResource(Res.string.plugin_version_pkg_format, plugin.version, plugin.pkg),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (plugin.loadError != null || !plugin.isCompatible) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (plugin.supportedOs.isNotEmpty()) {
+                        Text(
+                            "Supported OS: ${plugin.supportedOs.joinToString { it.name }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    val compatError = plugin.compatibilityError
+                    val loadError = plugin.loadError
+                    if (!plugin.isCompatible && compatError != null) {
+                        Text(
+                            compatError,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
+                        )
+                    } else if (loadError != null) {
+                        Text(
+                            loadError,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
+                        )
+                    }
 
-                    item { shape, modifierSpec ->
-                        FilledTonalIconButton(
-                            onClick = { onAction(PluginStatusAction.Settings) },
-                            shape = shape,
-                            modifier = modifierSpec
-                                .size(ToolkitTheme.dimensions.standardButtonHeight)
-                                .tooltip(Res.string.plugin_settings_tooltip),
-                            enabled = readyStatus && !isBusy
+                    if (alternateUpdate != null) {
+                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .clickable { onSwitchRepo(plugin.pkg) }
+                                .padding(top = ToolkitTheme.spacing.extraSmall / 2)
                         ) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = stringResource(Res.string.plugin_settings)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.badgeVertical
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Upgrade,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    stringResource(
+                                        Res.string.plugin_newer_version_in_other_repo,
+                                        alternateUpdate.newerVersion,
+                                        alternateUpdate.repo.name
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    "•",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    stringResource(Res.string.plugin_switch_repo_action),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+
+                    if (activity != null) {
+                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                        val stepText = when (activity.type) {
+                            JobType.Setup -> stringResource(Res.string.plugin_step_setup)
+                            JobType.Validation -> stringResource(Res.string.plugin_step_validation)
+                            JobType.Update -> stringResource(Res.string.plugin_step_update)
+                            else -> activity.step ?: stringResource(Res.string.plugin_state_activating)
+                        }
+                        Text(
+                            text = stepText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = ToolkitTheme.spacing.extraSmall / 2)
+                        )
+                        if (isDeterminate) {
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(ToolkitTheme.spacing.extraSmall),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(ToolkitTheme.spacing.extraSmall),
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
 
-                    item { shape, modifierSpec ->
-                        Box {
-                            FilledTonalIconButton(
-                                onClick = { expanded = true },
+                }
+
+                // Actions
+                var expanded by remember { mutableStateOf(false) }
+
+                val buttonState = CardButtonState(plugin.requiredAction, hasUpdate, alternateUpdate != null, enabled)
+                AnimatedContent(
+                    targetState = buttonState,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() }
+                ) { state ->
+                    val (reqAction, isUpdateAvailable, hasAltUpdate, readyStatus) = state
+                    ToolkitButtonGroup {
+                        if (reqAction != null) {
+                            val action = customActions.find { it.functionName == reqAction }
+                            val actionLabel = if (reqAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue")
+                            item { shape, modifierSpec ->
+                                Button(
+                                    onClick = {
+                                        if (reqAction == "CONFIGURE_SETTINGS") {
+                                            onAction(PluginStatusAction.Settings)
+                                        } else {
+                                            onAction(PluginStatusAction.Custom(reqAction))
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
+                                    shape = shape,
+                                    modifier = modifierSpec.tooltip(actionLabel),
+                                    enabled = readyStatus
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Build,
+                                        contentDescription = actionLabel,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                    )
+                                    if (!isCompact) {
+                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                        Text(
+                                            actionLabel,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        item { shape, modifierSpec ->
+                            if (isUpdateAvailable) {
+                                val updateLabel = stringResource(Res.string.plugin_update)
+                                Button(
+                                    onClick = { onAction(PluginStatusAction.Update) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                    shape = shape,
+                                    modifier = modifierSpec.tooltip(updateLabel),
+                                    enabled = readyStatus
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Upgrade,
+                                        contentDescription = updateLabel,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                    )
+                                    if (!isCompact) {
+                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                        Text(
+                                            updateLabel,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            } else if (hasAltUpdate) {
+                                val switchLabel = stringResource(Res.string.plugin_switch_repo_action)
+                                Button(
+                                    onClick = { onSwitchRepo(plugin.pkg) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    shape = shape,
+                                    modifier = modifierSpec.tooltip(switchLabel),
+                                    enabled = readyStatus
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Upgrade,
+                                        contentDescription = switchLabel,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                    )
+                                    if (!isCompact) {
+                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                        Text(
+                                            switchLabel,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            } else {
+                                val updateLocalLabel = stringResource(Res.string.plugin_update_local)
+                                FilledTonalButton(
+                                    onClick = { onAction(PluginStatusAction.Update) },
+                                    shape = shape,
+                                    modifier = modifierSpec.tooltip(updateLocalLabel),
+                                    enabled = readyStatus
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = updateLocalLabel,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                    )
+                                    if (!isCompact) {
+                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                        Text(
+                                            updateLocalLabel,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        item { shape, modifierSpec ->
+                            val toggleColor = if (plugin.isEnabled) {
+                                ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            } else {
+                                ButtonDefaults.filledTonalButtonColors()
+                            }
+                            val toggleText = when {
+                                activity != null -> when (activity.type) {
+                                    JobType.Setup -> if (isDeterminate) {
+                                        stringResource(Res.string.plugin_state_setting_up_percent, (progress * 100).toInt().coerceIn(0, 100))
+                                    } else {
+                                        stringResource(Res.string.plugin_state_setting_up)
+                                    }
+                                    JobType.Validation -> stringResource(Res.string.plugin_state_validating)
+                                    JobType.Update -> stringResource(Res.string.plugin_state_updating, (progress * 100).toInt().coerceIn(0, 100))
+                                    else -> if (plugin.isEnabled) {
+                                        stringResource(Res.string.plugin_state_activating)
+                                    } else {
+                                        stringResource(Res.string.plugin_state_deactivating)
+                                    }
+                                }
+                                else -> if (plugin.isEnabled) {
+                                    stringResource(Res.string.plugin_state_active)
+                                } else {
+                                    stringResource(Res.string.plugin_state_disabled)
+                                }
+                            }
+                            FilledTonalButton(
+                                onClick = { onToggle(!plugin.isEnabled) },
+                                colors = toggleColor,
                                 shape = shape,
-                                modifier = modifierSpec.size(ToolkitTheme.dimensions.standardButtonHeight),
+                                modifier = modifierSpec.tooltip(toggleText),
+                                enabled = readyStatus && !isBusy
+                            ) {
+                                if (isBusy) {
+                                    if (isDeterminate) {
+                                        CircularProgressIndicator(
+                                            progress = { progress },
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
+                                            strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
+                                            color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    } else {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize),
+                                            strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
+                                            color = if (plugin.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        imageVector = if (plugin.isEnabled) Icons.Default.CheckCircle else Icons.Default.Extension,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.toggleButtonIconSize)
+                                    )
+                                }
+                                if (!isCompact) {
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                    Text(
+                                        text = toggleText,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
+                        item { shape, modifierSpec ->
+                            FilledTonalIconButton(
+                                onClick = { onAction(PluginStatusAction.Settings) },
+                                shape = shape,
+                                modifier = modifierSpec
+                                    .size(ToolkitTheme.dimensions.standardButtonHeight)
+                                    .tooltip(Res.string.plugin_settings_tooltip),
                                 enabled = readyStatus && !isBusy
                             ) {
                                 Icon(
-                                    Icons.Default.MoreVert,
-                                    contentDescription = stringResource(Res.string.action_more_actions)
+                                    Icons.Default.Settings,
+                                    contentDescription = stringResource(Res.string.plugin_settings)
                                 )
                             }
-                            ToolkitDropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                if (alternateUpdate != null) {
+                        }
+
+                        item { shape, modifierSpec ->
+                            Box {
+                                FilledTonalIconButton(
+                                    onClick = { expanded = true },
+                                    shape = shape,
+                                    modifier = modifierSpec.size(ToolkitTheme.dimensions.standardButtonHeight),
+                                    enabled = readyStatus && !isBusy
+                                ) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = stringResource(Res.string.action_more_actions)
+                                    )
+                                }
+                                ToolkitDropdownMenu(
+                                    expanded = expanded,
+                                    onDismissRequest = { expanded = false }
+                                ) {
+                                    if (alternateUpdate != null) {
+                                        ToolkitDropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    stringResource(
+                                                        Res.string.plugin_switch_repo_action
+                                                    ) + " (${alternateUpdate.repo.name})"
+                                                )
+                                            },
+                                            onClick = {
+                                                expanded = false
+                                                onSwitchRepo(plugin.pkg)
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.Upgrade,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        )
+                                        ToolkitDropdownMenuItem(
+                                            text = { Text(stringResource(Res.string.plugin_update_local)) },
+                                            onClick = { onAction(PluginStatusAction.Update); expanded = false },
+                                            leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
+                                        )
+                                        ToolkitDropdownDivider()
+                                    }
+
+                                    if (hasUpdate && alternateUpdate == null) {
+                                        ToolkitDropdownMenuItem(
+                                            text = { Text(stringResource(Res.string.plugin_update_local)) },
+                                            onClick = { onAction(PluginStatusAction.Update); expanded = false },
+                                            leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
+                                        )
+                                        ToolkitDropdownDivider()
+                                    }
+
                                     ToolkitDropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                stringResource(
-                                                    Res.string.plugin_switch_repo_action
-                                                ) + " (${alternateUpdate.repo.name})"
-                                            )
-                                        },
-                                        onClick = {
-                                            expanded = false
-                                            onSwitchRepo(plugin.pkg)
-                                        },
-                                        leadingIcon = {
-                                            Icon(
-                                                Icons.Default.Upgrade,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
+                                        text = { Text(stringResource(Res.string.plugin_validate)) },
+                                        onClick = { onAction(PluginStatusAction.Validate); expanded = false },
+                                        leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
                                     )
                                     ToolkitDropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.plugin_update_local)) },
-                                        onClick = { onAction(PluginStatusAction.Update); expanded = false },
+                                        text = { Text(stringResource(Res.string.plugin_rerun_setup)) },
+                                        onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
+                                        leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
+                                    )
+                                    ToolkitDropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.plugin_reload)) },
+                                        onClick = { onAction(PluginStatusAction.Reload); expanded = false },
+                                        leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
+                                    )
+                                    ToolkitDropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.plugin_changelog)) },
+                                        onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
+                                        leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
+                                    )
+                                    ToolkitDropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.plugin_action_refresh_locks)) },
+                                        onClick = { onAction(PluginStatusAction.RefreshLocks); expanded = false },
+                                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) }
+                                    )
+                                    ToolkitDropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.plugin_open_folder)) },
+                                        onClick = { onAction(PluginStatusAction.OpenFolder); expanded = false },
                                         leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
                                     )
                                     ToolkitDropdownDivider()
+                                    ToolkitDropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.plugin_uninstall)) },
+                                        onClick = { onAction(PluginStatusAction.Uninstall); expanded = false },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        isDestructive = true
+                                    )
                                 }
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_validate)) },
-                                    onClick = { onAction(PluginStatusAction.Validate); expanded = false },
-                                    leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
-                                )
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_rerun_setup)) },
-                                    onClick = { onAction(PluginStatusAction.RerunSetup); expanded = false },
-                                    leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
-                                )
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_reload)) },
-                                    onClick = { onAction(PluginStatusAction.Reload); expanded = false },
-                                    leadingIcon = { Icon(Icons.Default.Replay, contentDescription = null) }
-                                )
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_changelog)) },
-                                    onClick = { onAction(PluginStatusAction.Changelog); expanded = false },
-                                    leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
-                                )
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_action_refresh_locks)) },
-                                    onClick = { onAction(PluginStatusAction.RefreshLocks); expanded = false },
-                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) }
-                                )
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_open_folder)) },
-                                    onClick = { onAction(PluginStatusAction.OpenFolder); expanded = false },
-                                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) }
-                                )
-                                ToolkitDropdownDivider()
-                                ToolkitDropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.plugin_uninstall)) },
-                                    onClick = { onAction(PluginStatusAction.Uninstall); expanded = false },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = null
-                                        )
-                                    },
-                                    isDestructive = true
-                                )
                             }
                         }
                     }

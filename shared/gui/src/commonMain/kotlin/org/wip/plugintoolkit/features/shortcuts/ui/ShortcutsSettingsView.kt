@@ -86,6 +86,8 @@ import plugintoolkit.composeapp.generated.resources.shortcuts_conflicts_detected
 import plugintoolkit.composeapp.generated.resources.shortcuts_reset
 import plugintoolkit.composeapp.generated.resources.shortcuts_section_priority
 
+import org.wip.plugintoolkit.shared.components.verticalFadingEdges
+
 /**
  * Standardized Settings view for shortcuts and gestures.
  * Adheres strictly to the standard SettingsGroup/SettingsItem visuals and utilizes
@@ -129,11 +131,17 @@ fun ShortcutsSettingsView(
         filteredActions.groupBy { it.situation }
     }
 
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.large)
+            .verticalFadingEdges(
+                scrollState = scrollState,
+                topFadeLength = ToolkitTheme.spacing.medium,
+                bottomFadeLength = ToolkitTheme.spacing.medium
+            )
+            .verticalScroll(scrollState)
     ) {
         // Global Conflict Banner
         AnimatedVisibility(
@@ -243,7 +251,7 @@ fun ShortcutsSettingsView(
                                         horizontal = ToolkitTheme.spacing.small,
                                         vertical = ToolkitTheme.spacing.extraExtraSmall
                                     ),
-                                    shape = ToolkitTheme.shapes.extraSmall
+                                    shape = ToolkitTheme.shapes.pill
                                 ) {
                                     Text(
                                         text = shortcutManager.formatEffectiveTriggers(action.id),

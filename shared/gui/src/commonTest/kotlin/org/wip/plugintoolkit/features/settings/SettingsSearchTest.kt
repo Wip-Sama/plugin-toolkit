@@ -129,4 +129,27 @@ class SettingsSearchTest {
         val items2 = results2.values.flatten()
         assertTrue(items2.isNotEmpty())
     }
+
+    @Test
+    fun testAutomaticBroadSearchFallbackCondition() {
+        // When user is on Appearance settings tab and searches for "Memory" (which belongs to System settings),
+        // local matches must be false, while broad search matches must be found across sections.
+        val defs = listOf(
+            createDefinition("app.theme", "Theme Selection", "Dark or Light", navKey = SettingNavKey.Appearance),
+            createDefinition("sys.memory", "Max Memory Limit", "Allocate heap", navKey = SettingNavKey.SystemSettings)
+        )
+        val registry = SettingsRegistry(defs)
+        val viewModel = SettingsSearchViewModel(registry)
+        val resolvedStrings = registry.definitions.value.flatMap {
+            listOfNotNull(it.title, it.subtitle, it.sectionTitle)
+        }.associateWith { (it as SettingText.Raw).text }
+
+        viewModel.searchQuery = "Memory"
+        val hasLocalInAppearance = viewModel.hasLocalMatches(SettingNavKey.Appearance, registry.definitions.value, resolvedStrings)
+        assertFalse(hasLocalInAppearance, "Appearance tab should have no local matches for 'Memory'")
+
+        val broadResults = viewModel.getBroadSearchResults(registry.definitions.value, resolvedStrings)
+        val broadMatches = broadResults.values.flatten()
+        assertTrue(broadMatches.any { it.id == "sys.memory" }, "Broad search should find 'sys.memory' across tabs")
+    }
 }

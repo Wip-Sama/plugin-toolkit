@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -80,8 +82,17 @@ fun NotificationHistoryView(viewModel: NotificationViewModel = koinInject()) {
                 )
             }
         } else {
+            val lazyListState = rememberLazyListState()
             LazyColumn(
-                modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                state = lazyListState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalFadingEdges(
+                        lazyListState = lazyListState,
+                        topFadeLength = ToolkitTheme.spacing.medium,
+                        bottomFadeLength = ToolkitTheme.spacing.medium
+                    ),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
             ) {
                 items(history, key = { it.id }) { record ->
                     NotificationItem(

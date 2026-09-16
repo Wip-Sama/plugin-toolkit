@@ -28,6 +28,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -75,6 +76,7 @@ import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
+import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.nav_notification_history
 import plugintoolkit.composeapp.generated.resources.section_about
@@ -83,6 +85,8 @@ import plugintoolkit.composeapp.generated.resources.section_plugins_manager
 import plugintoolkit.composeapp.generated.resources.section_plugins_repositories
 import plugintoolkit.composeapp.generated.resources.section_system
 import plugintoolkit.composeapp.generated.resources.setting_appearance
+import plugintoolkit.composeapp.generated.resources.settings_global_search_notice
+import plugintoolkit.composeapp.generated.resources.settings_no_global_results
 import plugintoolkit.composeapp.generated.resources.settings
 import plugintoolkit.composeapp.generated.resources.settings_feature_placeholder
 import plugintoolkit.composeapp.generated.resources.settings_no_results
@@ -284,7 +288,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = ToolkitTheme.spacing.medium))
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
             CompositionLocalProvider(
                 LocalSettingsSearchQuery provides searchQuery,
@@ -297,25 +301,48 @@ fun SettingsScreen(
 
                 if (!hasLocalMatches && currentKey != SettingNavKey.BroadSearch) {
                     Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        Text(
-                            stringResource(Res.string.settings_no_results, titleText),
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-                        Button(onClick = {
-                            if (backStack.lastOrNull() != SettingNavKey.BroadSearch) {
-                                backStack.add(SettingNavKey.BroadSearch)
+                        Surface(
+                            shape = ToolkitTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = ToolkitTheme.spacing.medium)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.medium,
+                                    vertical = ToolkitTheme.spacing.small
+                                ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                                Text(
+                                    text = stringResource(Res.string.settings_global_search_notice, titleText),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
                             }
-                        }) {
-                            Icon(Icons.Default.Search, contentDescription = null)
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Text(stringResource(Res.string.settings_search_whole))
                         }
+
+                        BroadSearchResultsView(
+                            searchQuery = searchQuery,
+                            allDefinitions = allDefinitions,
+                            searchViewModel = searchViewModel,
+                            resolvedStrings = resolvedStrings,
+                            onNavigate = { targetKey ->
+                                if (backStack.lastOrNull() != targetKey) {
+                                    backStack.add(targetKey)
+                                }
+                            }
+                        )
                     }
                 } else {
                     NavDisplay(
@@ -375,11 +402,22 @@ fun BroadSearchResultsView(
     val grouped = searchViewModel.getBroadSearchResults(allDefinitions, resolvedStrings)
 
     if (grouped.isEmpty()) {
-        PlaceholderView("No results found for \"$searchQuery\"")
+        PlaceholderView(stringResource(Res.string.settings_no_global_results, searchQuery))
         return
     }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalFadingEdges(
+                scrollState = scrollState,
+                topFadeLength = ToolkitTheme.spacing.medium,
+                bottomFadeLength = ToolkitTheme.spacing.medium
+            )
+            .verticalScroll(scrollState)
+    ) {
         grouped.forEach { (sectionName, items) ->
             SettingsGroup(title = sectionName) {
                 items.forEachIndexed { index, definition ->

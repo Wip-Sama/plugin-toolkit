@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -535,7 +536,7 @@ fun FlowRunnerView(
                 ) {
                     OutlinedButton(
                         onClick = { viewModel.saveFlowDefaults(currentFlow, parameterValues.toMap()) },
-                        modifier = Modifier.weight(1f)
+                        shape = MaterialTheme.shapes.medium
                     ) {
                         Icon(
                             Icons.Default.Bookmark,
@@ -546,24 +547,31 @@ fun FlowRunnerView(
                         Text(stringResource(Res.string.action_set_as_default))
                     }
 
-                    if (currentFlow.defaultValues.isNotEmpty()) {
-                        TextButton(
-                            onClick = {
-                                flowParameters.forEach { param ->
-                                    if (param.type != ParameterType.OUTPUT) {
-                                        parameterValues["${param.nodeId}_${param.portId}"] = param.defaultValue
-                                    }
+                    OutlinedButton(
+                        onClick = {
+                            flowParameters.forEach { param ->
+                                if (param.type != ParameterType.OUTPUT) {
+                                    parameterValues["${param.nodeId}_${param.portId}"] = param.defaultValue
                                 }
                             }
-                        ) {
-                            Text(stringResource(Res.string.action_reset_to_default))
-                        }
+                        },
+                        enabled = currentFlow.defaultValues.isNotEmpty(),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.action_reset_to_default))
                     }
 
                     Button(
                         onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = MaterialTheme.shapes.medium,
                         enabled = isFlowValid
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null)

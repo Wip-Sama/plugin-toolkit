@@ -392,6 +392,33 @@ fun CapabilityTester(
         horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        OutlinedButton(
+            onClick = onSetAsDefault,
+            enabled = isValid,
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Icon(
+                Icons.Default.Bookmark,
+                contentDescription = null,
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+            )
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+            Text(stringResource(Res.string.action_set_as_default))
+        }
+
+        OutlinedButton(
+            onClick = onResetDefaults,
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Icon(
+                Icons.Default.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+            )
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+            Text(stringResource(Res.string.action_reset_to_default))
+        }
+
         Button(
             onClick = onExecute,
             modifier = Modifier
@@ -416,42 +443,21 @@ fun CapabilityTester(
         ) {
             if (activeJobs.isNotEmpty()) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(ToolkitTheme.dimensions.settingsIconSize),
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
                     strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
                     color = MaterialTheme.colorScheme.onPrimary
                 )
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
                 Text(stringResource(Res.string.plugin_execute_capability_running, activeJobs.size))
             } else {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                )
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 Text(stringResource(Res.string.plugin_execute_capability))
             }
-        }
-
-        OutlinedButton(
-            onClick = onSetAsDefault,
-            enabled = isValid,
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Icon(
-                Icons.Default.Bookmark,
-                contentDescription = null,
-                modifier = Modifier.size(ToolkitTheme.dimensions.settingsIconSize)
-            )
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-            Text(stringResource(Res.string.action_set_as_default))
-        }
-
-        OutlinedButton(
-            onClick = onResetDefaults,
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Icon(
-                Icons.Default.Refresh,
-                contentDescription = null,
-                modifier = Modifier.size(ToolkitTheme.dimensions.settingsIconSize)
-            )
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-            Text(stringResource(Res.string.action_reset_to_default))
         }
     }
     if (requirementError != null) {

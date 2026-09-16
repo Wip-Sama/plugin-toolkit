@@ -38,6 +38,7 @@ import org.wip.plugintoolkit.api.Release
 import org.wip.plugintoolkit.api.utils.ChangelogParser
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.DialogService
+import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.about_built_by
 import plugintoolkit.composeapp.generated.resources.about_icon_author
@@ -83,10 +84,17 @@ fun AboutView(
         }
     }
 
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
+            .verticalFadingEdges(
+                scrollState = scrollState,
+                topFadeLength = ToolkitTheme.spacing.medium,
+                bottomFadeLength = ToolkitTheme.spacing.medium
+            )
+            .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.large)
     ) {

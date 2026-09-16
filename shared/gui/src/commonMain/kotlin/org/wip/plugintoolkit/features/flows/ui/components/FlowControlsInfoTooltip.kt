@@ -37,7 +37,11 @@ import plugintoolkit.composeapp.generated.resources.flow_info_title
 
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun FlowControlsInfoCard(
@@ -45,7 +49,7 @@ fun FlowControlsInfoCard(
 ) {
     Surface(
         modifier = modifier
-            .width(ToolkitTheme.dimensions.flowControlsTooltipWidth)
+            .widthIn(min = 540.dp, max = ToolkitTheme.dimensions.flowControlsTooltipWidth)
             .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.medium),
         shape = ToolkitTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -55,7 +59,10 @@ fun FlowControlsInfoCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+            modifier = Modifier
+                .heightIn(max = 560.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(ToolkitTheme.spacing.medium),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
         ) {
             // Header
@@ -86,7 +93,7 @@ fun FlowControlsInfoCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
+                    .height(IntrinsicSize.Max),
                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
                 // Column 1: Navigation & Board + Tools

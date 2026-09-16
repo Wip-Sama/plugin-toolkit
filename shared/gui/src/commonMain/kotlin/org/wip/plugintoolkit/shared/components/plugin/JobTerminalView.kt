@@ -39,8 +39,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.terminal_link_click_to_open_path
 import plugintoolkit.composeapp.generated.resources.terminal_link_click_to_open_url
@@ -154,7 +154,7 @@ internal fun TerminalView(
             Text(
                 text = logData.annotatedText,
                 style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = ToolkitTheme.codeFontFamily,
                 onTextLayout = { layoutResult = it },
                 modifier = Modifier
                     .fillMaxWidth()
