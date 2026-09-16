@@ -805,4 +805,13 @@
     <string name="flow_editor_single_entrypoint_error">Connections must have a single entrypoint</string>
     <string name="flow_editor_incompatible_types_error">Cannot connect: incompatible data types (%1$s cannot connect to %2$s)</string>
     <string name="flow_editor_input_already_connected_error">Cannot connect: input port &apos;%1$s&apos; already has an incoming connection</string>
+
+    <string name="job_execution_result_title">Execution Result</string>
+    <string name="flow_not_ready_node_chip">Not Ready: %1$s</string>
+    <string name="action_export_flow">Export Flow</string>
+    <string name="action_export_flow_tooltip">Export Flow to file</string>
+    <string name="action_copy_flow_clipboard">Copy to Clipboard</string>
+    <string name="action_copy_flow_clipboard_tooltip">Copy flow to clipboard</string>
+    <string name="action_edit_metadata">Edit Metadata</string>
+    <string name="action_edit">Edit</string>
 </resources>

@@ -35,12 +35,19 @@ import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_copy_flow_clipboard
+import plugintoolkit.composeapp.generated.resources.action_copy_flow_clipboard_tooltip
 import plugintoolkit.composeapp.generated.resources.action_delete
+import plugintoolkit.composeapp.generated.resources.action_edit
+import plugintoolkit.composeapp.generated.resources.action_edit_metadata
+import plugintoolkit.composeapp.generated.resources.action_export_flow
+import plugintoolkit.composeapp.generated.resources.action_export_flow_tooltip
 import plugintoolkit.composeapp.generated.resources.flow_broken_tag
 import plugintoolkit.composeapp.generated.resources.flow_editor_read_only
 import plugintoolkit.composeapp.generated.resources.flow_editor_read_only_reason
 import plugintoolkit.composeapp.generated.resources.flow_missing_chip
 import plugintoolkit.composeapp.generated.resources.flow_nodes_count
+import plugintoolkit.composeapp.generated.resources.flow_not_ready_node_chip
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_running
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_used_in_other
 import plugintoolkit.composeapp.generated.resources.flow_used_in_chip
@@ -111,7 +118,7 @@ internal fun FlowItem(
                             icon = {
                                 Box(
                                     modifier = Modifier
-                                        .size(ToolkitTheme.spacing.badgeHorizontal)
+                                        .size(ToolkitTheme.spacing.extraSmall)
                                         .background(MaterialTheme.colorScheme.primary, CircleShape)
                                 )
                             },
@@ -199,7 +206,7 @@ internal fun FlowItem(
 
                         notReadyNodes.forEach { node ->
                             ToolkitChip(
-                                text = "Not Ready: ${node.title}",
+                                text = stringResource(Res.string.flow_not_ready_node_chip, node.title),
                                 containerColor = MaterialTheme.colorScheme.error,
                                 contentColor = MaterialTheme.colorScheme.error,
                                 style = ToolkitChipStyle.Outlined,
@@ -219,11 +226,11 @@ internal fun FlowItem(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
-                            contentDescription = "Export Flow",
+                            contentDescription = stringResource(Res.string.action_export_flow),
                             tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier
                                 .size(ToolkitTheme.dimensions.iconMediumSmall)
-                                .tooltip("Export Flow to file")
+                                .tooltip(Res.string.action_export_flow_tooltip)
                         )
                     }
                 }
@@ -235,11 +242,11 @@ internal fun FlowItem(
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy to Clipboard",
+                            contentDescription = stringResource(Res.string.action_copy_flow_clipboard),
                             tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier
                                 .size(ToolkitTheme.dimensions.iconMediumSmall)
-                                .tooltip("Copy flow to clipboard")
+                                .tooltip(Res.string.action_copy_flow_clipboard_tooltip)
                         )
                     }
                 }
@@ -251,7 +258,7 @@ internal fun FlowItem(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "Edit Metadata",
+                            contentDescription = stringResource(Res.string.action_edit_metadata),
                             tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                         )
@@ -265,7 +272,7 @@ internal fun FlowItem(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit",
+                            contentDescription = stringResource(Res.string.action_edit),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
                         )

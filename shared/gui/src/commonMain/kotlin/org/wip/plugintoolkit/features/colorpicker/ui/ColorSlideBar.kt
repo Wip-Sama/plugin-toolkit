@@ -62,10 +62,10 @@ internal fun ColorSlideBar(
 
     val activeTrackHeight = ToolkitTheme.dimensions.trackHeightSmall
     val inactiveTrackHeight = ToolkitTheme.dimensions.trackHeightSmall
-    val handleLeadingSpace = ToolkitTheme.spacing.badgeHorizontal
-    val handleTrailingSpace = ToolkitTheme.spacing.badgeHorizontal
+    val handleLeadingSpace = ToolkitTheme.spacing.extraSmall
+    val handleTrailingSpace = ToolkitTheme.spacing.extraSmall
     val handleHeight = ToolkitTheme.dimensions.handleHeightMedium
-    val innerCornerRadius = ToolkitTheme.dimensions.cornerRadiusExtraSmall
+    val innerCornerRadius = ToolkitTheme.spacing.extraSmall
 
     LaunchedEffect(value) {
         onValueChange(value)

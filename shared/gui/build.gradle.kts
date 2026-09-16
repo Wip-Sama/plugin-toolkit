@@ -33,7 +33,6 @@ kotlin {
             implementation(libs.filekit.dialogs)
 
             implementation(libs.filekit.dialogs.compose)
-            implementation(libs.filekit.coil)
             implementation(libs.kermit)
             implementation(libs.ktor.client.core)
             implementation(libs.kotlinx.serialization.json)

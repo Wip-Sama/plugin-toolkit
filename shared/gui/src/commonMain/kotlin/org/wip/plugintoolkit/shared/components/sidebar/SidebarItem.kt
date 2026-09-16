@@ -63,10 +63,12 @@ fun <T> SidebarItem(
     else
         MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.high)
 
+    val radiusLarge = ToolkitTheme.spacing.medium
+    val radiusExtraSmall = ToolkitTheme.spacing.extraSmall
     val targetTopStart =
-        if (position == SidebarItemPosition.Start || position == SidebarItemPosition.StandAlone) ToolkitTheme.dimensions.cornerRadiusLarge else ToolkitTheme.dimensions.cornerRadiusExtraSmall
+        if (position == SidebarItemPosition.Start || position == SidebarItemPosition.StandAlone) radiusLarge else radiusExtraSmall
     val targetBottomStart =
-        if (position == SidebarItemPosition.End || position == SidebarItemPosition.StandAlone) ToolkitTheme.dimensions.cornerRadiusLarge else ToolkitTheme.dimensions.cornerRadiusExtraSmall
+        if (position == SidebarItemPosition.End || position == SidebarItemPosition.StandAlone) radiusLarge else radiusExtraSmall
 
     val topStart by animateDpAsState(targetTopStart, animationSpec = tween(300))
     val topEnd by animateDpAsState(targetTopStart, animationSpec = tween(300))
@@ -83,7 +85,7 @@ fun <T> SidebarItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = ToolkitTheme.spacing.badgeVertical)
+            .padding(bottom = ToolkitTheme.spacing.extraExtraSmall)
             .clip(animatedShape)
             .background(backgroundColor)
             .clickable { onClick() }
