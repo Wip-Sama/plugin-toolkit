@@ -364,8 +364,10 @@ fun Modifier.boardPointerEventGesture(
     onResetDrawingConnection: (() -> Unit)? = null,
     shortcutManager: ShortcutManager? = null,
     highlightedNodeId: Long? = null,
-    highlightedPortId: String? = null
+    highlightedPortId: String? = null,
+    onPan: ((Offset) -> Unit)? = null
 ): Modifier {
+    val currentOnPan by rememberUpdatedState(onPan)
     val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
     val currentHighlightedNodeId by rememberUpdatedState(highlightedNodeId)
     val currentHighlightedPortId by rememberUpdatedState(highlightedPortId)
@@ -412,6 +414,11 @@ fun Modifier.boardPointerEventGesture(
     var junctionDragStartGroupPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
     var junctionDragStartLabelPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
 
+    var rightClickStartPos by remember { mutableStateOf<Offset?>(null) }
+    var rightClickLastPos by remember { mutableStateOf<Offset?>(null) }
+    var rightClickDidDrag by remember { mutableStateOf(false) }
+    var middleClickLastPos by remember { mutableStateOf<Offset?>(null) }
+
     return this.pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) {
@@ -431,6 +438,27 @@ fun Modifier.boardPointerEventGesture(
                     interactionState.isCtrlModifierPressed = event.keyboardModifiers.isCtrlPressed
                     interactionState.isShiftModifierPressed = event.keyboardModifiers.isShiftPressed
                     interactionState.isAltModifierPressed = event.keyboardModifiers.isAltPressed
+
+                    if (event.buttons.isSecondaryPressed && rightClickStartPos != null) {
+                        val curPos = event.changes.firstOrNull()?.position ?: position
+                        val lastPos = rightClickLastPos ?: curPos
+                        val delta = curPos - lastPos
+                        rightClickLastPos = curPos
+                        if (!rightClickDidDrag && (curPos - rightClickStartPos!!).getDistance() > 6f) {
+                            rightClickDidDrag = true
+                        }
+                        if (rightClickDidDrag && currentOnPan != null) {
+                            currentOnPan?.invoke(delta)
+                        }
+                    } else if (event.buttons.isTertiaryPressed) {
+                        val curPos = event.changes.firstOrNull()?.position ?: position
+                        val lastPos = middleClickLastPos ?: curPos
+                        val delta = curPos - lastPos
+                        middleClickLastPos = curPos
+                        currentOnPan?.invoke(delta)
+                    } else {
+                        middleClickLastPos = null
+                    }
 
                     val draggingJuncId = interactionState.draggingJunctionId
                     if (draggingJuncId != null) {
@@ -566,7 +594,9 @@ fun Modifier.boardPointerEventGesture(
                         }
                         currentOnConnectionDrag(livePos)
                         interactionState.structuredConnectionLivePos = livePos
-                        event.changes.forEach { it.consume() }
+                        if (!event.buttons.isSecondaryPressed && !event.buttons.isTertiaryPressed) {
+                            event.changes.forEach { it.consume() }
+                        }
                     }
 
                     val closestJunc = ConnectionHitTester.findClosestJunction(
@@ -658,18 +688,19 @@ fun Modifier.boardPointerEventGesture(
                     interactionState.pendingMidpoint = null
                     interactionState.pendingMidpointWasAltPressed = false
                     interactionState.clearSnapping()
+                    rightClickStartPos = null
+                    rightClickLastPos = null
+                    rightClickDidDrag = false
+                    middleClickLastPos = null
                 } else if (event.type == PointerEventType.Press) {
                     if (event.buttons.isSecondaryPressed) {
-                        // Right-click cancels ongoing drawing sessions cleanly
-                        if (interactionState.isDrawingStructuredConnection) {
-                            interactionState.resetStructuredConnection()
-                            interactionState.clearSnapping()
-                            event.changes.forEach { it.consume() }
-                        } else if (currentIsDrawingConnection) {
-                            interactionState.clearSnapping()
-                            currentOnConnectionDrop(false)
-                            event.changes.forEach { it.consume() }
-                        }
+                        val pos = event.changes.firstOrNull()?.position ?: position
+                        rightClickStartPos = pos
+                        rightClickLastPos = pos
+                        rightClickDidDrag = false
+                    } else if (event.buttons.isTertiaryPressed) {
+                        val pos = event.changes.firstOrNull()?.position ?: position
+                        middleClickLastPos = pos
                     } else if (interactionState.isDrawingStructuredConnection && event.buttons.isPrimaryPressed) {
                         // Check if snapped to wire segment to split and finalize
                         if (interactionState.snappedWirePoint != null && interactionState.snappedWireConnection != null) {
@@ -891,6 +922,24 @@ fun Modifier.boardPointerEventGesture(
                         }
                     }
                 } else if (event.type == PointerEventType.Release) {
+                    if (rightClickStartPos != null) {
+                        if (!rightClickDidDrag) {
+                            // Right-click tap without drag: cancel ongoing drawing sessions cleanly
+                            if (interactionState.isDrawingStructuredConnection) {
+                                interactionState.resetStructuredConnection()
+                                interactionState.clearSnapping()
+                                event.changes.forEach { it.consume() }
+                            } else if (currentIsDrawingConnection) {
+                                interactionState.clearSnapping()
+                                currentOnConnectionDrop(false)
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                        rightClickStartPos = null
+                        rightClickLastPos = null
+                        rightClickDidDrag = false
+                    }
+                    middleClickLastPos = null
                     if (interactionState.pendingMidpoint != null) {
                         val (conn, segIdx) = interactionState.pendingMidpoint!!
                         val isAlt = event.keyboardModifiers.isAltPressed || interactionState.isAltModifierPressed || interactionState.pendingMidpointWasAltPressed

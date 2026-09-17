@@ -333,4 +333,108 @@ class FlowNodeManager {
             currentState.copy(offset = newOffset)
         }
     }
+
+    fun handleRefreshNode(
+        currentState: FlowEditorState,
+        nodeId: Long,
+        manifests: Map<String, org.wip.plugintoolkit.api.PluginManifest>
+    ): Pair<FlowEditorState, Node.CapabilityNode?> {
+        val node = currentState.flow.nodes.find { it.id == nodeId } as? Node.CapabilityNode ?: return Pair(currentState, null)
+        val manifest = manifests[node.pluginInfo.id] ?: manifests.values.find { m ->
+            m.capabilities.any { it.name == node.capability.name }
+        } ?: return Pair(currentState, null)
+
+        val refreshedNode = org.wip.plugintoolkit.features.flows.model.MigrationEngine.refreshCapabilityNode(node, manifest)
+        val updatedNodes = currentState.flow.nodes.map { if (it.id == nodeId) refreshedNode else it }
+        val newState = currentState.copy(
+            flow = currentState.flow.copy(nodes = updatedNodes),
+            hasUnsavedChanges = true
+        )
+        return Pair(newState, refreshedNode)
+    }
+
+    fun handleRefreshBrokenNodes(
+        currentState: FlowEditorState,
+        manifests: Map<String, org.wip.plugintoolkit.api.PluginManifest>
+    ): Pair<FlowEditorState, Int> {
+        val brokenNodes = currentState.flow.nodes.filterIsInstance<Node.CapabilityNode>().filter { it.isBroken }
+        if (brokenNodes.isEmpty()) return Pair(currentState, 0)
+
+        var healedCount = 0
+        val updatedNodes = currentState.flow.nodes.map { node ->
+            if (node is Node.CapabilityNode && node.isBroken) {
+                val manifest = manifests[node.pluginInfo.id] ?: manifests.values.find { m ->
+                    m.capabilities.any { it.name == node.capability.name }
+                }
+                if (manifest != null) {
+                    val healed = org.wip.plugintoolkit.features.flows.model.MigrationEngine.refreshCapabilityNode(node, manifest)
+                    if (!healed.isBroken) healedCount++
+                    healed
+                } else {
+                    node
+                }
+            } else {
+                node
+            }
+        }
+
+        val newState = if (healedCount > 0) {
+            currentState.copy(
+                flow = currentState.flow.copy(nodes = updatedNodes),
+                hasUnsavedChanges = true
+            )
+        } else {
+            currentState
+        }
+        return Pair(newState, healedCount)
+    }
+
+    fun handleReplaceNode(
+        currentState: FlowEditorState,
+        nodeId: Long,
+        targetNode: Node,
+        inputMappings: Map<String, String?>,
+        outputMappings: Map<String, String?>
+    ): FlowEditorState {
+        val oldNode = currentState.flow.nodes.find { it.id == nodeId } ?: return currentState
+        val updatedNodes = currentState.flow.nodes.map { if (it.id == nodeId) targetNode else it }
+
+        val remainingConnections = currentState.flow.connections.mapNotNull { conn ->
+            if (conn.targetNodeId == nodeId) {
+                val targetPort = inputMappings[conn.targetPortId]
+                if (targetPort != null) {
+                    conn.copy(targetPortId = targetPort)
+                } else {
+                    null
+                }
+            } else if (conn.sourceNodeId == nodeId) {
+                val sourcePort = outputMappings[conn.sourcePortId]
+                if (sourcePort != null) {
+                    conn.copy(sourcePortId = sourcePort)
+                } else {
+                    null
+                }
+            } else {
+                conn
+            }
+        }
+
+        val updatedPendingConnection = currentState.pendingConnection?.let {
+            if (it.sourceNodeId == nodeId || it.targetNodeId == nodeId) null else it
+        }
+
+        val updatedValidationErrors = currentState.validationErrors.filter {
+            it.sourceNodeId != nodeId && it.targetNodeId != nodeId
+        }
+
+        return currentState.copy(
+            flow = currentState.flow.copy(
+                nodes = updatedNodes,
+                connections = remainingConnections
+            ),
+            pendingConnection = updatedPendingConnection,
+            validationErrors = updatedValidationErrors,
+            hasUnsavedChanges = true
+        )
+    }
 }

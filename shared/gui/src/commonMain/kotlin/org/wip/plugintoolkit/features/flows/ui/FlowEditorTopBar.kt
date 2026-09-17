@@ -7,7 +7,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -26,6 +33,7 @@ import plugintoolkit.composeapp.generated.resources.flow_editor_no_flow_selected
 import plugintoolkit.composeapp.generated.resources.flow_editor_read_only
 import plugintoolkit.composeapp.generated.resources.flow_editor_read_only_reason
 import plugintoolkit.composeapp.generated.resources.flow_editor_save_changes
+import plugintoolkit.composeapp.generated.resources.flow_editor_refresh_broken_nodes
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_running
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_used_in_other
 
@@ -35,6 +43,8 @@ internal fun FlowEditorTopBar(
     isReadOnly: Boolean,
     readOnlyReasons: List<ReadOnlyReason>,
     hasUnsavedChanges: Boolean,
+    hasBrokenNodes: Boolean = false,
+    onRefreshBrokenNodes: (() -> Unit)? = null,
     onSave: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier
@@ -111,6 +121,27 @@ internal fun FlowEditorTopBar(
                             }
                         }
                     }
+                }
+            }
+
+            if (hasBrokenNodes && !isReadOnly && onRefreshBrokenNodes != null) {
+                OutlinedButton(
+                    onClick = onRefreshBrokenNodes,
+                    contentPadding = PaddingValues(
+                        horizontal = ToolkitTheme.spacing.medium,
+                        vertical = ToolkitTheme.spacing.small
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                    Text(stringResource(Res.string.flow_editor_refresh_broken_nodes))
                 }
             }
 

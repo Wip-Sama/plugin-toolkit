@@ -42,7 +42,7 @@ open class DefaultSystemConfig : SystemConfig {
     override val STARTUP_FLAG_BACKGROUND = "--background"
     override val WINDOWS_STARTUP_REGISTRY_PATH: String? = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
     override val LINUX_AUTOSTART_DIR: String? = ".config/autostart"
-    override val LINUX_DESKTOP_FILENAME: String? = "${STARTUP_APP_NAME.lowercase()}.desktop"
+    override val LINUX_DESKTOP_FILENAME: String? get() = "${STARTUP_APP_NAME.lowercase()}.desktop"
 
     override fun getAppDataDir(): String {
         val appData = System.getenv("APPDATA")
@@ -97,3 +97,44 @@ class PortableSystemConfig(
         }
     }
 }
+
+/**
+ * System configuration used for standalone plugin execution.
+ * Isolates all persistent application data, cache, settings, and logs into a dedicated folder
+ * specific to the plugin (e.g. `PluginToolkit/standalone/<pluginId>` or `baseDir/data` when portable).
+ * Disables host autostart and registry modification.
+ */
+class StandaloneSystemConfig(
+    val pluginId: String,
+    val baseDir: String? = null
+) : DefaultSystemConfig() {
+    private val sanitizedPluginId: String
+        get() = pluginId.replace(Regex("[^a-zA-Z0-9_.-]"), "_")
+
+    override val isPortable: Boolean get() = baseDir != null
+    override val APP_DATA_DIR_NAME: String get() = "PluginToolkit/standalone/$sanitizedPluginId"
+    override val LEGACY_SETTINGS_DIR_NAME: String get() = ".plugintoolkit/standalone/$sanitizedPluginId"
+    override val STARTUP_APP_NAME: String get() = "PluginToolkit-$sanitizedPluginId"
+
+    override val WINDOWS_STARTUP_REGISTRY_PATH: String? = null
+    override val LINUX_AUTOSTART_DIR: String? = null
+    override val LINUX_DESKTOP_FILENAME: String? = null
+
+    override fun getAppDataDir(): String {
+        return if (baseDir != null) {
+            val normalizedBase = baseDir.replace('\\', '/').removeSuffix("/")
+            "$normalizedBase/data"
+        } else {
+            super.getAppDataDir()
+        }
+    }
+
+    override fun getCacheDir(systemManaged: Boolean): String {
+        return if (baseDir != null) {
+            "${getAppDataDir()}/$CACHE_DIR_NAME"
+        } else {
+            super.getCacheDir(systemManaged)
+        }
+    }
+}
+

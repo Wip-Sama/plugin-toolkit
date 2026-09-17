@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.FileUtils
+import org.wip.plugintoolkit.core.utils.VersionUtils
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.utils.PluginCompatibilityUtils
@@ -130,9 +131,26 @@ class PluginRegistry(
                 }
             }
         }
-        _installedPlugins.update { allPlugins }
+        val deduplicatedPlugins = allPlugins
+            .groupBy { it.pkg }
+            .values
+            .map { duplicates ->
+                if (duplicates.size == 1) {
+                    duplicates.first()
+                } else {
+                    diskUpdateNeeded = true
+                    Logger.w { "Duplicate plugin entries found for package '${duplicates.first().pkg}'. Deduplicating..." }
+                    duplicates.maxWithOrNull(
+                        compareBy<InstalledPlugin> { it.isEnabled }
+                            .thenBy { it.isValidated }
+                            .thenComparing { a, b -> VersionUtils.compare(a.version, b.version) }
+                    ) ?: duplicates.first()
+                }
+            }
+
+        _installedPlugins.update { deduplicatedPlugins }
         if (diskUpdateNeeded) {
-            saveToManagedFolders(allPlugins)
+            saveToManagedFolders(deduplicatedPlugins)
         }
         Logger.d { "Loaded ${_installedPlugins.value.size} plugins from managed folders" }
     }
@@ -144,7 +162,7 @@ class PluginRegistry(
         var myVersion = 0L
         val updated = mutex.withLock {
             val current = _installedPlugins.value
-            val next = transform(current)
+            val next = transform(current).distinctBy { it.pkg }
             if (current != next) {
                 _installedPlugins.value = next
                 myVersion = ++currentVersion

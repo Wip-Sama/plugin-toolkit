@@ -15,6 +15,7 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_CAPABILITY
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PARAMETER_CONSTRAINTS
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PARAMETER_METADATA
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_API_CONFIG
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ACTION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_INFO
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_MANIFEST
@@ -411,10 +412,11 @@ object ManifestGenerator {
                             supportedOsCode.build()
                         )
                         .add(
-                            "requirements = %T(minMemoryMb = %L, minExecutionTimeMs = %L),\n",
+                            "requirements = %T(minMemoryMb = %L, minExecutionTimeMs = %L, targetAppVersion = %T.VERSION),\n",
                             CN_REQUIREMENTS,
                             minMemoryMb,
-                            minExecutionTimeMs
+                            minExecutionTimeMs,
+                            CN_API_CONFIG
                         )
                         .add("capabilities = ")
                         .add(capabilitiesCode.build())

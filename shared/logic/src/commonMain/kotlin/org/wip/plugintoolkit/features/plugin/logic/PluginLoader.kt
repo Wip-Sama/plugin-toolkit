@@ -10,6 +10,7 @@ expect object PluginLoader {
         forceReload: Boolean = false
     ): Result<PluginEntry>
 
+    fun registerPlugin(entry: PluginEntry, installPath: String? = null)
     fun unloadPlugin(jarPath: String)
     fun unloadPluginById(pluginId: String)
     fun unloadAll()

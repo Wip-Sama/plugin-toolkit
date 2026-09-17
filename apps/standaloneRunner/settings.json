@@ -1,0 +1,9 @@
+{
+    "settings": {
+        "apiKey": "default_api_key",
+        "secretToken": "ENC[dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAAmcRm9SXpXEipEeLnCiH8vQAAAAACAAAAAAAQZgAAAAEAACAAAACZWNN+S3xCSuncmRI8uyZuj+DoyUBYPtICmtkZM08b6wAAAAAOgAAAAAIAACAAAACHZ8JcZPGRvjHX6CmslczWEdfX84yXk6Cx02eQxgvw/xAAAABP+SDT+HrOjF0R/4+s8aVMQAAAADi3fhBc4lmz8Pqe+HUp6/CaFFjHcSt81v/DGqkp41bm/9gzV8AP0YyYlvbSnrKG6/LrILBgE3062NXEHAJy+fs=]",
+        "userId": "fsda"
+    },
+    "globalParams": {},
+    "capabilityParams": {}
+}

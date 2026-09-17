@@ -13,13 +13,13 @@ import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 
 class PluginManager(
-    private val repoManager: RepoManager,
+    private val repoManager: RepoManager? = null,
     private val registry: PluginRegistry,
-    private val installer: PluginInstaller,
+    private val installer: PluginInstaller? = null,
     private val lifecycleManager: PluginLifecycleManager,
-    private val scanner: PluginScanner,
+    private val scanner: PluginScanner? = null,
     private val coordinator: PluginLifecycleCoordinator,
-    private val folderManager: PluginFolderManager,
+    private val folderManager: PluginFolderManager? = null,
     private val scope: CoroutineScope
 ) {
     val installedPlugins: StateFlow<List<InstalledPlugin>> = registry.installedPlugins
@@ -36,47 +36,60 @@ class PluginManager(
 
     // --- Installation & Updates ---
 
-    suspend fun installLocal(filePath: String, targetFolderPath: String) =
-        installer.installLocal(filePath, targetFolderPath).onSuccess { manifest ->
+    suspend fun installLocal(filePath: String, targetFolderPath: String): Result<Unit> {
+        val inst = installer ?: return Result.failure(UnsupportedOperationException("Installer not configured in standalone mode"))
+        return inst.installLocal(filePath, targetFolderPath).onSuccess { manifest ->
             if (manifest != null) {
                 coordinator.handlePostInstall(manifest.plugin.id, manifest)
             }
         }.map { }
+    }
 
-    suspend fun enqueueRemoteInstall(plugin: ExtensionPlugin, targetFolderPath: String) =
-        installer.enqueueRemoteInstall(plugin, targetFolderPath)
+    suspend fun enqueueRemoteInstall(plugin: ExtensionPlugin, targetFolderPath: String) {
+        installer?.enqueueRemoteInstall(plugin, targetFolderPath)
+    }
 
     suspend fun installRemote(
         plugin: ExtensionPlugin,
         targetFolderPath: String,
         onDownloadProgress: ((bytesRead: Long, totalBytes: Long?, fraction: Float) -> Unit)? = null,
         onProgress: ((Float) -> Unit)? = null
-    ) = installer.installRemote(plugin, targetFolderPath, onDownloadProgress, onProgress).onSuccess { manifest ->
-        if (manifest != null) {
-            coordinator.handlePostInstall(plugin.pkg, manifest)
-        }
-    }.map { }
-
-    suspend fun uninstall(pkg: String) = installer.uninstall(pkg)
-
-    suspend fun updateLocal(pkg: String, newJarPath: String) =
-        installer.updateLocal(pkg, newJarPath).onSuccess { manifest ->
+    ): Result<Unit> {
+        val inst = installer ?: return Result.failure(UnsupportedOperationException("Installer not configured in standalone mode"))
+        return inst.installRemote(plugin, targetFolderPath, onDownloadProgress, onProgress).onSuccess { manifest ->
             if (manifest != null) {
-                coordinator.handlePostUpdate(pkg, manifest, installer)
+                coordinator.handlePostInstall(plugin.pkg, manifest)
             }
         }.map { }
+    }
 
-    suspend fun updateRemote(pkg: String) =
-        installer.updateRemote(pkg).onSuccess { manifest ->
+    suspend fun uninstall(pkg: String): Result<Unit> {
+        val inst = installer ?: return Result.failure(UnsupportedOperationException("Installer not configured in standalone mode"))
+        return inst.uninstall(pkg)
+    }
+
+    suspend fun updateLocal(pkg: String, newJarPath: String): Result<Unit> {
+        val inst = installer ?: return Result.failure(UnsupportedOperationException("Installer not configured in standalone mode"))
+        return inst.updateLocal(pkg, newJarPath).onSuccess { manifest ->
             if (manifest != null) {
-                coordinator.handlePostUpdate(pkg, manifest, installer)
+                coordinator.handlePostUpdate(pkg, manifest, inst)
             }
         }.map { }
+    }
 
-    fun getUpdate(pkg: String) = installer.getUpdate(pkg)
+    suspend fun updateRemote(pkg: String): Result<Unit> {
+        val inst = installer ?: return Result.failure(UnsupportedOperationException("Installer not configured in standalone mode"))
+        return inst.updateRemote(pkg).onSuccess { manifest ->
+            if (manifest != null) {
+                coordinator.handlePostUpdate(pkg, manifest, inst)
+            }
+        }.map { }
+    }
+
+    fun getUpdate(pkg: String) = installer?.getUpdate(pkg)
 
     suspend fun fetchRemoteChangelog(pkg: String): String? =
-        repoManager.fetchRemoteChangelog(pkg)
+        repoManager?.fetchRemoteChangelog(pkg)
 
     // --- Lifecycle Management ---
 
@@ -94,11 +107,12 @@ class PluginManager(
 
     // --- Scanning ---
 
-    suspend fun refreshInstalledPlugins() = scanner.refreshInstalledPlugins()
+    suspend fun refreshInstalledPlugins() = scanner?.refreshInstalledPlugins()
 
     fun rescanManagedFolders() {
+        val sc = scanner ?: return
         scope.launch {
-            scanner.rescanManagedFolders()
+            sc.rescanManagedFolders()
             // Post-scan: load plugins that are enabled, validated, and don't require setup/action
             installedPlugins.value.filter {
                 it.isEnabled && it.isValidated && it.requiredAction == null && !loadedPlugins.value.contains(
@@ -111,9 +125,12 @@ class PluginManager(
 
     // --- Folder Management ---
 
-    fun getManagedFolders() = folderManager.getManagedFolders()
+    fun getManagedFolders(): List<String> = folderManager?.getManagedFolders() ?: emptyList()
 
-    suspend fun removeManagedFolder(folderPath: String) = folderManager.removeManagedFolder(folderPath)
+    suspend fun removeManagedFolder(folderPath: String): Result<Unit> {
+        val fm = folderManager ?: return Result.failure(UnsupportedOperationException("FolderManager not configured in standalone mode"))
+        return fm.removeManagedFolder(folderPath)
+    }
 
     // --- Settings ---
 
@@ -151,11 +168,12 @@ class PluginManager(
         pkg: String,
         jobId: String? = null,
         capabilityName: String? = null,
+        manifest: org.wip.plugintoolkit.api.PluginManifest? = null,
         allowedPaths: List<String> = emptyList(),
         isDestructiveAllowed: Boolean = false,
         executionFileSystem: org.wip.plugintoolkit.api.ExecutionFileSystem? = null
     ) =
-        lifecycleManager.createPluginContext(pkg, jobId, capabilityName, null, allowedPaths, isDestructiveAllowed, executionFileSystem)
+        lifecycleManager.createPluginContext(pkg, jobId, capabilityName, manifest, allowedPaths, isDestructiveAllowed, executionFileSystem)
 
     suspend fun validatePluginInJob(pkg: String) = coordinator.triggerValidation(pkg)
 
@@ -163,7 +181,14 @@ class PluginManager(
 
     suspend fun enqueueSetupJob(pkg: String) = coordinator.enqueueSetupJob(pkg)
 
-    suspend fun rerunSetup(pkg: String) = coordinator.rerunSetup(pkg, installer)
+    suspend fun rerunSetup(pkg: String) {
+        val inst = installer
+        if (inst != null) {
+            coordinator.rerunSetup(pkg, inst)
+        } else {
+            coordinator.enqueueSetupJob(pkg)
+        }
+    }
 
     suspend fun runAction(
         pkg: String,

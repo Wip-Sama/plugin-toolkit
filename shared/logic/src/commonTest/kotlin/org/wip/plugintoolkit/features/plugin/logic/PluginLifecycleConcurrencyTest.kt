@@ -64,4 +64,36 @@ class PluginLifecycleConcurrencyTest {
             assertNotNull(registry.getPlugin(plugin.pkg))
         }
     }
+
+    @Test
+    fun testPluginRegistryDeduplicatesPackages() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+
+        val duplicateList = listOf(
+            InstalledPlugin(
+                pkg = "com.wip.cleaner",
+                name = "Cleaner V1",
+                version = "1.0.0",
+                installPath = "/tmp/cleaner1",
+                isEnabled = true
+            ),
+            InstalledPlugin(
+                pkg = "com.wip.cleaner",
+                name = "Cleaner V2",
+                version = "2.0.0",
+                installPath = "/tmp/cleaner2",
+                isEnabled = true
+            )
+        )
+
+        registry.updatePlugins { duplicateList }
+
+        val plugins = registry.installedPlugins.value
+        assertEquals(1, plugins.size)
+        assertEquals("com.wip.cleaner", plugins[0].pkg)
+    }
 }
+

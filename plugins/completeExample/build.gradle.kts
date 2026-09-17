@@ -34,3 +34,29 @@ dependencies {
 tasks.withType<ProcessResources> {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
+
+// --- Dual Build Mode: Standalone Desktop Runner Tasks ---
+tasks.register("run") {
+    group = "application"
+    description = "Runs this plugin inside the standalone Compose Desktop runner"
+    dependsOn(":apps:standaloneRunner:run")
+}
+
+tasks.register("createDistributable") {
+    group = "compose desktop"
+    description = "Generates the unpacked, runnable native standalone application directory"
+    dependsOn(":apps:standaloneRunner:createDistributable")
+}
+
+tasks.register("packageStandalone") {
+    group = "compose desktop"
+    description = "Packages this plugin as a standalone desktop distributable"
+    dependsOn(":apps:standaloneRunner:packageDistributionForCurrentOS")
+}
+
+tasks.register("packageStandalonePortable") {
+    group = "compose desktop"
+    description = "Packages this plugin as a portable ZIP standalone distribution"
+    dependsOn(":apps:standaloneRunner:packagePortableZip")
+}
+

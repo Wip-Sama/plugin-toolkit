@@ -72,6 +72,14 @@ sealed interface FlowEvent {
 
     data class EndMoveNode(val id: Long, val density: Float = 1f) : FlowEvent
     data class DeleteNode(val id: Long) : FlowEvent
+    data class RefreshNode(val nodeId: Long) : FlowEvent
+    data object RefreshBrokenNodes : FlowEvent
+    data class ReplaceNode(
+        val nodeId: Long,
+        val targetNode: Node,
+        val inputMappings: Map<String, String?>,
+        val outputMappings: Map<String, String?>
+    ) : FlowEvent
     data object CopySelectedNodes : FlowEvent
     data class PasteNodes(val position: Offset) : FlowEvent
 

@@ -204,7 +204,9 @@ object SplineMathUtils {
     fun computeSegmentMidpoints(
         points: List<Offset>,
         style: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
-        tension: Float = 0.5f
+        tension: Float = 0.5f,
+        startHorizontal: Boolean = true,
+        endHorizontal: Boolean = true
     ): List<Offset> {
         if (points.size < 2) return emptyList()
 
@@ -215,7 +217,7 @@ object SplineMathUtils {
                 }
             }
             ConnectionCurveStyle.Orthogonal -> {
-                val orthoPoints = computeOrthogonalPoints(points)
+                val orthoPoints = computeOrthogonalPoints(points, startHorizontal, endHorizontal)
                 (0 until points.size - 1).map { i ->
                     val p0 = points[i]
                     val p1 = points[i + 1]
@@ -262,7 +264,11 @@ object SplineMathUtils {
      * and preserves directional continuity through intermediate waypoints (a horizontal pass-through enters and leaves
      * horizontally; a vertical pass-through enters and leaves vertically) rather than inserting redundant middle staircases.
      */
-    fun computeOrthogonalPoints(points: List<Offset>): List<Offset> {
+    fun computeOrthogonalPoints(
+        points: List<Offset>,
+        startHorizontal: Boolean = true,
+        endHorizontal: Boolean = true
+    ): List<Offset> {
         if (points.size < 2) return points
         if (points.size == 2) {
             val p0 = points[0]
@@ -270,67 +276,52 @@ object SplineMathUtils {
             if (p0.x == p1.x || p0.y == p1.y) {
                 return listOf(p0, p1)
             }
-            val midX = (p0.x + p1.x) / 2f
-            return listOf(p0, Offset(midX, p0.y), Offset(midX, p1.y), p1)
-        }
-
-        val n = points.size
-        val waypointOrientations = Array(n) { Orientation.Horizontal }
-        waypointOrientations[0] = Orientation.Horizontal
-        waypointOrientations[n - 1] = Orientation.Horizontal
-
-        for (i in 1 until n - 1) {
-            val prev = points[i - 1]
-            val curr = points[i]
-            val next = points[i + 1]
-
-            val dyIn = curr.y - prev.y
-            val dyOut = next.y - curr.y
-            val dxIn = curr.x - prev.x
-            val dxOut = next.x - curr.x
-
-            if (dyIn * dyOut < -0.01f) {
-                waypointOrientations[i] = Orientation.Horizontal
-            } else if (dxIn * dxOut < -0.01f) {
-                waypointOrientations[i] = Orientation.Vertical
-            } else {
-                waypointOrientations[i] = if (abs(dxOut) >= abs(dyOut)) Orientation.Horizontal else Orientation.Vertical
+            return when {
+                startHorizontal && endHorizontal -> {
+                    val midX = (p0.x + p1.x) / 2f
+                    listOf(p0, Offset(midX, p0.y), Offset(midX, p1.y), p1)
+                }
+                startHorizontal && !endHorizontal -> {
+                    listOf(p0, Offset(p1.x, p0.y), p1)
+                }
+                !startHorizontal && endHorizontal -> {
+                    listOf(p0, Offset(p0.x, p1.y), p1)
+                }
+                else -> {
+                    listOf(p0, Offset(p1.x, p0.y), p1)
+                }
             }
         }
 
         val result = mutableListOf<Offset>()
         result.add(points[0])
 
-        for (i in 0 until n - 1) {
+        var currentIsHorizontal = startHorizontal
+
+        for (i in 0 until points.size - 1) {
             val pA = points[i]
             val pB = points[i + 1]
-            val dirA = waypointOrientations[i]
-            val dirB = waypointOrientations[i + 1]
+            val isLastSegment = (i == points.size - 2)
 
-            if (pA.x == pB.x || pA.y == pB.y) {
+            if (pA.x == pB.x) {
                 result.add(pB)
+                currentIsHorizontal = false
+            } else if (pA.y == pB.y) {
+                result.add(pB)
+                currentIsHorizontal = true
             } else {
-                when {
-                    dirA == Orientation.Horizontal && dirB == Orientation.Vertical -> {
-                        result.add(Offset(pB.x, pA.y))
-                        result.add(pB)
-                    }
-                    dirA == Orientation.Vertical && dirB == Orientation.Horizontal -> {
-                        result.add(Offset(pA.x, pB.y))
-                        result.add(pB)
-                    }
-                    dirA == Orientation.Horizontal && dirB == Orientation.Horizontal -> {
-                        val midX = (pA.x + pB.x) / 2f
-                        result.add(Offset(midX, pA.y))
-                        result.add(Offset(midX, pB.y))
-                        result.add(pB)
-                    }
-                    dirA == Orientation.Vertical && dirB == Orientation.Vertical -> {
-                        val midY = (pA.y + pB.y) / 2f
-                        result.add(Offset(pA.x, midY))
-                        result.add(Offset(pB.x, midY))
-                        result.add(pB)
-                    }
+                if (isLastSegment && endHorizontal) {
+                    result.add(Offset(pA.x, pB.y))
+                    result.add(pB)
+                    currentIsHorizontal = true
+                } else if (currentIsHorizontal) {
+                    result.add(Offset(pB.x, pA.y))
+                    result.add(pB)
+                    currentIsHorizontal = false
+                } else {
+                    result.add(Offset(pA.x, pB.y))
+                    result.add(pB)
+                    currentIsHorizontal = true
                 }
             }
         }
@@ -378,7 +369,9 @@ object SplineMathUtils {
     fun buildConnectionPath(
         points: List<Offset>,
         style: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
-        tension: Float = 0.5f
+        tension: Float = 0.5f,
+        startHorizontal: Boolean = true,
+        endHorizontal: Boolean = true
     ): Path {
         val path = Path()
         if (points.isEmpty()) return path
@@ -406,7 +399,7 @@ object SplineMathUtils {
             }
 
             ConnectionCurveStyle.Orthogonal -> {
-                val orthoPoints = computeOrthogonalPoints(points)
+                val orthoPoints = computeOrthogonalPoints(points, startHorizontal, endHorizontal)
                 return buildRoundedPolylinePath(orthoPoints, cornerRadius = 8f)
             }
         }
@@ -421,7 +414,9 @@ object SplineMathUtils {
         points: List<Offset>,
         style: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
         tension: Float = 0.5f,
-        samplesPerSegment: Int = 20
+        samplesPerSegment: Int = 20,
+        startHorizontal: Boolean = true,
+        endHorizontal: Boolean = true
     ): List<Offset> {
         if (points.isEmpty()) return emptyList()
         if (points.size == 1) return points
@@ -434,7 +429,7 @@ object SplineMathUtils {
             }
 
             ConnectionCurveStyle.Orthogonal -> {
-                sampled.addAll(computeOrthogonalPoints(points))
+                sampled.addAll(computeOrthogonalPoints(points, startHorizontal, endHorizontal))
             }
 
             ConnectionCurveStyle.Bezier,

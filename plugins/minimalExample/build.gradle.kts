@@ -34,3 +34,30 @@ dependencies {
 tasks.withType<ProcessResources> {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
+
+// ── Standalone Mode Tasks ──────────────────────────────────────────────────
+// Allows running and packaging this plugin in standalone desktop mode via :apps:standaloneRunner.
+// In standard mode, this module remains a pure Kotlin JVM library without Compose/GUI dependencies.
+tasks.register("run") {
+    group = "application"
+    description = "Runs this plugin as a standalone desktop app via :apps:standaloneRunner"
+    dependsOn(":apps:standaloneRunner:run")
+}
+
+tasks.register("createDistributable") {
+    group = "distribution"
+    description = "Generates the unpacked, runnable native standalone application directory"
+    dependsOn(":apps:standaloneRunner:createDistributable")
+}
+
+tasks.register("packageStandalone") {
+    group = "distribution"
+    description = "Packages this plugin as a standalone native desktop installer/app"
+    dependsOn(":apps:standaloneRunner:packageDistributionForCurrentOS")
+}
+
+tasks.register("packageStandalonePortable") {
+    group = "distribution"
+    description = "Packages this plugin as a standalone portable ZIP distribution"
+    dependsOn(":apps:standaloneRunner:packagePortableZip")
+}

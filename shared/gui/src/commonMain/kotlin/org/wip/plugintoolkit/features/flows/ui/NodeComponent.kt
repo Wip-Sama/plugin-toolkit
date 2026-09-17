@@ -42,6 +42,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.DataType
@@ -103,8 +104,12 @@ fun NodeComponent(
     isPaintToolActive: Boolean = false,
     isWashToolActive: Boolean = false,
     isShiftPressed: Boolean = false,
+    isEyedropperActive: Boolean = false,
+    onSampleColor: ((String) -> Unit)? = null,
     onPaintNode: ((Long, Boolean) -> Unit)? = null,
     onWashNode: ((Long) -> Unit)? = null,
+    onRefreshNode: ((Long) -> Unit)? = null,
+    onReplaceNode: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -244,17 +249,22 @@ fun NodeComponent(
                 .fillMaxWidth()
                 .onPointerEvent(PointerEventType.Enter) { onHoverNode(node.id) }
                 .onPointerEvent(PointerEventType.Exit) { onHoverNode(null) }
-                .pointerInput(node.id, isPaintToolActive, isWashToolActive, isShiftPressed) {
+                .pointerInput(node.id, isPaintToolActive, isWashToolActive, isEyedropperActive, isShiftPressed) {
                     detectTapGestures(
                         onTap = {
-                            if (isPaintToolActive && onPaintNode != null) {
+                            if (isEyedropperActive && onSampleColor != null) {
+                                val hex = node.color ?: headerColor.toHex(hexPrefix = true, includeAlpha = false)
+                                onSampleColor(hex)
+                            } else if (isPaintToolActive && onPaintNode != null) {
                                 onPaintNode(node.id, isShiftPressed)
                             } else if (isWashToolActive && onWashNode != null) {
                                 onWashNode(node.id)
                             }
                         },
                         onPress = {
-                            currentOnPress(node.id)
+                            if (!isEyedropperActive) {
+                                currentOnPress(node.id)
+                            }
                         }
                     )
                 },
@@ -279,7 +289,11 @@ fun NodeComponent(
                     onDelete = onDelete,
                     onShowDeleteConfirmation = { showDeleteConfirmation = true },
                     onShowLoadSettings = { showLoadSettingsDialog = true },
-                    onShowEditBoundary = { showEditBoundaryDialog = true }
+                    onShowEditBoundary = { showEditBoundaryDialog = true },
+                    onRefreshNode = onRefreshNode,
+                    onReplaceNode = onReplaceNode,
+                    isEyedropperActive = isEyedropperActive,
+                    onSampleColor = onSampleColor
                 )
 
                 // Body

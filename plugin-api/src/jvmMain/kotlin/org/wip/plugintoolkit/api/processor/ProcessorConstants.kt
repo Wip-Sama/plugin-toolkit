@@ -60,6 +60,7 @@ object ProcessorConstants {
     val CN_PLUGIN_MANIFEST = PluginManifest::class.asClassName()
     val CN_PLUGIN_INFO = PluginInfo::class.asClassName()
     val CN_REQUIREMENTS = Requirements::class.asClassName()
+    val CN_API_CONFIG = ClassName(API_PACKAGE, "ApiConfig")
     val CN_CAPABILITY = Capability::class.asClassName()
     val CN_PLUGIN_ACTION = PluginAction::class.asClassName()
     val CN_PARAMETER_METADATA = ParameterMetadata::class.asClassName()

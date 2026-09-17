@@ -345,6 +345,25 @@
     <string name="flow_editor_incompatible_types">Impossibile connettere: tipi incompatibili. Impossibile connettere %1$s a %2$s.</string>
     <string name="flow_editor_incompatible_semantics">Impossibile connettere: tipi semantici incompatibili. \'%1$s\' non può connettersi a \'%2$s\'.</string>
     <string name="flow_editor_btn_exit">Esci</string>
+    <string name="flow_node_refresh">Aggiorna Nodo</string>
+    <string name="flow_node_replace">Sostituisci Nodo Con...</string>
+    <string name="flow_editor_refresh_broken_nodes">Aggiorna Nodi Non Validi</string>
+    <string name="flow_node_refresh_success">Nodo '%1$s' aggiornato con successo</string>
+    <string name="flow_node_refresh_failed">Plugin o funzionalità non trovata per '%1$s'</string>
+    <string name="flow_nodes_healed_summary">%1$d nodi non validi aggiornati con successo</string>
+    <string name="flow_nodes_none_healed">Nessun nodo non valido è stato aggiornato</string>
+    <string name="replace_node_dialog_title">Sostituisci Nodo</string>
+    <string name="replace_node_search_placeholder">Seleziona nodo di sostituzione...</string>
+    <string name="replace_node_migrate_connections">Migra Connessioni</string>
+    <string name="replace_node_incoming_connections">Connessioni in Ingresso</string>
+    <string name="replace_node_outgoing_connections">Connessioni in Uscita</string>
+    <string name="replace_node_disconnect">Disconnetti</string>
+    <string name="replace_node_no_connections">Nessuna porta connessa da migrare.</string>
+    <string name="replace_node_confirm">Sostituisci</string>
+    <string name="replace_node_cancel">Annulla</string>
+    <string name="replace_node_success">Nodo sostituito con successo</string>
+    <string name="replace_node_select_target">Seleziona un nodo di destinazione sopra per mappare le connessioni</string>
+    <string name="replace_node_no_matches">Nessun nodo corrispondente trovato</string>
     <string name="flow_info_title">Scorciatoie e Controlli</string>
     <string name="flow_info_cat_navigation">Navigazione e Tavola</string>
     <string name="flow_info_cat_selection">Selezione e Nodi</string>
@@ -814,4 +833,11 @@
     <string name="action_copy_flow_clipboard_tooltip">Copia il flusso negli appunti</string>
     <string name="action_edit_metadata">Modifica Metadati</string>
     <string name="action_edit">Modifica</string>
+    <string name="standalone_runner_title">Esecutore Plugin</string>
+    <string name="standalone_setup_required_title">Configurazione Richiesta</string>
+    <string name="standalone_setup_required_desc">Questo plugin richiede una configurazione iniziale prima di poter eseguire le funzionalità.</string>
+    <string name="standalone_run_setup">Avvia Configurazione</string>
+    <string name="standalone_setup_completed">Configurazione Completata</string>
+    <string name="standalone_setup_in_progress">Configurazione plugin in corso…</string>
+    <string name="standalone_no_capabilities">Nessuna funzionalità trovata per questo plugin</string>
 </resources>

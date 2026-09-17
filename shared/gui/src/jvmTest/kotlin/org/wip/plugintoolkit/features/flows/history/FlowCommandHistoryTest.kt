@@ -327,4 +327,81 @@ class FlowCommandHistoryTest {
         assertTrue(viewModel.canUndo.value)
         assertFalse(viewModel.canRedo.value)
     }
+
+    @Test
+    fun testReplaceNodeCommandUndoAndRedo() {
+        val oldNode = Node.SystemNode(
+            id = 10L,
+            position = ModelOffset(100f, 100f),
+            title = "Old Node",
+            systemAction = "log",
+            inputs = listOf(InputPort("in_msg", "Input Msg", DataType.Primitive(PrimitiveType.STRING))),
+            outputs = listOf(OutputPort("out_msg", "Output Msg", DataType.Primitive(PrimitiveType.STRING)))
+        )
+
+        val newNode = Node.SystemNode(
+            id = 10L,
+            position = ModelOffset(100f, 100f),
+            title = "New Node",
+            systemAction = "save",
+            inputs = listOf(InputPort("data", "Data", DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+
+        val otherNode = Node.FlowInputNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            outputs = listOf(OutputPort("data_out", "Data Out", DataType.Primitive(PrimitiveType.STRING)))
+        )
+
+        val oldConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "data_out",
+            targetNodeId = 10L,
+            targetPortId = "in_msg"
+        )
+
+        val newConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "data_out",
+            targetNodeId = 10L,
+            targetPortId = "data"
+        )
+
+        val initialState = FlowEditorState(
+            flow = Flow("Test", nodes = listOf(otherNode, oldNode), connections = listOf(oldConn))
+        )
+
+        val command = ReplaceNodeCommand(
+            oldNode = oldNode,
+            newNode = newNode,
+            oldConnections = listOf(oldConn),
+            newConnections = listOf(newConn)
+        )
+
+        // 1. Execute
+        val executedState = command.execute(initialState)
+        assertEquals(2, executedState.flow.nodes.size)
+        val replaced = executedState.flow.nodes.find { it.id == 10L }
+        assertNotNull(replaced)
+        assertEquals("New Node", replaced.title)
+        assertEquals(1, executedState.flow.connections.size)
+        assertEquals("data", executedState.flow.connections.first().targetPortId)
+
+        // 2. Undo
+        val undoneState = command.undo(executedState)
+        val reverted = undoneState.flow.nodes.find { it.id == 10L }
+        assertNotNull(reverted)
+        assertEquals("Old Node", reverted.title)
+        assertEquals(1, undoneState.flow.connections.size)
+        assertEquals("in_msg", undoneState.flow.connections.first().targetPortId)
+
+        // 3. Redo
+        val redoneState = command.execute(undoneState)
+        val reReplaced = redoneState.flow.nodes.find { it.id == 10L }
+        assertNotNull(reReplaced)
+        assertEquals("New Node", reReplaced.title)
+        assertEquals(1, redoneState.flow.connections.size)
+        assertEquals("data", redoneState.flow.connections.first().targetPortId)
+    }
 }

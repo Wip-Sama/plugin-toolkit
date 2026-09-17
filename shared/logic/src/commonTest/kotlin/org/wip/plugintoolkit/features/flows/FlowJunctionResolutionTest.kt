@@ -246,9 +246,9 @@ class FlowJunctionResolutionTest {
     }
 
     @Test
-    fun testPurgeStrayPointsEliminatesJunctionWithoutIncomingSource() {
+    fun testPurgeStrayPointsRetainsJunctionConnectedToInputPort() {
         val junction = FlowJunction(100L, Offset(50f, 50f))
-        val deadEndOut = Connection(
+        val connToInput = Connection(
             sourceNodeId = -1L,
             sourcePortId = "",
             sourceJunctionId = 100L,
@@ -256,9 +256,32 @@ class FlowJunctionResolutionTest {
             targetPortId = "in"
         )
         val flow = Flow(
-            name = "no_source_flow",
+            name = "input_connected_flow",
             junctions = listOf(junction),
-            connections = listOf(deadEndOut)
+            connections = listOf(connToInput)
+        )
+
+        val purged = flow.purgeStrayPoints()
+        assertEquals(1, purged.junctions.size)
+        assertEquals(1, purged.connections.size)
+    }
+
+    @Test
+    fun testPurgeStrayPointsEliminatesCompletelyOrphanedJunctionAndConnections() {
+        val j1 = FlowJunction(100L, Offset(50f, 50f))
+        val j2 = FlowJunction(200L, Offset(100f, 100f))
+        val strayConn = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 100L,
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 200L
+        )
+        val flow = Flow(
+            name = "orphaned_flow",
+            junctions = listOf(j1, j2),
+            connections = listOf(strayConn)
         )
 
         val purged = flow.purgeStrayPoints()

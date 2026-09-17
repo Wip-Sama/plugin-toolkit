@@ -54,6 +54,8 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.flows.model.FlowLabel
+import org.wip.plugintoolkit.features.flows.ui.snapToGrid
+import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
 import org.wip.plugintoolkit.shared.components.plugin.inputs.parseColorString
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_label_color
@@ -165,10 +167,24 @@ fun FlowLabelComponent(
             }
             .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
                 if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        onDragDelta(dragAmount)
-                    }
+                    detectDragGestures(
+                        onDragEnd = {
+                            val snapDelta = label.position.snapToGrid() - label.position
+                            if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                onDragDelta(snapDelta.toComposeOffset())
+                            }
+                        },
+                        onDragCancel = {
+                            val snapDelta = label.position.snapToGrid() - label.position
+                            if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                onDragDelta(snapDelta.toComposeOffset())
+                            }
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            onDragDelta(dragAmount)
+                        }
+                    )
                 }
             }
             .testTag("flow_label_${label.id}")

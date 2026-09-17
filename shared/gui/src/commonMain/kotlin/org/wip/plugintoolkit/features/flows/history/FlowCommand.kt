@@ -137,33 +137,43 @@ data class AddNodeCommand(
 }
 
 /**
- * Command recording node deletions alongside all cascading connections removed.
+ * Command recording node deletions alongside all cascading connections and junctions removed.
  */
 data class DeleteNodesCommand(
     private val deletedNodes: List<Node>,
-    private val cascadeConnections: List<Connection>
+    private val cascadeConnections: List<Connection> = emptyList(),
+    private val cascadeJunctions: List<FlowJunction> = emptyList()
 ) : FlowCommand {
     override val description: String = "Delete ${deletedNodes.size} node(s)"
 
     private val deletedNodeIds = deletedNodes.map { it.id }.toSet()
+    private val cascadeConnSet = cascadeConnections.toSet()
+    private val cascadeJuncIds = cascadeJunctions.map { it.id }.toSet()
 
     override fun execute(state: FlowEditorState): FlowEditorState {
         val newNodes = state.flow.nodes.filter { it.id !in deletedNodeIds }
         val newConnections = state.flow.connections.filter {
-            it.sourceNodeId !in deletedNodeIds && it.targetNodeId !in deletedNodeIds
+            it.sourceNodeId !in deletedNodeIds && it.targetNodeId !in deletedNodeIds && it !in cascadeConnSet
         }
+        val newJunctions = state.flow.junctions.filter { it.id !in cascadeJuncIds }
         return state.copy(
-            flow = state.flow.copy(nodes = newNodes, connections = newConnections),
+            flow = state.flow.copy(nodes = newNodes, connections = newConnections, junctions = newJunctions),
             selectedNodeIds = state.selectedNodeIds - deletedNodeIds,
+            selectedPointIds = state.selectedPointIds - cascadeJuncIds,
             hasUnsavedChanges = true
         )
     }
 
     override fun undo(state: FlowEditorState): FlowEditorState {
+        val existingNodeIds = state.flow.nodes.map { it.id }.toSet()
+        val existingConnSet = state.flow.connections.toSet()
+        val existingJuncIds = state.flow.junctions.map { it.id }.toSet()
+
         return state.copy(
             flow = state.flow.copy(
-                nodes = state.flow.nodes + deletedNodes,
-                connections = state.flow.connections + cascadeConnections
+                nodes = state.flow.nodes + deletedNodes.filter { it.id !in existingNodeIds },
+                connections = state.flow.connections + cascadeConnections.filter { it !in existingConnSet },
+                junctions = state.flow.junctions + cascadeJunctions.filter { it.id !in existingJuncIds }
             ),
             hasUnsavedChanges = true
         )
@@ -202,23 +212,68 @@ data class ConnectPortsCommand(
 }
 
 /**
- * Command recording deletion of a connection.
+ * Command recording deletion of a connection alongside any cascading junctions/connections.
  */
 data class DisconnectPortsCommand(
-    private val connection: Connection
+    private val connection: Connection,
+    private val cascadeConnections: List<Connection> = emptyList(),
+    private val cascadeJunctions: List<FlowJunction> = emptyList()
 ) : FlowCommand {
     override val description: String = "Delete connection"
 
+    private val allDeletedConns = (cascadeConnections + connection).toSet()
+    private val allDeletedJuncIds = cascadeJunctions.map { it.id }.toSet()
+
     override fun execute(state: FlowEditorState): FlowEditorState {
         return state.copy(
-            flow = state.flow.copy(connections = state.flow.connections.filter { it != connection }),
+            flow = state.flow.copy(
+                connections = state.flow.connections.filter { it !in allDeletedConns },
+                junctions = state.flow.junctions.filter { it.id !in allDeletedJuncIds }
+            ),
+            hasUnsavedChanges = true
+        )
+    }
+
+    override fun undo(state: FlowEditorState): FlowEditorState {
+        val existingConns = state.flow.connections.toSet()
+        val existingJuncIds = state.flow.junctions.map { it.id }.toSet()
+        return state.copy(
+            flow = state.flow.copy(
+                connections = state.flow.connections + allDeletedConns.filter { it !in existingConns },
+                junctions = state.flow.junctions + cascadeJunctions.filter { it.id !in existingJuncIds }
+            ),
+            hasUnsavedChanges = true
+        )
+    }
+}
+
+/**
+ * Command recording deletion of a connection segment and intermediate junction restructuring.
+ */
+data class DeleteConnectionSegmentCommand(
+    private val beforeConnections: List<Connection>,
+    private val beforeJunctions: List<FlowJunction>,
+    private val afterConnections: List<Connection>,
+    private val afterJunctions: List<FlowJunction>
+) : FlowCommand {
+    override val description: String = "Delete connection segment"
+
+    override fun execute(state: FlowEditorState): FlowEditorState {
+        return state.copy(
+            flow = state.flow.copy(
+                connections = afterConnections,
+                junctions = afterJunctions
+            ),
             hasUnsavedChanges = true
         )
     }
 
     override fun undo(state: FlowEditorState): FlowEditorState {
         return state.copy(
-            flow = state.flow.copy(connections = state.flow.connections + connection),
+            flow = state.flow.copy(
+                connections = beforeConnections,
+                junctions = beforeJunctions
+            ),
             hasUnsavedChanges = true
         )
     }
@@ -635,4 +690,39 @@ data class UpdateWaypointsCommand(
             } else it
         }), hasUnsavedChanges = true)
 }
+
+/**
+ * Command recording replacing a node with another node and remapping its connections.
+ */
+data class ReplaceNodeCommand(
+    private val oldNode: Node,
+    private val newNode: Node,
+    private val oldConnections: List<Connection>,
+    private val newConnections: List<Connection>
+) : FlowCommand {
+    override val description: String = "Replace node '${oldNode.title}' with '${newNode.title}'"
+
+    override fun execute(state: FlowEditorState): FlowEditorState {
+        val updatedNodes = state.flow.nodes.map { if (it.id == oldNode.id) newNode else it }
+        val remainingConns = state.flow.connections.filter {
+            it.sourceNodeId != oldNode.id && it.targetNodeId != oldNode.id
+        }
+        return state.copy(
+            flow = state.flow.copy(nodes = updatedNodes, connections = remainingConns + newConnections),
+            hasUnsavedChanges = true
+        )
+    }
+
+    override fun undo(state: FlowEditorState): FlowEditorState {
+        val updatedNodes = state.flow.nodes.map { if (it.id == newNode.id) oldNode else it }
+        val remainingConns = state.flow.connections.filter {
+            it.sourceNodeId != newNode.id && it.targetNodeId != newNode.id
+        }
+        return state.copy(
+            flow = state.flow.copy(nodes = updatedNodes, connections = remainingConns + oldConnections),
+            hasUnsavedChanges = true
+        )
+    }
+}
+
 

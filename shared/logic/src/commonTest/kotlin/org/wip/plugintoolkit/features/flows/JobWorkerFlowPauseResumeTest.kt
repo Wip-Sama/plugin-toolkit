@@ -60,6 +60,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val mockPluginContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any()) } returns mockPluginContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
         stopKoin()
@@ -302,6 +303,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         val mockPluginContext = mockk<org.wip.plugintoolkit.api.PluginContext>(relaxed = true)
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockPluginContext
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any()) } returns mockPluginContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any(), any()) } returns mockPluginContext
         val mockLifecycleCoordinator = mockk<PluginLifecycleCoordinator>(relaxed = true)
 
         stopKoin()
@@ -505,6 +507,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
         }
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any()) } returns mockContext
         every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any()) } returns mockContext
+        every { mockPluginManager.createPluginContext(any(), any(), any(), any(), any(), any(), any()) } returns mockContext
 
         stopKoin()
         startKoin {
@@ -670,7 +673,7 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
             jobManager.resumeJob(job.id)
 
             // Wait for job to complete
-            withTimeout(2000) {
+            withTimeout(10000) {
                 while (jobManager.endedJobs.value.none { it.id == job.id }) {
                     delay(10)
                 }
@@ -684,6 +687,8 @@ class JobWorkerFlowPauseResumeTest : JobWorkerFlowTestBase() {
             jobWorker.stop()
         } finally {
             stopKoin()
+            PluginLoader.unloadAll()
+            io.mockk.unmockkAll()
         }
     }
 

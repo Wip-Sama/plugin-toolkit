@@ -378,7 +378,8 @@ fun BoardCanvas(
                 onResetDrawingConnection = onResetDrawingConnection,
                 shortcutManager = shortcutManager,
                 highlightedNodeId = highlightedNodeId,
-                highlightedPortId = highlightedPortId
+                highlightedPortId = highlightedPortId,
+                onPan = onPan
             )
             .boardSelectionBoxGesture(
                 interactionState = interactionState,

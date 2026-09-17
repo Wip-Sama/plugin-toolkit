@@ -17,7 +17,9 @@ import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +43,7 @@ import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
@@ -74,6 +77,10 @@ fun NodeHeader(
     onShowDeleteConfirmation: () -> Unit,
     onShowLoadSettings: () -> Unit,
     onShowEditBoundary: () -> Unit,
+    onRefreshNode: ((Long) -> Unit)? = null,
+    onReplaceNode: ((Long) -> Unit)? = null,
+    isEyedropperActive: Boolean = false,
+    onSampleColor: ((String) -> Unit)? = null,
 ) {
     var showTooltip by remember { mutableStateOf(false) }
     var tooltipJob by remember { mutableStateOf<Job?>(null) }
@@ -88,8 +95,15 @@ fun NodeHeader(
             .fillMaxWidth()
             .background(headerColor)
             .testTag("node_header_${node.id}")
-            .pointerInput(node.id, isReadOnly) {
-                if (!isReadOnly) {
+            .pointerInput(node.id, isReadOnly, isEyedropperActive) {
+                if (isEyedropperActive && onSampleColor != null) {
+                    detectTapGestures(
+                        onTap = {
+                            val hex = node.color ?: headerColor.toHex(hexPrefix = true, includeAlpha = false)
+                            onSampleColor(hex)
+                        }
+                    )
+                } else if (!isReadOnly) {
                     coroutineScope {
                         launch {
                             detectDragGestures(
@@ -233,6 +247,40 @@ fun NodeHeader(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Edit Port",
+                        tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                }
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+            }
+
+            if (node is Node.CapabilityNode && node.isBroken && !isReadOnly && onRefreshNode != null) {
+                IconButton(
+                    onClick = { onRefreshNode(node.id) },
+                    modifier = Modifier
+                        .size(ToolkitTheme.dimensions.iconMedium)
+                        .testTag("refresh_button_${node.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = stringResource(Res.string.flow_node_refresh),
+                        tint = onHeaderColor,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                    )
+                }
+                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+            }
+
+            if (!isReadOnly && onReplaceNode != null) {
+                IconButton(
+                    onClick = { onReplaceNode(node.id) },
+                    modifier = Modifier
+                        .size(ToolkitTheme.dimensions.iconMedium)
+                        .testTag("replace_button_${node.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = stringResource(Res.string.flow_node_replace),
                         tint = onHeaderColor.copy(alpha = ToolkitTheme.opacity.secondaryText),
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )

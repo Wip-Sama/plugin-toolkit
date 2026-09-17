@@ -9,7 +9,7 @@ import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 
 object PluginCompatibilityUtils {
     fun checkCompatibility(manifest: PluginManifest): Pair<Boolean, String?> {
-        val target = manifest.requirements.targetAppVersion ?: "1.0.0"
+        val target = manifest.requirements.targetAppVersion
         return checkVersionAndOs(target, manifest.plugin.supportedOs)
     }
 
@@ -17,7 +17,7 @@ object PluginCompatibilityUtils {
         if (manifest != null) {
             return checkCompatibility(manifest)
         }
-        val target = plugin.targetAppVersion ?: "1.0.0"
+        val target = plugin.targetAppVersion
         return checkVersionAndOs(target, plugin.supportedOs)
     }
 
@@ -27,26 +27,27 @@ object PluginCompatibilityUtils {
             return checkCompatibility(manifest)
         }
 
-
         // Fallback for ExtensionPlugin without a manifest
-        val target = plugin.minAppVersion ?: return true to null
+        val target = plugin.minAppVersion
         return checkVersionAndOs(target, emptyList())
     }
 
     fun checkCompatibility(flow: org.wip.plugintoolkit.features.repository.model.ExtensionFlow): Pair<Boolean, String?> {
-        val target = flow.minAppVersion ?: return true to null
+        val target = flow.minAppVersion
         return checkVersionAndOs(target, emptyList())
     }
 
-    private fun checkVersionAndOs(targetVersion: String, supportedOs: List<org.wip.plugintoolkit.api.OS>): Pair<Boolean, String?> {
-        val current = AppConfig.VERSION
-        val min = AppConfig.MIN_COMPATIBLE_PLUGIN_VERSION
+    private fun checkVersionAndOs(targetVersion: String?, supportedOs: List<org.wip.plugintoolkit.api.OS>): Pair<Boolean, String?> {
+        if (targetVersion != null) {
+            val current = AppConfig.VERSION
+            val min = AppConfig.MIN_COMPATIBLE_PLUGIN_VERSION
 
-        if (VersionUtils.compare(targetVersion, current) > 0) {
-            return false to "Plugin requires a newer app version (targeted for $targetVersion)"
-        }
-        if (VersionUtils.compare(targetVersion, min) < 0) {
-            return false to "Plugin is obsolete (targeted for $targetVersion, min supported $min)"
+            if (VersionUtils.compare(targetVersion, current) > 0) {
+                return false to "Plugin requires a newer app version (targeted for $targetVersion)"
+            }
+            if (VersionUtils.compare(targetVersion, min) < 0) {
+                return false to "Plugin is obsolete (targeted for $targetVersion, min supported $min)"
+            }
         }
 
         if (supportedOs.isNotEmpty()) {

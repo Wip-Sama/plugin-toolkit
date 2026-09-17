@@ -18,6 +18,7 @@ import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PluginSignalManager
 import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.core.utils.FileSystem
+import org.wip.plugintoolkit.core.utils.FileUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -98,7 +99,7 @@ class PluginLifecycleManager(
         _loadingPlugins.update { it + pkg }
         _pluginLoadingSteps.update { it + (pkg to "Starting load...") }
         try {
-            val (isComp, compError) = PluginCompatibilityUtils.checkCompatibility(plugin)
+            val (isComp, compError) = PluginCompatibilityUtils.checkCompatibility(plugin, getManifest(pkg))
             if (!isComp || !plugin.isCompatible) {
                 val errorMsg = compError ?: plugin.compatibilityError ?: "Plugin is incompatible with the current app version"
                 Logger.w { "Cannot load plugin $pkg: $errorMsg" }
@@ -109,33 +110,42 @@ class PluginLifecycleManager(
             val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
             val jarFile = "${plugin.installPath}/$jarFileName"
 
-            // Runtime signature verification for remote plugins
-            if (plugin.repoUrl != null) {
-                _pluginLoadingSteps.update { it + (pkg to "Verifying signature...") }
-                val repo = settingsRepository.loadSettings().extensions.repositories.find { it.url == plugin.repoUrl }
-                val publicKey = repo?.signPublicKey
-                val strictChecking = settingsRepository.loadSettings().extensions.strictSignatureChecking
+            val directPlugin = PluginLoader.getPluginById(pkg)
+            val result = if (directPlugin != null && !forceReload) {
+                Logger.d { "Plugin $pkg is already loaded in PluginLoader (direct/standalone); reusing instance." }
+                Result.success(directPlugin)
+            } else if (directPlugin != null && forceReload) {
+                Logger.d { "Force reloading direct plugin $pkg." }
+                Result.success(directPlugin)
+            } else {
+                // Runtime signature verification for remote plugins
+                if (plugin.repoUrl != null) {
+                    _pluginLoadingSteps.update { it + (pkg to "Verifying signature...") }
+                    val repo = settingsRepository.loadSettings().extensions.repositories.find { it.url == plugin.repoUrl }
+                    val publicKey = repo?.signPublicKey
+                    val strictChecking = settingsRepository.loadSettings().extensions.strictSignatureChecking
 
-                if (publicKey != null) {
-                    val isSignatureValid = PluginSecurity.verify(jarFile, publicKey)
-                    if (!isSignatureValid) {
-                        val msg = "Plugin signature verification failed for ${plugin.pkg}"
-                        Logger.w { msg }
-                        if (strictChecking || plugin.requiredAction == "CONFIRM_SIGNATURE") {
-                            updateLoadError(pkg, msg)
-                            return Result.failure(Exception(msg))
+                    if (publicKey != null) {
+                        val isSignatureValid = PluginSecurity.verify(jarFile, publicKey)
+                        if (!isSignatureValid) {
+                            val msg = "Plugin signature verification failed for ${plugin.pkg}"
+                            Logger.w { msg }
+                            if (strictChecking || plugin.requiredAction == "CONFIRM_SIGNATURE") {
+                                updateLoadError(pkg, msg)
+                                return Result.failure(Exception(msg))
+                            }
                         }
                     }
                 }
-            }
 
-            Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
-            _pluginLoadingSteps.update { it + (pkg to "Loading classes...") }
-            val settings = loadPluginSettings(pkg)
-            val result = try {
-                PluginLoader.loadPlugin(jarFile, settings.settings, forceReload = forceReload)
-            } catch (t: Throwable) {
-                Result.failure(Exception("Fatal error loading plugin classes", t))
+                Logger.d { "Requesting PluginLoader to load JAR: $jarFile" }
+                _pluginLoadingSteps.update { it + (pkg to "Loading classes...") }
+                val settings = loadPluginSettings(pkg)
+                try {
+                    PluginLoader.loadPlugin(jarFile, settings.settings, forceReload = forceReload)
+                } catch (t: Throwable) {
+                    Result.failure(Exception("Fatal error loading plugin classes", t))
+                }
             }
 
             return if (result.isSuccess) {
@@ -219,7 +229,9 @@ class PluginLifecycleManager(
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"
 
-        PluginLoader.unloadPlugin(jarFile)
+        if (FileUtils.exists(jarFile)) {
+            PluginLoader.unloadPlugin(jarFile)
+        }
         PluginLoader.unloadPluginById(pkg)
         _loadedPlugins.update { it - pkg }
         Logger.d { "Plugin $pkg unloaded and removed from active set" }
@@ -423,6 +435,12 @@ class PluginLifecycleManager(
     }
 
     fun getManifest(pkg: String): PluginManifest? {
+        val directPlugin = PluginLoader.getPluginById(pkg)
+        if (directPlugin != null) {
+            val directManifest = runCatching { directPlugin.getManifest().getOrNull() }.getOrNull()
+            if (directManifest != null) return directManifest
+        }
+
         val plugin = registry.getPlugin(pkg) ?: return null
         val jarFileName = plugin.jarFileName ?: (plugin.pkg.substringAfterLast(".") + ".jar")
         val jarFile = "${plugin.installPath}/$jarFileName"

@@ -9,6 +9,7 @@ plugins {
 buildkonfig {
     packageName = "org.wip.plugintoolkit.api"
     objectName = "ApiConfig"
+    exposeObjectWithName = "ApiConfig"
 
     defaultConfigs {
         buildConfigField(

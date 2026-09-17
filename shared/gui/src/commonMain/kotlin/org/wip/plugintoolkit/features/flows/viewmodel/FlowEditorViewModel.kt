@@ -25,8 +25,10 @@ import org.wip.plugintoolkit.features.flows.history.AddGroupCommand
 import org.wip.plugintoolkit.features.flows.history.AddJunctionCommand
 import org.wip.plugintoolkit.features.flows.history.AddLabelCommand
 import org.wip.plugintoolkit.features.flows.history.AddNodeCommand
+import org.wip.plugintoolkit.features.flows.history.ReplaceNodeCommand
 import org.wip.plugintoolkit.features.flows.history.CompositeCommand
 import org.wip.plugintoolkit.features.flows.history.ConnectPortsCommand
+import org.wip.plugintoolkit.features.flows.history.DeleteConnectionSegmentCommand
 import org.wip.plugintoolkit.features.flows.history.DeleteGroupCommand
 import org.wip.plugintoolkit.features.flows.history.DeleteJunctionCommand
 import org.wip.plugintoolkit.features.flows.history.DeleteLabelCommand
@@ -95,6 +97,7 @@ class FlowEditorViewModel(
         private var clipboardConnections: List<Connection> = emptyList()
         private var clipboardGroups: List<FlowGroup> = emptyList()
         private var clipboardLabels: List<FlowLabel> = emptyList()
+        private var clipboardJunctions: List<FlowJunction> = emptyList()
     }
 
     private val resolvedSettingsRepository: SettingsRepository? by lazy {
@@ -283,7 +286,10 @@ class FlowEditorViewModel(
                 is FlowEvent.ToggleNodeCollapse,
                 is FlowEvent.ToggleNodeInputsCollapse,
                 is FlowEvent.ToggleNodeOutputsCollapse,
-                is FlowEvent.BringToFront -> {
+                is FlowEvent.BringToFront,
+                is FlowEvent.RefreshNode,
+                is FlowEvent.RefreshBrokenNodes,
+                is FlowEvent.ReplaceNode -> {
                     resolvedNotificationService?.toast("Cannot modify the flow because it is currently running or used as a subflow in other flows.")
                     return
                 }
@@ -536,34 +542,106 @@ class FlowEditorViewModel(
             is FlowEvent.DeleteNode -> {
                 shouldRunTypeInference = true
                 val deletedNode = currentState.flow.nodes.find { it.id == event.id }
-                val cascadeConns = currentState.flow.connections.filter { it.sourceNodeId == event.id || it.targetNodeId == event.id }
+                val beforeFlow = currentState.flow
                 newState = nodeManager.handleDeleteNode(currentState, event.id)
+                val updatedFlow = newState.flow.purgeStrayPoints()
+                newState = newState.copy(flow = updatedFlow)
                 if (deletedNode != null) {
-                    pendingCommand = DeleteNodesCommand(listOf(deletedNode), cascadeConns)
+                    val removedConns = beforeFlow.connections.filter { it !in updatedFlow.connections.toSet() }
+                    val removedJuncs = beforeFlow.junctions.filter { it.id !in updatedFlow.junctions.map { j -> j.id }.toSet() }
+                    pendingCommand = DeleteNodesCommand(listOf(deletedNode), removedConns, removedJuncs)
+                }
+            }
+
+            is FlowEvent.RefreshNode -> {
+                val manifests = flowRepository.getAvailableManifests()
+                val (updatedState, refreshed) = nodeManager.handleRefreshNode(currentState, event.nodeId, manifests)
+                if (refreshed != null) {
+                    if (!refreshed.isBroken) {
+                        newState = updatedState
+                        shouldRunTypeInference = true
+                        resolvedNotificationService?.toast("Node '${refreshed.title}' refreshed successfully")
+                    } else {
+                        resolvedNotificationService?.toast("Plugin or capability not found for '${refreshed.title}'")
+                    }
+                } else {
+                    val node = currentState.flow.nodes.find { it.id == event.nodeId }
+                    resolvedNotificationService?.toast("Plugin or capability not found for '${node?.title ?: "node"}'")
+                }
+            }
+
+            is FlowEvent.RefreshBrokenNodes -> {
+                val manifests = flowRepository.getAvailableManifests()
+                val (updatedState, healedCount) = nodeManager.handleRefreshBrokenNodes(currentState, manifests)
+                if (healedCount > 0) {
+                    newState = updatedState
+                    shouldRunTypeInference = true
+                    resolvedNotificationService?.toast("$healedCount broken node(s) refreshed successfully")
+                } else {
+                    resolvedNotificationService?.toast("No broken nodes could be refreshed")
+                }
+            }
+
+            is FlowEvent.ReplaceNode -> {
+                val oldNode = currentState.flow.nodes.find { it.id == event.nodeId }
+                if (oldNode != null) {
+                    val oldConns = currentState.flow.connections.filter {
+                        it.sourceNodeId == event.nodeId || it.targetNodeId == event.nodeId
+                    }
+                    newState = nodeManager.handleReplaceNode(
+                        currentState = currentState,
+                        nodeId = event.nodeId,
+                        targetNode = event.targetNode,
+                        inputMappings = event.inputMappings,
+                        outputMappings = event.outputMappings
+                    )
+                    val newConns = newState.flow.connections.filter {
+                        it.sourceNodeId == event.nodeId || it.targetNodeId == event.nodeId
+                    }
+                    pendingCommand = ReplaceNodeCommand(oldNode, event.targetNode, oldConns, newConns)
+                    shouldRunTypeInference = true
+                    resolvedNotificationService?.toast("Node replaced successfully")
                 }
             }
             is FlowEvent.CopySelectedNodes -> {
                 val selectedNodes = currentState.selectedNodeIds
                 val selectedGroups = currentState.selectedGroupIds
                 val selectedLabels = currentState.selectedLabelIds
+                val selectedPoints = currentState.selectedPointIds
 
-                if (selectedNodes.isNotEmpty() || selectedGroups.isNotEmpty() || selectedLabels.isNotEmpty()) {
+                if (selectedNodes.isNotEmpty() || selectedGroups.isNotEmpty() || selectedLabels.isNotEmpty() || selectedPoints.isNotEmpty()) {
                     val groupContainedNodeIds = currentState.flow.groups
                         .filter { it.id in selectedGroups }
                         .flatMap { it.nodeIds }
                         .toSet()
                     val allNodesToCopy = selectedNodes + groupContainedNodeIds
 
+                    val wireJunctions = mutableSetOf<Long>()
+                    for (conn in currentState.flow.connections) {
+                        val tree = currentState.flow.findConnectedWireTree(conn)
+                        val treeNodes = currentState.flow.findConnectedNodesForWireTree(tree)
+                        if (treeNodes.isNotEmpty() && treeNodes.all { it in allNodesToCopy }) {
+                            tree.forEach { c ->
+                                c.sourceJunctionId?.let { wireJunctions.add(it) }
+                                c.targetJunctionId?.let { wireJunctions.add(it) }
+                            }
+                        }
+                    }
+                    val allJunctionsToCopy = selectedPoints + wireJunctions
+
                     clipboardNodes = currentState.flow.nodes.filter { it.id in allNodesToCopy }
-                    clipboardConnections = currentState.flow.connections.filter { 
-                        it.sourceNodeId in allNodesToCopy && it.targetNodeId in allNodesToCopy 
+                    clipboardJunctions = currentState.flow.junctions.filter { it.id in allJunctionsToCopy }
+                    clipboardConnections = currentState.flow.connections.filter { conn ->
+                        val sourceValid = (conn.sourceNodeId in allNodesToCopy) || (conn.sourceJunctionId != null && conn.sourceJunctionId in allJunctionsToCopy)
+                        val targetValid = (conn.targetNodeId in allNodesToCopy) || (conn.targetJunctionId != null && conn.targetJunctionId in allJunctionsToCopy) || (conn.floatingTarget != null)
+                        sourceValid && targetValid
                     }
                     clipboardGroups = currentState.flow.groups.filter { it.id in selectedGroups }
                     clipboardLabels = currentState.flow.labels.filter { it.id in selectedLabels }
                 }
             }
             is FlowEvent.PasteNodes -> {
-                if (clipboardNodes.isNotEmpty() || clipboardGroups.isNotEmpty() || clipboardLabels.isNotEmpty()) {
+                if (clipboardNodes.isNotEmpty() || clipboardGroups.isNotEmpty() || clipboardLabels.isNotEmpty() || clipboardJunctions.isNotEmpty()) {
                     shouldRunTypeInference = true
                     
                     var nextId = currentState.nextId
@@ -574,12 +652,21 @@ class FlowEditorViewModel(
                         idMapping[node.id] = newId
                         node.copyWithId(newId)
                     }
+
+                    var nextJuncId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
+                    val junctionIdMapping = mutableMapOf<Long, Long>()
+                    val newJunctions = clipboardJunctions.map { junc ->
+                        val newJId = nextJuncId++
+                        junctionIdMapping[junc.id] = newJId
+                        junc.copy(id = newJId)
+                    }
                     
-                    val offsetDelta = if (newNodes.isNotEmpty()) {
-                        val minX = newNodes.minOfOrNull { it.position.x } ?: 0f
-                        val minY = newNodes.minOfOrNull { it.position.y } ?: 0f
-                        val maxX = newNodes.maxOfOrNull { it.position.x } ?: 0f
-                        val maxY = newNodes.maxOfOrNull { it.position.y } ?: 0f
+                    val offsetDelta = if (newNodes.isNotEmpty() || newJunctions.isNotEmpty()) {
+                        val allPositions = newNodes.map { it.position } + newJunctions.map { it.position }
+                        val minX = allPositions.minOfOrNull { it.x } ?: 0f
+                        val minY = allPositions.minOfOrNull { it.y } ?: 0f
+                        val maxX = allPositions.maxOfOrNull { it.x } ?: 0f
+                        val maxY = allPositions.maxOfOrNull { it.y } ?: 0f
                         val centerX = minX + (maxX - minX) / 2f
                         val centerY = minY + (maxY - minY) / 2f
                         ModelOffset(event.position.x - centerX, event.position.y - centerY)
@@ -590,14 +677,26 @@ class FlowEditorViewModel(
                     val positionedNodes = newNodes.map { node ->
                         node.copyWithPosition((node.position + offsetDelta).snapToGrid())
                     }
+
+                    val positionedJunctions = newJunctions.map { junc ->
+                        junc.copy(position = (junc.position + offsetDelta).snapToGrid())
+                    }
                     
                     val newConnections = clipboardConnections.mapNotNull { conn ->
-                        val newSourceId = idMapping[conn.sourceNodeId]
-                        val newTargetId = idMapping[conn.targetNodeId]
-                        if (newSourceId != null && newTargetId != null) {
+                        val newSourceId = if (conn.sourceNodeId >= 0L) idMapping[conn.sourceNodeId] else conn.sourceNodeId
+                        val newTargetId = if (conn.targetNodeId >= 0L) idMapping[conn.targetNodeId] else conn.targetNodeId
+                        val newSourceJuncId = if (conn.sourceJunctionId != null) junctionIdMapping[conn.sourceJunctionId] else null
+                        val newTargetJuncId = if (conn.targetJunctionId != null) junctionIdMapping[conn.targetJunctionId] else null
+
+                        val validSource = (conn.sourceNodeId >= 0L && newSourceId != null) || (conn.sourceJunctionId != null && newSourceJuncId != null)
+                        val validTarget = (conn.targetNodeId >= 0L && newTargetId != null) || (conn.targetJunctionId != null && newTargetJuncId != null) || (conn.floatingTarget != null)
+                        if (validSource && validTarget) {
                             conn.copy(
-                                sourceNodeId = newSourceId,
-                                targetNodeId = newTargetId
+                                sourceNodeId = newSourceId ?: conn.sourceNodeId,
+                                targetNodeId = newTargetId ?: conn.targetNodeId,
+                                sourceJunctionId = newSourceJuncId,
+                                targetJunctionId = newTargetJuncId,
+                                waypoints = conn.waypoints.map { (it + offsetDelta).snapToGrid() }
                             )
                         } else null
                     }
@@ -623,23 +722,26 @@ class FlowEditorViewModel(
                     }
                     
                     newState = currentState.copy(
-                        nextId = nextId,
+                        nextId = maxOf(nextId, nextJuncId),
                         flow = currentState.flow.copy(
                             nodes = currentState.flow.nodes + positionedNodes,
+                            junctions = currentState.flow.junctions + positionedJunctions,
                             connections = currentState.flow.connections + newConnections,
                             groups = currentState.flow.groups + positionedGroups,
                             labels = currentState.flow.labels + positionedLabels
                         ),
                         selectedNodeIds = positionedNodes.map { it.id }.toSet(),
+                        selectedPointIds = positionedJunctions.map { it.id }.toSet(),
                         selectedGroupIds = positionedGroups.map { it.id }.toSet(),
                         selectedLabelIds = positionedLabels.map { it.id }.toSet(),
                         hasUnsavedChanges = true
                     )
                     val addNodeCommands = positionedNodes.map { AddNodeCommand(it) }
+                    val addJuncCommands = positionedJunctions.map { AddJunctionCommand(it) }
                     val addConnCommands = newConnections.map { ConnectPortsCommand(it) }
                     val addGroupCommands = positionedGroups.map { AddGroupCommand(it) }
                     val addLabelCommands = positionedLabels.map { AddLabelCommand(it) }
-                    pendingCommand = CompositeCommand("Paste elements", addNodeCommands + addConnCommands + addGroupCommands + addLabelCommands)
+                    pendingCommand = CompositeCommand("Paste elements", addNodeCommands + addJuncCommands + addConnCommands + addGroupCommands + addLabelCommands)
                 }
             }
 
@@ -720,9 +822,16 @@ class FlowEditorViewModel(
 
             is FlowEvent.DeleteConnection -> {
                 shouldRunTypeInference = true
+                val beforeFlow = currentState.flow
                 newState = connectionManager.handleDeleteConnection(currentState, event.connection)
                 if (newState !== currentState) {
-                    pendingCommand = DisconnectPortsCommand(event.connection)
+                    val removedConns = beforeFlow.connections.filter { it !in newState.flow.connections.toSet() }
+                    val removedJuncs = beforeFlow.junctions.filter { it.id !in newState.flow.junctions.map { j -> j.id }.toSet() }
+                    pendingCommand = DisconnectPortsCommand(
+                        connection = event.connection,
+                        cascadeConnections = removedConns.filter { it != event.connection },
+                        cascadeJunctions = removedJuncs
+                    )
                 }
             }
 
@@ -853,18 +962,18 @@ class FlowEditorViewModel(
                     selectedPointIds = emptySet(),
                     hasUnsavedChanges = true
                 )
+                val removedConns = currentState.flow.connections.filter { it !in updatedFlow.connections.toSet() }
+                val removedJuncs = currentState.flow.junctions.filter { it.id !in updatedFlow.junctions.map { j -> j.id }.toSet() }
+
                 val commands = mutableListOf<FlowCommand>()
-                if (deletedNodes.isNotEmpty() || cascadeConns.isNotEmpty()) {
-                    commands.add(DeleteNodesCommand(deletedNodes, cascadeConns))
+                if (deletedNodes.isNotEmpty() || removedConns.isNotEmpty() || removedJuncs.isNotEmpty()) {
+                    commands.add(DeleteNodesCommand(deletedNodes, removedConns, removedJuncs))
                 }
                 for (lbl in deletedLabels) {
                     commands.add(DeleteLabelCommand(lbl))
                 }
                 for (grp in deletedGroups) {
                     commands.add(DeleteGroupCommand(grp))
-                }
-                for (pt in deletedPoints) {
-                    commands.add(DeleteJunctionCommand(pt, cascadeConns.filter { it.sourceJunctionId == pt.id || it.targetJunctionId == pt.id }))
                 }
                 if (commands.isNotEmpty()) {
                     pendingCommand = CompositeCommand("Delete selected elements", commands)
@@ -1122,7 +1231,7 @@ class FlowEditorViewModel(
             // Groups
             is FlowEvent.AddGroup -> {
                 val newId = (currentState.flow.groups.maxOfOrNull { it.id } ?: 0L) + 1L
-                val newGroup = FlowGroup(id = newId, title = "New Group", position = event.position, size = ModelOffset(320f, 240f))
+                val newGroup = FlowGroup(id = newId, title = "New Group", position = event.position.snapToGrid(), size = ModelOffset(320f, 240f))
                 newState = currentState.copy(
                     flow = currentState.flow.copy(groups = currentState.flow.groups + newGroup),
                     hasUnsavedChanges = true
@@ -1178,6 +1287,7 @@ class FlowEditorViewModel(
                         } else l
                     }
 
+                    val newGrpPos = grp.position + event.delta
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
                             groups = updatedGroups,
@@ -1186,7 +1296,7 @@ class FlowEditorViewModel(
                         ),
                         hasUnsavedChanges = true
                     )
-                    pendingCommand = MoveGroupCommand(event.groupId, grp.position, grp.position + event.delta, nodeIdsToMove)
+                    pendingCommand = MoveGroupCommand(event.groupId, grp.position, newGrpPos, nodeIdsToMove)
                 }
             }
 
@@ -1211,7 +1321,7 @@ class FlowEditorViewModel(
             // Labels
             is FlowEvent.AddLabel -> {
                 val newId = (currentState.flow.labels.maxOfOrNull { it.id } ?: 0L) + 1L
-                val newLabel = FlowLabel(id = newId, text = "Text Note", position = event.position)
+                val newLabel = FlowLabel(id = newId, text = "Text Note", position = event.position.snapToGrid())
                 newState = currentState.copy(
                     flow = currentState.flow.copy(labels = currentState.flow.labels + newLabel),
                     hasUnsavedChanges = true
@@ -1267,6 +1377,7 @@ class FlowEditorViewModel(
                         } else node
                     }
 
+                    val newLblPos = lbl.position + event.delta
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
                             labels = updatedLabels,
@@ -1275,7 +1386,7 @@ class FlowEditorViewModel(
                         ),
                         hasUnsavedChanges = true
                     )
-                    pendingCommand = MoveLabelCommand(event.labelId, lbl.position, lbl.position + event.delta)
+                    pendingCommand = MoveLabelCommand(event.labelId, lbl.position, newLblPos)
                 }
             }
 
@@ -1752,7 +1863,17 @@ class FlowEditorViewModel(
                     val count = wps.size
                     val segIdx = event.segmentIndex
                     if (count == 0) {
+                        val beforeFlow = currentState.flow
                         newState = connectionManager.handleDeleteConnection(currentState, conn)
+                        if (newState !== currentState) {
+                            val removedConns = beforeFlow.connections.filter { it !in newState.flow.connections.toSet() }
+                            val removedJuncs = beforeFlow.junctions.filter { it.id !in newState.flow.junctions.map { j -> j.id }.toSet() }
+                            pendingCommand = DisconnectPortsCommand(
+                                connection = conn,
+                                cascadeConnections = removedConns.filter { it != conn },
+                                cascadeJunctions = removedJuncs
+                            )
+                        }
                     } else if (segIdx == 0) {
                         val newJuncId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
                         val newJunc = FlowJunction(newJuncId, wps[0], conn.color)
@@ -1770,6 +1891,12 @@ class FlowEditorViewModel(
                             ),
                             hasUnsavedChanges = true
                         )
+                        pendingCommand = DeleteConnectionSegmentCommand(
+                            beforeConnections = currentState.flow.connections,
+                            beforeJunctions = currentState.flow.junctions,
+                            afterConnections = newState.flow.connections,
+                            afterJunctions = newState.flow.junctions
+                        )
                     } else if (segIdx >= count) {
                         val remConn = conn.copy(
                             targetNodeId = -1L,
@@ -1782,6 +1909,12 @@ class FlowEditorViewModel(
                         newState = currentState.copy(
                             flow = currentState.flow.copy(connections = newConnections),
                             hasUnsavedChanges = true
+                        )
+                        pendingCommand = DeleteConnectionSegmentCommand(
+                            beforeConnections = currentState.flow.connections,
+                            beforeJunctions = currentState.flow.junctions,
+                            afterConnections = newState.flow.connections,
+                            afterJunctions = newState.flow.junctions
                         )
                     } else {
                         val conn1 = conn.copy(
@@ -1807,7 +1940,14 @@ class FlowEditorViewModel(
                             ),
                             hasUnsavedChanges = true
                         )
+                        pendingCommand = DeleteConnectionSegmentCommand(
+                            beforeConnections = currentState.flow.connections,
+                            beforeJunctions = currentState.flow.junctions,
+                            afterConnections = newState.flow.connections,
+                            afterJunctions = newState.flow.junctions
+                        )
                     }
+                    shouldRunTypeInference = true
                 }
             }
 

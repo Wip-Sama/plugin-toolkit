@@ -58,6 +58,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -1354,7 +1355,7 @@ class FlowEditorQoLTest {
     }
 
     @Test
-    fun testDeleteConnectionPurgesJunctionWhenSourceLost() {
+    fun testDeleteConnectionRetainsJunctionConnectedToTargetPort() {
         val junc = FlowJunction(id = 50L, position = ModelOffset(100f, 100f))
         val conn1 = Connection(
             sourceNodeId = 1L,
@@ -1370,12 +1371,18 @@ class FlowEditorQoLTest {
             targetNodeId = 2L,
             targetPortId = "in"
         )
-        val flow = Flow(name = "TestJunctionPurged", junctions = listOf(junc), connections = listOf(conn1, conn2))
+        val flow = Flow(name = "TestJunctionPreserved", junctions = listOf(junc), connections = listOf(conn1, conn2))
         val vm = createViewModel(flow)
 
         assertEquals(1, vm.state.value.flow.junctions.size)
         vm.onEvent(FlowEvent.DeleteConnection(conn1))
-        // Since junction 50 lost its source connection, it is a stray point and must be purged along with conn2
+        // Since junction 50 is still connected to node 2's input port via conn2, it must be retained
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        assertEquals(1, vm.state.value.flow.connections.size)
+        assertTrue(vm.state.value.flow.connections.contains(conn2))
+
+        // When conn2 is also deleted, junction 50 has no port connections left, so it gets purged
+        vm.onEvent(FlowEvent.DeleteConnection(conn2))
         assertEquals(0, vm.state.value.flow.junctions.size)
         assertEquals(0, vm.state.value.flow.connections.size)
     }
@@ -2204,6 +2211,149 @@ class FlowEditorQoLTest {
         val inferenceResult = FlowTypeInference.runTypeInference(arrayFlow)
         val errors = inferenceResult.validationErrors.filter { it.targetPortId == "in_list" }
         assertTrue(errors.isEmpty(), "Array ports should have no validation errors for multiple connections")
+    }
+
+    @Test
+    fun testCopyPasteComplexConnectionsWithJunctions() {
+        val node1 = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            title = "Node 1",
+            systemAction = "act1",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out", "Out", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val node2 = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(400f, 0f),
+            title = "Node 2",
+            systemAction = "act2",
+            inputs = listOf(InputPort("in", "In", dataType = DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+        val junc = FlowJunction(id = 100L, position = ModelOffset(200f, 0f))
+        val conn1 = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 100L
+        )
+        val conn2 = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 100L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val flow = Flow(
+            name = "TestCopyPasteComplex",
+            nodes = listOf(node1, node2),
+            junctions = listOf(junc),
+            connections = listOf(conn1, conn2)
+        )
+        val vm = createViewModel(flow)
+
+        // Select both nodes and copy
+        vm.onEvent(FlowEvent.SelectNodes(setOf(1L, 2L)))
+        vm.onEvent(FlowEvent.CopySelectedNodes)
+
+        // Paste
+        vm.onEvent(FlowEvent.PasteNodes(Offset(50f, 50f)))
+
+        val state = vm.state.value
+        assertEquals(4, state.flow.nodes.size)
+        assertEquals(2, state.flow.junctions.size)
+        assertEquals(4, state.flow.connections.size)
+
+        val newJunc = state.flow.junctions.find { it.id != 100L }
+        assertNotNull(newJunc)
+        assertEquals(ModelOffset(50f, 50f), newJunc.position)
+
+        val pastedConns = state.flow.connections.filter { it != conn1 && it != conn2 }
+        assertEquals(2, pastedConns.size)
+        val pastedConn1 = pastedConns.find { it.targetJunctionId == newJunc.id }
+        val pastedConn2 = pastedConns.find { it.sourceJunctionId == newJunc.id }
+        assertNotNull(pastedConn1)
+        assertNotNull(pastedConn2)
+
+        // Test Undo
+        vm.undo()
+        assertEquals(2, vm.state.value.flow.nodes.size)
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        assertEquals(2, vm.state.value.flow.connections.size)
+
+        // Test Redo
+        vm.redo()
+        assertEquals(4, vm.state.value.flow.nodes.size)
+        assertEquals(2, vm.state.value.flow.junctions.size)
+        assertEquals(4, vm.state.value.flow.connections.size)
+    }
+
+    @Test
+    fun testDeleteConnectionSegmentUndoRedo() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(100f, 100f), ModelOffset(200f, 100f))
+        )
+        val flow = Flow(name = "TestDeleteSeg", connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Delete segment 0
+        vm.onEvent(FlowEvent.DeleteConnectionSegment(conn, segmentIndex = 0))
+        val afterDel = vm.state.value.flow
+        assertEquals(1, afterDel.junctions.size)
+        assertEquals(1, afterDel.connections.size)
+        assertNotEquals(conn, afterDel.connections.first())
+
+        // Undo
+        vm.undo()
+        val afterUndo = vm.state.value.flow
+        assertEquals(0, afterUndo.junctions.size)
+        assertEquals(1, afterUndo.connections.size)
+        assertEquals(conn, afterUndo.connections.first())
+
+        // Redo
+        vm.redo()
+        val afterRedo = vm.state.value.flow
+        assertEquals(1, afterRedo.junctions.size)
+        assertEquals(1, afterRedo.connections.size)
+    }
+
+    @Test
+    fun testWholeTreeHighlightingHelpers() {
+        val j1 = FlowJunction(10L, ModelOffset(100f, 50f))
+        val j2 = FlowJunction(20L, ModelOffset(200f, 50f))
+        val conn1 = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = -1L, targetPortId = "", targetJunctionId = 10L)
+        val conn2 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 10L, targetNodeId = -1L, targetPortId = "", targetJunctionId = 20L)
+        val conn3 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 20L, targetNodeId = 2L, targetPortId = "in1")
+        val conn4 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 20L, targetNodeId = 3L, targetPortId = "in2")
+        val unrelatedConn = Connection(sourceNodeId = 4L, sourcePortId = "out", targetNodeId = 5L, targetPortId = "in")
+
+        val flow = Flow(
+            name = "TestTree",
+            junctions = listOf(j1, j2),
+            connections = listOf(conn1, conn2, conn3, conn4, unrelatedConn)
+        )
+
+        // findConnectedWireTree from any segment
+        val tree = flow.findConnectedWireTree(conn2)
+        assertEquals(setOf(conn1, conn2, conn3, conn4), tree)
+
+        // findConnectedNodesForWireTree
+        val nodesInTree = flow.findConnectedNodesForWireTree(tree)
+        assertEquals(setOf(1L, 2L, 3L), nodesInTree)
+
+        // findAllConnectionsForNode
+        val connsForNode1 = flow.findAllConnectionsForNode(1L)
+        assertEquals(setOf(conn1, conn2, conn3, conn4), connsForNode1)
+
+        // findConnectedNodesForNode
+        val connectedNodes = flow.findConnectedNodesForNode(1L)
+        assertEquals(setOf(2L, 3L), connectedNodes)
     }
 }
 

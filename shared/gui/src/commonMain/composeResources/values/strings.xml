@@ -345,6 +345,25 @@
     <string name="flow_editor_incompatible_types">Cannot connect: Incompatible types. Cannot connect %1$s to %2$s.</string>
     <string name="flow_editor_incompatible_semantics">Cannot connect: Incompatible semantic types. '%1$s' cannot connect to '%2$s'.</string>
     <string name="flow_editor_btn_exit">Exit</string>
+    <string name="flow_node_refresh">Refresh Node</string>
+    <string name="flow_node_replace">Replace Node With...</string>
+    <string name="flow_editor_refresh_broken_nodes">Refresh Broken Nodes</string>
+    <string name="flow_node_refresh_success">Node '%1$s' refreshed successfully</string>
+    <string name="flow_node_refresh_failed">Plugin or capability not found for '%1$s'</string>
+    <string name="flow_nodes_healed_summary">%1$d broken node(s) refreshed successfully</string>
+    <string name="flow_nodes_none_healed">No broken nodes could be refreshed</string>
+    <string name="replace_node_dialog_title">Replace Node</string>
+    <string name="replace_node_search_placeholder">Select replacement node...</string>
+    <string name="replace_node_migrate_connections">Migrate Connections</string>
+    <string name="replace_node_incoming_connections">Incoming Connections</string>
+    <string name="replace_node_outgoing_connections">Outgoing Connections</string>
+    <string name="replace_node_disconnect">Disconnect</string>
+    <string name="replace_node_no_connections">No connected ports to migrate.</string>
+    <string name="replace_node_confirm">Replace</string>
+    <string name="replace_node_cancel">Cancel</string>
+    <string name="replace_node_success">Node replaced successfully</string>
+    <string name="replace_node_select_target">Select a target node above to map connections</string>
+    <string name="replace_node_no_matches">No matching nodes found</string>
     <string name="flow_info_title">Canvas Shortcuts &amp; Controls</string>
     <string name="flow_info_cat_navigation">Navigation &amp; Board</string>
     <string name="flow_info_cat_selection">Selection &amp; Nodes</string>
@@ -814,4 +833,11 @@
     <string name="action_copy_flow_clipboard_tooltip">Copy flow to clipboard</string>
     <string name="action_edit_metadata">Edit Metadata</string>
     <string name="action_edit">Edit</string>
+    <string name="standalone_runner_title">Plugin Runner</string>
+    <string name="standalone_setup_required_title">Setup Required</string>
+    <string name="standalone_setup_required_desc">This plugin requires initial setup before capabilities can be executed.</string>
+    <string name="standalone_run_setup">Run Setup</string>
+    <string name="standalone_setup_completed">Setup Completed</string>
+    <string name="standalone_setup_in_progress">Setting up plugin…</string>
+    <string name="standalone_no_capabilities">No capabilities found for this plugin</string>
 </resources>

@@ -216,4 +216,77 @@ class FlowBrokenTest {
         kotlin.test.assertNotNull(addedPort, "Added port should exist")
         kotlin.test.assertEquals(kotlinx.serialization.json.JsonPrimitive(8080), addedPort.defaultValue)
     }
+
+    @Test
+    fun `test broken node heals to isBroken false when refreshed against valid manifest`() {
+        val brokenNode = createCapabilityNode(capabilityA, isBroken = true)
+        assertTrue(brokenNode.isBroken, "Node starts broken")
+
+        val manifest = org.wip.plugintoolkit.api.PluginManifest(
+            manifestVersion = "1.0",
+            plugin = dummyPluginInfo,
+            requirements = org.wip.plugintoolkit.api.Requirements(minMemoryMb = 256, minExecutionTimeMs = 1000),
+            capabilities = listOf(capabilityA)
+        )
+
+        val healed = org.wip.plugintoolkit.features.flows.model.MigrationEngine.refreshCapabilityNode(
+            node = brokenNode,
+            manifest = manifest
+        )
+
+        assertFalse(healed.isBroken, "Healed node must have isBroken = false")
+        kotlin.test.assertEquals(brokenNode.id, healed.id)
+    }
+
+    @Test
+    fun `test targeted migration does not mark nodes from other plugins as broken`() = kotlinx.coroutines.test.runTest {
+        val otherPluginInfo = PluginInfo(
+            id = "other.plugin",
+            name = "Other Plugin",
+            version = "1.0",
+            description = "Other"
+        )
+        val otherNode = Node.CapabilityNode(
+            id = 999L,
+            position = Offset.Zero,
+            pluginInfo = otherPluginInfo,
+            capability = Capability(
+                name = "Other Cap",
+                description = "Other",
+                returnType = org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.UNIT)
+            ),
+            inputs = emptyList(),
+            outputs = emptyList(),
+            isBroken = false
+        )
+
+        val targetNode = createCapabilityNode(capabilityA, isBroken = false)
+
+        val flow = Flow(
+            name = "Mixed Plugins Flow",
+            nodes = listOf(targetNode, otherNode)
+        )
+
+        // Simulate targeted update for dummyPluginInfo where otherPlugin is NOT in currentManifests
+        val currentManifests = mapOf(
+            dummyPluginInfo.id to org.wip.plugintoolkit.api.PluginManifest(
+                manifestVersion = "1.0",
+                plugin = dummyPluginInfo,
+                requirements = org.wip.plugintoolkit.api.Requirements(minMemoryMb = 256, minExecutionTimeMs = 1000),
+                capabilities = listOf(capabilityA)
+            )
+        )
+
+        val result = org.wip.plugintoolkit.features.flows.model.MigrationEngine.migrateFlow(
+            flow = flow,
+            currentManifests = currentManifests,
+            getMigrations = { emptyList() },
+            targetPluginId = dummyPluginInfo.id
+        )
+
+        val migratedOtherNode = result.migratedFlow.nodes.find { it.id == 999L } as? Node.CapabilityNode
+        kotlin.test.assertNotNull(migratedOtherNode)
+        assertFalse(migratedOtherNode.isBroken, "Other plugin's node MUST NOT be marked broken during targeted update")
+    }
 }
+

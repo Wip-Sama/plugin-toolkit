@@ -170,6 +170,32 @@ fun FlowEditorView(
     var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
     var dragGrabOffset by remember { mutableStateOf(Offset.Zero) }
     var draggingNodeScale by remember { mutableStateOf(1f) }
+    var replacingNodeId by remember { mutableStateOf<Long?>(null) }
+
+    val availablePlugins = viewModel.plugins.collectAsState().value
+    val availablePaletteNodes = remember(availablePlugins, state.flows, flow.name) {
+        val list = mutableListOf<PaletteNode>()
+        availablePlugins.forEach { entry ->
+            val manifest = entry.getManifest().getOrNull()
+            if (manifest != null) {
+                manifest.capabilities.forEach { cap ->
+                    list.add(PaletteNode.Capability(manifest.plugin, cap))
+                }
+            }
+        }
+        list.add(PaletteNode.FlowInput)
+        list.add(PaletteNode.FlowOutput)
+        listOf(
+            "Save", "save_file", "save_folder", "Load", "Log", "Delay",
+            "Convert", "Merger", "Conditional", "Comparator", "For", "While", "create_folder", "Error"
+        ).forEach { action ->
+            list.add(PaletteNode.System(action))
+        }
+        state.flows.filter { it.name != flow.name }.forEach { subflow ->
+            list.add(PaletteNode.SubFlow(subflow.name))
+        }
+        list
+    }
 
     val handlePaletteClick = { paletteNode: PaletteNode ->
         val dropPos = (Offset(boardSize.width / 2f, boardSize.height / 2f) - state.offset) / state.scale
@@ -725,17 +751,20 @@ fun FlowEditorView(
                                 } else null
                             } else null
 
-                        val nodeHighlightedPortIds = remember(node.id, nodeHighlightedPortId, hoveredConnection) {
+                        val nodeHighlightedPortIds = remember(node.id, nodeHighlightedPortId, hoveredConnection, flow.connections) {
                             val ids = mutableSetOf<String>()
                             if (nodeHighlightedPortId != null) {
                                 ids.add(nodeHighlightedPortId)
                             }
                             if (hoveredConnection != null) {
-                                if (hoveredConnection.sourceNodeId == node.id) {
-                                    ids.add(hoveredConnection.sourcePortId)
-                                }
-                                if (hoveredConnection.targetNodeId == node.id) {
-                                    ids.add(hoveredConnection.targetPortId)
+                                val wireTree = flow.findConnectedWireTree(hoveredConnection)
+                                for (conn in wireTree) {
+                                    if (conn.sourceNodeId == node.id) {
+                                        ids.add(conn.sourcePortId)
+                                    }
+                                    if (conn.targetNodeId == node.id) {
+                                        ids.add(conn.targetPortId)
+                                    }
                                 }
                             }
                             ids
@@ -743,15 +772,16 @@ fun FlowEditorView(
 
                         val isConnectedToHoveredNode = remember(hoveredNodeId, node.id, flow.connections) {
                             if (hoveredNodeId == null) false
-                            else flow.connections.any {
-                                (it.sourceNodeId == hoveredNodeId && it.targetNodeId == node.id) ||
-                                (it.targetNodeId == hoveredNodeId && it.sourceNodeId == node.id)
-                            }
+                            else flow.findConnectedNodesForNode(hoveredNodeId).contains(node.id)
                         }
 
-                        val isDimmedByConnectionHover = hoveredConnection != null && 
-                                hoveredConnection.sourceNodeId != node.id && 
-                                hoveredConnection.targetNodeId != node.id
+                        val isDimmedByConnectionHover = remember(hoveredConnection, node.id, flow.connections) {
+                            if (hoveredConnection == null) false
+                            else {
+                                val wireTree = flow.findConnectedWireTree(hoveredConnection)
+                                !flow.findConnectedNodesForWireTree(wireTree).contains(node.id)
+                            }
+                        }
 
                         val isDimmedByNodeHover = hoveredNodeId != null &&
                                 hoveredNodeId != node.id &&
@@ -759,7 +789,7 @@ fun FlowEditorView(
 
                         val isDimmed = isDimmedByConnectionHover || isDimmedByNodeHover
                                 
-                        val targetAlpha = if (isDimmed) 0.4f else 1f
+                        val targetAlpha = if (isDimmed) ToolkitTheme.opacity.disabled else 1f
                         val animatedAlpha by androidx.compose.animation.core.animateFloatAsState(
                             targetValue = targetAlpha,
                             animationSpec = androidx.compose.animation.core.tween(
@@ -929,8 +959,12 @@ fun FlowEditorView(
                                 isReadOnly = state.isReadOnly,
                                 isPaintToolActive = state.isPaintToolActive,
                                 isWashToolActive = state.isWashToolActive,
+                                isEyedropperActive = state.isEyedropperActive,
+                                onSampleColor = { viewModel.onEvent(FlowEvent.SampleColor(it)) },
                                 onPaintNode = { nodeId, isForce -> viewModel.onEvent(FlowEvent.PaintNode(nodeId, isForce)) },
                                 onWashNode = { nodeId -> viewModel.onEvent(FlowEvent.WashNode(nodeId)) },
+                                onRefreshNode = { id -> viewModel.onEvent(FlowEvent.RefreshNode(id)) },
+                                onReplaceNode = { id -> replacingNodeId = id },
                                 modifier = Modifier.onSizeChanged { size ->
                                     nodeSizes[node.id] = size
                                 }
@@ -1021,6 +1055,8 @@ fun FlowEditorView(
             isReadOnly = state.isReadOnly,
             readOnlyReasons = state.readOnlyReasons,
             hasUnsavedChanges = state.hasUnsavedChanges,
+            hasBrokenNodes = flow.nodes.any { it is Node.CapabilityNode && it.isBroken },
+            onRefreshBrokenNodes = { viewModel.onEvent(FlowEvent.RefreshBrokenNodes) },
             onSave = {
                 if (flow.name.isBlank()) {
                     saveAsName = ""
@@ -1065,6 +1101,33 @@ fun FlowEditorView(
                 },
                 onDismiss = { viewModel.onEvent(FlowEvent.CancelPendingConnection) }
             )
+        }
+
+        replacingNodeId?.let { replacingId ->
+            val originalNode = flow.nodes.find { it.id == replacingId }
+            if (originalNode != null) {
+                ReplaceNodeDialog(
+                    originalNode = originalNode,
+                    allNodes = flow.nodes,
+                    connections = flow.connections,
+                    availablePaletteNodes = availablePaletteNodes,
+                    availableFlows = state.flows,
+                    onConfirm = { newNode, inputMappings, outputMappings ->
+                        viewModel.onEvent(
+                            FlowEvent.ReplaceNode(
+                                nodeId = replacingId,
+                                targetNode = newNode,
+                                inputMappings = inputMappings,
+                                outputMappings = outputMappings
+                            )
+                        )
+                        replacingNodeId = null
+                    },
+                    onDismiss = {
+                        replacingNodeId = null
+                    }
+                )
+            }
         }
 
         if (showSaveAsDialog) {

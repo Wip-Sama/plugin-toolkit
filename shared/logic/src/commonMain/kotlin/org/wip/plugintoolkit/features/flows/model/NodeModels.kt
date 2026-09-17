@@ -670,14 +670,15 @@ data class Flow(
 
     /**
      * Detects and purges stray/dangling points (intermediate waypoints or junction nodes
-     * that have lost their incoming source or outgoing target connections).
-     * Disallows persisting points that do not belong to an active wire path.
+     * that are disconnected from any active node port or in-progress connection).
+     * Retains complex connection wire trees as long as at least one valid node port
+     * (output or input) or floating target remains connected to that wire tree.
      */
     fun purgeStrayPoints(): Flow {
         val validNodeIds = nodes.map { it.id }.toSet()
         val hasNodes = validNodeIds.isNotEmpty()
 
-        var currentConns = connections.filter { conn ->
+        val currentConns = connections.filter { conn ->
             val sourceValid = (conn.sourceNodeId < 0L && conn.sourceJunctionId != null) ||
                     (if (hasNodes) conn.sourceNodeId in validNodeIds else conn.sourceNodeId >= 0L)
             val targetValid = (conn.targetNodeId < 0L && (conn.targetJunctionId != null || conn.floatingTarget != null)) ||
@@ -687,58 +688,128 @@ data class Flow(
 
         val currentJunctions = junctions.associateBy { it.id }.toMutableMap()
 
-        var changed = true
-        while (changed) {
-            changed = false
-
-            // 1. Forward reachability from active source nodes
-            val reachableFromSource = mutableSetOf<Long>()
-            val forwardQueue = ArrayDeque<Long>()
-
-            for (conn in currentConns) {
-                val isSourceNode = if (hasNodes) conn.sourceNodeId in validNodeIds else conn.sourceNodeId >= 0L
-                if (isSourceNode && conn.targetJunctionId != null && conn.targetJunctionId in currentJunctions) {
-                    if (reachableFromSource.add(conn.targetJunctionId)) {
-                        forwardQueue.add(conn.targetJunctionId)
-                    }
-                }
-            }
-
-            val outFromJunc = currentConns.filter { it.sourceJunctionId != null }.groupBy { it.sourceJunctionId!! }
-            while (forwardQueue.isNotEmpty()) {
-                val jId = forwardQueue.removeFirst()
-                val outList = outFromJunc[jId].orEmpty()
-                for (conn in outList) {
-                    val tgtJuncId = conn.targetJunctionId
-                    if (tgtJuncId != null && tgtJuncId in currentJunctions && reachableFromSource.add(tgtJuncId)) {
-                        forwardQueue.add(tgtJuncId)
-                    }
-                }
-            }
-
-            // Junctions with 0 connections in currentConns are always stray
-            val connectedJunctionIds = currentConns.flatMap { listOfNotNull(it.sourceJunctionId, it.targetJunctionId) }.toSet()
-
-            // An active junction belongs to an active wire path originating from a source node and is connected
-            val activeJunctionIds = reachableFromSource.intersect(connectedJunctionIds)
-            val strayJunctionIds = currentJunctions.keys - activeJunctionIds
-
-            if (strayJunctionIds.isNotEmpty()) {
-                for (id in strayJunctionIds) {
-                    currentJunctions.remove(id)
-                }
-                currentConns = currentConns.filter { conn ->
-                    (conn.sourceJunctionId == null || conn.sourceJunctionId !in strayJunctionIds) &&
-                    (conn.targetJunctionId == null || conn.targetJunctionId !in strayJunctionIds)
-                }
-                changed = true
+        val adj = mutableMapOf<Long, MutableSet<Long>>()
+        for (jId in currentJunctions.keys) {
+            adj[jId] = mutableSetOf()
+        }
+        for (conn in currentConns) {
+            val sJunc = conn.sourceJunctionId
+            val tJunc = conn.targetJunctionId
+            if (sJunc != null && tJunc != null && sJunc in currentJunctions && tJunc in currentJunctions) {
+                adj.getOrPut(sJunc) { mutableSetOf() }.add(tJunc)
+                adj.getOrPut(tJunc) { mutableSetOf() }.add(sJunc)
             }
         }
 
+        val seedJunctions = mutableSetOf<Long>()
+        for (conn in currentConns) {
+            val hasValidSourcePort = conn.sourcePortId.isNotEmpty() &&
+                    (if (hasNodes) conn.sourceNodeId in validNodeIds else conn.sourceNodeId >= 0L)
+            val hasValidTargetPort = conn.targetPortId.isNotEmpty() &&
+                    (if (hasNodes) conn.targetNodeId in validNodeIds else conn.targetNodeId >= 0L)
+            val hasFloatingTarget = conn.floatingTarget != null
+
+            if (hasValidSourcePort && conn.targetJunctionId != null && conn.targetJunctionId in currentJunctions) {
+                seedJunctions.add(conn.targetJunctionId!!)
+            }
+            if ((hasValidTargetPort || hasFloatingTarget) && conn.sourceJunctionId != null && conn.sourceJunctionId in currentJunctions) {
+                seedJunctions.add(conn.sourceJunctionId!!)
+            }
+        }
+
+        val activeJunctionIds = mutableSetOf<Long>()
+        val queue = ArrayDeque<Long>()
+        for (seed in seedJunctions) {
+            if (activeJunctionIds.add(seed)) {
+                queue.add(seed)
+            }
+        }
+
+        while (queue.isNotEmpty()) {
+            val curr = queue.removeFirst()
+            for (neighbor in adj[curr].orEmpty()) {
+                if (neighbor in currentJunctions && activeJunctionIds.add(neighbor)) {
+                    queue.add(neighbor)
+                }
+            }
+        }
+
+        val retainedConns = currentConns.filter { conn ->
+            val sNode = if (hasNodes) conn.sourceNodeId in validNodeIds else conn.sourceNodeId >= 0L
+            val tNode = if (hasNodes) conn.targetNodeId in validNodeIds else conn.targetNodeId >= 0L
+            val directNodeToNode = sNode && tNode && conn.sourcePortId.isNotEmpty() && conn.targetPortId.isNotEmpty()
+            val touchesActiveJunc = (conn.sourceJunctionId != null && conn.sourceJunctionId in activeJunctionIds) ||
+                    (conn.targetJunctionId != null && conn.targetJunctionId in activeJunctionIds)
+            directNodeToNode || touchesActiveJunc
+        }
+
         return copy(
-            junctions = junctions.filter { it.id in currentJunctions.keys },
-            connections = currentConns
+            junctions = junctions.filter { it.id in activeJunctionIds },
+            connections = retainedConns
         )
+    }
+
+    /**
+     * Traverses and returns the entire set of connection segments that belong to the same
+     * connected wire tree as [connection] (via shared intermediate junctions).
+     */
+    fun findConnectedWireTree(connection: Connection): Set<Connection> {
+        val junctionToConns = mutableMapOf<Long, MutableList<Connection>>()
+        for (conn in connections) {
+            conn.sourceJunctionId?.let { junctionToConns.getOrPut(it) { mutableListOf() }.add(conn) }
+            conn.targetJunctionId?.let { junctionToConns.getOrPut(it) { mutableListOf() }.add(conn) }
+        }
+
+        val tree = mutableSetOf<Connection>()
+        val queue = ArrayDeque<Connection>()
+        if (tree.add(connection)) {
+            queue.add(connection)
+        }
+
+        while (queue.isNotEmpty()) {
+            val curr = queue.removeFirst()
+            val adjacentJunctions = listOfNotNull(curr.sourceJunctionId, curr.targetJunctionId)
+            for (jId in adjacentJunctions) {
+                for (neighbor in junctionToConns[jId].orEmpty()) {
+                    if (tree.add(neighbor)) {
+                        queue.add(neighbor)
+                    }
+                }
+            }
+        }
+        return tree
+    }
+
+    /**
+     * Returns all node IDs directly connected to any connection segment in [wireTree].
+     */
+    fun findConnectedNodesForWireTree(wireTree: Set<Connection>): Set<Long> {
+        val result = mutableSetOf<Long>()
+        for (conn in wireTree) {
+            if (conn.sourceNodeId >= 0L) result.add(conn.sourceNodeId)
+            if (conn.targetNodeId >= 0L) result.add(conn.targetNodeId)
+        }
+        return result
+    }
+
+    /**
+     * Finds all connection segments connected directly or indirectly (via junctions) to [nodeId].
+     */
+    fun findAllConnectionsForNode(nodeId: Long): Set<Connection> {
+        val directConns = connections.filter { it.sourceNodeId == nodeId || it.targetNodeId == nodeId }
+        val allConns = mutableSetOf<Connection>()
+        for (conn in directConns) {
+            allConns.addAll(findConnectedWireTree(conn))
+        }
+        return allConns
+    }
+
+    /**
+     * Finds all other node IDs connected to [nodeId] across direct or complex wire connections.
+     */
+    fun findConnectedNodesForNode(nodeId: Long): Set<Long> {
+        val wireConns = findAllConnectionsForNode(nodeId)
+        return findConnectedNodesForWireTree(wireConns).filter { it != nodeId }.toSet()
     }
 
     /**

@@ -2,29 +2,7 @@ package org.wip.plugintoolkit.features.flows.model
 
 object FlowUnpacker {
     fun hasCycle(connections: List<Connection>): Boolean {
-        val adjacencyList =
-            connections.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
-        val visited = mutableSetOf<Long>()
-        val visiting = mutableSetOf<Long>()
-
-        fun dfs(node: Long): Boolean {
-            if (node in visiting) return true
-            if (node in visited) return false
-
-            visiting.add(node)
-            val neighbors = adjacencyList[node] ?: emptyList()
-            for (neighbor in neighbors) {
-                if (dfs(neighbor)) return true
-            }
-            visiting.remove(node)
-            visited.add(node)
-            return false
-        }
-
-        for (node in adjacencyList.keys) {
-            if (dfs(node)) return true
-        }
-        return false
+        return org.wip.plugintoolkit.features.flows.logic.FlowCycleDetector.hasCycle(connections)
     }
 
     fun unpackSubflowInFlow(parentFlow: Flow, nodeId: Long, subflow: Flow): Flow {

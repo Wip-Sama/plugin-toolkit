@@ -382,7 +382,7 @@ fun PluginRepoDetails(
                             .fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                     ) {
-                        items(plugins, key = { it.pkg }) { plugin ->
+                        items(plugins.distinctBy { it.pkg }, key = { it.pkg }) { plugin ->
                             PluginListItem(
                                 plugin = plugin,
                                 currentRepo = currentRepo,

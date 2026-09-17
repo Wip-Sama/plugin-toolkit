@@ -47,11 +47,15 @@ object ConnectionHitTester {
                 continue
             }
 
+            val startIsHorizontal = connection.sourceJunctionId == null
+            val endIsHorizontal = connection.targetJunctionId == null && !connection.isFloating
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
                 style = effectiveStyle,
-                tension = roundness
+                tension = roundness,
+                startHorizontal = startIsHorizontal,
+                endHorizontal = endIsHorizontal
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -115,11 +119,15 @@ object ConnectionHitTester {
                 continue
             }
 
+            val startIsHorizontal = connection.sourceJunctionId == null
+            val endIsHorizontal = connection.targetJunctionId == null && !connection.isFloating
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
                 style = effectiveStyle,
-                tension = roundness
+                tension = roundness,
+                startHorizontal = startIsHorizontal,
+                endHorizontal = endIsHorizontal
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {

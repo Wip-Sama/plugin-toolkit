@@ -39,6 +39,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * A reusable Composable wrapper that shows a custom tooltip when the content is hovered.
@@ -142,6 +146,8 @@ fun Modifier.tooltip(
     tooltipCustomImpl(delay, content)
 }
 
+private const val TOOLTIP_DISMISS_DELAY_MILLIS: Long = 250L
+
 data class TooltipData(
     val coordinates: LayoutCoordinates,
     val text: String? = null,
@@ -161,8 +167,33 @@ data class TooltipData(
 
 class TooltipState {
     var tooltipData by mutableStateOf<TooltipData?>(null)
+    private var dismissJob: Job? = null
+    var isPopupHovered by mutableStateOf(false)
+
+    fun show(data: TooltipData) {
+        dismissJob?.cancel()
+        dismissJob = null
+        tooltipData = data
+    }
+
+    fun scheduleDismiss(coroutineScope: CoroutineScope, delayMillis: Long = TOOLTIP_DISMISS_DELAY_MILLIS) {
+        if (tooltipData?.isPinned == true) return
+        dismissJob?.cancel()
+        dismissJob = coroutineScope.launch {
+            delay(delayMillis)
+            if (!isPopupHovered) {
+                tooltipData = null
+            }
+        }
+    }
+
+    fun cancelDismiss() {
+        dismissJob?.cancel()
+        dismissJob = null
+    }
 
     fun toggle(coordinates: LayoutCoordinates, key: Any, content: @Composable () -> Unit) {
+        cancelDismiss()
         if (tooltipData?.key == key) {
             tooltipData = null
         } else {
@@ -176,15 +207,18 @@ class TooltipState {
     }
 
     fun dismiss() {
+        cancelDismiss()
         tooltipData = null
     }
 }
 
 val LocalTooltipState = staticCompositionLocalOf<TooltipState?> { null }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TooltipProvider(content: @Composable () -> Unit) {
     val tooltipState = remember { TooltipState() }
+    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val verticalOffsetDp = ToolkitTheme.dimensions.tooltipVerticalOffset
     
@@ -222,21 +256,33 @@ fun TooltipProvider(content: @Composable () -> Unit) {
                     tooltipState.dismiss()
                 }
             ) {
-                if (data.content != null) {
-                    data.content.invoke()
-                } else if (data.text != null) {
-                    Box(
-                        modifier = Modifier
-                            .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.extraSmall)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, ToolkitTheme.shapes.extraSmall)
-                            .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, ToolkitTheme.shapes.extraSmall)
-                            .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
-                    ) {
-                        Text(
-                            text = data.text,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                Box(
+                    modifier = Modifier
+                        .onPointerEvent(PointerEventType.Enter) {
+                            tooltipState.isPopupHovered = true
+                            tooltipState.cancelDismiss()
+                        }
+                        .onPointerEvent(PointerEventType.Exit) {
+                            tooltipState.isPopupHovered = false
+                            tooltipState.scheduleDismiss(scope)
+                        }
+                ) {
+                    if (data.content != null) {
+                        data.content.invoke()
+                    } else if (data.text != null) {
+                        Box(
+                            modifier = Modifier
+                                .shadow(ToolkitTheme.dimensions.elevationHigh, ToolkitTheme.shapes.extraSmall)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, ToolkitTheme.shapes.extraSmall)
+                                .border(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant, ToolkitTheme.shapes.extraSmall)
+                                .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                        ) {
+                            Text(
+                                text = data.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -248,24 +294,28 @@ fun TooltipProvider(content: @Composable () -> Unit) {
 @Composable
 private fun Modifier.tooltipImpl(text: String, delay: Duration): Modifier {
     val tooltipState = LocalTooltipState.current
+    val scope = rememberCoroutineScope()
     var isHovered by remember { mutableStateOf(false) }
     var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     LaunchedEffect(isHovered, tooltipState) {
         if (isHovered) {
+            tooltipState?.cancelDismiss()
             if (delay > Duration.ZERO) {
                 delay(delay)
             }
             if (layoutCoordinates != null) {
-                tooltipState?.tooltipData = TooltipData(
-                    coordinates = layoutCoordinates!!,
-                    text = text,
-                    key = text
+                tooltipState?.show(
+                    TooltipData(
+                        coordinates = layoutCoordinates!!,
+                        text = text,
+                        key = text
+                    )
                 )
             }
         } else {
             if (tooltipState?.tooltipData?.text == text && tooltipState.tooltipData?.coordinates == layoutCoordinates) {
-                tooltipState?.tooltipData = null
+                tooltipState.scheduleDismiss(scope)
             }
         }
     }
@@ -273,7 +323,7 @@ private fun Modifier.tooltipImpl(text: String, delay: Duration): Modifier {
     DisposableEffect(text, layoutCoordinates, tooltipState) {
         onDispose {
             if (tooltipState?.tooltipData?.text == text && tooltipState.tooltipData?.coordinates == layoutCoordinates) {
-                tooltipState?.tooltipData = null
+                tooltipState.dismiss()
             }
         }
     }
@@ -291,26 +341,30 @@ private fun Modifier.tooltipCustomImpl(
     content: @Composable () -> Unit
 ): Modifier {
     val tooltipState = LocalTooltipState.current
+    val scope = rememberCoroutineScope()
     var isHovered by remember { mutableStateOf(false) }
     var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val uniqueKey = remember { Any() }
 
     LaunchedEffect(isHovered, tooltipState) {
         if (isHovered) {
+            tooltipState?.cancelDismiss()
             if (delay > Duration.ZERO) {
                 delay(delay)
             }
             if (layoutCoordinates != null) {
-                tooltipState?.tooltipData = TooltipData(
-                    coordinates = layoutCoordinates!!,
-                    content = content,
-                    isPinned = false,
-                    key = uniqueKey
+                tooltipState?.show(
+                    TooltipData(
+                        coordinates = layoutCoordinates!!,
+                        content = content,
+                        isPinned = false,
+                        key = uniqueKey
+                    )
                 )
             }
         } else {
             if (tooltipState?.tooltipData?.key == uniqueKey && !tooltipState.tooltipData!!.isPinned) {
-                tooltipState.tooltipData = null
+                tooltipState.scheduleDismiss(scope)
             }
         }
     }
@@ -318,7 +372,7 @@ private fun Modifier.tooltipCustomImpl(
     DisposableEffect(uniqueKey, layoutCoordinates, tooltipState) {
         onDispose {
             if (tooltipState?.tooltipData?.key == uniqueKey && !tooltipState.tooltipData!!.isPinned) {
-                tooltipState.tooltipData = null
+                tooltipState.dismiss()
             }
         }
     }

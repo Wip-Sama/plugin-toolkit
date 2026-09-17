@@ -198,10 +198,12 @@ class FlowConnectionManager(
             return currentState // Already connected exactly
         }
 
-        if (sourceNodeId != -1L && targetNodeId != -1L && FlowCycleDetector.wouldCreateCycle(
-                sourceNodeId,
-                targetNodeId,
-                filteredConnections
+        if (FlowCycleDetector.wouldCreateCycle(
+                sourceNodeId = sourceNodeId,
+                sourceJunctionId = sourceJunctionId,
+                targetNodeId = targetNodeId,
+                targetJunctionId = targetJunctionId,
+                connections = filteredConnections
             )
         ) {
             notificationService?.toast("Cannot connect: Connecting these ports would create a loop (Directed Cyclic Graph). Enforcing Directed Acyclic Graph (DAG).")

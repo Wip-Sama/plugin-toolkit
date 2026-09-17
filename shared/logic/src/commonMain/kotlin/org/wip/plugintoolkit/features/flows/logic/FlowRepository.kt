@@ -58,6 +58,24 @@ class FlowRepository(
         return Path("$appDataDir/flows/$safeName.json")
     }
 
+    fun getAvailableManifests(): Map<String, org.wip.plugintoolkit.api.PluginManifest> {
+        val manifests = mutableMapOf<String, org.wip.plugintoolkit.api.PluginManifest>()
+        pluginManager.installedPlugins.value.forEach { installed ->
+            val manifest = pluginManager.getManifest(installed.pkg)
+            if (manifest != null) {
+                manifests[installed.pkg] = manifest
+                manifests[manifest.plugin.id] = manifest
+            }
+        }
+        org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins().forEach { entry ->
+            val manifest = runCatching { entry.getManifest().getOrNull() }.getOrNull()
+            if (manifest != null) {
+                manifests[manifest.plugin.id] = manifest
+            }
+        }
+        return manifests
+    }
+
     fun reloadFlows() {
         scope.launch(Dispatchers.IO) {
             try {
@@ -101,9 +119,8 @@ class FlowRepository(
                 }
 
                 val loadedFlows = mutableListOf<Flow>()
-                val manifests = pluginManager.installedPlugins.value.filter { it.isEnabled }
-                    .associate { it.pkg to pluginManager.getManifest(it.pkg) }
-                    .filterValues { it != null }.mapValues { it.value!! }
+                val manifests = getAvailableManifests()
+                val hasLoadedManifests = manifests.isNotEmpty()
 
                 SystemFileSystem.list(flowsDir).forEach { file ->
                     if (file.name.endsWith(".json")) {
@@ -111,15 +128,22 @@ class FlowRepository(
                             val content = SystemFileSystem.source(file).buffered().use { it.readString() }
                             val flow = json.decodeFromString<Flow>(content)
 
-                            val migResult = MigrationEngine.migrateFlow(
-                                flow = flow,
-                                currentManifests = manifests,
-                                getMigrations = { pluginManager.getMigrations(it) }
-                            )
-                            val finalFlow = migResult.migratedFlow
-                            if (finalFlow != flow) {
-                                val flowContent = json.encodeToString(Flow.serializer(), finalFlow)
-                                SystemFileSystem.sink(file).buffered().use { it.writeString(flowContent) }
+                            // Only run destructive migration if manifests are available;
+                            // otherwise, load flows as-is until plugins are discovered.
+                            val finalFlow = if (hasLoadedManifests) {
+                                val migResult = MigrationEngine.migrateFlow(
+                                    flow = flow,
+                                    currentManifests = manifests,
+                                    getMigrations = { pluginManager.getMigrations(it) }
+                                )
+                                val migrated = migResult.migratedFlow
+                                if (migrated != flow) {
+                                    val flowContent = json.encodeToString(Flow.serializer(), migrated)
+                                    SystemFileSystem.sink(file).buffered().use { it.writeString(flowContent) }
+                                }
+                                migrated
+                            } else {
+                                flow
                             }
                             loadedFlows.add(finalFlow)
                         } catch (e: Exception) {
@@ -263,9 +287,7 @@ class FlowRepository(
     fun triggerMigrationsForUpdatedPlugin(pluginId: String) {
         scope.launch(Dispatchers.IO) {
             val appDataDir = settingsPersistence.getSettingsDir()
-            val manifests =
-                pluginManager.installedPlugins.value.associate { it.pkg to pluginManager.getManifest(it.pkg) }
-                    .filterValues { it != null }.mapValues { it.value!! }
+            val manifests = getAvailableManifests()
 
             var flowsChanged = false
             val updatedFlows = _flows.value.map { flow ->
@@ -274,7 +296,8 @@ class FlowRepository(
                     val migResult = MigrationEngine.migrateFlow(
                         flow = flow,
                         currentManifests = manifests,
-                        getMigrations = { pluginManager.getMigrations(it) }
+                        getMigrations = { pluginManager.getMigrations(it) },
+                        targetPluginId = pluginId
                     )
 
                     if (migResult.migratedFlow != flow) {
@@ -295,5 +318,54 @@ class FlowRepository(
                 _flows.value = updatedFlows
             }
         }
+    }
+
+    fun refreshNode(flowName: String, nodeId: Long): Boolean {
+        resolvedExecutionGuard?.assertCanMutate(flowName, _flows.value)
+        val flow = _flows.value.find { it.name == flowName } ?: return false
+        val node = flow.nodes.find { it.id == nodeId } as? Node.CapabilityNode ?: return false
+        val manifests = getAvailableManifests()
+        val manifest = manifests[node.pluginInfo.id] ?: manifests.values.find { m ->
+            m.capabilities.any { it.name == node.capability.name }
+        } ?: return false
+
+        val refreshedNode = MigrationEngine.refreshCapabilityNode(node, manifest)
+        if (refreshedNode != node) {
+            val updatedNodes = flow.nodes.map { if (it.id == nodeId) refreshedNode else it }
+            val updatedFlow = flow.copy(nodes = updatedNodes)
+            saveFlow(updatedFlow)
+        }
+        return !refreshedNode.isBroken
+    }
+
+    fun refreshBrokenNodes(flowName: String): Int {
+        resolvedExecutionGuard?.assertCanMutate(flowName, _flows.value)
+        val flow = _flows.value.find { it.name == flowName } ?: return 0
+        val brokenNodes = flow.nodes.filterIsInstance<Node.CapabilityNode>().filter { it.isBroken }
+        if (brokenNodes.isEmpty()) return 0
+
+        val manifests = getAvailableManifests()
+        var healedCount = 0
+        val updatedNodes = flow.nodes.map { node ->
+            if (node is Node.CapabilityNode && node.isBroken) {
+                val manifest = manifests[node.pluginInfo.id] ?: manifests.values.find { m ->
+                    m.capabilities.any { it.name == node.capability.name }
+                }
+                if (manifest != null) {
+                    val healed = MigrationEngine.refreshCapabilityNode(node, manifest)
+                    if (!healed.isBroken) healedCount++
+                    healed
+                } else {
+                    node
+                }
+            } else {
+                node
+            }
+        }
+
+        if (healedCount > 0) {
+            saveFlow(flow.copy(nodes = updatedNodes))
+        }
+        return healedCount
     }
 }

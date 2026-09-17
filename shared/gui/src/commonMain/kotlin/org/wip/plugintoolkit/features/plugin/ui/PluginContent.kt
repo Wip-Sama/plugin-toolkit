@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Badge
@@ -312,6 +313,8 @@ fun CapabilityTester(
     providedLocks: Map<String, Boolean> = emptyMap(),
     providedSettings: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
     pluginId: String = "",
+    isPluginReady: Boolean = true,
+    notReadyReason: String? = null,
     onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     onExecute: () -> Unit,
     onSetAsDefault: () -> Unit = {},
@@ -376,7 +379,7 @@ fun CapabilityTester(
             parameterValues = parameterValues.toMap()
         )
     }
-    val isValid = validationErrors.isEmpty() && requirementError == null
+    val isValid = validationErrors.isEmpty() && requirementError == null && isPluginReady
 
     val targetSetting = remember(capability, providedLocks, providedSettings, parameterValues.toMap()) {
         org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.getCapabilityTargetSettingKey(
@@ -385,6 +388,33 @@ fun CapabilityTester(
             providedSettings = providedSettings,
             parameterValues = parameterValues.toMap()
         )
+    }
+
+    if (!isPluginReady && notReadyReason != null) {
+        Surface(
+            color = MaterialTheme.colorScheme.errorContainer,
+            shape = ToolkitTheme.shapes.small,
+            border = BorderStroke(ToolkitTheme.dimensions.borderThin, MaterialTheme.colorScheme.error.copy(alpha = ToolkitTheme.opacity.borderLow)),
+            modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.medium)
+        ) {
+            Row(
+                modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                )
+                Text(
+                    text = notReadyReason,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
     }
 
     Row(

@@ -35,6 +35,8 @@ private data class LoadedPlugin(
 
 actual object PluginLoader {
     private val loadedPlugins = ConcurrentHashMap<String, LoadedPlugin>()
+    private val directPlugins = ConcurrentHashMap<String, PluginEntry>()
+    private val directPluginsInstallPath = ConcurrentHashMap<String, String>()
     private val idToJarPath = ConcurrentHashMap<String, String>()
     private class RefCountedLock(var count: Int = 0)
     private val jarLocks = ConcurrentHashMap<String, RefCountedLock>()
@@ -176,6 +178,16 @@ actual object PluginLoader {
         }
     }
 
+    actual fun registerPlugin(entry: PluginEntry, installPath: String?) {
+        val pluginId = entry.getManifest().getOrNull()?.plugin?.id
+            ?: throw IllegalArgumentException("Cannot register plugin without a valid manifest or plugin ID")
+        directPlugins[pluginId] = entry
+        if (installPath != null) {
+            directPluginsInstallPath[pluginId] = installPath
+        }
+        Logger.i { "Registered direct plugin in PluginLoader: $pluginId" }
+    }
+
     actual fun unloadPluginById(pluginId: String) {
         val jarPath = idToJarPath.remove(pluginId)
         if (jarPath != null) {
@@ -215,20 +227,31 @@ actual object PluginLoader {
     }
 
     actual fun unloadAll() {
-        Logger.i { "Unloading all plugins (${loadedPlugins.size} currently loaded)" }
+        Logger.i { "Unloading all plugins (${loadedPlugins.size + directPlugins.size} currently loaded)" }
+        directPlugins.values.forEach {
+            try { it.shutdown() } catch (e: Throwable) { Logger.e(e) { "Error during shutdown of direct plugin" } }
+        }
+        directPlugins.clear()
+        directPluginsInstallPath.clear()
         loadedPlugins.keys.toList().forEach { unloadPlugin(it) }
     }
 
-    actual fun getPlugins(): List<PluginEntry> = loadedPlugins.values.map { it.entry }
+    actual fun getPlugins(): List<PluginEntry> =
+        (directPlugins.values + loadedPlugins.values.map { it.entry })
+            .distinctBy { it.getManifest().getOrNull()?.plugin?.id }
 
     actual fun getPlugin(jarPath: String): PluginEntry? = loadedPlugins[normalizePath(jarPath)]?.entry
 
     actual fun getPluginById(pluginId: String): PluginEntry? {
+        val direct = directPlugins[pluginId]
+        if (direct != null) return direct
         val jarPath = idToJarPath[pluginId] ?: return null
         return loadedPlugins[jarPath]?.entry
     }
 
     actual fun getPluginInstallPath(pluginId: String): String? {
+        val directPath = directPluginsInstallPath[pluginId]
+        if (directPath != null) return directPath
         val jarPath = idToJarPath[pluginId] ?: return null
         val plugin = loadedPlugins[jarPath]
         if (plugin != null) {

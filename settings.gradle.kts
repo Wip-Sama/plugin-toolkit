@@ -43,6 +43,7 @@ include(":plugin-api")
 // Applications
 include(":apps:desktopApp")
 include(":apps:cliApp")
+include(":apps:standaloneRunner")
 
 // Plugin examples
 include(":plugins:minimalExample")

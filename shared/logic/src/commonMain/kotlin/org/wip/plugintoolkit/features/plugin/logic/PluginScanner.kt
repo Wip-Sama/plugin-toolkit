@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.utils.FileUtils
+import org.wip.plugintoolkit.core.utils.VersionUtils
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 
 /**
@@ -56,6 +57,7 @@ class PluginScanner(
                 val folderName = normalizedDir.substringAfterLast("/")
 
                 val jarFiles = FileUtils.listFiles(normalizedDir).filter { it.endsWith(".jar") }
+                val dirPlugins = mutableListOf<InstalledPlugin>()
                 jarFiles.forEach { jarPath ->
                     val normalizedJarPath = normalizePath(jarPath)
                     val jarFileName = normalizedJarPath.substringAfterLast("/")
@@ -100,7 +102,7 @@ class PluginScanner(
                                         targetAppVersion = manifest.requirements.targetAppVersion
                                     )
                                 }
-                                folderPlugins.add(updatedPlugin)
+                                dirPlugins.add(updatedPlugin)
                             } else {
                                 Logger.w { "Skipping JAR in $normalizedDir: Folder name '$folderName' does not match plugin ID '$pkg'" }
                             }
@@ -108,6 +110,16 @@ class PluginScanner(
                             Logger.e(t) { "Failed to parse manifest from $normalizedJarPath" }
                         }
                     }
+                }
+
+                val bestPlugin = if (dirPlugins.size > 1) {
+                    dirPlugins.maxWithOrNull { a, b -> VersionUtils.compare(a.version, b.version) } ?: dirPlugins.first()
+                } else {
+                    dirPlugins.firstOrNull()
+                }
+
+                if (bestPlugin != null) {
+                    folderPlugins.add(bestPlugin)
                 }
             }
 
@@ -125,9 +137,17 @@ class PluginScanner(
             allUpdatedPlugins.addAll(folderPlugins)
         }
 
+        val uniqueUpdatedPlugins = allUpdatedPlugins
+            .groupBy { it.pkg }
+            .values
+            .map { list ->
+                if (list.size == 1) list.first()
+                else list.maxWithOrNull { a, b -> VersionUtils.compare(a.version, b.version) } ?: list.first()
+            }
+
         // Sync with registry if anything changed globally
-        if (globalChanged || allUpdatedPlugins.size != registry.installedPlugins.value.size) {
-            registry.updatePlugins { allUpdatedPlugins }
+        if (globalChanged || uniqueUpdatedPlugins.size != registry.installedPlugins.value.size) {
+            registry.updatePlugins { uniqueUpdatedPlugins }
         }
     }
 

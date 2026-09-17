@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -91,11 +92,16 @@ fun BoardGridAndConnectionsCanvas(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val junctionMap = flow.junctions.associate { it.id to it.position.toComposeOffset() }
 
+    val hoveredWireTree = remember(interactionState.hoveredConnection, flow.connections) {
+        interactionState.hoveredConnection?.let { flow.findConnectedWireTree(it) }
+    }
+    val nodeHoveredWireTree = remember(interactionState.hoveredNodeId, flow.connections) {
+        interactionState.hoveredNodeId?.let { flow.findAllConnectionsForNode(it) }
+    }
+
     val connectionAlphas = flow.connections.associateWith { connection ->
-        val isDimmedByConnectionHover = interactionState.hoveredConnection != null && interactionState.hoveredConnection != connection
-        val isDimmedByNodeHover = interactionState.hoveredNodeId != null &&
-                connection.sourceNodeId != interactionState.hoveredNodeId &&
-                connection.targetNodeId != interactionState.hoveredNodeId
+        val isDimmedByConnectionHover = hoveredWireTree != null && connection !in hoveredWireTree
+        val isDimmedByNodeHover = nodeHoveredWireTree != null && connection !in nodeHoveredWireTree
         val isDimmed = isDimmedByConnectionHover || isDimmedByNodeHover
         if (isDimmed) opacity.disabled else 1f
     }
@@ -126,14 +132,20 @@ fun BoardGridAndConnectionsCanvas(
 
         // Draw junctions (Unified connection points)
         flow.junctions.forEach { junction ->
+            val isJuncDimmedByConn = hoveredWireTree != null && hoveredWireTree.none { it.sourceJunctionId == junction.id || it.targetJunctionId == junction.id }
+            val isJuncDimmedByNode = nodeHoveredWireTree != null && nodeHoveredWireTree.none { it.sourceJunctionId == junction.id || it.targetJunctionId == junction.id }
+            val juncAlpha = if (isJuncDimmedByConn || isJuncDimmedByNode) opacity.disabled else 1f
+
             val center = (junction.position.toComposeOffset() * state.scale) + state.offset
             val isHovered = interactionState.hoveredJunctionId == junction.id
             val juncColor = junction.color
-            val jColor = if (!juncColor.isNullOrBlank()) {
+            val baseColor = if (!juncColor.isNullOrBlank()) {
                 parseColorString(juncColor)
             } else {
                 connectionColor
             }
+            val jColor = baseColor.copy(alpha = baseColor.alpha * juncAlpha)
+            val sColor = surfaceColor.copy(alpha = surfaceColor.alpha * juncAlpha)
             val isSelected = interactionState.selectedJunctionId == junction.id || junction.id in state.selectedPointIds
             val radius = (if (isHovered || isSelected) 7.5f else 5.5f) * state.scale
 
@@ -143,7 +155,7 @@ fun BoardGridAndConnectionsCanvas(
                 center = center
             )
             drawCircle(
-                color = surfaceColor,
+                color = sColor,
                 radius = radius,
                 center = center,
                 style = Stroke(width = 1.5f * state.scale)
@@ -203,8 +215,16 @@ fun BoardGridAndConnectionsCanvas(
                 } else {
                     dimensions.strokeWidthThin.toPx()
                 }
+                val startIsHorizontal = connection.sourceJunctionId == null
+                val endIsHorizontal = connection.targetJunctionId == null && !connection.isFloating
                 val effectiveStyle = curveStyle
-                val path = SplineMathUtils.buildConnectionPath(screenPoints, effectiveStyle, roundness)
+                val path = SplineMathUtils.buildConnectionPath(
+                    points = screenPoints,
+                    style = effectiveStyle,
+                    tension = roundness,
+                    startHorizontal = startIsHorizontal,
+                    endHorizontal = endIsHorizontal
+                )
                 drawPath(
                     path = path,
                     color = color,
@@ -266,7 +286,13 @@ fun BoardGridAndConnectionsCanvas(
 
                 // Draw Midpoints (Interactive splitting handles - 3x bigger)
                 val isConnHovered = interactionState.hoveredConnection == connection
-                val midpoints = SplineMathUtils.computeSegmentMidpoints(screenPoints, effectiveStyle, roundness)
+                val midpoints = SplineMathUtils.computeSegmentMidpoints(
+                    points = screenPoints,
+                    style = effectiveStyle,
+                    tension = roundness,
+                    startHorizontal = startIsHorizontal,
+                    endHorizontal = endIsHorizontal
+                )
                 midpoints.forEachIndexed { segIndex, midPt ->
                     val isMidpointHovered = interactionState.hoveredMidpoint?.first == connection &&
                             interactionState.hoveredMidpoint?.second == segIndex

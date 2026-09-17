@@ -211,6 +211,7 @@ class PluginLifecycleManagerTest {
         val mockProcessor = io.mockk.mockk<DataProcessor>()
         io.mockk.coEvery { mockProcessor.refreshLocks(any()) } throws NoClassDefFoundError("it/krzeminski/snakeyaml/engine/kmp/exceptions/MarkedYamlEngineException")
         io.mockk.every { mockEntry.getProcessor() } returns Result.success(mockProcessor)
+        io.mockk.every { mockEntry.getManifest() } returns Result.success(io.mockk.mockk(relaxed = true))
         io.mockk.mockkObject(PluginLoader)
 
         try {
@@ -219,6 +220,7 @@ class PluginLifecycleManagerTest {
             val locks = lifecycleManager.refreshLocks(pkg)
             kotlin.test.assertEquals(emptyMap(), locks, "refreshLocks must catch NoClassDefFoundError and return emptyMap")
         } finally {
+            PluginLoader.unloadAll()
             io.mockk.unmockkAll()
         }
     }

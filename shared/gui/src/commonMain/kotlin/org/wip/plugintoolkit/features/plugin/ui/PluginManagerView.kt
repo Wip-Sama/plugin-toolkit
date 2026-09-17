@@ -191,7 +191,9 @@ fun PluginManagerView(
     var sortMode by remember { mutableStateOf(PluginManagerSortMode.NameAsc) }
 
     val filteredPlugins = remember(plugins, searchQuery, chipFilter, sortMode, alternateRepoUpdates) {
-        plugins.filter { plugin ->
+        plugins
+            .distinctBy { it.pkg }
+            .filter { plugin ->
             val matchesSearch = searchQuery.isBlank() ||
                 plugin.name.contains(searchQuery, ignoreCase = true) ||
                 plugin.pkg.contains(searchQuery, ignoreCase = true) ||

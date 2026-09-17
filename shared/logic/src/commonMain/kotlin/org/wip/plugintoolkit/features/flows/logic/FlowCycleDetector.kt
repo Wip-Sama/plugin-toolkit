@@ -5,23 +5,63 @@ import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Node
 
+sealed class GraphVertex {
+    data class NodeVertex(val id: Long) : GraphVertex()
+    data class JunctionVertex(val id: Long) : GraphVertex()
+}
+
 object FlowCycleDetector {
 
-    fun wouldCreateCycle(sourceNodeId: Long, targetNodeId: Long, connections: List<Connection>): Boolean {
+    fun wouldCreateCycle(
+        sourceNodeId: Long,
+        targetNodeId: Long,
+        connections: List<Connection>
+    ): Boolean {
         if (sourceNodeId == targetNodeId) return true
+        return wouldCreateCycle(
+            source = GraphVertex.NodeVertex(sourceNodeId),
+            target = GraphVertex.NodeVertex(targetNodeId),
+            connections = connections
+        )
+    }
 
-        val nonFloating = connections.filter { !it.isFloating }
-        val adjacencyList =
-            nonFloating.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
-        val visited = mutableSetOf<Long>()
-        val queue = ArrayDeque<Long>()
+    fun wouldCreateCycle(
+        sourceNodeId: Long?,
+        sourceJunctionId: Long?,
+        targetNodeId: Long?,
+        targetJunctionId: Long?,
+        connections: List<Connection>
+    ): Boolean {
+        val source = when {
+            sourceNodeId != null && sourceNodeId >= 0L -> GraphVertex.NodeVertex(sourceNodeId)
+            sourceJunctionId != null -> GraphVertex.JunctionVertex(sourceJunctionId)
+            else -> return false
+        }
+        val target = when {
+            targetNodeId != null && targetNodeId >= 0L -> GraphVertex.NodeVertex(targetNodeId)
+            targetJunctionId != null -> GraphVertex.JunctionVertex(targetJunctionId)
+            else -> return false
+        }
+        return wouldCreateCycle(source, target, connections)
+    }
 
-        queue.add(targetNodeId)
-        visited.add(targetNodeId)
+    fun wouldCreateCycle(
+        source: GraphVertex,
+        target: GraphVertex,
+        connections: List<Connection>
+    ): Boolean {
+        if (source == target) return true
+
+        val adjacencyList = buildAdjacencyList(connections)
+        val visited = mutableSetOf<GraphVertex>()
+        val queue = ArrayDeque<GraphVertex>()
+
+        queue.add(target)
+        visited.add(target)
 
         while (queue.isNotEmpty()) {
             val current = queue.removeFirst()
-            if (current == sourceNodeId) {
+            if (current == source) {
                 return true
             }
             val neighbors = adjacencyList[current] ?: emptyList()
@@ -36,30 +76,50 @@ object FlowCycleDetector {
     }
 
     fun hasCycle(connections: List<Connection>): Boolean {
-        val nonFloating = connections.filter { !it.isFloating }
-        val adjacencyList =
-            nonFloating.groupBy { it.sourceNodeId }.mapValues { entry -> entry.value.map { it.targetNodeId } }
-        val visited = mutableSetOf<Long>()
-        val visiting = mutableSetOf<Long>()
+        val adjacencyList = buildAdjacencyList(connections)
+        val visited = mutableSetOf<GraphVertex>()
+        val visiting = mutableSetOf<GraphVertex>()
 
-        fun dfs(node: Long): Boolean {
-            if (node in visiting) return true
-            if (node in visited) return false
+        fun dfs(vertex: GraphVertex): Boolean {
+            if (vertex in visiting) return true
+            if (vertex in visited) return false
 
-            visiting.add(node)
-            val neighbors = adjacencyList[node] ?: emptyList()
+            visiting.add(vertex)
+            val neighbors = adjacencyList[vertex] ?: emptyList()
             for (neighbor in neighbors) {
                 if (dfs(neighbor)) return true
             }
-            visiting.remove(node)
-            visited.add(node)
+            visiting.remove(vertex)
+            visited.add(vertex)
             return false
         }
 
-        for (node in adjacencyList.keys) {
-            if (dfs(node)) return true
+        for (vertex in adjacencyList.keys) {
+            if (dfs(vertex)) return true
         }
         return false
+    }
+
+    private fun buildAdjacencyList(connections: List<Connection>): Map<GraphVertex, List<GraphVertex>> {
+        val nonFloating = connections.filter { !it.isFloating }
+        val adj = mutableMapOf<GraphVertex, MutableList<GraphVertex>>()
+
+        for (conn in nonFloating) {
+            val srcVertex: GraphVertex? = when {
+                conn.sourceNodeId >= 0L -> GraphVertex.NodeVertex(conn.sourceNodeId)
+                conn.sourceJunctionId != null -> GraphVertex.JunctionVertex(conn.sourceJunctionId)
+                else -> null
+            }
+            val tgtVertex: GraphVertex? = when {
+                conn.targetNodeId >= 0L -> GraphVertex.NodeVertex(conn.targetNodeId)
+                conn.targetJunctionId != null -> GraphVertex.JunctionVertex(conn.targetJunctionId)
+                else -> null
+            }
+            if (srcVertex != null && tgtVertex != null) {
+                adj.getOrPut(srcVertex) { mutableListOf() }.add(tgtVertex)
+            }
+        }
+        return adj
     }
 
     fun wouldCreateNestedFlowCycle(

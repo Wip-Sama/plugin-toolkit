@@ -70,4 +70,54 @@ class TooltipExtensionTest {
         state.dismiss()
         assertNull(state.tooltipData)
     }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testTooltipStateShowAndScheduleDismiss() = kotlinx.coroutines.test.runTest {
+        val state = TooltipState()
+        val coords = MockLayoutCoordinates()
+        val data = TooltipData("Test tooltip", coords)
+
+        state.show(data)
+        assertEquals(data, state.tooltipData)
+
+        // Schedule dismiss with 250ms
+        state.scheduleDismiss(this, 250L)
+        // Before delay expires, tooltip should still be active
+        testScheduler.advanceTimeBy(100L)
+        assertEquals(data, state.tooltipData)
+
+        // After delay expires without popup hover, tooltip should be dismissed
+        testScheduler.advanceTimeBy(160L)
+        assertNull(state.tooltipData)
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testTooltipStateHoverPreservesTooltip() = kotlinx.coroutines.test.runTest {
+        val state = TooltipState()
+        val coords = MockLayoutCoordinates()
+        val data = TooltipData("Hover tooltip", coords)
+
+        state.show(data)
+        state.scheduleDismiss(this, 250L)
+
+        // User moves mouse into popup before 250ms passes
+        testScheduler.advanceTimeBy(100L)
+        state.isPopupHovered = true
+        state.cancelDismiss()
+
+        // Wait past original dismiss time
+        testScheduler.advanceTimeBy(300L)
+        // Remains visible because hover occurred and cancelDismiss was called
+        assertEquals(data, state.tooltipData)
+
+        // When mouse exits popup, schedule dismiss again
+        state.isPopupHovered = false
+        state.scheduleDismiss(this, 250L)
+
+        testScheduler.advanceTimeBy(260L)
+        assertNull(state.tooltipData)
+    }
 }
+

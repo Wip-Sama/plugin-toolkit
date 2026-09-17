@@ -158,7 +158,7 @@ data class Dimensions(
     val progressIndicatorHeightSmall: Dp = 8.dp,
     val minWidthMedium: Dp = 300.dp,
     val maxWidthLarge: Dp = 500.dp,
-    val nodeWidth: Dp = 380.dp,
+    val nodeWidth: Dp = 400.dp,
     val heightSmall: Dp = 8.dp,
     val dialogMaxWidthLarge: Dp = 1280.dp,
     
