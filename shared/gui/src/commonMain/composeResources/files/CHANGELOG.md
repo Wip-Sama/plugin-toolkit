@@ -1,5 +1,20 @@
-Version: 2.1.1
+Version: 3.0.0
+Name: Packaged Timed Colors
 Date: xx-09-2026
+Added:
+	- Advanced connections in flow manager
+	- Different connections styles in flow editor
+	- Shortcut and Controls editor in settings
+	- Labels and Groups in flow editor
+	- Colors in flow editor
+	- Toolbar in flow editor
+	- Plugins can now be compiled as standalone apps (the standalone version of the plugin can also be loaded by the app) [TODO]
+	- Scheduler to automatically start flows / capabilities at specific times [TODO]
+	- Scheduler plugin events, a plugin can now create events that can be used to trigger an event schedule (they do not start by themselves and need to be setup by the user) [TODO]
+	- Experimental opt-in metrics collection (this is fully customizable to chose which metrics to collect/share) [TODO]
+Changes:
+	- New font for the job terminal
+	- The color picker wa fully reworked [TODO]
 Fixed:
 	- Connection Detachment During Canvas Pan
 	- When a capability definition changed without migration the flow still appeared valid even if it was not
