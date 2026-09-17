@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,10 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import org.wip.plugintoolkit.api.DataType
@@ -72,6 +75,7 @@ fun NodeInputSection(
     onUpdateInputPortDefault: (Long, String, Any?) -> Unit = { _, _, _ -> },
     inactiveConnectedPortIds: Set<String> = emptySet(),
     onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
+    showTopDivider: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val sectionTag = "input_section_${sectionType.name.lowercase()}_${node.id}"
@@ -80,13 +84,28 @@ fun NodeInputSection(
         if (highlightedPortId != null) highlightedPortIds + highlightedPortId else highlightedPortIds
     }
 
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val dividerStrokePx = with(LocalDensity.current) { ToolkitTheme.dimensions.borderThin.toPx() }
+    val dividerModifier = if (showTopDivider) {
+        Modifier.drawBehind {
+            drawLine(
+                color = outlineVariant,
+                start = Offset(0f, 0f),
+                end = Offset(size.width, 0f),
+                strokeWidth = dividerStrokePx
+            )
+        }
+    } else Modifier
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(ToolkitTheme.dimensions.nodeSectionHeaderHeight)
+                .then(dividerModifier)
                 .clip(ToolkitTheme.shapes.small)
                 .clickable { onToggleCollapse() }
-                .padding(horizontal = ToolkitTheme.spacing.extraSmall, vertical = ToolkitTheme.spacing.extraSmall)
+                .padding(horizontal = ToolkitTheme.spacing.extraSmall)
                 .testTag(sectionTag),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -164,9 +183,8 @@ fun NodeInputSection(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = ToolkitTheme.spacing.small),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.none)
             ) {
                 inputs.forEach { input ->
                     InputPortRow(

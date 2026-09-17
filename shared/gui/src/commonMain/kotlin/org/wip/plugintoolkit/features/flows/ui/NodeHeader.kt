@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -93,6 +94,7 @@ fun NodeHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(ToolkitTheme.dimensions.nodeHeaderHeight)
             .background(headerColor)
             .testTag("node_header_${node.id}")
             .pointerInput(node.id, isReadOnly, isEyedropperActive) {
@@ -134,7 +136,7 @@ fun NodeHeader(
                     }
                 }
             }
-            .padding(ToolkitTheme.spacing.mediumSmall),
+            .padding(horizontal = ToolkitTheme.spacing.mediumSmall),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {

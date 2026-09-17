@@ -1231,7 +1231,7 @@ class FlowEditorViewModel(
             // Groups
             is FlowEvent.AddGroup -> {
                 val newId = (currentState.flow.groups.maxOfOrNull { it.id } ?: 0L) + 1L
-                val newGroup = FlowGroup(id = newId, title = "New Group", position = event.position.snapToGrid(), size = ModelOffset(320f, 240f))
+                val newGroup = FlowGroup(id = newId, title = "New Group", position = event.position.snapToGrid(), size = ModelOffset(350f, 250f))
                 newState = currentState.copy(
                     flow = currentState.flow.copy(groups = currentState.flow.groups + newGroup),
                     hasUnsavedChanges = true
@@ -1243,7 +1243,9 @@ class FlowEditorViewModel(
                 val old = currentState.flow.groups.find { it.id == event.group.id }
                 if (old != null) {
                     newState = currentState.copy(
-                        flow = currentState.flow.copy(groups = currentState.flow.groups.map { if (it.id == event.group.id) event.group else it }),
+                        flow = currentState.flow.copy(
+                            groups = currentState.flow.groups.map { if (it.id == event.group.id) event.group else it }
+                        ),
                         hasUnsavedChanges = true
                     )
                     pendingCommand = UpdateGroupCommand(old, event.group)
@@ -1251,11 +1253,16 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.DeleteGroup -> {
-                newState = currentState.copy(
-                    flow = currentState.flow.copy(groups = currentState.flow.groups.filter { it.id != event.group.id }),
-                    hasUnsavedChanges = true
-                )
-                pendingCommand = DeleteGroupCommand(event.group)
+                val deleted = currentState.flow.groups.find { it.id == event.group.id }
+                if (deleted != null) {
+                    newState = currentState.copy(
+                        flow = currentState.flow.copy(
+                            groups = currentState.flow.groups.filter { it.id != event.group.id }
+                        ),
+                        hasUnsavedChanges = true
+                    )
+                    pendingCommand = DeleteGroupCommand(deleted)
+                }
             }
 
             is FlowEvent.MoveGroup -> {
@@ -1303,10 +1310,16 @@ class FlowEditorViewModel(
             is FlowEvent.ResizeGroup -> {
                 val grp = currentState.flow.groups.find { it.id == event.groupId }
                 if (grp != null) {
-                    val newSize = org.wip.plugintoolkit.features.flows.model.Offset(
-                        (grp.size.x + event.delta.x).coerceAtLeast(150f),
-                        (grp.size.y + event.delta.y).coerceAtLeast(100f)
-                    )
+                    val rawX = (grp.size.x + event.delta.x).coerceAtLeast(150f)
+                    val rawY = (grp.size.y + event.delta.y).coerceAtLeast(100f)
+                    val newSize = if (event.snap) {
+                        org.wip.plugintoolkit.features.flows.model.Offset(
+                            (kotlin.math.round(rawX / 50f) * 50f).coerceAtLeast(150f),
+                            (kotlin.math.round(rawY / 50f) * 50f).coerceAtLeast(100f)
+                        )
+                    } else {
+                        org.wip.plugintoolkit.features.flows.model.Offset(rawX, rawY)
+                    }
                     val updatedGroup = grp.copy(size = newSize)
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
@@ -1984,13 +1997,34 @@ class FlowEditorViewModel(
                     )
                     if (!event.isTransient) {
                         val newPos = junc.position + event.delta
-                        pendingCommand = MoveJunctionCommand(event.junctionId, junc.position, newPos)
+                        if (nodesToMove.isNotEmpty() || groupsToMove.isNotEmpty() || labelsToMove.isNotEmpty() || pointsToMove.size > 1) {
+                            pendingCommand = MoveBoardElementsCommand(
+                                nodeMoves = nodesToMove.associateWith { id ->
+                                    val n = currentState.flow.nodes.find { it.id == id }
+                                    Pair(n?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero, (n?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero) + event.delta)
+                                },
+                                groupMoves = groupsToMove.associateWith { id ->
+                                    val g = currentState.flow.groups.find { it.id == id }
+                                    Pair(g?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero, (g?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero) + event.delta)
+                                },
+                                labelMoves = labelsToMove.associateWith { id ->
+                                    val l = currentState.flow.labels.find { it.id == id }
+                                    Pair(l?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero, (l?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero) + event.delta)
+                                },
+                                pointMoves = pointsToMove.associateWith { id ->
+                                    val p = currentState.flow.junctions.find { it.id == id }
+                                    Pair(p?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero, (p?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero) + event.delta)
+                                }
+                            )
+                        } else {
+                            pendingCommand = MoveJunctionCommand(event.junctionId, junc.position, newPos)
+                        }
                     }
                 }
             }
 
             is FlowEvent.EndMoveJunction -> {
-                if (event.nodeMoves.isNotEmpty() || event.groupMoves.isNotEmpty() || event.labelMoves.isNotEmpty()) {
+                if (event.nodeMoves.isNotEmpty() || event.groupMoves.isNotEmpty() || event.labelMoves.isNotEmpty() || event.pointMoves.size > 1) {
                     pendingCommand = MoveBoardElementsCommand(
                         nodeMoves = event.nodeMoves,
                         groupMoves = event.groupMoves,
@@ -2000,10 +2034,6 @@ class FlowEditorViewModel(
                 } else if (event.pointMoves.size == 1) {
                     val (jId, pair) = event.pointMoves.entries.first()
                     pendingCommand = MoveJunctionCommand(jId, pair.first, pair.second)
-                } else if (event.pointMoves.isNotEmpty()) {
-                    pendingCommand = MoveBoardElementsCommand(
-                        pointMoves = event.pointMoves
-                    )
                 }
             }
 

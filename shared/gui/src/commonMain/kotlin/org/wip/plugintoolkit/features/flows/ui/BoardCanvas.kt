@@ -379,7 +379,16 @@ fun BoardCanvas(
                 shortcutManager = shortcutManager,
                 highlightedNodeId = highlightedNodeId,
                 highlightedPortId = highlightedPortId,
-                onPan = onPan
+                onPan = onPan,
+                onSelectNodes = onSelectNodes,
+                onSelectGroups = onSelectGroups,
+                onSelectLabels = onSelectLabels,
+                isPaintToolActive = state.isPaintToolActive,
+                isWashToolActive = state.isWashToolActive,
+                isEyedropperActive = state.isEyedropperActive,
+                onPaintConnection = onPaintConnection,
+                onWashConnection = onWashConnection,
+                onSampleColor = onSampleColor
             )
             .boardSelectionBoxGesture(
                 interactionState = interactionState,

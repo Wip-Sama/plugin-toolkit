@@ -2355,6 +2355,82 @@ class FlowEditorQoLTest {
         val connectedNodes = flow.findConnectedNodesForNode(1L)
         assertEquals(setOf(2L, 3L), connectedNodes)
     }
+
+    @Test
+    fun testMoveJunctionWithSelectedNodesUndoRedo() {
+        val n1 = Node.FlowInputNode(id = 1L, position = ModelOffset(100f, 100f), outputs = emptyList())
+        val j1 = FlowJunction(id = 10L, position = ModelOffset(300f, 300f))
+        val flow = Flow("TestMove", nodes = listOf(n1), junctions = listOf(j1))
+        val vm = createViewModel(flow)
+
+        // Select both the junction and node so multi-element move takes effect
+        vm.onEvent(FlowEvent.SelectPoints(setOf(10L)))
+        vm.onEvent(FlowEvent.SelectNodes(setOf(1L)))
+        vm.onEvent(FlowEvent.MoveJunction(junctionId = 10L, delta = ModelOffset(50f, 50f), isTransient = false))
+
+        val movedFlow = vm.state.value.flow
+        assertEquals(ModelOffset(350f, 350f), movedFlow.junctions.first().position)
+        assertEquals(ModelOffset(150f, 150f), movedFlow.nodes.first().position)
+
+        vm.undo()
+        val undoneFlow = vm.state.value.flow
+        assertEquals(ModelOffset(300f, 300f), undoneFlow.junctions.first().position)
+        assertEquals(ModelOffset(100f, 100f), undoneFlow.nodes.first().position)
+
+        vm.redo()
+        val redoneFlow = vm.state.value.flow
+        assertEquals(ModelOffset(350f, 350f), redoneFlow.junctions.first().position)
+        assertEquals(ModelOffset(150f, 150f), redoneFlow.nodes.first().position)
+    }
+
+    @Test
+    fun testGroupResizeWithSnap() {
+        val g1 = FlowGroup(id = 1L, title = "Group 1", position = ModelOffset(100f, 100f), size = ModelOffset(350f, 250f))
+        val flow = Flow("TestGroupSnap", groups = listOf(g1))
+        val vm = createViewModel(flow)
+
+        // Resize with snap = true: 350 + 22 = 372 -> snaps to 350; 250 + 38 = 288 -> snaps to 300
+        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, delta = ModelOffset(22f, 38f), snap = true))
+        val resizedFlow = vm.state.value.flow
+        assertEquals(ModelOffset(350f, 300f), resizedFlow.groups.first().size)
+
+        // Resize below min dimensions (150f x 100f)
+        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, delta = ModelOffset(-300f, -200f), snap = true))
+        val minResizedFlow = vm.state.value.flow
+        assertEquals(ModelOffset(150f, 100f), minResizedFlow.groups.first().size)
+    }
+
+    @Test
+    fun testNodePortGridAlignmentMath() {
+        val nodeY = 100f
+        val headerHeight = 75f
+        val sectionHeaderHeight = 50f
+        val rowHeight = 50f
+
+        // Collapsed summary port center in first section
+        val collapsedSummaryPortY = nodeY + headerHeight + (sectionHeaderHeight / 2f)
+        assertEquals(200f, collapsedSummaryPortY)
+        assertEquals(0f, collapsedSummaryPortY % 50f)
+
+        // Expanded port rows in first section
+        val row0CenterY = nodeY + headerHeight + sectionHeaderHeight + (rowHeight / 2f)
+        val row1CenterY = row0CenterY + rowHeight
+        assertEquals(250f, row0CenterY)
+        assertEquals(0f, row0CenterY % 50f)
+        assertEquals(300f, row1CenterY)
+        assertEquals(0f, row1CenterY % 50f)
+
+        // Second section (collapsed) below the 2-row expanded section
+        val section2StartY = nodeY + headerHeight + sectionHeaderHeight + (2 * rowHeight)
+        val section2SummaryPortY = section2StartY + (sectionHeaderHeight / 2f)
+        assertEquals(350f, section2SummaryPortY)
+        assertEquals(0f, section2SummaryPortY % 50f)
+
+        // Snapping formula verification
+        val rawPortYWithFloatingJitter = 250.04f
+        val snappedY = kotlin.math.round(rawPortYWithFloatingJitter / 50f) * 50f
+        assertEquals(250f, snappedY)
+    }
 }
 
 

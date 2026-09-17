@@ -77,7 +77,7 @@ import plugintoolkit.composeapp.generated.resources.flow_group_nodes_count
 import kotlin.math.roundToInt
 
 private const val GROUP_CORNER_RADIUS_DP = 16
-private const val GROUP_COLLAPSED_HEIGHT_DP = 44
+private const val GROUP_COLLAPSED_HEIGHT_DP = 50
 private const val GROUP_MIN_COLLAPSED_WIDTH_DP = 200
 private const val GROUP_BACKGROUND_ALPHA = 0.12f
 private const val GROUP_BORDER_ALPHA = 0.6f
@@ -397,10 +397,22 @@ fun FlowGroupComponent(
                     .fillMaxHeight()
                     .pointerHoverIcon(PlatformUtils.horizontalResizePointerIcon())
                     .pointerInput(group.id) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            onResizeGroup(group.id, Offset(dragAmount.x, 0f))
-                        }
+                        detectDragGestures(
+                            onDragEnd = {
+                                val snappedW = kotlin.math.round(group.size.x / 50f) * 50f
+                                val deltaX = snappedW - group.size.x
+                                if (deltaX != 0f) onResizeGroup(group.id, Offset(deltaX, 0f))
+                            },
+                            onDragCancel = {
+                                val snappedW = kotlin.math.round(group.size.x / 50f) * 50f
+                                val deltaX = snappedW - group.size.x
+                                if (deltaX != 0f) onResizeGroup(group.id, Offset(deltaX, 0f))
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                onResizeGroup(group.id, Offset(dragAmount.x, 0f))
+                            }
+                        )
                     }
             )
 
@@ -413,10 +425,22 @@ fun FlowGroupComponent(
                         .height(RESIZE_HANDLE_THICKNESS_DP.dp)
                         .pointerHoverIcon(PlatformUtils.verticalResizePointerIcon())
                         .pointerInput(group.id) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                onResizeGroup(group.id, Offset(0f, dragAmount.y))
-                            }
+                            detectDragGestures(
+                                onDragEnd = {
+                                    val snappedH = kotlin.math.round(group.size.y / 50f) * 50f
+                                    val deltaY = snappedH - group.size.y
+                                    if (deltaY != 0f) onResizeGroup(group.id, Offset(0f, deltaY))
+                                },
+                                onDragCancel = {
+                                    val snappedH = kotlin.math.round(group.size.y / 50f) * 50f
+                                    val deltaY = snappedH - group.size.y
+                                    if (deltaY != 0f) onResizeGroup(group.id, Offset(0f, deltaY))
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onResizeGroup(group.id, Offset(0f, dragAmount.y))
+                                }
+                            )
                         }
                 )
 
@@ -427,10 +451,24 @@ fun FlowGroupComponent(
                         .size(RESIZE_CORNER_SIZE_DP.dp)
                         .pointerHoverIcon(PlatformUtils.diagonalResizePointerIcon())
                         .pointerInput(group.id) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                onResizeGroup(group.id, dragAmount)
-                            }
+                            detectDragGestures(
+                                onDragEnd = {
+                                    val snappedW = kotlin.math.round(group.size.x / 50f) * 50f
+                                    val snappedH = kotlin.math.round(group.size.y / 50f) * 50f
+                                    val delta = Offset(snappedW - group.size.x, snappedH - group.size.y)
+                                    if (delta != Offset.Zero) onResizeGroup(group.id, delta)
+                                },
+                                onDragCancel = {
+                                    val snappedW = kotlin.math.round(group.size.x / 50f) * 50f
+                                    val snappedH = kotlin.math.round(group.size.y / 50f) * 50f
+                                    val delta = Offset(snappedW - group.size.x, snappedH - group.size.y)
+                                    if (delta != Offset.Zero) onResizeGroup(group.id, delta)
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onResizeGroup(group.id, dragAmount)
+                                }
+                            )
                         }
                 )
             }

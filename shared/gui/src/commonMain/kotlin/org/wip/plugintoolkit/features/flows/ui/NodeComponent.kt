@@ -300,8 +300,8 @@ fun NodeComponent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(ToolkitTheme.spacing.mediumSmall),
-                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                        .padding(horizontal = ToolkitTheme.spacing.mediumSmall),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.none)
                 ) {
                     val capNode = node as? Node.CapabilityNode
                     val visibleOutputs = node.outputs.filter { output ->
@@ -332,14 +332,6 @@ fun NodeComponent(
                             InputSectionType.INPUT_LOCATIONS -> inputLocationsCollapsed
                             InputSectionType.OUTPUT_LOCATIONS -> outputLocationsCollapsed
                             InputSectionType.PARAMETERS -> node.isInputsCollapsed
-                        }
-
-                        if (index > 0) {
-                            HorizontalDivider(
-                                modifier = Modifier.fillMaxWidth(),
-                                thickness = ToolkitTheme.dimensions.borderThin,
-                                color = MaterialTheme.colorScheme.outlineVariant
-                            )
                         }
 
                         NodeInputSection(
@@ -373,15 +365,8 @@ fun NodeComponent(
                             onFocusLost = onFocusLost,
                             onUpdateInputPortDefault = onUpdateInputPortDefault,
                             inactiveConnectedPortIds = inactiveConnectedPortIds,
-                            onPortDisposed = onPortDisposed
-                        )
-                    }
-
-                    if (inputSections.isNotEmpty() && visibleOutputs.isNotEmpty()) {
-                        HorizontalDivider(
-                            modifier = Modifier.fillMaxWidth(),
-                            thickness = ToolkitTheme.dimensions.borderThin,
-                            color = MaterialTheme.colorScheme.outlineVariant
+                            onPortDisposed = onPortDisposed,
+                            showTopDivider = index > 0
                         )
                     }
 
@@ -404,7 +389,8 @@ fun NodeComponent(
                         onDropConnection = onDropConnection,
                         onPortPositioned = onPortPositioned,
                         inactiveConnectedPortIds = inactiveConnectedPortIds,
-                        onPortDisposed = onPortDisposed
+                        onPortDisposed = onPortDisposed,
+                        showTopDivider = inputSections.isNotEmpty()
                     )
 
                     if (hasAdvancedPorts) {

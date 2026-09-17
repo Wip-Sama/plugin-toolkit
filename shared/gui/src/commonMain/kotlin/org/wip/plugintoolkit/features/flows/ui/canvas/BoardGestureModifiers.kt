@@ -365,9 +365,27 @@ fun Modifier.boardPointerEventGesture(
     shortcutManager: ShortcutManager? = null,
     highlightedNodeId: Long? = null,
     highlightedPortId: String? = null,
-    onPan: ((Offset) -> Unit)? = null
+    onPan: ((Offset) -> Unit)? = null,
+    onSelectNodes: ((Set<Long>) -> Unit)? = null,
+    onSelectGroups: ((Set<Long>) -> Unit)? = null,
+    onSelectLabels: ((Set<Long>) -> Unit)? = null,
+    isPaintToolActive: Boolean = false,
+    isWashToolActive: Boolean = false,
+    isEyedropperActive: Boolean = false,
+    onPaintConnection: ((Connection) -> Unit)? = null,
+    onWashConnection: ((Connection) -> Unit)? = null,
+    onSampleColor: ((String) -> Unit)? = null
 ): Modifier {
     val currentOnPan by rememberUpdatedState(onPan)
+    val currentOnSelectNodes by rememberUpdatedState(onSelectNodes)
+    val currentOnSelectGroups by rememberUpdatedState(onSelectGroups)
+    val currentOnSelectLabels by rememberUpdatedState(onSelectLabels)
+    val currentIsPaintToolActive by rememberUpdatedState(isPaintToolActive)
+    val currentIsWashToolActive by rememberUpdatedState(isWashToolActive)
+    val currentIsEyedropperActive by rememberUpdatedState(isEyedropperActive)
+    val currentOnPaintConnection by rememberUpdatedState(onPaintConnection)
+    val currentOnWashConnection by rememberUpdatedState(onWashConnection)
+    val currentOnSampleColor by rememberUpdatedState(onSampleColor)
     val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
     val currentHighlightedNodeId by rememberUpdatedState(highlightedNodeId)
     val currentHighlightedPortId by rememberUpdatedState(highlightedPortId)
@@ -439,23 +457,27 @@ fun Modifier.boardPointerEventGesture(
                     interactionState.isShiftModifierPressed = event.keyboardModifiers.isShiftPressed
                     interactionState.isAltModifierPressed = event.keyboardModifiers.isAltPressed
 
-                    if (event.buttons.isSecondaryPressed && rightClickStartPos != null) {
-                        val curPos = event.changes.firstOrNull()?.position ?: position
-                        val lastPos = rightClickLastPos ?: curPos
-                        val delta = curPos - lastPos
-                        rightClickLastPos = curPos
-                        if (!rightClickDidDrag && (curPos - rightClickStartPos!!).getDistance() > 6f) {
-                            rightClickDidDrag = true
-                        }
-                        if (rightClickDidDrag && currentOnPan != null) {
+                    if (currentIsDrawingConnection || interactionState.isDrawingStructuredConnection) {
+                        if (event.buttons.isSecondaryPressed && rightClickStartPos != null) {
+                            val curPos = event.changes.firstOrNull()?.position ?: position
+                            val lastPos = rightClickLastPos ?: curPos
+                            val delta = curPos - lastPos
+                            rightClickLastPos = curPos
+                            if (!rightClickDidDrag && (curPos - rightClickStartPos!!).getDistance() > 6f) {
+                                rightClickDidDrag = true
+                            }
+                            if (rightClickDidDrag && currentOnPan != null) {
+                                currentOnPan?.invoke(delta)
+                            }
+                        } else if (event.buttons.isTertiaryPressed) {
+                            val curPos = event.changes.firstOrNull()?.position ?: position
+                            val lastPos = middleClickLastPos ?: curPos
+                            val delta = curPos - lastPos
+                            middleClickLastPos = curPos
                             currentOnPan?.invoke(delta)
+                        } else {
+                            middleClickLastPos = null
                         }
-                    } else if (event.buttons.isTertiaryPressed) {
-                        val curPos = event.changes.firstOrNull()?.position ?: position
-                        val lastPos = middleClickLastPos ?: curPos
-                        val delta = curPos - lastPos
-                        middleClickLastPos = curPos
-                        currentOnPan?.invoke(delta)
                     } else {
                         middleClickLastPos = null
                     }
@@ -818,21 +840,52 @@ fun Modifier.boardPointerEventGesture(
                         val isShift = event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed
 
                         if (interactionState.hoveredMidpoint != null) {
-                            interactionState.pendingMidpoint = interactionState.hoveredMidpoint
-                            interactionState.pendingMidpointPressPos = position
-                            interactionState.pendingMidpointWasAltPressed = isAlt
-                            val actId = if (isAlt) ShortcutActionId.FLOW_CREATE_RAMIFICATION else ShortcutActionId.FLOW_MOVE_POINT
-                            currentShortcutManager?.eat(event, actId) ?: event.changes.forEach { it.consume() }
-                        } else if (interactionState.hoveredWaypoint != null) {
-                            val actId = if (isShift) ShortcutActionId.FLOW_DELETE_SELECTED else ShortcutActionId.FLOW_MOVE_POINT
-                            if (isShift) {
-                                val wp = interactionState.hoveredWaypoint!!
-                                currentOnDeleteWaypoint?.invoke(wp.first, wp.second)
-                                interactionState.hoveredWaypoint = null
+                            val mid = interactionState.hoveredMidpoint!!
+                            if (currentIsEyedropperActive && currentOnSampleColor != null) {
+                                currentOnSampleColor?.invoke(mid.first.color ?: "#808080")
+                                event.changes.forEach { it.consume() }
+                            } else if (currentIsPaintToolActive && currentOnPaintConnection != null) {
+                                currentOnPaintConnection?.invoke(mid.first)
+                                event.changes.forEach { it.consume() }
+                            } else if (currentIsWashToolActive && currentOnWashConnection != null) {
+                                currentOnWashConnection?.invoke(mid.first)
+                                event.changes.forEach { it.consume() }
+                            } else if (isShift) {
+                                currentOnDeleteConnectionSegment?.invoke(mid.first, mid.second)
+                                interactionState.hoveredMidpoint = null
+                                interactionState.clearHoveredConnection()
+                                if (interactionState.selectedConnection == mid.first) {
+                                    interactionState.selectedConnection = null
+                                }
+                                event.changes.forEach { it.consume() }
                             } else {
-                                interactionState.draggingWaypoint = interactionState.hoveredWaypoint
+                                interactionState.pendingMidpoint = interactionState.hoveredMidpoint
+                                interactionState.pendingMidpointPressPos = position
+                                interactionState.pendingMidpointWasAltPressed = isAlt
+                                val actId = if (isAlt) ShortcutActionId.FLOW_CREATE_RAMIFICATION else ShortcutActionId.FLOW_MOVE_POINT
+                                currentShortcutManager?.eat(event, actId) ?: event.changes.forEach { it.consume() }
                             }
-                            currentShortcutManager?.eat(event, actId) ?: event.changes.forEach { it.consume() }
+                        } else if (interactionState.hoveredWaypoint != null) {
+                            val wp = interactionState.hoveredWaypoint!!
+                            if (currentIsEyedropperActive && currentOnSampleColor != null) {
+                                currentOnSampleColor?.invoke(wp.first.color ?: "#808080")
+                                event.changes.forEach { it.consume() }
+                            } else if (currentIsPaintToolActive && currentOnPaintConnection != null) {
+                                currentOnPaintConnection?.invoke(wp.first)
+                                event.changes.forEach { it.consume() }
+                            } else if (currentIsWashToolActive && currentOnWashConnection != null) {
+                                currentOnWashConnection?.invoke(wp.first)
+                                event.changes.forEach { it.consume() }
+                            } else {
+                                val actId = if (isShift) ShortcutActionId.FLOW_DELETE_SELECTED else ShortcutActionId.FLOW_MOVE_POINT
+                                if (isShift) {
+                                    currentOnDeleteWaypoint?.invoke(wp.first, wp.second)
+                                    interactionState.hoveredWaypoint = null
+                                } else {
+                                    interactionState.draggingWaypoint = interactionState.hoveredWaypoint
+                                }
+                                currentShortcutManager?.eat(event, actId) ?: event.changes.forEach { it.consume() }
+                            }
                         } else if (interactionState.hoveredJunctionId != null) {
                             val juncId = interactionState.hoveredJunctionId!!
                             if (isAlt) {
@@ -853,6 +906,9 @@ fun Modifier.boardPointerEventGesture(
                                 val isSelected = juncId in currentSelectedPointIds
                                 if (!isSelected) {
                                     currentOnSelectPoints?.invoke(setOf(juncId))
+                                    currentOnSelectNodes?.invoke(emptySet())
+                                    currentOnSelectGroups?.invoke(emptySet())
+                                    currentOnSelectLabels?.invoke(emptySet())
                                     junctionDragStartPointPositions = currentJunctions.find { it.id == juncId }?.let { mapOf(juncId to it.position) } ?: emptyMap()
                                     junctionDragStartNodePositions = emptyMap()
                                     junctionDragStartGroupPositions = emptyMap()

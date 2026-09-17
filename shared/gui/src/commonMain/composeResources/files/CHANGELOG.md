@@ -8,7 +8,7 @@ Added:
 	- Labels and Groups in flow editor
 	- Colors in flow editor
 	- Toolbar in flow editor
-	- Plugins can now be compiled as standalone apps (the standalone version of the plugin can also be loaded by the app) [TODO]
+	- Plugins can now be compiled as standalone apps (the standalone version of the plugin can also be loaded by the app)
 	- Scheduler to automatically start flows / capabilities at specific times [TODO]
 	- Scheduler plugin events, a plugin can now create events that can be used to trigger an event schedule (they do not start by themselves and need to be setup by the user) [TODO]
 	- Experimental opt-in metrics collection (this is fully customizable to chose which metrics to collect/share) [TODO]

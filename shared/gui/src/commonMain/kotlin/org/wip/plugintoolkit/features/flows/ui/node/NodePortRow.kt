@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -104,8 +105,7 @@ fun InputPortRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = ToolkitTheme.dimensions.pluginIcon)
-            .padding(vertical = ToolkitTheme.spacing.extraSmall)
+            .height(ToolkitTheme.dimensions.nodeRowHeight)
             .testTag("port_row_${node.id}_${input.id}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -392,8 +392,7 @@ fun OutputPortRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = ToolkitTheme.dimensions.pluginIcon)
-            .padding(vertical = ToolkitTheme.spacing.extraSmall)
+            .height(ToolkitTheme.dimensions.nodeRowHeight)
             .testTag("port_row_${node.id}_${output.id}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End

@@ -154,7 +154,15 @@ fun FlowEditorView(
         val boardCoords = boardLayoutCoordinates
         if (coords != null && boardCoords != null && coords.isAttached) {
             val center = boardCoords.localBoundingBoxOf(coords, false).center
-            (center - state.offset) / state.scale
+            val rawPos = (center - state.offset) / state.scale
+            val node = flow.nodes.find { it.id == nodeId }
+            if (node != null) {
+                val targetX = if (isOutput) node.position.x + 400f else node.position.x
+                val targetY = kotlin.math.round(rawPos.y / 50f) * 50f
+                Offset(targetX, targetY)
+            } else {
+                rawPos
+            }
         } else {
             null
         }
