@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.RoundedCorner
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.model.localized
@@ -23,6 +25,7 @@ import org.wip.plugintoolkit.core.utils.StartupManager
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.AutoUpdateSettings
 import org.wip.plugintoolkit.features.settings.model.CacheManagementMode
+import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.features.settings.model.DebugSettings
 import org.wip.plugintoolkit.features.settings.model.FlowSettings
 import org.wip.plugintoolkit.features.settings.model.GeneralSettings
@@ -152,6 +155,35 @@ fun SettingsRegistryBuilder.systemDefinitions(
                     Icons.Default.Save,
                     subtitle = SettingText.Resource(Res.string.setting_flow_autosave_subtitle)
                 ) { copy(autosave = it) }
+
+                dropdown(
+                    prop = FlowSettings::defaultConnectionStyle,
+                    title = Res.string.setting_flow_default_connection_style,
+                    icon = Icons.Default.Timeline,
+                    options = listOf(
+                        ConnectionCurveStyle.CardinalSpline,
+                        ConnectionCurveStyle.Straight,
+                        ConnectionCurveStyle.Orthogonal
+                    ),
+                    subtitle = SettingText.Resource(Res.string.setting_flow_default_connection_style_subtitle),
+                    labelProvider = {
+                        when (it) {
+                            ConnectionCurveStyle.CardinalSpline -> stringResource(Res.string.flow_connection_style_cardinal)
+                            ConnectionCurveStyle.Straight -> stringResource(Res.string.flow_connection_style_straight)
+                            ConnectionCurveStyle.Orthogonal -> stringResource(Res.string.flow_connection_style_orthogonal)
+                            else -> it.name
+                        }
+                    }
+                ) { copy(defaultConnectionStyle = it) }
+
+                slider(
+                    prop = FlowSettings::defaultConnectionRoundness,
+                    title = SettingText.Resource(Res.string.setting_flow_default_connection_roundness),
+                    icon = Icons.Default.RoundedCorner,
+                    range = 0f..1f,
+                    steps = 10,
+                    subtitleProvider = { settings -> "${(settings.flows.defaultConnectionRoundness * 100).toInt()}%" }
+                ) { copy(defaultConnectionRoundness = it) }
             }
         }
 

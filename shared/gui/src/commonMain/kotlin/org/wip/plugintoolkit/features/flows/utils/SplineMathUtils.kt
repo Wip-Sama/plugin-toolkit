@@ -62,12 +62,14 @@ object SplineMathUtils {
      * Terminal ends depart/arrive horizontally (0° output exit, 180° input entry), while all
      * intermediate waypoints smoothly flow through continuous tangent angles determined by their neighbors,
      * completely eliminating unnatural 0°/180° intermediate ripples.
+     * At connection points (junctions), horizontal clamping is softened to permit smooth diagonal departures.
      */
     fun computeHarmonizedSplineSegments(
         points: List<Offset>,
         tension: Float = 0.5f,
         startHorizontal: Boolean = true,
-        endHorizontal: Boolean = true
+        endHorizontal: Boolean = true,
+        scale: Float = 1f
     ): List<CubicSegment> {
         if (points.size < 2) return emptyList()
 
@@ -75,12 +77,40 @@ object SplineMathUtils {
         val segments = ArrayList<CubicSegment>(n - 1)
         val clampedTension = tension.coerceIn(0f, 1f)
 
+        fun computeEndpointControl(
+            pFrom: Offset,
+            pTo: Offset,
+            isHorizontal: Boolean,
+            isStart: Boolean
+        ): Offset {
+            val chord = pTo - pFrom
+            val dist = chord.getDistance()
+            if (dist < 0.001f) return pFrom
+
+            return if (isHorizontal) {
+                val baseDx = abs(chord.x) * 0.5f
+                val softenedDx = if (abs(chord.y) > abs(chord.x)) {
+                    minOf(baseDx, abs(chord.y) * 0.5f + 40f * scale)
+                } else {
+                    baseDx
+                }
+                val dx = maxOf(softenedDx, 30f * scale) * clampedTension
+                if (isStart) Offset(pFrom.x + dx, pFrom.y) else Offset(pFrom.x - dx, pFrom.y)
+            } else {
+                // Softened departure/arrival at junction: follows the vector towards target
+                // so it flows naturally without unnatural kinks or belly sagging
+                val len = minOf(dist * 0.38f, 150f * scale) * clampedTension
+                val dirX = chord.x / dist
+                val dirY = chord.y / dist
+                Offset(pFrom.x + dirX * len, pFrom.y + dirY * len)
+            }
+        }
+
         if (n == 2) {
             val p0 = points[0]
             val p1 = points[1]
-            val dx = maxOf(abs(p1.x - p0.x) * 0.5f, 40f) * clampedTension
-            val c1 = if (startHorizontal) Offset(p0.x + dx, p0.y) else Offset(p0.x + (p1.x - p0.x) * 0.33f, p0.y + (p1.y - p0.y) * 0.33f)
-            val c2 = if (endHorizontal) Offset(p1.x - dx, p1.y) else Offset(p1.x - (p1.x - p0.x) * 0.33f, p1.y - (p1.y - p0.y) * 0.33f)
+            val c1 = computeEndpointControl(p0, p1, startHorizontal, isStart = true)
+            val c2 = computeEndpointControl(p1, p0, endHorizontal, isStart = false)
             segments.add(CubicSegment(p0, c1, c2, p1))
             return segments
         }
@@ -112,12 +142,7 @@ object SplineMathUtils {
 
             // Control point 1 (departing pCurr)
             val c1 = if (i == 0) {
-                if (startHorizontal) {
-                    val dx = maxOf(abs(pNext.x - pCurr.x) * 0.5f, 40f) * clampedTension
-                    Offset(pCurr.x + dx, pCurr.y)
-                } else {
-                    Offset(pCurr.x + (pNext.x - pCurr.x) * (clampedTension / 3f), pCurr.y + (pNext.y - pCurr.y) * (clampedTension / 3f))
-                }
+                computeEndpointControl(pCurr, pNext, startHorizontal, isStart = true)
             } else {
                 val dPrev = sqrt((pCurr.x - points[i - 1].x) * (pCurr.x - points[i - 1].x) + (pCurr.y - points[i - 1].y) * (pCurr.y - points[i - 1].y))
                 val dNext = chordDist
@@ -130,12 +155,7 @@ object SplineMathUtils {
 
             // Control point 2 (approaching pNext)
             val c2 = if (i + 1 == n - 1) {
-                if (endHorizontal) {
-                    val dx = maxOf(abs(pNext.x - pCurr.x) * 0.5f, 40f) * clampedTension
-                    Offset(pNext.x - dx, pNext.y)
-                } else {
-                    Offset(pNext.x - (pNext.x - pCurr.x) * (clampedTension / 3f), pNext.y - (pNext.y - pCurr.y) * (clampedTension / 3f))
-                }
+                computeEndpointControl(pNext, pCurr, endHorizontal, isStart = false)
             } else {
                 val dCurr = chordDist
                 val dAfter = sqrt((points[i + 2].x - pNext.x) * (points[i + 2].x - pNext.x) + (points[i + 2].y - pNext.y) * (points[i + 2].y - pNext.y))
@@ -157,7 +177,7 @@ object SplineMathUtils {
      */
     fun buildRoundedPolylinePath(
         points: List<Offset>,
-        cornerRadius: Float = 8f
+        cornerRadius: Float = 14f
     ): Path {
         val path = Path()
         if (points.isEmpty()) return path
@@ -206,7 +226,8 @@ object SplineMathUtils {
         style: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
         tension: Float = 0.5f,
         startHorizontal: Boolean = true,
-        endHorizontal: Boolean = true
+        endHorizontal: Boolean = true,
+        scale: Float = 1f
     ): List<Offset> {
         if (points.size < 2) return emptyList()
 
@@ -252,7 +273,7 @@ object SplineMathUtils {
             }
             ConnectionCurveStyle.Bezier,
             ConnectionCurveStyle.CardinalSpline -> {
-                val segments = computeHarmonizedSplineSegments(points, tension)
+                val segments = computeHarmonizedSplineSegments(points, tension, startHorizontal, endHorizontal, scale)
                 segments.map { it.evaluate(0.5f) }
             }
         }
@@ -273,7 +294,7 @@ object SplineMathUtils {
         if (points.size == 2) {
             val p0 = points[0]
             val p1 = points[1]
-            if (p0.x == p1.x || p0.y == p1.y) {
+            if (abs(p0.x - p1.x) < 0.2f || abs(p0.y - p1.y) < 0.2f) {
                 return listOf(p0, p1)
             }
             return when {
@@ -288,7 +309,8 @@ object SplineMathUtils {
                     listOf(p0, Offset(p0.x, p1.y), p1)
                 }
                 else -> {
-                    listOf(p0, Offset(p1.x, p0.y), p1)
+                    val midY = (p0.y + p1.y) / 2f
+                    listOf(p0, Offset(p0.x, midY), Offset(p1.x, midY), p1)
                 }
             }
         }
@@ -303,17 +325,40 @@ object SplineMathUtils {
             val pB = points[i + 1]
             val isLastSegment = (i == points.size - 2)
 
-            if (pA.x == pB.x) {
+            if (abs(pA.x - pB.x) < 0.2f) {
                 result.add(pB)
                 currentIsHorizontal = false
-            } else if (pA.y == pB.y) {
+            } else if (abs(pA.y - pB.y) < 0.2f) {
                 result.add(pB)
                 currentIsHorizontal = true
             } else {
-                if (isLastSegment && endHorizontal) {
-                    result.add(Offset(pA.x, pB.y))
-                    result.add(pB)
-                    currentIsHorizontal = true
+                if (isLastSegment) {
+                    when {
+                        currentIsHorizontal && endHorizontal -> {
+                            val midX = (pA.x + pB.x) / 2f
+                            result.add(Offset(midX, pA.y))
+                            result.add(Offset(midX, pB.y))
+                            result.add(pB)
+                            currentIsHorizontal = true
+                        }
+                        !currentIsHorizontal && endHorizontal -> {
+                            result.add(Offset(pA.x, pB.y))
+                            result.add(pB)
+                            currentIsHorizontal = true
+                        }
+                        currentIsHorizontal && !endHorizontal -> {
+                            result.add(Offset(pB.x, pA.y))
+                            result.add(pB)
+                            currentIsHorizontal = false
+                        }
+                        else -> {
+                            val midY = (pA.y + pB.y) / 2f
+                            result.add(Offset(pA.x, midY))
+                            result.add(Offset(pB.x, midY))
+                            result.add(pB)
+                            currentIsHorizontal = false
+                        }
+                    }
                 } else if (currentIsHorizontal) {
                     result.add(Offset(pB.x, pA.y))
                     result.add(pB)
@@ -338,9 +383,9 @@ object SplineMathUtils {
             val curr = points[i]
             val next = points[i + 1]
 
-            val isCollinearH = abs(prev.y - curr.y) < 0.01f && abs(curr.y - next.y) < 0.01f
-            val isCollinearV = abs(prev.x - curr.x) < 0.01f && abs(curr.x - next.x) < 0.01f
-            val isDuplicate = (curr - prev).getDistance() < 0.01f
+            val isCollinearH = abs(prev.y - curr.y) < 0.2f && abs(curr.y - next.y) < 0.2f
+            val isCollinearV = abs(prev.x - curr.x) < 0.2f && abs(curr.x - next.x) < 0.2f
+            val isDuplicate = (curr - prev).getDistance() < 0.2f
 
             if (!isCollinearH && !isCollinearV && !isDuplicate) {
                 simplified.add(curr)
@@ -371,7 +416,8 @@ object SplineMathUtils {
         style: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
         tension: Float = 0.5f,
         startHorizontal: Boolean = true,
-        endHorizontal: Boolean = true
+        endHorizontal: Boolean = true,
+        scale: Float = 1f
     ): Path {
         val path = Path()
         if (points.isEmpty()) return path
@@ -392,7 +438,7 @@ object SplineMathUtils {
             ConnectionCurveStyle.Bezier,
             ConnectionCurveStyle.CardinalSpline -> {
                 path.moveTo(points[0].x, points[0].y)
-                val segments = computeHarmonizedSplineSegments(points, tension)
+                val segments = computeHarmonizedSplineSegments(points, tension, startHorizontal, endHorizontal, scale)
                 for (seg in segments) {
                     path.cubicTo(seg.control1.x, seg.control1.y, seg.control2.x, seg.control2.y, seg.end.x, seg.end.y)
                 }
@@ -400,7 +446,8 @@ object SplineMathUtils {
 
             ConnectionCurveStyle.Orthogonal -> {
                 val orthoPoints = computeOrthogonalPoints(points, startHorizontal, endHorizontal)
-                return buildRoundedPolylinePath(orthoPoints, cornerRadius = 8f)
+                val r = maxOf(14f * scale, tension * 28f * scale)
+                return buildRoundedPolylinePath(orthoPoints, cornerRadius = r)
             }
         }
 
@@ -416,7 +463,8 @@ object SplineMathUtils {
         tension: Float = 0.5f,
         samplesPerSegment: Int = 20,
         startHorizontal: Boolean = true,
-        endHorizontal: Boolean = true
+        endHorizontal: Boolean = true,
+        scale: Float = 1f
     ): List<Offset> {
         if (points.isEmpty()) return emptyList()
         if (points.size == 1) return points
@@ -429,12 +477,46 @@ object SplineMathUtils {
             }
 
             ConnectionCurveStyle.Orthogonal -> {
-                sampled.addAll(computeOrthogonalPoints(points, startHorizontal, endHorizontal))
+                val orthoPoints = computeOrthogonalPoints(points, startHorizontal, endHorizontal)
+                if (orthoPoints.size <= 2) {
+                    sampled.addAll(orthoPoints)
+                } else {
+                    val rBase = maxOf(14f * scale, tension * 28f * scale)
+                    sampled.add(orthoPoints[0])
+                    for (i in 1 until orthoPoints.size - 1) {
+                        val pPrev = orthoPoints[i - 1]
+                        val pCurr = orthoPoints[i]
+                        val pNext = orthoPoints[i + 1]
+
+                        val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
+                        val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
+                        val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
+                        val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
+
+                        val r = minOf(rBase, lenIn * 0.45f, lenOut * 0.45f)
+                        if (r < 1f || lenIn == 0f || lenOut == 0f) {
+                            sampled.add(pCurr)
+                        } else {
+                            val startCorner = Offset(pCurr.x + (vIn.x / lenIn) * r, pCurr.y + (vIn.y / lenIn) * r)
+                            val endCorner = Offset(pCurr.x + (vOut.x / lenOut) * r, pCurr.y + (vOut.y / lenOut) * r)
+                            sampled.add(startCorner)
+                            for (s in 1..4) {
+                                val t = s / 5f
+                                val mt = 1f - t
+                                val qx = mt * mt * startCorner.x + 2f * mt * t * pCurr.x + t * t * endCorner.x
+                                val qy = mt * mt * startCorner.y + 2f * mt * t * pCurr.y + t * t * endCorner.y
+                                sampled.add(Offset(qx, qy))
+                            }
+                            sampled.add(endCorner)
+                        }
+                    }
+                    sampled.add(orthoPoints.last())
+                }
             }
 
             ConnectionCurveStyle.Bezier,
             ConnectionCurveStyle.CardinalSpline -> {
-                val segments = computeHarmonizedSplineSegments(points, tension)
+                val segments = computeHarmonizedSplineSegments(points, tension, startHorizontal, endHorizontal, scale)
                 if (segments.isEmpty()) {
                     sampled.addAll(points)
                 } else {

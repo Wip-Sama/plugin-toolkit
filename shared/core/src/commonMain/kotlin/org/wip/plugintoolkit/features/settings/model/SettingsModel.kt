@@ -28,6 +28,7 @@ data class AppSettings(
 @Serializable
 enum class ConnectionCurveStyle {
     CardinalSpline,
+    @Deprecated("Use CardinalSpline instead")
     Bezier,
     Straight,
     Orthogonal
@@ -247,7 +248,9 @@ data class AutoUpdateSettings(
  */
 @Serializable
 data class FlowSettings(
-    val autosave: Boolean = true
+    val autosave: Boolean = true,
+    val defaultConnectionStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
+    val defaultConnectionRoundness: Float = 0.5f
 )
 
 /**

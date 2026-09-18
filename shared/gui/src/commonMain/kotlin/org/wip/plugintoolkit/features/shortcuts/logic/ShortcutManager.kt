@@ -347,35 +347,85 @@ class ShortcutManager(
             return false
         }
 
+        val action = getAction(actionId) ?: return false
+
+        // 1. Situation applicability check: action's situation must be Global or currently active
+        val active = _activeSituations.value
+        if (active.size > 1 && action.situation != ShortcutSituation.Global && !active.contains(action.situation)) {
+            return false
+        }
+
+        // 2. Pointer situation check: board background actions (like box select) should not match when pointer is over an element
+        val pointer = _pointerSituation.value
+        if (pointer != null && pointer != ShortcutSituation.FlowBoard) {
+            if (action.situation == ShortcutSituation.FlowBoard && actionId == org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId.FLOW_BOX_SELECT) {
+                return false
+            }
+        }
+
         val isCtrl = event.keyboardModifiers.isCtrlPressed
         val isShift = event.keyboardModifiers.isShiftPressed
         val isAlt = event.keyboardModifiers.isAltPressed
         val isMeta = event.keyboardModifiers.isMetaPressed
 
-        val button = when {
-            event.buttons.isPrimaryPressed -> ShortcutPointerButton.Left
-            event.buttons.isSecondaryPressed -> ShortcutPointerButton.Right
-            event.buttons.isTertiaryPressed -> ShortcutPointerButton.Middle
-            event.buttons.isBackPressed -> ShortcutPointerButton.Back
-            event.buttons.isForwardPressed -> ShortcutPointerButton.Forward
-            else -> ShortcutPointerButton.None
+        // 3. Multi-button trigger matching:
+        // An action matches if any of its effective triggers match the modifiers, gesture, and has its required button pressed.
+        val triggers = getEffectiveTriggers(actionId)
+        val matched = triggers.any { trigger ->
+            val modifiersMatch = trigger.matchesModifiers(ctrl = isCtrl, shift = isShift, alt = isAlt, meta = isMeta)
+            if (!modifiersMatch) return@any false
+            if (trigger.gesture != gesture) return@any false
+
+            val buttonMatch = when (trigger.pointerButton) {
+                ShortcutPointerButton.Left -> event.buttons.isPrimaryPressed && !event.buttons.isSecondaryPressed && !event.buttons.isTertiaryPressed
+                ShortcutPointerButton.Right -> event.buttons.isSecondaryPressed
+                ShortcutPointerButton.Middle -> event.buttons.isTertiaryPressed
+                ShortcutPointerButton.Back -> event.buttons.isBackPressed
+                ShortcutPointerButton.Forward -> event.buttons.isForwardPressed
+                ShortcutPointerButton.None -> true
+            }
+            buttonMatch
         }
 
-        val matched = matches(
-            actionId = actionId,
-            isCtrl = isCtrl,
-            isShift = isShift,
-            isAlt = isAlt,
-            isMeta = isMeta,
-            button = button,
-            gesture = gesture
-        )
+        if (!matched) return false
 
-        if (matched && consume) {
+        // 4. Priority-based shadowing check:
+        // If another action in an active situation also matches this event/gesture and has a strictly higher effective action priority,
+        // this action is shadowed.
+        val actionPriority = getEffectiveActionPriority(actionId)
+        for (other in allActions) {
+            if (other.id == actionId) continue
+            if (other.situation != ShortcutSituation.Global && !active.contains(other.situation)) continue
+
+            val otherPriority = getEffectiveActionPriority(other.id)
+            if (otherPriority <= actionPriority) continue
+
+            val otherTriggers = getEffectiveTriggers(other.id)
+            val otherMatches = otherTriggers.any { ot ->
+                val mMatch = ot.matchesModifiers(ctrl = isCtrl, shift = isShift, alt = isAlt, meta = isMeta)
+                if (!mMatch) return@any false
+                if (ot.gesture != gesture) return@any false
+                when (ot.pointerButton) {
+                    ShortcutPointerButton.Left -> event.buttons.isPrimaryPressed && !event.buttons.isSecondaryPressed && !event.buttons.isTertiaryPressed
+                    ShortcutPointerButton.Right -> event.buttons.isSecondaryPressed
+                    ShortcutPointerButton.Middle -> event.buttons.isTertiaryPressed
+                    ShortcutPointerButton.Back -> event.buttons.isBackPressed
+                    ShortcutPointerButton.Forward -> event.buttons.isForwardPressed
+                    ShortcutPointerButton.None -> true
+                }
+            }
+
+            if (otherMatches) {
+                Logger.d { "Action '$actionId' skipped: shadowed by higher-priority active action '${other.id}' (${otherPriority} > ${actionPriority})" }
+                return false
+            }
+        }
+
+        if (consume) {
             eat(event, actionId)
         }
 
-        return matched
+        return true
     }
 
     /**

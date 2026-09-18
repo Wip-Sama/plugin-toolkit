@@ -365,8 +365,7 @@ fun NodeComponent(
                             onFocusLost = onFocusLost,
                             onUpdateInputPortDefault = onUpdateInputPortDefault,
                             inactiveConnectedPortIds = inactiveConnectedPortIds,
-                            onPortDisposed = onPortDisposed,
-                            showTopDivider = index > 0
+                            onPortDisposed = onPortDisposed
                         )
                     }
 
@@ -389,8 +388,7 @@ fun NodeComponent(
                         onDropConnection = onDropConnection,
                         onPortPositioned = onPortPositioned,
                         inactiveConnectedPortIds = inactiveConnectedPortIds,
-                        onPortDisposed = onPortDisposed,
-                        showTopDivider = inputSections.isNotEmpty()
+                        onPortDisposed = onPortDisposed
                     )
 
                     if (hasAdvancedPorts) {

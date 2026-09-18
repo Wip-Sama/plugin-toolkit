@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -80,25 +81,11 @@ fun NodeOutputSection(
         if (highlightedPortId != null) highlightedPortIds + highlightedPortId else highlightedPortIds
     }
 
-    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
-    val dividerStrokePx = with(LocalDensity.current) { ToolkitTheme.dimensions.borderThin.toPx() }
-    val dividerModifier = if (showTopDivider) {
-        Modifier.drawBehind {
-            drawLine(
-                color = outlineVariant,
-                start = Offset(0f, 0f),
-                end = Offset(size.width, 0f),
-                strokeWidth = dividerStrokePx
-            )
-        }
-    } else Modifier
-
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(ToolkitTheme.dimensions.nodeSectionHeaderHeight)
-                .then(dividerModifier)
                 .clip(ToolkitTheme.shapes.small)
                 .clickable { onToggleOutputsCollapse() }
                 .padding(horizontal = ToolkitTheme.spacing.extraSmall)
@@ -110,6 +97,13 @@ fun NodeOutputSection(
                 text = stringResource(Res.string.node_results_section),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
+            )
+            HorizontalDivider(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = ToolkitTheme.spacing.small),
+                thickness = ToolkitTheme.dimensions.borderThin,
+                color = MaterialTheme.colorScheme.outlineVariant
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(

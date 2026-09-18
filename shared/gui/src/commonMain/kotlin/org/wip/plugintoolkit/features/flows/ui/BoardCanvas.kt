@@ -136,6 +136,8 @@ fun BoardCanvas(
     onMoveLabel: (Long, org.wip.plugintoolkit.features.flows.model.Offset, Boolean) -> Unit = { _, _, _ -> },
     onMoveElement: (Long, Offset) -> Unit = { _, _ -> },
     onEndMoveElement: (Long) -> Unit = {},
+    onMoveSegment: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
+    onEndMoveSegment: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
     onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit = {},
     onChangeConnectionRoundness: (Float) -> Unit = {},
     onPaintConnection: ((Connection) -> Unit)? = null,
@@ -389,7 +391,6 @@ fun BoardCanvas(
                 shortcutManager = shortcutManager,
                 highlightedNodeId = highlightedNodeId,
                 highlightedPortId = highlightedPortId,
-                onPan = onPan,
                 onSelectNodes = onSelectNodes,
                 onSelectGroups = onSelectGroups,
                 onSelectLabels = onSelectLabels,
@@ -398,7 +399,9 @@ fun BoardCanvas(
                 isEyedropperActive = state.isEyedropperActive,
                 onPaintConnection = onPaintConnection,
                 onWashConnection = onWashConnection,
-                onSampleColor = onSampleColor
+                onSampleColor = onSampleColor,
+                onMoveSegment = onMoveSegment,
+                onEndMoveSegment = onEndMoveSegment
             )
             .boardSelectionBoxGesture(
                 interactionState = interactionState,
@@ -424,11 +427,17 @@ fun BoardCanvas(
                 shortcutManager = shortcutManager
             )
     ) {
-        val isDraggedInSelection = state.draggedNodeId != null && (
-            state.selectedNodeIds.contains(state.draggedNodeId) ||
-            state.selectedGroupIds.contains(state.draggedNodeId) ||
-            state.selectedLabelIds.contains(state.draggedNodeId) ||
-            state.selectedPointIds.contains(state.draggedNodeId)
+        val draggedId = state.draggedNodeId
+        val isDraggedNode = draggedId != null && flow.nodes.any { it.id == draggedId }
+        val isDraggedGroup = draggedId != null && flow.groups.any { it.id == draggedId }
+        val isDraggedLabel = draggedId != null && flow.labels.any { it.id == draggedId }
+        val isDraggedPoint = draggedId != null && flow.junctions.any { it.id == draggedId }
+
+        val isDraggedInSelection = draggedId != null && (
+            (isDraggedNode && state.selectedNodeIds.contains(draggedId)) ||
+            (isDraggedGroup && state.selectedGroupIds.contains(draggedId)) ||
+            (isDraggedLabel && state.selectedLabelIds.contains(draggedId)) ||
+            (isDraggedPoint && state.selectedPointIds.contains(draggedId))
         )
 
         val movingGroupIds = remember(state.draggedNodeId, state.selectedGroupIds, isDraggedInSelection, flow.groups) {
@@ -488,6 +497,7 @@ fun BoardCanvas(
             highlightedPortId = highlightedPortId,
             highlightedNodeId = highlightedNodeId,
             getPortBoardPosition = getPortBoardPosition,
+            connectionCurrentPos = connectionCurrentPos,
             problematicConnections = problematicConnections,
             portLayoutVersion = portLayoutVersion,
             curveStyle = state.connectionCurveStyle,

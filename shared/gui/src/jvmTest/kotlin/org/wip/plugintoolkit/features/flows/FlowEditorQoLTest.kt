@@ -45,6 +45,7 @@ import org.wip.plugintoolkit.features.flows.viewmodel.ActiveFlowEditorTracker
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowNodeManager
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -2454,6 +2455,493 @@ class FlowEditorQoLTest {
         val rawPortYWithFloatingJitter = 250.04f
         val snappedY = kotlin.math.round(rawPortYWithFloatingJitter / 50f) * 50f
         assertEquals(250f, snappedY)
+    }
+
+    @Test
+    fun testMidpointHitRadiusDoesNotSwallowOneUnitSegment() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        // 1u = 50dp segment from (0, 25) to (50, 25)
+        // Midpoint is at (25, 25)
+        val portMap = mapOf(
+            Triple(1L, "out", true) to Offset(0f, 25f),
+            Triple(2L, "in", false) to Offset(50f, 25f)
+        )
+        // Position at (10, 25) is 15px from midpoint (25, 25).
+        // With previous hitRadius 28f (min 24f), this would have matched!
+        // With new hitRadius 12f (min 8f), dist (15f) > minDistance (8f), so it correctly returns null!
+        val hit = ConnectionHitTester.findClosestMidpoint(
+            position = Offset(10f, 25f),
+            connections = listOf(conn),
+            getPortBoardPosition = { nodeId, portId, isOutput -> portMap[Triple(nodeId, portId, isOutput)] },
+            junctionMap = emptyMap(),
+            scale = 1f,
+            offset = Offset.Zero
+        )
+        assertNull(hit)
+
+        // But when clicked close to the midpoint (e.g. 3px away at (22, 25)), it hits!
+        val hitClose = ConnectionHitTester.findClosestMidpoint(
+            position = Offset(22f, 25f),
+            connections = listOf(conn),
+            getPortBoardPosition = { nodeId, portId, isOutput -> portMap[Triple(nodeId, portId, isOutput)] },
+            junctionMap = emptyMap(),
+            scale = 1f,
+            offset = Offset.Zero
+        )
+        assertNotNull(hitClose)
+        assertEquals(conn, hitClose.first)
+    }
+
+    @Test
+    fun testNodeBringToFrontClearsStaleSelections() {
+        val nodeManager = FlowNodeManager()
+        val node1 = mockk<Node>(relaxed = true) {
+            every { id } returns 1L
+        }
+        val node2 = mockk<Node>(relaxed = true) {
+            every { id } returns 2L
+        }
+        val state = FlowEditorState(
+            flow = Flow("TestFlow", nodes = listOf(node1, node2)),
+            selectedNodeIds = setOf(1L),
+            selectedPointIds = setOf(999L), // Stale point selection from previous wire interaction
+            selectedGroupIds = setOf(50L),
+            selectedLabelIds = setOf(60L)
+        )
+
+        // When bringing unselected node 2 to front, it should clear the stale point/group/label selections
+        val newState = nodeManager.handleBringToFront(state, 2L)
+        assertEquals(setOf(2L), newState.selectedNodeIds)
+        assertTrue(newState.selectedPointIds.isEmpty())
+        assertTrue(newState.selectedGroupIds.isEmpty())
+        assertTrue(newState.selectedLabelIds.isEmpty())
+    }
+
+    @Test
+    fun testResizeGroupUpdatesContainedNodeIds() {
+        val node1 = mockk<Node>(relaxed = true) {
+            every { id } returns 101L
+            every { position } returns ModelOffset(100f, 100f)
+        }
+        val node2 = mockk<Node>(relaxed = true) {
+            every { id } returns 102L
+            every { position } returns ModelOffset(250f, 250f)
+        }
+        val initialGroup = FlowGroup(
+            id = 1L,
+            title = "Group 1",
+            position = ModelOffset(50f, 50f),
+            size = ModelOffset(100f, 100f), // Covers [50..150, 50..150], only node 101 is inside
+            nodeIds = listOf(101L)
+        )
+        val initialFlow = Flow("TestFlow", nodes = listOf(node1, node2), groups = listOf(initialGroup))
+        val vm = createViewModel(initialFlow)
+
+        // Resize group to (250f, 250f), extending it to [50..300, 50..300] which now also encloses node 102 at (250, 250)
+        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, delta = ModelOffset(150f, 150f), snap = true))
+
+        val updatedGroup = vm.state.value.flow.groups.first { it.id == 1L }
+        assertTrue(updatedGroup.nodeIds.contains(101L))
+        assertTrue(updatedGroup.nodeIds.contains(102L))
+    }
+
+    @Test
+    fun testMovingGroupDoesNotCaptureStationaryNodes() {
+        val node1 = mockk<Node>(relaxed = true) {
+            every { id } returns 101L
+            every { position } returns ModelOffset(100f, 100f)
+        }
+        val stationaryNode = mockk<Node>(relaxed = true) {
+            every { id } returns 102L
+            every { position } returns ModelOffset(300f, 300f)
+        }
+        val initialGroup = FlowGroup(
+            id = 1L,
+            title = "Group 1",
+            position = ModelOffset(50f, 50f),
+            size = ModelOffset(100f, 100f),
+            nodeIds = listOf(101L)
+        )
+        val initialFlow = Flow("TestFlow", nodes = listOf(node1, stationaryNode), groups = listOf(initialGroup))
+        val vm = createViewModel(initialFlow)
+
+        // Move group over the stationary node at (300, 300)
+        vm.onEvent(FlowEvent.EndMoveNode(id = 1L))
+
+        val groupAfterMove = vm.state.value.flow.groups.first { it.id == 1L }
+        // The group must not have captured the stationary node
+        assertFalse(groupAfterMove.nodeIds.contains(102L))
+    }
+
+    @Test
+    fun testMoveSegmentMovesEndpointsAndConnectedNodes() {
+        val node1 = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            title = "Node 1",
+            systemAction = "act1",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out", "Out", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val node2 = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(200f, 200f),
+            title = "Node 2",
+            systemAction = "act2",
+            inputs = listOf(InputPort("in", "In", dataType = DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val flow = Flow(name = "TestSegmentMove", nodes = listOf(node1, node2), connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Move segment 0 by (50, 30)
+        vm.onEvent(FlowEvent.MoveSegment(conn, segmentIndex = 0, delta = ModelOffset(50f, 30f)))
+
+        val afterMove = vm.state.value.flow
+        assertEquals(ModelOffset(50f, 30f), afterMove.nodes.find { it.id == 1L }?.position)
+        assertEquals(ModelOffset(250f, 230f), afterMove.nodes.find { it.id == 2L }?.position)
+
+        // End move segment to commit undo/redo command
+        vm.onEvent(FlowEvent.EndMoveSegment(conn, segmentIndex = 0, totalDelta = ModelOffset(50f, 30f)))
+        assertTrue(vm.canUndo.value)
+
+        vm.undo()
+        val afterUndo = vm.state.value.flow
+        assertEquals(ModelOffset(0f, 0f), afterUndo.nodes.find { it.id == 1L }?.position)
+        assertEquals(ModelOffset(200f, 200f), afterUndo.nodes.find { it.id == 2L }?.position)
+
+        vm.redo()
+        val afterRedo = vm.state.value.flow
+        assertEquals(ModelOffset(50f, 30f), afterRedo.nodes.find { it.id == 1L }?.position)
+        assertEquals(ModelOffset(250f, 230f), afterRedo.nodes.find { it.id == 2L }?.position)
+    }
+
+    @Test
+    fun testMoveSegmentWithWaypointsMovesOnlySegmentEndpoints() {
+        val node1 = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            title = "Node 1",
+            systemAction = "act1",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out", "Out", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val node2 = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(300f, 300f),
+            title = "Node 2",
+            systemAction = "act2",
+            inputs = listOf(InputPort("in", "In", dataType = DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(100f, 50f))
+        )
+        val flow = Flow(name = "TestSegmentWaypoints", nodes = listOf(node1, node2), connections = listOf(conn))
+        val vm = createViewModel(flow)
+
+        // Move segment 0 (Node 1 -> Waypoint 0) by (10, 20)
+        vm.onEvent(FlowEvent.MoveSegment(conn, segmentIndex = 0, delta = ModelOffset(10f, 20f)))
+
+        val stateAfterSeg0 = vm.state.value.flow
+        assertEquals(ModelOffset(10f, 20f), stateAfterSeg0.nodes.find { it.id == 1L }?.position)
+        assertEquals(ModelOffset(110f, 70f), stateAfterSeg0.connections.first().waypoints.first())
+        // Node 2 must remain stationary
+        assertEquals(ModelOffset(300f, 300f), stateAfterSeg0.nodes.find { it.id == 2L }?.position)
+    }
+
+    @Test
+    fun testIdCollisionDoesNotMoveUnselectedElementOfDifferentType() {
+        val node1 = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(100f, 100f),
+            title = "Node 1",
+            systemAction = "act1",
+            inputs = emptyList(),
+            outputs = emptyList()
+        )
+        val group1 = FlowGroup(
+            id = 1L,
+            title = "Group 1",
+            position = ModelOffset(500f, 500f),
+            size = ModelOffset(200f, 200f)
+        )
+        val flow = Flow("TestCollision", nodes = listOf(node1), groups = listOf(group1))
+        val vm = createViewModel(flow)
+
+        // Select Node 1
+        vm.onEvent(FlowEvent.SelectNodes(setOf(1L)))
+        assertEquals(setOf(1L), vm.state.value.selectedNodeIds)
+        assertEquals(emptySet(), vm.state.value.selectedGroupIds)
+
+        // Drag Node 1 by (50, 50)
+        vm.onEvent(FlowEvent.MoveNode(id = 1L, delta = Offset(50f, 50f)))
+        vm.onEvent(FlowEvent.EndMoveNode(id = 1L))
+
+        // Node 1 should have moved
+        val movedNode = vm.state.value.flow.nodes.first { it.id == 1L }
+        assertEquals(ModelOffset(150f, 150f), movedNode.position)
+
+        // Group 1 (which shares id = 1L) must NOT have moved
+        val unchangedGroup = vm.state.value.flow.groups.first { it.id == 1L }
+        assertEquals(ModelOffset(500f, 500f), unchangedGroup.position)
+    }
+
+    @Test
+    fun testExistingJunctionDetectionPriorityOverWireClick() {
+        val junction = FlowJunction(id = 10L, position = ModelOffset(150f, 150f))
+        val junctions = listOf(junction)
+
+        // Hit testing at exact junction screen pos (or within hitRadius 20px)
+        val closePos = Offset(155f, 152f)
+        val foundJunc = ConnectionHitTester.findClosestJunction(
+            position = closePos,
+            junctions = junctions,
+            scale = 1.0f,
+            offset = Offset.Zero,
+            hitRadius = 20f
+        )
+        assertNotNull(foundJunc)
+        assertEquals(10L, foundJunc.id)
+    }
+
+    @Test
+    fun testExistingWaypointDetectionPriorityOverWireClick() {
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(200f, 150f))
+        )
+        val closePos = Offset(205f, 153f)
+        val foundWp = ConnectionHitTester.findClosestWaypoint(
+            position = closePos,
+            connections = listOf(conn),
+            scale = 1.0f,
+            offset = Offset.Zero,
+            hitRadius = 20f
+        )
+        assertNotNull(foundWp)
+        assertEquals(0, foundWp.second)
+    }
+
+    @Test
+    fun testPointerDeltaGuardsAgainstOffsetZeroJump() {
+        val interactionState = BoardInteractionState()
+        assertEquals(Offset.Zero, interactionState.lastPointerPosition)
+
+        // Initial pointer position during first move event
+        val currentPosition = Offset(850f, 420f)
+        val prevPointerPosition = if (interactionState.lastPointerPosition == Offset.Zero) {
+            currentPosition
+        } else {
+            interactionState.lastPointerPosition
+        }
+        val delta = currentPosition - prevPointerPosition
+
+        // Delta must be strictly Zero to prevent initial 800+ px coordinate jump
+        assertEquals(Offset.Zero, delta)
+    }
+
+    @Test
+    fun testEmptyBoardClickResetsJunctionFocus() {
+        val interactionState = BoardInteractionState()
+        interactionState.selectedJunctionId = 42L
+        interactionState.selectedConnection = Connection(1L, "out", 2L, "in")
+
+        // Simulating empty board tap clearing selection
+        interactionState.selectedJunctionId = null
+        interactionState.selectedConnection = null
+
+        assertNull(interactionState.selectedJunctionId)
+        assertNull(interactionState.selectedConnection)
+    }
+
+    @Test
+    fun testOrthogonalSplineVerticalDeparturePreventsSJog() {
+        // Vertical arrival into junction (startHorizontal = false)
+        val p0 = Offset(100f, 100f)
+        val p1 = Offset(200f, 300f)
+
+        val points = SplineMathUtils.computeOrthogonalPoints(
+            points = listOf(p0, p1),
+            startHorizontal = false,
+            endHorizontal = true
+        )
+
+        // When departing vertically (!startHorizontal), route should depart vertically first:
+        // intermediate points must have p0.x, not route horizontally first
+        assertEquals(3, points.size)
+        assertEquals(p0, points[0])
+        assertEquals(Offset(p0.x, p1.y), points[1])
+        assertEquals(p1, points[2])
+    }
+
+    @Test
+    fun testSoftenedSplineTerminalTangentsForStackedNodes() {
+        val p0 = Offset(100f, 100f)
+        val p1 = Offset(120f, 400f)
+
+        // For downward junction departure (startHorizontal = false)
+        val segments = SplineMathUtils.computeHarmonizedSplineSegments(
+            points = listOf(p0, p1),
+            tension = 0.5f,
+            startHorizontal = false,
+            endHorizontal = true
+        )
+
+        assertEquals(1, segments.size)
+        val seg = segments.first()
+        // Control point control1 should move downwards in Y towards p1 rather than being locked to control1.y == p0.y
+        assertTrue(seg.control1.y > p0.y, "Control point control1.y should advance downwards when startHorizontal is false")
+    }
+
+    @Test
+    fun testDefaultConnectionStyleAndRoundnessFromSettings() = kotlinx.coroutines.runBlocking {
+        every { mockSettingsRepo.settings } returns MutableStateFlow(
+            AppSettings(
+                flows = FlowSettings(
+                    defaultConnectionStyle = ConnectionCurveStyle.Orthogonal,
+                    defaultConnectionRoundness = 0.85f
+                )
+            )
+        )
+
+        val flowWithoutCustomStyle = Flow("StyleInheritFlow")
+        val vm = createViewModel(flowWithoutCustomStyle)
+
+        assertEquals(ConnectionCurveStyle.Orthogonal, vm.state.value.connectionCurveStyle)
+        assertEquals(0.85f, vm.state.value.connectionRoundness)
+    }
+
+    @Test
+    fun testPerFlowConnectionStyleAndRoundnessPersistence() = kotlinx.coroutines.runBlocking {
+        val flow = Flow(
+            name = "CustomStyleFlow",
+            connectionCurveStyle = ConnectionCurveStyle.Straight,
+            connectionRoundness = 0.2f
+        )
+        val vm = createViewModel(flow)
+
+        // Initially uses the flow's saved style
+        assertEquals(ConnectionCurveStyle.Straight, vm.state.value.connectionCurveStyle)
+        assertEquals(0.2f, vm.state.value.connectionRoundness)
+
+        // When user changes curve style to CardinalSpline
+        vm.onEvent(FlowEvent.UpdateConnectionCurveStyle(ConnectionCurveStyle.CardinalSpline))
+        assertEquals(ConnectionCurveStyle.CardinalSpline, vm.state.value.connectionCurveStyle)
+        assertEquals(ConnectionCurveStyle.CardinalSpline, vm.state.value.flow.connectionCurveStyle)
+        assertTrue(vm.state.value.hasUnsavedChanges)
+
+        // When user changes roundness
+        vm.onEvent(FlowEvent.UpdateConnectionRoundness(0.75f))
+        assertEquals(0.75f, vm.state.value.connectionRoundness)
+        assertEquals(0.75f, vm.state.value.flow.connectionRoundness)
+        assertTrue(vm.state.value.hasUnsavedChanges)
+    }
+
+    @Test
+    fun testConnectionOrientationsConsistency() {
+        val nodeToNode = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val (s1, e1) = ConnectionHitTester.getConnectionOrientations(nodeToNode)
+        assertTrue(s1, "Node output must exit horizontally")
+        assertTrue(e1, "Node input must enter horizontally")
+
+        val nodeToJunc = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = Connection.FLOATING_NODE_ID,
+            targetPortId = Connection.FLOATING_PORT_ID,
+            targetJunctionId = 100L
+        )
+        val (s2, e2) = ConnectionHitTester.getConnectionOrientations(nodeToJunc)
+        assertTrue(s2, "Node output must exit horizontally")
+        assertFalse(e2, "Junction arrival must enter vertically along corridor")
+
+        val juncToNode = Connection(
+            sourceNodeId = Connection.FLOATING_NODE_ID,
+            sourcePortId = Connection.FLOATING_PORT_ID,
+            sourceJunctionId = 100L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val (s3, e3) = ConnectionHitTester.getConnectionOrientations(juncToNode)
+        assertFalse(s3, "Junction departure must depart vertically along corridor")
+        assertTrue(e3, "Node input must enter horizontally")
+    }
+
+    @Test
+    fun testConnectionHitTesterMatchesDrawnCorridor() {
+        val pOut = androidx.compose.ui.geometry.Offset(100f, 100f)
+        val junc = androidx.compose.ui.geometry.Offset(300f, 200f)
+        val pIn = androidx.compose.ui.geometry.Offset(500f, 300f)
+
+        // Connection 1: Node output to Junction
+        val sampled1 = SplineMathUtils.sampleConnectionPoints(
+            points = listOf(pOut, junc),
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = true,
+            endHorizontal = false
+        )
+        // Verify corridor at x = 300f is directly hit
+        val corridorDist1 = SplineMathUtils.distanceToPath(androidx.compose.ui.geometry.Offset(300f, 150f), sampled1)
+        assertEquals(0f, corridorDist1, 0.5f)
+
+        // Connection 2: Junction to Node input
+        val sampled2 = SplineMathUtils.sampleConnectionPoints(
+            points = listOf(junc, pIn),
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = false,
+            endHorizontal = true
+        )
+        // Verify corridor at x = 300f is directly hit
+        val corridorDist2 = SplineMathUtils.distanceToPath(androidx.compose.ui.geometry.Offset(300f, 250f), sampled2)
+        assertEquals(0f, corridorDist2, 0.5f)
+    }
+
+    @Test
+    fun testJunctionMoveDirectOffsetNoDrift() = kotlinx.coroutines.runBlocking {
+        val junc = ConnectionPoint(id = 10L, position = org.wip.plugintoolkit.features.flows.model.Offset(100f, 100f))
+        val flow = Flow(
+            name = "JunctionMoveFlow",
+            junctions = listOf(junc)
+        )
+        val vm = createViewModel(flow)
+
+        // Move by delta (50, 20)
+        vm.onEvent(FlowEvent.MoveJunction(10L, org.wip.plugintoolkit.features.flows.model.Offset(50f, 20f), isTransient = true))
+        val current = vm.state.value.flow.junctions.first { it.id == 10L }
+        assertEquals(150f, current.position.x)
+        assertEquals(120f, current.position.y)
+
+        // Move to target using bounded delta without cumulative drift
+        val targetPos = org.wip.plugintoolkit.features.flows.model.Offset(200f, 250f)
+        val deltaToApply = targetPos - current.position
+        vm.onEvent(FlowEvent.MoveJunction(10L, deltaToApply, isTransient = true))
+        val afterMove = vm.state.value.flow.junctions.first { it.id == 10L }
+        assertEquals(200f, afterMove.position.x)
+        assertEquals(250f, afterMove.position.y)
     }
 }
 

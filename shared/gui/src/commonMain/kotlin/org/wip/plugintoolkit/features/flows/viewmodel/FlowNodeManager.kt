@@ -49,15 +49,20 @@ class FlowNodeManager {
 
     fun handleEndMoveNode(currentState: FlowEditorState, id: Long, density: Float): FlowEditorState {
         val finalOffset = currentState.currentDragOffset
-        val isSelectedMove = currentState.selectedNodeIds.contains(id) ||
-                currentState.selectedGroupIds.contains(id) ||
-                currentState.selectedLabelIds.contains(id) ||
-                currentState.selectedPointIds.contains(id)
+        val isNode = currentState.flow.nodes.any { it.id == id }
+        val isGroup = currentState.flow.groups.any { it.id == id }
+        val isLabel = currentState.flow.labels.any { it.id == id }
+        val isPoint = currentState.flow.junctions.any { it.id == id }
 
-        val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (currentState.flow.nodes.any { it.id == id }) setOf(id) else emptySet()).toMutableSet()
-        val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (currentState.flow.groups.any { it.id == id }) setOf(id) else emptySet()
-        val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (currentState.flow.labels.any { it.id == id }) setOf(id) else emptySet()
-        val pointsToMove = if (isSelectedMove) currentState.selectedPointIds else if (currentState.flow.junctions.any { it.id == id }) setOf(id) else emptySet()
+        val isSelectedMove = (isNode && currentState.selectedNodeIds.contains(id)) ||
+                (isGroup && currentState.selectedGroupIds.contains(id)) ||
+                (isLabel && currentState.selectedLabelIds.contains(id)) ||
+                (isPoint && currentState.selectedPointIds.contains(id))
+
+        val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (isNode) setOf(id) else emptySet()).toMutableSet()
+        val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (isGroup) setOf(id) else emptySet()
+        val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (isLabel) setOf(id) else emptySet()
+        val pointsToMove = if (isSelectedMove) currentState.selectedPointIds else if (isPoint) setOf(id) else emptySet()
 
         for (grpId in groupsToMove) {
             currentState.flow.groups.find { it.id == grpId }?.let { nodesToMove.addAll(it.nodeIds) }
@@ -291,7 +296,10 @@ class FlowNodeManager {
         }
         return currentState.copy(
             flow = currentState.flow.copy(nodes = currentState.flow.nodes.filter { it.id != nodeId } + node),
-            selectedNodeIds = newSelection
+            selectedNodeIds = newSelection,
+            selectedPointIds = if (isAlreadySelected) currentState.selectedPointIds else emptySet(),
+            selectedGroupIds = if (isAlreadySelected) currentState.selectedGroupIds else emptySet(),
+            selectedLabelIds = if (isAlreadySelected) currentState.selectedLabelIds else emptySet()
         )
     }
 

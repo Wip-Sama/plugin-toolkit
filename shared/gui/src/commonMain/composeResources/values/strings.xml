@@ -162,6 +162,10 @@
     <string name="section_flows_header">Flows</string>
     <string name="setting_flow_autosave">Autosave Flows</string>
     <string name="setting_flow_autosave_subtitle">Automatically save changes when editing flows</string>
+    <string name="setting_flow_default_connection_style">Default Wire Style</string>
+    <string name="setting_flow_default_connection_style_subtitle">Default spline curve style for new connections and flows</string>
+    <string name="setting_flow_default_connection_roundness">Default Wire Roundness</string>
+    <string name="setting_flow_default_connection_roundness_subtitle">Default curve curvature or corner radius</string>
     <string name="update_available_title">Update Available: %1$s</string>
     <string name="update_now">Update Now</string>
     <string name="update_later">Update Later</string>

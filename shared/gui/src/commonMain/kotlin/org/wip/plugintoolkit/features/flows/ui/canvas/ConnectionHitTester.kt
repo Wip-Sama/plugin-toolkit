@@ -10,6 +10,31 @@ import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 
 object ConnectionHitTester {
 
+    fun getConnectionOrientations(
+        connection: Connection,
+        connections: List<Connection> = emptyList()
+    ): Pair<Boolean, Boolean> {
+        val startIsHorizontal = if (connection.sourceJunctionId == null) {
+            true
+        } else {
+            // Connection leaves a junction. Check incoming connection to this junction
+            val incoming = connections.find { it.targetJunctionId == connection.sourceJunctionId }
+            if (incoming != null) {
+                false
+            } else {
+                false
+            }
+        }
+
+        val endIsHorizontal = if (connection.targetJunctionId == null && !connection.isFloating) {
+            true
+        } else {
+            false
+        }
+
+        return Pair(startIsHorizontal, endIsHorizontal)
+    }
+
     fun findClosestConnection(
         position: Offset,
         connections: List<Connection>,
@@ -47,15 +72,15 @@ object ConnectionHitTester {
                 continue
             }
 
-            val startIsHorizontal = connection.sourceJunctionId == null
-            val endIsHorizontal = connection.targetJunctionId == null && !connection.isFloating
+            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(connection, connections)
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
                 style = effectiveStyle,
                 tension = roundness,
                 startHorizontal = startIsHorizontal,
-                endHorizontal = endIsHorizontal
+                endHorizontal = endIsHorizontal,
+                scale = scale
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -119,15 +144,15 @@ object ConnectionHitTester {
                 continue
             }
 
-            val startIsHorizontal = connection.sourceJunctionId == null
-            val endIsHorizontal = connection.targetJunctionId == null && !connection.isFloating
+            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(connection, connections)
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
                 style = effectiveStyle,
                 tension = roundness,
                 startHorizontal = startIsHorizontal,
-                endHorizontal = endIsHorizontal
+                endHorizontal = endIsHorizontal,
+                scale = scale
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -161,10 +186,10 @@ object ConnectionHitTester {
         junctions: List<FlowJunction>,
         scale: Float,
         offset: Offset,
-        hitRadius: Float = 16f * scale
+        hitRadius: Float = 20f * scale
     ): FlowJunction? {
         var closest: FlowJunction? = null
-        var minDistance = hitRadius
+        var minDistance = if (hitRadius < 20f) 20f else hitRadius
         for (junction in junctions) {
             val screenPos = (junction.position.toComposeOffset() * scale) + offset
             val dist = (position - screenPos).getDistance()
@@ -186,12 +211,10 @@ object ConnectionHitTester {
         return distToSource < distToTarget
     }
 
-    fun getConnectionScreenPoints(
+    fun getConnectionBoardPoints(
         connection: Connection,
         getPortBoardPosition: (Long, String, Boolean) -> Offset?,
         junctionMap: Map<Long, Offset>,
-        scale: Float,
-        offset: Offset,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f
     ): List<Offset>? {
@@ -203,43 +226,62 @@ object ConnectionHitTester {
             return null
         }
 
-        val startScreenPos = when {
-            connection.sourceJunctionId != null -> junctionMap[connection.sourceJunctionId]?.let { (it * scale) + offset }
+        val startPos = when {
+            connection.sourceJunctionId != null -> junctionMap[connection.sourceJunctionId]
             srcCollapsedGroup != null -> {
-                val collapsedWidthPx = maxOf(srcCollapsedGroup.size.x * scale, 200f * density * scale)
-                val collapsedHeightPx = 44f * density * scale
+                val collapsedWidth = maxOf(srcCollapsedGroup.size.x, 200f * density)
+                val collapsedHeight = 44f * density
                 Offset(
-                    (srcCollapsedGroup.position.x * scale + offset.x) + collapsedWidthPx,
-                    (srcCollapsedGroup.position.y * scale + offset.y) + (collapsedHeightPx / 2f)
+                    srcCollapsedGroup.position.x + collapsedWidth,
+                    srcCollapsedGroup.position.y + (collapsedHeight / 2f)
                 )
             }
-            else -> getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId, true)?.let { (it * scale) + offset }
+            else -> getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId, true)
         } ?: return null
 
         val floating = connection.floatingTarget
-        val endScreenPos = when {
-            connection.targetJunctionId != null -> junctionMap[connection.targetJunctionId]?.let { (it * scale) + offset }
+        val endPos = when {
+            connection.targetJunctionId != null -> junctionMap[connection.targetJunctionId]
             tgtCollapsedGroup != null -> {
-                val collapsedHeightPx = 44f * density * scale
+                val collapsedHeight = 44f * density
                 Offset(
-                    tgtCollapsedGroup.position.x * scale + offset.x,
-                    (tgtCollapsedGroup.position.y * scale + offset.y) + (collapsedHeightPx / 2f)
+                    tgtCollapsedGroup.position.x,
+                    tgtCollapsedGroup.position.y + (collapsedHeight / 2f)
                 )
             }
-            floating != null -> (floating.toComposeOffset() * scale) + offset
-            else -> getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)?.let { (it * scale) + offset }
+            floating != null -> floating.toComposeOffset()
+            else -> getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
         } ?: return null
 
         val allPoints = mutableListOf<Offset>()
-        allPoints.add(startScreenPos)
+        allPoints.add(startPos)
         for (jId in connection.junctionIds) {
-            junctionMap[jId]?.let { allPoints.add((it * scale) + offset) }
+            junctionMap[jId]?.let { allPoints.add(it) }
         }
         for (wp in connection.waypoints) {
-            allPoints.add((wp.toComposeOffset() * scale) + offset)
+            allPoints.add(wp.toComposeOffset())
         }
-        allPoints.add(endScreenPos)
+        allPoints.add(endPos)
         return allPoints
+    }
+
+    fun getConnectionScreenPoints(
+        connection: Connection,
+        getPortBoardPosition: (Long, String, Boolean) -> Offset?,
+        junctionMap: Map<Long, Offset>,
+        scale: Float,
+        offset: Offset,
+        groups: List<FlowGroup> = emptyList(),
+        density: Float = 1f
+    ): List<Offset>? {
+        val boardPoints = getConnectionBoardPoints(
+            connection = connection,
+            getPortBoardPosition = getPortBoardPosition,
+            junctionMap = junctionMap,
+            groups = groups,
+            density = density
+        ) ?: return null
+        return boardPoints.map { (it * scale) + offset }
     }
 
     /**
@@ -251,10 +293,10 @@ object ConnectionHitTester {
         connections: List<Connection>,
         scale: Float,
         offset: Offset,
-        hitRadius: Float = 16f * scale
+        hitRadius: Float = 20f * scale
     ): Triple<Connection, Int, Offset>? {
         var closest: Triple<Connection, Int, Offset>? = null
-        var minDistance = if (hitRadius < 12f) 12f else hitRadius
+        var minDistance = if (hitRadius < 20f) 20f else hitRadius
 
         for (connection in connections) {
             connection.waypoints.forEachIndexed { index, wp ->
@@ -284,10 +326,10 @@ object ConnectionHitTester {
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f,
-        hitRadius: Float = 28f * scale
+        hitRadius: Float = 12f * scale
     ): Triple<Connection, Int, Offset>? {
         var closest: Triple<Connection, Int, Offset>? = null
-        var minDistance = if (hitRadius < 24f) 24f else hitRadius
+        var minDistance = if (hitRadius < 8f) 8f else hitRadius
 
         for (connection in connections) {
             val screenPoints = getConnectionScreenPoints(
@@ -302,11 +344,15 @@ object ConnectionHitTester {
 
             if (screenPoints.size < 2) continue
 
+            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(connection, connections)
             val effectiveStyle = curveStyle
             val midpoints = SplineMathUtils.computeSegmentMidpoints(
                 points = screenPoints,
                 style = effectiveStyle,
-                tension = roundness
+                tension = roundness,
+                startHorizontal = startIsHorizontal,
+                endHorizontal = endIsHorizontal,
+                scale = scale
             )
 
             midpoints.forEachIndexed { segIdx, midPt ->

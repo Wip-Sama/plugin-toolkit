@@ -77,6 +77,7 @@ fun BoardGridAndConnectionsCanvas(
     highlightedPortId: String?,
     highlightedNodeId: Long?,
     getPortBoardPosition: (Long, String, Boolean) -> Offset?,
+    connectionCurrentPos: Offset = Offset.Zero,
     problematicConnections: Set<Connection> = emptySet(),
     portLayoutVersion: Int = 0,
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
@@ -109,8 +110,9 @@ fun BoardGridAndConnectionsCanvas(
     }
 
     Canvas(modifier = modifier.fillMaxSize().testTag("board_grid")) {
-        // Read portLayoutVersion to ensure canvas redraws when node expansion or port layout completes
+        // Read portLayoutVersion and currentDragOffset to ensure canvas redraws reactively during node dragging
         if (portLayoutVersion < 0) return@Canvas
+        val _activeDragOffset = state.currentDragOffset
         val scaledGridSize = gridSize * state.scale
         val startX = (state.offset.x % scaledGridSize) - scaledGridSize
         val startY = (state.offset.y % scaledGridSize) - scaledGridSize
@@ -146,26 +148,26 @@ fun BoardGridAndConnectionsCanvas(
             } else {
                 connectionColor
             }
-            val jColor = baseColor.copy(alpha = baseColor.alpha * juncAlpha)
-            val sColor = surfaceColor.copy(alpha = surfaceColor.alpha * juncAlpha)
+            val color = if (isHovered) Color(0xFFFF2D55) else baseColor
             val isSelected = interactionState.selectedJunctionId == junction.id || junction.id in state.selectedPointIds
-            val radius = (if (isHovered || isSelected) 7.5f else 5.5f) * state.scale
 
             drawCircle(
-                color = jColor,
-                radius = radius,
+                color = color.copy(alpha = juncAlpha),
+                radius = 5.5f * state.scale,
                 center = center
             )
             drawCircle(
-                color = sColor,
-                radius = radius,
+                color = surfaceColor.copy(alpha = juncAlpha),
+                radius = 5.5f * state.scale,
                 center = center,
                 style = Stroke(width = 1.5f * state.scale)
             )
+
+            // Prominent selection highlight ring
             if (isSelected) {
                 drawCircle(
                     color = Color(0xFFFF9800),
-                    radius = radius + 3.5f * state.scale,
+                    radius = 9f * state.scale,
                     center = center,
                     style = Stroke(width = 2f * state.scale)
                 )
@@ -217,15 +219,19 @@ fun BoardGridAndConnectionsCanvas(
                 } else {
                     dimensions.strokeWidthThin.toPx()
                 }
-                val startIsHorizontal = connection.sourceJunctionId == null
-                val endIsHorizontal = connection.targetJunctionId == null && !connection.isFloating
+                val (startIsHorizontal, endIsHorizontal) = ConnectionHitTester.getConnectionOrientations(
+                    connection = connection,
+                    connections = flow.connections
+                )
+
                 val effectiveStyle = curveStyle
                 val path = SplineMathUtils.buildConnectionPath(
                     points = screenPoints,
                     style = effectiveStyle,
                     tension = roundness,
                     startHorizontal = startIsHorizontal,
-                    endHorizontal = endIsHorizontal
+                    endHorizontal = endIsHorizontal,
+                    scale = state.scale
                 )
                 drawPath(
                     path = path,
@@ -285,36 +291,6 @@ fun BoardGridAndConnectionsCanvas(
                         style = Stroke(width = 1.5f * state.scale)
                     )
                 }
-
-                // Draw Midpoints (Interactive splitting handles - 3x bigger)
-                val isConnHovered = interactionState.hoveredConnection == connection
-                val midpoints = SplineMathUtils.computeSegmentMidpoints(
-                    points = screenPoints,
-                    style = effectiveStyle,
-                    tension = roundness,
-                    startHorizontal = startIsHorizontal,
-                    endHorizontal = endIsHorizontal
-                )
-                midpoints.forEachIndexed { segIndex, midPt ->
-                    val isMidpointHovered = interactionState.hoveredMidpoint?.first == connection &&
-                            interactionState.hoveredMidpoint?.second == segIndex
-                    if (isConnHovered || isMidpointHovered) {
-                        val midRadius = (if (isMidpointHovered) 18f else 12f) * state.scale
-                        val midColor = (if (!connColor.isNullOrBlank()) parseColorString(connColor) else connectionColor)
-                            .copy(alpha = if (isMidpointHovered) 1f else 0.85f)
-                        drawCircle(
-                            color = midColor,
-                            radius = midRadius,
-                            center = midPt
-                        )
-                        drawCircle(
-                            color = surfaceColor,
-                            radius = midRadius,
-                            center = midPt,
-                            style = Stroke(width = 2.5f * state.scale)
-                        )
-                    }
-                }
             }
         }
 
@@ -343,14 +319,22 @@ fun BoardGridAndConnectionsCanvas(
         if (isDrawingConnection && connectionStartNodeId != null && connectionStartPortId != null) {
             val startBoardPos = getPortBoardPosition(connectionStartNodeId, connectionStartPortId, connectionStartIsOutput)
             if (startBoardPos != null) {
+                val fallbackPos = if (connectionCurrentPos != Offset.Zero) {
+                    connectionCurrentPos
+                } else if (interactionState.lastPointerPosition != Offset.Zero) {
+                    (interactionState.lastPointerPosition - state.offset) / state.scale
+                } else {
+                    startBoardPos
+                }
+
                 var currentPos = if (highlightedPortId != null && highlightedNodeId != null) {
-                    getPortBoardPosition(highlightedNodeId, highlightedPortId, !connectionStartIsOutput) ?: ((interactionState.lastPointerPosition - state.offset) / state.scale)
+                    getPortBoardPosition(highlightedNodeId, highlightedPortId, !connectionStartIsOutput) ?: fallbackPos
                 } else if (interactionState.hoveredJunctionId != null) {
-                    junctionMap[interactionState.hoveredJunctionId] ?: ((interactionState.lastPointerPosition - state.offset) / state.scale)
+                    junctionMap[interactionState.hoveredJunctionId] ?: fallbackPos
                 } else if (interactionState.snappedWirePoint != null) {
                     interactionState.snappedWirePoint!!
                 } else {
-                    (interactionState.lastPointerPosition - state.offset) / state.scale
+                    fallbackPos
                 }
 
                 if (interactionState.snappedWirePoint == null) {
@@ -368,7 +352,7 @@ fun BoardGridAndConnectionsCanvas(
                 }
 
                 val pts = listOf((startPos * state.scale) + state.offset, (endPos * state.scale) + state.offset)
-                val path = SplineMathUtils.buildConnectionPath(pts, curveStyle, roundness)
+                val path = SplineMathUtils.buildConnectionPath(pts, curveStyle, roundness, scale = state.scale)
                 drawPath(
                     path = path,
                     color = connectionColor.copy(alpha = opacity.disabled),
@@ -395,15 +379,21 @@ fun BoardGridAndConnectionsCanvas(
                 allBoardPts.add(startBoardPos)
                 allBoardPts.addAll(interactionState.structuredConnectionPoints)
 
+                val fallbackStructured = if (interactionState.structuredConnectionLivePos != Offset.Zero) {
+                    interactionState.structuredConnectionLivePos
+                } else {
+                    allBoardPts.lastOrNull() ?: startBoardPos
+                }
+
                 var liveBoardPos = if (highlightedPortId != null && highlightedNodeId != null) {
                     getPortBoardPosition(highlightedNodeId, highlightedPortId, !interactionState.structuredConnectionStartIsOutput)
-                        ?: interactionState.structuredConnectionLivePos
+                        ?: fallbackStructured
                 } else if (interactionState.hoveredJunctionId != null) {
-                    junctionMap[interactionState.hoveredJunctionId] ?: interactionState.structuredConnectionLivePos
+                    junctionMap[interactionState.hoveredJunctionId] ?: fallbackStructured
                 } else if (interactionState.snappedWirePoint != null) {
                     interactionState.snappedWirePoint!!
                 } else {
-                    interactionState.structuredConnectionLivePos
+                    fallbackStructured
                 }
 
                 val lastCommitted = allBoardPts.last()
@@ -417,7 +407,7 @@ fun BoardGridAndConnectionsCanvas(
                 allBoardPts.add(liveBoardPos)
 
                 val previewScreenPts = allBoardPts.map { (it * state.scale) + state.offset }
-                val previewPath = SplineMathUtils.buildConnectionPath(previewScreenPts, curveStyle, roundness)
+                val previewPath = SplineMathUtils.buildConnectionPath(previewScreenPts, curveStyle, roundness, scale = state.scale)
                 drawPath(
                     path = previewPath,
                     color = connectionColor.copy(alpha = 0.9f),

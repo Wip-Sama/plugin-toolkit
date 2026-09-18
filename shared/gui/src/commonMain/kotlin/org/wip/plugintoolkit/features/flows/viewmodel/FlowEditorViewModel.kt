@@ -238,9 +238,18 @@ class FlowEditorViewModel(
                 val maxPointId = activeFlowWithSyncedSubflows.junctions.maxOfOrNull { it.id } ?: -1L
                 val maxId = maxOf(maxNodeId, maxPointId)
 
+                val defaultStyle = resolvedSettingsRepository?.settings?.value?.flows?.defaultConnectionStyle
+                    ?: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline
+                val defaultRoundness = resolvedSettingsRepository?.settings?.value?.flows?.defaultConnectionRoundness
+                    ?: 0.5f
+                val effectiveStyle = activeFlowWithSyncedSubflows.connectionCurveStyle ?: defaultStyle
+                val effectiveRoundness = activeFlowWithSyncedSubflows.connectionRoundness ?: defaultRoundness
+
                 _state.update { currentState ->
                     currentState.copy(
                         flow = activeFlowWithSyncedSubflows,
+                        connectionCurveStyle = effectiveStyle,
+                        connectionRoundness = effectiveRoundness,
                         nextId = maxId + 1,
                         flows = allFlows,
                         hasUnsavedChanges = false
@@ -457,15 +466,20 @@ class FlowEditorViewModel(
                 shouldRunTypeInference = true
                 val finalOffset = currentState.currentDragOffset
                 newState = nodeManager.handleEndMoveNode(currentState, event.id, event.density)
-                val isSelectedMove = currentState.selectedNodeIds.contains(event.id) ||
-                        currentState.selectedGroupIds.contains(event.id) ||
-                        currentState.selectedLabelIds.contains(event.id) ||
-                        currentState.selectedPointIds.contains(event.id)
+                val isNode = currentState.flow.nodes.any { it.id == event.id }
+                val isGroup = currentState.flow.groups.any { it.id == event.id }
+                val isLabel = currentState.flow.labels.any { it.id == event.id }
+                val isPoint = currentState.flow.junctions.any { it.id == event.id }
 
-                val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (currentState.flow.nodes.any { it.id == event.id }) setOf(event.id) else emptySet()).toMutableSet()
-                val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (currentState.flow.groups.any { it.id == event.id }) setOf(event.id) else emptySet()
-                val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (currentState.flow.labels.any { it.id == event.id }) setOf(event.id) else emptySet()
-                val pointsToMove = if (isSelectedMove) currentState.selectedPointIds else if (currentState.flow.junctions.any { it.id == event.id }) setOf(event.id) else emptySet()
+                val isSelectedMove = (isNode && currentState.selectedNodeIds.contains(event.id)) ||
+                        (isGroup && currentState.selectedGroupIds.contains(event.id)) ||
+                        (isLabel && currentState.selectedLabelIds.contains(event.id)) ||
+                        (isPoint && currentState.selectedPointIds.contains(event.id))
+
+                val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (isNode) setOf(event.id) else emptySet()).toMutableSet()
+                val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (isGroup) setOf(event.id) else emptySet()
+                val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (isLabel) setOf(event.id) else emptySet()
+                val pointsToMove = if (isSelectedMove) currentState.selectedPointIds else if (isPoint) setOf(event.id) else emptySet()
 
                 for (grpId in groupsToMove) {
                     currentState.flow.groups.find { it.id == grpId }?.let { nodesToMove.addAll(it.nodeIds) }
@@ -482,23 +496,29 @@ class FlowEditorViewModel(
 
                 // Check group containment for moved nodes:
                 // Only nodes dropped inside a group become bound, and nodes dropped outside become unbound!
+                // Moving an existing group across stationary nodes must NEVER capture them.
+                val userMovedNodes = if (isSelectedMove) currentState.selectedNodeIds else if (currentState.flow.nodes.any { it.id == event.id }) setOf(event.id) else emptySet()
                 val updatedGroups = newState.flow.groups.map { baseGrp ->
-                    val currentlyBound = baseGrp.nodeIds.toMutableSet()
-                    for (nodeId in nodesToMove) {
-                        val node = newState.flow.nodes.find { it.id == nodeId }
-                        if (node != null) {
-                            val isInside = node.position.x >= baseGrp.position.x &&
-                                    node.position.x <= baseGrp.position.x + baseGrp.size.x &&
-                                    node.position.y >= baseGrp.position.y &&
-                                    node.position.y <= baseGrp.position.y + baseGrp.size.y
-                            if (isInside) {
-                                currentlyBound.add(nodeId)
-                            } else {
-                                currentlyBound.remove(nodeId)
+                    if (userMovedNodes.isEmpty()) {
+                        baseGrp
+                    } else {
+                        val currentlyBound = baseGrp.nodeIds.toMutableSet()
+                        for (nodeId in userMovedNodes) {
+                            val node = newState.flow.nodes.find { it.id == nodeId }
+                            if (node != null) {
+                                val isInside = node.position.x >= baseGrp.position.x &&
+                                        node.position.x <= baseGrp.position.x + baseGrp.size.x &&
+                                        node.position.y >= baseGrp.position.y &&
+                                        node.position.y <= baseGrp.position.y + baseGrp.size.y
+                                if (isInside) {
+                                    currentlyBound.add(nodeId)
+                                } else {
+                                    currentlyBound.remove(nodeId)
+                                }
                             }
                         }
+                        baseGrp.copy(nodeIds = currentlyBound.toList())
                     }
-                    baseGrp.copy(nodeIds = currentlyBound.toList())
                 }
 
                 val groupMoves = mutableMapOf<Long, Pair<ModelOffset, ModelOffset>>()
@@ -1323,7 +1343,13 @@ class FlowEditorViewModel(
                     } else {
                         org.wip.plugintoolkit.features.flows.model.Offset(rawX, rawY)
                     }
-                    val updatedGroup = grp.copy(size = newSize)
+                    val containedNodeIds = currentState.flow.nodes.filter { node ->
+                        node.position.x >= grp.position.x &&
+                        node.position.x <= grp.position.x + newSize.x &&
+                        node.position.y >= grp.position.y &&
+                        node.position.y <= grp.position.y + newSize.y
+                    }.map { it.id }
+                    val updatedGroup = grp.copy(size = newSize, nodeIds = containedNodeIds)
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
                             groups = currentState.flow.groups.map { if (it.id == event.groupId) updatedGroup else it }
@@ -2043,6 +2069,105 @@ class FlowEditorViewModel(
                 }
             }
 
+            is FlowEvent.MoveSegment -> {
+                val conn = currentState.flow.connections.find {
+                    it.sourceNodeId == event.connection.sourceNodeId &&
+                    it.sourcePortId == event.connection.sourcePortId &&
+                    it.targetNodeId == event.connection.targetNodeId &&
+                    it.targetPortId == event.connection.targetPortId &&
+                    it.sourceJunctionId == event.connection.sourceJunctionId &&
+                    it.targetJunctionId == event.connection.targetJunctionId
+                } ?: event.connection
+
+                val waypoints = conn.waypoints
+                val wCount = waypoints.size
+                val segIdx = event.segmentIndex.coerceIn(0, wCount)
+
+                val startNodeId = if (segIdx == 0 && conn.sourceJunctionId == null && conn.sourceNodeId != Connection.FLOATING_NODE_ID) conn.sourceNodeId else null
+                val startJuncId = if (segIdx == 0) conn.sourceJunctionId else null
+                val startWpIdx = if (segIdx > 0) segIdx - 1 else null
+
+                val endNodeId = if (segIdx == wCount && conn.targetJunctionId == null && conn.targetNodeId != Connection.FLOATING_NODE_ID) conn.targetNodeId else null
+                val endJuncId = if (segIdx == wCount) conn.targetJunctionId else null
+                val endWpIdx = if (segIdx < wCount) segIdx else null
+
+                val nodesToMove = listOfNotNull(startNodeId, endNodeId).toSet()
+                val junctionsToMove = listOfNotNull(startJuncId, endJuncId).toSet()
+                val wpIndicesToMove = listOfNotNull(startWpIdx, endWpIdx).toSet()
+
+                val updatedNodes = if (nodesToMove.isNotEmpty()) {
+                    currentState.flow.nodes.map { n ->
+                        if (n.id in nodesToMove) n.copyWithPosition(n.position + event.delta) else n
+                    }
+                } else currentState.flow.nodes
+
+                val updatedJunctions = if (junctionsToMove.isNotEmpty()) {
+                    currentState.flow.junctions.map { j ->
+                        if (j.id in junctionsToMove) j.copyWithPosition(j.position + event.delta) else j
+                    }
+                } else currentState.flow.junctions
+
+                val updatedConnections = if (wpIndicesToMove.isNotEmpty()) {
+                    currentState.flow.connections.map { c ->
+                        if (c == conn) {
+                            val newWps = c.waypoints.mapIndexed { idx, wp ->
+                                if (idx in wpIndicesToMove) wp + event.delta else wp
+                            }
+                            c.copy(waypoints = newWps)
+                        } else c
+                    }
+                } else currentState.flow.connections
+
+                newState = currentState.copy(
+                    flow = currentState.flow.copy(
+                        nodes = updatedNodes,
+                        junctions = updatedJunctions,
+                        connections = updatedConnections
+                    ),
+                    hasUnsavedChanges = true
+                )
+            }
+
+            is FlowEvent.EndMoveSegment -> {
+                val conn = currentState.flow.connections.find {
+                    it.sourceNodeId == event.connection.sourceNodeId &&
+                    it.sourcePortId == event.connection.sourcePortId &&
+                    it.targetNodeId == event.connection.targetNodeId &&
+                    it.targetPortId == event.connection.targetPortId &&
+                    it.sourceJunctionId == event.connection.sourceJunctionId &&
+                    it.targetJunctionId == event.connection.targetJunctionId
+                } ?: event.connection
+
+                val waypoints = conn.waypoints
+                val wCount = waypoints.size
+                val segIdx = event.segmentIndex.coerceIn(0, wCount)
+
+                val startNodeId = if (segIdx == 0 && conn.sourceJunctionId == null && conn.sourceNodeId != Connection.FLOATING_NODE_ID) conn.sourceNodeId else null
+                val startJuncId = if (segIdx == 0) conn.sourceJunctionId else null
+                val endNodeId = if (segIdx == wCount && conn.targetJunctionId == null && conn.targetNodeId != Connection.FLOATING_NODE_ID) conn.targetNodeId else null
+                val endJuncId = if (segIdx == wCount) conn.targetJunctionId else null
+
+                val nodesToMove = listOfNotNull(startNodeId, endNodeId).toSet()
+                val junctionsToMove = listOfNotNull(startJuncId, endJuncId).toSet()
+
+                if (nodesToMove.isNotEmpty() || junctionsToMove.isNotEmpty()) {
+                    val nodeMoves = nodesToMove.associateWith { id ->
+                        val n = currentState.flow.nodes.find { it.id == id }
+                        val pos = n?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero
+                        Pair(pos - event.totalDelta, pos)
+                    }
+                    val pointMoves = junctionsToMove.associateWith { id ->
+                        val j = currentState.flow.junctions.find { it.id == id }
+                        val pos = j?.position ?: org.wip.plugintoolkit.features.flows.model.Offset.Zero
+                        Pair(pos - event.totalDelta, pos)
+                    }
+                    pendingCommand = MoveBoardElementsCommand(
+                        nodeMoves = nodeMoves,
+                        pointMoves = pointMoves
+                    )
+                }
+            }
+
             is FlowEvent.DeleteJunction -> {
                 val junc = currentState.flow.junctions.find { it.id == event.junctionId }
                 if (junc != null) {
@@ -2105,11 +2230,19 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.UpdateConnectionCurveStyle -> {
-                newState = currentState.copy(connectionCurveStyle = event.style)
+                newState = currentState.copy(
+                    connectionCurveStyle = event.style,
+                    flow = currentState.flow.copy(connectionCurveStyle = event.style),
+                    hasUnsavedChanges = true
+                )
             }
 
             is FlowEvent.UpdateConnectionRoundness -> {
-                newState = currentState.copy(connectionRoundness = event.roundness)
+                newState = currentState.copy(
+                    connectionRoundness = event.roundness,
+                    flow = currentState.flow.copy(connectionRoundness = event.roundness),
+                    hasUnsavedChanges = true
+                )
             }
 
             is FlowEvent.ToggleStructuredConnectionMode -> {

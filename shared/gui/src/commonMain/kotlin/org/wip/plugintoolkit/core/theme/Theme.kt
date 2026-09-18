@@ -81,6 +81,7 @@ data class Dimensions(
     val cardElevation: Dp = 2.dp,
     val repositorySidebarWidth: Dp = 340.dp,
     val textFieldHeight: Dp = 56.dp,
+    val textFieldHeightCompact: Dp = 28.dp,
     val borderSelected: Dp = 3.dp,
     val borderUnselected: Dp = 1.dp,
     val borderThin: Dp = 0.5.dp,

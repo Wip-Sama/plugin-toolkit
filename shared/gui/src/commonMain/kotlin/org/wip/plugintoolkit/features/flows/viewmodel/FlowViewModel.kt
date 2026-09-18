@@ -262,6 +262,8 @@ sealed interface FlowEvent {
         val index: Int? = null
     ) : FlowEvent
     data class MoveWaypoint(val connection: Connection, val index: Int, val newPoint: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class MoveSegment(val connection: Connection, val segmentIndex: Int, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class EndMoveSegment(val connection: Connection, val segmentIndex: Int, val totalDelta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
     data class DeleteWaypoint(val connection: Connection, val index: Int) : FlowEvent
     data class DeleteConnectionSegment(val connection: Connection, val segmentIndex: Int) : FlowEvent
     data class CreateFloatingConnection(

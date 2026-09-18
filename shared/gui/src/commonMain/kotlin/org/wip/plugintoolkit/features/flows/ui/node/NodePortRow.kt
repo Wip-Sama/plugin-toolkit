@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.flows.ui.node
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.sp
 
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -177,9 +179,11 @@ fun InputPortRow(
                                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                                 Text(
                                     text = displayName,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
                                     fontWeight = FontWeight.SemiBold,
-                                    color = labelColor
+                                    color = labelColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -196,17 +200,21 @@ fun InputPortRow(
                         ) {
                             Text(
                                 text = displayName,
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
                                 fontWeight = FontWeight.SemiBold,
-                                color = labelColor
+                                color = labelColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     } else {
                         Text(
                             text = displayName,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
                             fontWeight = FontWeight.SemiBold,
-                            color = labelColor
+                            color = labelColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -222,37 +230,44 @@ fun InputPortRow(
                         formatDataType(inputDataType)
                     }
 
-                Text(
-                    text = typeLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
-                )
                 val inferredSem = inferredSemanticTypes[Pair(node.id, input.id)] ?: input.semanticTypes
-                if (inferredSem.isNotEmpty()) {
-                    val first = inferredSem.first().canonicalId
-                    val semText = if (inferredSem.size > 1) {
-                        "$first (+${inferredSem.size - 1} more)"
-                    } else {
-                        first
-                    }
-                    TooltipArea(
-                        tooltip = {
-                            Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
-                                inferredSem.forEach { sem ->
-                                    Text(
-                                        text = "• ${sem.canonicalId}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = typeLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (inferredSem.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        val first = inferredSem.first().canonicalId
+                        val semText = if (inferredSem.size > 1) {
+                            "$first (+${inferredSem.size - 1} more)"
+                        } else {
+                            first
+                        }
+                        TooltipArea(
+                            tooltip = {
+                                Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
+                                    inferredSem.forEach { sem ->
+                                        Text(
+                                            text = "• ${sem.canonicalId}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
+                        ) {
+                            Text(
+                                text = semText,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
-                    ) {
-                        Text(
-                            text = semText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
                 if (portErrors.isNotEmpty()) {
@@ -260,7 +275,7 @@ fun InputPortRow(
                         text = portErrors.first().message,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -313,20 +328,21 @@ fun InputPortRow(
             if (!isConnected && !isReadOnly) {
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 val hasCustomDefault = input.defaultValue != null
-                IconButton(
-                    onClick = {
-                        val valToSet = input.value ?: currentPortValue
-                        onUpdateInputPortDefault(node.id, input.id, valToSet)
-                    },
+                Box(
                     modifier = Modifier
-                        .size(ToolkitTheme.dimensions.iconMedium)
-                        .testTag("set_default_${node.id}_${input.id}")
+                        .size(ToolkitTheme.dimensions.iconMediumLarge)
+                        .clickable {
+                            val valToSet = input.value ?: currentPortValue
+                            onUpdateInputPortDefault(node.id, input.id, valToSet)
+                        }
+                        .testTag("set_default_${node.id}_${input.id}"),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Bookmark,
                         contentDescription = stringResource(Res.string.action_set_node_default),
                         tint = if (hasCustomDefault) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled),
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
                     )
                 }
             }
@@ -423,7 +439,7 @@ fun OutputPortRow(
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Text(
                                 text = output.name,
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
                                 fontWeight = FontWeight.SemiBold,
                                 color = ToolkitTheme.colors.warning
                             )
@@ -442,17 +458,21 @@ fun OutputPortRow(
                     ) {
                         Text(
                             text = output.name,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 } else {
                     Text(
                         text = output.name,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -467,38 +487,48 @@ fun OutputPortRow(
                     formatDataType(outputDataType)
                 }
 
-            Text(
-                text = typeLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
-            )
             val inferredSem = inferredSemanticTypes[Pair(node.id, output.id)] ?: output.semanticTypes
-            if (inferredSem.isNotEmpty()) {
-                val first = inferredSem.first().canonicalId
-                val semText = if (inferredSem.size > 1) {
-                    "$first (+${inferredSem.size - 1} more)"
-                } else {
-                    first
-                }
-                TooltipArea(
-                    tooltip = {
-                        Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
-                            inferredSem.forEach { sem ->
-                                Text(
-                                    text = "• ${sem.canonicalId}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                if (inferredSem.isNotEmpty()) {
+                    val first = inferredSem.first().canonicalId
+                    val semText = if (inferredSem.size > 1) {
+                        "$first (+${inferredSem.size - 1} more)"
+                    } else {
+                        first
+                    }
+                    TooltipArea(
+                        tooltip = {
+                            Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
+                                inferredSem.forEach { sem ->
+                                    Text(
+                                        text = "• ${sem.canonicalId}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
+                    ) {
+                        Text(
+                            text = semText,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 11.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                ) {
-                    Text(
-                        text = semText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                 }
+                Text(
+                    text = typeLabel,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             val portErrors = validationErrors.filter {
                 (it.sourceNodeId == node.id && it.sourcePortId == output.id) ||
@@ -509,7 +539,7 @@ fun OutputPortRow(
                     text = portErrors.first().message,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }

@@ -28,6 +28,7 @@ import org.wip.plugintoolkit.api.ParameterConditionEvaluator
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.parseSemanticTypes
+import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils
 
@@ -649,7 +650,9 @@ data class Flow(
     val junctions: List<FlowJunction> = emptyList(),
     val version: String = "1.0.0",
     val description: String? = null,
-    val defaultValues: Map<String, JsonElement> = emptyMap()
+    val defaultValues: Map<String, JsonElement> = emptyMap(),
+    val connectionCurveStyle: ConnectionCurveStyle? = null,
+    val connectionRoundness: Float? = null
 ) {
     val connectionPoints: List<ConnectionPoint> get() = junctions
 

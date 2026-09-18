@@ -16,6 +16,17 @@ data class StructuredConnectionStartInfo(
     val livePos: Offset? = null
 )
 
+data class DraggingSegmentInfo(
+    val connection: Connection,
+    val segmentIndex: Int,
+    val startNodeId: Long? = null,
+    val startJunctionId: Long? = null,
+    val startWaypointIndex: Int? = null,
+    val endNodeId: Long? = null,
+    val endJunctionId: Long? = null,
+    val endWaypointIndex: Int? = null
+)
+
 @Stable
 class BoardInteractionState {
     var selectedConnection: Connection? by mutableStateOf(null)
@@ -33,6 +44,7 @@ class BoardInteractionState {
     var draggingJunctionId: Long? by mutableStateOf(null)
     var hoveredWaypoint: Pair<Connection, Int>? by mutableStateOf(null)
     var draggingWaypoint: Pair<Connection, Int>? by mutableStateOf(null)
+    var draggingSegment: DraggingSegmentInfo? by mutableStateOf(null)
     var hoveredMidpoint: Pair<Connection, Int>? by mutableStateOf(null)
     var pendingMidpoint: Pair<Connection, Int>? by mutableStateOf(null)
     var pendingMidpointPressPos: Offset by mutableStateOf(Offset.Zero)
@@ -112,6 +124,7 @@ class BoardInteractionState {
         selectedJunctionId = null
         draggingJunctionId = null
         draggingWaypoint = null
+        draggingSegment = null
         pendingMidpoint = null
         pendingMidpointPressPos = Offset.Zero
         pendingMidpointWasAltPressed = false

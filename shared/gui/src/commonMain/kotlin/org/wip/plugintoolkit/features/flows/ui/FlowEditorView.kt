@@ -353,6 +353,7 @@ fun FlowEditorView(
             connectionStartPortId = null
             highlightedPortId = null
             highlightedNodeId = null
+            connectionCurrentPos = Offset.Zero
 
             if (hlPortId != null && hlNodeId != null && startNodeId != null && startPortId != null) {
                 val sourceNodeId = if (startIsOutput) startNodeId else hlNodeId
@@ -515,7 +516,11 @@ fun FlowEditorView(
             onMoveConnectionLast = { viewModel.onEvent(FlowEvent.MoveConnectionLast(it)) },
             selectedNodeIds = state.selectedNodeIds,
             onSelectNodes = { viewModel.onEvent(FlowEvent.SelectNodes(it)) },
-            onClearSelection = { viewModel.onEvent(FlowEvent.ClearSelection) },
+            onClearSelection = {
+                interactionState.selectedJunctionId = null
+                interactionState.selectedConnection = null
+                viewModel.onEvent(FlowEvent.ClearSelection)
+            },
             onDeleteSelectedNodes = {
                 portLayouts.keys.removeAll { state.selectedNodeIds.contains(it.first) }
                 viewModel.onEvent(FlowEvent.DeleteSelectedNodes)
@@ -547,6 +552,8 @@ fun FlowEditorView(
             onMoveLabel = { id, delta, snap -> viewModel.onEvent(FlowEvent.MoveLabel(id, delta, snap)) },
             onMoveElement = { id, delta -> viewModel.onEvent(FlowEvent.MoveNode(id, delta, snap = false, showGhost = false)) },
             onEndMoveElement = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
+            onMoveSegment = { conn, index, delta -> viewModel.onEvent(FlowEvent.MoveSegment(conn, index, delta)) },
+            onEndMoveSegment = { conn, index, totalDelta -> viewModel.onEvent(FlowEvent.EndMoveSegment(conn, index, totalDelta)) },
             onChangeConnectionStyle = { viewModel.onEvent(FlowEvent.UpdateConnectionCurveStyle(it)) },
             onChangeConnectionRoundness = { viewModel.onEvent(FlowEvent.UpdateConnectionRoundness(it)) },
             onPaintConnection = { viewModel.onEvent(FlowEvent.PaintConnection(it)) },
@@ -644,9 +651,6 @@ fun FlowEditorView(
                 highlightedPortId = null
                 highlightedNodeId = null
             },
-            structuredConnectionStartInfo = structuredConnectionStartInfo,
-            onClearStructuredConnectionStartInfo = { structuredConnectionStartInfo = null },
-            interactionState = interactionState,
             onToggleStructuredConnectionMode = {
                 viewModel.onEvent(FlowEvent.ToggleStructuredConnectionMode)
             },
@@ -656,7 +660,11 @@ fun FlowEditorView(
             onToggleEyedropper = { viewModel.onEvent(FlowEvent.ToggleEyedropper) },
             onToggleAdvancedConnectionMode = { viewModel.onEvent(FlowEvent.ToggleAdvancedConnectionMode) },
             onPaintSelection = { viewModel.onEvent(FlowEvent.PaintSelection) },
-            onWashSelection = { viewModel.onEvent(FlowEvent.WashSelection) }
+            onWashSelection = { viewModel.onEvent(FlowEvent.WashSelection) },
+            structuredConnectionStartInfo = structuredConnectionStartInfo,
+            onClearStructuredConnectionStartInfo = { structuredConnectionStartInfo = null },
+            interactionState = interactionState,
+            modifier = Modifier.fillMaxSize()
         ) { hoveredConnection, hoveredNodeId, onHoverNode ->
             CompositionLocalProvider(LocalOverlayHost provides dropdownOverlay) {
                 // 1.1 Ghost Preview for Snapping (rendered underneath nodes)
@@ -680,26 +688,25 @@ fun FlowEditorView(
                 }
 
                 // 1.2 Nodes
-                val collapsedGroupNodeIds = remember(flow.groups, flow.nodes) {
-                    flow.groups.filter { it.isCollapsed }.flatMap { group ->
-                        group.nodeIds + flow.nodes.filter { node ->
-                            node.position.x >= group.position.x &&
-                            node.position.x <= group.position.x + group.size.x &&
-                            node.position.y >= group.position.y &&
-                            node.position.y <= group.position.y + group.size.y
-                        }.map { it.id }
-                    }.toSet()
+                val collapsedGroupNodeIds = remember(flow.groups) {
+                    flow.groups.filter { it.isCollapsed }.flatMap { it.nodeIds }.toSet()
                 }
 
                 flow.nodes.forEach { node ->
                     if (collapsedGroupNodeIds.contains(node.id)) return@forEach
                     key(node.id) {
                         val isDragged = state.draggedNodeId == node.id
-                        val isDraggedInSelection = state.draggedNodeId != null && (
-                            state.selectedNodeIds.contains(state.draggedNodeId) ||
-                            state.selectedGroupIds.contains(state.draggedNodeId) ||
-                            state.selectedLabelIds.contains(state.draggedNodeId) ||
-                            state.selectedPointIds.contains(state.draggedNodeId)
+                        val draggedId = state.draggedNodeId
+                        val isDraggedNode = draggedId != null && flow.nodes.any { it.id == draggedId }
+                        val isDraggedGroup = draggedId != null && flow.groups.any { it.id == draggedId }
+                        val isDraggedLabel = draggedId != null && flow.labels.any { it.id == draggedId }
+                        val isDraggedPoint = draggedId != null && flow.junctions.any { it.id == draggedId }
+
+                        val isDraggedInSelection = draggedId != null && (
+                            (isDraggedNode && state.selectedNodeIds.contains(draggedId)) ||
+                            (isDraggedGroup && state.selectedGroupIds.contains(draggedId)) ||
+                            (isDraggedLabel && state.selectedLabelIds.contains(draggedId)) ||
+                            (isDraggedPoint && state.selectedPointIds.contains(draggedId))
                         )
                         val isPartOfSelectionDrag = isDraggedInSelection && state.selectedNodeIds.contains(node.id)
                         val isContainedInMovingGroup = state.draggedNodeId != null && (
@@ -941,17 +948,21 @@ fun FlowEditorView(
                                           connectionStartNodeId = nodeId
                                           connectionStartPortId = portId
                                           connectionStartIsOutput = isOutput
-                                          getPortBoardPosition(nodeId, portId, isOutput)?.let {
-                                              connectionCurrentPos = it
-                                          }
+                                           getPortBoardPosition(nodeId, portId, isOutput)?.let {
+                                               connectionCurrentPos = it
+                                               interactionState.lastPointerPosition = (it * state.scale) + state.offset
+                                           }
                                       }
                                   },
                                 onDragConnection = {
                                     // Ignored, BoardCanvas handles it
                                 },
                                  onDropConnection = handleConnectionDrop,
-                                onPress = { id -> viewModel.onEvent(FlowEvent.BringToFront(id)) },
-                                highlightedPortId = nodeHighlightedPortId,
+                                 onPress = { id ->
+                                     interactionState.selectedJunctionId = null
+                                     viewModel.onEvent(FlowEvent.BringToFront(id))
+                                 },
+                                 highlightedPortId = nodeHighlightedPortId,
                                 highlightedPortIds = nodeHighlightedPortIds,
                                 highlightedPortColor = nodeHighlightedPortColor,
                                 onHoverNode = onHoverNode,

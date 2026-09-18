@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -527,24 +528,16 @@ private fun SplineSettingsCard(
             )
 
             // Connection style chips
-            Row(
+            FlowRow(
                 modifier = Modifier.padding(vertical = spacing.extraSmall),
-                horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall)
+                horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
+                verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)
             ) {
                 FilterChip(
                     selected = connectionStyle == ConnectionCurveStyle.CardinalSpline,
                     onClick = { onChangeConnectionStyle(ConnectionCurveStyle.CardinalSpline) },
                     label = { Text(stringResource(Res.string.flow_connection_style_cardinal), style = MaterialTheme.typography.labelSmall) }
                 )
-                FilterChip(
-                    selected = connectionStyle == ConnectionCurveStyle.Bezier,
-                    onClick = { onChangeConnectionStyle(ConnectionCurveStyle.Bezier) },
-                    label = { Text(stringResource(Res.string.flow_connection_style_bezier), style = MaterialTheme.typography.labelSmall) }
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall)
-            ) {
                 FilterChip(
                     selected = connectionStyle == ConnectionCurveStyle.Straight,
                     onClick = { onChangeConnectionStyle(ConnectionCurveStyle.Straight) },
