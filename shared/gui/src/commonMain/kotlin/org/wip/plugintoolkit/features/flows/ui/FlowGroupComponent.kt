@@ -92,7 +92,9 @@ fun FlowGroupComponent(
     isReadOnly: Boolean,
     onUpdateGroup: (FlowGroup) -> Unit,
     onDeleteGroup: (FlowGroup) -> Unit,
-    onDragDelta: (Offset) -> Unit,
+    onDragDelta: (Offset) -> Unit = {},
+    onMove: ((Long, Offset) -> Unit)? = null,
+    onEndMove: ((Long) -> Unit)? = null,
     isSelected: Boolean = false,
     isDropTarget: Boolean = false,
     hasIncomingConnections: Boolean = false,
@@ -103,7 +105,7 @@ fun FlowGroupComponent(
     onPaintGroup: ((Long) -> Unit)? = null,
     onWashGroup: ((Long) -> Unit)? = null,
     onSampleColor: ((String) -> Unit)? = null,
-    onResizeGroup: ((Long, Offset) -> Unit)? = null,
+    onResizeGroup: ((Long, Offset, Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val dimensions = ToolkitTheme.dimensions
@@ -134,18 +136,16 @@ fun FlowGroupComponent(
         MaterialTheme.colorScheme.primary
     }
 
-    val groupWidthPx = if (group.isCollapsed) {
-        maxOf(group.size.x, GROUP_MIN_COLLAPSED_WIDTH_DP * density)
+    val groupWidthDp = if (group.isCollapsed) {
+        maxOf(group.size.x, GROUP_MIN_COLLAPSED_WIDTH_DP.toFloat()).dp
     } else {
-        group.size.x
+        group.size.x.dp
     }
-    val groupHeightPx = if (group.isCollapsed) {
-        GROUP_COLLAPSED_HEIGHT_DP * density
+    val groupHeightDp = if (group.isCollapsed) {
+        dimensions.groupCollapsedHeight
     } else {
-        group.size.y
+        group.size.y.dp
     }
-    val groupWidthDp = with(LocalDensity.current) { groupWidthPx.toDp() }
-    val groupHeightDp = with(LocalDensity.current) { groupHeightPx.toDp() }
     val cornerShape = RoundedCornerShape(GROUP_CORNER_RADIUS_DP.dp)
 
     val borderColor = when {
@@ -196,22 +196,48 @@ fun FlowGroupComponent(
             }
             .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
                 if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive) {
+                    var isDraggingGroup = false
                     detectDragGestures(
+                        onDragStart = { offset ->
+                            val isNearRight = offset.x >= (group.size.x - RESIZE_HANDLE_THICKNESS_DP * 1.5f)
+                            val isNearBottom = !group.isCollapsed && offset.y >= (group.size.y - RESIZE_HANDLE_THICKNESS_DP * 1.5f)
+                            isDraggingGroup = !isNearRight && !isNearBottom
+                        },
                         onDragEnd = {
-                            val snapDelta = group.position.snapToGrid() - group.position
-                            if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                onDragDelta(snapDelta.toComposeOffset())
+                            if (isDraggingGroup) {
+                                isDraggingGroup = false
+                                if (onEndMove != null) {
+                                    onEndMove(group.id)
+                                } else {
+                                    val snapDelta = group.position.snapToGrid() - group.position
+                                    if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                        onDragDelta(snapDelta.toComposeOffset())
+                                    }
+                                }
                             }
                         },
                         onDragCancel = {
-                            val snapDelta = group.position.snapToGrid() - group.position
-                            if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                onDragDelta(snapDelta.toComposeOffset())
+                            if (isDraggingGroup) {
+                                isDraggingGroup = false
+                                if (onEndMove != null) {
+                                    onEndMove(group.id)
+                                } else {
+                                    val snapDelta = group.position.snapToGrid() - group.position
+                                    if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                        onDragDelta(snapDelta.toComposeOffset())
+                                    }
+                                }
                             }
                         },
                         onDrag = { change, dragAmount ->
-                            change.consume()
-                            onDragDelta(dragAmount)
+                            if (isDraggingGroup) {
+                                change.consume()
+                                if (onMove != null) {
+                                    onMove(group.id, dragAmount)
+                                } else {
+                                    onDragDelta(dragAmount)
+                                }
+                            }
                         }
                     )
                 }
@@ -399,18 +425,14 @@ fun FlowGroupComponent(
                     .pointerInput(group.id) {
                         detectDragGestures(
                             onDragEnd = {
-                                val snappedW = kotlin.math.round(group.size.x / 50f) * 50f
-                                val deltaX = snappedW - group.size.x
-                                if (deltaX != 0f) onResizeGroup(group.id, Offset(deltaX, 0f))
+                                onResizeGroup(group.id, Offset.Zero, true)
                             },
                             onDragCancel = {
-                                val snappedW = kotlin.math.round(group.size.x / 50f) * 50f
-                                val deltaX = snappedW - group.size.x
-                                if (deltaX != 0f) onResizeGroup(group.id, Offset(deltaX, 0f))
+                                onResizeGroup(group.id, Offset.Zero, true)
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                onResizeGroup(group.id, Offset(dragAmount.x, 0f))
+                                onResizeGroup(group.id, Offset(dragAmount.x, 0f), false)
                             }
                         )
                     }
@@ -427,18 +449,14 @@ fun FlowGroupComponent(
                         .pointerInput(group.id) {
                             detectDragGestures(
                                 onDragEnd = {
-                                    val snappedH = kotlin.math.round(group.size.y / 50f) * 50f
-                                    val deltaY = snappedH - group.size.y
-                                    if (deltaY != 0f) onResizeGroup(group.id, Offset(0f, deltaY))
+                                    onResizeGroup(group.id, Offset.Zero, true)
                                 },
                                 onDragCancel = {
-                                    val snappedH = kotlin.math.round(group.size.y / 50f) * 50f
-                                    val deltaY = snappedH - group.size.y
-                                    if (deltaY != 0f) onResizeGroup(group.id, Offset(0f, deltaY))
+                                    onResizeGroup(group.id, Offset.Zero, true)
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    onResizeGroup(group.id, Offset(0f, dragAmount.y))
+                                    onResizeGroup(group.id, Offset(0f, dragAmount.y), false)
                                 }
                             )
                         }
@@ -453,20 +471,14 @@ fun FlowGroupComponent(
                         .pointerInput(group.id) {
                             detectDragGestures(
                                 onDragEnd = {
-                                    val snappedW = kotlin.math.round(group.size.x / 50f) * 50f
-                                    val snappedH = kotlin.math.round(group.size.y / 50f) * 50f
-                                    val delta = Offset(snappedW - group.size.x, snappedH - group.size.y)
-                                    if (delta != Offset.Zero) onResizeGroup(group.id, delta)
+                                    onResizeGroup(group.id, Offset.Zero, true)
                                 },
                                 onDragCancel = {
-                                    val snappedW = kotlin.math.round(group.size.x / 50f) * 50f
-                                    val snappedH = kotlin.math.round(group.size.y / 50f) * 50f
-                                    val delta = Offset(snappedW - group.size.x, snappedH - group.size.y)
-                                    if (delta != Offset.Zero) onResizeGroup(group.id, delta)
+                                    onResizeGroup(group.id, Offset.Zero, true)
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    onResizeGroup(group.id, dragAmount)
+                                    onResizeGroup(group.id, dragAmount, false)
                                 }
                             )
                         }

@@ -205,13 +205,13 @@ sealed interface FlowEvent {
     data class AddGroup(val position: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
     data class UpdateGroup(val group: org.wip.plugintoolkit.features.flows.model.FlowGroup) : FlowEvent
     data class DeleteGroup(val group: org.wip.plugintoolkit.features.flows.model.FlowGroup) : FlowEvent
-    data class MoveGroup(val groupId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class MoveGroup(val groupId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset, val snap: Boolean = false) : FlowEvent
     data class ResizeGroup(val groupId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset, val snap: Boolean = false) : FlowEvent
 
     data class AddLabel(val position: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
     data class UpdateLabel(val label: org.wip.plugintoolkit.features.flows.model.FlowLabel) : FlowEvent
     data class DeleteLabel(val label: org.wip.plugintoolkit.features.flows.model.FlowLabel) : FlowEvent
-    data class MoveLabel(val labelId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent
+    data class MoveLabel(val labelId: Long, val delta: org.wip.plugintoolkit.features.flows.model.Offset, val snap: Boolean = false) : FlowEvent
 
     // Junctions, Waypoints & Splines
     data class AddJunctionAndBranch(

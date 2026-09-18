@@ -2401,30 +2401,48 @@ class FlowEditorQoLTest {
     }
 
     @Test
+    fun testGroupAndLabelMoveWithSnap() {
+        val group = FlowGroup(id = 10L, title = "Group Snap", position = ModelOffset(100f, 100f), size = ModelOffset(200f, 150f))
+        val label = FlowLabel(id = 20L, text = "Label Snap", position = ModelOffset(100f, 100f))
+        val flow = Flow("TestMoveSnap", groups = listOf(group), labels = listOf(label))
+        val vm = createViewModel(flow)
+
+        // Move group with snap = true: (100, 100) + (18, 32) = (118, 132) -> snaps to (100, 150)
+        vm.onEvent(FlowEvent.MoveGroup(groupId = 10L, delta = ModelOffset(18f, 32f), snap = true))
+        val movedGroupFlow = vm.state.value.flow
+        assertEquals(ModelOffset(100f, 150f), movedGroupFlow.groups.first().position)
+
+        // Move label with snap = true: (100, 100) + (38, 12) = (138, 112) -> snaps to (150, 100)
+        vm.onEvent(FlowEvent.MoveLabel(labelId = 20L, delta = ModelOffset(38f, 12f), snap = true))
+        val movedLabelFlow = vm.state.value.flow
+        assertEquals(ModelOffset(150f, 100f), movedLabelFlow.labels.first().position)
+    }
+
+    @Test
     fun testNodePortGridAlignmentMath() {
         val nodeY = 100f
-        val headerHeight = 75f
+        val headerHeight = 50f
         val sectionHeaderHeight = 50f
-        val rowHeight = 50f
-
-        // Collapsed summary port center in first section
-        val collapsedSummaryPortY = nodeY + headerHeight + (sectionHeaderHeight / 2f)
-        assertEquals(200f, collapsedSummaryPortY)
-        assertEquals(0f, collapsedSummaryPortY % 50f)
+        val rowHeight = 100f // 2 dots = 2u (1 port every 2 dots on the board)
 
         // Expanded port rows in first section
+        // Row 0 spans [200f, 300f], port center is 50f into the row = 250f (Dot 5)
         val row0CenterY = nodeY + headerHeight + sectionHeaderHeight + (rowHeight / 2f)
-        val row1CenterY = row0CenterY + rowHeight
         assertEquals(250f, row0CenterY)
         assertEquals(0f, row0CenterY % 50f)
-        assertEquals(300f, row1CenterY)
+
+        // Row 1 spans [300f, 400f], port center is 50f into the row = 350f (Dot 7)
+        val row1CenterY = row0CenterY + rowHeight
+        assertEquals(350f, row1CenterY)
         assertEquals(0f, row1CenterY % 50f)
 
-        // Second section (collapsed) below the 2-row expanded section
+        // Port spacing is exactly 100f (1 port every 2 dots, alternating "1 yes, 1 no")
+        assertEquals(100f, row1CenterY - row0CenterY)
+
+        // Second section below 2-row expanded section starts at 400f (Dot 8)
         val section2StartY = nodeY + headerHeight + sectionHeaderHeight + (2 * rowHeight)
-        val section2SummaryPortY = section2StartY + (sectionHeaderHeight / 2f)
-        assertEquals(350f, section2SummaryPortY)
-        assertEquals(0f, section2SummaryPortY % 50f)
+        assertEquals(400f, section2StartY)
+        assertEquals(0f, section2StartY % 50f)
 
         // Snapping formula verification
         val rawPortYWithFloatingJitter = 250.04f

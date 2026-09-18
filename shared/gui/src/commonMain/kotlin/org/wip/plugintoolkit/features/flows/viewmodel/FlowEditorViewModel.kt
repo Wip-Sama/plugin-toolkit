@@ -1276,25 +1276,28 @@ class FlowEditorViewModel(
                         currentState.flow.groups.find { it.id == gId }?.let { nodeIdsToMove.addAll(it.nodeIds) }
                     }
 
+                    val rawNewGrpPos = grp.position + event.delta
+                    val newGrpPos = if (event.snap) rawNewGrpPos.snapToGrid() else rawNewGrpPos
+                    val effectiveDelta = newGrpPos - grp.position
+
                     val updatedNodes = currentState.flow.nodes.map { node ->
                         if (node.id in nodeIdsToMove) {
-                            node.copyWithPosition(node.position + event.delta)
+                            node.copyWithPosition(if (event.snap) (node.position + effectiveDelta).snapToGrid() else node.position + effectiveDelta)
                         } else node
                     }
 
                     val updatedGroups = currentState.flow.groups.map { g ->
                         if (g.id in groupsToMove) {
-                            g.copy(position = g.position + event.delta)
+                            g.copy(position = if (event.snap) (g.position + effectiveDelta).snapToGrid() else g.position + effectiveDelta)
                         } else g
                     }
 
                     val updatedLabels = currentState.flow.labels.map { l ->
                         if (l.id in labelsToMove) {
-                            l.copy(position = l.position + event.delta)
+                            l.copy(position = if (event.snap) (l.position + effectiveDelta).snapToGrid() else l.position + effectiveDelta)
                         } else l
                     }
 
-                    val newGrpPos = grp.position + event.delta
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
                             groups = updatedGroups,
@@ -1372,25 +1375,28 @@ class FlowEditorViewModel(
                         currentState.flow.groups.find { it.id == gId }?.let { nodeIdsToMove.addAll(it.nodeIds) }
                     }
 
+                    val rawNewLblPos = lbl.position + event.delta
+                    val newLblPos = if (event.snap) rawNewLblPos.snapToGrid() else rawNewLblPos
+                    val effectiveDelta = newLblPos - lbl.position
+
                     val updatedLabels = currentState.flow.labels.map { l ->
                         if (l.id in labelsToMove) {
-                            l.copy(position = l.position + event.delta)
+                            l.copy(position = if (event.snap) (l.position + effectiveDelta).snapToGrid() else l.position + effectiveDelta)
                         } else l
                     }
 
                     val updatedGroups = currentState.flow.groups.map { g ->
                         if (g.id in groupsToMove) {
-                            g.copy(position = g.position + event.delta)
+                            g.copy(position = if (event.snap) (g.position + effectiveDelta).snapToGrid() else g.position + effectiveDelta)
                         } else g
                     }
 
                     val updatedNodes = currentState.flow.nodes.map { node ->
                         if (node.id in nodeIdsToMove) {
-                            node.copyWithPosition(node.position + event.delta)
+                            node.copyWithPosition(if (event.snap) (node.position + effectiveDelta).snapToGrid() else node.position + effectiveDelta)
                         } else node
                     }
 
-                    val newLblPos = lbl.position + event.delta
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
                             labels = updatedLabels,

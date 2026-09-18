@@ -76,7 +76,9 @@ fun FlowLabelComponent(
     isReadOnly: Boolean,
     onUpdateLabel: (FlowLabel) -> Unit,
     onDeleteLabel: (FlowLabel) -> Unit,
-    onDragDelta: (Offset) -> Unit,
+    onDragDelta: (Offset) -> Unit = {},
+    onMove: ((Long, Offset) -> Unit)? = null,
+    onEndMove: ((Long) -> Unit)? = null,
     isSelected: Boolean = false,
     isPaintToolActive: Boolean = false,
     isWashToolActive: Boolean = false,
@@ -169,20 +171,32 @@ fun FlowLabelComponent(
                 if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive) {
                     detectDragGestures(
                         onDragEnd = {
-                            val snapDelta = label.position.snapToGrid() - label.position
-                            if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                onDragDelta(snapDelta.toComposeOffset())
+                            if (onEndMove != null) {
+                                onEndMove(label.id)
+                            } else {
+                                val snapDelta = label.position.snapToGrid() - label.position
+                                if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                    onDragDelta(snapDelta.toComposeOffset())
+                                }
                             }
                         },
                         onDragCancel = {
-                            val snapDelta = label.position.snapToGrid() - label.position
-                            if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                onDragDelta(snapDelta.toComposeOffset())
+                            if (onEndMove != null) {
+                                onEndMove(label.id)
+                            } else {
+                                val snapDelta = label.position.snapToGrid() - label.position
+                                if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                    onDragDelta(snapDelta.toComposeOffset())
+                                }
                             }
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            onDragDelta(dragAmount)
+                            if (onMove != null) {
+                                onMove(label.id, dragAmount)
+                            } else {
+                                onDragDelta(dragAmount)
+                            }
                         }
                     )
                 }

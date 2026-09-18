@@ -154,15 +154,7 @@ fun FlowEditorView(
         val boardCoords = boardLayoutCoordinates
         if (coords != null && boardCoords != null && coords.isAttached) {
             val center = boardCoords.localBoundingBoxOf(coords, false).center
-            val rawPos = (center - state.offset) / state.scale
-            val node = flow.nodes.find { it.id == nodeId }
-            if (node != null) {
-                val targetX = if (isOutput) node.position.x + 400f else node.position.x
-                val targetY = kotlin.math.round(rawPos.y / 50f) * 50f
-                Offset(targetX, targetY)
-            } else {
-                rawPos
-            }
+            (center - state.offset) / state.scale
         } else {
             null
         }
@@ -549,10 +541,12 @@ fun FlowEditorView(
             },
             onUpdateGroup = { viewModel.onEvent(FlowEvent.UpdateGroup(it)) },
             onDeleteGroup = { viewModel.onEvent(FlowEvent.DeleteGroup(it)) },
-            onMoveGroup = { id, delta -> viewModel.onEvent(FlowEvent.MoveGroup(id, delta)) },
+            onMoveGroup = { id, delta, snap -> viewModel.onEvent(FlowEvent.MoveGroup(id, delta, snap)) },
             onUpdateLabel = { viewModel.onEvent(FlowEvent.UpdateLabel(it)) },
             onDeleteLabel = { viewModel.onEvent(FlowEvent.DeleteLabel(it)) },
-            onMoveLabel = { id, delta -> viewModel.onEvent(FlowEvent.MoveLabel(id, delta)) },
+            onMoveLabel = { id, delta, snap -> viewModel.onEvent(FlowEvent.MoveLabel(id, delta, snap)) },
+            onMoveElement = { id, delta -> viewModel.onEvent(FlowEvent.MoveNode(id, delta, snap = false, showGhost = false)) },
+            onEndMoveElement = { id -> viewModel.onEvent(FlowEvent.EndMoveNode(id, density.density)) },
             onChangeConnectionStyle = { viewModel.onEvent(FlowEvent.UpdateConnectionCurveStyle(it)) },
             onChangeConnectionRoundness = { viewModel.onEvent(FlowEvent.UpdateConnectionRoundness(it)) },
             onPaintConnection = { viewModel.onEvent(FlowEvent.PaintConnection(it)) },
@@ -567,7 +561,7 @@ fun FlowEditorView(
             },
             onDeleteJunction = { viewModel.onEvent(FlowEvent.DeleteJunction(it)) },
             onSampleColor = { viewModel.onEvent(FlowEvent.SampleColor(it)) },
-            onResizeGroup = { id, delta -> viewModel.onEvent(FlowEvent.ResizeGroup(id, delta.toModelOffset())) },
+            onResizeGroup = { id, delta, snap -> viewModel.onEvent(FlowEvent.ResizeGroup(id, delta.toModelOffset(), snap)) },
             onSelectLabels = { viewModel.onEvent(FlowEvent.SelectLabels(it)) },
             onSelectGroups = { viewModel.onEvent(FlowEvent.SelectGroups(it)) },
             onSelectPoints = { viewModel.onEvent(FlowEvent.SelectPoints(it)) },
