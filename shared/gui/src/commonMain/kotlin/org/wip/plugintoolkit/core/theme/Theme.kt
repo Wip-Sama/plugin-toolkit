@@ -160,7 +160,7 @@ data class Dimensions(
     val maxWidthLarge: Dp = 500.dp,
     val nodeWidth: Dp = 400.dp,
     val gridStep: Dp = 50.dp,
-    val nodeHeaderHeight: Dp = 50.dp,
+    val nodeHeaderHeight: Dp = 75.dp,
     val nodeSectionHeaderHeight: Dp = 50.dp,
     val nodeRowHeight: Dp = 50.dp,
     val groupCollapsedHeight: Dp = 50.dp,

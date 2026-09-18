@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +50,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.window.Popup
@@ -171,7 +173,12 @@ fun BoardCanvas(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.(hoveredConnection: Connection?, hoveredNodeId: Long?, onHoverNode: (Long?) -> Unit) -> Unit
 ) {
-    val density = LocalDensity.current
+    val currentDensity = LocalDensity.current
+    val boardDensity = remember(currentDensity) {
+        if (currentDensity.density == 1f) currentDensity
+        else Density(density = 1f, fontScale = currentDensity.fontScale * currentDensity.density)
+    }
+    val density = boardDensity
     val focusRequester = remember { FocusRequester() }
     val shortcutManager = LocalShortcutManager.current
 
@@ -273,9 +280,10 @@ fun BoardCanvas(
     val dimensions = ToolkitTheme.dimensions
     val spacing = ToolkitTheme.spacing
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
+    CompositionLocalProvider(LocalDensity provides boardDensity) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
             .testTag("board_canvas")
             .onGloballyPositioned { onBoardLayoutCoordinatesChanged(it) }
             .onSizeChanged {
@@ -725,29 +733,34 @@ fun BoardCanvas(
             (nodeColors + connColors + groupColors + labelColors).distinct()
         }
 
-        FlowFloatingAppBar(
-            scale = state.scale,
-            isReadOnly = isReadOnly,
-            isPaintToolActive = state.isPaintToolActive,
-            isWashToolActive = state.isWashToolActive,
-            isEyedropperActive = state.isEyedropperActive,
-            isAdvancedConnectionMode = state.isAdvancedConnectionMode,
-            activePaintColor = state.activePaintColor,
-            colorsInFlow = colorsInFlow,
-            connectionStyle = state.connectionCurveStyle,
-            connectionRoundness = state.connectionRoundness,
-            onTogglePaintTool = onTogglePaintTool,
-            onToggleWashTool = onToggleWashTool,
-            onToggleEyedropper = onToggleEyedropper,
-            onToggleAdvancedConnectionMode = onToggleAdvancedConnectionMode,
-            onSelectPaintColor = onSelectPaintColor,
-            onAddGroup = onAddGroup,
-            onAddLabel = onAddLabel,
-            onChangeConnectionStyle = onChangeConnectionStyle,
-            onChangeConnectionRoundness = onChangeConnectionRoundness,
-            onZoomIn = { onZoom(-1f, centerPosition, false) },
-            onZoomOut = { onZoom(1f, centerPosition, false) },
-            modifier = Modifier.align(Alignment.BottomEnd)
-        )
+        Box(modifier = Modifier.align(Alignment.BottomEnd)) {
+            CompositionLocalProvider(LocalDensity provides currentDensity) {
+                FlowFloatingAppBar(
+                    scale = state.scale,
+                    isReadOnly = isReadOnly,
+                    isPaintToolActive = state.isPaintToolActive,
+                    isWashToolActive = state.isWashToolActive,
+                    isEyedropperActive = state.isEyedropperActive,
+                    isAdvancedConnectionMode = state.isAdvancedConnectionMode,
+                    activePaintColor = state.activePaintColor,
+                    colorsInFlow = colorsInFlow,
+                    connectionStyle = state.connectionCurveStyle,
+                    connectionRoundness = state.connectionRoundness,
+                    onTogglePaintTool = onTogglePaintTool,
+                    onToggleWashTool = onToggleWashTool,
+                    onToggleEyedropper = onToggleEyedropper,
+                    onToggleAdvancedConnectionMode = onToggleAdvancedConnectionMode,
+                    onSelectPaintColor = onSelectPaintColor,
+                    onAddGroup = onAddGroup,
+                    onAddLabel = onAddLabel,
+                    onChangeConnectionStyle = onChangeConnectionStyle,
+                    onChangeConnectionRoundness = onChangeConnectionRoundness,
+                    onZoomIn = { onZoom(-1f, centerPosition, false) },
+                    onZoomOut = { onZoom(1f, centerPosition, false) },
+                    modifier = Modifier
+                )
+            }
+        }
     }
+}
 }
