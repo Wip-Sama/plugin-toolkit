@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.RoundedCorner
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.SystemConfig
@@ -29,6 +30,7 @@ import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.features.settings.model.DebugSettings
 import org.wip.plugintoolkit.features.settings.model.FlowSettings
 import org.wip.plugintoolkit.features.settings.model.GeneralSettings
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
 import org.wip.plugintoolkit.features.settings.utils.SettingText
@@ -184,6 +186,26 @@ fun SettingsRegistryBuilder.systemDefinitions(
                     steps = 10,
                     subtitleProvider = { settings -> "${(settings.flows.defaultConnectionRoundness * 100).toInt()}%" }
                 ) { copy(defaultConnectionRoundness = it) }
+
+                dropdown(
+                    prop = FlowSettings::defaultOrthogonalStepMode,
+                    title = Res.string.flow_orthogonal_step_mode,
+                    icon = Icons.Default.AltRoute,
+                    options = listOf(
+                        OrthogonalStepMode.Middle,
+                        OrthogonalStepMode.Before,
+                        OrthogonalStepMode.After
+                    ),
+                    subtitle = SettingText.Resource(Res.string.flow_orthogonal_step_mode_subtitle),
+                    labelProvider = {
+                        when (it) {
+                            OrthogonalStepMode.Middle -> stringResource(Res.string.flow_orthogonal_step_middle)
+                            OrthogonalStepMode.Before -> stringResource(Res.string.flow_orthogonal_step_before)
+                            OrthogonalStepMode.After -> stringResource(Res.string.flow_orthogonal_step_after)
+                            else -> it.name
+                        }
+                    }
+                ) { copy(defaultOrthogonalStepMode = it) }
             }
         }
 

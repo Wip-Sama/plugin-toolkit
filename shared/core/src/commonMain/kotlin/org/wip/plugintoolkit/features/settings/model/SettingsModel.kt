@@ -35,6 +35,16 @@ enum class ConnectionCurveStyle {
 }
 
 /**
+ * Step transition behavior for orthogonal connection wires.
+ */
+@Serializable
+enum class OrthogonalStepMode {
+    Middle,
+    Before,
+    After
+}
+
+/**
  * Visual styling and theme configuration options.
  */
 @Serializable
@@ -47,7 +57,8 @@ data class AppearanceSettings(
     val isSidebarCollapsed: Boolean = false,
     val useCustomTitleBar: Boolean = true,
     val connectionStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
-    val connectionRoundness: Float = 0.5f
+    val connectionRoundness: Float = 0.5f,
+    val orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
 )
 
 /**
@@ -250,7 +261,8 @@ data class AutoUpdateSettings(
 data class FlowSettings(
     val autosave: Boolean = true,
     val defaultConnectionStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
-    val defaultConnectionRoundness: Float = 0.5f
+    val defaultConnectionRoundness: Float = 0.5f,
+    val defaultOrthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
 )
 
 /**

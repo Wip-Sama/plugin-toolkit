@@ -36,6 +36,7 @@ import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
 import org.wip.plugintoolkit.features.flows.ui.toModelOffset
 import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 
 fun Modifier.boardConnectionTapGesture(
     interactionState: BoardInteractionState,
@@ -58,6 +59,7 @@ fun Modifier.boardConnectionTapGesture(
     junctions: List<FlowJunction> = emptyList(),
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
     roundness: Float = 0.5f,
+    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
     groups: List<FlowGroup> = emptyList()
 ): Modifier = this.pointerInput(
     connections,
@@ -72,6 +74,7 @@ fun Modifier.boardConnectionTapGesture(
     junctions,
     curveStyle,
     roundness,
+    orthogonalStepMode,
     groups
 ) {
     val d = density?.density ?: 1f
@@ -88,7 +91,8 @@ fun Modifier.boardConnectionTapGesture(
                 curveStyle = curveStyle,
                 roundness = roundness,
                 groups = groups,
-                density = d
+                density = d,
+                stepMode = orthogonalStepMode
             )
             if (bestConnection != null) {
                 if (isEyedropperActive && onSampleColor != null) {
@@ -339,6 +343,7 @@ fun Modifier.boardPointerEventGesture(
     connectionStartIsOutput: Boolean = true,
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
     roundness: Float = 0.5f,
+    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
     isAdvancedConnectionMode: Boolean = false,
     onAddJunctionAndBranch: ((Connection, Offset, Int) -> Unit)? = null,
     onDeleteConnectionSegment: ((Connection, Int) -> Unit)? = null,
@@ -405,6 +410,7 @@ fun Modifier.boardPointerEventGesture(
     val currentConnectionStartIsOutput by rememberUpdatedState(connectionStartIsOutput)
     val currentCurveStyle by rememberUpdatedState(curveStyle)
     val currentRoundness by rememberUpdatedState(roundness)
+    val currentOrthogonalStepMode by rememberUpdatedState(orthogonalStepMode)
     val currentIsAdvancedConnectionMode by rememberUpdatedState(isAdvancedConnectionMode)
     val currentOnAddJunctionAndBranch by rememberUpdatedState(onAddJunctionAndBranch)
     val currentSelectedPointIds by rememberUpdatedState(selectedPointIds)
@@ -423,6 +429,7 @@ fun Modifier.boardPointerEventGesture(
     var junctionDragStartGroupPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
     var junctionDragStartLabelPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
     var junctionDragStartPointerPosition by remember { mutableStateOf<Offset?>(null) }
+    var junctionLastDispatchedBoardPos by remember { mutableStateOf<Offset?>(null) }
     var segmentDragStartPos by remember { mutableStateOf<Offset?>(null) }
 
     var rightClickStartPos by remember { mutableStateOf<Offset?>(null) }
@@ -472,12 +479,11 @@ fun Modifier.boardPointerEventGesture(
                             } else {
                                 startPos.toComposeOffset() + totalDelta
                             }
-                            val currentJunc = currentJunctions.find { it.id == draggingJuncId }
-                            if (currentJunc != null) {
-                                val deltaToApply = targetBoardPos.toModelOffset() - currentJunc.position
-                                if (deltaToApply.x != 0f || deltaToApply.y != 0f) {
-                                    currentOnMoveJunction?.invoke(draggingJuncId, deltaToApply)
-                                }
+                            val prevBoardPos = junctionLastDispatchedBoardPos ?: startPos.toComposeOffset()
+                            val deltaToApply = targetBoardPos - prevBoardPos
+                            if (deltaToApply.x != 0f || deltaToApply.y != 0f) {
+                                currentOnMoveJunction?.invoke(draggingJuncId, deltaToApply.toModelOffset())
+                                junctionLastDispatchedBoardPos = targetBoardPos
                             }
                         } else {
                             val delta = (position - prevPointerPosition) / currentScale
@@ -527,7 +533,8 @@ fun Modifier.boardPointerEventGesture(
                                 initialMinDistance = 24f * currentScale,
                                 junctions = currentJunctions,
                                 curveStyle = currentCurveStyle,
-                                roundness = currentRoundness
+                                roundness = currentRoundness,
+                                stepMode = currentOrthogonalStepMode
                             )
                             if (connProj != null) {
                                 interactionState.snappedWirePoint = connProj.projectedPoint
@@ -610,7 +617,8 @@ fun Modifier.boardPointerEventGesture(
                         scale = currentScale,
                         offset = currentOffset,
                         curveStyle = currentCurveStyle,
-                        roundness = currentRoundness
+                        roundness = currentRoundness,
+                        stepMode = currentOrthogonalStepMode
                     )
                     interactionState.hoveredMidpoint = closestMid?.let { Pair(it.first, it.second) }
 
@@ -644,7 +652,8 @@ fun Modifier.boardPointerEventGesture(
                             offset = currentOffset,
                             junctions = currentJunctions,
                             curveStyle = currentCurveStyle,
-                            roundness = currentRoundness
+                            roundness = currentRoundness,
+                            stepMode = currentOrthogonalStepMode
                         )
                     }
 
@@ -671,6 +680,7 @@ fun Modifier.boardPointerEventGesture(
                     interactionState.clearHoveredMidpoint()
                     interactionState.draggingWaypoint = null
                     interactionState.draggingJunctionId = null
+                    junctionLastDispatchedBoardPos = null
                     interactionState.pendingMidpoint = null
                     interactionState.pendingMidpointWasAltPressed = false
                     interactionState.clearSnapping()
@@ -853,7 +863,20 @@ fun Modifier.boardPointerEventGesture(
                             }
                         } else if (hitJunc != null) {
                             val juncId = hitJunc.id
-                            if (isAlt) {
+                            if (currentIsEyedropperActive || currentIsPaintToolActive || currentIsWashToolActive) {
+                                val connectedConns = currentConnections.filter { it.sourceJunctionId == juncId || it.targetJunctionId == juncId }
+                                if (currentIsEyedropperActive && currentOnSampleColor != null) {
+                                    val sample = connectedConns.firstOrNull { it.color != null }?.color ?: "#808080"
+                                    currentOnSampleColor?.invoke(sample)
+                                    event.changes.forEach { it.consume() }
+                                } else if (currentIsPaintToolActive && currentOnPaintConnection != null) {
+                                    connectedConns.forEach { currentOnPaintConnection?.invoke(it) }
+                                    event.changes.forEach { it.consume() }
+                                } else if (currentIsWashToolActive && currentOnWashConnection != null) {
+                                    connectedConns.forEach { currentOnWashConnection?.invoke(it) }
+                                    event.changes.forEach { it.consume() }
+                                }
+                            } else if (isAlt) {
                                 // Ramification / branching directly from junction
                                 interactionState.isDrawingStructuredConnection = true
                                 interactionState.structuredConnectionSourceJunctionId = juncId
@@ -888,6 +911,7 @@ fun Modifier.boardPointerEventGesture(
                                 interactionState.draggingJunctionId = juncId
                                 interactionState.lastPointerPosition = position
                                 junctionDragStartPointerPosition = position
+                                junctionLastDispatchedBoardPos = hitJunc.position.toComposeOffset()
                                 currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
                             }
                         } else {
@@ -899,10 +923,20 @@ fun Modifier.boardPointerEventGesture(
                                 offset = currentOffset,
                                 junctions = currentJunctions,
                                 curveStyle = currentCurveStyle,
-                                roundness = currentRoundness
+                                roundness = currentRoundness,
+                                stepMode = currentOrthogonalStepMode
                             )
                             if (connProj != null) {
-                                if (isShift) {
+                                if (currentIsEyedropperActive && currentOnSampleColor != null) {
+                                    currentOnSampleColor?.invoke(connProj.connection.color ?: "#808080")
+                                    event.changes.forEach { it.consume() }
+                                } else if (currentIsPaintToolActive && currentOnPaintConnection != null) {
+                                    currentOnPaintConnection?.invoke(connProj.connection)
+                                    event.changes.forEach { it.consume() }
+                                } else if (currentIsWashToolActive && currentOnWashConnection != null) {
+                                    currentOnWashConnection?.invoke(connProj.connection)
+                                    event.changes.forEach { it.consume() }
+                                } else if (isShift) {
                                     if (connProj.connection.waypoints.isNotEmpty() && currentOnDeleteConnectionSegment != null) {
                                         currentOnDeleteConnectionSegment?.invoke(connProj.connection, connProj.segmentIndex)
                                     } else {
@@ -938,6 +972,7 @@ fun Modifier.boardPointerEventGesture(
                                     junctionDragStartNodePositions = emptyMap()
                                     junctionDragStartGroupPositions = emptyMap()
                                     junctionDragStartLabelPositions = emptyMap()
+                                    junctionLastDispatchedBoardPos = connProj.projectedPoint
                                     currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
                                 }
                             }
@@ -1006,6 +1041,7 @@ fun Modifier.boardPointerEventGesture(
                         junctionDragStartGroupPositions = emptyMap()
                         junctionDragStartLabelPositions = emptyMap()
                         junctionDragStartPointerPosition = null
+                        junctionLastDispatchedBoardPos = null
                         interactionState.draggingJunctionId = null
                     }
                     interactionState.draggingWaypoint = null

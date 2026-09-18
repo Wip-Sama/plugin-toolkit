@@ -47,5 +47,6 @@ data class FlowEditorState(
     val isAdvancedConnectionMode: Boolean = false,
     val activePaintColor: String? = "#4CAF50",
     val connectionCurveStyle: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle = org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline,
-    val connectionRoundness: Float = 0.5f
+    val connectionRoundness: Float = 0.5f,
+    val orthogonalStepMode: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Middle
 )

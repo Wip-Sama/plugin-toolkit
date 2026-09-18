@@ -556,6 +556,7 @@ fun FlowEditorView(
             onEndMoveSegment = { conn, index, totalDelta -> viewModel.onEvent(FlowEvent.EndMoveSegment(conn, index, totalDelta)) },
             onChangeConnectionStyle = { viewModel.onEvent(FlowEvent.UpdateConnectionCurveStyle(it)) },
             onChangeConnectionRoundness = { viewModel.onEvent(FlowEvent.UpdateConnectionRoundness(it)) },
+            onChangeOrthogonalStepMode = { viewModel.onEvent(FlowEvent.UpdateOrthogonalStepMode(it)) },
             onPaintConnection = { viewModel.onEvent(FlowEvent.PaintConnection(it)) },
             onWashConnection = { viewModel.onEvent(FlowEvent.WashConnection(it)) },
             onPaintGroup = { viewModel.onEvent(FlowEvent.PaintGroup(it)) },

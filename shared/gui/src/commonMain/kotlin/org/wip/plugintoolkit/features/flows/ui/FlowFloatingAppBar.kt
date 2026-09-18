@@ -83,6 +83,11 @@ import plugintoolkit.composeapp.generated.resources.flow_toolbar_pick_color
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_roundness
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_spline_style
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_wash
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_mode
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_middle
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_before
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_after
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import kotlin.math.roundToInt
 
 private const val DEFAULT_PAINT_COLOR = "#4CAF50"
@@ -103,6 +108,7 @@ fun FlowFloatingAppBar(
     colorsInFlow: List<String> = emptyList(),
     connectionStyle: ConnectionCurveStyle,
     connectionRoundness: Float,
+    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
     onTogglePaintTool: () -> Unit,
     onToggleWashTool: () -> Unit,
     onToggleEyedropper: () -> Unit = {},
@@ -112,6 +118,7 @@ fun FlowFloatingAppBar(
     onAddLabel: () -> Unit,
     onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit,
     onChangeConnectionRoundness: (Float) -> Unit,
+    onChangeOrthogonalStepMode: (OrthogonalStepMode) -> Unit = {},
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     modifier: Modifier = Modifier
@@ -306,17 +313,20 @@ fun FlowFloatingAppBar(
                     }
 
                     if (showSplineSettings) {
+                        val popupOffsetY = if (connectionStyle == ConnectionCurveStyle.Orthogonal) -330 else -260
                         Popup(
                             alignment = Alignment.TopCenter,
-                            offset = IntOffset(0, -260),
+                            offset = IntOffset(0, popupOffsetY),
                             onDismissRequest = { showSplineSettings = false },
                             properties = PopupProperties(focusable = true)
                         ) {
                             SplineSettingsCard(
                                 connectionStyle = connectionStyle,
                                 connectionRoundness = connectionRoundness,
+                                orthogonalStepMode = orthogonalStepMode,
                                 onChangeConnectionStyle = onChangeConnectionStyle,
-                                onChangeConnectionRoundness = onChangeConnectionRoundness
+                                onChangeConnectionRoundness = onChangeConnectionRoundness,
+                                onChangeOrthogonalStepMode = onChangeOrthogonalStepMode
                             )
                         }
                     }
@@ -500,20 +510,23 @@ private fun QuickPaletteCard(
 private fun SplineSettingsCard(
     connectionStyle: ConnectionCurveStyle,
     connectionRoundness: Float,
+    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
     onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit,
     onChangeConnectionRoundness: (Float) -> Unit,
+    onChangeOrthogonalStepMode: (OrthogonalStepMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val spacing = ToolkitTheme.spacing
     val shapes = ToolkitTheme.shapes
+    val dimensions = ToolkitTheme.dimensions
 
     Surface(
         shape = shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shadowElevation = ToolkitTheme.dimensions.elevationHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = dimensions.elevationHigh,
+        border = BorderStroke(dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier
-            .width(260.dp)
+            .width(280.dp)
             .padding(spacing.small)
             .testTag("spline_settings_card")
     ) {
@@ -548,6 +561,36 @@ private fun SplineSettingsCard(
                     onClick = { onChangeConnectionStyle(ConnectionCurveStyle.Orthogonal) },
                     label = { Text(stringResource(Res.string.flow_connection_style_orthogonal), style = MaterialTheme.typography.labelSmall) }
                 )
+            }
+
+            if (connectionStyle == ConnectionCurveStyle.Orthogonal) {
+                Spacer(modifier = Modifier.height(spacing.extraSmall))
+                Text(
+                    text = stringResource(Res.string.flow_orthogonal_step_mode),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                FlowRow(
+                    modifier = Modifier.padding(vertical = spacing.extraSmall),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
+                    verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)
+                ) {
+                    FilterChip(
+                        selected = orthogonalStepMode == OrthogonalStepMode.Middle,
+                        onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.Middle) },
+                        label = { Text(stringResource(Res.string.flow_orthogonal_step_middle), style = MaterialTheme.typography.labelSmall) }
+                    )
+                    FilterChip(
+                        selected = orthogonalStepMode == OrthogonalStepMode.Before,
+                        onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.Before) },
+                        label = { Text(stringResource(Res.string.flow_orthogonal_step_before), style = MaterialTheme.typography.labelSmall) }
+                    )
+                    FilterChip(
+                        selected = orthogonalStepMode == OrthogonalStepMode.After,
+                        onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.After) },
+                        label = { Text(stringResource(Res.string.flow_orthogonal_step_after), style = MaterialTheme.typography.labelSmall) }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(spacing.extraSmall))

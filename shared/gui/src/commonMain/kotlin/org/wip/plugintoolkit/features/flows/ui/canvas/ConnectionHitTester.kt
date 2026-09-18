@@ -7,6 +7,7 @@ import org.wip.plugintoolkit.features.flows.model.FlowJunction
 import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
 import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 
 object ConnectionHitTester {
 
@@ -46,7 +47,8 @@ object ConnectionHitTester {
         curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
-        density: Float = 1f
+        density: Float = 1f,
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
     ): Connection? {
         val junctionMap = junctions.associate { it.id to it.position.toComposeOffset() }
         var bestConnection: Connection? = null
@@ -80,7 +82,8 @@ object ConnectionHitTester {
                 tension = roundness,
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
-                scale = scale
+                scale = scale,
+                stepMode = stepMode
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -116,7 +119,8 @@ object ConnectionHitTester {
         curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
-        density: Float = 1f
+        density: Float = 1f,
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
     ): ConnectionProjection? {
         val junctionMap = junctions.associate { it.id to it.position.toComposeOffset() }
         var bestConnection: Connection? = null
@@ -152,7 +156,8 @@ object ConnectionHitTester {
                 tension = roundness,
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
-                scale = scale
+                scale = scale,
+                stepMode = stepMode
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -326,7 +331,8 @@ object ConnectionHitTester {
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f,
-        hitRadius: Float = 12f * scale
+        hitRadius: Float = 12f * scale,
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
     ): Triple<Connection, Int, Offset>? {
         var closest: Triple<Connection, Int, Offset>? = null
         var minDistance = if (hitRadius < 8f) 8f else hitRadius
@@ -352,7 +358,8 @@ object ConnectionHitTester {
                 tension = roundness,
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
-                scale = scale
+                scale = scale,
+                stepMode = stepMode
             )
 
             midpoints.forEachIndexed { segIdx, midPt ->

@@ -1843,7 +1843,14 @@ class FlowEditorViewModel(
 
             is FlowEvent.AddWaypoint -> {
                 val conn = currentState.flow.connections.find {
-                    it == event.connection || (it.sourceNodeId == event.connection.sourceNodeId && it.sourcePortId == event.connection.sourcePortId && it.targetNodeId == event.connection.targetNodeId && it.targetPortId == event.connection.targetPortId)
+                    it == event.connection || (
+                        it.sourceNodeId == event.connection.sourceNodeId &&
+                        it.sourcePortId == event.connection.sourcePortId &&
+                        it.targetNodeId == event.connection.targetNodeId &&
+                        it.targetPortId == event.connection.targetPortId &&
+                        it.sourceJunctionId == event.connection.sourceJunctionId &&
+                        it.targetJunctionId == event.connection.targetJunctionId
+                    )
                 }
                 if (conn != null) {
                     val oldWps = conn.waypoints
@@ -1865,7 +1872,14 @@ class FlowEditorViewModel(
 
             is FlowEvent.MoveWaypoint -> {
                 val conn = currentState.flow.connections.find {
-                    it == event.connection || (it.sourceNodeId == event.connection.sourceNodeId && it.sourcePortId == event.connection.sourcePortId && it.targetNodeId == event.connection.targetNodeId && it.targetPortId == event.connection.targetPortId)
+                    it == event.connection || (
+                        it.sourceNodeId == event.connection.sourceNodeId &&
+                        it.sourcePortId == event.connection.sourcePortId &&
+                        it.targetNodeId == event.connection.targetNodeId &&
+                        it.targetPortId == event.connection.targetPortId &&
+                        it.sourceJunctionId == event.connection.sourceJunctionId &&
+                        it.targetJunctionId == event.connection.targetJunctionId
+                    )
                 }
                 if (conn != null && event.index in conn.waypoints.indices) {
                     val oldWps = conn.waypoints
@@ -1883,7 +1897,14 @@ class FlowEditorViewModel(
 
             is FlowEvent.DeleteWaypoint -> {
                 val conn = currentState.flow.connections.find {
-                    it == event.connection || (it.sourceNodeId == event.connection.sourceNodeId && it.sourcePortId == event.connection.sourcePortId && it.targetNodeId == event.connection.targetNodeId && it.targetPortId == event.connection.targetPortId)
+                    it == event.connection || (
+                        it.sourceNodeId == event.connection.sourceNodeId &&
+                        it.sourcePortId == event.connection.sourcePortId &&
+                        it.targetNodeId == event.connection.targetNodeId &&
+                        it.targetPortId == event.connection.targetPortId &&
+                        it.sourceJunctionId == event.connection.sourceJunctionId &&
+                        it.targetJunctionId == event.connection.targetJunctionId
+                    )
                 }
                 if (conn != null && event.index in conn.waypoints.indices) {
                     val oldWps = conn.waypoints
@@ -1901,7 +1922,14 @@ class FlowEditorViewModel(
 
             is FlowEvent.DeleteConnectionSegment -> {
                 val conn = currentState.flow.connections.find {
-                    it == event.connection || (it.sourceNodeId == event.connection.sourceNodeId && it.sourcePortId == event.connection.sourcePortId && it.targetNodeId == event.connection.targetNodeId && it.targetPortId == event.connection.targetPortId)
+                    it == event.connection || (
+                        it.sourceNodeId == event.connection.sourceNodeId &&
+                        it.sourcePortId == event.connection.sourcePortId &&
+                        it.targetNodeId == event.connection.targetNodeId &&
+                        it.targetPortId == event.connection.targetPortId &&
+                        it.sourceJunctionId == event.connection.sourceJunctionId &&
+                        it.targetJunctionId == event.connection.targetJunctionId
+                    )
                 }
                 if (conn != null) {
                     val wps = conn.waypoints
@@ -2241,6 +2269,14 @@ class FlowEditorViewModel(
                 newState = currentState.copy(
                     connectionRoundness = event.roundness,
                     flow = currentState.flow.copy(connectionRoundness = event.roundness),
+                    hasUnsavedChanges = true
+                )
+            }
+
+            is FlowEvent.UpdateOrthogonalStepMode -> {
+                newState = currentState.copy(
+                    orthogonalStepMode = event.mode,
+                    flow = currentState.flow.copy(orthogonalStepMode = event.mode),
                     hasUnsavedChanges = true
                 )
             }

@@ -29,6 +29,7 @@ import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.parseSemanticTypes
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils
 
@@ -652,7 +653,8 @@ data class Flow(
     val description: String? = null,
     val defaultValues: Map<String, JsonElement> = emptyMap(),
     val connectionCurveStyle: ConnectionCurveStyle? = null,
-    val connectionRoundness: Float? = null
+    val connectionRoundness: Float? = null,
+    val orthogonalStepMode: OrthogonalStepMode? = null
 ) {
     val connectionPoints: List<ConnectionPoint> get() = junctions
 

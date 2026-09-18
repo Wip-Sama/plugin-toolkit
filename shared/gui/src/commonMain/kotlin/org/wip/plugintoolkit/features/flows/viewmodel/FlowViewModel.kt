@@ -286,6 +286,7 @@ sealed interface FlowEvent {
     ) : FlowEvent
     data class UpdateConnectionCurveStyle(val style: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle) : FlowEvent
     data class UpdateConnectionRoundness(val roundness: Float) : FlowEvent
+    data class UpdateOrthogonalStepMode(val mode: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode) : FlowEvent
     object ToggleStructuredConnectionMode : FlowEvent
 }
 

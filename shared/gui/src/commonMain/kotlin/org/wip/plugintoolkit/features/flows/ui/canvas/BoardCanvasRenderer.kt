@@ -26,6 +26,7 @@ import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import org.wip.plugintoolkit.shared.components.plugin.inputs.parseColorString
 
 private val sharedBezierPath = Path()
@@ -82,6 +83,7 @@ fun BoardGridAndConnectionsCanvas(
     portLayoutVersion: Int = 0,
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
     roundness: Float = 0.5f,
+    stepMode: OrthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle,
     modifier: Modifier = Modifier
 ) {
     val dimensions = ToolkitTheme.dimensions
@@ -231,7 +233,8 @@ fun BoardGridAndConnectionsCanvas(
                     tension = roundness,
                     startHorizontal = startIsHorizontal,
                     endHorizontal = endIsHorizontal,
-                    scale = state.scale
+                    scale = state.scale,
+                    stepMode = stepMode
                 )
                 drawPath(
                     path = path,
@@ -352,7 +355,7 @@ fun BoardGridAndConnectionsCanvas(
                 }
 
                 val pts = listOf((startPos * state.scale) + state.offset, (endPos * state.scale) + state.offset)
-                val path = SplineMathUtils.buildConnectionPath(pts, curveStyle, roundness, scale = state.scale)
+                val path = SplineMathUtils.buildConnectionPath(pts, curveStyle, roundness, scale = state.scale, stepMode = stepMode)
                 drawPath(
                     path = path,
                     color = connectionColor.copy(alpha = opacity.disabled),
@@ -407,7 +410,7 @@ fun BoardGridAndConnectionsCanvas(
                 allBoardPts.add(liveBoardPos)
 
                 val previewScreenPts = allBoardPts.map { (it * state.scale) + state.offset }
-                val previewPath = SplineMathUtils.buildConnectionPath(previewScreenPts, curveStyle, roundness, scale = state.scale)
+                val previewPath = SplineMathUtils.buildConnectionPath(previewScreenPts, curveStyle, roundness, scale = state.scale, stepMode = stepMode)
                 drawPath(
                     path = previewPath,
                     color = connectionColor.copy(alpha = 0.9f),

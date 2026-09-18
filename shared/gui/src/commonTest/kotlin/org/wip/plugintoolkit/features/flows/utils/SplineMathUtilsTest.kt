@@ -309,4 +309,81 @@ class SplineMathUtilsTest {
         assertTrue(outTangent.x > 0f)
         assertTrue(outTangent.y > 0f)
     }
+
+    @Test
+    fun testOrthogonalStepModes() {
+        val start = Offset(100f, 100f)
+        val end = Offset(300f, 200f)
+        val points = listOf(start, end)
+
+        // Middle step mode (default): intermediate corner at x = 200f
+        val midPoints = SplineMathUtils.computeOrthogonalPoints(points, startHorizontal = true, endHorizontal = true, stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Middle)
+        assertEquals(4, midPoints.size)
+        assertEquals(200f, midPoints[1].x)
+        assertEquals(100f, midPoints[1].y)
+        assertEquals(200f, midPoints[2].x)
+        assertEquals(200f, midPoints[2].y)
+
+        // Before step mode: step occurs early, near start
+        val beforePoints = SplineMathUtils.computeOrthogonalPoints(points, startHorizontal = true, endHorizontal = true, stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Before)
+        assertTrue(beforePoints.size >= 3)
+        assertEquals(start, beforePoints.first())
+        assertEquals(end, beforePoints.last())
+
+        // After step mode: step occurs late, curving directly up/down near end
+        val afterPoints = SplineMathUtils.computeOrthogonalPoints(points, startHorizontal = true, endHorizontal = true, stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.After)
+        assertTrue(afterPoints.size >= 3)
+        assertEquals(start, afterPoints.first())
+        assertEquals(end, afterPoints.last())
+    }
+
+    @Test
+    fun testHarmonizedSplineMonotonicityNoOvershoot() {
+        // Monotonically increasing points (e.g. 90-degree bend or stair-step)
+        val points = listOf(
+            Offset(0f, 0f),
+            Offset(100f, 0f),
+            Offset(100f, 100f)
+        )
+        val segments = SplineMathUtils.computeHarmonizedSplineSegments(points, tension = 0.5f)
+        assertEquals(2, segments.size)
+
+        for (seg in segments) {
+            val minX = minOf(seg.start.x, seg.end.x) - 0.01f
+            val maxX = maxOf(seg.start.x, seg.end.x) + 0.01f
+            val minY = minOf(seg.start.y, seg.end.y) - 0.01f
+            val maxY = maxOf(seg.start.y, seg.end.y) + 0.01f
+
+            // Fritsch-Carlson monotone slope clamping guarantees control points stay bounded
+            assertTrue(seg.control1.x in minX..maxX, "control1.x ${seg.control1.x} must be within [$minX, $maxX]")
+            assertTrue(seg.control2.x in minX..maxX, "control2.x ${seg.control2.x} must be within [$minX, $maxX]")
+            assertTrue(seg.control1.y in minY..maxY, "control1.y ${seg.control1.y} must be within [$minY, $maxY]")
+            assertTrue(seg.control2.y in minY..maxY, "control2.y ${seg.control2.y} must be within [$minY, $maxY]")
+        }
+    }
+
+    @Test
+    fun testSplineResilienceToNonFiniteOrDuplicatedPoints() {
+        // Duplicated points
+        val dupPoints = listOf(Offset(50f, 50f), Offset(50f, 50f), Offset(150f, 150f))
+        val segsDup = SplineMathUtils.computeHarmonizedSplineSegments(dupPoints, tension = 0.5f)
+        assertTrue(segsDup.isNotEmpty())
+        for (seg in segsDup) {
+            assertTrue(seg.control1.x.isFinite())
+            assertTrue(seg.control1.y.isFinite())
+            assertTrue(seg.control2.x.isFinite())
+            assertTrue(seg.control2.y.isFinite())
+        }
+
+        // Non-finite point input
+        val invalidPoints = listOf(Offset(0f, 0f), Offset(Float.NaN, Float.POSITIVE_INFINITY), Offset(100f, 100f))
+        val segsInvalid = SplineMathUtils.computeHarmonizedSplineSegments(invalidPoints, tension = 0.5f)
+        assertTrue(segsInvalid.isNotEmpty())
+        for (seg in segsInvalid) {
+            assertTrue(seg.control1.x.isFinite())
+            assertTrue(seg.control1.y.isFinite())
+            assertTrue(seg.control2.x.isFinite())
+            assertTrue(seg.control2.y.isFinite())
+        }
+    }
 }

@@ -79,6 +79,7 @@ import org.wip.plugintoolkit.features.flows.ui.canvas.boardSelectionBoxGesture
 import org.wip.plugintoolkit.features.flows.utils.BoardMathUtils
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutSituation
 import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
 import org.wip.plugintoolkit.shared.components.LocalOverlayHost
@@ -140,6 +141,7 @@ fun BoardCanvas(
     onEndMoveSegment: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
     onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit = {},
     onChangeConnectionRoundness: (Float) -> Unit = {},
+    onChangeOrthogonalStepMode: (OrthogonalStepMode) -> Unit = {},
     onPaintConnection: ((Connection) -> Unit)? = null,
     onWashConnection: ((Connection) -> Unit)? = null,
     onPaintGroup: ((Long) -> Unit)? = null,
@@ -342,6 +344,7 @@ fun BoardCanvas(
                 junctions = flow.junctions,
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness,
+                orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle,
                 groups = flow.groups
             )
             .boardPanGesture(
@@ -377,6 +380,7 @@ fun BoardCanvas(
                 connectionStartIsOutput = connectionStartIsOutput,
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness,
+                orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle,
                 isAdvancedConnectionMode = state.isAdvancedConnectionMode,
                 onAddJunctionAndBranch = onAddJunctionAndBranch,
                 selectedPointIds = state.selectedPointIds,
@@ -501,7 +505,8 @@ fun BoardCanvas(
             problematicConnections = problematicConnections,
             portLayoutVersion = portLayoutVersion,
             curveStyle = state.connectionCurveStyle,
-            roundness = state.connectionRoundness
+            roundness = state.connectionRoundness,
+            stepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle
         )
 
         // 1.1 Groups Layer (Behind nodes and labels)
@@ -756,6 +761,7 @@ fun BoardCanvas(
                     colorsInFlow = colorsInFlow,
                     connectionStyle = state.connectionCurveStyle,
                     connectionRoundness = state.connectionRoundness,
+                    orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle,
                     onTogglePaintTool = onTogglePaintTool,
                     onToggleWashTool = onToggleWashTool,
                     onToggleEyedropper = onToggleEyedropper,
@@ -765,6 +771,7 @@ fun BoardCanvas(
                     onAddLabel = onAddLabel,
                     onChangeConnectionStyle = onChangeConnectionStyle,
                     onChangeConnectionRoundness = onChangeConnectionRoundness,
+                    onChangeOrthogonalStepMode = onChangeOrthogonalStepMode,
                     onZoomIn = { onZoom(-1f, centerPosition, false) },
                     onZoomOut = { onZoom(1f, centerPosition, false) },
                     modifier = Modifier
