@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.shared.components.plugin
 
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -125,5 +126,62 @@ class JobResultCardTest {
         assertTrue(action1 != action3)
         assertEquals(PluginStatusAction.Uninstall, PluginStatusAction.Uninstall)
         assertEquals(PluginStatusAction.Update, PluginStatusAction.Update)
+    }
+
+    @Test
+    fun testCalculateResizedLogHeightPx() {
+        // Drag downwards increases height
+        val expanded = calculateResizedLogHeightPx(
+            currentHeightPx = 150f,
+            deltaY = 75f,
+            minHeightPx = 100f,
+            maxHeightPx = 800f
+        )
+        assertEquals(225f, expanded)
+
+        // Drag upwards decreases height
+        val shrunk = calculateResizedLogHeightPx(
+            currentHeightPx = 225f,
+            deltaY = -50f,
+            minHeightPx = 100f,
+            maxHeightPx = 800f
+        )
+        assertEquals(175f, shrunk)
+
+        // Coerce at minimum height
+        val clampedMin = calculateResizedLogHeightPx(
+            currentHeightPx = 120f,
+            deltaY = -50f,
+            minHeightPx = 100f,
+            maxHeightPx = 800f
+        )
+        assertEquals(100f, clampedMin)
+
+        // Coerce at maximum height
+        val clampedMax = calculateResizedLogHeightPx(
+            currentHeightPx = 750f,
+            deltaY = 100f,
+            minHeightPx = 100f,
+            maxHeightPx = 800f
+        )
+        assertEquals(800f, clampedMax)
+    }
+
+    @Test
+    fun testCalculateToggledLogHeight() {
+        val defaultHeight = 150.dp
+        val expandedHeight = 450.dp
+
+        // When at default height, toggle expands to expandedHeight
+        assertEquals(expandedHeight, calculateToggledLogHeight(defaultHeight, defaultHeight, expandedHeight))
+
+        // When at expanded height, toggle collapses to defaultHeight
+        assertEquals(defaultHeight, calculateToggledLogHeight(expandedHeight, defaultHeight, expandedHeight))
+
+        // When resized above default height, toggle collapses to defaultHeight
+        assertEquals(defaultHeight, calculateToggledLogHeight(300.dp, defaultHeight, expandedHeight))
+
+        // When resized below default height, toggle expands to expandedHeight
+        assertEquals(expandedHeight, calculateToggledLogHeight(100.dp, defaultHeight, expandedHeight))
     }
 }

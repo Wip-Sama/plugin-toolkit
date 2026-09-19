@@ -204,6 +204,8 @@
     <string name="action_cancel">Annulla</string>
     <string name="action_expand">Espandi</string>
     <string name="action_collapse">Comprimi</string>
+    <string name="action_expand_terminal">Espandi terminale</string>
+    <string name="action_collapse_terminal">Comprimi terminale</string>
     <string name="plugin_settings_title">Impostazioni: %1$s</string>
     <string name="settings_search_placeholder">Cerca impostazioni...</string>
     <string name="settings_search_by_section">Per Sezione</string>

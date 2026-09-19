@@ -188,6 +188,7 @@ data class Dimensions(
     val logTerminalMinHeight: Dp = 100.dp,
     val logTerminalMaxHeight: Dp = 800.dp,
     val logTerminalDefaultHeight: Dp = 150.dp,
+    val logTerminalExpandedHeight: Dp = 450.dp,
     val capabilityProgressBarHeight: Dp = 4.dp,
     val dialogUpdateWidth: Dp = 680.dp,
     val dialogUpdateHeight: Dp = 540.dp,

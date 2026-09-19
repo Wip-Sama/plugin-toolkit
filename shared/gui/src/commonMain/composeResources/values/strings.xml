@@ -208,6 +208,8 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_expand">Expand</string>
     <string name="action_collapse">Collapse</string>
+    <string name="action_expand_terminal">Expand terminal</string>
+    <string name="action_collapse_terminal">Collapse terminal</string>
     <string name="plugin_settings_title">Settings: %1$s</string>
     <string name="settings_search_placeholder">Search settings...</string>
     <string name="settings_search_by_section">By Section</string>

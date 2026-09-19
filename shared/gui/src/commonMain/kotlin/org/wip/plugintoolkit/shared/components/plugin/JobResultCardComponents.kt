@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -48,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
@@ -75,8 +79,10 @@ import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
 import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_clear
+import plugintoolkit.composeapp.generated.resources.action_collapse_terminal
 import plugintoolkit.composeapp.generated.resources.action_copy_logs
 import plugintoolkit.composeapp.generated.resources.action_delete
+import plugintoolkit.composeapp.generated.resources.action_expand_terminal
 import plugintoolkit.composeapp.generated.resources.action_export
 import plugintoolkit.composeapp.generated.resources.action_force_cancel
 import plugintoolkit.composeapp.generated.resources.action_pause
@@ -375,7 +381,26 @@ internal fun JobResultOutputsSection(
 }
 
 /**
- * Terminal console output section featuring a resizable drag handle.
+ * Calculates the new height in pixels after a drag offset, constrained by min and max bounds.
+ */
+internal fun calculateResizedLogHeightPx(
+    currentHeightPx: Float,
+    deltaY: Float,
+    minHeightPx: Float,
+    maxHeightPx: Float
+): Float = (currentHeightPx + deltaY).coerceIn(minHeightPx, maxHeightPx)
+
+/**
+ * Calculates toggled terminal height between default and expanded states.
+ */
+internal fun calculateToggledLogHeight(
+    currentHeight: Dp,
+    defaultHeight: Dp,
+    expandedHeight: Dp
+): Dp = if (currentHeight > defaultHeight) defaultHeight else expandedHeight
+
+/**
+ * Terminal console output section featuring an expand/collapse toggle and a resizable drag handle.
  */
 @Composable
 internal fun JobResultConsoleSection(
@@ -385,17 +410,47 @@ internal fun JobResultConsoleSection(
     onLogHeightChange: (Dp) -> Unit,
     minLogHeight: Dp,
     maxLogHeight: Dp,
+    defaultLogHeight: Dp = ToolkitTheme.dimensions.logTerminalDefaultHeight,
     modifier: Modifier = Modifier
 ) {
     val uriHandler = LocalUriHandler.current
+    val currentLogHeight by rememberUpdatedState(logHeight)
+    val currentOnLogHeightChange by rememberUpdatedState(onLogHeightChange)
+    val currentMinLogHeight by rememberUpdatedState(minLogHeight)
+    val currentMaxLogHeight by rememberUpdatedState(maxLogHeight)
+    var isDragging by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(Res.string.flow_console_logs_title),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(Res.string.flow_console_logs_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            val isExpanded = logHeight > defaultLogHeight
+            val expandedHeight = ToolkitTheme.dimensions.logTerminalExpandedHeight
+            IconButton(
+                onClick = {
+                    onLogHeightChange(calculateToggledLogHeight(logHeight, defaultLogHeight, expandedHeight))
+                },
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+            ) {
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                    contentDescription = stringResource(
+                        if (isExpanded) Res.string.action_collapse_terminal else Res.string.action_expand_terminal
+                    ),
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
         Box(
@@ -421,12 +476,31 @@ internal fun JobResultConsoleSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(ToolkitTheme.dimensions.logHandleHeight)
-                .pointerInput(minLogHeight, maxLogHeight) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        val newHeight = logHeight + dragAmount.y.toDp()
-                        onLogHeightChange(newHeight.coerceIn(minLogHeight, maxLogHeight))
-                    }
+                .pointerHoverIcon(PlatformUtils.verticalResizePointerIcon())
+                .pointerInput(Unit) {
+                    var accumulatedHeightPx = 0f
+                    detectDragGestures(
+                        onDragStart = {
+                            isDragging = true
+                            accumulatedHeightPx = currentLogHeight.toPx()
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            accumulatedHeightPx = calculateResizedLogHeightPx(
+                                currentHeightPx = accumulatedHeightPx,
+                                deltaY = dragAmount.y,
+                                minHeightPx = currentMinLogHeight.toPx(),
+                                maxHeightPx = currentMaxLogHeight.toPx()
+                            )
+                            currentOnLogHeightChange(accumulatedHeightPx.toDp())
+                        }
+                    )
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -434,7 +508,10 @@ internal fun JobResultConsoleSection(
                 modifier = Modifier
                     .width(ToolkitTheme.dimensions.logHandleWidth)
                     .height(ToolkitTheme.dimensions.logHandleBarHeight)
-                    .background(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
+                    .background(
+                        if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                        MaterialTheme.shapes.small
+                    )
             )
         }
     }

@@ -143,7 +143,8 @@ fun JobResultCard(
                             logHeight = logHeight,
                             onLogHeightChange = { logHeight = it },
                             minLogHeight = minLogHeight,
-                            maxLogHeight = maxLogHeight
+                            maxLogHeight = maxLogHeight,
+                            defaultLogHeight = defaultLogHeight
                         )
                     }
                 }
