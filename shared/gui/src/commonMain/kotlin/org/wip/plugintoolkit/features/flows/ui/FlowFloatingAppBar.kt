@@ -84,6 +84,7 @@ import plugintoolkit.composeapp.generated.resources.flow_toolbar_roundness
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_spline_style
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_wash
 import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_mode
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_auto
 import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_middle
 import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_before
 import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_after
@@ -108,7 +109,7 @@ fun FlowFloatingAppBar(
     colorsInFlow: List<String> = emptyList(),
     connectionStyle: ConnectionCurveStyle,
     connectionRoundness: Float,
-    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
+    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
     onTogglePaintTool: () -> Unit,
     onToggleWashTool: () -> Unit,
     onToggleEyedropper: () -> Unit = {},
@@ -510,7 +511,7 @@ private fun QuickPaletteCard(
 private fun SplineSettingsCard(
     connectionStyle: ConnectionCurveStyle,
     connectionRoundness: Float,
-    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
+    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
     onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit,
     onChangeConnectionRoundness: (Float) -> Unit,
     onChangeOrthogonalStepMode: (OrthogonalStepMode) -> Unit = {},
@@ -575,6 +576,11 @@ private fun SplineSettingsCard(
                     horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
                     verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)
                 ) {
+                    FilterChip(
+                        selected = orthogonalStepMode == OrthogonalStepMode.Auto,
+                        onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.Auto) },
+                        label = { Text(stringResource(Res.string.flow_orthogonal_step_auto), style = MaterialTheme.typography.labelSmall) }
+                    )
                     FilterChip(
                         selected = orthogonalStepMode == OrthogonalStepMode.Middle,
                         onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.Middle) },

@@ -199,4 +199,98 @@ class ConnectionHitTesterTest {
         kotlin.test.assertNotNull(res1)
         assertEquals(1, res1.segmentIndex)
     }
+
+    @Test
+    fun testVerticalJunctionFeedYieldsVerticalStartAndSingleBendVhCurve() {
+        // Vertical trunk wire coming down from top bar (60, 50) to Junction 100 at (60, 115)
+        val incomingConn = Connection(
+            sourceNodeId = Connection.FLOATING_NODE_ID,
+            sourcePortId = Connection.FLOATING_PORT_ID,
+            sourceJunctionId = 10L, // Top bar junction at (60, 50)
+            targetNodeId = Connection.FLOATING_NODE_ID,
+            targetPortId = Connection.FLOATING_PORT_ID,
+            targetJunctionId = 100L // Junction 2 at (60, 115)
+        )
+
+        // Outgoing connection leaving Junction 100 to target node at (200, 850)
+        val outgoingConn = Connection(
+            sourceNodeId = Connection.FLOATING_NODE_ID,
+            sourcePortId = Connection.FLOATING_PORT_ID,
+            sourceJunctionId = 100L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+
+        val juncMap = mapOf(
+            10L to Offset(60f, 50f),
+            100L to Offset(60f, 115f)
+        )
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nodeId, _, isOutput ->
+            if (nodeId == 2L && !isOutput) Offset(200f, 850f) else null
+        }
+
+        val (startH, endH) = ConnectionHitTester.getConnectionOrientations(
+            connection = outgoingConn,
+            connections = listOf(incomingConn, outgoingConn),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos
+        )
+
+        // Because incoming wire is vertical moving DOWN and target is ahead (y=850 > y=115),
+        // departure preserves vertical tangent (startIsHorizontal = false)
+        assertFalse(startH, "Outgoing connection must exit vertically downwards through the junction")
+        assertTrue(endH, "Target node input must receive connection horizontally")
+
+        // In Auto orthogonal step mode, (!startH && endH) forms the 1-bend (60, 115) -> (60, 850) -> (200, 850) path (Yellow line)
+        val orthoPoints = org.wip.plugintoolkit.features.flows.utils.SplineMathUtils.computeOrthogonalPoints(
+            listOf(Offset(60f, 115f), Offset(200f, 850f)),
+            startHorizontal = startH,
+            endHorizontal = endH,
+            stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
+        )
+        assertEquals(3, orthoPoints.size, "Must only have 3 points (1 single corner at (60, 850))")
+        assertEquals(Offset(60f, 115f), orthoPoints[0])
+        assertEquals(Offset(60f, 850f), orthoPoints[1])
+        assertEquals(Offset(200f, 850f), orthoPoints[2])
+    }
+
+    @Test
+    fun testHorizontalJunctionFeedYieldsHorizontalContinuity() {
+        // Horizontal trunk wire coming from left (100, 100) to Junction 100 at (300, 100)
+        val incomingConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = Connection.FLOATING_NODE_ID,
+            targetPortId = Connection.FLOATING_PORT_ID,
+            targetJunctionId = 100L
+        )
+
+        // Outgoing connection continuing right to Node 2 at (500, 100)
+        val outgoingConn = Connection(
+            sourceNodeId = Connection.FLOATING_NODE_ID,
+            sourcePortId = Connection.FLOATING_PORT_ID,
+            sourceJunctionId = 100L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+
+        val juncMap = mapOf(100L to Offset(300f, 100f))
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nodeId, _, isOutput ->
+            when {
+                nodeId == 1L && isOutput -> Offset(100f, 100f)
+                nodeId == 2L && !isOutput -> Offset(500f, 100f)
+                else -> null
+            }
+        }
+
+        val (startH, endH) = ConnectionHitTester.getConnectionOrientations(
+            connection = outgoingConn,
+            connections = listOf(incomingConn, outgoingConn),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos
+        )
+
+        assertTrue(startH, "Outgoing connection must exit horizontally through horizontal junction")
+        assertTrue(endH, "Target node input must receive connection horizontally")
+    }
 }

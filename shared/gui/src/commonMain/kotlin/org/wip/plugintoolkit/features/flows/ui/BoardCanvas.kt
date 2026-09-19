@@ -344,7 +344,7 @@ fun BoardCanvas(
                 junctions = flow.junctions,
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness,
-                orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle,
+                orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
                 groups = flow.groups
             )
             .boardPanGesture(
@@ -380,7 +380,7 @@ fun BoardCanvas(
                 connectionStartIsOutput = connectionStartIsOutput,
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness,
-                orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle,
+                orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
                 isAdvancedConnectionMode = state.isAdvancedConnectionMode,
                 onAddJunctionAndBranch = onAddJunctionAndBranch,
                 selectedPointIds = state.selectedPointIds,
@@ -506,7 +506,7 @@ fun BoardCanvas(
             portLayoutVersion = portLayoutVersion,
             curveStyle = state.connectionCurveStyle,
             roundness = state.connectionRoundness,
-            stepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle
+            stepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto
         )
 
         // 1.1 Groups Layer (Behind nodes and labels)
@@ -761,7 +761,7 @@ fun BoardCanvas(
                     colorsInFlow = colorsInFlow,
                     connectionStyle = state.connectionCurveStyle,
                     connectionRoundness = state.connectionRoundness,
-                    orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle,
+                    orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
                     onTogglePaintTool = onTogglePaintTool,
                     onToggleWashTool = onToggleWashTool,
                     onToggleEyedropper = onToggleEyedropper,

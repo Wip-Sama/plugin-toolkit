@@ -192,6 +192,7 @@ fun SettingsRegistryBuilder.systemDefinitions(
                     title = Res.string.flow_orthogonal_step_mode,
                     icon = Icons.Default.AltRoute,
                     options = listOf(
+                        OrthogonalStepMode.Auto,
                         OrthogonalStepMode.Middle,
                         OrthogonalStepMode.Before,
                         OrthogonalStepMode.After
@@ -199,6 +200,7 @@ fun SettingsRegistryBuilder.systemDefinitions(
                     subtitle = SettingText.Resource(Res.string.flow_orthogonal_step_mode_subtitle),
                     labelProvider = {
                         when (it) {
+                            OrthogonalStepMode.Auto -> stringResource(Res.string.flow_orthogonal_step_auto)
                             OrthogonalStepMode.Middle -> stringResource(Res.string.flow_orthogonal_step_middle)
                             OrthogonalStepMode.Before -> stringResource(Res.string.flow_orthogonal_step_before)
                             OrthogonalStepMode.After -> stringResource(Res.string.flow_orthogonal_step_after)

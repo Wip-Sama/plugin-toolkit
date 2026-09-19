@@ -704,6 +704,7 @@
     <string name="flow_connection_style_orthogonal">Orthogonal</string>
     <string name="flow_orthogonal_step_mode">Step Mode</string>
     <string name="flow_orthogonal_step_mode_subtitle">Configure intermediate step position for orthogonal connection turns</string>
+    <string name="flow_orthogonal_step_auto">Auto (Smooth)</string>
     <string name="flow_orthogonal_step_middle">Middle</string>
     <string name="flow_orthogonal_step_before">Step Before</string>
     <string name="flow_orthogonal_step_after">Step After</string>

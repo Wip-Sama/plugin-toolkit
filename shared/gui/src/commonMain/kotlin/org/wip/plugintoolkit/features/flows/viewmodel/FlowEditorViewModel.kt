@@ -242,14 +242,18 @@ class FlowEditorViewModel(
                     ?: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline
                 val defaultRoundness = resolvedSettingsRepository?.settings?.value?.flows?.defaultConnectionRoundness
                     ?: 0.5f
+                val defaultStepMode = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalStepMode
+                    ?: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
                 val effectiveStyle = activeFlowWithSyncedSubflows.connectionCurveStyle ?: defaultStyle
                 val effectiveRoundness = activeFlowWithSyncedSubflows.connectionRoundness ?: defaultRoundness
+                val effectiveStepMode = activeFlowWithSyncedSubflows.orthogonalStepMode ?: defaultStepMode
 
                 _state.update { currentState ->
                     currentState.copy(
                         flow = activeFlowWithSyncedSubflows,
                         connectionCurveStyle = effectiveStyle,
                         connectionRoundness = effectiveRoundness,
+                        orthogonalStepMode = effectiveStepMode,
                         nextId = maxId + 1,
                         flows = allFlows,
                         hasUnsavedChanges = false

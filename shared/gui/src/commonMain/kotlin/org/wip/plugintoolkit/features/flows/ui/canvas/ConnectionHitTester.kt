@@ -9,28 +9,117 @@ import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 
+import kotlin.math.abs
+
 object ConnectionHitTester {
 
     fun getConnectionOrientations(
         connection: Connection,
-        connections: List<Connection> = emptyList()
+        connections: List<Connection> = emptyList(),
+        junctionMap: Map<Long, Offset> = emptyMap(),
+        getPortBoardPosition: ((Long, String, Boolean) -> Offset?)? = null,
+        groups: List<FlowGroup> = emptyList(),
+        density: Float = 1f
     ): Pair<Boolean, Boolean> {
+        // Determine start orientation:
         val startIsHorizontal = if (connection.sourceJunctionId == null) {
+            // Node output ports always exit horizontally to the right
             true
         } else {
-            // Connection leaves a junction. Check incoming connection to this junction
-            val incoming = connections.find { it.targetJunctionId == connection.sourceJunctionId }
-            if (incoming != null) {
-                false
+            val juncId = connection.sourceJunctionId
+            val juncPos = junctionMap[juncId]
+
+            // Find incoming connection entering this junction
+            val incoming = connections.find {
+                it != connection && (it.targetJunctionId == juncId || juncId in it.junctionIds)
+            }
+
+            if (incoming != null && juncPos != null && getPortBoardPosition != null) {
+                val inPoints = getConnectionBoardPoints(
+                    connection = incoming,
+                    getPortBoardPosition = getPortBoardPosition,
+                    junctionMap = junctionMap,
+                    groups = groups,
+                    density = density
+                )
+                if (inPoints != null && inPoints.size >= 2) {
+                    val idx = inPoints.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                    val prevPoint = if (idx > 0) inPoints[idx - 1] else inPoints[inPoints.size - 2]
+                    val dxIn = juncPos.x - prevPoint.x
+                    val dyIn = juncPos.y - prevPoint.y
+                    val isIncomingVertical = abs(dyIn) > abs(dxIn)
+
+                    val floating = connection.floatingTarget
+                    val targetPos = when {
+                        connection.targetJunctionId != null -> junctionMap[connection.targetJunctionId]
+                        floating != null -> floating.toComposeOffset()
+                        else -> getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
+                    }
+
+                    if (targetPos != null) {
+                        val dxToTarget = targetPos.x - juncPos.x
+                        val dyToTarget = targetPos.y - juncPos.y
+
+                        val isAhead = if (isIncomingVertical) {
+                            if (dyIn >= 0f) dyToTarget > 1f else dyToTarget < -1f
+                        } else {
+                            if (dxIn >= 0f) dxToTarget > 1f else dxToTarget < -1f
+                        }
+
+                        if (isAhead) {
+                            // Preserve incoming tangent through junction (no sharp break)
+                            !isIncomingVertical
+                        } else {
+                            // Target branches off perpendicularly: take perpendicular departure
+                            isIncomingVertical
+                        }
+                    } else {
+                        !isIncomingVertical
+                    }
+                } else {
+                    true
+                }
             } else {
-                false
+                true
             }
         }
 
+        // Determine end orientation:
         val endIsHorizontal = if (connection.targetJunctionId == null && !connection.isFloating) {
+            // Node input ports always enter horizontally from the left
             true
+        } else if (connection.targetJunctionId != null) {
+            val juncId = connection.targetJunctionId
+            val juncPos = junctionMap[juncId]
+
+            // Check if an outgoing connection continues through this junction
+            val outgoing = connections.find {
+                it != connection && (it.sourceJunctionId == juncId || juncId in it.junctionIds)
+            }
+
+            if (outgoing != null && juncPos != null && getPortBoardPosition != null) {
+                val outPoints = getConnectionBoardPoints(
+                    connection = outgoing,
+                    getPortBoardPosition = getPortBoardPosition,
+                    junctionMap = junctionMap,
+                    groups = groups,
+                    density = density
+                )
+                if (outPoints != null && outPoints.size >= 2) {
+                    val idx = outPoints.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                    val nextPoint = if (idx >= 0 && idx < outPoints.size - 1) outPoints[idx + 1] else outPoints[1]
+                    val dxOut = nextPoint.x - juncPos.x
+                    val dyOut = nextPoint.y - juncPos.y
+                    val isOutgoingVertical = abs(dyOut) > abs(dxOut)
+                    !isOutgoingVertical
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
         } else {
-            false
+            true
         }
 
         return Pair(startIsHorizontal, endIsHorizontal)
@@ -74,7 +163,14 @@ object ConnectionHitTester {
                 continue
             }
 
-            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(connection, connections)
+            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(
+                connection = connection,
+                connections = connections,
+                junctionMap = junctionMap,
+                getPortBoardPosition = getPortBoardPosition,
+                groups = groups,
+                density = density
+            )
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
@@ -148,7 +244,14 @@ object ConnectionHitTester {
                 continue
             }
 
-            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(connection, connections)
+            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(
+                connection = connection,
+                connections = connections,
+                junctionMap = junctionMap,
+                getPortBoardPosition = getPortBoardPosition,
+                groups = groups,
+                density = density
+            )
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
@@ -350,7 +453,14 @@ object ConnectionHitTester {
 
             if (screenPoints.size < 2) continue
 
-            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(connection, connections)
+            val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(
+                connection = connection,
+                connections = connections,
+                junctionMap = junctionMap,
+                getPortBoardPosition = getPortBoardPosition,
+                groups = groups,
+                density = density
+            )
             val effectiveStyle = curveStyle
             val midpoints = SplineMathUtils.computeSegmentMidpoints(
                 points = screenPoints,

@@ -85,12 +85,11 @@ object SplineMathUtils {
     }
 
     /**
-     * Computes a harmonized, monotonic $C^1$ continuous spline connecting [points] using
-     * Centripetal Catmull-Rom parameterization ($\alpha = 0.5$) combined with Fritsch-Carlson
-     * monotone slope clamping.
+     * Computes a harmonized, $C^1$ continuous spline connecting [points] using
+     * Catmull-Rom parameterization converted to cubic Bézier control points (PDF 2).
      *
-     * This eliminates unnatural overshoot, retrograde loops, and S-bend ripples (Image 3) while
-     * ensuring that corners (Image 4) round smoothly without bulging outwards.
+     * Ensures C1 tangent continuity and smooth curvature across all intermediate segments
+     * (eliminating fallback to rigid straight lines) while respecting horizontal port boundaries.
      */
     fun computeHarmonizedSplineSegments(
         points: List<Offset>,
@@ -124,7 +123,7 @@ object SplineMathUtils {
                 }
                 val dx = maxOf(softenedDx, 30f * scale) * clampedTension
                 val signX = if (chord.x >= 0f) 1f else -1f
-                val clampedDx = minOf(dx, abs(chord.x) * 0.85f)
+                val clampedDx = minOf(dx, maxOf(abs(chord.x) * 0.85f, 20f * scale))
                 Offset(pFrom.x + signX * clampedDx, pFrom.y)
             } else {
                 val len = minOf(dist * 0.38f, 150f * scale) * clampedTension
@@ -137,14 +136,8 @@ object SplineMathUtils {
         if (n == 2) {
             val p0 = pts[0]
             val p1 = pts[1]
-            val c1Raw = computeEndpointControl(p0, p1, startHorizontal)
-            val c2Raw = computeEndpointControl(p1, p0, endHorizontal)
-            val minX = minOf(p0.x, p1.x)
-            val maxX = maxOf(p0.x, p1.x)
-            val minY = minOf(p0.y, p1.y)
-            val maxY = maxOf(p0.y, p1.y)
-            val c1 = Offset(c1Raw.x.coerceIn(minX, maxX), c1Raw.y.coerceIn(minY, maxY))
-            val c2 = Offset(c2Raw.x.coerceIn(minX, maxX), c2Raw.y.coerceIn(minY, maxY))
+            val c1 = computeEndpointControl(p0, p1, startHorizontal)
+            val c2 = computeEndpointControl(p1, p0, endHorizontal)
             segments.add(CubicSegment(p0, c1, c2, p1))
             return segments
         }
@@ -154,7 +147,7 @@ object SplineMathUtils {
         val chordDistances = Array(n - 1) { i -> chords[i].getDistance() }
         val centripetalDistances = Array(n - 1) { i -> sqrt(maxOf(0.001f, chordDistances[i])) }
 
-        // Compute centripetal tangents at each intermediate point
+        // Compute C1 continuous Catmull-Rom tangents at each intermediate point (PDF 2)
         val tangents = Array(n) { Offset.Zero }
         for (i in 1 until n - 1) {
             val sPrev = chords[i - 1]
@@ -170,21 +163,15 @@ object SplineMathUtils {
                 var tx = (sPrev.x * wPrev + sNext.x * wNext) * clampedTension
                 var ty = (sPrev.y * wPrev + sNext.y * wNext) * clampedTension
 
-                // Fritsch-Carlson Monotone Slope Clamping:
-                // If adjacent segments change direction in an axis, tangent on that axis MUST be 0 (local extremum).
-                // Otherwise, limit tangent magnitude to prevent overshoot beyond the interval.
-                if (sPrev.x * sNext.x <= 0f) {
-                    tx = 0f
-                } else {
-                    val maxTx = 3f * minOf(abs(sPrev.x), abs(sNext.x))
-                    tx = tx.coerceIn(-maxTx, maxTx)
-                }
-
-                if (sPrev.y * sNext.y <= 0f) {
-                    ty = 0f
-                } else {
-                    val maxTy = 3f * minOf(abs(sPrev.y), abs(sNext.y))
-                    ty = ty.coerceIn(-maxTy, maxTy)
+                // Smooth chord-proportional limit to prevent excessive loops while preserving curvature
+                val dPrev = chordDistances[i - 1]
+                val dNext = chordDistances[i]
+                val maxDist = minOf(dPrev, dNext) * 1.5f
+                val tDist = sqrt(tx * tx + ty * ty)
+                if (tDist > maxDist && tDist > 0.001f) {
+                    val scaleFactor = maxDist / tDist
+                    tx *= scaleFactor
+                    ty *= scaleFactor
                 }
 
                 tangents[i] = Offset(tx, ty)
@@ -194,11 +181,17 @@ object SplineMathUtils {
         for (i in 0 until n - 1) {
             val pCurr = pts[i]
             val pNext = pts[i + 1]
-            val chord = chords[i]
 
             // Control point 1 (departing pCurr)
-            val c1Raw = if (i == 0) {
-                computeEndpointControl(pCurr, pNext, startHorizontal)
+            val c1 = if (i == 0) {
+                if (startHorizontal) {
+                    computeEndpointControl(pCurr, pNext, isHorizontal = true)
+                } else {
+                    Offset(
+                        pCurr.x + (pNext.x - pCurr.x) * 0.333f * clampedTension,
+                        pCurr.y + (pNext.y - pCurr.y) * 0.333f * clampedTension
+                    )
+                }
             } else {
                 Offset(
                     pCurr.x + tangents[i].x * 0.333f,
@@ -207,30 +200,21 @@ object SplineMathUtils {
             }
 
             // Control point 2 (approaching pNext)
-            val c2Raw = if (i + 1 == n - 1) {
-                computeEndpointControl(pNext, pCurr, endHorizontal)
+            val c2 = if (i + 1 == n - 1) {
+                if (endHorizontal) {
+                    computeEndpointControl(pNext, pCurr, isHorizontal = true)
+                } else {
+                    Offset(
+                        pNext.x - (pNext.x - pCurr.x) * 0.333f * clampedTension,
+                        pNext.y - (pNext.y - pCurr.y) * 0.333f * clampedTension
+                    )
+                }
             } else {
                 Offset(
                     pNext.x - tangents[i + 1].x * 0.333f,
                     pNext.y - tangents[i + 1].y * 0.333f
                 )
             }
-
-            // Coordinate bounding box coercion: ensures the cubic curve stays strictly monotonic
-            // and within the convex interval of the endpoints without any retrograde bulging.
-            val minX = minOf(pCurr.x, pNext.x)
-            val maxX = maxOf(pCurr.x, pNext.x)
-            val minY = minOf(pCurr.y, pNext.y)
-            val maxY = maxOf(pCurr.y, pNext.y)
-
-            val c1 = Offset(
-                c1Raw.x.coerceIn(minX, maxX),
-                c1Raw.y.coerceIn(minY, maxY)
-            )
-            val c2 = Offset(
-                c2Raw.x.coerceIn(minX, maxX),
-                c2Raw.y.coerceIn(minY, maxY)
-            )
 
             segments.add(CubicSegment(pCurr, c1, c2, pNext))
         }
@@ -294,7 +278,7 @@ object SplineMathUtils {
         startHorizontal: Boolean = true,
         endHorizontal: Boolean = true,
         scale: Float = 1f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return emptyList()
@@ -350,169 +334,159 @@ object SplineMathUtils {
     /**
      * Expands a sequence of points into a single continuous orthogonal (horizontal and vertical) path.
      * Respects port launch and arrival directions, preserves directional continuity, and supports
-     * configurable [stepMode] (Middle, Before, After) to prioritize minimizing sharp corners (Image 2).
+     * configurable [stepMode] (Auto/Min-Break, Middle, Before, After) as specified in PDF 1.
      */
     fun computeOrthogonalPoints(
         points: List<Offset>,
         startHorizontal: Boolean = true,
         endHorizontal: Boolean = true,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return pts
+
         if (pts.size == 2) {
             val p0 = pts[0]
             val p1 = pts[1]
             if (abs(p0.x - p1.x) < 0.2f || abs(p0.y - p1.y) < 0.2f) {
                 return listOf(p0, p1)
             }
-            return when {
-                startHorizontal && endHorizontal -> {
-                    val midX = when (stepMode) {
-                        OrthogonalStepMode.Middle -> (p0.x + p1.x) / 2f
-                        OrthogonalStepMode.Before -> {
-                            val lead = minOf(36f, abs(p1.x - p0.x) * 0.25f)
-                            if (p1.x >= p0.x) p0.x + lead else p0.x - lead
-                        }
-                        OrthogonalStepMode.After -> {
-                            val lead = minOf(36f, abs(p1.x - p0.x) * 0.25f)
-                            if (p1.x >= p0.x) p1.x - lead else p1.x + lead
-                        }
-                    }
-                    listOf(p0, Offset(midX, p0.y), Offset(midX, p1.y), p1)
-                }
-                startHorizontal && !endHorizontal -> {
-                    listOf(p0, Offset(p1.x, p0.y), p1)
-                }
-                !startHorizontal && endHorizontal -> {
+
+            return when (stepMode) {
+                OrthogonalStepMode.Before -> {
+                    // D3 / Protovis step-before: Vertical then Horizontal (corner at (x0, y1))
                     listOf(p0, Offset(p0.x, p1.y), p1)
                 }
-                else -> {
-                    val midY = when (stepMode) {
-                        OrthogonalStepMode.Middle -> (p0.y + p1.y) / 2f
-                        OrthogonalStepMode.Before -> {
-                            val lead = minOf(36f, abs(p1.y - p0.y) * 0.25f)
-                            if (p1.y >= p0.y) p0.y + lead else p0.y - lead
-                        }
-                        OrthogonalStepMode.After -> {
-                            val lead = minOf(36f, abs(p1.y - p0.y) * 0.25f)
-                            if (p1.y >= p0.y) p1.y - lead else p1.y + lead
-                        }
+                OrthogonalStepMode.After -> {
+                    // D3 / Protovis step-after: Horizontal then Vertical (corner at (x1, y0))
+                    listOf(p0, Offset(p1.x, p0.y), p1)
+                }
+                OrthogonalStepMode.Middle,
+                OrthogonalStepMode.Auto -> {
+                    if (startHorizontal && endHorizontal) {
+                        val midX = (p0.x + p1.x) / 2f
+                        listOf(p0, Offset(midX, p0.y), Offset(midX, p1.y), p1)
+                    } else if (startHorizontal && !endHorizontal) {
+                        listOf(p0, Offset(p1.x, p0.y), p1)
+                    } else if (!startHorizontal && endHorizontal) {
+                        listOf(p0, Offset(p0.x, p1.y), p1)
+                    } else {
+                        val midY = (p0.y + p1.y) / 2f
+                        listOf(p0, Offset(p0.x, midY), Offset(p1.x, midY), p1)
                     }
-                    listOf(p0, Offset(p0.x, midY), Offset(p1.x, midY), p1)
                 }
             }
         }
 
-        val result = mutableListOf<Offset>()
-        result.add(pts[0])
+        // Multi-point orthogonal routing (n > 2)
+        val waypoints = mutableListOf<Offset>()
+        waypoints.add(pts[0])
 
-        var currentIsHorizontal = startHorizontal
+        var currentDir = if (startHorizontal) "H" else "V"
+        var currentHeading = if (startHorizontal) {
+            if (pts.size > 1 && pts[1].x < pts[0].x) "LEFT" else "RIGHT"
+        } else {
+            if (pts.size > 1 && pts[1].y < pts[0].y) "UP" else "DOWN"
+        }
 
         for (i in 0 until pts.size - 1) {
-            val pA = pts[i]
-            val pB = pts[i + 1]
+            val p0 = pts[i]
+            val p1 = pts[i + 1]
+            val dx = p1.x - p0.x
+            val dy = p1.y - p0.y
             val isLastSegment = (i == pts.size - 2)
-
-            if (abs(pA.x - pB.x) < 0.2f) {
-                result.add(pB)
-                currentIsHorizontal = false
-            } else if (abs(pA.y - pB.y) < 0.2f) {
-                result.add(pB)
-                currentIsHorizontal = true
-            } else if (isLastSegment) {
-                when {
-                    currentIsHorizontal && endHorizontal -> {
-                        val midX = when (stepMode) {
-                            OrthogonalStepMode.Middle -> (pA.x + pB.x) / 2f
-                            OrthogonalStepMode.Before -> {
-                                val lead = minOf(36f, abs(pB.x - pA.x) * 0.25f)
-                                if (pB.x >= pA.x) pA.x + lead else pA.x - lead
-                            }
-                            OrthogonalStepMode.After -> {
-                                val lead = minOf(36f, abs(pB.x - pA.x) * 0.25f)
-                                if (pB.x >= pA.x) pB.x - lead else pB.x + lead
-                            }
+            if (stepMode != OrthogonalStepMode.Auto) {
+                if (abs(dx) < 0.2f) {
+                    currentDir = "V"
+                    waypoints.add(p1)
+                } else if (abs(dy) < 0.2f) {
+                    currentDir = "H"
+                    waypoints.add(p1)
+                } else {
+                    when (stepMode) {
+                        OrthogonalStepMode.Before -> {
+                            waypoints.add(Offset(p0.x, p1.y))
+                            currentDir = "H"
+                            waypoints.add(p1)
                         }
-                        result.add(Offset(midX, pA.y))
-                        result.add(Offset(midX, pB.y))
-                        result.add(pB)
-                        currentIsHorizontal = true
-                    }
-                    !currentIsHorizontal && endHorizontal -> {
-                        // Vertical travel entering horizontal port: 1 smooth corner
-                        result.add(Offset(pA.x, pB.y))
-                        result.add(pB)
-                        currentIsHorizontal = true
-                    }
-                    currentIsHorizontal && !endHorizontal -> {
-                        // Horizontal travel entering vertical port: 1 smooth corner
-                        result.add(Offset(pB.x, pA.y))
-                        result.add(pB)
-                        currentIsHorizontal = false
-                    }
-                    else -> {
-                        val midY = when (stepMode) {
-                            OrthogonalStepMode.Middle -> (pA.y + pB.y) / 2f
-                            OrthogonalStepMode.Before -> {
-                                val lead = minOf(36f, abs(pB.y - pA.y) * 0.25f)
-                                if (pB.y >= pA.y) pA.y + lead else pA.y - lead
-                            }
-                            OrthogonalStepMode.After -> {
-                                val lead = minOf(36f, abs(pB.y - pA.y) * 0.25f)
-                                if (pB.y >= pA.y) pB.y - lead else pB.y + lead
-                            }
+                        OrthogonalStepMode.After -> {
+                            waypoints.add(Offset(p1.x, p0.y))
+                            currentDir = "V"
+                            waypoints.add(p1)
                         }
-                        result.add(Offset(pA.x, midY))
-                        result.add(Offset(pB.x, midY))
-                        result.add(pB)
-                        currentIsHorizontal = false
+                        OrthogonalStepMode.Middle -> {
+                            if (currentDir == "H") {
+                                val midX = (p0.x + p1.x) / 2f
+                                waypoints.add(Offset(midX, p0.y))
+                                waypoints.add(Offset(midX, p1.y))
+                                currentDir = "H"
+                            } else {
+                                val midY = (p0.y + p1.y) / 2f
+                                waypoints.add(Offset(p0.x, midY))
+                                waypoints.add(Offset(p1.x, midY))
+                                currentDir = "V"
+                            }
+                            waypoints.add(p1)
+                        }
+                        OrthogonalStepMode.Auto -> {}
                     }
                 }
             } else {
-                // Intermediate segment routing between waypoints / junctions:
-                // Prioritize minimizing sharp corners based on stepMode
-                when (stepMode) {
-                    OrthogonalStepMode.Before -> {
-                        if (currentIsHorizontal) {
-                            result.add(Offset(pA.x, pB.y))
-                            result.add(pB)
-                            currentIsHorizontal = true
-                        } else {
-                            result.add(Offset(pB.x, pA.y))
-                            result.add(pB)
-                            currentIsHorizontal = false
-                        }
+                // Direction-aware "Min-Break" Orthogonal Routing (PDF 1)
+                if (currentHeading == "RIGHT" || currentHeading == "LEFT") {
+                    val isAhead = (currentHeading == "RIGHT" && dx > 0f) || (currentHeading == "LEFT" && dx < 0f)
+                    if (abs(dy) < 0.5f && isAhead) {
+                        // Aligned continuation horizontally
+                        currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
+                    } else if (abs(dx) < 0.5f) {
+                        currentHeading = if (dy >= 0f) "DOWN" else "UP"
+                    } else if (isLastSegment && endHorizontal && isAhead) {
+                        val midX = (p0.x + p1.x) / 2f
+                        waypoints.add(Offset(midX, p0.y))
+                        waypoints.add(Offset(midX, p1.y))
+                    } else if (isAhead) {
+                        waypoints.add(Offset(p1.x, p0.y))
+                        currentHeading = if (dy >= 0f) "DOWN" else "UP"
+                    } else {
+                        // U-turn / Backtracking: target opposes heading
+                        val stub = if (currentHeading == "RIGHT") 24f else -24f
+                        val midY = (p0.y + p1.y) / 2f
+                        waypoints.add(Offset(p0.x + stub, p0.y))
+                        waypoints.add(Offset(p0.x + stub, midY))
+                        waypoints.add(Offset(p1.x, midY))
+                        currentHeading = if (dy >= 0f) "DOWN" else "UP"
                     }
-                    OrthogonalStepMode.After -> {
-                        // Step after: keep current direction to target coordinate, then turn (minimizes sharp corners, Image 2)
-                        if (currentIsHorizontal) {
-                            result.add(Offset(pB.x, pA.y))
-                            result.add(pB)
-                            currentIsHorizontal = false
-                        } else {
-                            result.add(Offset(pA.x, pB.y))
-                            result.add(pB)
-                            currentIsHorizontal = true
-                        }
-                    }
-                    OrthogonalStepMode.Middle -> {
-                        if (currentIsHorizontal) {
-                            result.add(Offset(pB.x, pA.y))
-                            result.add(pB)
-                            currentIsHorizontal = false
-                        } else {
-                            result.add(Offset(pA.x, pB.y))
-                            result.add(pB)
-                            currentIsHorizontal = true
-                        }
+                } else {
+                    val isAhead = (currentHeading == "DOWN" && dy > 0f) || (currentHeading == "UP" && dy < 0f)
+                    if (abs(dx) < 0.5f && isAhead) {
+                        // Aligned continuation vertically
+                        currentHeading = if (dy >= 0f) "DOWN" else "UP"
+                    } else if (abs(dy) < 0.5f) {
+                        currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
+                    } else if (isLastSegment && !endHorizontal && isAhead) {
+                        val midY = (p0.y + p1.y) / 2f
+                        waypoints.add(Offset(p0.x, midY))
+                        waypoints.add(Offset(p1.x, midY))
+                    } else if (isAhead) {
+                        waypoints.add(Offset(p0.x, p1.y))
+                        currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
+                    } else {
+                        // U-turn / Backtracking: target opposes heading
+                        val stub = if (currentHeading == "DOWN") 24f else -24f
+                        val midX = (p0.x + p1.x) / 2f
+                        waypoints.add(Offset(p0.x, p0.y + stub))
+                        waypoints.add(Offset(midX, p0.y + stub))
+                        waypoints.add(Offset(midX, p1.y))
+                        currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
                     }
                 }
+                waypoints.add(p1)
             }
         }
 
-        return simplifyOrthogonalPath(result)
+        return simplifyOrthogonalPath(waypoints)
     }
+
 
     private fun simplifyOrthogonalPath(points: List<Offset>): List<Offset> {
         if (points.size <= 2) return points

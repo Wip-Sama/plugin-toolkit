@@ -2877,7 +2877,7 @@ class FlowEditorQoLTest {
         )
         val (s2, e2) = ConnectionHitTester.getConnectionOrientations(nodeToJunc)
         assertTrue(s2, "Node output must exit horizontally")
-        assertFalse(e2, "Junction arrival must enter vertically along corridor")
+        assertTrue(e2, "Junction arrival must enter horizontally to maintain continuous flow")
 
         val juncToNode = Connection(
             sourceNodeId = Connection.FLOATING_NODE_ID,
@@ -2887,7 +2887,7 @@ class FlowEditorQoLTest {
             targetPortId = "in"
         )
         val (s3, e3) = ConnectionHitTester.getConnectionOrientations(juncToNode)
-        assertFalse(s3, "Junction departure must depart vertically along corridor")
+        assertTrue(s3, "Junction departure must depart horizontally to maintain continuous flow")
         assertTrue(e3, "Node input must enter horizontally")
     }
 
@@ -2902,21 +2902,21 @@ class FlowEditorQoLTest {
             points = listOf(pOut, junc),
             style = ConnectionCurveStyle.Orthogonal,
             startHorizontal = true,
-            endHorizontal = false
+            endHorizontal = true
         )
-        // Verify corridor at x = 300f is directly hit
-        val corridorDist1 = SplineMathUtils.distanceToPath(androidx.compose.ui.geometry.Offset(300f, 150f), sampled1)
+        // Verify mid corridor at x = 200f is directly hit
+        val corridorDist1 = SplineMathUtils.distanceToPath(androidx.compose.ui.geometry.Offset(200f, 150f), sampled1)
         assertEquals(0f, corridorDist1, 0.5f)
 
         // Connection 2: Junction to Node input
         val sampled2 = SplineMathUtils.sampleConnectionPoints(
             points = listOf(junc, pIn),
             style = ConnectionCurveStyle.Orthogonal,
-            startHorizontal = false,
+            startHorizontal = true,
             endHorizontal = true
         )
-        // Verify corridor at x = 300f is directly hit
-        val corridorDist2 = SplineMathUtils.distanceToPath(androidx.compose.ui.geometry.Offset(300f, 250f), sampled2)
+        // Verify mid corridor at x = 400f is directly hit
+        val corridorDist2 = SplineMathUtils.distanceToPath(androidx.compose.ui.geometry.Offset(400f, 250f), sampled2)
         assertEquals(0f, corridorDist2, 0.5f)
     }
 

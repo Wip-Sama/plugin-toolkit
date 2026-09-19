@@ -83,7 +83,7 @@ fun BoardGridAndConnectionsCanvas(
     portLayoutVersion: Int = 0,
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
     roundness: Float = 0.5f,
-    stepMode: OrthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Middle,
+    stepMode: OrthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
     modifier: Modifier = Modifier
 ) {
     val dimensions = ToolkitTheme.dimensions
@@ -223,7 +223,11 @@ fun BoardGridAndConnectionsCanvas(
                 }
                 val (startIsHorizontal, endIsHorizontal) = ConnectionHitTester.getConnectionOrientations(
                     connection = connection,
-                    connections = flow.connections
+                    connections = flow.connections,
+                    junctionMap = junctionMap,
+                    getPortBoardPosition = getPortBoardPosition,
+                    groups = flow.groups,
+                    density = this.density
                 )
 
                 val effectiveStyle = curveStyle

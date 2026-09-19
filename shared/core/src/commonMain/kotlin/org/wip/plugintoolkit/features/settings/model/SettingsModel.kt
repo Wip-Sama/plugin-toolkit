@@ -39,6 +39,7 @@ enum class ConnectionCurveStyle {
  */
 @Serializable
 enum class OrthogonalStepMode {
+    Auto,
     Middle,
     Before,
     After
@@ -58,7 +59,7 @@ data class AppearanceSettings(
     val useCustomTitleBar: Boolean = true,
     val connectionStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
     val connectionRoundness: Float = 0.5f,
-    val orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+    val orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
 )
 
 /**
@@ -262,7 +263,7 @@ data class FlowSettings(
     val autosave: Boolean = true,
     val defaultConnectionStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
     val defaultConnectionRoundness: Float = 0.5f,
-    val defaultOrthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+    val defaultOrthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
 )
 
 /**

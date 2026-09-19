@@ -316,7 +316,7 @@ class SplineMathUtilsTest {
         val end = Offset(300f, 200f)
         val points = listOf(start, end)
 
-        // Middle step mode (default): intermediate corner at x = 200f
+        // Middle step mode: intermediate corner at x = 200f
         val midPoints = SplineMathUtils.computeOrthogonalPoints(points, startHorizontal = true, endHorizontal = true, stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Middle)
         assertEquals(4, midPoints.size)
         assertEquals(200f, midPoints[1].x)
@@ -324,41 +324,153 @@ class SplineMathUtilsTest {
         assertEquals(200f, midPoints[2].x)
         assertEquals(200f, midPoints[2].y)
 
-        // Before step mode: step occurs early, near start
+        // Before step mode (PDF 1): moves Y first then X -> corner at (start.x, end.y) = (100, 200)
         val beforePoints = SplineMathUtils.computeOrthogonalPoints(points, startHorizontal = true, endHorizontal = true, stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Before)
-        assertTrue(beforePoints.size >= 3)
+        assertEquals(3, beforePoints.size)
         assertEquals(start, beforePoints.first())
+        assertEquals(Offset(100f, 200f), beforePoints[1])
         assertEquals(end, beforePoints.last())
 
-        // After step mode: step occurs late, curving directly up/down near end
+        // After step mode (PDF 1): moves X first then Y -> corner at (end.x, start.y) = (300, 100)
         val afterPoints = SplineMathUtils.computeOrthogonalPoints(points, startHorizontal = true, endHorizontal = true, stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.After)
-        assertTrue(afterPoints.size >= 3)
+        assertEquals(3, afterPoints.size)
         assertEquals(start, afterPoints.first())
+        assertEquals(Offset(300f, 100f), afterPoints[1])
         assertEquals(end, afterPoints.last())
+
+        // Auto step mode (PDF 1): for 2 points between horizontal ports, uses smooth midpoint routing
+        val autoPoints = SplineMathUtils.computeOrthogonalPoints(points, startHorizontal = true, endHorizontal = true, stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto)
+        assertEquals(4, autoPoints.size)
+        assertEquals(200f, autoPoints[1].x)
+        assertEquals(200f, autoPoints[2].x)
     }
 
     @Test
-    fun testHarmonizedSplineMonotonicityNoOvershoot() {
-        // Monotonically increasing points (e.g. 90-degree bend or stair-step)
-        val points = listOf(
-            Offset(0f, 0f),
-            Offset(100f, 0f),
-            Offset(100f, 100f)
+    fun testOrthogonalAutoMinBreakMultiPointRouting() {
+        // Multi-waypoint path as in PDF 1
+        val p0 = Offset(100f, 100f)
+        val p1 = Offset(200f, 300f)
+        val p2 = Offset(400f, 400f)
+        val p3 = Offset(600f, 200f)
+        val points = listOf(p0, p1, p2, p3)
+
+        val autoPoints = SplineMathUtils.computeOrthogonalPoints(
+            points,
+            startHorizontal = true,
+            endHorizontal = true,
+            stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
         )
-        val segments = SplineMathUtils.computeHarmonizedSplineSegments(points, tension = 0.5f)
-        assertEquals(2, segments.size)
 
-        for (seg in segments) {
-            val minX = minOf(seg.start.x, seg.end.x) - 0.01f
-            val maxX = maxOf(seg.start.x, seg.end.x) + 0.01f
-            val minY = minOf(seg.start.y, seg.end.y) - 0.01f
-            val maxY = maxOf(seg.start.y, seg.end.y) + 0.01f
+        // In Auto mode, every segment inherits the incoming direction from the preceding segment,
+        // avoiding breaks at intermediate nodes (tangent continuity through p1 and p2).
+        assertTrue(autoPoints.size >= 4)
+        assertEquals(p0, autoPoints.first())
+        assertEquals(p3, autoPoints.last())
 
-            // Fritsch-Carlson monotone slope clamping guarantees control points stay bounded
-            assertTrue(seg.control1.x in minX..maxX, "control1.x ${seg.control1.x} must be within [$minX, $maxX]")
-            assertTrue(seg.control2.x in minX..maxX, "control2.x ${seg.control2.x} must be within [$minX, $maxX]")
-            assertTrue(seg.control1.y in minY..maxY, "control1.y ${seg.control1.y} must be within [$minY, $maxY]")
-            assertTrue(seg.control2.y in minY..maxY, "control2.y ${seg.control2.y} must be within [$minY, $maxY]")
+        // Ensure all segments are strictly horizontal or vertical
+        for (i in 0 until autoPoints.size - 1) {
+            val a = autoPoints[i]
+            val b = autoPoints[i + 1]
+            val isH = abs(a.y - b.y) < 0.2f
+            val isV = abs(a.x - b.x) < 0.2f
+            assertTrue(isH || isV, "Segment from $a to $b must be strictly horizontal or vertical")
+        }
+    }
+
+    @Test
+    fun testOrthogonalNaturalHeadingVerticalRiseAndRoofLine() {
+        // Vertical rise continuing straight up through intermediate waypoint to roof line (Top Red Section)
+        val p0 = Offset(100f, 400f)
+        val w1 = Offset(100f, 250f)
+        val w2 = Offset(250f, 100f)
+        val pEnd = Offset(400f, 100f)
+
+        val pathPoints = SplineMathUtils.computeOrthogonalPoints(
+            listOf(p0, w1, w2, pEnd),
+            startHorizontal = false,
+            endHorizontal = true,
+            stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
+        )
+
+        assertTrue(pathPoints.contains(Offset(100f, 100f)), "Must have corner at (100, 100) continuing straight rise")
+        assertEquals(p0, pathPoints.first())
+        assertEquals(pEnd, pathPoints.last())
+    }
+
+    @Test
+    fun testOrthogonalNaturalHeadingFloorSweepRight() {
+        // Lower loop dropping down, sweeping across bottom floor, then rising (Bottom Red Section)
+        val p0 = Offset(300f, 300f)
+        val wFloor1 = Offset(300f, 500f)
+        val wFloor2 = Offset(500f, 500f)
+        val pTarget = Offset(550f, 420f)
+
+        val pathPoints = SplineMathUtils.computeOrthogonalPoints(
+            listOf(p0, wFloor1, wFloor2, pTarget),
+            startHorizontal = false,
+            endHorizontal = false,
+            stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
+        )
+
+        // When travelling along the floor at y = 500f, it sweeps forward to x = 550f,
+        // cornering at (550, 500), then rises up to pTarget without stair-stepping early
+        assertTrue(pathPoints.contains(Offset(550f, 500f)), "Must sweep across floor to (550, 500) before rising")
+    }
+
+    @Test
+    fun testOrthogonalHeadingUTurnDetour() {
+        // Path moving RIGHT, but target is behind to the LEFT
+        val p0 = Offset(100f, 100f)
+        val pAhead = Offset(300f, 100f)
+        val pBehind = Offset(150f, 300f)
+
+        val pathPoints = SplineMathUtils.computeOrthogonalPoints(
+            listOf(p0, pAhead, pBehind),
+            startHorizontal = true,
+            endHorizontal = true,
+            stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
+        )
+
+        // Preserves straight exit from pAhead (> 300f) before looping back toward pBehind
+        val maxX = pathPoints.maxOf { it.x }
+        assertTrue(maxX > 300f, "U-turn must project forward stub (maxX was $maxX, expected > 300)")
+        assertEquals(pBehind, pathPoints.last())
+    }
+
+    @Test
+    fun testCardinalSplineIntermediateSegmentsAreCurved() {
+        // Multi-waypoint zigzag path like the user screenshot:
+        // Source port -> w1 -> w2 -> w3 -> w4 -> Target port
+        val complexPath = listOf(
+            Offset(50f, 400f),
+            Offset(150f, 300f),
+            Offset(250f, 280f),
+            Offset(300f, 100f),
+            Offset(400f, 100f),
+            Offset(350f, 320f),
+            Offset(500f, 320f),
+            Offset(600f, 200f),
+            Offset(700f, 250f)
+        )
+
+        val segments = SplineMathUtils.computeHarmonizedSplineSegments(
+            complexPath,
+            tension = 0.5f,
+            startHorizontal = true,
+            endHorizontal = true
+        )
+        assertEquals(complexPath.size - 1, segments.size)
+
+        // Verify that EVERY intermediate segment between waypoints has non-zero curvature
+        // (i.e. control points are distinct from endpoints, not collapsed to a straight line)
+        for (i in 1 until segments.size - 1) {
+            val seg = segments[i]
+            val c1Dist = (seg.control1 - seg.start).getDistance()
+            val c2Dist = (seg.control2 - seg.end).getDistance()
+            assertTrue(c1Dist > 1f, "Intermediate segment $i control1 must not collapse onto start (was $c1Dist)")
+            assertTrue(c2Dist > 1f, "Intermediate segment $i control2 must not collapse onto end (was $c2Dist)")
+            val mid = seg.evaluate(0.5f)
+            assertTrue(mid.x.isFinite() && mid.y.isFinite())
         }
     }
 

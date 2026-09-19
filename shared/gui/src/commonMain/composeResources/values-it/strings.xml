@@ -700,6 +700,7 @@
     <string name="flow_connection_style_orthogonal">Ortogonale</string>
     <string name="flow_orthogonal_step_mode">Modalità gradino</string>
     <string name="flow_orthogonal_step_mode_subtitle">Configura la posizione del gradino intermedio per le curve ortogonali</string>
+    <string name="flow_orthogonal_step_auto">Automatico (Fluido)</string>
     <string name="flow_orthogonal_step_middle">Centro</string>
     <string name="flow_orthogonal_step_before">Gradino prima</string>
     <string name="flow_orthogonal_step_after">Gradino dopo</string>

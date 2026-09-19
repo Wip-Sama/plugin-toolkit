@@ -59,7 +59,7 @@ fun Modifier.boardConnectionTapGesture(
     junctions: List<FlowJunction> = emptyList(),
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
     roundness: Float = 0.5f,
-    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
+    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
     groups: List<FlowGroup> = emptyList()
 ): Modifier = this.pointerInput(
     connections,
@@ -343,7 +343,7 @@ fun Modifier.boardPointerEventGesture(
     connectionStartIsOutput: Boolean = true,
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
     roundness: Float = 0.5f,
-    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
+    orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
     isAdvancedConnectionMode: Boolean = false,
     onAddJunctionAndBranch: ((Connection, Offset, Int) -> Unit)? = null,
     onDeleteConnectionSegment: ((Connection, Int) -> Unit)? = null,
