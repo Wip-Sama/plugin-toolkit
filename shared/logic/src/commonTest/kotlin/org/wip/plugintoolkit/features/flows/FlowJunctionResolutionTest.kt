@@ -1,11 +1,17 @@
 package org.wip.plugintoolkit.features.flows
 
+import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.features.flows.logic.FlowTypeInference
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowJunction
 import org.wip.plugintoolkit.features.flows.model.FlowLabel
+import org.wip.plugintoolkit.features.flows.model.InputPort
+import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.Offset
+import org.wip.plugintoolkit.features.flows.model.OutputPort
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -426,4 +432,132 @@ class FlowJunctionResolutionTest {
         assertEquals(1L, effective[0].sourceNodeId)
         assertEquals(2L, effective[0].targetNodeId)
     }
+
+    @Test
+    fun testPurgeStrayPointsDeduplicatesMultipleIncomingConnectionsToSameJunction() {
+        val j1 = FlowJunction(id = 100L, position = Offset(200f, 100f))
+        val connValid = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 100L
+        )
+        val connRedundant = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 100L
+        )
+        val connOut = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 100L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val flow = Flow(
+            name = "multi_inbound_junction",
+            junctions = listOf(j1),
+            connections = listOf(connValid, connRedundant, connOut)
+        )
+
+        val purged = flow.purgeStrayPoints()
+        assertEquals(1, purged.junctions.size)
+        assertEquals(2, purged.connections.size)
+        assertTrue(purged.connections.contains(connValid))
+        assertFalse(purged.connections.contains(connRedundant))
+        assertTrue(purged.connections.contains(connOut))
+    }
+
+    @Test
+    fun testPurgeStrayPointsDeduplicatesMultipleIncomingConnectionsToSameNonArrayInputPort() {
+        val inPort = InputPort(id = "text", name = "Text", dataType = DataType.Primitive(PrimitiveType.STRING))
+        val outPort = OutputPort(id = "out", name = "Out", dataType = DataType.Primitive(PrimitiveType.STRING))
+        val n1 = Node.SystemNode(1L, Offset.Zero, "N1", "action", emptyList(), listOf(outPort))
+        val n2 = Node.SystemNode(2L, Offset.Zero, "N2", "action", emptyList(), listOf(outPort))
+        val n3 = Node.SystemNode(3L, Offset.Zero, "N3", "action", listOf(inPort), emptyList())
+
+        val conn1 = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = 3L, targetPortId = "text")
+        val conn2 = Connection(sourceNodeId = 2L, sourcePortId = "out", targetNodeId = 3L, targetPortId = "text")
+
+        val flow = Flow(
+            name = "duplicate_input_flow",
+            nodes = listOf(n1, n2, n3),
+            connections = listOf(conn1, conn2)
+        )
+
+        val purged = flow.purgeStrayPoints()
+        assertEquals(1, purged.connections.size)
+        assertTrue(purged.connections.contains(conn1) || purged.connections.contains(conn2))
+    }
+
+    @Test
+    fun testIsJunctionAlreadyTargeted() {
+        val j1 = FlowJunction(id = 100L, position = Offset(200f, 100f))
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 100L
+        )
+        val flow = Flow(
+            name = "targeted_junction_flow",
+            junctions = listOf(j1),
+            connections = listOf(conn)
+        )
+
+        assertTrue(flow.isJunctionAlreadyTargeted(100L))
+        assertFalse(flow.isJunctionAlreadyTargeted(200L))
+    }
+
+    @Test
+    fun testIsInputPortAlreadyConnectedChecksPhysicalConnections() {
+        val inPort = InputPort(id = "text", name = "Text", dataType = DataType.Primitive(PrimitiveType.STRING))
+        val n1 = Node.SystemNode(1L, Offset.Zero, "N1", "action", listOf(inPort), emptyList())
+        val orphanedConn = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            targetNodeId = 1L,
+            targetPortId = "text"
+        )
+        val flow = Flow(
+            name = "orphaned_input_flow",
+            nodes = listOf(n1),
+            connections = listOf(orphanedConn)
+        )
+
+        assertTrue(flow.isInputPortAlreadyConnected(1L, "text"))
+        assertFalse(flow.isInputPortAlreadyConnected(1L, "other"))
+    }
+
+    @Test
+    fun testTypeInferenceDetectsMultipleIncomingConnectionsToJunction() {
+        val j1 = FlowJunction(id = 100L, position = Offset(200f, 100f))
+        val conn1 = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 100L
+        )
+        val conn2 = Connection(
+            sourceNodeId = 2L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 100L
+        )
+        val flow = Flow(
+            name = "multi_junction_flow",
+            junctions = listOf(j1),
+            connections = listOf(conn1, conn2)
+        )
+
+        val result = FlowTypeInference.runTypeInference(flow)
+        assertTrue(result.validationErrors.any { it.message.contains("Junction 100 cannot have multiple incoming connections") })
+    }
 }
+

@@ -626,6 +626,7 @@
     <string name="node_configure_defaults">Configure Node Defaults</string>
     <string name="flow_clear_defaults">Clear Defaults</string>
     <string name="flow_defaults_cleared">Default values cleared for flow \'%1$s\'</string>
+    <string name="flow_error_read_only_save">Cannot modify defaults: Flow \'%1$s\' is currently executing or utilized as an active subflow.</string>
 
     <!-- Sidebar Start Mode -->
     <string name="setting_sidebar_start_mode">Sidebar Start Mode</string>

@@ -150,7 +150,7 @@ class FlowConnectionManager(
         }
 
         if (targetJunctionId != null) {
-            if (effectiveSource != null && currentState.flow.hasExistingEntrypoint(targetJunctionId)) {
+            if (currentState.flow.isJunctionAlreadyTargeted(targetJunctionId) || currentState.flow.hasExistingEntrypoint(targetJunctionId)) {
                 notificationService?.toast("Connections must have a single entrypoint")
                 return currentState
             }

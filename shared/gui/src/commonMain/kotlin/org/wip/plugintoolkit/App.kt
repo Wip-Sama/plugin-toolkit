@@ -192,7 +192,7 @@ private fun AppContentImpl(
                                         title = dialogUnsavedChangesTitle,
                                         message = "All the unsaved data will be lost. Are you sure you want to exit?",
                                         onConfirm = {
-                                            activeFlowEditorTracker.setHasUnsavedChanges(false)
+                                            activeFlowEditorTracker.discardChanges()
                                             backStack.clear()
                                             backStack.add(screen)
                                         }

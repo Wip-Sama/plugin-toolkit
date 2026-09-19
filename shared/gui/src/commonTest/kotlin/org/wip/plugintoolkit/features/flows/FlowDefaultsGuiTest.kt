@@ -23,6 +23,7 @@ import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.Requirements
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.flows.history.UpdateInputPortDefaultCommand
+import org.wip.plugintoolkit.features.flows.logic.FlowReadOnlyViolationException
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.InputPort
@@ -187,6 +188,80 @@ class FlowDefaultsGuiTest {
                 it.defaultValues.isEmpty()
             })
         }
+    }
+
+    @Test
+    fun testSaveFlowDefaultsWhenFlowIsLockedDoesNotMutateAndNotifies() = runTest(testDispatcher) {
+        val flowRepository = mockk<FlowRepository>(relaxed = true)
+        val notificationService = mockk<NotificationService>(relaxed = true)
+
+        val flow = Flow(name = "LockedFlow")
+        val flowsFlow = MutableStateFlow(listOf(flow))
+        every { flowRepository.flows } returns flowsFlow
+        every { flowRepository.isFlowLocked("LockedFlow") } returns true
+
+        val viewModel = FlowViewModel(
+            flowRepository = flowRepository,
+            notificationService = notificationService
+        )
+        advanceUntilIdle()
+
+        // Attempt to save defaults on locked flow
+        viewModel.saveFlowDefaults(flow, mapOf("1_val" to "some_value"))
+        advanceUntilIdle()
+
+        // Should NOT call saveFlow
+        verify(exactly = 0) { flowRepository.saveFlow(any()) }
+        // Should show toast
+        verify(atLeast = 1) { notificationService.toast(any<String>(), any<Boolean>()) }
+    }
+
+    @Test
+    fun testSaveFlowDefaultsCatchesFlowReadOnlyViolationException() = runTest(testDispatcher) {
+        val flowRepository = mockk<FlowRepository>(relaxed = true)
+        val notificationService = mockk<NotificationService>(relaxed = true)
+
+        val flow = Flow(name = "LockedFlow")
+        val flowsFlow = MutableStateFlow(listOf(flow))
+        every { flowRepository.flows } returns flowsFlow
+        every { flowRepository.isFlowLocked("LockedFlow") } returns false
+        every { flowRepository.saveFlow(any()) } throws FlowReadOnlyViolationException("LockedFlow", "Active execution lock")
+
+        val viewModel = FlowViewModel(
+            flowRepository = flowRepository,
+            notificationService = notificationService
+        )
+        advanceUntilIdle()
+
+        // Attempt to save defaults; must catch exception without crashing
+        viewModel.saveFlowDefaults(flow, mapOf("1_val" to "some_value"))
+        advanceUntilIdle()
+
+        verify(atLeast = 1) { notificationService.toast(any<String>(), any<Boolean>()) }
+    }
+
+    @Test
+    fun testClearFlowDefaultsWhenFlowIsLockedDoesNotMutateAndNotifies() = runTest(testDispatcher) {
+        val flowRepository = mockk<FlowRepository>(relaxed = true)
+        val notificationService = mockk<NotificationService>(relaxed = true)
+
+        val flow = Flow(name = "LockedFlow", defaultValues = mapOf("1_val" to JsonPrimitive("saved")))
+        val flowsFlow = MutableStateFlow(listOf(flow))
+        every { flowRepository.flows } returns flowsFlow
+        every { flowRepository.isFlowLocked("LockedFlow") } returns true
+
+        val viewModel = FlowViewModel(
+            flowRepository = flowRepository,
+            notificationService = notificationService
+        )
+        advanceUntilIdle()
+
+        // Attempt to clear defaults on locked flow
+        viewModel.clearFlowDefaults(flow)
+        advanceUntilIdle()
+
+        verify(exactly = 0) { flowRepository.saveFlow(any()) }
+        verify(atLeast = 1) { notificationService.toast(any<String>(), any<Boolean>()) }
     }
 
     @Test

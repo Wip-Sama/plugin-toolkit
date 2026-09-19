@@ -622,6 +622,7 @@
     <string name="node_configure_defaults">Configura predefiniti del nodo</string>
     <string name="flow_clear_defaults">Cancella predefiniti</string>
     <string name="flow_defaults_cleared">Valori predefiniti cancellati per il flusso \'%1$s\'</string>
+    <string name="flow_error_read_only_save">Impossibile modificare i valori predefiniti: il flusso \'%1$s\' è attualmente in esecuzione o utilizzato come sottoflusso attivo.</string>
 
     <!-- Sidebar Start Mode -->
     <string name="setting_sidebar_start_mode">Modalità Avvio Barra Laterale</string>

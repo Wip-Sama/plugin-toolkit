@@ -98,7 +98,7 @@ class ReactiveCapabilityLockTracker(
                 )
             }
 
-            if (!node.isReady(flow.connections, nodeSettings, nodeLocks)) {
+            if (!node.isReady(flow.connections, nodeSettings, nodeLocks, flow.getEffectiveConnections())) {
                 return Result.failure(IllegalStateException("Node '${node.title}' has unsatisfied parameter configurations."))
             }
         }

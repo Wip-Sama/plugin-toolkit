@@ -1653,6 +1653,36 @@ class FlowEditorQoLTest {
     }
 
     @Test
+    fun testSplitConnectionAndConnectFromJunctionRejectsMultipleEntrypoints() {
+        val originalConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            color = "#00FFCC",
+            isStructured = true
+        )
+        val junc = FlowJunction(id = 100L, position = ModelOffset(50f, 50f))
+        val flow = Flow(name = "TestSplitWireFromJunction", junctions = listOf(junc), connections = listOf(originalConn))
+        val vm = createViewModel(flow)
+
+        // Split connection at (150, 150) and attempt to branch from junction 100 into already-sourced wire
+        vm.onEvent(
+            FlowEvent.SplitConnectionAndConnect(
+                connection = originalConn,
+                splitPosition = ModelOffset(150f, 150f),
+                sourceJunctionId = 100L,
+                intermediatePoints = listOf(ModelOffset(120f, 150f))
+            )
+        )
+
+        val resultFlow = vm.state.value.flow
+        // Multi-entrypoint split is rejected!
+        assertEquals(1, resultFlow.connections.size)
+        assertEquals(1, resultFlow.junctions.size) // Only original junction 100 remains
+    }
+
+    @Test
     fun testPointShortcutCatalogMappings() {
         val actions = DefaultShortcutCatalog.actions
 
@@ -1757,6 +1787,52 @@ class FlowEditorQoLTest {
         assertTrue(resultFlow.connections.any { it.sourceNodeId == 1L && it.targetJunctionId == pt1.id })
         assertTrue(resultFlow.connections.any { it.sourceJunctionId == pt1.id && it.targetJunctionId == pt2.id })
         assertTrue(resultFlow.connections.any { it.sourceJunctionId == pt2.id && it.targetNodeId == 2L })
+    }
+
+    @Test
+    fun testFinalizeStructuredConnectionRejectsAlreadyTargetedJunction() {
+        val j1 = FlowJunction(id = 100L, position = ModelOffset(50f, 50f))
+        val initialConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 100L
+        )
+        val flow = Flow(name = "TestAlreadyTargetedJunction", junctions = listOf(j1), connections = listOf(initialConn))
+        val vm = createViewModel(flow)
+
+        // Attempt to connect another node 2 into junction 100 which is already targeted via FinalizeStructuredConnectionWithPoints
+        vm.onEvent(
+            FlowEvent.FinalizeStructuredConnectionWithPoints(
+                sourceNodeId = 2L,
+                sourcePortId = "out",
+                targetNodeId = -1L,
+                targetPortId = "",
+                targetJunctionId = 100L,
+                points = listOf(ModelOffset(25f, 50f))
+            )
+        )
+
+        val resultFlow = vm.state.value.flow
+        // New connection is rejected! Only the initial connection remains.
+        assertEquals(1, resultFlow.connections.size)
+        assertEquals(100L, resultFlow.connections.first().targetJunctionId)
+        assertEquals(1L, resultFlow.connections.first().sourceNodeId)
+
+        // Also test ConnectPortsWithWaypoints directly into targeted junction
+        vm.onEvent(
+            FlowEvent.ConnectPortsWithWaypoints(
+                sourceNodeId = 2L,
+                sourcePortId = "out",
+                targetNodeId = -1L,
+                targetPortId = "",
+                targetJunctionId = 100L,
+                waypoints = emptyList()
+            )
+        )
+        val flowAfterConnect = vm.state.value.flow
+        assertEquals(1, flowAfterConnect.connections.size)
     }
 
     @Test

@@ -156,6 +156,66 @@ object FlowTypeInference {
                 }
             }
 
+        // Check for junctions receiving multiple incoming connections
+        flow.connections.filter { it.targetJunctionId != null }
+            .groupBy { it.targetJunctionId }
+            .forEach { (targetJunctionId, conns) ->
+                if (conns.size > 1 && targetJunctionId != null) {
+                    for (conn in conns.drop(1)) {
+                        errors.add(
+                            ValidationError(
+                                sourceNodeId = conn.sourceNodeId,
+                                sourcePortId = conn.sourcePortId,
+                                targetNodeId = -1L,
+                                targetPortId = "",
+                                message = "Junction $targetJunctionId cannot have multiple incoming connections (${conns.size})"
+                            )
+                        )
+                    }
+                }
+            }
+
+        // Check for connections feeding input ports that have no source output port
+        flow.connections.forEach { conn ->
+            if (conn.targetNodeId >= 0L && conn.targetPortId.isNotEmpty()) {
+                val hasValidSource = flow.findConnectionEntrypoint(conn) != null
+                if (!hasValidSource) {
+                    val targetNode = flow.nodes.find { it.id == conn.targetNodeId }
+                    val targetPort = targetNode?.inputs?.find { it.id == conn.targetPortId }
+                    val portName = targetPort?.name ?: conn.targetPortId
+                    errors.add(
+                        ValidationError(
+                            sourceNodeId = conn.sourceNodeId,
+                            sourcePortId = conn.sourcePortId,
+                            targetNodeId = conn.targetNodeId,
+                            targetPortId = conn.targetPortId,
+                            message = "Input port '$portName' is connected to an open connection with no source output port"
+                        )
+                    )
+                }
+            } else if (conn.targetJunctionId != null) {
+                val hasValidSource = flow.findConnectionEntrypoint(conn) != null
+                if (!hasValidSource) {
+                    val downstream = flow.findDownstreamTargets(conn.targetJunctionId)
+                    if (downstream.isNotEmpty()) {
+                        val firstTarget = downstream.first()
+                        val targetNode = flow.nodes.find { it.id == firstTarget.first }
+                        val targetPort = targetNode?.inputs?.find { it.id == firstTarget.second }
+                        val portName = targetPort?.name ?: firstTarget.second
+                        errors.add(
+                            ValidationError(
+                                sourceNodeId = conn.sourceNodeId,
+                                sourcePortId = conn.sourcePortId,
+                                targetNodeId = conn.targetNodeId,
+                                targetPortId = conn.targetPortId,
+                                message = "Connection leads to input port '$portName' but has no source output port"
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
         // Check input ports regex validation
         flow.nodes.forEach { node ->
             node.inputs.forEach { input ->

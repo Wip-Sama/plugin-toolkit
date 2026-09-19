@@ -27,7 +27,9 @@ import org.wip.plugintoolkit.core.model.resolveNonComposable
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_defaults_cleared
 import plugintoolkit.composeapp.generated.resources.flow_defaults_saved
+import plugintoolkit.composeapp.generated.resources.flow_error_read_only_save
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.flows.logic.FlowReadOnlyViolationException
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -661,7 +663,7 @@ class FlowViewModel(
     }
 
     fun isFlowRunning(flowName: String): Boolean {
-        return try {
+        return isFlowLocked(flowName) || try {
             val jobManager = getKoin().get<JobManager>()
             jobManager.jobs.value.any { job ->
                 job.type == JobType.Flow &&
@@ -680,7 +682,13 @@ class FlowViewModel(
             }
             return
         }
-        flowRepository.deleteFlow(name)
+        try {
+            flowRepository.deleteFlow(name)
+        } catch (e: FlowReadOnlyViolationException) {
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast(e.message ?: "Cannot delete flow '$name': Flow is currently read-only.")
+            }
+        }
     }
 
     fun executeFlow(flow: Flow, parameterValues: Map<String, String>) {
@@ -774,7 +782,17 @@ class FlowViewModel(
         }
     }
 
+    fun isFlowLocked(flowName: String): Boolean = flowRepository.isFlowLocked(flowName)
+
     fun saveFlowDefaults(flow: Flow, parameterValues: Map<String, String>) {
+        if (isFlowLocked(flow.name)) {
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast(
+                    Res.string.flow_error_read_only_save.localized.resolveNonComposable(flow.name)
+                )
+            }
+            return
+        }
         val updatedDefaults = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
         parameterValues.forEach { (key, value) ->
             val parts = key.split("_", limit = 2)
@@ -821,21 +839,45 @@ class FlowViewModel(
         }
 
         val updatedFlow = flow.copy(defaultValues = updatedDefaults, nodes = updatedNodes)
-        flowRepository.saveFlow(updatedFlow)
-        viewModelScope.launch(Dispatchers.Main) {
-            resolvedNotificationService?.toast(
-                Res.string.flow_defaults_saved.localized.resolveNonComposable(flow.name)
-            )
+        try {
+            flowRepository.saveFlow(updatedFlow)
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast(
+                    Res.string.flow_defaults_saved.localized.resolveNonComposable(flow.name)
+                )
+            }
+        } catch (e: FlowReadOnlyViolationException) {
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast(
+                    Res.string.flow_error_read_only_save.localized.resolveNonComposable(flow.name)
+                )
+            }
         }
     }
 
     fun clearFlowDefaults(flow: Flow) {
+        if (isFlowLocked(flow.name)) {
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast(
+                    Res.string.flow_error_read_only_save.localized.resolveNonComposable(flow.name)
+                )
+            }
+            return
+        }
         val updatedFlow = flow.copy(defaultValues = emptyMap())
-        flowRepository.saveFlow(updatedFlow)
-        viewModelScope.launch(Dispatchers.Main) {
-            resolvedNotificationService?.toast(
-                Res.string.flow_defaults_cleared.localized.resolveNonComposable(flow.name)
-            )
+        try {
+            flowRepository.saveFlow(updatedFlow)
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast(
+                    Res.string.flow_defaults_cleared.localized.resolveNonComposable(flow.name)
+                )
+            }
+        } catch (e: FlowReadOnlyViolationException) {
+            viewModelScope.launch(Dispatchers.Main) {
+                resolvedNotificationService?.toast(
+                    Res.string.flow_error_read_only_save.localized.resolveNonComposable(flow.name)
+                )
+            }
         }
     }
 }

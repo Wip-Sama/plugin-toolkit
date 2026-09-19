@@ -159,6 +159,10 @@ class FlowRepository(
         }
     }
 
+    fun isFlowLocked(flowName: String): Boolean {
+        return resolvedExecutionGuard?.isFlowLocked(flowName, _flows.value) ?: false
+    }
+
     fun saveFlow(flow: Flow) {
         resolvedExecutionGuard?.assertCanMutate(flow.name, _flows.value)
         scope.launch(Dispatchers.IO) {

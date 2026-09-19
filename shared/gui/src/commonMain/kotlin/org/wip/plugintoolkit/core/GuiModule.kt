@@ -2,12 +2,14 @@ package org.wip.plugintoolkit.core
 
 import org.koin.core.module.Module
 import org.koin.dsl.module
+import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.features.flows.viewmodel.ActiveFlowEditorTracker
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
+import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
@@ -18,6 +20,8 @@ import org.wip.plugintoolkit.features.settings.definitions.loggingDefinitions
 import org.wip.plugintoolkit.features.settings.definitions.notificationDefinitions
 import org.wip.plugintoolkit.features.settings.definitions.pluginDefinitions
 import org.wip.plugintoolkit.features.settings.definitions.systemDefinitions
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
+import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.utils.SettingsRegistry
 import org.wip.plugintoolkit.features.settings.utils.build
 import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
@@ -48,13 +52,13 @@ val guiModule: Module = module {
     single { ActiveFlowEditorTracker() }
     factory { (flowName: String) ->
         FlowEditorViewModel(
-            flowName,
-            get(),
-            getOrNull(),
-            getOrNull(),
-            getOrNull(),
-            getOrNull(),
-            getOrNull()
+            initialFlowName = flowName,
+            flowRepository = get(),
+            settingsPersistence = getOrNull<SettingsPersistence>(),
+            notificationService = getOrNull<NotificationService>(),
+            pluginRegistry = getOrNull<PluginRegistry>(),
+            activeFlowEditorTracker = getOrNull<ActiveFlowEditorTracker>(),
+            settingsRepository = getOrNull<SettingsRepository>()
         )
     }
     factory { NotificationViewModel(get()) }

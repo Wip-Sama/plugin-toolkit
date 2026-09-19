@@ -99,6 +99,7 @@ fun FlowRunnerView(
 ) {
     val state by viewModel.state.collectAsState()
     val jobViewModel: JobViewModel = koinInject()
+    val allJobs by jobViewModel.jobs.collectAsState(emptyList())
     val pluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager = koinInject()
     val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
     val pluginSettingsState by pluginManager.pluginSettingsState.collectAsState()
@@ -529,6 +530,10 @@ fun FlowRunnerView(
                     }
                 }
 
+                val isFlowLocked = remember(currentFlow.name, state.flows, allJobs) {
+                    viewModel.isFlowLocked(currentFlow.name)
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
@@ -536,6 +541,7 @@ fun FlowRunnerView(
                 ) {
                     OutlinedButton(
                         onClick = { viewModel.saveFlowDefaults(currentFlow, parameterValues.toMap()) },
+                        enabled = !isFlowLocked,
                         shape = MaterialTheme.shapes.medium
                     ) {
                         Icon(
@@ -591,7 +597,6 @@ fun FlowRunnerView(
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraLarge))
 
                 // Real Execution History
-                val allJobs by jobViewModel.jobs.collectAsState(emptyList())
                 val endedJobs by jobViewModel.endedJobs.collectAsState(emptyList())
 
                 val flowJobs = remember(allJobs, endedJobs, currentFlow) {

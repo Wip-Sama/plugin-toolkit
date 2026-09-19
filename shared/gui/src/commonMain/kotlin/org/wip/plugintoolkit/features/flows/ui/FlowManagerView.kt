@@ -176,15 +176,17 @@ fun FlowManagerView(
             val missingCapabilities = flow.nodes.filterIsInstance<Node.CapabilityNode>()
                 .map { it.capability.name }
                 .filter { it !in activeCapabilities }
+            val effectiveConns = flow.getEffectiveConnections()
             val notReadyNodes = flow.nodes.filter { node ->
                 val settings =
                     if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
                 val locks = if (node is Node.CapabilityNode) {
                     pluginLocksState[node.pluginInfo.id] ?: pluginLocksState.values.fold(emptyMap()) { acc, m -> acc + m }
                 } else null
-                !node.isReady(flow.connections, settings, locks)
+                !node.isReady(flow.connections, settings, locks, effectiveConns)
             }
-            val isReady = missingCapabilities.isEmpty() && notReadyNodes.isEmpty()
+            val hasSourcelessInput = flow.getSourcelessInputConnections().isNotEmpty()
+            val isReady = missingCapabilities.isEmpty() && notReadyNodes.isEmpty() && !hasSourcelessInput
 
             val matchesFilter = when (chipFilter) {
                 FlowChipFilter.All -> true
@@ -361,13 +363,14 @@ fun FlowManagerView(
                     }
 
                     val notReadyNodes = remember(flow, state.flows, pluginLocksState, loadedPlugins) {
+                        val effectiveConns = flow.getEffectiveConnections()
                         flow.nodes.filter { node ->
                             val settings =
                                 if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
                             val locks = if (node is Node.CapabilityNode) {
                                 pluginLocksState[node.pluginInfo.id] ?: pluginLocksState.values.fold(emptyMap()) { acc, m -> acc + m }
                             } else null
-                            !node.isReady(flow.connections, settings, locks)
+                            !node.isReady(flow.connections, settings, locks, effectiveConns)
                         }
                     }
 

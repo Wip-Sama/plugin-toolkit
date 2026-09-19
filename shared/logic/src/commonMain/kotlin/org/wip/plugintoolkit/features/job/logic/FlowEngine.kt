@@ -158,6 +158,12 @@ class FlowEngine(
         val runtimeInferred = FlowTypeInferenceCache.getOrCreate(flow) { runRuntimeTypeInference(flow) }
         val nodesById = flow.nodes.associateBy { it.id }
         val effectiveConnections = flow.getEffectiveConnections()
+        val sourcelessConnections = flow.getSourcelessInputConnections()
+        if (sourcelessConnections.isNotEmpty()) {
+            throw IllegalStateException(
+                "Cannot execute flow '${flow.name}': One or more input ports are connected to open wires without a source output port."
+            )
+        }
         val connectionsByTarget = effectiveConnections.groupBy { Pair(it.targetNodeId, it.targetPortId) }
         val connectionsBySource = effectiveConnections.groupBy { Pair(it.sourceNodeId, it.sourcePortId) }
 
@@ -185,6 +191,12 @@ class FlowEngine(
                     return if (raw is JsonElement) fromJsonElement(raw) else raw
                 }
             } else {
+                val hasPhysicalConn = flow.connections.any { it.targetNodeId == nodeId && it.targetPortId == portId }
+                if (hasPhysicalConn) {
+                    throw IllegalStateException(
+                        "Cannot resolve input value for node $nodeId port '$portId': Port is wired to a connection but no source output port provides data."
+                    )
+                }
                 val overrideKey = "${nodeId}_${portId}"
                 val overrideVal = initialParameters[overrideKey] ?: flow.defaultValues[overrideKey]
                 if (overrideVal != null) {
@@ -493,9 +505,14 @@ class FlowEngine(
                         )
                     }
                     val isReady = try {
-                        node.isReady(effectiveConnections, pluginSettings, pluginLocks)
+                        node.isReady(
+                            connections = flow.connections,
+                            settings = pluginSettings,
+                            locks = pluginLocks,
+                            effectiveConnections = effectiveConnections
+                        )
                     } catch (e: Exception) {
-                        true
+                        false
                     }
                     if (!isReady) {
                         throw Exception("Capability node '${node.title}' parameters or option locks are not satisfied.")

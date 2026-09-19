@@ -832,7 +832,8 @@ fun FlowEditorView(
                                     if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null,
                                     if (node is Node.CapabilityNode) {
                                         pluginLocksState[node.pluginInfo.id] ?: pluginLocksState.values.fold(emptyMap()) { acc, m -> acc + m }
-                                    } else null
+                                    } else null,
+                                    flow.getEffectiveConnections()
                                 ),
                                 onFocusLost = {
                                     if (viewModel.isAutoSaveEnabled && !state.isReadOnly) {

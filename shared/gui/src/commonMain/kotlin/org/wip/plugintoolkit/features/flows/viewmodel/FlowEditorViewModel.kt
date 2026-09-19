@@ -110,8 +110,8 @@ class FlowEditorViewModel(
 
     val isAutoSaveEnabled: Boolean
         get() = resolvedSettingsRepository?.let { repo ->
-            (repo.isLoaded.value as? Boolean ?: false) && repo.settings.value.flows.autosave
-        } == true
+            repo.isLoaded.value && repo.settings.value.flows.autosave
+        } ?: false
 
     private val resolvedActiveFlowEditorTracker: ActiveFlowEditorTracker by lazy {
         activeFlowEditorTracker ?: try {
@@ -233,7 +233,7 @@ class FlowEditorViewModel(
                     allFlows.find { it.name == activeFlowName } ?: Flow(activeFlowName)
                 }
 
-                val activeFlowWithSyncedSubflows = syncSubflowNodes(activeFlow, allFlows)
+                val activeFlowWithSyncedSubflows = syncSubflowNodes(activeFlow, allFlows).healDuplicateConnections()
                 val maxNodeId = activeFlowWithSyncedSubflows.nodes.maxOfOrNull { it.id } ?: -1L
                 val maxPointId = activeFlowWithSyncedSubflows.junctions.maxOfOrNull { it.id } ?: -1L
                 val maxId = maxOf(maxNodeId, maxPointId)
@@ -1580,8 +1580,13 @@ class FlowEditorViewModel(
                             }
                         }
                     }
-                } else if (event.sourceNodeId != null) {
+                } else if (event.sourceNodeId != null || event.sourceJunctionId != null) {
                     if (currentState.flow.hasExistingEntrypoint(event.connection)) {
+                        resolvedNotificationService?.toast("Connections must have a single entrypoint")
+                        return
+                    }
+                } else if (event.targetJunctionId != null) {
+                    if (currentState.flow.isJunctionAlreadyTargeted(event.targetJunctionId) || currentState.flow.hasExistingEntrypoint(event.targetJunctionId)) {
                         resolvedNotificationService?.toast("Connections must have a single entrypoint")
                         return
                     }
@@ -1761,7 +1766,7 @@ class FlowEditorViewModel(
                 }
 
                 if (tJuncId != null) {
-                    if (effectiveSource != null && currentState.flow.hasExistingEntrypoint(tJuncId)) {
+                    if (currentState.flow.isJunctionAlreadyTargeted(tJuncId) || currentState.flow.hasExistingEntrypoint(tJuncId)) {
                         resolvedNotificationService?.toast("Connections must have a single entrypoint")
                         return
                     }
@@ -2526,13 +2531,15 @@ class FlowEditorViewModel(
         } else {
             allFlows.find { it.name == activeFlowName } ?: Flow(activeFlowName)
         }
-        val syncedFlow = syncSubflowNodes(originalFlow, allFlows)
+        val syncedFlow = syncSubflowNodes(originalFlow, allFlows).healDuplicateConnections()
         val maxNodeId = syncedFlow.nodes.maxOfOrNull { it.id } ?: -1L
+        val maxPointId = syncedFlow.junctions.maxOfOrNull { it.id } ?: -1L
+        val maxId = maxOf(maxNodeId, maxPointId)
 
         _state.update { currentState ->
             currentState.copy(
                 flow = syncedFlow,
-                nextId = maxNodeId + 1,
+                nextId = maxId + 1,
                 flows = allFlows,
                 pendingConnection = null,
                 selectedNodeIds = emptySet(),
