@@ -19,6 +19,12 @@ data class JunctionFilletParams(
 
 object ConnectionHitTester {
 
+    private fun findJunctionLocalPrevPoint(path: List<Offset>, junction: Offset, epsilon: Float = 1f): Offset? {
+        if (path.size < 2) return null
+        val idx = path.indexOfFirst { (it - junction).getDistance() < epsilon }
+        return if (idx > 0) path[idx - 1] else null
+    }
+
     fun getConnectionOrientations(
         connection: Connection,
         connections: List<Connection> = emptyList(),
@@ -53,8 +59,7 @@ object ConnectionHitTester {
                     } else null
 
                     val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
-                        val idx = inBoardPts.indexOfFirst { (it - tgtJuncPos).getDistance() < 1f }
-                        if (idx > 0) inBoardPts[idx - 1] else inBoardPts[inBoardPts.size - 2]
+                        findJunctionLocalPrevPoint(inBoardPts, tgtJuncPos)
                     } else if (connection.sourceJunctionId != null) {
                         junctionMap[connection.sourceJunctionId]
                     } else {
@@ -120,8 +125,7 @@ object ConnectionHitTester {
                     } else null
 
                     val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
-                        val idx = inBoardPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
-                        if (idx > 0) inBoardPts[idx - 1] else inBoardPts[inBoardPts.size - 2]
+                        findJunctionLocalPrevPoint(inBoardPts, juncPos)
                     } else if (incoming.sourceJunctionId != null) {
                         junctionMap[incoming.sourceJunctionId]
                     } else {
@@ -163,8 +167,7 @@ object ConnectionHitTester {
                             )
                         } else null
                         val incomingPrevPt = if (incomingPrevBoard != null && incomingPrevBoard.size >= 2) {
-                            val idx = incomingPrevBoard.indexOfFirst { (it - juncPos).getDistance() < 1f }
-                            if (idx > 0) incomingPrevBoard[idx - 1] else incomingPrevBoard[incomingPrevBoard.size - 2]
+                            findJunctionLocalPrevPoint(incomingPrevBoard, juncPos)
                         } else null
                         val dxInSign = if (incomingPrevPt != null) juncPos.x - incomingPrevPt.x else 1f
 
@@ -186,8 +189,7 @@ object ConnectionHitTester {
                             )
                         } else null
                         val incomingPrevPt = if (incomingPrevBoard != null && incomingPrevBoard.size >= 2) {
-                            val idx = incomingPrevBoard.indexOfFirst { (it - juncPos).getDistance() < 1f }
-                            if (idx > 0) incomingPrevBoard[idx - 1] else incomingPrevBoard[incomingPrevBoard.size - 2]
+                            findJunctionLocalPrevPoint(incomingPrevBoard, juncPos)
                         } else null
                         val dyInSign = if (incomingPrevPt != null) juncPos.y - incomingPrevPt.y else 1f
 
@@ -276,12 +278,7 @@ object ConnectionHitTester {
                             endHorizontal = inEndH,
                             stepMode = stepMode
                         )
-                        val idx = inOrthoPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
-                        val prevPoint = if (idx > 0) {
-                            inOrthoPts[idx - 1]
-                        } else if (inOrthoPts.size >= 2) {
-                            inOrthoPts[inOrthoPts.size - 2]
-                        } else null
+                        val prevPoint = findJunctionLocalPrevPoint(inOrthoPts, juncPos)
 
                         if (prevPoint != null) {
                             startFilletLeadIn = (prevPoint * scale) + offset
@@ -326,12 +323,7 @@ object ConnectionHitTester {
                             endHorizontal = myEndH,
                             stepMode = stepMode
                         )
-                        val idx = myOrthoPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
-                        val prevPoint = if (idx > 0) {
-                            myOrthoPts[idx - 1]
-                        } else if (myOrthoPts.size >= 2) {
-                            myOrthoPts[myOrthoPts.size - 2]
-                        } else null
+                        val prevPoint = findJunctionLocalPrevPoint(myOrthoPts, juncPos)
 
                         if (prevPoint != null) {
                             val dIn = juncPos - prevPoint
@@ -389,7 +381,7 @@ object ConnectionHitTester {
                                             val lenInScreen = lenIn * scale
                                             val lenOutScreen = lenOut * scale
                                             val r = minOf(rBase, lenInScreen * 0.45f, lenOutScreen * 0.45f)
-                                            val minR = minOf(lenInScreen, lenOutScreen) * 0.01f
+                                            val minR = 0.01f
                                             if (r >= minR && r > 0f) {
                                                 Logger.v(tag = "JunctionFillet") {
                                                     "endTrim junc[$tgtJuncId]: perpendicular branch (dot=$dot), r=$r accepted " +
@@ -837,4 +829,3 @@ object ConnectionHitTester {
         return closest
     }
 }
-

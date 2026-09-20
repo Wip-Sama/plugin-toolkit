@@ -271,11 +271,11 @@ object SplineMathUtils {
                 val vIn = Offset(vInRaw.x / lenIn, vInRaw.y / lenIn)
                 val vOut = Offset(vOutRaw.x / lenOut, vOutRaw.y / lenOut)
                 val dot = vIn.x * vOut.x + vIn.y * vOut.y
-                if (abs(dot) < 0.1f) {
+                if (abs(dot) < 0.1f || dot < -0.75f) {
                     val r = minOf(cornerRadius, lenIn * 0.45f, lenOut * 0.45f)
                     // Use proportional minimum to stay zoom-stable: fillet degrades gracefully
                     // instead of snapping to a sharp corner at low zoom.
-                    val minR = minOf(lenIn, lenOut) * 0.01f
+                    val minR = 0.01f
                     if (r >= minR && r > 0f) {
                         hasStartFillet = true
                         startFilletStart = Offset(p0.x - vIn.x * r, p0.y - vIn.y * r)
@@ -287,7 +287,7 @@ object SplineMathUtils {
 
         if (hasStartFillet) {
             path.moveTo(startFilletStart.x, startFilletStart.y)
-            path.quadraticTo(p0.x, p0.y, startFilletEnd.x, startFilletEnd.y)
+            path.quadraticBezierTo(p0.x, p0.y, startFilletEnd.x, startFilletEnd.y)
 
             if (effectivePoints.size == 2) {
                 path.lineTo(effectivePoints[1].x, effectivePoints[1].y)
@@ -305,7 +305,7 @@ object SplineMathUtils {
                 val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
 
                 val r = minOf(cornerRadius, lenIn * 0.45f, lenOut * 0.45f)
-                val minR = minOf(lenIn, lenOut) * 0.01f
+                val minR = 0.01f
                 if (lenIn == 0f || lenOut == 0f || r < minR || r <= 0f) {
                     path.lineTo(pCurr.x, pCurr.y)
                 } else {
@@ -336,7 +336,7 @@ object SplineMathUtils {
             val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
 
             val r = minOf(cornerRadius, lenIn * 0.45f, lenOut * 0.45f)
-            val minR = minOf(lenIn, lenOut) * 0.01f
+            val minR = 0.01f
             if (lenIn == 0f || lenOut == 0f || r < minR || r <= 0f) {
                 path.lineTo(pCurr.x, pCurr.y)
             } else {
@@ -781,9 +781,9 @@ object SplineMathUtils {
                         val vIn = Offset(vInRaw.x / lenIn, vInRaw.y / lenIn)
                         val vOut = Offset(vOutRaw.x / lenOut, vOutRaw.y / lenOut)
                         val dot = vIn.x * vOut.x + vIn.y * vOut.y
-                        if (abs(dot) < 0.1f) {
+                        if (abs(dot) < 0.1f || dot < -0.75f) {
                             val r = minOf(rBase, lenIn * 0.45f, lenOut * 0.45f)
-                            val minR = minOf(lenIn, lenOut) * 0.01f
+                            val minR = 0.01f
                             if (r >= minR && r > 0f) {
                                 hasStartFillet = true
                                 startFilletStart = Offset(p0.x - vIn.x * r, p0.y - vIn.y * r)
@@ -818,7 +818,7 @@ object SplineMathUtils {
                             val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
 
                             val r = minOf(rBase, lenIn * 0.45f, lenOut * 0.45f)
-                            val minR = minOf(lenIn, lenOut) * 0.01f
+                            val minR = 0.01f
                             if (lenIn == 0f || lenOut == 0f || r < minR || r <= 0f) {
                                 sampled.add(pCurr)
                             } else {
@@ -853,7 +853,7 @@ object SplineMathUtils {
                             val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
 
                             val r = minOf(rBase, lenIn * 0.45f, lenOut * 0.45f)
-                            val minR = minOf(lenIn, lenOut) * 0.01f
+                            val minR = 0.01f
                             if (lenIn == 0f || lenOut == 0f || r < minR || r <= 0f) {
                                 sampled.add(pCurr)
                             } else {

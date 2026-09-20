@@ -362,4 +362,57 @@ class ConnectionHitTesterTest {
             "With correct horizontal arrival, at least start fillet or end trim must be non-zero for the outgoing branch"
         )
     }
+
+    @Test
+    fun testLongSegmentJunctionAlwaysGetsEndTrim() {
+        // Regression test for the position-dependent sharp corner bug.
+        // Junction 212 sits at the end of a very long horizontal wire (3900 board units)
+        // and branches vertically to a distant junction 213 (1500 board units first segment).
+        //
+        // Old bug: minR = minOf(lenInScreen, lenOutScreen) * 0.01f = 1500*1*0.01 = 15
+        //          rBase = 14*1 = 14 → r=14 < minR=15 → rejected at ALL zoom levels.
+        //
+        // Fix: minR = 1f (fixed floor) → r=14 >= 1 → always accepted.
+        val incoming = Connection(
+            sourceJunctionId = 193L,
+            sourceNodeId = Connection.FLOATING_NODE_ID,
+            sourcePortId = Connection.FLOATING_PORT_ID,
+            targetNodeId = Connection.FLOATING_NODE_ID,
+            targetPortId = Connection.FLOATING_PORT_ID,
+            targetJunctionId = 212L
+        )
+        val outgoing = Connection(
+            sourceJunctionId = 212L,
+            sourceNodeId = Connection.FLOATING_NODE_ID,
+            sourcePortId = Connection.FLOATING_PORT_ID,
+            targetNodeId = Connection.FLOATING_NODE_ID,
+            targetPortId = Connection.FLOATING_PORT_ID,
+            targetJunctionId = 213L
+        )
+
+        // Junction 193 at (450, 1850), 212 at (4350, 1850), 213 at (4350, -1150)
+        // → incoming horizontal: 3900 board units
+        // → outgoing vertical first segment: 1500 board units (to midpoint at y=350)
+        val juncMap = mapOf(
+            193L to Offset(450f, 1850f),
+            212L to Offset(4350f, 1850f),
+            213L to Offset(4300f, -1150f)
+        )
+        val getPortPos: (Long, String, Boolean) -> Offset? = { _, _, _ -> null }
+
+        // scale=1 to match log conditions
+        val filletParams = ConnectionHitTester.getJunctionFilletParams(
+            connection = incoming,
+            connections = listOf(incoming, outgoing),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos,
+            scale = 1f
+        )
+
+        assertTrue(
+            filletParams.endTrimDistance > 0f,
+            "Perpendicular junction with long segments (lenIn=3900, lenOut=1500) must always " +
+            "produce a non-zero endTrimDistance (old minR formula = 15 > rBase = 14 caused rejection)"
+        )
+    }
 }
