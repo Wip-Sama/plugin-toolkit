@@ -190,7 +190,7 @@ class ShortcutManager(
             timestamp = Clock.System.now().toEpochMilliseconds()
         )
         _lastEatenEvent.value = info
-        Logger.d { "Pointer event eaten by action '${actionId ?: "unknown"}' in situation '${situation.displayLabel}' (priority: $effectivePriority, mode: ${getPriorityMode()})" }
+        Logger.v { "Pointer event eaten by action '${actionId ?: "unknown"}' in situation '${situation.displayLabel}' (priority: $effectivePriority, mode: ${getPriorityMode()})" }
     }
 
     init {

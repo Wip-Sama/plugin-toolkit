@@ -281,7 +281,8 @@ object ConnectionHitTester {
                                             val lenInScreen = lenIn * scale
                                             val lenOutScreen = lenOut * scale
                                             val r = minOf(rBase, lenInScreen * 0.45f, lenOutScreen * 0.45f)
-                                            if (r >= 1f) {
+                                            val minR = minOf(lenInScreen, lenOutScreen) * 0.01f
+                                            if (r >= minR && r > 0f) {
                                                 minBranchRadius = if (minBranchRadius == null) r else minOf(minBranchRadius, r)
                                             }
                                         }
@@ -367,6 +368,7 @@ object ConnectionHitTester {
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
                 scale = scale,
+                canvasOffset = offset,
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
                 endTrimDistance = filletParams.endTrimDistance
@@ -462,6 +464,7 @@ object ConnectionHitTester {
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
                 scale = scale,
+                canvasOffset = offset,
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
                 endTrimDistance = filletParams.endTrimDistance
@@ -685,6 +688,7 @@ object ConnectionHitTester {
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
                 scale = scale,
+                canvasOffset = offset,
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
                 endTrimDistance = filletParams.endTrimDistance
