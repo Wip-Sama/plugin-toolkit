@@ -251,6 +251,7 @@ fun BoardGridAndConnectionsCanvas(
                     startHorizontal = startIsHorizontal,
                     endHorizontal = endIsHorizontal,
                     scale = state.scale,
+                    canvasOffset = state.offset,
                     stepMode = stepMode,
                     startFilletLeadIn = filletParams.startFilletLeadIn,
                     endTrimDistance = filletParams.endTrimDistance
@@ -374,7 +375,7 @@ fun BoardGridAndConnectionsCanvas(
                 }
 
                 val pts = listOf((startPos * state.scale) + state.offset, (endPos * state.scale) + state.offset)
-                val path = SplineMathUtils.buildConnectionPath(pts, curveStyle, roundness, scale = state.scale, stepMode = stepMode)
+                val path = SplineMathUtils.buildConnectionPath(pts, curveStyle, roundness, scale = state.scale, canvasOffset = state.offset, stepMode = stepMode)
                 drawPath(
                     path = path,
                     color = connectionColor.copy(alpha = opacity.disabled),
@@ -456,6 +457,7 @@ fun BoardGridAndConnectionsCanvas(
                     curveStyle,
                     roundness,
                     scale = state.scale,
+                    canvasOffset = state.offset,
                     stepMode = stepMode,
                     startFilletLeadIn = previewLeadIn
                 )

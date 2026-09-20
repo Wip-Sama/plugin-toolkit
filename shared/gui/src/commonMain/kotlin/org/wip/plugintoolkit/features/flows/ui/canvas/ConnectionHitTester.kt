@@ -26,7 +26,47 @@ object ConnectionHitTester {
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f
     ): Pair<Boolean, Boolean> {
-        // Determine start orientation:
+        // 1. Determine end orientation (how this connection arrives at its target):
+        val endIsHorizontal = if (connection.targetJunctionId == null && !connection.isFloating) {
+            // Node input ports always enter horizontally from the left
+            true
+        } else if (connection.targetJunctionId != null) {
+            val tgtJuncPos = junctionMap[connection.targetJunctionId]
+            if (tgtJuncPos != null) {
+                val inBoardPts = if (getPortBoardPosition != null) {
+                    getConnectionBoardPoints(
+                        connection = connection,
+                        getPortBoardPosition = getPortBoardPosition,
+                        junctionMap = junctionMap,
+                        groups = groups,
+                        density = density
+                    )
+                } else null
+
+                val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
+                    val idx = inBoardPts.indexOfFirst { (it - tgtJuncPos).getDistance() < 1f }
+                    if (idx > 0) inBoardPts[idx - 1] else inBoardPts[inBoardPts.size - 2]
+                } else if (connection.sourceJunctionId != null) {
+                    junctionMap[connection.sourceJunctionId]
+                } else {
+                    null
+                }
+
+                if (inPrevPoint != null) {
+                    val dx = tgtJuncPos.x - inPrevPoint.x
+                    val dy = tgtJuncPos.y - inPrevPoint.y
+                    abs(dx) >= abs(dy)
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        } else {
+            true
+        }
+
+        // 2. Determine start orientation (how this connection leaves its source):
         val startIsHorizontal = if (connection.sourceJunctionId == null) {
             // Node output ports always exit horizontally to the right
             true
@@ -39,92 +79,80 @@ object ConnectionHitTester {
                 it != connection && (it.targetJunctionId == juncId || juncId in it.junctionIds)
             }
 
-            if (incoming != null && juncPos != null && getPortBoardPosition != null) {
-                val inPoints = getConnectionBoardPoints(
-                    connection = incoming,
-                    getPortBoardPosition = getPortBoardPosition,
-                    junctionMap = junctionMap,
-                    groups = groups,
-                    density = density
-                )
-                if (inPoints != null && inPoints.size >= 2) {
-                    val idx = inPoints.indexOfFirst { (it - juncPos).getDistance() < 1f }
-                    val prevPoint = if (idx > 0) inPoints[idx - 1] else inPoints[inPoints.size - 2]
-                    val dxIn = juncPos.x - prevPoint.x
-                    val dyIn = juncPos.y - prevPoint.y
-                    val isIncomingVertical = abs(dyIn) > abs(dxIn)
+            if (incoming != null && juncPos != null) {
+                // Determine incoming travel direction and arrival axis
+                val inBoardPts = if (getPortBoardPosition != null) {
+                    getConnectionBoardPoints(
+                        connection = incoming,
+                        getPortBoardPosition = getPortBoardPosition,
+                        junctionMap = junctionMap,
+                        groups = groups,
+                        density = density
+                    )
+                } else null
 
-                    val floating = connection.floatingTarget
-                    val targetPos = when {
-                        connection.targetJunctionId != null -> junctionMap[connection.targetJunctionId]
-                        floating != null -> floating.toComposeOffset()
-                        else -> getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
-                    }
+                val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
+                    val idx = inBoardPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                    if (idx > 0) inBoardPts[idx - 1] else inBoardPts[inBoardPts.size - 2]
+                } else if (incoming.sourceJunctionId != null) {
+                    junctionMap[incoming.sourceJunctionId]
+                } else {
+                    null
+                }
 
-                    if (targetPos != null) {
-                        val dxToTarget = targetPos.x - juncPos.x
-                        val dyToTarget = targetPos.y - juncPos.y
+                val dxIn = if (inPrevPoint != null) juncPos.x - inPrevPoint.x else 1f
+                val dyIn = if (inPrevPoint != null) juncPos.y - inPrevPoint.y else 0f
+                val inEndH = abs(dxIn) >= abs(dyIn)
 
-                        val isAhead = if (isIncomingVertical) {
-                            if (dyIn >= 0f) dyToTarget > 1f else dyToTarget < -1f
-                        } else {
-                            if (dxIn >= 0f) dxToTarget > 1f else dxToTarget < -1f
-                        }
+                val floating = connection.floatingTarget
+                val targetPos = when {
+                    connection.targetJunctionId != null -> junctionMap[connection.targetJunctionId]
+                    floating != null -> floating.toComposeOffset()
+                    getPortBoardPosition != null -> getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
+                    else -> null
+                }
 
+                if (targetPos != null) {
+                    val dxToTarget = targetPos.x - juncPos.x
+                    val dyToTarget = targetPos.y - juncPos.y
+
+                    if (inEndH) {
+                        // Incoming arrived horizontally: continues through only if target is predominantly forward horizontal
+                        val isAhead = abs(dxToTarget) >= abs(dyToTarget) && (if (dxIn >= 0f) dxToTarget > 10f else dxToTarget < -10f)
                         if (isAhead) {
-                            // Preserve incoming tangent through junction (no sharp break)
-                            !isIncomingVertical
+                            true // Continue straight through horizontally
                         } else {
-                            // Target branches off perpendicularly: take perpendicular departure
-                            isIncomingVertical
+                            false // Branch off vertically
                         }
                     } else {
-                        !isIncomingVertical
+                        // Incoming arrived vertically: continues through only if target is predominantly forward vertical
+                        val isAhead = abs(dyToTarget) >= abs(dxToTarget) && (if (dyIn >= 0f) dyToTarget > 10f else dyToTarget < -10f)
+                        if (isAhead) {
+                            false // Continue straight through vertically
+                        } else {
+                            true // Branch off horizontally
+                        }
                     }
                 } else {
-                    true
+                    inEndH
                 }
             } else {
-                true
-            }
-        }
-
-        // Determine end orientation:
-        val endIsHorizontal = if (connection.targetJunctionId == null && !connection.isFloating) {
-            // Node input ports always enter horizontally from the left
-            true
-        } else if (connection.targetJunctionId != null) {
-            val juncId = connection.targetJunctionId
-            val juncPos = junctionMap[juncId]
-
-            // Check if an outgoing connection continues through this junction
-            val outgoing = connections.find {
-                it != connection && (it.sourceJunctionId == juncId || juncId in it.junctionIds)
-            }
-
-            if (outgoing != null && juncPos != null && getPortBoardPosition != null) {
-                val outPoints = getConnectionBoardPoints(
-                    connection = outgoing,
-                    getPortBoardPosition = getPortBoardPosition,
-                    junctionMap = junctionMap,
-                    groups = groups,
-                    density = density
-                )
-                if (outPoints != null && outPoints.size >= 2) {
-                    val idx = outPoints.indexOfFirst { (it - juncPos).getDistance() < 1f }
-                    val nextPoint = if (idx >= 0 && idx < outPoints.size - 1) outPoints[idx + 1] else outPoints[1]
-                    val dxOut = nextPoint.x - juncPos.x
-                    val dyOut = nextPoint.y - juncPos.y
-                    val isOutgoingVertical = abs(dyOut) > abs(dxOut)
-                    !isOutgoingVertical
+                // No incoming connection: determine departure axis from target displacement
+                val floating = connection.floatingTarget
+                val targetPos = when {
+                    connection.targetJunctionId != null -> junctionMap[connection.targetJunctionId]
+                    floating != null -> floating.toComposeOffset()
+                    getPortBoardPosition != null -> getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
+                    else -> null
+                }
+                if (targetPos != null && juncPos != null) {
+                    val dx = targetPos.x - juncPos.x
+                    val dy = targetPos.y - juncPos.y
+                    abs(dx) >= abs(dy)
                 } else {
                     true
                 }
-            } else {
-                true
             }
-        } else {
-            true
         }
 
         return Pair(startIsHorizontal, endIsHorizontal)
@@ -140,7 +168,7 @@ object ConnectionHitTester {
         scale: Float = 1f,
         offset: Offset = Offset.Zero,
         tension: Float = 0.5f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
     ): JunctionFilletParams {
         var startFilletLeadIn: Offset? = null
         var endTrimDistance = 0f
@@ -314,7 +342,7 @@ object ConnectionHitTester {
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
     ): Connection? {
         val junctionMap = junctions.associate { it.id to it.position.toComposeOffset() }
         var bestConnection: Connection? = null
@@ -642,7 +670,7 @@ object ConnectionHitTester {
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f,
         hitRadius: Float = 12f * scale,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
     ): Triple<Connection, Int, Offset>? {
         var closest: Triple<Connection, Int, Offset>? = null
         var minDistance = if (hitRadius < 8f) 8f else hitRadius

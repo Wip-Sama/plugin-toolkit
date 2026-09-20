@@ -572,4 +572,85 @@ class SplineMathUtilsTest {
         assertEquals(100f, sampled.last().x, 0.5f)
         assertEquals(86f, sampled.last().y, 0.5f)
     }
+
+    @Test
+    fun testZoomInvarianceAcrossScales() {
+        val boardStart = Offset(50f, 100f)
+        val boardEnd = Offset(300f, 250f)
+        val scales = listOf(0.1f, 0.25f, 0.5f, 1.0f, 2.0f, 5.0f)
+        val offsets = listOf(Offset.Zero, Offset(120f, -80f), Offset(-45.5f, 300.2f))
+
+        for (scale in scales) {
+            for (offset in offsets) {
+                val screenPts = listOf(boardStart * scale + offset, boardEnd * scale + offset)
+                val sampled = SplineMathUtils.sampleConnectionPoints(
+                    points = screenPts,
+                    style = ConnectionCurveStyle.Orthogonal,
+                    scale = scale,
+                    canvasOffset = offset
+                )
+
+                assertTrue(sampled.size >= 4, "Should have multiple sampled points at scale $scale")
+                // Convert sampled points back to board space
+                val boardSampled = sampled.map { (it - offset) / scale }
+
+                // The normalized start and end must match boardStart and boardEnd exactly
+                assertEquals(boardStart.x, boardSampled.first().x, 0.1f)
+                assertEquals(boardStart.y, boardSampled.first().y, 0.1f)
+                assertEquals(boardEnd.x, boardSampled.last().x, 0.1f)
+                assertEquals(boardEnd.y, boardSampled.last().y, 0.1f)
+
+                // The corner should be rounded, not a sharp point at the unfilleted waypoint
+                val unfilletedCorner1 = Offset((boardStart.x + boardEnd.x) / 2f, boardStart.y)
+                val unfilletedCorner2 = Offset((boardStart.x + boardEnd.x) / 2f, boardEnd.y)
+                assertTrue(
+                    boardSampled.none { (it - unfilletedCorner1).getDistance() < 0.5f },
+                    "Filleted curve should not touch sharp corner 1 at scale $scale"
+                )
+                assertTrue(
+                    boardSampled.none { (it - unfilletedCorner2).getDistance() < 0.5f },
+                    "Filleted curve should not touch sharp corner 2 at scale $scale"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun testFilletZoomInvarianceWithJunctionBranch() {
+        val juncBoard = Offset(200f, 200f)
+        val leadInBoard = Offset(50f, 200f) // Incoming from left (moving right)
+        val targetBoard = Offset(200f, 50f)  // Outgoing branching up (moving up)
+        val scales = listOf(0.1f, 0.2f, 0.5f, 1.0f, 2.5f, 5.0f)
+
+        for (scale in scales) {
+            val offset = Offset(133.7f, -42.1f)
+            val screenJunc = juncBoard * scale + offset
+            val screenLeadIn = leadInBoard * scale + offset
+            val screenTarget = targetBoard * scale + offset
+
+            val sampled = SplineMathUtils.sampleConnectionPoints(
+                points = listOf(screenJunc, screenTarget),
+                style = ConnectionCurveStyle.Orthogonal,
+                startHorizontal = false,
+                endHorizontal = true,
+                scale = scale,
+                canvasOffset = offset,
+                startFilletLeadIn = screenLeadIn
+            )
+
+            assertTrue(sampled.isNotEmpty(), "Sampled points must not be empty at scale $scale")
+            val boardSampled = sampled.map { (it - offset) / scale }
+
+            // Board-space fillet radius should be 14f (minOf(14, 150 * 0.45, 150 * 0.45) = 14)
+            // Fillet should start at (200 - 14, 200) = (186, 200) at every scale
+            assertEquals(186f, boardSampled.first().x, 0.5f, "Fillet start X should be zoom-invariant at scale $scale")
+            assertEquals(200f, boardSampled.first().y, 0.5f, "Fillet start Y should be zoom-invariant at scale $scale")
+
+            // Filleted curve must never touch the sharp junction vertex (200, 200)
+            assertTrue(
+                boardSampled.none { (it - juncBoard).getDistance() < 1f },
+                "Curve must smoothly bypass junction vertex at scale $scale"
+            )
+        }
+    }
 }
