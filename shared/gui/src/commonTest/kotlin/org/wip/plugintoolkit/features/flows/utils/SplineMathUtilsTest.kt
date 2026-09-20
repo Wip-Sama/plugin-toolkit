@@ -498,4 +498,78 @@ class SplineMathUtilsTest {
             assertTrue(seg.control2.y.isFinite())
         }
     }
+
+    @Test
+    fun testBuildRoundedPolylinePathWithStartFilletLeadInPerpendicular() {
+        val junc = Offset(100f, 100f)
+        val leadIn = Offset(50f, 100f) // incoming moving right (1, 0)
+        val target = Offset(100f, 0f)  // outgoing moving up (0, -1)
+        val points = listOf(junc, target)
+
+        val path = SplineMathUtils.buildRoundedPolylinePath(
+            points = points,
+            cornerRadius = 14f,
+            startFilletLeadIn = leadIn
+        )
+        assertTrue(!path.isEmpty)
+
+        val sampled = SplineMathUtils.sampleConnectionPoints(
+            points = points,
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = false,
+            endHorizontal = false,
+            startFilletLeadIn = leadIn
+        )
+        // Expected fillet radius = minOf(14, 50 * 0.45, 100 * 0.45) = 14f
+        // Start corner = (100 - 14, 100) = (86, 100)
+        // End corner = (100, 100 - 14) = (100, 86)
+        assertEquals(86f, sampled.first().x, 0.5f)
+        assertEquals(100f, sampled.first().y, 0.5f)
+        // Final point is target (100, 0)
+        assertEquals(100f, sampled.last().x, 0.5f)
+        assertEquals(0f, sampled.last().y, 0.5f)
+        // Point (100, 100) must NOT be in sampled points because it was filleted
+        assertTrue(sampled.none { (it - junc).getDistance() < 1f })
+    }
+
+    @Test
+    fun testBuildRoundedPolylinePathWithStartFilletLeadInCollinear() {
+        val junc = Offset(100f, 100f)
+        val leadIn = Offset(50f, 100f) // incoming moving right (1, 0)
+        val target = Offset(200f, 100f) // outgoing moving right (1, 0) - straight through!
+        val points = listOf(junc, target)
+
+        val sampled = SplineMathUtils.sampleConnectionPoints(
+            points = points,
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = true,
+            endHorizontal = true,
+            startFilletLeadIn = leadIn
+        )
+        // Collinear straight through should start directly at junc (100, 100)
+        assertEquals(100f, sampled.first().x, 0.5f)
+        assertEquals(100f, sampled.first().y, 0.5f)
+        assertEquals(200f, sampled.last().x, 0.5f)
+        assertEquals(100f, sampled.last().y, 0.5f)
+    }
+
+    @Test
+    fun testBuildRoundedPolylinePathWithEndTrimDistance() {
+        val src = Offset(100f, 0f)
+        val junc = Offset(100f, 100f)
+        val points = listOf(src, junc)
+
+        val sampled = SplineMathUtils.sampleConnectionPoints(
+            points = points,
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = false,
+            endHorizontal = false,
+            endTrimDistance = 14f
+        )
+        // Trimmed by 14 along (0, 1) -> stops at (100, 86)
+        assertEquals(100f, sampled.first().x, 0.5f)
+        assertEquals(0f, sampled.first().y, 0.5f)
+        assertEquals(100f, sampled.last().x, 0.5f)
+        assertEquals(86f, sampled.last().y, 0.5f)
+    }
 }

@@ -3019,6 +3019,212 @@ class FlowEditorQoLTest {
         assertEquals(200f, afterMove.position.x)
         assertEquals(250f, afterMove.position.y)
     }
+
+    @Test
+    fun testOrthogonalJunctionBifurcationFilletAndHitTest() {
+        val junc = ConnectionPoint(id = 10L, position = ModelOffset(200f, 200f))
+        val connIn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 10L
+        )
+        val connThrough = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 10L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val connBranch = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 10L,
+            targetNodeId = 3L,
+            targetPortId = "in"
+        )
+        val connections = listOf(connIn, connThrough, connBranch)
+        val junctionMap = mapOf(10L to Offset(200f, 200f))
+        val portPositions = mapOf(
+            Triple(1L, "out", true) to Offset(0f, 200f),
+            Triple(2L, "in", false) to Offset(400f, 200f),
+            Triple(3L, "in", false) to Offset(200f, 50f)
+        )
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nId, pId, isOut ->
+            portPositions[Triple(nId, pId, isOut)]
+        }
+
+        // 1. Incoming connection has through connection -> endTrimDistance is 0
+        val inFillet = ConnectionHitTester.getJunctionFilletParams(
+            connection = connIn,
+            connections = connections,
+            junctionMap = junctionMap,
+            getPortBoardPosition = getPortPos
+        )
+        assertEquals(0f, inFillet.endTrimDistance, 0.01f)
+
+        // 2. Through connection continues straight -> starts at (200, 200) without start fillet curve
+        val throughFillet = ConnectionHitTester.getJunctionFilletParams(
+            connection = connThrough,
+            connections = connections,
+            junctionMap = junctionMap,
+            getPortBoardPosition = getPortPos
+        )
+        val throughPts = ConnectionHitTester.getConnectionScreenPoints(
+            connThrough, getPortPos, junctionMap, scale = 1f, offset = Offset.Zero
+        )!!
+        val throughSampled = SplineMathUtils.sampleConnectionPoints(
+            points = throughPts,
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = true,
+            endHorizontal = true,
+            startFilletLeadIn = throughFillet.startFilletLeadIn
+        )
+        assertEquals(200f, throughSampled.first().x, 0.5f)
+        assertEquals(200f, throughSampled.first().y, 0.5f)
+
+        // 3. Branch connection peels off perpendicularly -> start fillet curve applied!
+        val branchFillet = ConnectionHitTester.getJunctionFilletParams(
+            connection = connBranch,
+            connections = connections,
+            junctionMap = junctionMap,
+            getPortBoardPosition = getPortPos
+        )
+        assertEquals(Offset(0f, 200f), branchFillet.startFilletLeadIn)
+
+        val branchPts = ConnectionHitTester.getConnectionScreenPoints(
+            connBranch, getPortPos, junctionMap, scale = 1f, offset = Offset.Zero
+        )!!
+        val branchSampled = SplineMathUtils.sampleConnectionPoints(
+            points = branchPts,
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = false,
+            endHorizontal = true,
+            startFilletLeadIn = branchFillet.startFilletLeadIn
+        )
+        // Fillet starts to the left of the junction on the incoming wire (x = 200 - 14 = 186)
+        assertEquals(186f, branchSampled.first().x, 0.5f)
+        assertEquals(200f, branchSampled.first().y, 0.5f)
+        // Junction dot at (200, 200) is bypassed by branch
+        kotlin.test.assertTrue(branchSampled.none { (it - Offset(200f, 200f)).getDistance() < 1f })
+
+        // 4. Hit test near the fillet curve selects the branch connection
+        val hit = ConnectionHitTester.findClosestConnection(
+            position = Offset(190f, 195f),
+            connections = connections,
+            getPortBoardPosition = getPortPos,
+            scale = 1f,
+            offset = Offset.Zero,
+            junctions = listOf(junc),
+            curveStyle = ConnectionCurveStyle.Orthogonal
+        )
+        assertEquals(connBranch, hit)
+    }
+
+    @Test
+    fun testOrthogonalJunctionCornerWrappingWithoutThroughConnection() {
+        val junc = ConnectionPoint(id = 10L, position = ModelOffset(200f, 200f))
+        val connIn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 10L
+        )
+        val connOut = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 10L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val connections = listOf(connIn, connOut)
+        val junctionMap = mapOf(10L to Offset(200f, 200f))
+        val portPositions = mapOf(
+            Triple(1L, "out", true) to Offset(200f, 50f),
+            Triple(2L, "in", false) to Offset(400f, 200f)
+        )
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nId, pId, isOut ->
+            portPositions[Triple(nId, pId, isOut)]
+        }
+
+        // Incoming connection trimmed by fillet radius r (14f)
+        val inFillet = ConnectionHitTester.getJunctionFilletParams(
+            connection = connIn,
+            connections = connections,
+            junctionMap = junctionMap,
+            getPortBoardPosition = getPortPos
+        )
+        assertEquals(14f, inFillet.endTrimDistance, 0.5f)
+
+        val inPts = ConnectionHitTester.getConnectionScreenPoints(
+            connIn, getPortPos, junctionMap, scale = 1f, offset = Offset.Zero
+        )!!
+        val inSampled = SplineMathUtils.sampleConnectionPoints(
+            points = inPts,
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = false,
+            endHorizontal = false,
+            endTrimDistance = inFillet.endTrimDistance
+        )
+        // Stops at (200, 186)
+        assertEquals(200f, inSampled.last().x, 0.5f)
+        assertEquals(186f, inSampled.last().y, 0.5f)
+
+        // Outgoing connection curves from (200, 186) to (214, 200)
+        val outFillet = ConnectionHitTester.getJunctionFilletParams(
+            connection = connOut,
+            connections = connections,
+            junctionMap = junctionMap,
+            getPortBoardPosition = getPortPos
+        )
+        val outPts = ConnectionHitTester.getConnectionScreenPoints(
+            connOut, getPortPos, junctionMap, scale = 1f, offset = Offset.Zero
+        )!!
+        val outSampled = SplineMathUtils.sampleConnectionPoints(
+            points = outPts,
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = true,
+            endHorizontal = true,
+            startFilletLeadIn = outFillet.startFilletLeadIn
+        )
+        // Starts seamlessly at (200, 186) where incoming ended
+        assertEquals(200f, outSampled.first().x, 0.5f)
+        assertEquals(186f, outSampled.first().y, 0.5f)
+        // Neither touches (200, 200)
+        kotlin.test.assertTrue(inSampled.none { (it - Offset(200f, 200f)).getDistance() < 1f })
+        kotlin.test.assertTrue(outSampled.none { (it - Offset(200f, 200f)).getDistance() < 1f })
+    }
+
+    @Test
+    fun testOrthogonalJunctionSourcelessStraightRendering() {
+        val junc = ConnectionPoint(id = 10L, position = ModelOffset(200f, 200f))
+        val connOut = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 10L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val connections = listOf(connOut)
+        val junctionMap = mapOf(10L to Offset(200f, 200f))
+        val portPositions = mapOf(
+            Triple(2L, "in", false) to Offset(400f, 200f)
+        )
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nId, pId, isOut ->
+            portPositions[Triple(nId, pId, isOut)]
+        }
+
+        val outFillet = ConnectionHitTester.getJunctionFilletParams(
+            connection = connOut,
+            connections = connections,
+            junctionMap = junctionMap,
+            getPortBoardPosition = getPortPos
+        )
+        kotlin.test.assertNull(outFillet.startFilletLeadIn)
+        assertEquals(0f, outFillet.endTrimDistance, 0.01f)
+    }
 }
 
 

@@ -230,6 +230,19 @@ fun BoardGridAndConnectionsCanvas(
                     density = this.density
                 )
 
+                val filletParams = ConnectionHitTester.getJunctionFilletParams(
+                    connection = connection,
+                    connections = flow.connections,
+                    junctionMap = junctionMap,
+                    getPortBoardPosition = getPortBoardPosition,
+                    groups = flow.groups,
+                    density = this.density,
+                    scale = state.scale,
+                    offset = state.offset,
+                    tension = roundness,
+                    stepMode = stepMode
+                )
+
                 val effectiveStyle = curveStyle
                 val path = SplineMathUtils.buildConnectionPath(
                     points = screenPoints,
@@ -238,7 +251,9 @@ fun BoardGridAndConnectionsCanvas(
                     startHorizontal = startIsHorizontal,
                     endHorizontal = endIsHorizontal,
                     scale = state.scale,
-                    stepMode = stepMode
+                    stepMode = stepMode,
+                    startFilletLeadIn = filletParams.startFilletLeadIn,
+                    endTrimDistance = filletParams.endTrimDistance
                 )
                 drawPath(
                     path = path,
@@ -414,7 +429,36 @@ fun BoardGridAndConnectionsCanvas(
                 allBoardPts.add(liveBoardPos)
 
                 val previewScreenPts = allBoardPts.map { (it * state.scale) + state.offset }
-                val previewPath = SplineMathUtils.buildConnectionPath(previewScreenPts, curveStyle, roundness, scale = state.scale, stepMode = stepMode)
+                val previewLeadIn = if (interactionState.structuredConnectionSourceJunctionId != null) {
+                    val dummyConn = Connection(
+                        sourceNodeId = -1L,
+                        sourcePortId = "",
+                        targetNodeId = -1L,
+                        targetPortId = "",
+                        sourceJunctionId = interactionState.structuredConnectionSourceJunctionId
+                    )
+                    ConnectionHitTester.getJunctionFilletParams(
+                        connection = dummyConn,
+                        connections = flow.connections,
+                        junctionMap = junctionMap,
+                        getPortBoardPosition = getPortBoardPosition,
+                        groups = flow.groups,
+                        density = this.density,
+                        scale = state.scale,
+                        offset = state.offset,
+                        tension = roundness,
+                        stepMode = stepMode
+                    ).startFilletLeadIn
+                } else null
+
+                val previewPath = SplineMathUtils.buildConnectionPath(
+                    previewScreenPts,
+                    curveStyle,
+                    roundness,
+                    scale = state.scale,
+                    stepMode = stepMode,
+                    startFilletLeadIn = previewLeadIn
+                )
                 drawPath(
                     path = previewPath,
                     color = connectionColor.copy(alpha = 0.9f),

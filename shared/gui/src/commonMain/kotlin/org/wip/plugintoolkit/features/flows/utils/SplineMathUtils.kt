@@ -224,10 +224,13 @@ object SplineMathUtils {
 
     /**
      * Builds a polyline path with small rounded corners at bends, ideal for structured / schematic wires.
+     * Supports optional [startFilletLeadIn] and [endTrimDistance] for junction connection points.
      */
     fun buildRoundedPolylinePath(
         points: List<Offset>,
-        cornerRadius: Float = 14f
+        cornerRadius: Float = 14f,
+        startFilletLeadIn: Offset? = null,
+        endTrimDistance: Float = 0f
     ): Path {
         val path = Path()
         if (points.isEmpty()) return path
@@ -235,17 +238,93 @@ object SplineMathUtils {
             path.moveTo(points[0].x, points[0].y)
             return path
         }
-        if (points.size == 2) {
-            path.moveTo(points[0].x, points[0].y)
-            path.lineTo(points[1].x, points[1].y)
+
+        val effectivePoints = points.toMutableList()
+        if (endTrimDistance > 0f && effectivePoints.size >= 2) {
+            val pPenultimate = effectivePoints[effectivePoints.size - 2]
+            val pLast = effectivePoints.last()
+            val vEnd = pLast - pPenultimate
+            val lenEnd = vEnd.getDistance()
+            if (lenEnd > 0.1f) {
+                val trimDist = minOf(endTrimDistance, lenEnd * 0.45f)
+                effectivePoints[effectivePoints.size - 1] = Offset(
+                    pLast.x - (vEnd.x / lenEnd) * trimDist,
+                    pLast.y - (vEnd.y / lenEnd) * trimDist
+                )
+            }
+        }
+
+        // Check start fillet lead-in at connection points
+        var hasStartFillet = false
+        var startFilletStart = Offset.Zero
+        var startFilletEnd = Offset.Zero
+        val p0 = effectivePoints[0]
+        val p1 = effectivePoints[1]
+
+        if (startFilletLeadIn != null) {
+            val vInRaw = p0 - startFilletLeadIn
+            val lenIn = vInRaw.getDistance()
+            val vOutRaw = p1 - p0
+            val lenOut = vOutRaw.getDistance()
+
+            if (lenIn >= 0.1f && lenOut >= 0.1f) {
+                val vIn = Offset(vInRaw.x / lenIn, vInRaw.y / lenIn)
+                val vOut = Offset(vOutRaw.x / lenOut, vOutRaw.y / lenOut)
+                val dot = vIn.x * vOut.x + vIn.y * vOut.y
+                if (abs(dot) < 0.1f) {
+                    val r = minOf(cornerRadius, lenIn * 0.45f, lenOut * 0.45f)
+                    if (r >= 1f) {
+                        hasStartFillet = true
+                        startFilletStart = Offset(p0.x - vIn.x * r, p0.y - vIn.y * r)
+                        startFilletEnd = Offset(p0.x + vOut.x * r, p0.y + vOut.y * r)
+                    }
+                }
+            }
+        }
+
+        if (hasStartFillet) {
+            path.moveTo(startFilletStart.x, startFilletStart.y)
+            path.quadraticBezierTo(p0.x, p0.y, startFilletEnd.x, startFilletEnd.y)
+
+            if (effectivePoints.size == 2) {
+                path.lineTo(effectivePoints[1].x, effectivePoints[1].y)
+                return path
+            }
+
+            for (i in 1 until effectivePoints.size - 1) {
+                val pPrev = if (i == 1) startFilletEnd else effectivePoints[i - 1]
+                val pCurr = effectivePoints[i]
+                val pNext = effectivePoints[i + 1]
+
+                val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
+                val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
+                val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
+                val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
+
+                val r = minOf(cornerRadius, lenIn * 0.45f, lenOut * 0.45f)
+                if (r < 1f || lenIn == 0f || lenOut == 0f) {
+                    path.lineTo(pCurr.x, pCurr.y)
+                } else {
+                    val startCorner = Offset(pCurr.x + (vIn.x / lenIn) * r, pCurr.y + (vIn.y / lenIn) * r)
+                    val endCorner = Offset(pCurr.x + (vOut.x / lenOut) * r, pCurr.y + (vOut.y / lenOut) * r)
+                    path.lineTo(startCorner.x, startCorner.y)
+                    path.quadraticBezierTo(pCurr.x, pCurr.y, endCorner.x, endCorner.y)
+                }
+            }
+            path.lineTo(effectivePoints.last().x, effectivePoints.last().y)
             return path
         }
 
-        path.moveTo(points[0].x, points[0].y)
-        for (i in 1 until points.size - 1) {
-            val pPrev = points[i - 1]
-            val pCurr = points[i]
-            val pNext = points[i + 1]
+        path.moveTo(effectivePoints[0].x, effectivePoints[0].y)
+        if (effectivePoints.size == 2) {
+            path.lineTo(effectivePoints[1].x, effectivePoints[1].y)
+            return path
+        }
+
+        for (i in 1 until effectivePoints.size - 1) {
+            val pPrev = effectivePoints[i - 1]
+            val pCurr = effectivePoints[i]
+            val pNext = effectivePoints[i + 1]
 
             val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
             val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
@@ -262,7 +341,7 @@ object SplineMathUtils {
                 path.quadraticBezierTo(pCurr.x, pCurr.y, endCorner.x, endCorner.y)
             }
         }
-        path.lineTo(points.last().x, points.last().y)
+        path.lineTo(effectivePoints.last().x, effectivePoints.last().y)
         return path
     }
 
@@ -278,7 +357,9 @@ object SplineMathUtils {
         startHorizontal: Boolean = true,
         endHorizontal: Boolean = true,
         scale: Float = 1f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+        startFilletLeadIn: Offset? = null,
+        endTrimDistance: Float = 0f
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return emptyList()
@@ -524,6 +605,7 @@ object SplineMathUtils {
 
     /**
      * Builds a Compose [Path] connecting [points] according to [style], [tension], and [stepMode].
+     * Supports optional [startFilletLeadIn] and [endTrimDistance] for junction connection points.
      */
     fun buildConnectionPath(
         points: List<Offset>,
@@ -532,7 +614,9 @@ object SplineMathUtils {
         startHorizontal: Boolean = true,
         endHorizontal: Boolean = true,
         scale: Float = 1f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
+        startFilletLeadIn: Offset? = null,
+        endTrimDistance: Float = 0f
     ): Path {
         val pts = sanitizePoints(points)
         val path = Path()
@@ -563,7 +647,12 @@ object SplineMathUtils {
             ConnectionCurveStyle.Orthogonal -> {
                 val orthoPoints = computeOrthogonalPoints(pts, startHorizontal, endHorizontal, stepMode)
                 val r = maxOf(14f * scale, tension * 28f * scale)
-                return buildRoundedPolylinePath(orthoPoints, cornerRadius = r)
+                return buildRoundedPolylinePath(
+                    points = orthoPoints,
+                    cornerRadius = r,
+                    startFilletLeadIn = startFilletLeadIn,
+                    endTrimDistance = endTrimDistance
+                )
             }
         }
 
@@ -572,6 +661,7 @@ object SplineMathUtils {
 
     /**
      * Samples points along the connection path for precise distance calculations and hit-testing.
+     * Supports optional [startFilletLeadIn] and [endTrimDistance] for junction connection points.
      */
     fun sampleConnectionPoints(
         points: List<Offset>,
@@ -581,7 +671,9 @@ object SplineMathUtils {
         startHorizontal: Boolean = true,
         endHorizontal: Boolean = true,
         scale: Float = 1f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
+        startFilletLeadIn: Offset? = null,
+        endTrimDistance: Float = 0f
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.isEmpty()) return emptyList()
@@ -596,39 +688,131 @@ object SplineMathUtils {
 
             ConnectionCurveStyle.Orthogonal -> {
                 val orthoPoints = computeOrthogonalPoints(pts, startHorizontal, endHorizontal, stepMode)
-                if (orthoPoints.size <= 2) {
-                    sampled.addAll(orthoPoints)
-                } else {
-                    val rBase = maxOf(14f * scale, tension * 28f * scale)
-                    sampled.add(orthoPoints[0])
-                    for (i in 1 until orthoPoints.size - 1) {
-                        val pPrev = orthoPoints[i - 1]
-                        val pCurr = orthoPoints[i]
-                        val pNext = orthoPoints[i + 1]
+                if (orthoPoints.isEmpty()) return emptyList()
+                if (orthoPoints.size == 1) return orthoPoints
 
-                        val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
-                        val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
-                        val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
-                        val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
+                val effectiveOrtho = orthoPoints.toMutableList()
+                if (endTrimDistance > 0f && effectiveOrtho.size >= 2) {
+                    val pPenultimate = effectiveOrtho[effectiveOrtho.size - 2]
+                    val pLast = effectiveOrtho.last()
+                    val vEnd = pLast - pPenultimate
+                    val lenEnd = vEnd.getDistance()
+                    if (lenEnd > 0.1f) {
+                        val trimDist = minOf(endTrimDistance, lenEnd * 0.45f)
+                        effectiveOrtho[effectiveOrtho.size - 1] = Offset(
+                            pLast.x - (vEnd.x / lenEnd) * trimDist,
+                            pLast.y - (vEnd.y / lenEnd) * trimDist
+                        )
+                    }
+                }
 
-                        val r = minOf(rBase, lenIn * 0.45f, lenOut * 0.45f)
-                        if (r < 1f || lenIn == 0f || lenOut == 0f) {
-                            sampled.add(pCurr)
-                        } else {
-                            val startCorner = Offset(pCurr.x + (vIn.x / lenIn) * r, pCurr.y + (vIn.y / lenIn) * r)
-                            val endCorner = Offset(pCurr.x + (vOut.x / lenOut) * r, pCurr.y + (vOut.y / lenOut) * r)
-                            sampled.add(startCorner)
-                            for (s in 1..4) {
-                                val t = s / 5f
-                                val mt = 1f - t
-                                val qx = mt * mt * startCorner.x + 2f * mt * t * pCurr.x + t * t * endCorner.x
-                                val qy = mt * mt * startCorner.y + 2f * mt * t * pCurr.y + t * t * endCorner.y
-                                sampled.add(Offset(qx, qy))
+                val rBase = maxOf(14f * scale, tension * 28f * scale)
+
+                // Check start fillet lead-in
+                var hasStartFillet = false
+                var startFilletStart = Offset.Zero
+                var startFilletEnd = Offset.Zero
+                val p0 = effectiveOrtho[0]
+                val p1 = effectiveOrtho[1]
+
+                if (startFilletLeadIn != null) {
+                    val vInRaw = p0 - startFilletLeadIn
+                    val lenIn = vInRaw.getDistance()
+                    val vOutRaw = p1 - p0
+                    val lenOut = vOutRaw.getDistance()
+
+                    if (lenIn >= 0.1f && lenOut >= 0.1f) {
+                        val vIn = Offset(vInRaw.x / lenIn, vInRaw.y / lenIn)
+                        val vOut = Offset(vOutRaw.x / lenOut, vOutRaw.y / lenOut)
+                        val dot = vIn.x * vOut.x + vIn.y * vOut.y
+                        if (abs(dot) < 0.1f) {
+                            val r = minOf(rBase, lenIn * 0.45f, lenOut * 0.45f)
+                            if (r >= 1f) {
+                                hasStartFillet = true
+                                startFilletStart = Offset(p0.x - vIn.x * r, p0.y - vIn.y * r)
+                                startFilletEnd = Offset(p0.x + vOut.x * r, p0.y + vOut.y * r)
                             }
-                            sampled.add(endCorner)
                         }
                     }
-                    sampled.add(orthoPoints.last())
+                }
+
+                if (hasStartFillet) {
+                    sampled.add(startFilletStart)
+                    for (s in 1..4) {
+                        val t = s / 5f
+                        val mt = 1f - t
+                        val qx = mt * mt * startFilletStart.x + 2f * mt * t * p0.x + t * t * startFilletEnd.x
+                        val qy = mt * mt * startFilletStart.y + 2f * mt * t * p0.y + t * t * startFilletEnd.y
+                        sampled.add(Offset(qx, qy))
+                    }
+                    sampled.add(startFilletEnd)
+
+                    if (effectiveOrtho.size == 2) {
+                        sampled.add(effectiveOrtho[1])
+                    } else {
+                        for (i in 1 until effectiveOrtho.size - 1) {
+                            val pPrev = if (i == 1) startFilletEnd else effectiveOrtho[i - 1]
+                            val pCurr = effectiveOrtho[i]
+                            val pNext = effectiveOrtho[i + 1]
+
+                            val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
+                            val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
+                            val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
+                            val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
+
+                            val r = minOf(rBase, lenIn * 0.45f, lenOut * 0.45f)
+                            if (r < 1f || lenIn == 0f || lenOut == 0f) {
+                                sampled.add(pCurr)
+                            } else {
+                                val startCorner = Offset(pCurr.x + (vIn.x / lenIn) * r, pCurr.y + (vIn.y / lenIn) * r)
+                                val endCorner = Offset(pCurr.x + (vOut.x / lenOut) * r, pCurr.y + (vOut.y / lenOut) * r)
+                                sampled.add(startCorner)
+                                for (s in 1..4) {
+                                    val t = s / 5f
+                                    val mt = 1f - t
+                                    val qx = mt * mt * startCorner.x + 2f * mt * t * pCurr.x + t * t * endCorner.x
+                                    val qy = mt * mt * startCorner.y + 2f * mt * t * pCurr.y + t * t * endCorner.y
+                                    sampled.add(Offset(qx, qy))
+                                }
+                                sampled.add(endCorner)
+                            }
+                        }
+                        sampled.add(effectiveOrtho.last())
+                    }
+                } else {
+                    if (effectiveOrtho.size <= 2) {
+                        sampled.addAll(effectiveOrtho)
+                    } else {
+                        sampled.add(effectiveOrtho[0])
+                        for (i in 1 until effectiveOrtho.size - 1) {
+                            val pPrev = effectiveOrtho[i - 1]
+                            val pCurr = effectiveOrtho[i]
+                            val pNext = effectiveOrtho[i + 1]
+
+                            val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
+                            val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
+                            val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
+                            val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
+
+                            val r = minOf(rBase, lenIn * 0.45f, lenOut * 0.45f)
+                            if (r < 1f || lenIn == 0f || lenOut == 0f) {
+                                sampled.add(pCurr)
+                            } else {
+                                val startCorner = Offset(pCurr.x + (vIn.x / lenIn) * r, pCurr.y + (vIn.y / lenIn) * r)
+                                val endCorner = Offset(pCurr.x + (vOut.x / lenOut) * r, pCurr.y + (vOut.y / lenOut) * r)
+                                sampled.add(startCorner)
+                                for (s in 1..4) {
+                                    val t = s / 5f
+                                    val mt = 1f - t
+                                    val qx = mt * mt * startCorner.x + 2f * mt * t * pCurr.x + t * t * endCorner.x
+                                    val qy = mt * mt * startCorner.y + 2f * mt * t * pCurr.y + t * t * endCorner.y
+                                    sampled.add(Offset(qx, qy))
+                                }
+                                sampled.add(endCorner)
+                            }
+                        }
+                        sampled.add(effectiveOrtho.last())
+                    }
                 }
             }
 

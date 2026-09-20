@@ -11,6 +11,11 @@ import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 
 import kotlin.math.abs
 
+data class JunctionFilletParams(
+    val startFilletLeadIn: Offset? = null,
+    val endTrimDistance: Float = 0f
+)
+
 object ConnectionHitTester {
 
     fun getConnectionOrientations(
@@ -125,6 +130,177 @@ object ConnectionHitTester {
         return Pair(startIsHorizontal, endIsHorizontal)
     }
 
+    fun getJunctionFilletParams(
+        connection: Connection,
+        connections: List<Connection> = emptyList(),
+        junctionMap: Map<Long, Offset> = emptyMap(),
+        getPortBoardPosition: ((Long, String, Boolean) -> Offset?)? = null,
+        groups: List<FlowGroup> = emptyList(),
+        density: Float = 1f,
+        scale: Float = 1f,
+        offset: Offset = Offset.Zero,
+        tension: Float = 0.5f,
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+    ): JunctionFilletParams {
+        var startFilletLeadIn: Offset? = null
+        var endTrimDistance = 0f
+
+        // 1. Start fillet for connection originating from a junction
+        val srcJuncId = connection.sourceJunctionId
+        if (srcJuncId != null && getPortBoardPosition != null) {
+            val juncPos = junctionMap[srcJuncId]
+            if (juncPos != null) {
+                val incoming = connections.find {
+                    it != connection && (it.targetJunctionId == srcJuncId || srcJuncId in it.junctionIds)
+                }
+                if (incoming != null) {
+                    val inBoardPts = getConnectionBoardPoints(
+                        connection = incoming,
+                        getPortBoardPosition = getPortBoardPosition,
+                        junctionMap = junctionMap,
+                        groups = groups,
+                        density = density
+                    )
+                    if (inBoardPts != null && inBoardPts.size >= 2) {
+                        val (inStartH, inEndH) = getConnectionOrientations(
+                            connection = incoming,
+                            connections = connections,
+                            junctionMap = junctionMap,
+                            getPortBoardPosition = getPortBoardPosition,
+                            groups = groups,
+                            density = density
+                        )
+                        val inOrthoPts = SplineMathUtils.computeOrthogonalPoints(
+                            inBoardPts,
+                            startHorizontal = inStartH,
+                            endHorizontal = inEndH,
+                            stepMode = stepMode
+                        )
+                        val idx = inOrthoPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                        val prevPoint = if (idx > 0) {
+                            inOrthoPts[idx - 1]
+                        } else if (inOrthoPts.size >= 2) {
+                            inOrthoPts[inOrthoPts.size - 2]
+                        } else null
+
+                        if (prevPoint != null) {
+                            startFilletLeadIn = (prevPoint * scale) + offset
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. End trim for connection terminating at a junction with turning outgoing branches
+        val tgtJuncId = connection.targetJunctionId
+        if (tgtJuncId != null && getPortBoardPosition != null) {
+            val juncPos = junctionMap[tgtJuncId]
+            if (juncPos != null) {
+                val outgoingList = connections.filter {
+                    it != connection && (it.sourceJunctionId == tgtJuncId || tgtJuncId in it.junctionIds)
+                }
+                if (outgoingList.isNotEmpty()) {
+                    val myBoardPts = getConnectionBoardPoints(
+                        connection = connection,
+                        getPortBoardPosition = getPortBoardPosition,
+                        junctionMap = junctionMap,
+                        groups = groups,
+                        density = density
+                    )
+                    if (myBoardPts != null && myBoardPts.size >= 2) {
+                        val (myStartH, myEndH) = getConnectionOrientations(
+                            connection = connection,
+                            connections = connections,
+                            junctionMap = junctionMap,
+                            getPortBoardPosition = getPortBoardPosition,
+                            groups = groups,
+                            density = density
+                        )
+                        val myOrthoPts = SplineMathUtils.computeOrthogonalPoints(
+                            myBoardPts,
+                            startHorizontal = myStartH,
+                            endHorizontal = myEndH,
+                            stepMode = stepMode
+                        )
+                        val idx = myOrthoPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                        val prevPoint = if (idx > 0) {
+                            myOrthoPts[idx - 1]
+                        } else if (myOrthoPts.size >= 2) {
+                            myOrthoPts[myOrthoPts.size - 2]
+                        } else null
+
+                        if (prevPoint != null) {
+                            val dIn = juncPos - prevPoint
+                            val lenIn = dIn.getDistance()
+                            if (lenIn > 0.1f) {
+                                val vIn = Offset(dIn.x / lenIn, dIn.y / lenIn)
+                                var hasThrough = false
+                                var minBranchRadius: Float? = null
+                                val rBase = maxOf(14f * scale, tension * 28f * scale)
+
+                                for (outConn in outgoingList) {
+                                    val outBoardPts = getConnectionBoardPoints(
+                                        connection = outConn,
+                                        getPortBoardPosition = getPortBoardPosition,
+                                        junctionMap = junctionMap,
+                                        groups = groups,
+                                        density = density
+                                    ) ?: continue
+                                    if (outBoardPts.size < 2) continue
+
+                                    val (outStartH, outEndH) = getConnectionOrientations(
+                                        connection = outConn,
+                                        connections = connections,
+                                        junctionMap = junctionMap,
+                                        getPortBoardPosition = getPortBoardPosition,
+                                        groups = groups,
+                                        density = density
+                                    )
+                                    val outOrthoPts = SplineMathUtils.computeOrthogonalPoints(
+                                        outBoardPts,
+                                        startHorizontal = outStartH,
+                                        endHorizontal = outEndH,
+                                        stepMode = stepMode
+                                    )
+                                    val outIdx = outOrthoPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                                    val nextPoint = if (outIdx >= 0 && outIdx < outOrthoPts.size - 1) {
+                                        outOrthoPts[outIdx + 1]
+                                    } else if (outOrthoPts.size >= 2) {
+                                        outOrthoPts[1]
+                                    } else null ?: continue
+
+                                    val dOut = nextPoint - juncPos
+                                    val lenOut = dOut.getDistance()
+                                    if (lenOut > 0.1f) {
+                                        val vOut = Offset(dOut.x / lenOut, dOut.y / lenOut)
+                                        val dot = vIn.x * vOut.x + vIn.y * vOut.y
+                                        if (dot > 0.9f) {
+                                            hasThrough = true
+                                            break
+                                        } else if (abs(dot) < 0.1f) {
+                                            val lenInScreen = lenIn * scale
+                                            val lenOutScreen = lenOut * scale
+                                            val r = minOf(rBase, lenInScreen * 0.45f, lenOutScreen * 0.45f)
+                                            if (r >= 1f) {
+                                                minBranchRadius = if (minBranchRadius == null) r else minOf(minBranchRadius, r)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (!hasThrough && minBranchRadius != null) {
+                                    endTrimDistance = minBranchRadius
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return JunctionFilletParams(startFilletLeadIn = startFilletLeadIn, endTrimDistance = endTrimDistance)
+    }
+
     fun findClosestConnection(
         position: Offset,
         connections: List<Connection>,
@@ -171,6 +347,18 @@ object ConnectionHitTester {
                 groups = groups,
                 density = density
             )
+            val filletParams = getJunctionFilletParams(
+                connection = connection,
+                connections = connections,
+                junctionMap = junctionMap,
+                getPortBoardPosition = getPortBoardPosition,
+                groups = groups,
+                density = density,
+                scale = scale,
+                offset = offset,
+                tension = roundness,
+                stepMode = stepMode
+            )
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
@@ -179,7 +367,9 @@ object ConnectionHitTester {
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
                 scale = scale,
-                stepMode = stepMode
+                stepMode = stepMode,
+                startFilletLeadIn = filletParams.startFilletLeadIn,
+                endTrimDistance = filletParams.endTrimDistance
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -252,6 +442,18 @@ object ConnectionHitTester {
                 groups = groups,
                 density = density
             )
+            val filletParams = getJunctionFilletParams(
+                connection = connection,
+                connections = connections,
+                junctionMap = junctionMap,
+                getPortBoardPosition = getPortBoardPosition,
+                groups = groups,
+                density = density,
+                scale = scale,
+                offset = offset,
+                tension = roundness,
+                stepMode = stepMode
+            )
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
                 points = screenPoints,
@@ -260,7 +462,9 @@ object ConnectionHitTester {
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
                 scale = scale,
-                stepMode = stepMode
+                stepMode = stepMode,
+                startFilletLeadIn = filletParams.startFilletLeadIn,
+                endTrimDistance = filletParams.endTrimDistance
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -461,6 +665,18 @@ object ConnectionHitTester {
                 groups = groups,
                 density = density
             )
+            val filletParams = getJunctionFilletParams(
+                connection = connection,
+                connections = connections,
+                junctionMap = junctionMap,
+                getPortBoardPosition = getPortBoardPosition,
+                groups = groups,
+                density = density,
+                scale = scale,
+                offset = offset,
+                tension = roundness,
+                stepMode = stepMode
+            )
             val effectiveStyle = curveStyle
             val midpoints = SplineMathUtils.computeSegmentMidpoints(
                 points = screenPoints,
@@ -469,7 +685,9 @@ object ConnectionHitTester {
                 startHorizontal = startIsHorizontal,
                 endHorizontal = endIsHorizontal,
                 scale = scale,
-                stepMode = stepMode
+                stepMode = stepMode,
+                startFilletLeadIn = filletParams.startFilletLeadIn,
+                endTrimDistance = filletParams.endTrimDistance
             )
 
             midpoints.forEachIndexed { segIdx, midPt ->
