@@ -447,7 +447,7 @@ object SplineMathUtils {
         if (pts.size == 2) {
             val p0 = pts[0]
             val p1 = pts[1]
-            if (abs(p0.x - p1.x) < 0.2f || abs(p0.y - p1.y) < 0.2f) {
+            if (abs(p0.x - p1.x) < 1.5f || abs(p0.y - p1.y) < 1.5f) {
                 return listOf(p0, p1)
             }
 
@@ -534,10 +534,9 @@ object SplineMathUtils {
                 // Direction-aware "Min-Break" Orthogonal Routing (PDF 1)
                 if (currentHeading == "RIGHT" || currentHeading == "LEFT") {
                     val isAhead = (currentHeading == "RIGHT" && dx > 0f) || (currentHeading == "LEFT" && dx < 0f)
-                    if (abs(dy) < 0.5f && isAhead) {
-                        // Aligned continuation horizontally
+                    if (abs(dy) < 1.5f && isAhead) {
                         currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
-                    } else if (abs(dx) < 0.5f) {
+                    } else if (abs(dx) < 1.5f) {
                         currentHeading = if (dy >= 0f) "DOWN" else "UP"
                     } else if (isLastSegment && endHorizontal && isAhead) {
                         val midX = (p0.x + p1.x) / 2f
@@ -557,10 +556,9 @@ object SplineMathUtils {
                     }
                 } else {
                     val isAhead = (currentHeading == "DOWN" && dy > 0f) || (currentHeading == "UP" && dy < 0f)
-                    if (abs(dx) < 0.5f && isAhead) {
-                        // Aligned continuation vertically
+                    if (abs(dx) < 1.5f && isAhead) {
                         currentHeading = if (dy >= 0f) "DOWN" else "UP"
-                    } else if (abs(dy) < 0.5f) {
+                    } else if (abs(dy) < 1.5f) {
                         currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
                     } else if (isLastSegment && !endHorizontal && isAhead) {
                         val midY = (p0.y + p1.y) / 2f
@@ -596,16 +594,16 @@ object SplineMathUtils {
             val curr = points[i]
             val next = points[i + 1]
 
-            val isCollinearH = abs(prev.y - curr.y) < 0.2f && abs(curr.y - next.y) < 0.2f
-            val isCollinearV = abs(prev.x - curr.x) < 0.2f && abs(curr.x - next.x) < 0.2f
-            val isDuplicate = (curr - prev).getDistance() < 0.2f
+            val isCollinearH = abs(prev.y - curr.y) < 1.0f && abs(curr.y - next.y) < 1.0f
+            val isCollinearV = abs(prev.x - curr.x) < 1.0f && abs(curr.x - next.x) < 1.0f
+            val isDuplicate = (curr - prev).getDistance() < 1.0f
 
             if (!isCollinearH && !isCollinearV && !isDuplicate) {
                 simplified.add(curr)
             }
         }
         val last = points.last()
-        if ((last - simplified.last()).getDistance() >= 0.2f) {
+        if ((last - simplified.last()).getDistance() >= 1.0f) {
             simplified.add(last)
         } else if (simplified.size == 1) {
             simplified.add(last)

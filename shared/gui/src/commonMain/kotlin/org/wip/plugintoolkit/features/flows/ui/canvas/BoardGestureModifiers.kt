@@ -37,6 +37,7 @@ import org.wip.plugintoolkit.features.flows.ui.toModelOffset
 import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
+import co.touchlab.kermit.Logger
 
 fun Modifier.boardConnectionTapGesture(
     interactionState: BoardInteractionState,
@@ -671,6 +672,53 @@ fun Modifier.boardPointerEventGesture(
                         }
                     } else {
                         interactionState.hoveredConnectionIsSource = null
+                    }
+                    if (bestConnection != interactionState.hoveredConnection) {
+                        if (bestConnection != null) {
+                            val junctionMap = currentJunctions.associate { it.id to it.position.toComposeOffset() }
+                            val (startH, endH) = ConnectionHitTester.getConnectionOrientations(
+                                connection = bestConnection,
+                                connections = currentConnections,
+                                junctionMap = junctionMap,
+                                getPortBoardPosition = currentGetPortBoardPosition
+                            )
+                            val filletParams = ConnectionHitTester.getJunctionFilletParams(
+                                connection = bestConnection,
+                                connections = currentConnections,
+                                junctionMap = junctionMap,
+                                getPortBoardPosition = currentGetPortBoardPosition,
+                                scale = currentScale,
+                                offset = currentOffset
+                            )
+                            val boardPoints = ConnectionHitTester.getConnectionBoardPoints(
+                                connection = bestConnection,
+                                getPortBoardPosition = currentGetPortBoardPosition,
+                                junctionMap = junctionMap,
+                                density = 1f
+                            )
+                            val orthoPts = if (boardPoints != null && boardPoints.size >= 2) {
+                                SplineMathUtils.computeOrthogonalPoints(
+                                    boardPoints,
+                                    startHorizontal = startH,
+                                    endHorizontal = endH,
+                                    stepMode = currentOrthogonalStepMode
+                                )
+                            } else null
+                            Logger.d(tag = "HoveredConnection") {
+                                buildString {
+                                    appendLine("=== HOVERED CONNECTION ===")
+                                    appendLine("  id: ${bestConnection.sourceNodeId}:${bestConnection.sourcePortId} -> ${bestConnection.targetNodeId}:${bestConnection.targetPortId}")
+                                    appendLine("  sourceJunctionId=${bestConnection.sourceJunctionId}  targetJunctionId=${bestConnection.targetJunctionId}")
+                                    appendLine("  waypoints=${bestConnection.waypoints.size}")
+                                    appendLine("  startIsHorizontal=$startH  endIsHorizontal=$endH")
+                                    appendLine("  startFilletLeadIn=${filletParams.startFilletLeadIn}  endTrimDistance=${filletParams.endTrimDistance}")
+                                    appendLine("  cursorBoard=(${(position.x - currentOffset.x) / currentScale}, ${(position.y - currentOffset.y) / currentScale})")
+                                    appendLine("  orthoPts(${orthoPts?.size ?: 0}): ${orthoPts?.joinToString { "(${it.x},${it.y})" } ?: "n/a"}")
+                                }
+                            }
+                        } else {
+                            Logger.d(tag = "HoveredConnection") { "=== HOVER CLEARED ==" }
+                        }
                     }
                     interactionState.hoveredConnection = bestConnection
                 } else if (event.type == PointerEventType.Exit) {

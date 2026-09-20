@@ -653,4 +653,48 @@ class SplineMathUtilsTest {
             )
         }
     }
+
+    @Test
+    fun testOrthogonalRoutingIsStableUnderSubpixelJitter() {
+        // Verifies that subpixel layout-rounding differences (< 1.5 board units in X or Y)
+        // do NOT change the topology (bend count) of the orthogonal path.
+        // Before the fix, 0.2f thresholds meant jitter of 0.3 board units could flip routing.
+        val baseFrom = Offset(100f, 200f)
+        val baseTo   = Offset(400f, 250f) // mostly horizontal — should always route H-V-H
+
+        val basePoints = SplineMathUtils.computeOrthogonalPoints(
+            listOf(baseFrom, baseTo),
+            startHorizontal = true,
+            endHorizontal = true
+        )
+        val baseBendCount = basePoints.size
+
+        // Apply jitter values BELOW the 1.5f threshold
+        val jitterValues = listOf(0f, 0.3f, 0.5f, 0.9f, 1.0f, 1.4f)
+        for (jitterY in jitterValues) {
+            val jitteredFrom = Offset(baseFrom.x, baseFrom.y + jitterY)
+            val jitteredTo   = Offset(baseTo.x, baseTo.y + jitterY)
+            val jitteredPoints = SplineMathUtils.computeOrthogonalPoints(
+                listOf(jitteredFrom, jitteredTo),
+                startHorizontal = true,
+                endHorizontal = true
+            )
+            assertEquals(
+                baseBendCount,
+                jitteredPoints.size,
+                "Bend count must be stable under Y-jitter of $jitterY board units"
+            )
+        }
+
+        // Also test near-collinear vertical case: dx < 1.5 should NOT add a bend
+        val nearVertFrom = Offset(200f, 100f)
+        val nearVertTo   = Offset(201f, 400f) // dx = 1f < 1.5f threshold → should route straight
+        val nearVertPoints = SplineMathUtils.computeOrthogonalPoints(
+            listOf(nearVertFrom, nearVertTo),
+            startHorizontal = true,
+            endHorizontal = true
+        )
+        // With 1.5f threshold: abs(p0.x - p1.x) = 1f < 1.5f, so it returns listOf(p0, p1) directly
+        assertEquals(2, nearVertPoints.size, "Near-vertical path (dx=1) must not get an extra bend")
+    }
 }

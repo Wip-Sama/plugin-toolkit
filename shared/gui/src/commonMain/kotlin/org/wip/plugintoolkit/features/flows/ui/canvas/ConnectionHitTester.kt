@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.features.flows.ui.canvas
 
 import androidx.compose.ui.geometry.Offset
+import co.touchlab.kermit.Logger
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowJunction
@@ -26,83 +27,116 @@ object ConnectionHitTester {
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f
     ): Pair<Boolean, Boolean> {
+        val connId = "conn[${connection.sourceNodeId}:${connection.sourcePortId}->${connection.targetNodeId}:${connection.targetPortId}]"
         // 1. Determine end orientation (how this connection arrives at its target):
         val endIsHorizontal = if (connection.targetJunctionId == null && !connection.isFloating) {
-            // Node input ports always enter horizontally from the left
+            // Node input ports always receive connections horizontally from the left
+            Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (target is a node input port, always horizontal)" }
             true
         } else if (connection.targetJunctionId != null) {
             val tgtJuncPos = junctionMap[connection.targetJunctionId]
             if (tgtJuncPos != null) {
-                val inBoardPts = if (getPortBoardPosition != null) {
-                    getConnectionBoardPoints(
-                        connection = connection,
-                        getPortBoardPosition = getPortBoardPosition,
-                        junctionMap = junctionMap,
-                        groups = groups,
-                        density = density
-                    )
-                } else null
-
-                val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
-                    val idx = inBoardPts.indexOfFirst { (it - tgtJuncPos).getDistance() < 1f }
-                    if (idx > 0) inBoardPts[idx - 1] else inBoardPts[inBoardPts.size - 2]
-                } else if (connection.sourceJunctionId != null) {
-                    junctionMap[connection.sourceJunctionId]
-                } else {
-                    null
-                }
-
-                if (inPrevPoint != null) {
-                    val dx = tgtJuncPos.x - inPrevPoint.x
-                    val dy = tgtJuncPos.y - inPrevPoint.y
-                    abs(dx) >= abs(dy)
-                } else {
+                if (connection.sourceJunctionId == null && connection.waypoints.isEmpty()) {
+                    Logger.v(tag = "ConnectionOrientations") {
+                        "$connId: endIsHorizontal=true (node output port -> junction, no waypoints: always arrives horizontally)"
+                    }
                     true
+                } else {
+                    val inBoardPts = if (getPortBoardPosition != null) {
+                        getConnectionBoardPoints(
+                            connection = connection,
+                            getPortBoardPosition = getPortBoardPosition,
+                            junctionMap = junctionMap,
+                            groups = groups,
+                            density = density
+                        )
+                    } else null
+
+                    val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
+                        val idx = inBoardPts.indexOfFirst { (it - tgtJuncPos).getDistance() < 1f }
+                        if (idx > 0) inBoardPts[idx - 1] else inBoardPts[inBoardPts.size - 2]
+                    } else if (connection.sourceJunctionId != null) {
+                        junctionMap[connection.sourceJunctionId]
+                    } else {
+                        null
+                    }
+
+                    if (inPrevPoint != null) {
+                        val dx = tgtJuncPos.x - inPrevPoint.x
+                        val dy = tgtJuncPos.y - inPrevPoint.y
+                        val result = abs(dx) >= abs(dy)
+                        Logger.v(tag = "ConnectionOrientations") {
+                            "$connId: endIsHorizontal=$result from prev-segment (dx=$dx, dy=$dy, abs(dx)>=abs(dy)=$result)"
+                        }
+                        result
+                    } else {
+                        Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (no prev point found, defaulting)" }
+                        true
+                    }
                 }
             } else {
+                Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (target junction pos not in map, defaulting)" }
                 true
             }
         } else {
+            Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (floating/default)" }
             true
         }
 
         // 2. Determine start orientation (how this connection leaves its source):
         val startIsHorizontal = if (connection.sourceJunctionId == null) {
             // Node output ports always exit horizontally to the right
+            Logger.v(tag = "ConnectionOrientations") { "$connId: startIsHorizontal=true (node output port, always horizontal)" }
             true
         } else {
             val juncId = connection.sourceJunctionId
             val juncPos = junctionMap[juncId]
 
-            // Find incoming connection entering this junction
+            // Find incoming connection entering this junction to determine its through-axis
             val incoming = connections.find {
                 it != connection && (it.targetJunctionId == juncId || juncId in it.junctionIds)
             }
 
             if (incoming != null && juncPos != null) {
-                // Determine incoming travel direction and arrival axis
-                val inBoardPts = if (getPortBoardPosition != null) {
-                    getConnectionBoardPoints(
-                        connection = incoming,
-                        getPortBoardPosition = getPortBoardPosition,
-                        junctionMap = junctionMap,
-                        groups = groups,
-                        density = density
-                    )
-                } else null
-
-                val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
-                    val idx = inBoardPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
-                    if (idx > 0) inBoardPts[idx - 1] else inBoardPts[inBoardPts.size - 2]
-                } else if (incoming.sourceJunctionId != null) {
-                    junctionMap[incoming.sourceJunctionId]
+                val inEndH: Boolean
+                if (incoming.sourceJunctionId == null && incoming.waypoints.isEmpty()) {
+                    // Incoming comes directly from a node output port: always horizontal arrival
+                    inEndH = true
+                    Logger.v(tag = "ConnectionOrientations") {
+                        "$connId: incoming=${
+                            "conn[${incoming.sourceNodeId}:${incoming.sourcePortId}]->junc[$juncId]"
+                        } inEndH=true (node output -> junction, no waypoints)"
+                    }
                 } else {
-                    null
-                }
+                    // Derive arrival axis from actual orthogonal segment preceding the junction
+                    val inBoardPts = if (getPortBoardPosition != null) {
+                        getConnectionBoardPoints(
+                            connection = incoming,
+                            getPortBoardPosition = getPortBoardPosition,
+                            junctionMap = junctionMap,
+                            groups = groups,
+                            density = density
+                        )
+                    } else null
 
-                val dxIn = if (inPrevPoint != null) juncPos.x - inPrevPoint.x else 1f
-                val dyIn = if (inPrevPoint != null) juncPos.y - inPrevPoint.y else 0f
-                val inEndH = abs(dxIn) >= abs(dyIn)
+                    val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
+                        val idx = inBoardPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                        if (idx > 0) inBoardPts[idx - 1] else inBoardPts[inBoardPts.size - 2]
+                    } else if (incoming.sourceJunctionId != null) {
+                        junctionMap[incoming.sourceJunctionId]
+                    } else {
+                        null
+                    }
+
+                    val dxIn = if (inPrevPoint != null) juncPos.x - inPrevPoint.x else 1f
+                    val dyIn = if (inPrevPoint != null) juncPos.y - inPrevPoint.y else 0f
+                    inEndH = abs(dxIn) >= abs(dyIn)
+                    Logger.v(tag = "ConnectionOrientations") {
+                        "$connId: incoming junc[${
+                            incoming.sourceJunctionId ?: incoming.sourceNodeId
+                        }]->junc[$juncId] inEndH=$inEndH (dxIn=$dxIn, dyIn=$dyIn)"
+                    }
+                }
 
                 val floating = connection.floatingTarget
                 val targetPos = when {
@@ -117,23 +151,55 @@ object ConnectionHitTester {
                     val dyToTarget = targetPos.y - juncPos.y
 
                     if (inEndH) {
-                        // Incoming arrived horizontally: continues through only if target is predominantly forward horizontal
-                        val isAhead = abs(dxToTarget) >= abs(dyToTarget) && (if (dxIn >= 0f) dxToTarget > 10f else dxToTarget < -10f)
-                        if (isAhead) {
-                            true // Continue straight through horizontally
-                        } else {
-                            false // Branch off vertically
+                        // Incoming arrived horizontally: continue through only if target is predominantly forward horizontal
+                        // Determine the incoming horizontal direction by looking at the last segment of the incoming connection
+                        val incomingPrevBoard = if (getPortBoardPosition != null) {
+                            getConnectionBoardPoints(
+                                connection = incoming,
+                                getPortBoardPosition = getPortBoardPosition,
+                                junctionMap = junctionMap,
+                                groups = groups,
+                                density = density
+                            )
+                        } else null
+                        val incomingPrevPt = if (incomingPrevBoard != null && incomingPrevBoard.size >= 2) {
+                            val idx = incomingPrevBoard.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                            if (idx > 0) incomingPrevBoard[idx - 1] else incomingPrevBoard[incomingPrevBoard.size - 2]
+                        } else null
+                        val dxInSign = if (incomingPrevPt != null) juncPos.x - incomingPrevPt.x else 1f
+
+                        val isAhead = abs(dxToTarget) >= abs(dyToTarget) && (if (dxInSign >= 0f) dxToTarget > 10f else dxToTarget < -10f)
+                        val result = isAhead // true = continue horizontal, false = branch vertical
+                        Logger.v(tag = "ConnectionOrientations") {
+                            "$connId: startIsHorizontal=$result (inEndH=true, dxToTarget=$dxToTarget, dyToTarget=$dyToTarget, isAhead=$isAhead -> ${if (result) "continue horizontal" else "branch vertical"})"
                         }
+                        result
                     } else {
-                        // Incoming arrived vertically: continues through only if target is predominantly forward vertical
-                        val isAhead = abs(dyToTarget) >= abs(dxToTarget) && (if (dyIn >= 0f) dyToTarget > 10f else dyToTarget < -10f)
-                        if (isAhead) {
-                            false // Continue straight through vertically
-                        } else {
-                            true // Branch off horizontally
+                        // Incoming arrived vertically: continue through only if target is predominantly forward vertical
+                        val incomingPrevBoard = if (getPortBoardPosition != null) {
+                            getConnectionBoardPoints(
+                                connection = incoming,
+                                getPortBoardPosition = getPortBoardPosition,
+                                junctionMap = junctionMap,
+                                groups = groups,
+                                density = density
+                            )
+                        } else null
+                        val incomingPrevPt = if (incomingPrevBoard != null && incomingPrevBoard.size >= 2) {
+                            val idx = incomingPrevBoard.indexOfFirst { (it - juncPos).getDistance() < 1f }
+                            if (idx > 0) incomingPrevBoard[idx - 1] else incomingPrevBoard[incomingPrevBoard.size - 2]
+                        } else null
+                        val dyInSign = if (incomingPrevPt != null) juncPos.y - incomingPrevPt.y else 1f
+
+                        val isAhead = abs(dyToTarget) >= abs(dxToTarget) && (if (dyInSign >= 0f) dyToTarget > 10f else dyToTarget < -10f)
+                        val result = !isAhead // false = continue vertical, true = branch horizontal
+                        Logger.v(tag = "ConnectionOrientations") {
+                            "$connId: startIsHorizontal=$result (inEndH=false, dxToTarget=$dxToTarget, dyToTarget=$dyToTarget, isAhead=$isAhead -> ${if (result) "branch horizontal" else "continue vertical"})"
                         }
+                        result
                     }
                 } else {
+                    Logger.v(tag = "ConnectionOrientations") { "$connId: startIsHorizontal=$inEndH (no target pos, mirrors inEndH)" }
                     inEndH
                 }
             } else {
@@ -148,13 +214,19 @@ object ConnectionHitTester {
                 if (targetPos != null && juncPos != null) {
                     val dx = targetPos.x - juncPos.x
                     val dy = targetPos.y - juncPos.y
-                    abs(dx) >= abs(dy)
+                    val result = abs(dx) >= abs(dy)
+                    Logger.v(tag = "ConnectionOrientations") {
+                        "$connId: startIsHorizontal=$result (no incoming, junc->target dx=$dx, dy=$dy)"
+                    }
+                    result
                 } else {
+                    Logger.v(tag = "ConnectionOrientations") { "$connId: startIsHorizontal=true (no incoming, no target pos, defaulting)" }
                     true
                 }
             }
         }
 
+        Logger.v(tag = "ConnectionOrientations") { "$connId: FINAL startIsHorizontal=$startIsHorizontal, endIsHorizontal=$endIsHorizontal" }
         return Pair(startIsHorizontal, endIsHorizontal)
     }
 
@@ -213,6 +285,10 @@ object ConnectionHitTester {
 
                         if (prevPoint != null) {
                             startFilletLeadIn = (prevPoint * scale) + offset
+                            Logger.v(tag = "JunctionFillet") {
+                                "startFillet conn[${connection.sourceNodeId}:${connection.sourcePortId}] " +
+                                "src-junc[${connection.sourceJunctionId}]: lead-in=$prevPoint (screen=${startFilletLeadIn})"
+                            }
                         }
                     }
                 }
@@ -303,6 +379,10 @@ object ConnectionHitTester {
                                         val vOut = Offset(dOut.x / lenOut, dOut.y / lenOut)
                                         val dot = vIn.x * vOut.x + vIn.y * vOut.y
                                         if (dot > 0.9f) {
+                                            // Through-connection: no fillet needed on incoming wire
+                                            Logger.v(tag = "JunctionFillet") {
+                                                "endTrim junc[$tgtJuncId]: outgoing conn[${outConn.sourceNodeId}] is through-connection (dot=$dot > 0.9), skipping trim"
+                                            }
                                             hasThrough = true
                                             break
                                         } else if (abs(dot) < 0.1f) {
@@ -311,7 +391,20 @@ object ConnectionHitTester {
                                             val r = minOf(rBase, lenInScreen * 0.45f, lenOutScreen * 0.45f)
                                             val minR = minOf(lenInScreen, lenOutScreen) * 0.01f
                                             if (r >= minR && r > 0f) {
+                                                Logger.v(tag = "JunctionFillet") {
+                                                    "endTrim junc[$tgtJuncId]: perpendicular branch (dot=$dot), r=$r accepted " +
+                                                    "(rBase=$rBase, lenInScreen=$lenInScreen, lenOutScreen=$lenOutScreen)"
+                                                }
                                                 minBranchRadius = if (minBranchRadius == null) r else minOf(minBranchRadius, r)
+                                            } else {
+                                                Logger.v(tag = "JunctionFillet") {
+                                                    "endTrim junc[$tgtJuncId]: perpendicular branch (dot=$dot), r=$r REJECTED " +
+                                                    "(r < minR=$minR or r <= 0)"
+                                                }
+                                            }
+                                        } else {
+                                            Logger.v(tag = "JunctionFillet") {
+                                                "endTrim junc[$tgtJuncId]: outgoing conn[${outConn.sourceNodeId}] neither through nor perpendicular (dot=$dot), skipping"
                                             }
                                         }
                                     }
@@ -319,6 +412,17 @@ object ConnectionHitTester {
 
                                 if (!hasThrough && minBranchRadius != null) {
                                     endTrimDistance = minBranchRadius
+                                    Logger.v(tag = "JunctionFillet") {
+                                        "endTrim junc[$tgtJuncId]: final endTrimDistance=$endTrimDistance (screen px)"
+                                    }
+                                } else if (hasThrough) {
+                                    Logger.v(tag = "JunctionFillet") {
+                                        "endTrim junc[$tgtJuncId]: no trim applied (through-connection detected)"
+                                    }
+                                } else {
+                                    Logger.v(tag = "JunctionFillet") {
+                                        "endTrim junc[$tgtJuncId]: no trim applied (no valid perpendicular branch)"
+                                    }
                                 }
                             }
                         }

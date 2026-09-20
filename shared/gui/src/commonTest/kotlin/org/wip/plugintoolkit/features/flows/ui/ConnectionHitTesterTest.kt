@@ -293,4 +293,73 @@ class ConnectionHitTesterTest {
         assertTrue(startH, "Outgoing connection must exit horizontally through horizontal junction")
         assertTrue(endH, "Target node input must receive connection horizontally")
     }
+
+    @Test
+    fun testDiagonalNodeToJunctionMaintainsHorizontalArrivalAndFillet() {
+        // Reproduce the permanently angular connection bug:
+        // - Source node output port at (100, 350)
+        // - Target junction at (250, 100) — diagonally placed: abs(dy=250) > abs(dx=150)
+        // - Without the fix, abs(dx) < abs(dy) would have set endIsHorizontal=false,
+        //   causing the wire to enter the junction vertically and collide with the outgoing
+        //   vertical branch, preventing any fillet from being calculated.
+        val incomingConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = org.wip.plugintoolkit.features.flows.model.Connection.FLOATING_NODE_ID,
+            targetPortId = org.wip.plugintoolkit.features.flows.model.Connection.FLOATING_PORT_ID,
+            targetJunctionId = 100L
+        )
+        // Outgoing branch leaves junction vertically upward to node 2 at (250, 0)
+        val outgoingConn = Connection(
+            sourceNodeId = org.wip.plugintoolkit.features.flows.model.Connection.FLOATING_NODE_ID,
+            sourcePortId = org.wip.plugintoolkit.features.flows.model.Connection.FLOATING_PORT_ID,
+            sourceJunctionId = 100L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+
+        val juncMap = mapOf(100L to Offset(250f, 100f))
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nodeId, _, isOutput ->
+            when {
+                nodeId == 1L && isOutput -> Offset(100f, 350f)   // diagonal: dy=250 > dx=150
+                nodeId == 2L && !isOutput -> Offset(600f, 100f)  // outgoing goes horizontally right
+                else -> null
+            }
+        }
+
+        // The incoming connection should be classified as arriving HORIZONTALLY regardless of diagonal
+        val (inStartH, inEndH) = ConnectionHitTester.getConnectionOrientations(
+            connection = incomingConn,
+            connections = listOf(incomingConn, outgoingConn),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos
+        )
+        assertTrue(inStartH, "Node output port always starts horizontally")
+        assertTrue(inEndH, "Node->junction without waypoints must always arrive horizontally, regardless of diagonal placement")
+
+        // The outgoing connection should branch off horizontally (since inEndH is true and target is to the right)
+        val (outStartH, outEndH) = ConnectionHitTester.getConnectionOrientations(
+            connection = outgoingConn,
+            connections = listOf(incomingConn, outgoingConn),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos
+        )
+        assertTrue(outStartH, "Outgoing branch should continue or branch horizontally")
+        assertTrue(outEndH, "Target node input must receive connection horizontally")
+
+        // Fillet params for the outgoing branch should now receive a valid startFilletLeadIn
+        val filletParams = ConnectionHitTester.getJunctionFilletParams(
+            connection = outgoingConn,
+            connections = listOf(incomingConn, outgoingConn),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos,
+            scale = 1f
+        )
+        // With horizontal arrival corrected, the dot product will be perpendicular (not collinear),
+        // so startFilletLeadIn must be non-null
+        assertTrue(
+            filletParams.startFilletLeadIn != null || filletParams.endTrimDistance > 0f,
+            "With correct horizontal arrival, at least start fillet or end trim must be non-zero for the outgoing branch"
+        )
+    }
 }
