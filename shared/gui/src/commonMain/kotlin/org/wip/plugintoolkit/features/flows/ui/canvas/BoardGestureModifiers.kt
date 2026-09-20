@@ -368,6 +368,8 @@ fun Modifier.boardPointerEventGesture(
     isEyedropperActive: Boolean = false,
     onPaintConnection: ((Connection) -> Unit)? = null,
     onWashConnection: ((Connection) -> Unit)? = null,
+    onPaintJunction: ((Long) -> Unit)? = null,
+    onWashJunction: ((Long) -> Unit)? = null,
     onSampleColor: ((String) -> Unit)? = null,
     onMoveSegment: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
     onEndMoveSegment: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null
@@ -380,6 +382,8 @@ fun Modifier.boardPointerEventGesture(
     val currentIsEyedropperActive by rememberUpdatedState(isEyedropperActive)
     val currentOnPaintConnection by rememberUpdatedState(onPaintConnection)
     val currentOnWashConnection by rememberUpdatedState(onWashConnection)
+    val currentOnPaintJunction by rememberUpdatedState(onPaintJunction)
+    val currentOnWashJunction by rememberUpdatedState(onWashJunction)
     val currentOnSampleColor by rememberUpdatedState(onSampleColor)
     val currentOnMoveSegment by rememberUpdatedState(onMoveSegment)
     val currentOnEndMoveSegment by rememberUpdatedState(onEndMoveSegment)
@@ -914,14 +918,14 @@ fun Modifier.boardPointerEventGesture(
                             if (currentIsEyedropperActive || currentIsPaintToolActive || currentIsWashToolActive) {
                                 val connectedConns = currentConnections.filter { it.sourceJunctionId == juncId || it.targetJunctionId == juncId }
                                 if (currentIsEyedropperActive && currentOnSampleColor != null) {
-                                    val sample = connectedConns.firstOrNull { it.color != null }?.color ?: "#808080"
+                                    val sample = hitJunc.color ?: connectedConns.firstOrNull { it.color != null }?.color ?: "#808080"
                                     currentOnSampleColor?.invoke(sample)
                                     event.changes.forEach { it.consume() }
-                                } else if (currentIsPaintToolActive && currentOnPaintConnection != null) {
-                                    connectedConns.forEach { currentOnPaintConnection?.invoke(it) }
+                                } else if (currentIsPaintToolActive && currentOnPaintJunction != null) {
+                                    currentOnPaintJunction?.invoke(juncId)
                                     event.changes.forEach { it.consume() }
-                                } else if (currentIsWashToolActive && currentOnWashConnection != null) {
-                                    connectedConns.forEach { currentOnWashConnection?.invoke(it) }
+                                } else if (currentIsWashToolActive && currentOnWashJunction != null) {
+                                    currentOnWashJunction?.invoke(juncId)
                                     event.changes.forEach { it.consume() }
                                 }
                             } else if (isAlt) {

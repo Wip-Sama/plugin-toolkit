@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -31,6 +32,7 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 fun PortCircle(
     color: Color,
     isHighlighted: Boolean = false,
+    isVisible: Boolean = true,
     onDragStart: () -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: (isShiftPressed: Boolean) -> Unit,
@@ -59,10 +61,13 @@ fun PortCircle(
         MaterialTheme.colorScheme.background
     }
 
+    val effectiveAlpha = if (isVisible || isHighlighted || isMouseHovered) 1f else 0f
+
     Box(
         modifier = modifier
             .size(ToolkitTheme.dimensions.iconExtraSmall)
             .clip(CircleShape)
+            .alpha(effectiveAlpha)
             .background(backgroundDisplayColor)
             .border(if (isHighlighted || isMouseHovered) ToolkitTheme.dimensions.borderSelected else ToolkitTheme.dimensions.progressIndicatorStroke, displayColor, CircleShape)
             .pointerInput(Unit) {

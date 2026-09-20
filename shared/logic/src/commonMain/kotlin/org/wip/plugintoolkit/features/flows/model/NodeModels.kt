@@ -712,6 +712,50 @@ data class Flow(
     }
 
     /**
+     * Removes a junction point while bridging its incoming connections with outgoing connections.
+     * Returns the updated Flow alongside the list of removed connections and newly created bridged connections.
+     */
+    fun removeJunctionWithBridging(junctionId: Long): Triple<Flow, List<Connection>, List<Connection>> {
+        val junction = junctions.find { it.id == junctionId } ?: return Triple(this, emptyList(), emptyList())
+        val incoming = connections.filter { it.targetJunctionId == junctionId }
+        val outgoing = connections.filter { it.sourceJunctionId == junctionId }
+
+        val bridgedConnections = mutableListOf<Connection>()
+        if (incoming.isNotEmpty() && outgoing.isNotEmpty()) {
+            for (inConn in incoming) {
+                for (outConn in outgoing) {
+                    bridgedConnections.add(
+                        Connection(
+                            sourceNodeId = inConn.sourceNodeId,
+                            sourcePortId = inConn.sourcePortId,
+                            sourceJunctionId = inConn.sourceJunctionId,
+                            targetNodeId = outConn.targetNodeId,
+                            targetPortId = outConn.targetPortId,
+                            targetJunctionId = outConn.targetJunctionId,
+                            floatingTarget = outConn.floatingTarget,
+                            orderIndex = outConn.orderIndex,
+                            color = inConn.color ?: outConn.color,
+                            waypoints = inConn.waypoints + outConn.waypoints,
+                            junctionIds = inConn.junctionIds + outConn.junctionIds,
+                            isStructured = inConn.isStructured || outConn.isStructured
+                        )
+                    )
+                }
+            }
+        }
+
+        val removedConnections = (incoming + outgoing).distinct()
+        val remainingConnections = connections.filter { it !in removedConnections } + bridgedConnections
+        val remainingJunctions = junctions.filter { it.id != junctionId }
+
+        val updatedFlow = copy(
+            junctions = remainingJunctions,
+            connections = remainingConnections
+        )
+        return Triple(updatedFlow, removedConnections, bridgedConnections)
+    }
+
+    /**
      * Detects and purges stray/dangling points (intermediate waypoints or junction nodes
      * that are disconnected from any active node port or in-progress connection).
      * Retains complex connection wire trees as long as at least one valid node port
@@ -1188,8 +1232,12 @@ data class Flow(
         val targetNode = nodes.find { it.id == targetNodeId } ?: return false
         val targetPort = targetNode.inputs.find { it.id == targetPortId } ?: return false
         if (targetPort.dataType is DataType.Array) return false
-        return connections.any { it.targetNodeId == targetNodeId && it.targetPortId == targetPortId } ||
-                getEffectiveConnections().any { it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }
+        val hasDirectActiveSource = connections.any {
+            it.targetNodeId == targetNodeId && it.targetPortId == targetPortId &&
+                    (it.sourceNodeId >= 0L || (it.sourceJunctionId != null && findJunctionEntrypoint(it.sourceJunctionId) != null))
+        }
+        val hasEffectiveSource = getEffectiveConnections().any { it.targetNodeId == targetNodeId && it.targetPortId == targetPortId }
+        return hasDirectActiveSource || hasEffectiveSource
     }
 
     fun isJunctionAlreadyTargeted(junctionId: Long): Boolean {

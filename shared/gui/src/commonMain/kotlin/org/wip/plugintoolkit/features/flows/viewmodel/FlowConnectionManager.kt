@@ -366,6 +366,16 @@ class FlowConnectionManager(
         )
     }
 
+    fun handleDeleteJunction(currentState: FlowEditorState, junctionId: Long): FlowEditorState {
+        val junction = currentState.flow.junctions.find { it.id == junctionId } ?: return currentState
+        val (newFlow, _, _) = currentState.flow.removeJunctionWithBridging(junctionId)
+        return currentState.copy(
+            flow = newFlow.purgeStrayPoints(),
+            selectedPointIds = currentState.selectedPointIds - junctionId,
+            hasUnsavedChanges = true
+        )
+    }
+
     fun handleDeleteConnection(currentState: FlowEditorState, connection: Connection): FlowEditorState {
         val remainingConnections = currentState.flow.connections.filter { it != connection }.map { conn ->
             if (conn.targetNodeId == connection.targetNodeId && conn.targetPortId == connection.targetPortId && (conn.orderIndex

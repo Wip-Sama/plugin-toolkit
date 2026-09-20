@@ -148,6 +148,8 @@ fun BoardCanvas(
     onWashGroup: ((Long) -> Unit)? = null,
     onPaintLabel: ((Long) -> Unit)? = null,
     onWashLabel: ((Long) -> Unit)? = null,
+    onPaintJunction: ((Long) -> Unit)? = null,
+    onWashJunction: ((Long) -> Unit)? = null,
     onMoveJunction: ((Long, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)? = null,
     onEndMoveJunction: ((Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>) -> Unit)? = null,
     onDeleteJunction: ((Long) -> Unit)? = null,
@@ -169,6 +171,7 @@ fun BoardCanvas(
     onAddJunctionAndBranch: (Connection, Offset, Int) -> Unit = { _, _, _ -> },
     onToggleEyedropper: () -> Unit = {},
     onToggleAdvancedConnectionMode: () -> Unit = {},
+    onToggleHideConnectionPorts: () -> Unit = {},
     onPaintSelection: () -> Unit = {},
     onWashSelection: () -> Unit = {},
     structuredConnectionStartInfo: StructuredConnectionStartInfo? = null,
@@ -403,6 +406,8 @@ fun BoardCanvas(
                 isEyedropperActive = state.isEyedropperActive,
                 onPaintConnection = onPaintConnection,
                 onWashConnection = onWashConnection,
+                onPaintJunction = onPaintJunction,
+                onWashJunction = onWashJunction,
                 onSampleColor = onSampleColor,
                 onMoveSegment = onMoveSegment,
                 onEndMoveSegment = onEndMoveSegment
@@ -743,9 +748,10 @@ fun BoardCanvas(
         val colorsInFlow = remember(flow) {
             val nodeColors = flow.nodes.mapNotNull { it.color }.filter { it.isNotBlank() }
             val connColors = flow.connections.mapNotNull { it.color }.filter { it.isNotBlank() }
+            val juncColors = flow.junctions.mapNotNull { it.color }.filter { it.isNotBlank() }
             val groupColors = flow.groups.mapNotNull { it.color }.filter { it.isNotBlank() }
             val labelColors = flow.labels.mapNotNull { it.color }.filter { it.isNotBlank() }
-            (nodeColors + connColors + groupColors + labelColors).distinct()
+            (nodeColors + connColors + juncColors + groupColors + labelColors).distinct()
         }
 
         Box(modifier = Modifier.align(Alignment.BottomEnd)) {
@@ -757,6 +763,7 @@ fun BoardCanvas(
                     isWashToolActive = state.isWashToolActive,
                     isEyedropperActive = state.isEyedropperActive,
                     isAdvancedConnectionMode = state.isAdvancedConnectionMode,
+                    hideConnectionPortsUnlessHovered = state.hideConnectionPortsUnlessHovered,
                     activePaintColor = state.activePaintColor,
                     colorsInFlow = colorsInFlow,
                     connectionStyle = state.connectionCurveStyle,
@@ -766,6 +773,7 @@ fun BoardCanvas(
                     onToggleWashTool = onToggleWashTool,
                     onToggleEyedropper = onToggleEyedropper,
                     onToggleAdvancedConnectionMode = onToggleAdvancedConnectionMode,
+                    onToggleHideConnectionPorts = onToggleHideConnectionPorts,
                     onSelectPaintColor = onSelectPaintColor,
                     onAddGroup = onAddGroup,
                     onAddLabel = onAddLabel,

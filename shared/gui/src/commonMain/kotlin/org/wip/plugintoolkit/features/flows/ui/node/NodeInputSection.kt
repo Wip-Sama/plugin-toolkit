@@ -77,6 +77,9 @@ fun NodeInputSection(
     inactiveConnectedPortIds: Set<String> = emptySet(),
     onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
     showTopDivider: Boolean = false,
+    hideConnectionPortsUnlessHovered: Boolean = false,
+    isDrawingConnection: Boolean = false,
+    isNodeHovered: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val sectionTag = "input_section_${sectionType.name.lowercase()}_${node.id}"
@@ -102,6 +105,7 @@ fun NodeInputSection(
                     PortCircle(
                         color = headerColor,
                         isHighlighted = inputs.any { effectiveHighlightedPortIds.contains(it.id) },
+                        isVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || inputs.any { effectiveHighlightedPortIds.contains(it.id) },
                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                         modifier = Modifier.onGloballyPositioned { coords ->
                             inputs.forEach { input ->
@@ -148,6 +152,7 @@ fun NodeInputSection(
                     PortCircle(
                         color = headerColor,
                         isHighlighted = inputs.any { effectiveHighlightedPortIds.contains(it.id) },
+                        isVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || inputs.any { effectiveHighlightedPortIds.contains(it.id) },
                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                         modifier = Modifier.onGloballyPositioned { coords ->
                             inputs.forEach { input ->
@@ -201,7 +206,10 @@ fun NodeInputSection(
                         onFocusLost = onFocusLost,
                         onUpdateInputPortDefault = onUpdateInputPortDefault,
                         isInactiveAndConnected = inactiveConnectedPortIds.contains(input.id),
-                        onPortDisposed = onPortDisposed
+                        onPortDisposed = onPortDisposed,
+                        hideConnectionPortsUnlessHovered = hideConnectionPortsUnlessHovered,
+                        isDrawingConnection = isDrawingConnection,
+                        isNodeHovered = isNodeHovered
                     )
                 }
             }

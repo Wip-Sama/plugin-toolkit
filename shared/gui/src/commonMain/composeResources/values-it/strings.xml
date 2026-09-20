@@ -162,6 +162,9 @@
     <string name="section_flows_header">Flussi</string>
     <string name="setting_flow_autosave">Salvataggio Automatico Flussi</string>
     <string name="setting_flow_autosave_subtitle">Salva automaticamente le modifiche durante la modifica dei flussi</string>
+    <string name="setting_flow_hide_connection_ports">Nascondi Porte di Connessione</string>
+    <string name="setting_flow_hide_connection_ports_subtitle">Nascondi i cerchi delle porte a meno che non siano sorvolati o si stia disegnando una connessione</string>
+    <string name="flow_toolbar_hide_connection_ports">Attiva/Disattiva Visibilità Porte</string>
     <string name="update_available_title">Aggiornamento Disponibile: %1$s</string>
     <string name="update_now">Aggiorna Ora</string>
     <string name="update_later">Aggiorna Più Tardi</string>

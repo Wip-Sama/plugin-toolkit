@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -77,6 +79,7 @@ import plugintoolkit.composeapp.generated.resources.flow_toolbar_add_label
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_advanced_connections
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_colors_in_flow
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_eyedropper
+import plugintoolkit.composeapp.generated.resources.flow_toolbar_hide_connection_ports
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_paint
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_palette_quick
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_pick_color
@@ -105,6 +108,7 @@ fun FlowFloatingAppBar(
     isWashToolActive: Boolean,
     isEyedropperActive: Boolean = false,
     isAdvancedConnectionMode: Boolean = false,
+    hideConnectionPortsUnlessHovered: Boolean = false,
     activePaintColor: String?,
     colorsInFlow: List<String> = emptyList(),
     connectionStyle: ConnectionCurveStyle,
@@ -114,6 +118,7 @@ fun FlowFloatingAppBar(
     onToggleWashTool: () -> Unit,
     onToggleEyedropper: () -> Unit = {},
     onToggleAdvancedConnectionMode: () -> Unit = {},
+    onToggleHideConnectionPorts: () -> Unit = {},
     onSelectPaintColor: (String) -> Unit,
     onAddGroup: () -> Unit,
     onAddLabel: () -> Unit,
@@ -347,6 +352,24 @@ fun FlowFloatingAppBar(
                     Icon(
                         imageVector = Icons.Default.Hub,
                         contentDescription = stringResource(Res.string.flow_toolbar_advanced_connections),
+                        modifier = Modifier.size(dimensions.iconSmall)
+                    )
+                }
+
+                // 5.2 Port Auto-Hide toggle
+                IconButton(
+                    onClick = onToggleHideConnectionPorts,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (hideConnectionPortsUnlessHovered) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                        contentColor = if (hideConnectionPortsUnlessHovered) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    modifier = Modifier
+                        .size(dimensions.standardButtonHeight)
+                        .testTag("toolbar_hide_connection_ports")
+                ) {
+                    Icon(
+                        imageVector = if (hideConnectionPortsUnlessHovered) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = stringResource(Res.string.flow_toolbar_hide_connection_ports),
                         modifier = Modifier.size(dimensions.iconSmall)
                     )
                 }

@@ -383,6 +383,40 @@ class FlowEditorQoLTest {
     }
 
     @Test
+    fun testViewModelPaintAndWashJunctionsAndSelection() {
+        val junc = FlowJunction(id = 50L, position = ModelOffset.Zero)
+        val initialFlow = Flow("JuncColorTest", junctions = listOf(junc))
+        val vm = createViewModel(initialFlow)
+
+        vm.onEvent(FlowEvent.SetActivePaintColor("#E91E63"))
+
+        // Direct Paint Junction
+        vm.onEvent(FlowEvent.PaintJunction(50L))
+        assertEquals("#E91E63", vm.state.value.flow.junctions.first().color)
+
+        // Direct Wash Junction
+        vm.onEvent(FlowEvent.WashJunction(50L))
+        assertNull(vm.state.value.flow.junctions.first().color)
+
+        // Paint via SelectPoints + PaintSelection
+        vm.onEvent(FlowEvent.SelectPoints(setOf(50L)))
+        vm.onEvent(FlowEvent.PaintSelection)
+        assertEquals("#E91E63", vm.state.value.flow.junctions.first().color)
+
+        // Wash via WashSelection
+        vm.onEvent(FlowEvent.WashSelection)
+        assertNull(vm.state.value.flow.junctions.first().color)
+
+        // Undo restores previous painted color
+        vm.undo()
+        assertEquals("#E91E63", vm.state.value.flow.junctions.first().color)
+
+        // Redo restores washed state
+        vm.redo()
+        assertNull(vm.state.value.flow.junctions.first().color)
+    }
+
+    @Test
     fun testViewModelJunctionBranchingAndFloatingConnections() {
         val conn = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = 2L, targetPortId = "in", color = "#E91E63")
         val initialFlow = Flow("BranchTest", connections = listOf(conn))
@@ -1594,7 +1628,7 @@ class FlowEditorQoLTest {
     }
 
     @Test
-    fun testDeleteSelectedPointsRemovesPointsAndTheirConnections() {
+    fun testDeleteSelectedPointsRemovesPointsAndBridgesConnections() {
         val junc1 = FlowJunction(id = 101L, position = ModelOffset(100f, 100f))
         val conn1 = Connection(
             sourceNodeId = 1L,
@@ -1619,7 +1653,66 @@ class FlowEditorQoLTest {
         vm.onEvent(FlowEvent.DeleteSelectedNodes)
         assertTrue(vm.state.value.selectedPointIds.isEmpty())
         assertTrue(vm.state.value.flow.junctions.isEmpty())
-        assertTrue(vm.state.value.flow.connections.isEmpty())
+        assertEquals(1, vm.state.value.flow.connections.size)
+        val bridged = vm.state.value.flow.connections.first()
+        assertEquals(1L, bridged.sourceNodeId)
+        assertEquals("out", bridged.sourcePortId)
+        assertEquals(2L, bridged.targetNodeId)
+        assertEquals("in", bridged.targetPortId)
+
+        // Undo restores the junction and previous connections
+        vm.undo()
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        assertEquals(2, vm.state.value.flow.connections.size)
+    }
+
+    @Test
+    fun testMultiHopJunctionDeletionBridging() {
+        // Node1:out -> J1 -> J2 -> Node2:in
+        val j1 = FlowJunction(id = 101L, position = ModelOffset(100f, 100f))
+        val j2 = FlowJunction(id = 102L, position = ModelOffset(200f, 100f))
+        val c1 = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = -1L, targetPortId = "", targetJunctionId = 101L)
+        val c2 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 101L, targetNodeId = -1L, targetPortId = "", targetJunctionId = 102L)
+        val c3 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 102L, targetNodeId = 2L, targetPortId = "in")
+
+        val flow = Flow(name = "MultiHop", junctions = listOf(j1, j2), connections = listOf(c1, c2, c3))
+        val vm = createViewModel(flow)
+
+        // Delete J1 -> Node1:out -> J2 -> Node2:in
+        vm.onEvent(FlowEvent.DeleteJunction(101L))
+        assertEquals(1, vm.state.value.flow.junctions.size)
+        assertEquals(102L, vm.state.value.flow.junctions.first().id)
+        assertEquals(2, vm.state.value.flow.connections.size)
+        assertTrue(vm.state.value.flow.connections.any { it.sourceNodeId == 1L && it.targetJunctionId == 102L })
+        assertTrue(vm.state.value.flow.connections.any { it.sourceJunctionId == 102L && it.targetNodeId == 2L })
+
+        // Delete J2 -> Node1:out -> Node2:in
+        vm.onEvent(FlowEvent.DeleteJunction(102L))
+        assertTrue(vm.state.value.flow.junctions.isEmpty())
+        assertEquals(1, vm.state.value.flow.connections.size)
+        val direct = vm.state.value.flow.connections.first()
+        assertEquals(1L, direct.sourceNodeId)
+        assertEquals("out", direct.sourcePortId)
+        assertEquals(2L, direct.targetNodeId)
+        assertEquals("in", direct.targetPortId)
+    }
+
+    @Test
+    fun testBranchedJunctionDeletionBridging() {
+        // Node1:out -> J1, J1 -> Node2:in, J1 -> Node3:in
+        val j1 = FlowJunction(id = 101L, position = ModelOffset(100f, 100f))
+        val c1 = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = -1L, targetPortId = "", targetJunctionId = 101L)
+        val c2 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 101L, targetNodeId = 2L, targetPortId = "in")
+        val c3 = Connection(sourceNodeId = -1L, sourcePortId = "", sourceJunctionId = 101L, targetNodeId = 3L, targetPortId = "in")
+
+        val flow = Flow(name = "BranchDelete", junctions = listOf(j1), connections = listOf(c1, c2, c3))
+        val vm = createViewModel(flow)
+
+        vm.onEvent(FlowEvent.DeleteJunction(101L))
+        assertTrue(vm.state.value.flow.junctions.isEmpty())
+        assertEquals(2, vm.state.value.flow.connections.size)
+        assertTrue(vm.state.value.flow.connections.any { it.sourceNodeId == 1L && it.targetNodeId == 2L })
+        assertTrue(vm.state.value.flow.connections.any { it.sourceNodeId == 1L && it.targetNodeId == 3L })
     }
 
     @Test
@@ -1900,7 +1993,9 @@ class FlowEditorQoLTest {
 
         val resultFlow = vm.state.value.flow
         assertTrue(resultFlow.junctions.isEmpty(), "Junction should be deleted")
-        assertTrue(resultFlow.connections.isEmpty(), "Cascading connections should be purged")
+        assertEquals(1, resultFlow.connections.size, "Connections should be bridged rather than purged")
+        assertEquals(1L, resultFlow.connections.first().sourceNodeId)
+        assertEquals(2L, resultFlow.connections.first().targetNodeId)
         assertTrue(vm.state.value.selectedPointIds.isEmpty())
     }
 
@@ -2198,6 +2293,88 @@ class FlowEditorQoLTest {
         )
         assertEquals(2, vm.state.value.flow.connections.size)
         assertEquals(0, vm.state.value.flow.junctions.size)
+    }
+
+    @Test
+    fun testIntermediateSegmentMergingToInputPortSucceeds() {
+        val srcNodeA = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            title = "Src A",
+            systemAction = "actA",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out", "Out", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val tgtNodeB = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(300f, 0f),
+            title = "Tgt B",
+            systemAction = "actB",
+            inputs = listOf(InputPort("in_single", "In Single", dataType = DataType.Primitive(PrimitiveType.STRING))),
+            outputs = emptyList()
+        )
+
+        // Pre-existing dangling intermediate branch: J1 -> NodeB:in_single (no source node attached yet)
+        val j1 = FlowJunction(id = 101L, position = ModelOffset(150f, 0f))
+        val danglingConn = Connection(
+            sourceNodeId = -1L,
+            sourcePortId = "",
+            sourceJunctionId = 101L,
+            targetNodeId = 2L,
+            targetPortId = "in_single"
+        )
+
+        val flow = Flow(
+            name = "TestBridgeToInputPort",
+            nodes = listOf(srcNodeA, tgtNodeB),
+            junctions = listOf(j1),
+            connections = listOf(danglingConn)
+        )
+        val vm = createViewModel(flow)
+
+        // Connect NodeA:out -> J1 (bridging into the incoming segment of NodeB:in_single)
+        vm.onEvent(
+            FlowEvent.ConnectPortsWithWaypoints(
+                sourceNodeId = 1L,
+                sourcePortId = "out",
+                targetNodeId = -1L,
+                targetPortId = "",
+                targetJunctionId = 101L,
+                isStructured = true
+            )
+        )
+
+        // Connection succeeds! Total 2 connections forming NodeA:out -> J1 -> NodeB:in_single
+        val resultFlow = vm.state.value.flow
+        assertEquals(2, resultFlow.connections.size)
+        assertEquals(1, resultFlow.junctions.size)
+        val effective = resultFlow.getEffectiveConnections()
+        assertEquals(1, effective.size)
+        assertEquals(1L, effective.first().sourceNodeId)
+        assertEquals(2L, effective.first().targetNodeId)
+        assertEquals("in_single", effective.first().targetPortId)
+
+        // Now that NodeB:in_single has an active source (NodeA), connecting another source NodeC into J1 is rejected
+        val srcNodeC = Node.SystemNode(
+            id = 3L,
+            position = ModelOffset(0f, 100f),
+            title = "Src C",
+            systemAction = "actC",
+            inputs = emptyList(),
+            outputs = listOf(OutputPort("out", "Out", dataType = DataType.Primitive(PrimitiveType.STRING)))
+        )
+        val vmWithC = createViewModel(resultFlow.copy(nodes = resultFlow.nodes + srcNodeC))
+        vmWithC.onEvent(
+            FlowEvent.ConnectPortsWithWaypoints(
+                sourceNodeId = 3L,
+                sourcePortId = "out",
+                targetNodeId = -1L,
+                targetPortId = "",
+                targetJunctionId = 101L,
+                isStructured = true
+            )
+        )
+        assertEquals(2, vmWithC.state.value.flow.connections.size, "Connecting a second source into J1 must be rejected")
     }
 
     @Test
@@ -2930,6 +3107,31 @@ class FlowEditorQoLTest {
         assertEquals(0.75f, vm.state.value.connectionRoundness)
         assertEquals(0.75f, vm.state.value.flow.connectionRoundness)
         assertTrue(vm.state.value.hasUnsavedChanges)
+    }
+
+    @Test
+    fun testPortAutoHideToggleAndPreferences() = kotlinx.coroutines.runBlocking {
+        every { mockSettingsRepo.settings } returns MutableStateFlow(
+            AppSettings(
+                flows = FlowSettings(
+                    hideConnectionPortsUnlessHovered = true
+                )
+            )
+        )
+
+        val flow = Flow("AutoHideTest")
+        val vm = createViewModel(flow)
+
+        // Loaded from settings
+        assertTrue(vm.state.value.hideConnectionPortsUnlessHovered)
+
+        // Toggle hide connection ports
+        vm.onEvent(FlowEvent.ToggleHideConnectionPorts)
+        assertFalse(vm.state.value.hideConnectionPortsUnlessHovered)
+
+        // Toggle again
+        vm.onEvent(FlowEvent.ToggleHideConnectionPorts)
+        assertTrue(vm.state.value.hideConnectionPortsUnlessHovered)
     }
 
     @Test

@@ -263,7 +263,8 @@ data class FlowSettings(
     val autosave: Boolean = true,
     val defaultConnectionStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
     val defaultConnectionRoundness: Float = 0.5f,
-    val defaultOrthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
+    val defaultOrthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+    val hideConnectionPortsUnlessHovered: Boolean = false
 )
 
 /**

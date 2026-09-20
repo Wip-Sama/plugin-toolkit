@@ -24,15 +24,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.sp
 
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
@@ -61,6 +66,7 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_set_node_default
 import plugintoolkit.composeapp.generated.resources.node_port_inactive_connected_warning
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun InputPortRow(
     input: InputPort,
@@ -83,7 +89,10 @@ fun InputPortRow(
     onFocusLost: () -> Unit,
     onUpdateInputPortDefault: (Long, String, Any?) -> Unit = { _, _, _ -> },
     isInactiveAndConnected: Boolean = false,
-    onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> }
+    onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
+    hideConnectionPortsUnlessHovered: Boolean = false,
+    isDrawingConnection: Boolean = false,
+    isNodeHovered: Boolean = false
 ) {
     DisposableEffect(node.id, input.id) {
         onDispose {
@@ -97,6 +106,8 @@ fun InputPortRow(
         else pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
     }
 
+    var isRowHovered by remember { mutableStateOf(false) }
+    val isPortVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || isRowHovered || highlightedPortId == input.id
 
     val currentPortValue = input.value ?: input.defaultValue
 
@@ -109,7 +120,9 @@ fun InputPortRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(ToolkitTheme.dimensions.nodeRowHeight)
-            .testTag("port_row_${node.id}_${input.id}"),
+            .testTag("port_row_${node.id}_${input.id}")
+            .onPointerEvent(PointerEventType.Enter) { isRowHovered = true }
+            .onPointerEvent(PointerEventType.Exit) { isRowHovered = false },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -127,6 +140,7 @@ fun InputPortRow(
             PortCircle(
                 color = inputCircleColor,
                 isHighlighted = highlightedPortId == input.id,
+                isVisible = isPortVisible,
                 onDragStart = {
                     if (!isReadOnly) onStartConnection(node.id, input.id, false)
                 },
@@ -384,6 +398,7 @@ fun InputPortRow(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun OutputPortRow(
     output: OutputPort,
@@ -400,7 +415,10 @@ fun OutputPortRow(
     onDropConnection: (Boolean) -> Unit,
     onPortPositioned: (Long, String, Boolean, LayoutCoordinates) -> Unit,
     isInactiveAndConnected: Boolean = false,
-    onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> }
+    onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
+    hideConnectionPortsUnlessHovered: Boolean = false,
+    isDrawingConnection: Boolean = false,
+    isNodeHovered: Boolean = false
 ) {
     DisposableEffect(node.id, output.id) {
         onDispose {
@@ -408,11 +426,16 @@ fun OutputPortRow(
         }
     }
 
+    var isRowHovered by remember { mutableStateOf(false) }
+    val isPortVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || isRowHovered || highlightedPortId == output.id
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(ToolkitTheme.dimensions.nodeRowHeight)
-            .testTag("port_row_${node.id}_${output.id}"),
+            .testTag("port_row_${node.id}_${output.id}")
+            .onPointerEvent(PointerEventType.Enter) { isRowHovered = true }
+            .onPointerEvent(PointerEventType.Exit) { isRowHovered = false },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End
     ) {
@@ -555,6 +578,7 @@ fun OutputPortRow(
         PortCircle(
             color = outputCircleColor,
             isHighlighted = highlightedPortId == output.id,
+            isVisible = isPortVisible,
             onDragStart = { if (!isReadOnly) onStartConnection(node.id, output.id, true) },
             onDrag = { if (!isReadOnly) onDragConnection(it) },
             onDragEnd = { if (!isReadOnly) onDropConnection(it) },

@@ -244,6 +244,8 @@ class FlowEditorViewModel(
                     ?: 0.5f
                 val defaultStepMode = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalStepMode
                     ?: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
+                val defaultHidePorts = resolvedSettingsRepository?.settings?.value?.flows?.hideConnectionPortsUnlessHovered
+                    ?: false
                 val effectiveStyle = activeFlowWithSyncedSubflows.connectionCurveStyle ?: defaultStyle
                 val effectiveRoundness = activeFlowWithSyncedSubflows.connectionRoundness ?: defaultRoundness
                 val effectiveStepMode = activeFlowWithSyncedSubflows.orthogonalStepMode ?: defaultStepMode
@@ -254,6 +256,7 @@ class FlowEditorViewModel(
                         connectionCurveStyle = effectiveStyle,
                         connectionRoundness = effectiveRoundness,
                         orthogonalStepMode = effectiveStepMode,
+                        hideConnectionPortsUnlessHovered = defaultHidePorts,
                         nextId = maxId + 1,
                         flows = allFlows,
                         hasUnsavedChanges = false
@@ -960,22 +963,23 @@ class FlowEditorViewModel(
 
             is FlowEvent.DeleteSelectedNodes -> {
                 shouldRunTypeInference = true
-                val deletedNodes = currentState.flow.nodes.filter { it.id in currentState.selectedNodeIds }
-                val cascadeConns = currentState.flow.connections.filter {
-                    it.sourceNodeId in currentState.selectedNodeIds || it.targetNodeId in currentState.selectedNodeIds ||
-                    (it.sourceJunctionId != null && it.sourceJunctionId in currentState.selectedPointIds) ||
-                    (it.targetJunctionId != null && it.targetJunctionId in currentState.selectedPointIds)
+                var workingFlow = currentState.flow
+                for (juncId in currentState.selectedPointIds) {
+                    workingFlow = workingFlow.removeJunctionWithBridging(juncId).first
                 }
-                val deletedLabels = currentState.flow.labels.filter { it.id in currentState.selectedLabelIds }
-                val deletedGroups = currentState.flow.groups.filter { it.id in currentState.selectedGroupIds }
+                val deletedNodes = workingFlow.nodes.filter { it.id in currentState.selectedNodeIds }
+                val cascadeConns = workingFlow.connections.filter {
+                    it.sourceNodeId in currentState.selectedNodeIds || it.targetNodeId in currentState.selectedNodeIds
+                }
+                val deletedLabels = workingFlow.labels.filter { it.id in currentState.selectedLabelIds }
+                val deletedGroups = workingFlow.groups.filter { it.id in currentState.selectedGroupIds }
                 val deletedPoints = currentState.flow.junctions.filter { it.id in currentState.selectedPointIds }
 
-                val updatedFlow = currentState.flow.copy(
-                    nodes = currentState.flow.nodes.filter { it.id !in currentState.selectedNodeIds },
-                    connections = currentState.flow.connections.filter { it !in cascadeConns },
-                    labels = currentState.flow.labels.filter { it.id !in currentState.selectedLabelIds },
-                    groups = currentState.flow.groups.filter { it.id !in currentState.selectedGroupIds },
-                    junctions = currentState.flow.junctions.filter { it.id !in currentState.selectedPointIds }
+                val updatedFlow = workingFlow.copy(
+                    nodes = workingFlow.nodes.filter { it.id !in currentState.selectedNodeIds },
+                    connections = workingFlow.connections.filter { it !in cascadeConns },
+                    labels = workingFlow.labels.filter { it.id !in currentState.selectedLabelIds },
+                    groups = workingFlow.groups.filter { it.id !in currentState.selectedGroupIds }
                 ).purgeStrayPoints()
 
                 newState = currentState.copy(
@@ -987,11 +991,12 @@ class FlowEditorViewModel(
                     hasUnsavedChanges = true
                 )
                 val removedConns = currentState.flow.connections.filter { it !in updatedFlow.connections.toSet() }
-                val removedJuncs = currentState.flow.junctions.filter { it.id !in updatedFlow.junctions.map { j -> j.id }.toSet() }
+                val removedJuncs = (currentState.flow.junctions.filter { it.id !in updatedFlow.junctions.map { j -> j.id }.toSet() } + deletedPoints).distinctBy { it.id }
+                val addedConns = updatedFlow.connections.filter { it !in currentState.flow.connections.toSet() }
 
                 val commands = mutableListOf<FlowCommand>()
-                if (deletedNodes.isNotEmpty() || removedConns.isNotEmpty() || removedJuncs.isNotEmpty()) {
-                    commands.add(DeleteNodesCommand(deletedNodes, removedConns, removedJuncs))
+                if (deletedNodes.isNotEmpty() || removedConns.isNotEmpty() || removedJuncs.isNotEmpty() || addedConns.isNotEmpty()) {
+                    commands.add(DeleteNodesCommand(deletedNodes, removedConns, removedJuncs, addedConns))
                 }
                 for (lbl in deletedLabels) {
                     commands.add(DeleteLabelCommand(lbl))
@@ -1103,7 +1108,7 @@ class FlowEditorViewModel(
 
             is FlowEvent.PaintNode -> {
                 val isSelected = currentState.selectedNodeIds.contains(event.nodeId)
-                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size + currentState.selectedPointIds.size
                 if (isSelected && totalSelected > 1) {
                     val newSt = applyPaintToSelection(currentState, currentState.activePaintColor, event.isForce)
                     newState = newSt
@@ -1142,7 +1147,7 @@ class FlowEditorViewModel(
 
             is FlowEvent.PaintGroup -> {
                 val isSelected = currentState.selectedGroupIds.contains(event.groupId)
-                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size + currentState.selectedPointIds.size
                 if (isSelected && totalSelected > 1) {
                     val newSt = applyPaintToSelection(currentState, currentState.activePaintColor)
                     newState = newSt
@@ -1160,7 +1165,7 @@ class FlowEditorViewModel(
 
             is FlowEvent.PaintLabel -> {
                 val isSelected = currentState.selectedLabelIds.contains(event.labelId)
-                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size + currentState.selectedPointIds.size
                 if (isSelected && totalSelected > 1) {
                     val newSt = applyPaintToSelection(currentState, currentState.activePaintColor)
                     newState = newSt
@@ -1176,9 +1181,27 @@ class FlowEditorViewModel(
                 }
             }
 
+            is FlowEvent.PaintJunction -> {
+                val isSelected = currentState.selectedPointIds.contains(event.junctionId)
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size + currentState.selectedPointIds.size
+                if (isSelected && totalSelected > 1) {
+                    val newSt = applyPaintToSelection(currentState, currentState.activePaintColor)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                } else {
+                    val color = currentState.activePaintColor
+                    val updatedJunctions = currentState.flow.junctions.map {
+                        if (it.id == event.junctionId) it.copy(color = color) else it
+                    }
+                    val newFlow = currentState.flow.copy(junctions = updatedJunctions)
+                    newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                    pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+                }
+            }
+
             is FlowEvent.WashNode -> {
                 val isSelected = currentState.selectedNodeIds.contains(event.nodeId)
-                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size + currentState.selectedPointIds.size
                 if (isSelected && totalSelected > 1) {
                     val newSt = applyPaintToSelection(currentState, null)
                     newState = newSt
@@ -1204,7 +1227,7 @@ class FlowEditorViewModel(
 
             is FlowEvent.WashGroup -> {
                 val isSelected = currentState.selectedGroupIds.contains(event.groupId)
-                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size + currentState.selectedPointIds.size
                 if (isSelected && totalSelected > 1) {
                     val newSt = applyPaintToSelection(currentState, null)
                     newState = newSt
@@ -1221,7 +1244,7 @@ class FlowEditorViewModel(
 
             is FlowEvent.WashLabel -> {
                 val isSelected = currentState.selectedLabelIds.contains(event.labelId)
-                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size + currentState.selectedPointIds.size
                 if (isSelected && totalSelected > 1) {
                     val newSt = applyPaintToSelection(currentState, null)
                     newState = newSt
@@ -1236,8 +1259,25 @@ class FlowEditorViewModel(
                 }
             }
 
+            is FlowEvent.WashJunction -> {
+                val isSelected = currentState.selectedPointIds.contains(event.junctionId)
+                val totalSelected = currentState.selectedNodeIds.size + currentState.selectedGroupIds.size + currentState.selectedLabelIds.size + currentState.selectedPointIds.size
+                if (isSelected && totalSelected > 1) {
+                    val newSt = applyPaintToSelection(currentState, null)
+                    newState = newSt
+                    pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
+                } else {
+                    val updatedJunctions = currentState.flow.junctions.map {
+                        if (it.id == event.junctionId) it.copy(color = null) else it
+                    }
+                    val newFlow = currentState.flow.copy(junctions = updatedJunctions)
+                    newState = currentState.copy(flow = newFlow, hasUnsavedChanges = true)
+                    pendingCommand = PaintElementsCommand(currentState.flow, newFlow)
+                }
+            }
+
             is FlowEvent.PaintSelection -> {
-                if (currentState.selectedNodeIds.isNotEmpty() || currentState.selectedGroupIds.isNotEmpty() || currentState.selectedLabelIds.isNotEmpty()) {
+                if (currentState.selectedNodeIds.isNotEmpty() || currentState.selectedGroupIds.isNotEmpty() || currentState.selectedLabelIds.isNotEmpty() || currentState.selectedPointIds.isNotEmpty()) {
                     val newSt = applyPaintToSelection(currentState, currentState.activePaintColor)
                     newState = newSt
                     pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
@@ -1245,7 +1285,7 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.WashSelection -> {
-                if (currentState.selectedNodeIds.isNotEmpty() || currentState.selectedGroupIds.isNotEmpty() || currentState.selectedLabelIds.isNotEmpty()) {
+                if (currentState.selectedNodeIds.isNotEmpty() || currentState.selectedGroupIds.isNotEmpty() || currentState.selectedLabelIds.isNotEmpty() || currentState.selectedPointIds.isNotEmpty()) {
                     val newSt = applyPaintToSelection(currentState, null)
                     newState = newSt
                     pendingCommand = PaintElementsCommand(currentState.flow, newSt.flow)
@@ -2208,15 +2248,17 @@ class FlowEditorViewModel(
             is FlowEvent.DeleteJunction -> {
                 val junc = currentState.flow.junctions.find { it.id == event.junctionId }
                 if (junc != null) {
-                    val cascading = currentState.flow.connections.filter { it.sourceJunctionId == event.junctionId || it.targetJunctionId == event.junctionId }
+                    val (updatedFlow, removedConns, addedConns) = currentState.flow.removeJunctionWithBridging(event.junctionId)
+                    val purgedFlow = updatedFlow.purgeStrayPoints()
+                    val finalRemoved = currentState.flow.connections.filter { it !in purgedFlow.connections.toSet() }
+                    val finalAdded = purgedFlow.connections.filter { it !in currentState.flow.connections.toSet() }
                     newState = currentState.copy(
-                        flow = currentState.flow.copy(
-                            junctions = currentState.flow.junctions.filter { it.id != event.junctionId },
-                            connections = currentState.flow.connections - cascading.toSet()
-                        ),
+                        flow = purgedFlow,
+                        selectedPointIds = currentState.selectedPointIds - event.junctionId,
                         hasUnsavedChanges = true
                     )
-                    pendingCommand = DeleteJunctionCommand(junc, cascading)
+                    pendingCommand = DeleteJunctionCommand(junc, cascadingConnections = finalRemoved, addedConnections = finalAdded)
+                    shouldRunTypeInference = true
                 }
             }
 
@@ -2292,6 +2334,14 @@ class FlowEditorViewModel(
 
             is FlowEvent.ToggleStructuredConnectionMode -> {
                 newState = currentState.copy(isAdvancedConnectionMode = !currentState.isAdvancedConnectionMode)
+            }
+
+            is FlowEvent.ToggleHideConnectionPorts -> {
+                val newHide = !currentState.hideConnectionPortsUnlessHovered
+                newState = currentState.copy(hideConnectionPortsUnlessHovered = newHide)
+                resolvedSettingsRepository?.updateSettings { appSettings ->
+                    appSettings.copy(flows = appSettings.flows.copy(hideConnectionPortsUnlessHovered = newHide))
+                }
             }
 
             else -> {}
@@ -2560,6 +2610,7 @@ class FlowEditorViewModel(
         val selectedNodeIds = currentState.selectedNodeIds
         val selectedGroupIds = currentState.selectedGroupIds
         val selectedLabelIds = currentState.selectedLabelIds
+        val selectedPointIds = currentState.selectedPointIds
 
         val updatedNodes = currentState.flow.nodes.map { node ->
             if (node.id in selectedNodeIds) node.copyWithColor(color) else node
@@ -2570,8 +2621,11 @@ class FlowEditorViewModel(
         val updatedLabels = currentState.flow.labels.map { lbl ->
             if (lbl.id in selectedLabelIds) lbl.copy(color = color) else lbl
         }
+        val updatedJunctions = currentState.flow.junctions.map { junc ->
+            if (junc.id in selectedPointIds) junc.copy(color = color) else junc
+        }
         val updatedConnections = currentState.flow.connections.map { conn ->
-            if (conn.sourceNodeId in selectedNodeIds) {
+            if (conn.sourceNodeId in selectedNodeIds || (conn.sourceJunctionId != null && conn.sourceJunctionId in selectedPointIds)) {
                 if (forceConnections || conn.color == null || color == null) {
                     conn.copy(color = color)
                 } else conn
@@ -2581,6 +2635,7 @@ class FlowEditorViewModel(
             nodes = updatedNodes,
             groups = updatedGroups,
             labels = updatedLabels,
+            junctions = updatedJunctions,
             connections = updatedConnections
         )
         return currentState.copy(flow = newFlow, hasUnsavedChanges = true)

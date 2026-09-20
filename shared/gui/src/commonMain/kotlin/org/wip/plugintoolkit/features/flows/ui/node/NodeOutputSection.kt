@@ -73,6 +73,9 @@ fun NodeOutputSection(
     inactiveConnectedPortIds: Set<String> = emptySet(),
     onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
     showTopDivider: Boolean = false,
+    hideConnectionPortsUnlessHovered: Boolean = false,
+    isDrawingConnection: Boolean = false,
+    isNodeHovered: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (outputs.isEmpty()) return
@@ -129,6 +132,7 @@ fun NodeOutputSection(
                     PortCircle(
                         color = headerColor,
                         isHighlighted = outputs.any { effectiveHighlightedPortIds.contains(it.id) },
+                        isVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || outputs.any { effectiveHighlightedPortIds.contains(it.id) },
                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                         modifier = Modifier.onGloballyPositioned { coords ->
                             outputs.forEach { output ->
@@ -174,7 +178,10 @@ fun NodeOutputSection(
                         onDropConnection = onDropConnection,
                         onPortPositioned = if (isOutputsCollapsed) { _, _, _, _ -> } else onPortPositioned,
                         isInactiveAndConnected = inactiveConnectedPortIds.contains(output.id),
-                        onPortDisposed = onPortDisposed
+                        onPortDisposed = onPortDisposed,
+                        hideConnectionPortsUnlessHovered = hideConnectionPortsUnlessHovered,
+                        isDrawingConnection = isDrawingConnection,
+                        isNodeHovered = isNodeHovered
                     )
                 }
             }

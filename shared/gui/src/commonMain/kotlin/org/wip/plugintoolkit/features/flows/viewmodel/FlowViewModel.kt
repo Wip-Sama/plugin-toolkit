@@ -191,10 +191,12 @@ sealed interface FlowEvent {
     data class PaintConnection(val connection: Connection) : FlowEvent
     data class PaintGroup(val groupId: Long) : FlowEvent
     data class PaintLabel(val labelId: Long) : FlowEvent
+    data class PaintJunction(val junctionId: Long) : FlowEvent
     data class WashNode(val nodeId: Long) : FlowEvent
     data class WashConnection(val connection: Connection) : FlowEvent
     data class WashGroup(val groupId: Long) : FlowEvent
     data class WashLabel(val labelId: Long) : FlowEvent
+    data class WashJunction(val junctionId: Long) : FlowEvent
     data object PaintSelection : FlowEvent
     data object WashSelection : FlowEvent
 
@@ -289,7 +291,8 @@ sealed interface FlowEvent {
     data class UpdateConnectionCurveStyle(val style: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle) : FlowEvent
     data class UpdateConnectionRoundness(val roundness: Float) : FlowEvent
     data class UpdateOrthogonalStepMode(val mode: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode) : FlowEvent
-    object ToggleStructuredConnectionMode : FlowEvent
+    data object ToggleStructuredConnectionMode : FlowEvent
+    data object ToggleHideConnectionPorts : FlowEvent
 }
 
 class FlowViewModel(

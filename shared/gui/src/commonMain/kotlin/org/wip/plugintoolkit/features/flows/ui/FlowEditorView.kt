@@ -563,6 +563,8 @@ fun FlowEditorView(
             onWashGroup = { viewModel.onEvent(FlowEvent.WashGroup(it)) },
             onPaintLabel = { viewModel.onEvent(FlowEvent.PaintLabel(it)) },
             onWashLabel = { viewModel.onEvent(FlowEvent.WashLabel(it)) },
+            onPaintJunction = { viewModel.onEvent(FlowEvent.PaintJunction(it)) },
+            onWashJunction = { viewModel.onEvent(FlowEvent.WashJunction(it)) },
             onMoveJunction = { id, delta -> viewModel.onEvent(FlowEvent.MoveJunction(id, delta, isTransient = true)) },
             onEndMoveJunction = { pointMoves, nodeMoves, groupMoves, labelMoves ->
                 viewModel.onEvent(FlowEvent.EndMoveJunction(pointMoves, nodeMoves, groupMoves, labelMoves))
@@ -660,6 +662,7 @@ fun FlowEditorView(
             },
             onToggleEyedropper = { viewModel.onEvent(FlowEvent.ToggleEyedropper) },
             onToggleAdvancedConnectionMode = { viewModel.onEvent(FlowEvent.ToggleAdvancedConnectionMode) },
+            onToggleHideConnectionPorts = { viewModel.onEvent(FlowEvent.ToggleHideConnectionPorts) },
             onPaintSelection = { viewModel.onEvent(FlowEvent.PaintSelection) },
             onWashSelection = { viewModel.onEvent(FlowEvent.WashSelection) },
             structuredConnectionStartInfo = structuredConnectionStartInfo,
@@ -980,6 +983,9 @@ fun FlowEditorView(
                                 onWashNode = { nodeId -> viewModel.onEvent(FlowEvent.WashNode(nodeId)) },
                                 onRefreshNode = { id -> viewModel.onEvent(FlowEvent.RefreshNode(id)) },
                                 onReplaceNode = { id -> replacingNodeId = id },
+                                hideConnectionPortsUnlessHovered = state.hideConnectionPortsUnlessHovered,
+                                isDrawingConnection = isDrawingConnection || interactionState.isDrawingStructuredConnection,
+                                isNodeHovered = hoveredNodeId == node.id,
                                 modifier = Modifier.onSizeChanged { size ->
                                     nodeSizes[node.id] = size
                                 }

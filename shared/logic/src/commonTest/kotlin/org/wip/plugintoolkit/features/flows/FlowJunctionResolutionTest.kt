@@ -517,20 +517,35 @@ class FlowJunctionResolutionTest {
     fun testIsInputPortAlreadyConnectedChecksPhysicalConnections() {
         val inPort = InputPort(id = "text", name = "Text", dataType = DataType.Primitive(PrimitiveType.STRING))
         val n1 = Node.SystemNode(1L, Offset.Zero, "N1", "action", listOf(inPort), emptyList())
-        val orphanedConn = Connection(
+        val j1 = FlowJunction(id = 100L, position = Offset.Zero)
+        val danglingJuncConn = Connection(
             sourceNodeId = -1L,
             sourcePortId = "",
+            sourceJunctionId = 100L,
             targetNodeId = 1L,
             targetPortId = "text"
         )
-        val flow = Flow(
-            name = "orphaned_input_flow",
+        val flowDangling = Flow(
+            name = "dangling_input_flow",
             nodes = listOf(n1),
-            connections = listOf(orphanedConn)
+            junctions = listOf(j1),
+            connections = listOf(danglingJuncConn)
         )
 
-        assertTrue(flow.isInputPortAlreadyConnected(1L, "text"))
-        assertFalse(flow.isInputPortAlreadyConnected(1L, "other"))
+        // Dangling junction branch without an active source does NOT mark input port as already connected
+        assertFalse(flowDangling.isInputPortAlreadyConnected(1L, "text"))
+
+        // When junction 100 is connected to an active source node, it becomes connected
+        val srcConn = Connection(
+            sourceNodeId = 2L,
+            sourcePortId = "out",
+            targetNodeId = -1L,
+            targetPortId = "",
+            targetJunctionId = 100L
+        )
+        val flowConnected = flowDangling.copy(connections = listOf(danglingJuncConn, srcConn))
+        assertTrue(flowConnected.isInputPortAlreadyConnected(1L, "text"))
+        assertFalse(flowConnected.isInputPortAlreadyConnected(1L, "other"))
     }
 
     @Test

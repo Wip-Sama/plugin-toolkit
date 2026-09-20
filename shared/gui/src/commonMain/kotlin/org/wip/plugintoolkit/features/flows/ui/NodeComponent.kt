@@ -110,12 +110,17 @@ fun NodeComponent(
     onWashNode: ((Long) -> Unit)? = null,
     onRefreshNode: ((Long) -> Unit)? = null,
     onReplaceNode: ((Long) -> Unit)? = null,
+    hideConnectionPortsUnlessHovered: Boolean = false,
+    isDrawingConnection: Boolean = false,
+    isNodeHovered: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditBoundaryDialog by remember { mutableStateOf(false) }
     var showLoadSettingsDialog by remember { mutableStateOf(false) }
+    var isCardHovered by remember { mutableStateOf(false) }
+    val effectiveNodeHovered = isNodeHovered || isCardHovered
 
     val currentOnMove by rememberUpdatedState(onMove)
     val currentOnEndMove by rememberUpdatedState(onEndMove)
@@ -247,8 +252,14 @@ fun NodeComponent(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .onPointerEvent(PointerEventType.Enter) { onHoverNode(node.id) }
-                .onPointerEvent(PointerEventType.Exit) { onHoverNode(null) }
+                .onPointerEvent(PointerEventType.Enter) {
+                    isCardHovered = true
+                    onHoverNode(node.id)
+                }
+                .onPointerEvent(PointerEventType.Exit) {
+                    isCardHovered = false
+                    onHoverNode(null)
+                }
                 .pointerInput(node.id, isPaintToolActive, isWashToolActive, isEyedropperActive, isShiftPressed) {
                     detectTapGestures(
                         onTap = {
@@ -365,7 +376,10 @@ fun NodeComponent(
                             onFocusLost = onFocusLost,
                             onUpdateInputPortDefault = onUpdateInputPortDefault,
                             inactiveConnectedPortIds = inactiveConnectedPortIds,
-                            onPortDisposed = onPortDisposed
+                            onPortDisposed = onPortDisposed,
+                            hideConnectionPortsUnlessHovered = hideConnectionPortsUnlessHovered,
+                            isDrawingConnection = isDrawingConnection,
+                            isNodeHovered = effectiveNodeHovered
                         )
                     }
 
@@ -388,7 +402,10 @@ fun NodeComponent(
                         onDropConnection = onDropConnection,
                         onPortPositioned = onPortPositioned,
                         inactiveConnectedPortIds = inactiveConnectedPortIds,
-                        onPortDisposed = onPortDisposed
+                        onPortDisposed = onPortDisposed,
+                        hideConnectionPortsUnlessHovered = hideConnectionPortsUnlessHovered,
+                        isDrawingConnection = isDrawingConnection,
+                        isNodeHovered = effectiveNodeHovered
                     )
 
                     if (hasAdvancedPorts) {
