@@ -159,11 +159,11 @@ fun SettingsRegistryBuilder.systemDefinitions(
                 ) { copy(autosave = it) }
 
                 switch(
-                    FlowSettings::hideConnectionPortsUnlessHovered,
-                    Res.string.setting_flow_hide_connection_ports,
+                    FlowSettings::hideConnectionPointsUnlessHovered,
+                    Res.string.setting_flow_hide_connection_points,
                     Icons.Default.NearMe,
-                    subtitle = SettingText.Resource(Res.string.setting_flow_hide_connection_ports_subtitle)
-                ) { copy(hideConnectionPortsUnlessHovered = it) }
+                    subtitle = SettingText.Resource(Res.string.setting_flow_hide_connection_points_subtitle)
+                ) { copy(hideConnectionPointsUnlessHovered = it) }
 
                 dropdown(
                     prop = FlowSettings::defaultConnectionStyle,

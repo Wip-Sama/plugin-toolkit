@@ -166,9 +166,9 @@
     <string name="setting_flow_default_connection_style_subtitle">Default spline curve style for new connections and flows</string>
     <string name="setting_flow_default_connection_roundness">Default Wire Roundness</string>
     <string name="setting_flow_default_connection_roundness_subtitle">Default curve curvature or corner radius</string>
-    <string name="setting_flow_hide_connection_ports">Hide Connection Ports</string>
-    <string name="setting_flow_hide_connection_ports_subtitle">Hide port circles unless hovered or drawing a connection</string>
-    <string name="flow_toolbar_hide_connection_ports">Toggle Port Visibility</string>
+    <string name="setting_flow_hide_connection_points">Hide Connection Points</string>
+    <string name="setting_flow_hide_connection_points_subtitle">Hide wire junctions and waypoints when they are not hovered or selected to reduce visual clutter</string>
+    <string name="flow_toolbar_hide_connection_points">Toggle Connection Points</string>
     <string name="update_available_title">Update Available: %1$s</string>
     <string name="update_now">Update Now</string>
     <string name="update_later">Update Later</string>

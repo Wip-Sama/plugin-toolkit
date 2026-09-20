@@ -49,5 +49,5 @@ data class FlowEditorState(
     val connectionCurveStyle: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle = org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline,
     val connectionRoundness: Float = 0.5f,
     val orthogonalStepMode: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto,
-    val hideConnectionPortsUnlessHovered: Boolean = false
+    val hideConnectionPointsUnlessHovered: Boolean = false
 )

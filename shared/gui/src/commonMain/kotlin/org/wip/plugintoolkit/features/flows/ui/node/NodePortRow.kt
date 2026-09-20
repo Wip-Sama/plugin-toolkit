@@ -90,7 +90,6 @@ fun InputPortRow(
     onUpdateInputPortDefault: (Long, String, Any?) -> Unit = { _, _, _ -> },
     isInactiveAndConnected: Boolean = false,
     onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
-    hideConnectionPortsUnlessHovered: Boolean = false,
     isDrawingConnection: Boolean = false,
     isNodeHovered: Boolean = false
 ) {
@@ -107,7 +106,7 @@ fun InputPortRow(
     }
 
     var isRowHovered by remember { mutableStateOf(false) }
-    val isPortVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || isRowHovered || highlightedPortId == input.id
+    val isPortVisible = true
 
     val currentPortValue = input.value ?: input.defaultValue
 
@@ -416,7 +415,6 @@ fun OutputPortRow(
     onPortPositioned: (Long, String, Boolean, LayoutCoordinates) -> Unit,
     isInactiveAndConnected: Boolean = false,
     onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
-    hideConnectionPortsUnlessHovered: Boolean = false,
     isDrawingConnection: Boolean = false,
     isNodeHovered: Boolean = false
 ) {
@@ -427,7 +425,7 @@ fun OutputPortRow(
     }
 
     var isRowHovered by remember { mutableStateOf(false) }
-    val isPortVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || isRowHovered || highlightedPortId == output.id
+    val isPortVisible = true
 
     Row(
         modifier = Modifier

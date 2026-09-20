@@ -31,6 +31,7 @@ fun Modifier.boardKeyboardHandler(
     onTogglePaintTool: (() -> Unit)? = null,
     onToggleWashTool: (() -> Unit)? = null,
     onToggleStructuredConnectionMode: (() -> Unit)? = null,
+    onToggleEyedropper: (() -> Unit)? = null,
     onLeaveStructuredConnectionAtLastPoint: ((Long?, String?, Long?, List<Offset>) -> Unit)? = null,
     shortcutManager: ShortcutManager? = null
 ): Modifier = this
@@ -101,6 +102,13 @@ fun Modifier.boardKeyboardHandler(
             enabled = !isReadOnly && onToggleStructuredConnectionMode != null
         ) {
             onToggleStructuredConnectionMode?.invoke()
+        }
+
+        onKey(
+            ShortcutActionId.FLOW_EYEDROPPER,
+            enabled = !isReadOnly && onToggleEyedropper != null
+        ) {
+            onToggleEyedropper?.invoke()
         }
 
         onRawKey { keyEvent ->

@@ -153,26 +153,34 @@ fun BoardGridAndConnectionsCanvas(
             val color = if (isHovered) Color(0xFFFF2D55) else baseColor
             val isSelected = interactionState.selectedJunctionId == junction.id || junction.id in state.selectedPointIds
 
-            drawCircle(
-                color = color.copy(alpha = juncAlpha),
-                radius = 5.5f * state.scale,
-                center = center
-            )
-            drawCircle(
-                color = surfaceColor.copy(alpha = juncAlpha),
-                radius = 5.5f * state.scale,
-                center = center,
-                style = Stroke(width = 1.5f * state.scale)
-            )
+            val isJunctionVisible = !state.hideConnectionPointsUnlessHovered ||
+                    isHovered || isSelected ||
+                    isDrawingConnection || interactionState.isDrawingStructuredConnection ||
+                    (hoveredWireTree != null && !isJuncDimmedByConn) ||
+                    (nodeHoveredWireTree != null && !isJuncDimmedByNode)
 
-            // Prominent selection highlight ring
-            if (isSelected) {
+            if (isJunctionVisible) {
                 drawCircle(
-                    color = Color(0xFFFF9800),
-                    radius = 9f * state.scale,
-                    center = center,
-                    style = Stroke(width = 2f * state.scale)
+                    color = color.copy(alpha = juncAlpha),
+                    radius = 5.5f * state.scale,
+                    center = center
                 )
+                drawCircle(
+                    color = surfaceColor.copy(alpha = juncAlpha),
+                    radius = 5.5f * state.scale,
+                    center = center,
+                    style = Stroke(width = 1.5f * state.scale)
+                )
+
+                // Prominent selection highlight ring
+                if (isSelected) {
+                    drawCircle(
+                        color = Color(0xFFFF9800),
+                        radius = 9f * state.scale,
+                        center = center,
+                        style = Stroke(width = 2f * state.scale)
+                    )
+                }
             }
         }
 
@@ -300,19 +308,29 @@ fun BoardGridAndConnectionsCanvas(
                             interactionState.hoveredWaypoint?.second == index
                     val isWpDragging = interactionState.draggingWaypoint?.first == connection &&
                             interactionState.draggingWaypoint?.second == index
-                    val wpRadius = (if (isWpHovered || isWpDragging) 7.5f else 5.5f) * state.scale
-                    val wpColor = if (!connColor.isNullOrBlank()) parseColorString(connColor) else connectionColor
-                    drawCircle(
-                        color = wpColor,
-                        radius = wpRadius,
-                        center = center
-                    )
-                    drawCircle(
-                        color = surfaceColor,
-                        radius = wpRadius,
-                        center = center,
-                        style = Stroke(width = 1.5f * state.scale)
-                    )
+                            
+                    val isWpVisible = !state.hideConnectionPointsUnlessHovered ||
+                            isWpHovered || isWpDragging ||
+                            isDrawingConnection || interactionState.isDrawingStructuredConnection ||
+                            isHovered || isSelected || isGroupHighlighted ||
+                            (hoveredWireTree != null && connection in hoveredWireTree) ||
+                            (nodeHoveredWireTree != null && connection in nodeHoveredWireTree)
+
+                    if (isWpVisible) {
+                        val wpRadius = (if (isWpHovered || isWpDragging) 7.5f else 5.5f) * state.scale
+                        val wpColor = if (!connColor.isNullOrBlank()) parseColorString(connColor) else connectionColor
+                        drawCircle(
+                            color = wpColor,
+                            radius = wpRadius,
+                            center = center
+                        )
+                        drawCircle(
+                            color = surfaceColor,
+                            radius = wpRadius,
+                            center = center,
+                            style = Stroke(width = 1.5f * state.scale)
+                        )
+                    }
                 }
             }
         }

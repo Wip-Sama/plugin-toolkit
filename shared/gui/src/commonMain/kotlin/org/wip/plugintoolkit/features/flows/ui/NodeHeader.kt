@@ -82,6 +82,11 @@ fun NodeHeader(
     onReplaceNode: ((Long) -> Unit)? = null,
     isEyedropperActive: Boolean = false,
     onSampleColor: ((String) -> Unit)? = null,
+    isPaintToolActive: Boolean = false,
+    isWashToolActive: Boolean = false,
+    onPaintNode: ((Long, Boolean) -> Unit)? = null,
+    onWashNode: ((Long) -> Unit)? = null,
+    isShiftPressed: Boolean = false,
 ) {
     var showTooltip by remember { mutableStateOf(false) }
     var tooltipJob by remember { mutableStateOf<Job?>(null) }
@@ -97,12 +102,24 @@ fun NodeHeader(
             .height(ToolkitTheme.dimensions.nodeHeaderHeight)
             .background(headerColor)
             .testTag("node_header_${node.id}")
-            .pointerInput(node.id, isReadOnly, isEyedropperActive) {
+            .pointerInput(node.id, isReadOnly, isEyedropperActive, isPaintToolActive, isWashToolActive, isShiftPressed) {
                 if (isEyedropperActive && onSampleColor != null) {
                     detectTapGestures(
                         onTap = {
                             val hex = node.color ?: headerColor.toHex(hexPrefix = true, includeAlpha = false)
                             onSampleColor(hex)
+                        }
+                    )
+                } else if (isPaintToolActive && onPaintNode != null) {
+                    detectTapGestures(
+                        onTap = {
+                            onPaintNode(node.id, isShiftPressed)
+                        }
+                    )
+                } else if (isWashToolActive && onWashNode != null) {
+                    detectTapGestures(
+                        onTap = {
+                            onWashNode(node.id)
                         }
                     )
                 } else if (!isReadOnly) {

@@ -244,7 +244,7 @@ class FlowEditorViewModel(
                     ?: 0.5f
                 val defaultStepMode = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalStepMode
                     ?: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
-                val defaultHidePorts = resolvedSettingsRepository?.settings?.value?.flows?.hideConnectionPortsUnlessHovered
+                val defaultHidePorts = resolvedSettingsRepository?.settings?.value?.flows?.hideConnectionPointsUnlessHovered
                     ?: false
                 val effectiveStyle = activeFlowWithSyncedSubflows.connectionCurveStyle ?: defaultStyle
                 val effectiveRoundness = activeFlowWithSyncedSubflows.connectionRoundness ?: defaultRoundness
@@ -256,7 +256,7 @@ class FlowEditorViewModel(
                         connectionCurveStyle = effectiveStyle,
                         connectionRoundness = effectiveRoundness,
                         orthogonalStepMode = effectiveStepMode,
-                        hideConnectionPortsUnlessHovered = defaultHidePorts,
+                        hideConnectionPointsUnlessHovered = defaultHidePorts,
                         nextId = maxId + 1,
                         flows = allFlows,
                         hasUnsavedChanges = false
@@ -2337,10 +2337,10 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.ToggleHideConnectionPorts -> {
-                val newHide = !currentState.hideConnectionPortsUnlessHovered
-                newState = currentState.copy(hideConnectionPortsUnlessHovered = newHide)
+                val newHide = !currentState.hideConnectionPointsUnlessHovered
+                newState = currentState.copy(hideConnectionPointsUnlessHovered = newHide)
                 resolvedSettingsRepository?.updateSettings { appSettings ->
-                    appSettings.copy(flows = appSettings.flows.copy(hideConnectionPortsUnlessHovered = newHide))
+                    appSettings.copy(flows = appSettings.flows.copy(hideConnectionPointsUnlessHovered = newHide))
                 }
             }
 

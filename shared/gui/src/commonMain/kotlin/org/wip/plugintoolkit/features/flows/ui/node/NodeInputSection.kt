@@ -77,7 +77,6 @@ fun NodeInputSection(
     inactiveConnectedPortIds: Set<String> = emptySet(),
     onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
     showTopDivider: Boolean = false,
-    hideConnectionPortsUnlessHovered: Boolean = false,
     isDrawingConnection: Boolean = false,
     isNodeHovered: Boolean = false,
     modifier: Modifier = Modifier
@@ -105,7 +104,7 @@ fun NodeInputSection(
                     PortCircle(
                         color = headerColor,
                         isHighlighted = inputs.any { effectiveHighlightedPortIds.contains(it.id) },
-                        isVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || inputs.any { effectiveHighlightedPortIds.contains(it.id) },
+                        isVisible = true,
                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                         modifier = Modifier.onGloballyPositioned { coords ->
                             inputs.forEach { input ->
@@ -152,7 +151,7 @@ fun NodeInputSection(
                     PortCircle(
                         color = headerColor,
                         isHighlighted = inputs.any { effectiveHighlightedPortIds.contains(it.id) },
-                        isVisible = !hideConnectionPortsUnlessHovered || isDrawingConnection || isNodeHovered || inputs.any { effectiveHighlightedPortIds.contains(it.id) },
+                        isVisible = true,
                         onDragStart = {}, onDrag = {}, onDragEnd = {},
                         modifier = Modifier.onGloballyPositioned { coords ->
                             inputs.forEach { input ->
@@ -207,7 +206,6 @@ fun NodeInputSection(
                         onUpdateInputPortDefault = onUpdateInputPortDefault,
                         isInactiveAndConnected = inactiveConnectedPortIds.contains(input.id),
                         onPortDisposed = onPortDisposed,
-                        hideConnectionPortsUnlessHovered = hideConnectionPortsUnlessHovered,
                         isDrawingConnection = isDrawingConnection,
                         isNodeHovered = isNodeHovered
                     )

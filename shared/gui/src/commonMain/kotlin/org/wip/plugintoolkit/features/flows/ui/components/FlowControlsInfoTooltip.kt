@@ -42,6 +42,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 
 @Composable
 fun FlowControlsInfoCard(
@@ -60,7 +62,6 @@ fun FlowControlsInfoCard(
     ) {
         Column(
             modifier = Modifier
-                .heightIn(max = 560.dp)
                 .verticalScroll(rememberScrollState())
                 .padding(ToolkitTheme.spacing.medium),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
@@ -90,10 +91,22 @@ fun FlowControlsInfoCard(
             )
 
             // Balanced 2-column layout
+            val dividerColor = MaterialTheme.colorScheme.outlineVariant
+            val dividerWidth = ToolkitTheme.dimensions.borderThin
+            
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(IntrinsicSize.Max),
+                    .drawBehind {
+                        val strokeWidth = dividerWidth.toPx()
+                        val x = size.width / 2f
+                        drawLine(
+                            color = dividerColor,
+                            start = Offset(x, 0f),
+                            end = Offset(x, size.height),
+                            strokeWidth = strokeWidth
+                        )
+                    },
                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
                 // Column 1: Navigation & Board + Tools
@@ -125,11 +138,6 @@ fun FlowControlsInfoCard(
                         )
                     )
                 }
-
-                VerticalDivider(
-                    thickness = ToolkitTheme.dimensions.borderThin,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
 
                 // Column 2: Connections & Points + Selection
                 Column(

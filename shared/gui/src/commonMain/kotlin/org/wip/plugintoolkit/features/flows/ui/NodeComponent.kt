@@ -110,7 +110,6 @@ fun NodeComponent(
     onWashNode: ((Long) -> Unit)? = null,
     onRefreshNode: ((Long) -> Unit)? = null,
     onReplaceNode: ((Long) -> Unit)? = null,
-    hideConnectionPortsUnlessHovered: Boolean = false,
     isDrawingConnection: Boolean = false,
     isNodeHovered: Boolean = false,
     modifier: Modifier = Modifier
@@ -304,7 +303,12 @@ fun NodeComponent(
                     onRefreshNode = onRefreshNode,
                     onReplaceNode = onReplaceNode,
                     isEyedropperActive = isEyedropperActive,
-                    onSampleColor = onSampleColor
+                    onSampleColor = onSampleColor,
+                    isPaintToolActive = isPaintToolActive,
+                    isWashToolActive = isWashToolActive,
+                    onPaintNode = onPaintNode,
+                    onWashNode = onWashNode,
+                    isShiftPressed = isShiftPressed
                 )
 
                 // Body
@@ -377,7 +381,6 @@ fun NodeComponent(
                             onUpdateInputPortDefault = onUpdateInputPortDefault,
                             inactiveConnectedPortIds = inactiveConnectedPortIds,
                             onPortDisposed = onPortDisposed,
-                            hideConnectionPortsUnlessHovered = hideConnectionPortsUnlessHovered,
                             isDrawingConnection = isDrawingConnection,
                             isNodeHovered = effectiveNodeHovered
                         )
@@ -403,7 +406,6 @@ fun NodeComponent(
                         onPortPositioned = onPortPositioned,
                         inactiveConnectedPortIds = inactiveConnectedPortIds,
                         onPortDisposed = onPortDisposed,
-                        hideConnectionPortsUnlessHovered = hideConnectionPortsUnlessHovered,
                         isDrawingConnection = isDrawingConnection,
                         isNodeHovered = effectiveNodeHovered
                     )

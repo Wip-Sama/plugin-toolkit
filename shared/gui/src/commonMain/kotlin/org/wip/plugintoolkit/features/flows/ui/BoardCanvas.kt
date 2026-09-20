@@ -321,6 +321,7 @@ fun BoardCanvas(
                 onTogglePaintTool = onTogglePaintTool,
                 onToggleWashTool = onToggleWashTool,
                 onToggleStructuredConnectionMode = onToggleStructuredConnectionMode,
+                onToggleEyedropper = onToggleEyedropper,
                 onLeaveStructuredConnectionAtLastPoint = { sNodeId, sPortId, sJuncId, pts ->
                     onLeaveStructuredConnectionAtLastPoint(sNodeId, sPortId, sJuncId, pts.map { it.toModelOffset() })
                 },
@@ -763,7 +764,7 @@ fun BoardCanvas(
                     isWashToolActive = state.isWashToolActive,
                     isEyedropperActive = state.isEyedropperActive,
                     isAdvancedConnectionMode = state.isAdvancedConnectionMode,
-                    hideConnectionPortsUnlessHovered = state.hideConnectionPortsUnlessHovered,
+                    hideConnectionPointsUnlessHovered = state.hideConnectionPointsUnlessHovered,
                     activePaintColor = state.activePaintColor,
                     colorsInFlow = colorsInFlow,
                     connectionStyle = state.connectionCurveStyle,
@@ -773,7 +774,7 @@ fun BoardCanvas(
                     onToggleWashTool = onToggleWashTool,
                     onToggleEyedropper = onToggleEyedropper,
                     onToggleAdvancedConnectionMode = onToggleAdvancedConnectionMode,
-                    onToggleHideConnectionPorts = onToggleHideConnectionPorts,
+                    onToggleHideConnectionPoints = onToggleHideConnectionPorts,
                     onSelectPaintColor = onSelectPaintColor,
                     onAddGroup = onAddGroup,
                     onAddLabel = onAddLabel,

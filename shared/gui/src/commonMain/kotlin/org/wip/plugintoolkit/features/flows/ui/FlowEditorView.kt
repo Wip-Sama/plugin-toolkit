@@ -983,7 +983,6 @@ fun FlowEditorView(
                                 onWashNode = { nodeId -> viewModel.onEvent(FlowEvent.WashNode(nodeId)) },
                                 onRefreshNode = { id -> viewModel.onEvent(FlowEvent.RefreshNode(id)) },
                                 onReplaceNode = { id -> replacingNodeId = id },
-                                hideConnectionPortsUnlessHovered = state.hideConnectionPortsUnlessHovered,
                                 isDrawingConnection = isDrawingConnection || interactionState.isDrawingStructuredConnection,
                                 isNodeHovered = hoveredNodeId == node.id,
                                 modifier = Modifier.onSizeChanged { size ->

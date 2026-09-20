@@ -3114,7 +3114,7 @@ class FlowEditorQoLTest {
         every { mockSettingsRepo.settings } returns MutableStateFlow(
             AppSettings(
                 flows = FlowSettings(
-                    hideConnectionPortsUnlessHovered = true
+                    hideConnectionPointsUnlessHovered = true
                 )
             )
         )
@@ -3123,15 +3123,15 @@ class FlowEditorQoLTest {
         val vm = createViewModel(flow)
 
         // Loaded from settings
-        assertTrue(vm.state.value.hideConnectionPortsUnlessHovered)
+        assertTrue(vm.state.value.hideConnectionPointsUnlessHovered)
 
         // Toggle hide connection ports
         vm.onEvent(FlowEvent.ToggleHideConnectionPorts)
-        assertFalse(vm.state.value.hideConnectionPortsUnlessHovered)
+        assertFalse(vm.state.value.hideConnectionPointsUnlessHovered)
 
         // Toggle again
         vm.onEvent(FlowEvent.ToggleHideConnectionPorts)
-        assertTrue(vm.state.value.hideConnectionPortsUnlessHovered)
+        assertTrue(vm.state.value.hideConnectionPointsUnlessHovered)
     }
 
     @Test
