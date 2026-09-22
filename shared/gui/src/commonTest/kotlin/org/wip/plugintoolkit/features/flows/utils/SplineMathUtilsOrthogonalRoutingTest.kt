@@ -71,6 +71,72 @@ class SplineMathUtilsOrthogonalRoutingTest {
     }
 
     @Test
+    fun testOrthogonalAutoUsesSingleBendForJunctionConnections() {
+        val junctionRoutes = listOf(
+            SplineMathUtils.computeOrthogonalPoints(
+                listOf(Offset(2450f, 1750f), Offset(3200f, 150f)),
+                startHorizontal = false,
+                endHorizontal = false,
+                stepMode = OrthogonalStepMode.Auto,
+                useMiddleRouteForDirectConnection = false
+            ),
+            SplineMathUtils.computeOrthogonalPoints(
+                listOf(Offset(3750f, 2200f), Offset(4500f, -200f)),
+                startHorizontal = false,
+                endHorizontal = false,
+                stepMode = OrthogonalStepMode.Auto,
+                useMiddleRouteForDirectConnection = false
+            )
+        )
+
+        assertEquals(
+            listOf(
+                Offset(2450f, 1750f),
+                Offset(2450f, 150f),
+                Offset(3200f, 150f)
+            ),
+            junctionRoutes.first()
+        )
+        assertEquals(
+            listOf(
+                Offset(3750f, 2200f),
+                Offset(3750f, -200f),
+                Offset(4500f, -200f)
+            ),
+            junctionRoutes.last()
+        )
+    }
+
+    @Test
+    fun testOrthogonalAutoJunctionContinuationIgnoresEndHeading() {
+        val routes = listOf(
+            SplineMathUtils.computeOrthogonalPoints(
+                listOf(Offset(550f, 950f), Offset(900f, 700f)),
+                startHorizontal = true,
+                endHorizontal = true,
+                stepMode = OrthogonalStepMode.Auto,
+                useMiddleRouteForDirectConnection = false
+            ),
+            SplineMathUtils.computeOrthogonalPoints(
+                listOf(Offset(800f, 1350f), Offset(2050f, 600f)),
+                startHorizontal = true,
+                endHorizontal = true,
+                stepMode = OrthogonalStepMode.Auto,
+                useMiddleRouteForDirectConnection = false
+            )
+        )
+
+        assertEquals(
+            listOf(Offset(550f, 950f), Offset(900f, 950f), Offset(900f, 700f)),
+            routes.first()
+        )
+        assertEquals(
+            listOf(Offset(800f, 1350f), Offset(2050f, 1350f), Offset(2050f, 600f)),
+            routes.last()
+        )
+    }
+
+    @Test
     fun testOrthogonalNaturalHeadingVerticalRiseAndRoofLine() {
         // Vertical rise continuing straight up through intermediate waypoint to roof line
         val p0 = Offset(100f, 400f)

@@ -535,14 +535,8 @@ object SplineMathUtils {
                         waypoints.add(p1)
                     }
                     OrthogonalStepMode.Auto -> {
-                        val targetEndHorizontal = if (isDirectConnection) {
-                            endHorizontal
-                        } else {
-                            currentDir != Orientation.Horizontal
-                        }
-
                         if (currentDir == Orientation.Horizontal) {
-                            if (targetEndHorizontal) {
+                            if (isDirectConnection && endHorizontal) {
                                 val midX = (p0.x + p1.x) / 2f
                                 waypoints.add(Offset(midX, p0.y))
                                 waypoints.add(Offset(midX, p1.y))
@@ -551,7 +545,7 @@ object SplineMathUtils {
                                 currentDir = Orientation.Vertical
                             }
                         } else {
-                            if (!targetEndHorizontal) {
+                            if (isDirectConnection && !endHorizontal) {
                                 val midY = (p0.y + p1.y) / 2f
                                 waypoints.add(Offset(p0.x, midY))
                                 waypoints.add(Offset(p1.x, midY))
