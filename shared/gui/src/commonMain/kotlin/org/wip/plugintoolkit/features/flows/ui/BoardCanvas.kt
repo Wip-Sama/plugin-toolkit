@@ -154,7 +154,7 @@ fun BoardCanvas(
     onEndMoveJunction: ((Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>) -> Unit)? = null,
     onDeleteJunction: ((Long) -> Unit)? = null,
     onSampleColor: (String) -> Unit = {},
-    onResizeGroup: (Long, Offset, Boolean) -> Unit = { _, _, _ -> },
+    onResizeGroup: (Long, Offset, Offset, Boolean) -> Unit = { _, _, _, _ -> },
     onSelectLabels: (Set<Long>) -> Unit = {},
     onSelectGroups: (Set<Long>) -> Unit = {},
     onSelectPoints: (Set<Long>) -> Unit = {},
@@ -529,6 +529,13 @@ fun BoardCanvas(
                 val isGroupSelected = state.selectedGroupIds.contains(group.id)
                 val isMoving = movingGroupIds.contains(group.id)
                 val groupDragOffset = if (isMoving) state.currentDragOffset.toComposeOffset() else Offset.Zero
+                
+                val isBlocked = interactionState.hoveredJunctionId != null || 
+                                interactionState.hoveredWaypoint != null || 
+                                interactionState.hoveredMidpoint != null ||
+                                interactionState.hoveredConnection != null ||
+                                isDrawingConnection || interactionState.isDrawingStructuredConnection ||
+                                state.draggedNodeId != null
 
                 BoardElementContainer(
                     position = group.position.toComposeOffset(),
@@ -556,7 +563,8 @@ fun BoardCanvas(
                         onPaintGroup = onPaintGroup,
                         onWashGroup = onWashGroup,
                         onSampleColor = onSampleColor,
-                        onResizeGroup = onResizeGroup
+                        onResizeGroup = onResizeGroup,
+                        isInteractionBlocked = isBlocked && !isMoving
                     )
                 }
             }

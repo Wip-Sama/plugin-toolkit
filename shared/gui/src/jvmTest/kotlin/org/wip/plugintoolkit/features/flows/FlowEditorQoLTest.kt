@@ -555,7 +555,7 @@ class FlowEditorQoLTest {
         val initialFlow = Flow(name = "TestResize", groups = listOf(grp))
         val vm = createViewModel(initialFlow)
 
-        vm.onEvent(FlowEvent.ResizeGroup(10L, ModelOffset(50f, 30f)))
+        vm.onEvent(FlowEvent.ResizeGroup(10L, positionDelta = ModelOffset.Zero, sizeDelta = ModelOffset(50f, 30f)))
         val resized = vm.state.value.flow.groups.first()
         assertEquals(250f, resized.size.x)
         assertEquals(180f, resized.size.y)
@@ -604,14 +604,14 @@ class FlowEditorQoLTest {
         assertEquals(emptyList(), vm.state.value.flow.groups.first().nodeIds)
 
         // 2. Drag node into group (move from 500,500 by -400,-400 to 100,100)
-        vm.onEvent(FlowEvent.MoveNode(1L, androidx.compose.ui.geometry.Offset(-400f, -400f), snap = false, showGhost = false))
+        vm.onEvent(FlowEvent.MoveNode(1L, Offset(-400f, -400f), snap = false, showGhost = false))
         vm.onEvent(FlowEvent.EndMoveNode(1L, density = 1f))
 
         // Node is now bound to group!
         assertEquals(listOf(1L), vm.state.value.flow.groups.first().nodeIds)
 
         // 3. Drag node outside group (move from 100,100 by 600,600 to 700,700)
-        vm.onEvent(FlowEvent.MoveNode(1L, androidx.compose.ui.geometry.Offset(600f, 600f), snap = false, showGhost = false))
+        vm.onEvent(FlowEvent.MoveNode(1L, Offset(600f, 600f), snap = false, showGhost = false))
         vm.onEvent(FlowEvent.EndMoveNode(1L, density = 1f))
 
         // Node is now unbound from group!
@@ -633,9 +633,9 @@ class FlowEditorQoLTest {
 
         val portLookup: (Long, String, Boolean) -> androidx.compose.ui.geometry.Offset? = { nodeId, _, _ ->
             when (nodeId) {
-                1L -> androidx.compose.ui.geometry.Offset(50f, 50f)
-                2L -> androidx.compose.ui.geometry.Offset(150f, 50f)
-                3L -> androidx.compose.ui.geometry.Offset(600f, 50f)
+                1L -> Offset(50f, 50f)
+                2L -> Offset(150f, 50f)
+                3L -> Offset(600f, 50f)
                 else -> null
             }
         }
@@ -698,7 +698,7 @@ class FlowEditorQoLTest {
         vm.onEvent(FlowEvent.CopySelectedNodes)
 
         // Paste at (200, 200)
-        vm.onEvent(FlowEvent.PasteNodes(androidx.compose.ui.geometry.Offset(200f, 200f)))
+        vm.onEvent(FlowEvent.PasteNodes(Offset(200f, 200f)))
 
         // Verify copied elements exist
         assertEquals(2, vm.state.value.flow.nodes.size)
@@ -787,7 +787,7 @@ class FlowEditorQoLTest {
         assertEquals(ModelOffset(150f, 150f), vm.state.value.flow.labels.first().position)
 
         // Moving node via MoveNode & EndMoveNode moves all selected elements by (50, 50)
-        vm.onEvent(FlowEvent.MoveNode(1L, androidx.compose.ui.geometry.Offset(50f, 50f), snap = false, showGhost = false))
+        vm.onEvent(FlowEvent.MoveNode(1L, Offset(50f, 50f), snap = false, showGhost = false))
         vm.onEvent(FlowEvent.EndMoveNode(1L, density = 1f))
 
         assertEquals(ModelOffset(150f, 150f), vm.state.value.flow.nodes.first().position)
@@ -887,7 +887,7 @@ class FlowEditorQoLTest {
     @Test
     fun testGroupResizeConsistencyAcrossZoomLevels() {
         val testScales = listOf(0.5f, 1.0f, 1.5f, 2.0f)
-        val screenDragAmount = androidx.compose.ui.geometry.Offset(80f, 60f)
+        val screenDragAmount = Offset(80f, 60f)
 
         for (scale in testScales) {
             val initialGroup = FlowGroup(id = 10L, title = "Resizable", position = ModelOffset(100f, 100f), size = ModelOffset(300f, 200f))
@@ -896,7 +896,7 @@ class FlowEditorQoLTest {
 
             // Pointer gesture produces screen drag; board delta passed to VM is screenDrag / scale
             val boardDelta = ModelOffset(screenDragAmount.x / scale, screenDragAmount.y / scale)
-            vm.onEvent(FlowEvent.ResizeGroup(initialGroup.id, boardDelta))
+            vm.onEvent(FlowEvent.ResizeGroup(initialGroup.id, positionDelta = ModelOffset.Zero, sizeDelta = boardDelta))
 
             val updatedGroup = vm.state.value.flow.groups.first()
             val boardSizeDeltaX = updatedGroup.size.x - initialGroup.size.x
@@ -911,7 +911,7 @@ class FlowEditorQoLTest {
     @Test
     fun testGroupAndLabelMovementConsistencyAcrossZoomLevels() {
         val testScales = listOf(0.5f, 1.0f, 1.5f, 2.0f)
-        val screenDragAmount = androidx.compose.ui.geometry.Offset(50f, 75f)
+        val screenDragAmount = Offset(50f, 75f)
 
         for (scale in testScales) {
             val group = FlowGroup(id = 1L, title = "G", position = ModelOffset(100f, 100f), size = ModelOffset(300f, 200f))
@@ -962,17 +962,17 @@ class FlowEditorQoLTest {
 
         val getPortBoardPos: (Long, String, Boolean) -> androidx.compose.ui.geometry.Offset? = { id, _, _ ->
             when (id) {
-                1L -> androidx.compose.ui.geometry.Offset(150f, 220f)
-                2L -> androidx.compose.ui.geometry.Offset(250f, 220f)
-                3L -> androidx.compose.ui.geometry.Offset(700f, 200f)
-                4L -> androidx.compose.ui.geometry.Offset(10f, 200f)
+                1L -> Offset(150f, 220f)
+                2L -> Offset(250f, 220f)
+                3L -> Offset(700f, 200f)
+                4L -> Offset(10f, 200f)
                 else -> null
             }
         }
 
         val testScales = listOf(0.5f, 1.0f, 2.0f)
         val testDensities = listOf(1.0f, 1.5f, 2.0f)
-        val boardOffset = androidx.compose.ui.geometry.Offset(50f, 30f)
+        val boardOffset = Offset(50f, 30f)
 
         for (scale in testScales) {
             for (density in testDensities) {
@@ -1034,7 +1034,7 @@ class FlowEditorQoLTest {
         val vm = createViewModel(flow)
 
         // Resizing group works
-        vm.onEvent(FlowEvent.ResizeGroup(group.id, ModelOffset(50f, 30f)))
+        vm.onEvent(FlowEvent.ResizeGroup(group.id, positionDelta = ModelOffset.Zero, sizeDelta = ModelOffset(50f, 30f)))
         assertEquals(250f, vm.state.value.flow.groups.first().size.x)
         assertEquals(180f, vm.state.value.flow.groups.first().size.y)
 
@@ -2644,12 +2644,12 @@ class FlowEditorQoLTest {
         val vm = createViewModel(flow)
 
         // Resize with snap = true: 350 + 22 = 372 -> snaps to 350; 250 + 38 = 288 -> snaps to 300
-        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, delta = ModelOffset(22f, 38f), snap = true))
+        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, positionDelta = ModelOffset.Zero, sizeDelta = ModelOffset(22f, 38f), snap = true))
         val resizedFlow = vm.state.value.flow
         assertEquals(ModelOffset(350f, 300f), resizedFlow.groups.first().size)
 
         // Resize below min dimensions (150f x 100f)
-        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, delta = ModelOffset(-300f, -200f), snap = true))
+        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, positionDelta = ModelOffset.Zero, sizeDelta = ModelOffset(-300f, -200f), snap = true))
         val minResizedFlow = vm.state.value.flow
         assertEquals(ModelOffset(150f, 100f), minResizedFlow.groups.first().size)
     }
@@ -2796,7 +2796,7 @@ class FlowEditorQoLTest {
         val vm = createViewModel(initialFlow)
 
         // Resize group to (250f, 250f), extending it to [50..300, 50..300] which now also encloses node 102 at (250, 250)
-        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, delta = ModelOffset(150f, 150f), snap = true))
+        vm.onEvent(FlowEvent.ResizeGroup(groupId = 1L, positionDelta = ModelOffset.Zero, sizeDelta = ModelOffset(150f, 150f), snap = true))
 
         val updatedGroup = vm.state.value.flow.groups.first { it.id == 1L }
         assertTrue(updatedGroup.nodeIds.contains(101L))
@@ -3171,9 +3171,9 @@ class FlowEditorQoLTest {
 
     @Test
     fun testConnectionHitTesterMatchesDrawnCorridor() {
-        val pOut = androidx.compose.ui.geometry.Offset(100f, 100f)
-        val junc = androidx.compose.ui.geometry.Offset(300f, 200f)
-        val pIn = androidx.compose.ui.geometry.Offset(500f, 300f)
+        val pOut = Offset(100f, 100f)
+        val junc = Offset(300f, 200f)
+        val pIn = Offset(500f, 300f)
 
         // Connection 1: Node output to Junction
         val sampled1 = SplineMathUtils.sampleConnectionPoints(
@@ -3183,7 +3183,7 @@ class FlowEditorQoLTest {
             endHorizontal = true
         )
         // Verify mid corridor at x = 200f is directly hit
-        val corridorDist1 = SplineMathUtils.distanceToPath(androidx.compose.ui.geometry.Offset(200f, 150f), sampled1)
+        val corridorDist1 = SplineMathUtils.distanceToPath(Offset(200f, 150f), sampled1)
         assertEquals(0f, corridorDist1, 0.5f)
 
         // Connection 2: Junction to Node input
@@ -3194,7 +3194,7 @@ class FlowEditorQoLTest {
             endHorizontal = true
         )
         // Verify mid corridor at x = 400f is directly hit
-        val corridorDist2 = SplineMathUtils.distanceToPath(androidx.compose.ui.geometry.Offset(400f, 250f), sampled2)
+        val corridorDist2 = SplineMathUtils.distanceToPath(Offset(400f, 250f), sampled2)
         assertEquals(0f, corridorDist2, 0.5f)
     }
 

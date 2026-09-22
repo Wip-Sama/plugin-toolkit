@@ -30,6 +30,8 @@ data class FlowEditorState(
     val draggedNodeId: Long? = null,
     val currentDragOffset: ModelOffset = ModelOffset.Zero,
     val ghostPosition: ModelOffset? = null,
+    val capturedJunctionIds: Set<Long> = emptySet(),
+    val capturedWaypoints: Map<org.wip.plugintoolkit.features.flows.model.Connection, Set<Int>> = emptyMap(),
     val flows: List<Flow> = emptyList(),
     val inferredTypes: Map<Pair<Long, String>, DataType> = emptyMap(),
     val inferredSemanticTypes: Map<Pair<Long, String>, List<SemanticType>> = emptyMap(),

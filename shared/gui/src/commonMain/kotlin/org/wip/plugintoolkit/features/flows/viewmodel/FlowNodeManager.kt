@@ -40,10 +40,43 @@ class FlowNodeManager {
         val node = currentState.flow.nodes.find { it.id == id }
         val ghostToSet = if (showGhost && node != null) (node.position + newOffset).snapToGrid() else null
 
+        var capturedJunctions = currentState.capturedJunctionIds
+        var capturedWaypoints = currentState.capturedWaypoints
+        if (currentState.draggedNodeId == null) {
+            val isGroup = currentState.flow.groups.any { it.id == id }
+            val isSelectedMove = (isGroup && currentState.selectedGroupIds.contains(id)) || 
+                                 (currentState.flow.nodes.any { it.id == id } && currentState.selectedNodeIds.contains(id)) ||
+                                 (currentState.flow.labels.any { it.id == id } && currentState.selectedLabelIds.contains(id)) ||
+                                 (currentState.flow.junctions.any { it.id == id } && currentState.selectedPointIds.contains(id))
+            val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (isGroup) setOf(id) else emptySet()
+
+            if (groupsToMove.isNotEmpty()) {
+                val groupBounds = currentState.flow.groups.filter { it.id in groupsToMove }.map { g ->
+                    androidx.compose.ui.geometry.Rect(g.position.x, g.position.y, g.position.x + g.size.x, g.position.y + g.size.y)
+                }
+                capturedJunctions = currentState.flow.junctions.filter { junc ->
+                    groupBounds.any { bounds -> bounds.contains(androidx.compose.ui.geometry.Offset(junc.position.x, junc.position.y)) }
+                }.map { it.id }.toSet()
+                
+                val waypointsMap = mutableMapOf<Connection, Set<Int>>()
+                for (conn in currentState.flow.connections) {
+                    val wpsInside = conn.waypoints.mapIndexedNotNull { index, wp ->
+                        if (groupBounds.any { bounds -> bounds.contains(androidx.compose.ui.geometry.Offset(wp.x, wp.y)) }) index else null
+                    }.toSet()
+                    if (wpsInside.isNotEmpty()) {
+                        waypointsMap[conn] = wpsInside
+                    }
+                }
+                capturedWaypoints = waypointsMap
+            }
+        }
+
         return currentState.copy(
             draggedNodeId = id,
             currentDragOffset = newOffset,
-            ghostPosition = ghostToSet
+            ghostPosition = ghostToSet,
+            capturedJunctionIds = capturedJunctions,
+            capturedWaypoints = capturedWaypoints
         )
     }
 
@@ -62,7 +95,7 @@ class FlowNodeManager {
         val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (isNode) setOf(id) else emptySet()).toMutableSet()
         val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (isGroup) setOf(id) else emptySet()
         val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (isLabel) setOf(id) else emptySet()
-        val pointsToMove = if (isSelectedMove) currentState.selectedPointIds else if (isPoint) setOf(id) else emptySet()
+        val pointsToMove = (if (isSelectedMove) currentState.selectedPointIds else if (isPoint) setOf(id) else emptySet()) + currentState.capturedJunctionIds
 
         for (grpId in groupsToMove) {
             currentState.flow.groups.find { it.id == grpId }?.let { nodesToMove.addAll(it.nodeIds) }
@@ -94,9 +127,19 @@ class FlowNodeManager {
                 junc.copy(position = (junc.position + finalOffset).snapToGrid())
             } else junc
         }
+        
+        val updatedConnections = currentState.flow.connections.map { conn ->
+            val capturedWps = currentState.capturedWaypoints[conn]
+            if (capturedWps != null && capturedWps.isNotEmpty()) {
+                val newWps = conn.waypoints.mapIndexed { index, wp ->
+                    if (capturedWps.contains(index)) (wp + finalOffset).snapToGrid() else wp
+                }
+                conn.copy(waypoints = newWps)
+            } else conn
+        }
 
         val reorderedNodes = updatedNodes.filter { !nodesToMove.contains(it.id) } + updatedNodes.filter { nodesToMove.contains(it.id) }
-        val newFlow = currentState.flow.copy(nodes = reorderedNodes, groups = updatedGroups, labels = updatedLabels, junctions = updatedJunctions)
+        val newFlow = currentState.flow.copy(nodes = reorderedNodes, groups = updatedGroups, labels = updatedLabels, junctions = updatedJunctions, connections = updatedConnections)
         val newSelection = if (isSelectedMove) currentState.selectedNodeIds else (if (currentState.flow.nodes.any { it.id == id }) setOf(id) else currentState.selectedNodeIds)
 
         return currentState.copy(
@@ -105,7 +148,9 @@ class FlowNodeManager {
             hasUnsavedChanges = true,
             draggedNodeId = null,
             currentDragOffset = org.wip.plugintoolkit.features.flows.model.Offset.Zero,
-            ghostPosition = null
+            ghostPosition = null,
+            capturedJunctionIds = emptySet(),
+            capturedWaypoints = emptyMap()
         )
     }
 

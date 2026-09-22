@@ -259,12 +259,14 @@ object SplineMathUtils {
         var startFilletStart = Offset.Zero
         var startFilletEnd = Offset.Zero
         val p0 = effectivePoints[0]
-        val p1 = effectivePoints[1]
+        
+        // Use original points for lead-in calculation to prevent trimmed segments from altering fillet radius
+        val origP1 = points[1]
 
         if (startFilletLeadIn != null) {
             val vInRaw = p0 - startFilletLeadIn
             val lenIn = vInRaw.getDistance()
-            val vOutRaw = p1 - p0
+            val vOutRaw = origP1 - p0
             val lenOut = vOutRaw.getDistance()
 
             if (lenIn >= 0.1f && lenOut >= 0.1f) {
@@ -443,7 +445,6 @@ object SplineMathUtils {
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return pts
-
         if (pts.size == 2) {
             val p0 = pts[0]
             val p1 = pts[1]
@@ -453,11 +454,9 @@ object SplineMathUtils {
 
             return when (stepMode) {
                 OrthogonalStepMode.Before -> {
-                    // D3 / Protovis step-before: Vertical then Horizontal (corner at (x0, y1))
                     listOf(p0, Offset(p0.x, p1.y), p1)
                 }
                 OrthogonalStepMode.After -> {
-                    // D3 / Protovis step-after: Horizontal then Vertical (corner at (x1, y0))
                     listOf(p0, Offset(p1.x, p0.y), p1)
                 }
                 OrthogonalStepMode.Middle,
@@ -476,111 +475,72 @@ object SplineMathUtils {
                 }
             }
         }
-
         // Multi-point orthogonal routing (n > 2)
         val waypoints = mutableListOf<Offset>()
         waypoints.add(pts[0])
 
         var currentDir = if (startHorizontal) "H" else "V"
-        var currentHeading = if (startHorizontal) {
-            if (pts.size > 1 && pts[1].x < pts[0].x) "LEFT" else "RIGHT"
-        } else {
-            if (pts.size > 1 && pts[1].y < pts[0].y) "UP" else "DOWN"
-        }
 
         for (i in 0 until pts.size - 1) {
             val p0 = pts[i]
             val p1 = pts[i + 1]
             val dx = p1.x - p0.x
             val dy = p1.y - p0.y
-            val isLastSegment = (i == pts.size - 2)
-            if (stepMode != OrthogonalStepMode.Auto) {
-                if (abs(dx) < 0.2f) {
-                    currentDir = "V"
-                    waypoints.add(p1)
-                } else if (abs(dy) < 0.2f) {
-                    currentDir = "H"
-                    waypoints.add(p1)
-                } else {
-                    when (stepMode) {
-                        OrthogonalStepMode.Before -> {
-                            waypoints.add(Offset(p0.x, p1.y))
+            
+            if (abs(dx) < 0.2f) {
+                currentDir = "V"
+                waypoints.add(p1)
+            } else if (abs(dy) < 0.2f) {
+                currentDir = "H"
+                waypoints.add(p1)
+            } else {
+                when (stepMode) {
+                    OrthogonalStepMode.Before -> {
+                        waypoints.add(Offset(p0.x, p1.y))
+                        currentDir = "H"
+                        waypoints.add(p1)
+                    }
+                    OrthogonalStepMode.After -> {
+                        waypoints.add(Offset(p1.x, p0.y))
+                        currentDir = "V"
+                        waypoints.add(p1)
+                    }
+                    OrthogonalStepMode.Middle -> {
+                        if (currentDir == "H") {
+                            val midX = (p0.x + p1.x) / 2f
+                            waypoints.add(Offset(midX, p0.y))
+                            waypoints.add(Offset(midX, p1.y))
                             currentDir = "H"
-                            waypoints.add(p1)
-                        }
-                        OrthogonalStepMode.After -> {
-                            waypoints.add(Offset(p1.x, p0.y))
+                        } else {
+                            val midY = (p0.y + p1.y) / 2f
+                            waypoints.add(Offset(p0.x, midY))
+                            waypoints.add(Offset(p1.x, midY))
                             currentDir = "V"
-                            waypoints.add(p1)
                         }
-                        OrthogonalStepMode.Middle -> {
-                            if (currentDir == "H") {
-                                val midX = (p0.x + p1.x) / 2f
-                                waypoints.add(Offset(midX, p0.y))
-                                waypoints.add(Offset(midX, p1.y))
-                                currentDir = "H"
+                        waypoints.add(p1)
+                    }
+                    OrthogonalStepMode.Auto -> {
+                        if (currentDir == "H") {
+                            if (abs(dx) >= 0.1f) {
+                                waypoints.add(Offset(p1.x, p0.y))
+                                currentDir = if (abs(dy) >= 0.1f) "V" else "H"
                             } else {
-                                val midY = (p0.y + p1.y) / 2f
-                                waypoints.add(Offset(p0.x, midY))
-                                waypoints.add(Offset(p1.x, midY))
                                 currentDir = "V"
                             }
-                            waypoints.add(p1)
+                        } else {
+                            if (abs(dy) >= 0.1f) {
+                                waypoints.add(Offset(p0.x, p1.y))
+                                currentDir = if (abs(dx) >= 0.1f) "H" else "V"
+                            } else {
+                                currentDir = "H"
+                            }
                         }
-                        OrthogonalStepMode.Auto -> {}
+                        waypoints.add(p1)
                     }
                 }
-            } else {
-                // Direction-aware "Min-Break" Orthogonal Routing (PDF 1)
-                if (currentHeading == "RIGHT" || currentHeading == "LEFT") {
-                    val isAhead = (currentHeading == "RIGHT" && dx > 0f) || (currentHeading == "LEFT" && dx < 0f)
-                    if (abs(dy) < 1.5f && isAhead) {
-                        currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
-                    } else if (abs(dx) < 1.5f) {
-                        currentHeading = if (dy >= 0f) "DOWN" else "UP"
-                    } else if (isLastSegment && endHorizontal && isAhead) {
-                        val midX = (p0.x + p1.x) / 2f
-                        waypoints.add(Offset(midX, p0.y))
-                        waypoints.add(Offset(midX, p1.y))
-                    } else if (isAhead) {
-                        waypoints.add(Offset(p1.x, p0.y))
-                        currentHeading = if (dy >= 0f) "DOWN" else "UP"
-                    } else {
-                        // U-turn / Backtracking: target opposes heading
-                        val stub = if (currentHeading == "RIGHT") 24f else -24f
-                        val midY = (p0.y + p1.y) / 2f
-                        waypoints.add(Offset(p0.x + stub, p0.y))
-                        waypoints.add(Offset(p0.x + stub, midY))
-                        waypoints.add(Offset(p1.x, midY))
-                        currentHeading = if (dy >= 0f) "DOWN" else "UP"
-                    }
-                } else {
-                    val isAhead = (currentHeading == "DOWN" && dy > 0f) || (currentHeading == "UP" && dy < 0f)
-                    if (abs(dx) < 1.5f && isAhead) {
-                        currentHeading = if (dy >= 0f) "DOWN" else "UP"
-                    } else if (abs(dy) < 1.5f) {
-                        currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
-                    } else if (isLastSegment && !endHorizontal && isAhead) {
-                        val midY = (p0.y + p1.y) / 2f
-                        waypoints.add(Offset(p0.x, midY))
-                        waypoints.add(Offset(p1.x, midY))
-                    } else if (isAhead) {
-                        waypoints.add(Offset(p0.x, p1.y))
-                        currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
-                    } else {
-                        // U-turn / Backtracking: target opposes heading
-                        val stub = if (currentHeading == "DOWN") 24f else -24f
-                        val midX = (p0.x + p1.x) / 2f
-                        waypoints.add(Offset(p0.x, p0.y + stub))
-                        waypoints.add(Offset(midX, p0.y + stub))
-                        waypoints.add(Offset(midX, p1.y))
-                        currentHeading = if (dx >= 0f) "RIGHT" else "LEFT"
-                    }
-                }
-                waypoints.add(p1)
             }
         }
-
+        
         return simplifyOrthogonalPath(waypoints)
     }
 

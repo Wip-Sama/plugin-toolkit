@@ -105,7 +105,8 @@ fun FlowGroupComponent(
     onPaintGroup: ((Long) -> Unit)? = null,
     onWashGroup: ((Long) -> Unit)? = null,
     onSampleColor: ((String) -> Unit)? = null,
-    onResizeGroup: ((Long, Offset, Boolean) -> Unit)? = null,
+    onResizeGroup: ((Long, Offset, Offset, Boolean) -> Unit)? = null,
+    isInteractionBlocked: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val dimensions = ToolkitTheme.dimensions
@@ -171,31 +172,33 @@ fun FlowGroupComponent(
                 ),
                 shape = cornerShape
             )
-            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
-                            val isShift = event.keyboardModifiers.isShiftPressed
-                            if (isEyedropperActive && onSampleColor != null) {
-                                onSampleColor(group.color ?: "#4CAF50")
-                                event.changes.forEach { it.consume() }
-                            } else if (isPaintToolActive && onPaintGroup != null) {
-                                onPaintGroup(group.id)
-                                event.changes.forEach { it.consume() }
-                            } else if (isWashToolActive && onWashGroup != null) {
-                                onWashGroup(group.id)
-                                event.changes.forEach { it.consume() }
-                            } else if (isShift && !isReadOnly) {
-                                isEditingTitle = true
-                                event.changes.forEach { it.consume() }
+            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, isInteractionBlocked) {
+                if (!isInteractionBlocked) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
+                                val isShift = event.keyboardModifiers.isShiftPressed
+                                if (isEyedropperActive && onSampleColor != null) {
+                                    onSampleColor(group.color ?: "#4CAF50")
+                                    event.changes.forEach { it.consume() }
+                                } else if (isPaintToolActive && onPaintGroup != null) {
+                                    onPaintGroup(group.id)
+                                    event.changes.forEach { it.consume() }
+                                } else if (isWashToolActive && onWashGroup != null) {
+                                    onWashGroup(group.id)
+                                    event.changes.forEach { it.consume() }
+                                } else if (isShift && !isReadOnly) {
+                                    isEditingTitle = true
+                                    event.changes.forEach { it.consume() }
+                                }
                             }
                         }
                     }
                 }
             }
-            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
-                if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive) {
+            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, isInteractionBlocked) {
+                if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive && !isInteractionBlocked) {
                     var isDraggingGroup = false
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -424,15 +427,49 @@ fun FlowGroupComponent(
                     .pointerHoverIcon(PlatformUtils.horizontalResizePointerIcon())
                     .pointerInput(group.id) {
                         detectDragGestures(
-                            onDragEnd = {
-                                onResizeGroup(group.id, Offset.Zero, true)
-                            },
-                            onDragCancel = {
-                                onResizeGroup(group.id, Offset.Zero, true)
-                            },
+                            onDragEnd = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                            onDragCancel = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                onResizeGroup(group.id, Offset(dragAmount.x, 0f), false)
+                                onResizeGroup(group.id, Offset.Zero, Offset(dragAmount.x, 0f), false)
+                            }
+                        )
+                    }
+            )
+            
+            // Left edge handle
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(RESIZE_HANDLE_THICKNESS_DP.dp)
+                    .fillMaxHeight()
+                    .pointerHoverIcon(PlatformUtils.horizontalResizePointerIcon())
+                    .pointerInput(group.id) {
+                        detectDragGestures(
+                            onDragEnd = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                            onDragCancel = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                onResizeGroup(group.id, Offset(dragAmount.x, 0f), Offset(-dragAmount.x, 0f), false)
+                            }
+                        )
+                    }
+            )
+            
+            // Top edge handle
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(RESIZE_HANDLE_THICKNESS_DP.dp)
+                    .pointerHoverIcon(PlatformUtils.verticalResizePointerIcon())
+                    .pointerInput(group.id) {
+                        detectDragGestures(
+                            onDragEnd = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                            onDragCancel = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                onResizeGroup(group.id, Offset(0f, dragAmount.y), Offset(0f, -dragAmount.y), false)
                             }
                         )
                     }
@@ -448,15 +485,11 @@ fun FlowGroupComponent(
                         .pointerHoverIcon(PlatformUtils.verticalResizePointerIcon())
                         .pointerInput(group.id) {
                             detectDragGestures(
-                                onDragEnd = {
-                                    onResizeGroup(group.id, Offset.Zero, true)
-                                },
-                                onDragCancel = {
-                                    onResizeGroup(group.id, Offset.Zero, true)
-                                },
+                                onDragEnd = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                                onDragCancel = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    onResizeGroup(group.id, Offset(0f, dragAmount.y), false)
+                                    onResizeGroup(group.id, Offset.Zero, Offset(0f, dragAmount.y), false)
                                 }
                             )
                         }
@@ -470,15 +503,65 @@ fun FlowGroupComponent(
                         .pointerHoverIcon(PlatformUtils.diagonalResizePointerIcon())
                         .pointerInput(group.id) {
                             detectDragGestures(
-                                onDragEnd = {
-                                    onResizeGroup(group.id, Offset.Zero, true)
-                                },
-                                onDragCancel = {
-                                    onResizeGroup(group.id, Offset.Zero, true)
-                                },
+                                onDragEnd = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                                onDragCancel = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    onResizeGroup(group.id, dragAmount, false)
+                                    onResizeGroup(group.id, Offset.Zero, dragAmount, false)
+                                }
+                            )
+                        }
+                )
+                
+                // Bottom-left corner handle
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .size(RESIZE_CORNER_SIZE_DP.dp)
+                        .pointerHoverIcon(PlatformUtils.diagonalResizePointerIcon()) // We'd ideally want the other diagonal, but we use what we have or generic
+                        .pointerInput(group.id) {
+                            detectDragGestures(
+                                onDragEnd = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                                onDragCancel = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onResizeGroup(group.id, Offset(dragAmount.x, 0f), Offset(-dragAmount.x, dragAmount.y), false)
+                                }
+                            )
+                        }
+                )
+                
+                // Top-left corner handle
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .size(RESIZE_CORNER_SIZE_DP.dp)
+                        .pointerHoverIcon(PlatformUtils.diagonalResizePointerIcon())
+                        .pointerInput(group.id) {
+                            detectDragGestures(
+                                onDragEnd = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                                onDragCancel = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onResizeGroup(group.id, Offset(dragAmount.x, dragAmount.y), Offset(-dragAmount.x, -dragAmount.y), false)
+                                }
+                            )
+                        }
+                )
+                
+                // Top-right corner handle
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(RESIZE_CORNER_SIZE_DP.dp)
+                        .pointerHoverIcon(PlatformUtils.diagonalResizePointerIcon())
+                        .pointerInput(group.id) {
+                            detectDragGestures(
+                                onDragEnd = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                                onDragCancel = { onResizeGroup(group.id, Offset.Zero, Offset.Zero, true) },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onResizeGroup(group.id, Offset(0f, dragAmount.y), Offset(dragAmount.x, -dragAmount.y), false)
                                 }
                             )
                         }

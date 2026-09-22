@@ -571,7 +571,7 @@ fun FlowEditorView(
             },
             onDeleteJunction = { viewModel.onEvent(FlowEvent.DeleteJunction(it)) },
             onSampleColor = { viewModel.onEvent(FlowEvent.SampleColor(it)) },
-            onResizeGroup = { id, delta, snap -> viewModel.onEvent(FlowEvent.ResizeGroup(id, delta.toModelOffset(), snap)) },
+            onResizeGroup = { id, posDelta, sizeDelta, snap -> viewModel.onEvent(FlowEvent.ResizeGroup(id, posDelta.toModelOffset(), sizeDelta.toModelOffset(), snap)) },
             onSelectLabels = { viewModel.onEvent(FlowEvent.SelectLabels(it)) },
             onSelectGroups = { viewModel.onEvent(FlowEvent.SelectGroups(it)) },
             onSelectPoints = { viewModel.onEvent(FlowEvent.SelectPoints(it)) },

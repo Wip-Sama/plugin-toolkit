@@ -1377,8 +1377,12 @@ class FlowEditorViewModel(
             is FlowEvent.ResizeGroup -> {
                 val grp = currentState.flow.groups.find { it.id == event.groupId }
                 if (grp != null) {
-                    val rawX = (grp.size.x + event.delta.x).coerceAtLeast(150f)
-                    val rawY = (grp.size.y + event.delta.y).coerceAtLeast(100f)
+                    val rawX = (grp.size.x + event.sizeDelta.x).coerceAtLeast(150f)
+                    val rawY = (grp.size.y + event.sizeDelta.y).coerceAtLeast(100f)
+                    
+                    val rawPosX = grp.position.x + event.positionDelta.x
+                    val rawPosY = grp.position.y + event.positionDelta.y
+                    
                     val newSize = if (event.snap) {
                         org.wip.plugintoolkit.features.flows.model.Offset(
                             (kotlin.math.round(rawX / 50f) * 50f).coerceAtLeast(150f),
@@ -1387,20 +1391,30 @@ class FlowEditorViewModel(
                     } else {
                         org.wip.plugintoolkit.features.flows.model.Offset(rawX, rawY)
                     }
+                    
+                    val newPosition = if (event.snap) {
+                        org.wip.plugintoolkit.features.flows.model.Offset(
+                            kotlin.math.round(rawPosX / 50f) * 50f,
+                            kotlin.math.round(rawPosY / 50f) * 50f
+                        )
+                    } else {
+                        org.wip.plugintoolkit.features.flows.model.Offset(rawPosX, rawPosY)
+                    }
+                    
                     val containedNodeIds = currentState.flow.nodes.filter { node ->
-                        node.position.x >= grp.position.x &&
-                        node.position.x <= grp.position.x + newSize.x &&
-                        node.position.y >= grp.position.y &&
-                        node.position.y <= grp.position.y + newSize.y
+                        node.position.x >= newPosition.x &&
+                        node.position.x <= newPosition.x + newSize.x &&
+                        node.position.y >= newPosition.y &&
+                        node.position.y <= newPosition.y + newSize.y
                     }.map { it.id }
-                    val updatedGroup = grp.copy(size = newSize, nodeIds = containedNodeIds)
+                    val updatedGroup = grp.copy(position = newPosition, size = newSize, nodeIds = containedNodeIds)
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
                             groups = currentState.flow.groups.map { if (it.id == event.groupId) updatedGroup else it }
                         ),
                         hasUnsavedChanges = true
                     )
-                    pendingCommand = ResizeGroupCommand(event.groupId, grp.size, newSize)
+                    pendingCommand = ResizeGroupCommand(event.groupId, grp.size, newSize, grp.position, newPosition)
                 }
             }
 

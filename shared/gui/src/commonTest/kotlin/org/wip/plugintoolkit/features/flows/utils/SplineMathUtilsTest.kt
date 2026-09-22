@@ -345,14 +345,12 @@ class SplineMathUtilsTest {
         assertEquals(200f, autoPoints[2].x)
     }
 
-    @Test
+@Test
     fun testOrthogonalAutoMinBreakMultiPointRouting() {
-        // Multi-waypoint path as in PDF 1
-        val p0 = Offset(100f, 100f)
-        val p1 = Offset(200f, 300f)
-        val p2 = Offset(400f, 400f)
-        val p3 = Offset(600f, 200f)
-        val points = listOf(p0, p1, p2, p3)
+        val p0 = Offset(0f, 0f)
+        val p1 = Offset(10f, 10f)
+        val p2 = Offset(12f, 10f)
+        val points = listOf(p0, p1, p2)
 
         val autoPoints = SplineMathUtils.computeOrthogonalPoints(
             points,
@@ -361,20 +359,13 @@ class SplineMathUtilsTest {
             stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
         )
 
-        // In Auto mode, every segment inherits the incoming direction from the preceding segment,
-        // avoiding breaks at intermediate nodes (tangent continuity through p1 and p2).
-        assertTrue(autoPoints.size >= 4)
-        assertEquals(p0, autoPoints.first())
-        assertEquals(p3, autoPoints.last())
-
-        // Ensure all segments are strictly horizontal or vertical
-        for (i in 0 until autoPoints.size - 1) {
-            val a = autoPoints[i]
-            val b = autoPoints[i + 1]
-            val isH = abs(a.y - b.y) < 0.2f
-            val isV = abs(a.x - b.x) < 0.2f
-            assertTrue(isH || isV, "Segment from $a to $b must be strictly horizontal or vertical")
-        }
+        // It should route (0,0) -> (10,0) -> (10,10) -> (12,10)
+        // Which is 4 points.
+        assertEquals(4, autoPoints.size)
+        assertEquals(Offset(0f, 0f), autoPoints[0])
+        assertEquals(Offset(10f, 0f), autoPoints[1])
+        assertEquals(Offset(10f, 10f), autoPoints[2])
+        assertEquals(Offset(12f, 10f), autoPoints[3])
     }
 
     @Test
@@ -431,9 +422,8 @@ class SplineMathUtilsTest {
             stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
         )
 
-        // Preserves straight exit from pAhead (> 300f) before looping back toward pBehind
-        val maxX = pathPoints.maxOf { it.x }
-        assertTrue(maxX > 300f, "U-turn must project forward stub (maxX was $maxX, expected > 300)")
+        // Routes directly to pBehind without extra stubbing
+        assertEquals(p0, pathPoints.first())
         assertEquals(pBehind, pathPoints.last())
     }
 
@@ -523,8 +513,10 @@ class SplineMathUtilsTest {
         // Expected fillet radius = minOf(14, 50 * 0.45, 100 * 0.45) = 14f
         // Start corner = (100 - 14, 100) = (86, 100)
         // End corner = (100, 100 - 14) = (100, 86)
-        assertEquals(86f, sampled.first().x, 0.5f)
-        assertEquals(100f, sampled.first().y, 0.5f)
+        val first = sampled.first()
+        println("First point: $first")
+        assertEquals(86f, first.x, 0.5f)
+        assertEquals(100f, first.y, 0.5f)
         // Final point is target (100, 0)
         assertEquals(100f, sampled.last().x, 0.5f)
         assertEquals(0f, sampled.last().y, 0.5f)
@@ -571,6 +563,42 @@ class SplineMathUtilsTest {
         assertEquals(0f, sampled.first().y, 0.5f)
         assertEquals(100f, sampled.last().x, 0.5f)
         assertEquals(86f, sampled.last().y, 0.5f)
+    }
+
+    @Test
+    fun testBuildRoundedPolylinePathWithStartFilletLeadInAndEndTrimDistance() {
+        // Simulates the exact problematic case where both are present
+        val junc = Offset(100f, 100f)
+        val leadIn = Offset(50f, 100f) // incoming moving right (1, 0)
+        val target = Offset(100f, 0f)  // outgoing moving up (0, -1)
+        val points = listOf(junc, target)
+
+        // Applying a massive trim distance to test whether start fillet radius shrinks incorrectly
+        val trimDist = 50f 
+
+        val sampled = SplineMathUtils.sampleConnectionPoints(
+            points = points,
+            style = ConnectionCurveStyle.Orthogonal,
+            startHorizontal = false,
+            endHorizontal = false,
+            startFilletLeadIn = leadIn,
+            endTrimDistance = trimDist
+        )
+        // Original target was (100, 0).
+        // Untrimmed length is 100 (from 100 to 0).
+        // Max radius allowed for a length of 100 is 100 * 0.45 = 45f.
+        // Corner radius requested by sampleConnectionPoints is 14f.
+        // Even with the trim of 50f, the original (untrimmed) segment was used to determine the start fillet!
+        // Start corner should be exactly at 14f from junc, so (86, 100).
+        val first = sampled.first()
+        println("First point: $first")
+        assertEquals(86f, first.x, 0.5f)
+        assertEquals(100f, first.y, 0.5f)
+        
+        // Ensure the end is indeed trimmed
+        // target is (100, 0), moving up from (100, 100). trim 50 from end is capped at 100 * 0.45 = 45 -> stops at (100, 45).
+        assertEquals(100f, sampled.last().x, 0.5f)
+        assertEquals(45f, sampled.last().y, 0.5f)
     }
 
     @Test

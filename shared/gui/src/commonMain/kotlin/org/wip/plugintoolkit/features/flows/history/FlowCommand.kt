@@ -662,13 +662,19 @@ data class PaintElementsCommand(
 data class ResizeGroupCommand(
     private val groupId: Long,
     private val oldSize: ModelOffset,
-    private val newSize: ModelOffset
+    private val newSize: ModelOffset,
+    private val oldPosition: ModelOffset? = null,
+    private val newPosition: ModelOffset? = null
 ) : FlowCommand {
     override val description: String = "Resize group"
     override fun execute(state: FlowEditorState): FlowEditorState =
-        state.copy(flow = state.flow.copy(groups = state.flow.groups.map { if (it.id == groupId) it.copy(size = newSize) else it }), hasUnsavedChanges = true)
+        state.copy(flow = state.flow.copy(groups = state.flow.groups.map { 
+            if (it.id == groupId) it.copy(size = newSize, position = newPosition ?: it.position) else it 
+        }), hasUnsavedChanges = true)
     override fun undo(state: FlowEditorState): FlowEditorState =
-        state.copy(flow = state.flow.copy(groups = state.flow.groups.map { if (it.id == groupId) it.copy(size = oldSize) else it }), hasUnsavedChanges = true)
+        state.copy(flow = state.flow.copy(groups = state.flow.groups.map { 
+            if (it.id == groupId) it.copy(size = oldSize, position = oldPosition ?: it.position) else it 
+        }), hasUnsavedChanges = true)
 }
 
 /**
