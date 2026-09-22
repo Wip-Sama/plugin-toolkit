@@ -28,8 +28,6 @@ object SplineMathUtils {
     
     // Thresholds for orthogonal snapping
     private const val ORTHOGONAL_ALIGNMENT_TOLERANCE = 1.5f
-    private const val ORTHOGONAL_DIR_TOLERANCE = 0.2f
-    private const val ORTHOGONAL_DIR_CHANGE_TOLERANCE = 0.1f
     private const val COLLINEAR_TOLERANCE = 1.0f
     
     // Spline / Bezier tension calculation constants
@@ -154,9 +152,9 @@ object SplineMathUtils {
             if (dist < TANGENT_MIN_DISTANCE) return pFrom
 
             return if (isHorizontal) {
-                val baseDx = abs(chord.x) * 0.5f
+                val baseDx = abs(chord.x) * CONTROL_POINT_BASE_FACTOR
                 val softenedDx = if (abs(chord.y) > abs(chord.x)) {
-                    minOf(baseDx, abs(chord.y) * 0.5f + CONTROL_POINT_SOFTEN_OFFSET * scale)
+                    minOf(baseDx, abs(chord.y) * CONTROL_POINT_BASE_FACTOR + CONTROL_POINT_SOFTEN_OFFSET * scale)
                 } else {
                     baseDx
                 }
@@ -205,7 +203,7 @@ object SplineMathUtils {
                 // Smooth chord-proportional limit to prevent excessive loops while preserving curvature
                 val dPrev = chordDistances[i - 1]
                 val dNext = chordDistances[i]
-                val maxDist = minOf(dPrev, dNext) * 1.5f
+                val maxDist = minOf(dPrev, dNext) * MAX_TANGENT_DISTANCE_FACTOR
                 val tDist = sqrt(tx * tx + ty * ty)
                 if (tDist > maxDist && tDist > TANGENT_MIN_DISTANCE) {
                     val scaleFactor = maxDist / tDist
@@ -317,7 +315,7 @@ object SplineMathUtils {
                     // Use proportional minimum to stay zoom-stable: fillet degrades gracefully
                     // instead of snapping to a sharp corner at low zoom.
                     val minR = MIN_CORNER_RADIUS
-                    if (r >= minR && r > 0f) {
+                    if (r >= minR) {
                         hasStartFillet = true
                         startFilletStart = Offset(p0.x - vIn.x * r, p0.y - vIn.y * r)
                         startFilletEnd = Offset(p0.x + vOut.x * r, p0.y + vOut.y * r)
@@ -378,7 +376,7 @@ object SplineMathUtils {
 
             val r = minOf(cornerRadius, lenIn * TRIM_FACTOR, lenOut * TRIM_FACTOR)
             val minR = MIN_CORNER_RADIUS
-            if (lenIn == 0f || lenOut == 0f || r < minR || r <= 0f) {
+            if (lenIn == 0f || lenOut == 0f || r < minR) {
                 path.lineTo(pCurr.x, pCurr.y)
             } else {
                 val startCorner = Offset(pCurr.x + (vIn.x / lenIn) * r, pCurr.y + (vIn.y / lenIn) * r)
@@ -406,7 +404,8 @@ object SplineMathUtils {
         canvasOffset: Offset = Offset.Zero,
         stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
         startFilletLeadIn: Offset? = null,
-        endTrimDistance: Float = 0f
+        endTrimDistance: Float = 0f,
+        useMiddleRouteForDirectConnection: Boolean = true
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return emptyList()
@@ -425,7 +424,13 @@ object SplineMathUtils {
                     points.filter { it.x.isFinite() && it.y.isFinite() }
                 }
                 val boardPts = sanitizePoints(rawBoardPts)
-                val orthoBoard = computeOrthogonalPoints(boardPts, startHorizontal, endHorizontal, stepMode)
+                val orthoBoard = computeOrthogonalPoints(
+                    boardPts,
+                    startHorizontal,
+                    endHorizontal,
+                    stepMode,
+                    useMiddleRouteForDirectConnection
+                )
                 // Re-transform to screen space for midpoint calculations.
                 val orthoPoints = if (scale != 1f || canvasOffset != Offset.Zero) {
                     orthoBoard.map { it * scale + canvasOffset }
@@ -479,7 +484,8 @@ object SplineMathUtils {
         points: List<Offset>,
         startHorizontal: Boolean = true,
         endHorizontal: Boolean = true,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+        useMiddleRouteForDirectConnection: Boolean = true
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return pts
@@ -488,18 +494,18 @@ object SplineMathUtils {
         waypoints.add(pts[0])
 
         var currentDir = if (startHorizontal) Orientation.Horizontal else Orientation.Vertical
+        val isDirectConnection = useMiddleRouteForDirectConnection && pts.size == 2
 
         for (i in 0 until pts.size - 1) {
             val p0 = pts[i]
             val p1 = pts[i + 1]
             val dx = p1.x - p0.x
             val dy = p1.y - p0.y
-            val isFinalStep = (i == pts.size - 2)
             
-            if (abs(dx) < ORTHOGONAL_DIR_TOLERANCE) {
+            if (abs(dx) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
                 currentDir = Orientation.Vertical
                 waypoints.add(p1)
-            } else if (abs(dy) < ORTHOGONAL_DIR_TOLERANCE) {
+            } else if (abs(dy) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
                 currentDir = Orientation.Horizontal
                 waypoints.add(p1)
             } else {
@@ -529,18 +535,28 @@ object SplineMathUtils {
                         waypoints.add(p1)
                     }
                     OrthogonalStepMode.Auto -> {
+                        val targetEndHorizontal = if (isDirectConnection) {
+                            endHorizontal
+                        } else {
+                            currentDir != Orientation.Horizontal
+                        }
+
                         if (currentDir == Orientation.Horizontal) {
-                            if (abs(dx) >= 0.1f) {
-                                waypoints.add(Offset(p1.x, p0.y))
-                                currentDir = if (abs(dy) >= 0.1f) Orientation.Vertical else Orientation.Horizontal
+                            if (targetEndHorizontal) {
+                                val midX = (p0.x + p1.x) / 2f
+                                waypoints.add(Offset(midX, p0.y))
+                                waypoints.add(Offset(midX, p1.y))
                             } else {
+                                waypoints.add(Offset(p1.x, p0.y))
                                 currentDir = Orientation.Vertical
                             }
                         } else {
-                            if (abs(dy) >= 0.1f) {
-                                waypoints.add(Offset(p0.x, p1.y))
-                                currentDir = if (abs(dx) >= 0.1f) Orientation.Horizontal else Orientation.Vertical
+                            if (!targetEndHorizontal) {
+                                val midY = (p0.y + p1.y) / 2f
+                                waypoints.add(Offset(p0.x, midY))
+                                waypoints.add(Offset(p1.x, midY))
                             } else {
+                                waypoints.add(Offset(p0.x, p1.y))
                                 currentDir = Orientation.Horizontal
                             }
                         }
@@ -614,7 +630,8 @@ object SplineMathUtils {
         canvasOffset: Offset = Offset.Zero,
         stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
         startFilletLeadIn: Offset? = null,
-        endTrimDistance: Float = 0f
+        endTrimDistance: Float = 0f,
+        useMiddleRouteForDirectConnection: Boolean = true
     ): Path {
         val validPoints = points.filter { it.x.isFinite() && it.y.isFinite() }
         val path = Path()
@@ -653,7 +670,13 @@ object SplineMathUtils {
                     validPoints
                 }
                 val boardPts = sanitizePoints(rawBoardPts)
-                val orthoBoard = computeOrthogonalPoints(boardPts, startHorizontal, endHorizontal, stepMode)
+                val orthoBoard = computeOrthogonalPoints(
+                    boardPts,
+                    startHorizontal,
+                    endHorizontal,
+                    stepMode,
+                    useMiddleRouteForDirectConnection
+                )
                 // Re-transform orthogonal waypoints back to screen space.
                 val orthoScreen = if (scale != 1f || canvasOffset != Offset.Zero) {
                     orthoBoard.map { it * scale + canvasOffset }
@@ -690,7 +713,8 @@ object SplineMathUtils {
         canvasOffset: Offset = Offset.Zero,
         stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
         startFilletLeadIn: Offset? = null,
-        endTrimDistance: Float = 0f
+        endTrimDistance: Float = 0f,
+        useMiddleRouteForDirectConnection: Boolean = true
     ): List<Offset> {
         val validPoints = points.filter { it.x.isFinite() && it.y.isFinite() }
         if (validPoints.isEmpty()) return emptyList()
@@ -709,7 +733,13 @@ object SplineMathUtils {
                     validPoints.map { (it - canvasOffset) * (1f / scale) }
                 } else { validPoints }
                 val boardPts = sanitizePoints(rawBoardPts)
-                val orthoBoard = computeOrthogonalPoints(boardPts, startHorizontal, endHorizontal, stepMode)
+                val orthoBoard = computeOrthogonalPoints(
+                    boardPts,
+                    startHorizontal,
+                    endHorizontal,
+                    stepMode,
+                    useMiddleRouteForDirectConnection
+                )
                 val orthoPoints = if (scale != 1f || canvasOffset != Offset.Zero) {
                     orthoBoard.map { it * scale + canvasOffset }
                 } else { orthoBoard }

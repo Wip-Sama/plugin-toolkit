@@ -19,6 +19,12 @@ data class JunctionFilletParams(
 
 object ConnectionHitTester {
 
+    fun usesMiddleRouteForDirectConnection(connection: Connection): Boolean =
+        connection.sourceJunctionId == null &&
+                connection.targetJunctionId == null &&
+                connection.junctionIds.isEmpty() &&
+                connection.waypoints.isEmpty()
+
     private fun findJunctionLocalPrevPoint(path: List<Offset>, junction: Offset, epsilon: Float = 1f): Offset? {
         if (path.size < 2) return null
         val idx = path.indexOfFirst { (it - junction).getDistance() < epsilon }
@@ -276,7 +282,8 @@ object ConnectionHitTester {
                             inBoardPts,
                             startHorizontal = inStartH,
                             endHorizontal = inEndH,
-                            stepMode = stepMode
+                            stepMode = stepMode,
+                            useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(incoming)
                         )
                         val prevPoint = findJunctionLocalPrevPoint(inOrthoPts, juncPos)
 
@@ -321,7 +328,8 @@ object ConnectionHitTester {
                             myBoardPts,
                             startHorizontal = myStartH,
                             endHorizontal = myEndH,
-                            stepMode = stepMode
+                            stepMode = stepMode,
+                            useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection)
                         )
                         val prevPoint = findJunctionLocalPrevPoint(myOrthoPts, juncPos)
 
@@ -356,7 +364,8 @@ object ConnectionHitTester {
                                         outBoardPts,
                                         startHorizontal = outStartH,
                                         endHorizontal = outEndH,
-                                        stepMode = stepMode
+                                        stepMode = stepMode,
+                                        useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(outConn)
                                     )
                                     val outIdx = outOrthoPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
                                     val nextPoint = if (outIdx >= 0 && outIdx < outOrthoPts.size - 1) {
@@ -495,7 +504,8 @@ object ConnectionHitTester {
                 canvasOffset = offset,
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
-                endTrimDistance = filletParams.endTrimDistance
+                endTrimDistance = filletParams.endTrimDistance,
+                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection)
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -591,7 +601,8 @@ object ConnectionHitTester {
                 canvasOffset = offset,
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
-                endTrimDistance = filletParams.endTrimDistance
+                endTrimDistance = filletParams.endTrimDistance,
+                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection)
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -815,7 +826,8 @@ object ConnectionHitTester {
                 canvasOffset = offset,
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
-                endTrimDistance = filletParams.endTrimDistance
+                endTrimDistance = filletParams.endTrimDistance,
+                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection)
             )
 
             midpoints.forEachIndexed { segIdx, midPt ->

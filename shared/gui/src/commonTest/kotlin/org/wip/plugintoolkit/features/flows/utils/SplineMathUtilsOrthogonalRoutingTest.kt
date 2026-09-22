@@ -32,6 +32,45 @@ class SplineMathUtilsOrthogonalRoutingTest {
     }
 
     @Test
+    fun testOrthogonalAutoUsesMiddleRouteOnlyForDirectConnections() {
+        val directPoints = SplineMathUtils.computeOrthogonalPoints(
+            listOf(Offset(0f, 0f), Offset(10f, 20f)),
+            startHorizontal = true,
+            endHorizontal = true,
+            stepMode = OrthogonalStepMode.Auto
+        )
+        assertEquals(
+            listOf(
+                Offset(0f, 0f),
+                Offset(5f, 0f),
+                Offset(5f, 20f),
+                Offset(10f, 20f)
+            ),
+            directPoints
+        )
+
+        val junctionConnectionPoints = SplineMathUtils.computeOrthogonalPoints(
+            listOf(
+                Offset(0f, 0f),
+                Offset(10f, 20f)
+            ),
+            startHorizontal = true,
+            endHorizontal = true,
+            stepMode = OrthogonalStepMode.Auto,
+            useMiddleRouteForDirectConnection = false
+        )
+
+        assertEquals(
+            listOf(
+                Offset(0f, 0f),
+                Offset(10f, 0f),
+                Offset(10f, 20f)
+            ),
+            junctionConnectionPoints
+        )
+    }
+
+    @Test
     fun testOrthogonalNaturalHeadingVerticalRiseAndRoofLine() {
         // Vertical rise continuing straight up through intermediate waypoint to roof line
         val p0 = Offset(100f, 400f)

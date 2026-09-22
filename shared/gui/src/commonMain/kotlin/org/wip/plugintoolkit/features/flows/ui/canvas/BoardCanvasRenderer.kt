@@ -250,7 +250,6 @@ fun BoardGridAndConnectionsCanvas(
                     tension = roundness,
                     stepMode = stepMode
                 )
-
                 val effectiveStyle = curveStyle
                 val path = SplineMathUtils.buildConnectionPath(
                     points = screenPoints,
@@ -262,7 +261,9 @@ fun BoardGridAndConnectionsCanvas(
                     canvasOffset = state.offset,
                     stepMode = stepMode,
                     startFilletLeadIn = filletParams.startFilletLeadIn,
-                    endTrimDistance = filletParams.endTrimDistance
+                    endTrimDistance = filletParams.endTrimDistance,
+                    useMiddleRouteForDirectConnection =
+                        ConnectionHitTester.usesMiddleRouteForDirectConnection(connection)
                 )
                 drawPath(
                     path = path,

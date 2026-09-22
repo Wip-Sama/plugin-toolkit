@@ -705,7 +705,9 @@ fun Modifier.boardPointerEventGesture(
                                     boardPoints,
                                     startHorizontal = startH,
                                     endHorizontal = endH,
-                                    stepMode = currentOrthogonalStepMode
+                                    stepMode = currentOrthogonalStepMode,
+                                    useMiddleRouteForDirectConnection =
+                                        ConnectionHitTester.usesMiddleRouteForDirectConnection(bestConnection)
                                 )
                             } else null
                             Logger.d(tag = "HoveredConnection") {
@@ -1130,4 +1132,3 @@ fun Modifier.boardPointerEventGesture(
         }
     }
 }
-
