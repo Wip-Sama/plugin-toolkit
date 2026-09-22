@@ -148,68 +148,45 @@ object ConnectionHitTester {
                     }
                 }
 
-                val floating = connection.floatingTarget
+                val floatingTarget = connection.floatingTarget
                 val targetPos = when {
                     connection.targetJunctionId != null -> junctionMap[connection.targetJunctionId]
-                    floating != null -> floating.toComposeOffset()
-                    getPortBoardPosition != null -> getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
+                    floatingTarget != null -> floatingTarget.toComposeOffset()
+                    getPortBoardPosition != null ->
+                        getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
                     else -> null
                 }
-
-                if (targetPos != null) {
-                    val dxToTarget = targetPos.x - juncPos.x
-                    val dyToTarget = targetPos.y - juncPos.y
-
-                    if (inEndH) {
-                        // Incoming arrived horizontally: continue through only if target is predominantly forward horizontal
-                        // Determine the incoming horizontal direction by looking at the last segment of the incoming connection
-                        val incomingPrevBoard = if (getPortBoardPosition != null) {
-                            getConnectionBoardPoints(
-                                connection = incoming,
-                                getPortBoardPosition = getPortBoardPosition,
-                                junctionMap = junctionMap,
-                                groups = groups,
-                                density = density
-                            )
-                        } else null
-                        val incomingPrevPt = if (incomingPrevBoard != null && incomingPrevBoard.size >= 2) {
-                            findJunctionLocalPrevPoint(incomingPrevBoard, juncPos)
-                        } else null
-                        val dxInSign = if (incomingPrevPt != null) juncPos.x - incomingPrevPt.x else 1f
-
-                        val isAhead = abs(dxToTarget) >= abs(dyToTarget) && (if (dxInSign >= 0f) dxToTarget > 10f else dxToTarget < -10f)
-                        val result = isAhead // true = continue horizontal, false = branch vertical
-                        Logger.v(tag = "ConnectionOrientations") {
-                            "$connId: startIsHorizontal=$result (inEndH=true, dxToTarget=$dxToTarget, dyToTarget=$dyToTarget, isAhead=$isAhead -> ${if (result) "continue horizontal" else "branch vertical"})"
-                        }
-                        result
-                    } else {
-                        // Incoming arrived vertically: continue through only if target is predominantly forward vertical
-                        val incomingPrevBoard = if (getPortBoardPosition != null) {
-                            getConnectionBoardPoints(
-                                connection = incoming,
-                                getPortBoardPosition = getPortBoardPosition,
-                                junctionMap = junctionMap,
-                                groups = groups,
-                                density = density
-                            )
-                        } else null
-                        val incomingPrevPt = if (incomingPrevBoard != null && incomingPrevBoard.size >= 2) {
-                            findJunctionLocalPrevPoint(incomingPrevBoard, juncPos)
-                        } else null
-                        val dyInSign = if (incomingPrevPt != null) juncPos.y - incomingPrevPt.y else 1f
-
-                        val isAhead = abs(dyToTarget) >= abs(dxToTarget) && (if (dyInSign >= 0f) dyToTarget > 10f else dyToTarget < -10f)
-                        val result = !isAhead // false = continue vertical, true = branch horizontal
-                        Logger.v(tag = "ConnectionOrientations") {
-                            "$connId: startIsHorizontal=$result (inEndH=false, dxToTarget=$dxToTarget, dyToTarget=$dyToTarget, isAhead=$isAhead -> ${if (result) "branch horizontal" else "continue vertical"})"
-                        }
-                        result
-                    }
+                val incomingBoardPts = if (getPortBoardPosition != null) {
+                    getConnectionBoardPoints(
+                        connection = incoming,
+                        getPortBoardPosition = getPortBoardPosition,
+                        junctionMap = junctionMap,
+                        groups = groups,
+                        density = density
+                    )
+                } else null
+                val incomingPrevPoint = if (incomingBoardPts != null && incomingBoardPts.size >= 2) {
+                    findJunctionLocalPrevPoint(incomingBoardPts, juncPos)
                 } else {
-                    Logger.v(tag = "ConnectionOrientations") { "$connId: startIsHorizontal=$inEndH (no target pos, mirrors inEndH)" }
-                    inEndH
+                    junctionMap[incoming.sourceJunctionId]
                 }
+                val targetDx = targetPos?.x?.minus(juncPos.x) ?: 0f
+                val targetDy = targetPos?.y?.minus(juncPos.y) ?: 0f
+                val incomingDx = incomingPrevPoint?.let { juncPos.x - it.x } ?: 1f
+                val incomingDy = incomingPrevPoint?.let { juncPos.y - it.y } ?: 1f
+                val continuesForward = if (inEndH) {
+                    targetDx > 10f && incomingDx >= 0f ||
+                        targetDx < -10f && incomingDx < 0f
+                } else {
+                    targetDy > 10f && incomingDy >= 0f ||
+                        targetDy < -10f && incomingDy < 0f
+                }
+                val result = if (continuesForward) inEndH else !inEndH
+                Logger.v(tag = "ConnectionOrientations") {
+                    "$connId: startIsHorizontal=$result (incomingAxis=$inEndH, " +
+                        "targetDx=$targetDx, targetDy=$targetDy, continuesForward=$continuesForward)"
+                }
+                result
             } else {
                 // No incoming connection: determine departure axis from target displacement
                 val floating = connection.floatingTarget

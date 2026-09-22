@@ -27,7 +27,7 @@ object SplineMathUtils {
     private const val POINT_DUPLICATE_TOLERANCE = 0.1f
     
     // Thresholds for orthogonal snapping
-    private const val ORTHOGONAL_ALIGNMENT_TOLERANCE = 1.5f
+    private const val ORTHOGONAL_ALIGNMENT_TOLERANCE = 4f
     private const val COLLINEAR_TOLERANCE = 1.0f
     
     // Spline / Bezier tension calculation constants
@@ -45,6 +45,7 @@ object SplineMathUtils {
     // Path rounding and filleting constants
     private const val DEFAULT_CORNER_RADIUS = 14f
     private const val TENSION_RADIUS_FACTOR = 28f
+    private const val MIN_RENDER_CORNER_RADIUS = 4f
     private const val TRIM_FACTOR = 0.45f
     private const val MIN_CORNER_RADIUS = 0.01f
     private const val FILLET_DOT_TOLERANCE_STRAIGHT = 0.1f
@@ -277,6 +278,16 @@ object SplineMathUtils {
         }
 
         val effectivePoints = points.toMutableList()
+        var i = 1
+        while (i < effectivePoints.lastIndex) {
+            val incomingLength = (effectivePoints[i] - effectivePoints[i - 1]).getDistance()
+            val outgoingLength = (effectivePoints[i + 1] - effectivePoints[i]).getDistance()
+            if (incomingLength < MIN_RENDER_CORNER_RADIUS || outgoingLength < MIN_RENDER_CORNER_RADIUS) {
+                effectivePoints.removeAt(i)
+            } else {
+                i++
+            }
+        }
         if (endTrimDistance > 0f && effectivePoints.size >= 2) {
             val pPenultimate = effectivePoints[effectivePoints.size - 2]
             val pLast = effectivePoints.last()
@@ -298,7 +309,7 @@ object SplineMathUtils {
         val p0 = effectivePoints[0]
         
         // Use original points for lead-in calculation to prevent trimmed segments from altering fillet radius
-        val origP1 = points[1]
+        val origP1 = effectivePoints[1]
 
         if (startFilletLeadIn != null) {
             val vInRaw = p0 - startFilletLeadIn
@@ -677,7 +688,11 @@ object SplineMathUtils {
                 } else {
                     orthoBoard
                 }
-                val r = maxOf(DEFAULT_CORNER_RADIUS * scale, tension * TENSION_RADIUS_FACTOR * scale)
+                val r = maxOf(
+                    DEFAULT_CORNER_RADIUS * scale,
+                    tension * TENSION_RADIUS_FACTOR * scale,
+                    MIN_RENDER_CORNER_RADIUS
+                )
                 return buildRoundedPolylinePath(
                     points = orthoScreen,
                     cornerRadius = r,

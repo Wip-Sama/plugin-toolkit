@@ -137,6 +137,48 @@ class SplineMathUtilsOrthogonalRoutingTest {
     }
 
     @Test
+    fun testOrthogonalAutoSnapsSmallEndpointAxisDrift() {
+        val route = SplineMathUtils.computeOrthogonalPoints(
+            listOf(Offset(328.37332f, 1747.4736f), Offset(2450f, 1750f)),
+            startHorizontal = true,
+            endHorizontal = true,
+            stepMode = OrthogonalStepMode.Auto
+        )
+
+        assertEquals(
+            listOf(Offset(328.37332f, 1747.4736f), Offset(2450f, 1750f)),
+            route
+        )
+    }
+
+    @Test
+    fun testLoggedLongJunctionRouteRemainsOrthogonalWhenZoomedOut() {
+        val route = SplineMathUtils.computeOrthogonalPoints(
+            listOf(Offset(-300f, 1850f), Offset(4300f, -1150f)),
+            startHorizontal = true,
+            endHorizontal = true,
+            stepMode = OrthogonalStepMode.Auto,
+            useMiddleRouteForDirectConnection = false
+        )
+
+        assertEquals(
+            listOf(
+                Offset(-300f, 1850f),
+                Offset(4300f, 1850f),
+                Offset(4300f, -1150f)
+            ),
+            route
+        )
+
+        val path = SplineMathUtils.buildConnectionPath(
+            points = route.map { it * 0.05f },
+            style = org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.Orthogonal,
+            scale = 0.05f
+        )
+        assertTrue(!path.isEmpty)
+    }
+
+    @Test
     fun testOrthogonalNaturalHeadingVerticalRiseAndRoofLine() {
         // Vertical rise continuing straight up through intermediate waypoint to roof line
         val p0 = Offset(100f, 400f)

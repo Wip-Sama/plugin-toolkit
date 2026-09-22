@@ -295,6 +295,59 @@ class ConnectionHitTesterTest {
     }
 
     @Test
+    fun testHorizontalJunctionContinuationDoesNotSwitchAxisForVerticalTarget() {
+        val incomingConn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = Connection.FLOATING_NODE_ID,
+            targetPortId = Connection.FLOATING_PORT_ID,
+            targetJunctionId = 225L
+        )
+        val outgoingConn = Connection(
+            sourceNodeId = Connection.FLOATING_NODE_ID,
+            sourcePortId = Connection.FLOATING_PORT_ID,
+            sourceJunctionId = 225L,
+            targetNodeId = Connection.FLOATING_NODE_ID,
+            targetPortId = Connection.FLOATING_PORT_ID,
+            targetJunctionId = 228L
+        )
+
+        val juncMap = mapOf(
+            225L to Offset(2450f, 1750f),
+            228L to Offset(3200f, 50f)
+        )
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nodeId, _, isOutput ->
+            if (nodeId == 1L && isOutput) Offset(330f, 1750f) else null
+        }
+
+        val (startH, endH) = ConnectionHitTester.getConnectionOrientations(
+            connection = outgoingConn,
+            connections = listOf(incomingConn, outgoingConn),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos
+        )
+
+        assertTrue(startH, "Outgoing connection must inherit horizontal arrival at junction 225")
+        assertFalse(endH, "Junction-to-junction target should retain its vertical arrival axis")
+
+        val orthoPoints = org.wip.plugintoolkit.features.flows.utils.SplineMathUtils.computeOrthogonalPoints(
+            listOf(juncMap.getValue(225L), juncMap.getValue(228L)),
+            startHorizontal = startH,
+            endHorizontal = endH,
+            stepMode = org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto,
+            useMiddleRouteForDirectConnection = false
+        )
+        assertEquals(
+            listOf(
+                Offset(2450f, 1750f),
+                Offset(3200f, 1750f),
+                Offset(3200f, 50f)
+            ),
+            orthoPoints
+        )
+    }
+
+    @Test
     fun testDiagonalNodeToJunctionMaintainsHorizontalArrivalAndFillet() {
         // Reproduce the permanently angular connection bug:
         // - Source node output port at (100, 350)
