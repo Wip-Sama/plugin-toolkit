@@ -38,6 +38,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.core.utils.FormatUtils
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import org.wip.plugintoolkit.features.job.utils.ProcessMemoryUtils
@@ -53,6 +54,9 @@ class JobWorker(
     private val settingsRepository: SettingsRepository by inject()
     private val notificationService: NotificationService by inject()
     private var isWorkerActive = true
+    @Volatile
+    var isExecutingJob: Boolean = false
+        private set
     private val workerJob = SupervisorJob(scope.coroutineContext[kotlinx.coroutines.Job])
     private val workerScope = scope + workerJob
 
@@ -74,9 +78,11 @@ class JobWorker(
 
                     // Link this execution to the manager for cancellation support
                     val jobExecution = launch {
+                        isExecutingJob = true
                         try {
                             executeJob(next)
                         } finally {
+                            isExecutingJob = false
                             Logger.d { "Worker $workerId: Finished job ${next.id}" }
                             manager.unregisterJobHandle(next.id)
                         }
@@ -705,6 +711,13 @@ class JobWorker(
         manager.addJobLog(job.id, "Executing via FlowEngine...")
         val engine = FlowEngine(manager, executorRegistry, pluginManager, lifecycleCoordinator, workerScope)
         engine.executeFlowJob(job)
+    }
+
+    fun stopGracefully() {
+        isWorkerActive = false
+        if (!isExecutingJob) {
+            workerJob.cancel()
+        }
     }
 
     fun stop() {

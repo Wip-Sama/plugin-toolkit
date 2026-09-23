@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -41,7 +42,7 @@ class JobManager(
     private val scope: CoroutineScope,
     private val settingsRepository: SettingsRepository
 ) {
-    private val maxConcurrentJobs get() = settingsRepository.settings.value.jobs.maxConcurrentJobs
+    private val maxConcurrentJobs get() = maxOf(1, settingsRepository.settings.value.jobs.maxConcurrentJobs)
     private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
     private val maxHistoryLength get() = settingsRepository.settings.value.jobs.maxHistoryLength
 
@@ -68,6 +69,7 @@ class JobManager(
     private val _jobLogs = MutableStateFlow<Map<String, List<String>>>(emptyMap())
     val jobLogs: StateFlow<Map<String, List<String>>> = _jobLogs.asStateFlow()
 
+    private val workersMutex = Mutex()
     private val workers = mutableListOf<JobWorker>()
 
     // Channel to signal workers that a new job is available.
@@ -137,7 +139,7 @@ class JobManager(
             }
 
             // Start workers after initial load
-            startWorkers()
+            adjustWorkers(maxConcurrentJobs)
 
             // Observe and save job state changes
             launch {
@@ -145,14 +147,36 @@ class JobManager(
                     jobRepository.saveJobs(currentJobs)
                 }
             }
+
+            // Observe live changes to maxConcurrentJobs setting
+            launch {
+                settingsRepository.settings
+                    .map { maxOf(1, it.jobs.maxConcurrentJobs) }
+                    .distinctUntilChanged()
+                    .collect { targetWorkers ->
+                        adjustWorkers(targetWorkers)
+                        jobSignal.trySend(Unit)
+                    }
+            }
         }
     }
 
-    private fun startWorkers() {
-        repeat(maxConcurrentJobs) {
-            val worker = JobWorker(it, this, scope)
-            workers.add(worker)
-            worker.start()
+    private suspend fun adjustWorkers(targetCount: Int) {
+        workersMutex.withLock {
+            if (targetCount > workers.size) {
+                for (i in workers.size until targetCount) {
+                    val worker = JobWorker(i, this, scope)
+                    workers.add(worker)
+                    worker.start()
+                }
+            } else if (targetCount < workers.size) {
+                val excessCount = workers.size - targetCount
+                val excessWorkers = workers.takeLast(excessCount)
+                repeat(excessCount) {
+                    workers.removeAt(workers.lastIndex)
+                }
+                excessWorkers.forEach { it.stopGracefully() }
+            }
         }
     }
 
@@ -319,31 +343,44 @@ class JobManager(
             var claimedJob: BackgroundJob? = null
 
             _jobs.update { currentList ->
-                // PriorityQueue behavior: FIFO based on list order
-                val candidate = currentList.firstOrNull { it.status == JobStatus.Queued }
+                val runningCount = currentList.count {
+                    it.status == JobStatus.Running || it.status == JobStatus.PauseRequested
+                }
+                if (runningCount < maxConcurrentJobs) {
+                    // PriorityQueue behavior: FIFO based on list order
+                    val candidate = currentList.firstOrNull { it.status == JobStatus.Queued }
 
-                if (candidate != null) {
-                    claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
-                    activeJobPeakMemory[candidate.id] = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
-                    currentList.map { if (it.id == candidate.id) claimedJob else it }
+                    if (candidate != null) {
+                        claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
+                        activeJobPeakMemory[candidate.id] = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
+                        currentList.map { if (it.id == candidate.id) claimedJob else it }
+                    } else {
+                        currentList
+                    }
                 } else {
                     currentList
                 }
             }
 
             if (claimedJob != null) {
-                // If there are more jobs, signal again to wake up other idle workers
-                if (_jobs.value.any { it.status == JobStatus.Queued }) {
+                // If there are more available concurrency slots and queued jobs, signal again to wake up other idle workers
+                val runningCount = _jobs.value.count {
+                    it.status == JobStatus.Running || it.status == JobStatus.PauseRequested
+                }
+                if (runningCount < maxConcurrentJobs && _jobs.value.any { it.status == JobStatus.Queued }) {
                     jobSignal.trySend(Unit)
                 }
                 return claimedJob
             }
 
-            // Wait for signal if no jobs are queued
-            Logger.v { "No queued jobs, worker waiting for signal..." }
+            // Wait for signal if no jobs are queued or if max concurrent limit is reached
+            Logger.v { "No queued jobs or limit reached ($maxConcurrentJobs), worker waiting for signal..." }
 
-            // Before receiving, do one more quick check to avoid unnecessary suspension
-            if (_jobs.value.any { it.status == JobStatus.Queued }) {
+            // Before receiving, check if capacity has become available and jobs are queued
+            val currentRunning = _jobs.value.count {
+                it.status == JobStatus.Running || it.status == JobStatus.PauseRequested
+            }
+            if (currentRunning < maxConcurrentJobs && _jobs.value.any { it.status == JobStatus.Queued }) {
                 continue
             }
 
@@ -482,6 +519,7 @@ class JobManager(
             }
             addHistoryEntryInternal(jobId, jobName, "Completed")
             Logger.i { "Job $jobId ($jobName) completed successfully" }
+            jobSignal.trySend(Unit)
         } else {
             val job = _jobs.value.find { it.id == jobId }
             Logger.w { "Attempted to complete job $jobId, but it was not in Running state (current: ${job?.status})" }
@@ -538,6 +576,7 @@ class JobManager(
             }
             addHistoryEntryInternal(jobId, jobName, "Failed", errorMessage)
             Logger.e { "Job $jobId ($jobName) failed: $errorMessage" }
+            jobSignal.trySend(Unit)
         } else {
             val job = _jobs.value.find { it.id == jobId }
             Logger.w { "Attempted to fail job $jobId, but it was not in Running state (current: ${job?.status})" }
@@ -591,6 +630,7 @@ class JobManager(
             if (job != null) {
                 saveResumeState(job)
             }
+            jobSignal.trySend(Unit)
         }
         return paused
     }
@@ -704,7 +744,10 @@ class JobManager(
     }
 
     suspend fun stopAll() {
-        workers.forEach { it.stop() }
+        workersMutex.withLock {
+            workers.forEach { it.stop() }
+            workers.clear()
+        }
         handlesMutex.withLock {
             activeJobHandles.values.forEach { it.cancel(force = true) }
             activeJobHandles.clear()

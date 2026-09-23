@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.job.logic
 
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
@@ -12,6 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JobManagerTest {
@@ -467,5 +469,182 @@ class JobManagerTest {
         assertNotNull(runningJob3)
         assertEquals(JobStatus.Paused, runningJob3.status)
         assertEquals(JsonPrimitive("state_snapshot"), runningJob3.resumeState)
+    }
+
+    @Test
+    fun testMaxConcurrentJobsEnforcement() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings().copy(
+            jobs = AppSettings().jobs.copy(maxConcurrentJobs = 1)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job1 = BackgroundJob(
+            id = "concurrent-job-1",
+            name = "Job 1",
+            type = JobType.Capability,
+            pluginId = "test-plugin",
+            capabilityName = "cap1"
+        )
+        val job2 = BackgroundJob(
+            id = "concurrent-job-2",
+            name = "Job 2",
+            type = JobType.Capability,
+            pluginId = "test-plugin",
+            capabilityName = "cap2"
+        )
+
+        jobManager.enqueueJob(job1)
+        jobManager.enqueueJob(job2)
+
+        // Claim first job
+        val claimed1 = jobManager.waitForNextJob()
+        assertEquals("concurrent-job-1", claimed1.id)
+        assertEquals(JobStatus.Running, claimed1.status)
+
+        // Second job is still Queued, cannot be claimed because limit = 1
+        val queuedJob = jobManager.jobs.value.find { it.id == "concurrent-job-2" }
+        assertNotNull(queuedJob)
+        assertEquals(JobStatus.Queued, queuedJob.status)
+
+        val claimed2Attempt = withTimeoutOrNull(200) {
+            jobManager.waitForNextJob()
+        }
+        assertNull(claimed2Attempt, "Second job should not be claimable while first is running and limit is 1")
+
+        // Complete job 1 -> frees slot and wakes up next job
+        jobManager.tryCompleteJob("concurrent-job-1", "Done")
+
+        // Now job 2 should be claimed
+        val claimed2 = withTimeoutOrNull(1000) {
+            jobManager.waitForNextJob()
+        }
+        assertNotNull(claimed2)
+        assertEquals("concurrent-job-2", claimed2.id)
+        assertEquals(JobStatus.Running, claimed2.status)
+
+        jobManager.tryCompleteJob("concurrent-job-2", "Done")
+    }
+
+    @Test
+    fun testLiveMaxConcurrentJobsIncrease() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings().copy(
+            jobs = AppSettings().jobs.copy(maxConcurrentJobs = 1)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job1 = BackgroundJob(id = "live-inc-1", name = "Job 1", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap1")
+        val job2 = BackgroundJob(id = "live-inc-2", name = "Job 2", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap2")
+
+        jobManager.enqueueJob(job1)
+        jobManager.enqueueJob(job2)
+
+        val claimed1 = jobManager.waitForNextJob()
+        assertEquals("live-inc-1", claimed1.id)
+
+        // Cannot claim job2 under limit 1
+        val attemptBefore = withTimeoutOrNull(200) { jobManager.waitForNextJob() }
+        assertNull(attemptBefore)
+
+        // Increase limit live to 2
+        settingsRepo.updateSettings { current -> current.copy(jobs = current.jobs.copy(maxConcurrentJobs = 2)) }
+
+        // Now job2 can be claimed while job1 is still running!
+        val claimed2 = withTimeoutOrNull(1000) { jobManager.waitForNextJob() }
+        assertNotNull(claimed2)
+        assertEquals("live-inc-2", claimed2.id)
+
+        val runningJobs = jobManager.jobs.value.filter { it.status == JobStatus.Running }
+        assertEquals(2, runningJobs.size)
+
+        jobManager.tryCompleteJob("live-inc-1", "Done")
+        jobManager.tryCompleteJob("live-inc-2", "Done")
+    }
+
+    @Test
+    fun testLiveMaxConcurrentJobsDecreaseLocksNewJobs() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings().copy(
+            jobs = AppSettings().jobs.copy(maxConcurrentJobs = 2)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job1 = BackgroundJob(id = "live-dec-1", name = "Job 1", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap1")
+        val job2 = BackgroundJob(id = "live-dec-2", name = "Job 2", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap2")
+        val job3 = BackgroundJob(id = "live-dec-3", name = "Job 3", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap3")
+
+        jobManager.enqueueJob(job1)
+        jobManager.enqueueJob(job2)
+        jobManager.enqueueJob(job3)
+
+        val claimed1 = jobManager.waitForNextJob()
+        val claimed2 = jobManager.waitForNextJob()
+        assertEquals("live-dec-1", claimed1.id)
+        assertEquals("live-dec-2", claimed2.id)
+
+        // 2 jobs are currently running. Decrease limit live to 1
+        settingsRepo.updateSettings { current -> current.copy(jobs = current.jobs.copy(maxConcurrentJobs = 1)) }
+
+        // Finish job1 -> running count becomes 1 (which equals the new limit 1)
+        jobManager.tryCompleteJob("live-dec-1", "Done")
+
+        // Since running count is 1 and maxConcurrentJobs is 1, job3 must NOT start!
+        val attemptJob3 = withTimeoutOrNull(200) { jobManager.waitForNextJob() }
+        assertNull(attemptJob3, "Job 3 should be locked until running jobs drop below new limit")
+
+        // Now complete job2 -> running count becomes 0
+        jobManager.tryCompleteJob("live-dec-2", "Done")
+
+        // Now job3 can start!
+        val claimed3 = withTimeoutOrNull(1000) { jobManager.waitForNextJob() }
+        assertNotNull(claimed3)
+        assertEquals("live-dec-3", claimed3.id)
+
+        jobManager.tryCompleteJob("live-dec-3", "Done")
+    }
+
+    @Test
+    fun testTryFailAndTryPauseSignalWaitingWorkers() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings().copy(
+            jobs = AppSettings().jobs.copy(maxConcurrentJobs = 1)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        // Test fail wake-up
+        val job1 = BackgroundJob(id = "signal-fail-1", name = "Job 1", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap1")
+        val job2 = BackgroundJob(id = "signal-fail-2", name = "Job 2", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap2")
+        jobManager.enqueueJob(job1)
+        jobManager.enqueueJob(job2)
+
+        val claimed1 = jobManager.waitForNextJob()
+        assertEquals("signal-fail-1", claimed1.id)
+
+        // Failing job1 frees slot and wakes up job2
+        jobManager.tryFailJob("signal-fail-1", "Failed deliberately")
+        val claimed2 = withTimeoutOrNull(1000) { jobManager.waitForNextJob() }
+        assertNotNull(claimed2)
+        assertEquals("signal-fail-2", claimed2.id)
+
+        // Test pause wake-up
+        val job3 = BackgroundJob(id = "signal-pause-3", name = "Job 3", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap3")
+        jobManager.enqueueJob(job3)
+
+        // Pausing job2 frees slot and wakes up job3
+        jobManager.tryPauseJob("signal-fail-2", JsonPrimitive("paused"))
+        val claimed3 = withTimeoutOrNull(1000) { jobManager.waitForNextJob() }
+        assertNotNull(claimed3)
+        assertEquals("signal-pause-3", claimed3.id)
+
+        jobManager.tryCompleteJob("signal-pause-3", "Done")
     }
 }
