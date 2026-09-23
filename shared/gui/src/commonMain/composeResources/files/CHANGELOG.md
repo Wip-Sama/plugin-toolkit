@@ -20,6 +20,10 @@ Fixed:
 	- When a capability definition changed without migration the flow still appeared valid even if it was not
   - Required parameters with default values in failed validation and required toggling on and off before proceeding
   - Expanding a collapsed node did not immediately re-render the connections until the cursor moved
+  - fixed job limits not properly enforced
+  - Selection box locking onto screen and detaching during canvas zoom
+  - Box selection shortcut failing to trigger when remapped in Shortcut Manager
+  - Group contained connection points not updating dynamically during drag and failing to restore on undo/redo
 ----------------------------------------------------------------------------------------------------
 Version: 2.1.0
 Date: 10-09-2026

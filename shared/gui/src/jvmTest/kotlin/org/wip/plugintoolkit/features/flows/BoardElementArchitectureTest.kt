@@ -299,4 +299,49 @@ class BoardElementArchitectureTest {
         val stateRevertedGroup = groupCmd.undo(stateAfterGroup)
         assertEquals("Original Title", stateRevertedGroup.flow.groups.first().title)
     }
+
+    @Test
+    fun testDynamicCapturedJunctionsDuringGroupDrag() = runTest {
+        val group = FlowGroup(
+            id = 10L,
+            title = "Group 1",
+            position = ModelOffset(100f, 100f),
+            size = ModelOffset(200f, 200f)
+        )
+        val junctionInside = FlowJunction(
+            id = 20L,
+            position = ModelOffset(150f, 150f)
+        )
+        val junctionOutside = FlowJunction(
+            id = 21L,
+            position = ModelOffset(500f, 500f)
+        )
+        val flow = Flow(
+            name = "Test Flow",
+            groups = listOf(group),
+            junctions = listOf(junctionInside, junctionOutside)
+        )
+        var state = FlowEditorState(flow = flow)
+
+        // Start drag on the group
+        val dragDelta = ComposeOffset(50f, 50f)
+        state = nodeManager.handleMoveNode(state, 10L, dragDelta, snap = false, showGhost = false)
+
+        // Contained junction must be captured dynamically
+        assertEquals(setOf(20L), state.capturedJunctionIds)
+        assertEquals(ModelOffset(50f, 50f), state.currentDragOffset)
+
+        // End drag
+        state = nodeManager.handleEndMoveNode(state, 10L, density = 1f)
+
+        // Captured junctions are cleared and position is committed
+        assertEquals(emptySet(), state.capturedJunctionIds)
+        val movedGroup = state.flow.groups.first { it.id == 10L }
+        val movedJunctionInside = state.flow.junctions.first { it.id == 20L }
+        val untouchedJunctionOutside = state.flow.junctions.first { it.id == 21L }
+
+        assertEquals(ModelOffset(150f, 150f), movedGroup.position)
+        assertEquals(ModelOffset(200f, 200f), movedJunctionInside.position)
+        assertEquals(ModelOffset(500f, 500f), untouchedJunctionOutside.position)
+    }
 }

@@ -509,11 +509,15 @@ fun BoardGridAndConnectionsCanvas(
 @Composable
 fun SelectionBoxCanvas(
     interactionState: BoardInteractionState,
+    scale: Float = 1f,
+    offset: Offset = Offset.Zero,
     modifier: Modifier = Modifier
 ) {
-    val start = interactionState.selectionStart
-    val end = interactionState.selectionEnd
-    if (start != null && end != null) {
+    val boardStart = interactionState.selectionStart
+    val boardEnd = interactionState.selectionEnd
+    if (boardStart != null && boardEnd != null) {
+        val start = (boardStart * scale) + offset
+        val end = (boardEnd * scale) + offset
         val dimensions = ToolkitTheme.dimensions
         val opacity = ToolkitTheme.opacity
         val connectionColor = MaterialTheme.colorScheme.primary

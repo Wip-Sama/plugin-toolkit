@@ -472,7 +472,8 @@ data class MoveGroupCommand(
     private val groupId: Long,
     private val oldPos: ModelOffset,
     private val newPos: ModelOffset,
-    private val movedNodeIds: Set<Long> = emptySet()
+    private val movedNodeIds: Set<Long> = emptySet(),
+    private val movedPointIds: Set<Long> = emptySet()
 ) : FlowCommand {
     override val description: String = "Move group"
     override fun execute(state: FlowEditorState): FlowEditorState {
@@ -482,10 +483,16 @@ data class MoveGroupCommand(
                 if (it.id in movedNodeIds) it.copyWithPosition(it.position + delta) else it
             }
         } else state.flow.nodes
+        val updatedJunctions = if (movedPointIds.isNotEmpty()) {
+            state.flow.junctions.map {
+                if (it.id in movedPointIds) it.copyWithPosition(it.position + delta) else it
+            }
+        } else state.flow.junctions
         return state.copy(
             flow = state.flow.copy(
                 groups = state.flow.groups.map { if (it.id == groupId) it.copy(position = newPos) else it },
-                nodes = updatedNodes
+                nodes = updatedNodes,
+                junctions = updatedJunctions
             ),
             hasUnsavedChanges = true
         )
@@ -497,10 +504,16 @@ data class MoveGroupCommand(
                 if (it.id in movedNodeIds) it.copyWithPosition(it.position - delta) else it
             }
         } else state.flow.nodes
+        val updatedJunctions = if (movedPointIds.isNotEmpty()) {
+            state.flow.junctions.map {
+                if (it.id in movedPointIds) it.copyWithPosition(it.position - delta) else it
+            }
+        } else state.flow.junctions
         return state.copy(
             flow = state.flow.copy(
                 groups = state.flow.groups.map { if (it.id == groupId) it.copy(position = oldPos) else it },
-                nodes = updatedNodes
+                nodes = updatedNodes,
+                junctions = updatedJunctions
             ),
             hasUnsavedChanges = true
         )

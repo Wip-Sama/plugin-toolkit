@@ -464,11 +464,12 @@ fun BoardCanvas(
             else emptySet()
         }
 
-        val movingPointIds = remember(state.draggedNodeId, state.selectedPointIds, isDraggedInSelection, flow.junctions) {
-            if (state.draggedNodeId == null) emptySet()
+        val movingPointIds = remember(state.draggedNodeId, state.selectedPointIds, isDraggedInSelection, flow.junctions, state.capturedJunctionIds) {
+            val base = if (state.draggedNodeId == null) emptySet()
             else if (isDraggedInSelection) state.selectedPointIds + (if (flow.junctions.any { it.id == state.draggedNodeId }) setOf(state.draggedNodeId) else emptySet())
             else if (flow.junctions.any { it.id == state.draggedNodeId }) setOf(state.draggedNodeId)
             else emptySet()
+            base + state.capturedJunctionIds
         }
 
         val renderedGroups = remember(flow.groups, movingGroupIds, state.currentDragOffset) {
@@ -647,7 +648,11 @@ fun BoardCanvas(
         content(interactionState.hoveredConnection, interactionState.hoveredNodeId) { interactionState.hoveredNodeId = it }
 
         // 3. Selection Box overlay drawing
-        SelectionBoxCanvas(interactionState = interactionState)
+        SelectionBoxCanvas(
+            interactionState = interactionState,
+            scale = state.scale,
+            offset = state.offset
+        )
 
         // 4. Order Badges
         flow.connections.forEach { conn ->

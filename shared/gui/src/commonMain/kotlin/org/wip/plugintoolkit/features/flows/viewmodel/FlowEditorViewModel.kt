@@ -486,7 +486,7 @@ class FlowEditorViewModel(
                 val nodesToMove = (if (isSelectedMove) currentState.selectedNodeIds else if (isNode) setOf(event.id) else emptySet()).toMutableSet()
                 val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (isGroup) setOf(event.id) else emptySet()
                 val labelsToMove = if (isSelectedMove) currentState.selectedLabelIds else if (isLabel) setOf(event.id) else emptySet()
-                val pointsToMove = if (isSelectedMove) currentState.selectedPointIds else if (isPoint) setOf(event.id) else emptySet()
+                val pointsToMove = (if (isSelectedMove) currentState.selectedPointIds else if (isPoint) setOf(event.id) else emptySet()) + currentState.capturedJunctionIds
 
                 for (grpId in groupsToMove) {
                     currentState.flow.groups.find { it.id == grpId }?.let { nodesToMove.addAll(it.nodeIds) }
@@ -1340,6 +1340,18 @@ class FlowEditorViewModel(
                         currentState.flow.groups.find { it.id == gId }?.let { nodeIdsToMove.addAll(it.nodeIds) }
                     }
 
+                    val capturedJunctions = currentState.flow.junctions.filter { junc ->
+                        groupsToMove.any { gId ->
+                            val g = currentState.flow.groups.find { it.id == gId }
+                            g != null &&
+                                    junc.position.x >= g.position.x &&
+                                    junc.position.x <= g.position.x + g.size.x &&
+                                    junc.position.y >= g.position.y &&
+                                    junc.position.y <= g.position.y + g.size.y
+                        }
+                    }.map { it.id }.toSet()
+                    val pointIdsToMove = (if (isSelected) currentState.selectedPointIds else emptySet()) + capturedJunctions
+
                     val rawNewGrpPos = grp.position + event.delta
                     val newGrpPos = if (event.snap) rawNewGrpPos.snapToGrid() else rawNewGrpPos
                     val effectiveDelta = newGrpPos - grp.position
@@ -1362,15 +1374,22 @@ class FlowEditorViewModel(
                         } else l
                     }
 
+                    val updatedJunctions = currentState.flow.junctions.map { pt ->
+                        if (pt.id in pointIdsToMove) {
+                            pt.copyWithPosition(if (event.snap) (pt.position + effectiveDelta).snapToGrid() else pt.position + effectiveDelta)
+                        } else pt
+                    }
+
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
                             groups = updatedGroups,
                             labels = updatedLabels,
-                            nodes = updatedNodes
+                            nodes = updatedNodes,
+                            junctions = updatedJunctions
                         ),
                         hasUnsavedChanges = true
                     )
-                    pendingCommand = MoveGroupCommand(event.groupId, grp.position, newGrpPos, nodeIdsToMove)
+                    pendingCommand = MoveGroupCommand(event.groupId, grp.position, newGrpPos, nodeIdsToMove, pointIdsToMove)
                 }
             }
 

@@ -13,6 +13,8 @@ import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.FlowGroup
+import org.wip.plugintoolkit.features.flows.model.FlowJunction
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.Offset as ModelOffset
@@ -404,4 +406,145 @@ class FlowCommandHistoryTest {
         assertEquals(1, redoneState.flow.connections.size)
         assertEquals("data", redoneState.flow.connections.first().targetPortId)
     }
+
+    @Test
+    fun testMoveGroupCommandWithConnectionPointsUndoRedo() {
+        val group = FlowGroup(
+            id = 10L,
+            title = "Test Group",
+            position = ModelOffset(100f, 100f),
+            size = ModelOffset(200f, 200f)
+        )
+        val junction = FlowJunction(
+            id = 20L,
+            position = ModelOffset(150f, 150f)
+        )
+        val initialState = FlowEditorState(
+            flow = Flow("Test", groups = listOf(group), junctions = listOf(junction))
+        )
+
+        val command = MoveGroupCommand(
+            groupId = 10L,
+            oldPos = ModelOffset(100f, 100f),
+            newPos = ModelOffset(200f, 250f),
+            movedNodeIds = emptySet(),
+            movedPointIds = setOf(20L)
+        )
+
+        // 1. Execute
+        val executedState = command.execute(initialState)
+        assertEquals(ModelOffset(200f, 250f), executedState.flow.groups.first().position)
+        assertEquals(ModelOffset(250f, 300f), executedState.flow.junctions.first().position)
+
+        // 2. Undo
+        val undoneState = command.undo(executedState)
+        assertEquals(ModelOffset(100f, 100f), undoneState.flow.groups.first().position)
+        assertEquals(ModelOffset(150f, 150f), undoneState.flow.junctions.first().position)
+
+        // 3. Redo
+        val redoneState = command.execute(undoneState)
+        assertEquals(ModelOffset(200f, 250f), redoneState.flow.groups.first().position)
+        assertEquals(ModelOffset(250f, 300f), redoneState.flow.junctions.first().position)
+    }
+
+    private fun createViewModel(initialFlow: Flow): FlowEditorViewModel = runBlocking {
+        every { mockFlowRepo.flows } returns MutableStateFlow(listOf(initialFlow))
+        val vm = FlowEditorViewModel(
+            initialFlowName = initialFlow.name,
+            flowRepository = mockFlowRepo
+        ).apply {
+            bypassReadOnlyForTesting = true
+        }
+        for (i in 1..100) {
+            if (vm.state.value.flow.name == initialFlow.name &&
+                vm.state.value.flow.junctions.size == initialFlow.junctions.size &&
+                vm.state.value.flow.groups.size == initialFlow.groups.size
+            ) break
+            kotlinx.coroutines.delay(10)
+        }
+        vm
+    }
+
+    @Test
+    fun testGroupDragWithContainedJunctionUndoRedo() = runBlocking {
+        val group = FlowGroup(
+            id = 10L,
+            title = "Group 1",
+            position = ModelOffset(100f, 100f),
+            size = ModelOffset(200f, 200f)
+        )
+        val junction = FlowJunction(
+            id = 20L,
+            position = ModelOffset(150f, 150f)
+        )
+        val flow = Flow("TestDragJunc", groups = listOf(group), junctions = listOf(junction))
+        val viewModel = createViewModel(flow)
+
+        // Drag group by (50f, 50f)
+        viewModel.onEvent(FlowEvent.MoveNode(id = 10L, delta = Offset(50f, 50f)))
+        assertEquals(setOf(20L), viewModel.state.value.capturedJunctionIds)
+
+        // End drag
+        viewModel.onEvent(FlowEvent.EndMoveNode(id = 10L, density = 1f))
+
+        // Both group and junction should have moved by +50f (snapped to 150f, 150f and 200f, 200f)
+        val movedGroup = viewModel.state.value.flow.groups.first { it.id == 10L }
+        val movedJunction = viewModel.state.value.flow.junctions.first { it.id == 20L }
+        assertEquals(ModelOffset(150f, 150f), movedGroup.position)
+        assertEquals(ModelOffset(200f, 200f), movedJunction.position)
+        assertTrue(viewModel.canUndo.value)
+
+        // Undo
+        viewModel.undo()
+        val undoneGroup = viewModel.state.value.flow.groups.first { it.id == 10L }
+        val undoneJunction = viewModel.state.value.flow.junctions.first { it.id == 20L }
+        assertEquals(ModelOffset(100f, 100f), undoneGroup.position, "Group restored to original position on undo")
+        assertEquals(ModelOffset(150f, 150f), undoneJunction.position, "Contained connection point restored on undo")
+
+        // Redo
+        viewModel.redo()
+        val redoneGroup = viewModel.state.value.flow.groups.first { it.id == 10L }
+        val redoneJunction = viewModel.state.value.flow.junctions.first { it.id == 20L }
+        assertEquals(ModelOffset(150f, 150f), redoneGroup.position, "Group position re-applied on redo")
+        assertEquals(ModelOffset(200f, 200f), redoneJunction.position, "Contained connection point re-applied on redo")
+    }
+
+    @Test
+    fun testMoveGroupEventWithContainedJunctionUndoRedo() = runBlocking {
+        val group = FlowGroup(
+            id = 10L,
+            title = "Group 1",
+            position = ModelOffset(100f, 100f),
+            size = ModelOffset(200f, 200f)
+        )
+        val junction = FlowJunction(
+            id = 20L,
+            position = ModelOffset(150f, 150f)
+        )
+        val flow = Flow("TestMoveGroupEvent", groups = listOf(group), junctions = listOf(junction))
+        val viewModel = createViewModel(flow)
+
+        // Dispatch FlowEvent.MoveGroup with delta (50f, 50f)
+        viewModel.onEvent(FlowEvent.MoveGroup(groupId = 10L, delta = ModelOffset(50f, 50f), snap = false))
+
+        val movedGroup = viewModel.state.value.flow.groups.first { it.id == 10L }
+        val movedJunction = viewModel.state.value.flow.junctions.first { it.id == 20L }
+        assertEquals(ModelOffset(150f, 150f), movedGroup.position)
+        assertEquals(ModelOffset(200f, 200f), movedJunction.position)
+
+        // Undo
+        viewModel.undo()
+        val undoneGroup = viewModel.state.value.flow.groups.first { it.id == 10L }
+        val undoneJunction = viewModel.state.value.flow.junctions.first { it.id == 20L }
+        assertEquals(ModelOffset(100f, 100f), undoneGroup.position)
+        assertEquals(ModelOffset(150f, 150f), undoneJunction.position)
+
+        // Redo
+        viewModel.redo()
+        val redoneGroup = viewModel.state.value.flow.groups.first { it.id == 10L }
+        val redoneJunction = viewModel.state.value.flow.junctions.first { it.id == 20L }
+        assertEquals(ModelOffset(150f, 150f), redoneGroup.position)
+        assertEquals(ModelOffset(200f, 200f), redoneJunction.position)
+    }
 }
+
