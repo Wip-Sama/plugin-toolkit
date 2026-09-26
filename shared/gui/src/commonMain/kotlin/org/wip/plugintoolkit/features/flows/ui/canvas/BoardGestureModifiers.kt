@@ -64,6 +64,7 @@ fun Modifier.boardConnectionTapGesture(
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
     roundness: Float = 0.5f,
     orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+    orthogonalPortLead: Boolean = false,
     groups: List<FlowGroup> = emptyList()
 ): Modifier = this.pointerInput(
     connections,
@@ -79,6 +80,7 @@ fun Modifier.boardConnectionTapGesture(
     curveStyle,
     roundness,
     orthogonalStepMode,
+    orthogonalPortLead,
     groups
 ) {
     val d = density?.density ?: 1f
@@ -96,7 +98,9 @@ fun Modifier.boardConnectionTapGesture(
                 roundness = roundness,
                 groups = groups,
                 density = d,
-                stepMode = orthogonalStepMode
+                stepMode = orthogonalStepMode,
+                orthogonalPortLead = orthogonalPortLead,
+                nodes = nodes
             )
             if (bestConnection != null) {
                 if (isEyedropperActive && onSampleColor != null) {
@@ -412,6 +416,7 @@ fun Modifier.boardPointerEventGesture(
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.Bezier,
     roundness: Float = 0.5f,
     orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+    orthogonalPortLead: Boolean = false,
     isAdvancedConnectionMode: Boolean = false,
     onAddJunctionAndBranch: ((Connection, Offset, Int) -> Unit)? = null,
     onDeleteConnectionSegment: ((Connection, Int) -> Unit)? = null,
@@ -483,6 +488,7 @@ fun Modifier.boardPointerEventGesture(
     val currentCurveStyle by rememberUpdatedState(curveStyle)
     val currentRoundness by rememberUpdatedState(roundness)
     val currentOrthogonalStepMode by rememberUpdatedState(orthogonalStepMode)
+    val currentOrthogonalPortLead by rememberUpdatedState(orthogonalPortLead)
     val currentIsAdvancedConnectionMode by rememberUpdatedState(isAdvancedConnectionMode)
     val currentOnAddJunctionAndBranch by rememberUpdatedState(onAddJunctionAndBranch)
     val currentSelectedPointIds by rememberUpdatedState(selectedPointIds)
@@ -606,7 +612,9 @@ fun Modifier.boardPointerEventGesture(
                                 junctions = currentJunctions,
                                 curveStyle = currentCurveStyle,
                                 roundness = currentRoundness,
-                                stepMode = currentOrthogonalStepMode
+                                stepMode = currentOrthogonalStepMode,
+                                orthogonalPortLead = currentOrthogonalPortLead,
+                                nodes = currentNodes
                             )
                             if (connProj != null) {
                                 interactionState.snappedWirePoint = connProj.projectedPoint
@@ -690,7 +698,9 @@ fun Modifier.boardPointerEventGesture(
                         offset = currentOffset,
                         curveStyle = currentCurveStyle,
                         roundness = currentRoundness,
-                        stepMode = currentOrthogonalStepMode
+                        stepMode = currentOrthogonalStepMode,
+                        orthogonalPortLead = currentOrthogonalPortLead,
+                        nodes = currentNodes
                     )
                     interactionState.hoveredMidpoint = closestMid?.let { Pair(it.first, it.second) }
 
@@ -725,7 +735,9 @@ fun Modifier.boardPointerEventGesture(
                             junctions = currentJunctions,
                             curveStyle = currentCurveStyle,
                             roundness = currentRoundness,
-                            stepMode = currentOrthogonalStepMode
+                            stepMode = currentOrthogonalStepMode,
+                            orthogonalPortLead = currentOrthogonalPortLead,
+                            nodes = currentNodes
                         )
                     }
 
@@ -751,15 +763,21 @@ fun Modifier.boardPointerEventGesture(
                                 connection = bestConnection,
                                 connections = currentConnections,
                                 junctionMap = junctionMap,
-                                getPortBoardPosition = currentGetPortBoardPosition
+                                getPortBoardPosition = currentGetPortBoardPosition,
+                                groups = currentGroups,
+                                stepMode = currentOrthogonalStepMode,
+                                orthogonalPortLead = currentOrthogonalPortLead
                             )
                             val filletParams = ConnectionHitTester.getJunctionFilletParams(
                                 connection = bestConnection,
                                 connections = currentConnections,
                                 junctionMap = junctionMap,
                                 getPortBoardPosition = currentGetPortBoardPosition,
+                                groups = currentGroups,
                                 scale = currentScale,
-                                offset = currentOffset
+                                offset = currentOffset,
+                                stepMode = currentOrthogonalStepMode,
+                                orthogonalPortLead = currentOrthogonalPortLead
                             )
                             val boardPoints = ConnectionHitTester.getConnectionBoardPoints(
                                 connection = bestConnection,
@@ -774,10 +792,14 @@ fun Modifier.boardPointerEventGesture(
                                     endHorizontal = endH,
                                     stepMode = currentOrthogonalStepMode,
                                     useMiddleRouteForDirectConnection =
-                                        ConnectionHitTester.usesMiddleRouteForDirectConnection(bestConnection)
+                                        ConnectionHitTester.usesMiddleRouteForDirectConnection(bestConnection, currentOrthogonalPortLead),
+                                    startPortLead = ConnectionHitTester.hasStartPortLead(bestConnection, currentOrthogonalPortLead),
+                                    endPortLead = ConnectionHitTester.hasEndPortLead(bestConnection, currentOrthogonalPortLead),
+                                    startBorderX = ConnectionHitTester.getSourceNodeBorderX(bestConnection, currentNodes),
+                                    endBorderX = ConnectionHitTester.getTargetNodeBorderX(bestConnection, currentNodes)
                                 )
                             } else null
-                            Logger.d(tag = "HoveredConnection") {
+                            Logger.v(tag = "HoveredConnection") {
                                 buildString {
                                     appendLine("=== HOVERED CONNECTION ===")
                                     appendLine("  id: ${bestConnection.sourceNodeId}:${bestConnection.sourcePortId} -> ${bestConnection.targetNodeId}:${bestConnection.targetPortId}")
@@ -790,7 +812,7 @@ fun Modifier.boardPointerEventGesture(
                                 }
                             }
                         } else {
-                            Logger.d(tag = "HoveredConnection") { "=== HOVER CLEARED ==" }
+                            Logger.v(tag = "HoveredConnection") { "=== HOVER CLEARED ==" }
                         }
                     }
                     interactionState.hoveredConnection = bestConnection
@@ -1045,7 +1067,9 @@ fun Modifier.boardPointerEventGesture(
                                 junctions = currentJunctions,
                                 curveStyle = currentCurveStyle,
                                 roundness = currentRoundness,
-                                stepMode = currentOrthogonalStepMode
+                                stepMode = currentOrthogonalStepMode,
+                                orthogonalPortLead = currentOrthogonalPortLead,
+                                nodes = currentNodes
                             )
                             if (connProj != null) {
                                 if (currentIsEyedropperActive && currentOnSampleColor != null) {

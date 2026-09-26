@@ -710,6 +710,8 @@
     <string name="flow_orthogonal_step_middle">Centro</string>
     <string name="flow_orthogonal_step_before">Gradino prima</string>
     <string name="flow_orthogonal_step_after">Gradino dopo</string>
+    <string name="flow_orthogonal_port_lead">Distanza porta (1u)</string>
+    <string name="flow_orthogonal_port_lead_subtitle">Aggiunge un punto invisibile a 1u di spazio griglia dalle porte di input e output dei nodi in modalità Auto</string>
 
     <!-- Flow Info additions -->
     <string name="flow_info_paint_label">P / B</string>

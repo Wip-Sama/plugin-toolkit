@@ -38,6 +38,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -91,6 +92,7 @@ import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_auto
 import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_middle
 import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_before
 import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_after
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_port_lead
 import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import kotlin.math.roundToInt
 
@@ -114,6 +116,7 @@ fun FlowFloatingAppBar(
     connectionStyle: ConnectionCurveStyle,
     connectionRoundness: Float,
     orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+    orthogonalPortLead: Boolean = false,
     onTogglePaintTool: () -> Unit,
     onToggleWashTool: () -> Unit,
     onToggleEyedropper: () -> Unit = {},
@@ -125,6 +128,7 @@ fun FlowFloatingAppBar(
     onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit,
     onChangeConnectionRoundness: (Float) -> Unit,
     onChangeOrthogonalStepMode: (OrthogonalStepMode) -> Unit = {},
+    onChangeOrthogonalPortLead: (Boolean) -> Unit = {},
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     modifier: Modifier = Modifier
@@ -319,7 +323,7 @@ fun FlowFloatingAppBar(
                     }
 
                     if (showSplineSettings) {
-                        val popupOffsetY = if (connectionStyle == ConnectionCurveStyle.Orthogonal) -330 else -260
+                        val popupOffsetY = if (connectionStyle == ConnectionCurveStyle.Orthogonal) -390 else -260
                         Popup(
                             alignment = Alignment.TopCenter,
                             offset = IntOffset(0, popupOffsetY),
@@ -330,9 +334,11 @@ fun FlowFloatingAppBar(
                                 connectionStyle = connectionStyle,
                                 connectionRoundness = connectionRoundness,
                                 orthogonalStepMode = orthogonalStepMode,
+                                orthogonalPortLead = orthogonalPortLead,
                                 onChangeConnectionStyle = onChangeConnectionStyle,
                                 onChangeConnectionRoundness = onChangeConnectionRoundness,
-                                onChangeOrthogonalStepMode = onChangeOrthogonalStepMode
+                                onChangeOrthogonalStepMode = onChangeOrthogonalStepMode,
+                                onChangeOrthogonalPortLead = onChangeOrthogonalPortLead
                             )
                         }
                     }
@@ -535,9 +541,11 @@ private fun SplineSettingsCard(
     connectionStyle: ConnectionCurveStyle,
     connectionRoundness: Float,
     orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+    orthogonalPortLead: Boolean = false,
     onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit,
     onChangeConnectionRoundness: (Float) -> Unit,
     onChangeOrthogonalStepMode: (OrthogonalStepMode) -> Unit = {},
+    onChangeOrthogonalPortLead: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val spacing = ToolkitTheme.spacing
@@ -619,6 +627,28 @@ private fun SplineSettingsCard(
                         onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.After) },
                         label = { Text(stringResource(Res.string.flow_orthogonal_step_after), style = MaterialTheme.typography.labelSmall) }
                     )
+                }
+
+                if (orthogonalStepMode == OrthogonalStepMode.Auto) {
+                    Spacer(modifier = Modifier.height(spacing.extraSmall))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onChangeOrthogonalPortLead(!orthogonalPortLead) },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.flow_orthogonal_port_lead),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Switch(
+                            checked = orthogonalPortLead,
+                            onCheckedChange = onChangeOrthogonalPortLead,
+                            modifier = Modifier.testTag("orthogonal_port_lead_switch")
+                        )
+                    }
                 }
             }
 

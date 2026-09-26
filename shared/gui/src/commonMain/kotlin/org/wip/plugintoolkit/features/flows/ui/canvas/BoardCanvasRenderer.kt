@@ -84,6 +84,7 @@ fun BoardGridAndConnectionsCanvas(
     curveStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
     roundness: Float = 0.5f,
     stepMode: OrthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
+    orthogonalPortLead: Boolean = state.orthogonalPortLead ?: flow.orthogonalPortLead ?: false,
     modifier: Modifier = Modifier
 ) {
     val dimensions = ToolkitTheme.dimensions
@@ -235,7 +236,10 @@ fun BoardGridAndConnectionsCanvas(
                     junctionMap = junctionMap,
                     getPortBoardPosition = getPortBoardPosition,
                     groups = flow.groups,
-                    density = this.density
+                    density = this.density,
+                    stepMode = stepMode,
+                    orthogonalPortLead = orthogonalPortLead,
+                    nodes = flow.nodes
                 )
 
                 val filletParams = ConnectionHitTester.getJunctionFilletParams(
@@ -248,9 +252,13 @@ fun BoardGridAndConnectionsCanvas(
                     scale = state.scale,
                     offset = state.offset,
                     tension = roundness,
-                    stepMode = stepMode
+                    stepMode = stepMode,
+                    orthogonalPortLead = orthogonalPortLead,
+                    nodes = flow.nodes
                 )
                 val effectiveStyle = curveStyle
+                val startBorderX = ConnectionHitTester.getSourceNodeBorderX(connection, flow.nodes)
+                val endBorderX = ConnectionHitTester.getTargetNodeBorderX(connection, flow.nodes)
                 val path = SplineMathUtils.buildConnectionPath(
                     points = screenPoints,
                     style = effectiveStyle,
@@ -263,7 +271,11 @@ fun BoardGridAndConnectionsCanvas(
                     startFilletLeadIn = filletParams.startFilletLeadIn,
                     endTrimDistance = filletParams.endTrimDistance,
                     useMiddleRouteForDirectConnection =
-                        ConnectionHitTester.usesMiddleRouteForDirectConnection(connection)
+                        ConnectionHitTester.usesMiddleRouteForDirectConnection(connection, orthogonalPortLead),
+                    startPortLead = ConnectionHitTester.hasStartPortLead(connection, orthogonalPortLead),
+                    endPortLead = ConnectionHitTester.hasEndPortLead(connection, orthogonalPortLead),
+                    startBorderX = startBorderX,
+                    endBorderX = endBorderX
                 )
                 drawPath(
                     path = path,
@@ -394,7 +406,28 @@ fun BoardGridAndConnectionsCanvas(
                 }
 
                 val pts = listOf((startPos * state.scale) + state.offset, (endPos * state.scale) + state.offset)
-                val path = SplineMathUtils.buildConnectionPath(pts, curveStyle, roundness, scale = state.scale, canvasOffset = state.offset, stepMode = stepMode)
+                val isTargetNodePort = highlightedPortId != null && highlightedNodeId != null
+                val leadStart = if (connectionStartIsOutput) orthogonalPortLead else (isTargetNodePort && orthogonalPortLead)
+                val leadEnd = if (!connectionStartIsOutput) orthogonalPortLead else (isTargetNodePort && orthogonalPortLead)
+
+                val previewSourceNodeId = if (connectionStartIsOutput) connectionStartNodeId else (if (isTargetNodePort) highlightedNodeId else null)
+                val previewTargetNodeId = if (!connectionStartIsOutput) connectionStartNodeId else (if (isTargetNodePort) highlightedNodeId else null)
+                val previewStartBorderX = previewSourceNodeId?.let { id -> flow.nodes.find { it.id == id } }?.let { it.position.x + 400f }
+                val previewEndBorderX = previewTargetNodeId?.let { id -> flow.nodes.find { it.id == id } }?.let { it.position.x }
+
+                val path = SplineMathUtils.buildConnectionPath(
+                    pts,
+                    curveStyle,
+                    roundness,
+                    scale = state.scale,
+                    canvasOffset = state.offset,
+                    stepMode = stepMode,
+                    useMiddleRouteForDirectConnection = !orthogonalPortLead,
+                    startPortLead = leadStart,
+                    endPortLead = leadEnd,
+                    startBorderX = previewStartBorderX,
+                    endBorderX = previewEndBorderX
+                )
                 drawPath(
                     path = path,
                     color = connectionColor.copy(alpha = opacity.disabled),
@@ -467,9 +500,16 @@ fun BoardGridAndConnectionsCanvas(
                         scale = state.scale,
                         offset = state.offset,
                         tension = roundness,
-                        stepMode = stepMode
+                        stepMode = stepMode,
+                        orthogonalPortLead = orthogonalPortLead,
+                        nodes = flow.nodes
                     ).startFilletLeadIn
                 } else null
+
+                val isStartNodePort = interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionSourceJunctionId == null
+                val isEndNodePort = highlightedNodeId != null && highlightedPortId != null
+                val previewStartBorderX = if (isStartNodePort) flow.nodes.find { it.id == interactionState.structuredConnectionStartNodeId }?.let { it.position.x + 400f } else null
+                val previewEndBorderX = if (isEndNodePort) flow.nodes.find { it.id == highlightedNodeId }?.let { it.position.x } else null
 
                 val previewPath = SplineMathUtils.buildConnectionPath(
                     previewScreenPts,
@@ -478,7 +518,12 @@ fun BoardGridAndConnectionsCanvas(
                     scale = state.scale,
                     canvasOffset = state.offset,
                     stepMode = stepMode,
-                    startFilletLeadIn = previewLeadIn
+                    startFilletLeadIn = previewLeadIn,
+                    useMiddleRouteForDirectConnection = !orthogonalPortLead,
+                    startPortLead = isStartNodePort && orthogonalPortLead,
+                    endPortLead = isEndNodePort && orthogonalPortLead,
+                    startBorderX = previewStartBorderX,
+                    endBorderX = previewEndBorderX
                 )
                 drawPath(
                     path = previewPath,

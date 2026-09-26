@@ -244,11 +244,14 @@ class FlowEditorViewModel(
                     ?: 0.5f
                 val defaultStepMode = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalStepMode
                     ?: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
+                val defaultPortLead = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalPortLead
+                    ?: false
                 val defaultHidePorts = resolvedSettingsRepository?.settings?.value?.flows?.hideConnectionPointsUnlessHovered
                     ?: false
                 val effectiveStyle = activeFlowWithSyncedSubflows.connectionCurveStyle ?: defaultStyle
                 val effectiveRoundness = activeFlowWithSyncedSubflows.connectionRoundness ?: defaultRoundness
                 val effectiveStepMode = activeFlowWithSyncedSubflows.orthogonalStepMode ?: defaultStepMode
+                val effectivePortLead = activeFlowWithSyncedSubflows.orthogonalPortLead ?: defaultPortLead
 
                 _state.update { currentState ->
                     currentState.copy(
@@ -256,6 +259,7 @@ class FlowEditorViewModel(
                         connectionCurveStyle = effectiveStyle,
                         connectionRoundness = effectiveRoundness,
                         orthogonalStepMode = effectiveStepMode,
+                        orthogonalPortLead = effectivePortLead,
                         hideConnectionPointsUnlessHovered = defaultHidePorts,
                         nextId = maxId + 1,
                         flows = allFlows,
@@ -2361,6 +2365,14 @@ class FlowEditorViewModel(
                 newState = currentState.copy(
                     orthogonalStepMode = event.mode,
                     flow = currentState.flow.copy(orthogonalStepMode = event.mode),
+                    hasUnsavedChanges = true
+                )
+            }
+
+            is FlowEvent.UpdateOrthogonalPortLead -> {
+                newState = currentState.copy(
+                    orthogonalPortLead = event.enabled,
+                    flow = currentState.flow.copy(orthogonalPortLead = event.enabled),
                     hasUnsavedChanges = true
                 )
             }

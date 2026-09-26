@@ -348,13 +348,10 @@ class ConnectionHitTesterTest {
     }
 
     @Test
-    fun testDiagonalNodeToJunctionMaintainsHorizontalArrivalAndFillet() {
-        // Reproduce the permanently angular connection bug:
-        // - Source node output port at (100, 350)
-        // - Target junction at (250, 100) — diagonally placed: abs(dy=250) > abs(dx=150)
-        // - Without the fix, abs(dx) < abs(dy) would have set endIsHorizontal=false,
-        //   causing the wire to enter the junction vertically and collide with the outgoing
-        //   vertical branch, preventing any fillet from being calculated.
+    fun testDiagonalNodeToJunctionCorrectlyDetectsVerticalArrivalAndFillet() {
+        // Source node output port at (100, 350)
+        // Target junction at (250, 100) — orthogonally routes (100, 350) -> (250, 350) -> (250, 100)
+        // The last segment enters junction 100 vertically from below.
         val incomingConn = Connection(
             sourceNodeId = 1L,
             sourcePortId = "out",
@@ -362,7 +359,7 @@ class ConnectionHitTesterTest {
             targetPortId = org.wip.plugintoolkit.features.flows.model.Connection.FLOATING_PORT_ID,
             targetJunctionId = 100L
         )
-        // Outgoing branch leaves junction vertically upward to node 2 at (250, 0)
+        // Outgoing branch leaves junction horizontally to node 2 at (600, 100)
         val outgoingConn = Connection(
             sourceNodeId = org.wip.plugintoolkit.features.flows.model.Connection.FLOATING_NODE_ID,
             sourcePortId = org.wip.plugintoolkit.features.flows.model.Connection.FLOATING_PORT_ID,
@@ -374,13 +371,13 @@ class ConnectionHitTesterTest {
         val juncMap = mapOf(100L to Offset(250f, 100f))
         val getPortPos: (Long, String, Boolean) -> Offset? = { nodeId, _, isOutput ->
             when {
-                nodeId == 1L && isOutput -> Offset(100f, 350f)   // diagonal: dy=250 > dx=150
+                nodeId == 1L && isOutput -> Offset(100f, 350f)
                 nodeId == 2L && !isOutput -> Offset(600f, 100f)  // outgoing goes horizontally right
                 else -> null
             }
         }
 
-        // The incoming connection should be classified as arriving HORIZONTALLY regardless of diagonal
+        // The incoming connection should be classified as arriving VERTICALLY because the orthogonal route bents vertically
         val (inStartH, inEndH) = ConnectionHitTester.getConnectionOrientations(
             connection = incomingConn,
             connections = listOf(incomingConn, outgoingConn),
@@ -388,16 +385,16 @@ class ConnectionHitTesterTest {
             getPortBoardPosition = getPortPos
         )
         assertTrue(inStartH, "Node output port always starts horizontally")
-        assertTrue(inEndH, "Node->junction without waypoints must always arrive horizontally, regardless of diagonal placement")
+        assertFalse(inEndH, "Node->junction ending with vertical segment must arrive vertically")
 
-        // The outgoing connection should branch off horizontally (since inEndH is true and target is to the right)
+        // The outgoing connection should branch off horizontally (since incoming arrived vertically and target is to the right)
         val (outStartH, outEndH) = ConnectionHitTester.getConnectionOrientations(
             connection = outgoingConn,
             connections = listOf(incomingConn, outgoingConn),
             junctionMap = juncMap,
             getPortBoardPosition = getPortPos
         )
-        assertTrue(outStartH, "Outgoing branch should continue or branch horizontally")
+        assertTrue(outStartH, "Outgoing branch should branch horizontally")
         assertTrue(outEndH, "Target node input must receive connection horizontally")
 
         // Fillet params for the outgoing branch should now receive a valid startFilletLeadIn
@@ -408,12 +405,63 @@ class ConnectionHitTesterTest {
             getPortBoardPosition = getPortPos,
             scale = 1f
         )
-        // With horizontal arrival corrected, the dot product will be perpendicular (not collinear),
-        // so startFilletLeadIn must be non-null
+        // With vertical arrival and horizontal outgoing departure, the turn is perpendicular,
+        // so startFilletLeadIn or endTrimDistance must be non-zero
         assertTrue(
             filletParams.startFilletLeadIn != null || filletParams.endTrimDistance > 0f,
-            "With correct horizontal arrival, at least start fillet or end trim must be non-zero for the outgoing branch"
+            "Perpendicular corner at junction must produce valid fillet lead-in or trim"
         )
+    }
+
+    @Test
+    fun testOrthogonalAutoNodeToJunctionVerticalArrivalFromDebugReport() {
+        // Reproduce the user's exact debug case:
+        // id: 41:created_path -> -1:
+        // sourceJunctionId=null targetJunctionId=230
+        // waypoints=0
+        // startPos = (330.90717, 1349.4056), targetJuncPos = (2050.0, 100.0)
+        // orthoPts(3): (330.90717, 1349.4056), (2050.0, 1349.4056), (2050.0, 100.0)
+        val incomingConn = Connection(
+            sourceNodeId = 41L,
+            sourcePortId = "created_path",
+            targetNodeId = Connection.FLOATING_NODE_ID,
+            targetPortId = Connection.FLOATING_PORT_ID,
+            targetJunctionId = 230L
+        )
+        val outgoingConn = Connection(
+            sourceNodeId = Connection.FLOATING_NODE_ID,
+            sourcePortId = Connection.FLOATING_PORT_ID,
+            sourceJunctionId = 230L,
+            targetNodeId = 2L,
+            targetPortId = "in"
+        )
+        val juncMap = mapOf(230L to Offset(2050f, 100f))
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nodeId, portId, isOutput ->
+            when {
+                nodeId == 41L && portId == "created_path" && isOutput -> Offset(330.90717f, 1349.4056f)
+                nodeId == 2L && !isOutput -> Offset(2500f, 100f)
+                else -> null
+            }
+        }
+
+        val (startH, endH) = ConnectionHitTester.getConnectionOrientations(
+            connection = incomingConn,
+            connections = listOf(incomingConn, outgoingConn),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos
+        )
+
+        assertTrue(startH, "Node output port starts horizontally")
+        assertFalse(endH, "Incoming connection to junction 230 ends vertically along x=2050")
+
+        val (outStartH, outEndH) = ConnectionHitTester.getConnectionOrientations(
+            connection = outgoingConn,
+            connections = listOf(incomingConn, outgoingConn),
+            junctionMap = juncMap,
+            getPortBoardPosition = getPortPos
+        )
+        assertTrue(outStartH, "Outgoing connection turning right must depart horizontally")
+        assertTrue(outEndH, "Target node input receives horizontally")
     }
 
     @Test

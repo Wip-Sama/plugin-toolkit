@@ -21,14 +21,16 @@ object SplineMathUtils {
     enum class Orientation { Horizontal, Vertical }
 
     // --- Tuning Constants ---
+    const val DEFAULT_GRID_SIZE = 50f  
+    const val NODE_PORT_INSET = 19f
     private const val DEFAULT_TENSION = 0.5f
     
     // Tolerance for considering points identical or co-located
     private const val POINT_DUPLICATE_TOLERANCE = 0.1f
     
     // Thresholds for orthogonal snapping
-    private const val ORTHOGONAL_ALIGNMENT_TOLERANCE = 4f
-    private const val COLLINEAR_TOLERANCE = 1.0f
+    const val ORTHOGONAL_ALIGNMENT_TOLERANCE = 4f
+    const val COLLINEAR_TOLERANCE = 1.0f
     
     // Spline / Bezier tension calculation constants
     private const val CONTROL_POINT_MIN_DX = 30f
@@ -43,14 +45,14 @@ object SplineMathUtils {
     private const val MAX_TANGENT_DISTANCE_FACTOR = 1.5f
     
     // Path rounding and filleting constants
-    private const val DEFAULT_CORNER_RADIUS = 14f
-    private const val TENSION_RADIUS_FACTOR = 28f
-    private const val MIN_RENDER_CORNER_RADIUS = 4f
-    private const val TRIM_FACTOR = 0.45f
-    private const val MIN_CORNER_RADIUS = 0.01f
-    private const val FILLET_DOT_TOLERANCE_STRAIGHT = 0.1f
-    private const val FILLET_DOT_TOLERANCE_BEND = -0.75f
-    private const val MIN_SEGMENT_LENGTH = 0.1f
+    const val DEFAULT_CORNER_RADIUS = 14f
+    const val TENSION_RADIUS_FACTOR = 28f
+    const val MIN_RENDER_CORNER_RADIUS = 4f
+    const val TRIM_FACTOR = 0.5f
+    const val MIN_CORNER_RADIUS = 0.01f
+    const val FILLET_DOT_TOLERANCE_STRAIGHT = 0.1f
+    const val FILLET_DOT_TOLERANCE_BEND = -0.75f
+    const val MIN_SEGMENT_LENGTH = 0.1f
     
     // Midpoint and interpolation constants
     private const val MIDPOINT_DISTANCE_TOLERANCE = 0.5f
@@ -278,23 +280,15 @@ object SplineMathUtils {
         }
 
         val effectivePoints = points.toMutableList()
-        var i = 1
-        while (i < effectivePoints.lastIndex) {
-            val incomingLength = (effectivePoints[i] - effectivePoints[i - 1]).getDistance()
-            val outgoingLength = (effectivePoints[i + 1] - effectivePoints[i]).getDistance()
-            if (incomingLength < MIN_RENDER_CORNER_RADIUS || outgoingLength < MIN_RENDER_CORNER_RADIUS) {
-                effectivePoints.removeAt(i)
-            } else {
-                i++
-            }
-        }
+        val origP1 = points[1]
+        var trimDist = 0f
         if (endTrimDistance > 0f && effectivePoints.size >= 2) {
             val pPenultimate = effectivePoints[effectivePoints.size - 2]
             val pLast = effectivePoints.last()
             val vEnd = pLast - pPenultimate
             val lenEnd = vEnd.getDistance()
             if (lenEnd > MIN_SEGMENT_LENGTH) {
-                val trimDist = minOf(endTrimDistance, lenEnd * TRIM_FACTOR)
+                trimDist = minOf(endTrimDistance, lenEnd * TRIM_FACTOR)
                 effectivePoints[effectivePoints.size - 1] = Offset(
                     pLast.x - (vEnd.x / lenEnd) * trimDist,
                     pLast.y - (vEnd.y / lenEnd) * trimDist
@@ -307,9 +301,6 @@ object SplineMathUtils {
         var startFilletStart = Offset.Zero
         var startFilletEnd = Offset.Zero
         val p0 = effectivePoints[0]
-        
-        // Use original points for lead-in calculation to prevent trimmed segments from altering fillet radius
-        val origP1 = effectivePoints[1]
 
         if (startFilletLeadIn != null) {
             val vInRaw = p0 - startFilletLeadIn
@@ -322,9 +313,23 @@ object SplineMathUtils {
                 val vOut = Offset(vOutRaw.x / lenOut, vOutRaw.y / lenOut)
                 val dot = vIn.x * vOut.x + vIn.y * vOut.y
                 if (abs(dot) < MIN_SEGMENT_LENGTH || dot < FILLET_DOT_TOLERANCE_BEND) {
-                    val r = minOf(cornerRadius, lenIn * TRIM_FACTOR, lenOut * TRIM_FACTOR)
-                    // Use proportional minimum to stay zoom-stable: fillet degrades gracefully
-                    // instead of snapping to a sharp corner at low zoom.
+                    var r = minOf(cornerRadius, lenIn * TRIM_FACTOR, lenOut * TRIM_FACTOR)
+                    // If a 2-point segment has both a start fillet and an end trim, ensure the fillet and trim
+                    // don't leave a gap or cross over when the segment is short:
+                    if (effectivePoints.size == 2 && trimDist > 0f) {
+                        val totalDist = lenOut
+                        if (r + trimDist > totalDist && totalDist > 0f) {
+                            val ratio = totalDist / (r + trimDist)
+                            r *= ratio
+                            val scaledTrim = trimDist * ratio
+                            val pLast = points.last()
+                            val vEnd = pLast - p0
+                            effectivePoints[1] = Offset(
+                                pLast.x - (vEnd.x / totalDist) * scaledTrim,
+                                pLast.y - (vEnd.y / totalDist) * scaledTrim
+                            )
+                        }
+                    }
                     val minR = MIN_CORNER_RADIUS
                     if (r >= minR) {
                         hasStartFillet = true
@@ -337,7 +342,7 @@ object SplineMathUtils {
 
         if (hasStartFillet) {
             path.moveTo(startFilletStart.x, startFilletStart.y)
-            path.quadraticTo(p0.x, p0.y, startFilletEnd.x, startFilletEnd.y)
+            path.quadraticBezierTo(p0.x, p0.y, startFilletEnd.x, startFilletEnd.y)
 
             if (effectivePoints.size == 2) {
                 path.lineTo(effectivePoints[1].x, effectivePoints[1].y)
@@ -416,7 +421,12 @@ object SplineMathUtils {
         stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
         startFilletLeadIn: Offset? = null,
         endTrimDistance: Float = 0f,
-        useMiddleRouteForDirectConnection: Boolean = true
+        useMiddleRouteForDirectConnection: Boolean = true,
+        startPortLead: Boolean = false,
+        endPortLead: Boolean = false,
+        gridSize: Float = DEFAULT_GRID_SIZE,
+        startBorderX: Float? = null,
+        endBorderX: Float? = null
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return emptyList()
@@ -440,19 +450,21 @@ object SplineMathUtils {
                     startHorizontal,
                     endHorizontal,
                     stepMode,
-                    useMiddleRouteForDirectConnection
+                    useMiddleRouteForDirectConnection,
+                    startPortLead = startPortLead,
+                    endPortLead = endPortLead,
+                    gridSize = gridSize,
+                    startBorderX = startBorderX,
+                    endBorderX = endBorderX
                 )
-                // Re-transform to screen space for midpoint calculations.
-                val orthoPoints = if (scale != 1f || canvasOffset != Offset.Zero) {
-                    orthoBoard.map { it * scale + canvasOffset }
-                } else { orthoBoard }
-                (0 until pts.size - 1).map { i ->
-                    val p0 = pts[i]
-                    val p1 = pts[i + 1]
-                    val idx0 = orthoPoints.indexOfFirst { (it - p0).getDistance() < MIDPOINT_DISTANCE_TOLERANCE * scale }
-                    val idx1 = orthoPoints.indexOfLast { (it - p1).getDistance() < MIDPOINT_DISTANCE_TOLERANCE * scale }
-                    if (idx0 != -1 && idx1 != -1 && idx1 > idx0) {
-                        val subPoints = orthoPoints.subList(idx0, idx1 + 1)
+                // Evaluate midpoints purely in board coordinates, eliminating any zoom dependency.
+                (0 until boardPts.size - 1).map { i ->
+                    val bp0 = boardPts[i]
+                    val bp1 = boardPts[i + 1]
+                    val idx0 = orthoBoard.indexOfFirst { (it - bp0).getDistance() < COLLINEAR_TOLERANCE }
+                    val idx1 = orthoBoard.indexOfLast { (it - bp1).getDistance() < COLLINEAR_TOLERANCE }
+                    val boardMid = if (idx0 != -1 && idx1 != -1 && idx1 > idx0) {
+                        val subPoints = orthoBoard.subList(idx0, idx1 + 1)
                         var totalLen = 0f
                         for (k in 0 until subPoints.size - 1) {
                             totalLen += (subPoints[k + 1] - subPoints[k]).getDistance()
@@ -472,9 +484,14 @@ object SplineMathUtils {
                             }
                             accumulated += segLen
                         }
-                        foundMid ?: Offset((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f)
+                        foundMid ?: Offset((bp0.x + bp1.x) * 0.5f, (bp0.y + bp1.y) * 0.5f)
                     } else {
-                        Offset((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f)
+                        Offset((bp0.x + bp1.x) * 0.5f, (bp0.y + bp1.y) * 0.5f)
+                    }
+                    if (scale != 1f || canvasOffset != Offset.Zero) {
+                        (boardMid * scale) + canvasOffset
+                    } else {
+                        boardMid
                     }
                 }
             }
@@ -496,10 +513,28 @@ object SplineMathUtils {
         startHorizontal: Boolean = true,
         endHorizontal: Boolean = true,
         stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
-        useMiddleRouteForDirectConnection: Boolean = true
+        useMiddleRouteForDirectConnection: Boolean = true,
+        startPortLead: Boolean = false,
+        endPortLead: Boolean = false,
+        gridSize: Float = DEFAULT_GRID_SIZE,
+        startBorderX: Float? = null,
+        endBorderX: Float? = null
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return pts
+
+        if (stepMode == OrthogonalStepMode.Auto && (startPortLead || endPortLead)) {
+            return routeOrthogonalAutoWithPortLeads(
+                pts = pts,
+                startHorizontal = startHorizontal,
+                endHorizontal = endHorizontal,
+                startPortLead = startPortLead,
+                endPortLead = endPortLead,
+                gridSize = gridSize,
+                startBorderX = startBorderX,
+                endBorderX = endBorderX
+            )
+        }
         
         val waypoints = mutableListOf<Offset>()
         waypoints.add(pts[0])
@@ -574,6 +609,261 @@ object SplineMathUtils {
         return simplifyOrthogonalPath(waypoints)
     }
 
+    fun computeStartPortLead(
+        p0: Offset,
+        startBorderX: Float? = null,
+        gridSize: Float = DEFAULT_GRID_SIZE
+    ): Offset {
+        val borderX = startBorderX ?: (p0.x + NODE_PORT_INSET)
+        return Offset(borderX + gridSize, p0.y)
+    }
+
+    fun computeEndPortLead(
+        p1: Offset,
+        endBorderX: Float? = null,
+        gridSize: Float = DEFAULT_GRID_SIZE
+    ): Offset {
+        val borderX = endBorderX ?: (p1.x - NODE_PORT_INSET)
+        return Offset(borderX - gridSize, p1.y)
+    }
+
+    private fun routeOrthogonalAutoWithPortLeads(
+        pts: List<Offset>,
+        startHorizontal: Boolean,
+        endHorizontal: Boolean,
+        startPortLead: Boolean,
+        endPortLead: Boolean,
+        gridSize: Float,
+        startBorderX: Float? = null,
+        endBorderX: Float? = null
+    ): List<Offset> {
+        if (pts.size == 2) {
+            val waypoints = mutableListOf<Offset>()
+            routeDirectConnectionWithPortLeads(
+                p0 = pts[0],
+                p1 = pts[1],
+                startHorizontal = startHorizontal,
+                endHorizontal = endHorizontal,
+                startPortLead = startPortLead,
+                endPortLead = endPortLead,
+                gridSize = gridSize,
+                startBorderX = startBorderX,
+                endBorderX = endBorderX,
+                outWaypoints = waypoints
+            )
+            return simplifyOrthogonalPath(waypoints)
+        }
+
+        // Multi-point connection with intermediate waypoints:
+        // Place start lead waypoint at wStart and end lead waypoint at wEnd,
+        // then route through all intermediate waypoints using standard Auto (no middle route).
+        val innerPts = mutableListOf<Offset>()
+        if (startPortLead) {
+            val pLead0 = computeStartPortLead(pts.first(), startBorderX, gridSize)
+            val pNext = pts[1]
+            // If the next waypoint is ahead but within lead range, avoid adding overshooting lead waypoint
+            if (pNext.x > pts.first().x && pNext.x <= pLead0.x) {
+                innerPts.add(pts.first())
+            } else {
+                innerPts.add(pLead0)
+            }
+        } else {
+            innerPts.add(pts.first())
+        }
+        for (i in 1 until pts.size - 1) {
+            innerPts.add(pts[i])
+        }
+        if (endPortLead) {
+            val pLead1 = computeEndPortLead(pts.last(), endBorderX, gridSize)
+            val pPrev = pts[pts.size - 2]
+            // If previous waypoint is behind target but within lead range, avoid adding overshooting lead waypoint
+            if (pPrev.x < pts.last().x && pPrev.x >= pLead1.x) {
+                innerPts.add(pts.last())
+            } else {
+                innerPts.add(pLead1)
+            }
+        } else {
+            innerPts.add(pts.last())
+        }
+
+        val routedInner = computeOrthogonalPoints(
+            points = innerPts,
+            startHorizontal = if (startPortLead) true else startHorizontal,
+            endHorizontal = if (endPortLead) true else endHorizontal,
+            stepMode = OrthogonalStepMode.Auto,
+            useMiddleRouteForDirectConnection = false,
+            startPortLead = false,
+            endPortLead = false,
+            gridSize = gridSize
+        )
+
+        val finalWaypoints = mutableListOf<Offset>()
+        finalWaypoints.add(pts.first())
+        finalWaypoints.addAll(routedInner)
+        finalWaypoints.add(pts.last())
+        return simplifyOrthogonalPath(finalWaypoints)
+    }
+
+    private fun routeDirectConnectionWithPortLeads(
+        p0: Offset,
+        p1: Offset,
+        startHorizontal: Boolean,
+        endHorizontal: Boolean,
+        startPortLead: Boolean,
+        endPortLead: Boolean,
+        gridSize: Float,
+        startBorderX: Float? = null,
+        endBorderX: Float? = null,
+        outWaypoints: MutableList<Offset>
+    ) {
+        outWaypoints.add(p0)
+
+        // 1. Both start and end have port leads (Node output -> Node input)
+        if (startPortLead && endPortLead) {
+            val pLead0 = computeStartPortLead(p0, startBorderX, gridSize)
+            val pLead1 = computeEndPortLead(p1, endBorderX, gridSize)
+            val b0 = startBorderX ?: (p0.x + NODE_PORT_INSET)
+            val b1 = endBorderX ?: (p1.x - NODE_PORT_INSET)
+            val isForward = if (startBorderX != null && endBorderX != null) b1 > b0 else p1.x > p0.x
+
+            if (isForward) {
+                if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                    outWaypoints.add(p1)
+                } else if (pLead1.x >= pLead0.x) {
+                    outWaypoints.add(Offset(pLead1.x, p0.y))
+                    outWaypoints.add(pLead1)
+                    outWaypoints.add(p1)
+                } else {
+                    // Nodes or ports are too close together for full leads.
+                    // If ports are in near range (< 30f), avoid adding the additional middle waypoints
+                    // that cause loops or improper vertical middle fallbacks.
+                    val corridorWidth = if (b1 > b0) b1 - b0 else (p1.x - p0.x)
+                    if (corridorWidth < 30f) {
+                        outWaypoints.add(Offset(p0.x, p1.y))
+                        outWaypoints.add(p1)
+                    } else {
+                        val stepX = if (b1 > b0) (b0 + b1) / 2f else (p0.x + p1.x) / 2f
+                        outWaypoints.add(Offset(stepX, p0.y))
+                        outWaypoints.add(Offset(stepX, p1.y))
+                        outWaypoints.add(p1)
+                    }
+                }
+            } else {
+                // Backward connection (target node is behind source node) -> loop around
+                val turnY = if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                    p0.y + gridSize
+                } else {
+                    (p0.y + p1.y) / 2f
+                }
+                outWaypoints.add(pLead0)
+                outWaypoints.add(Offset(pLead0.x, turnY))
+                outWaypoints.add(Offset(pLead1.x, turnY))
+                outWaypoints.add(pLead1)
+                outWaypoints.add(p1)
+            }
+            return
+        }
+
+        // 2. Only startPortLead (Node output -> Junction or floating target)
+        if (startPortLead) {
+            val pLead0 = computeStartPortLead(p0, startBorderX, gridSize)
+            val b0 = startBorderX ?: (p0.x + NODE_PORT_INSET)
+            val isForward = if (startBorderX != null) p1.x > b0 else p1.x > p0.x
+
+            if (isForward) {
+                if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                    outWaypoints.add(p1)
+                } else if (p1.x >= pLead0.x) {
+                    if (endHorizontal) {
+                        outWaypoints.add(pLead0)
+                        outWaypoints.add(Offset(pLead0.x, p1.y))
+                    } else {
+                        outWaypoints.add(Offset(p1.x, p0.y))
+                    }
+                    outWaypoints.add(p1)
+                } else {
+                    // Target is ahead but within lead range; if in near range, avoid additional waypoints
+                    val corridorWidth = p1.x - p0.x
+                    if (corridorWidth < 30f) {
+                        if (endHorizontal) {
+                            outWaypoints.add(Offset(p0.x, p1.y))
+                        } else {
+                            outWaypoints.add(Offset(p1.x, p0.y))
+                        }
+                    } else {
+                        if (endHorizontal) {
+                            val stepX = (p0.x + p1.x) / 2f
+                            outWaypoints.add(Offset(stepX, p0.y))
+                            outWaypoints.add(Offset(stepX, p1.y))
+                        } else {
+                            outWaypoints.add(Offset(p1.x, p0.y))
+                        }
+                    }
+                    outWaypoints.add(p1)
+                }
+            } else {
+                val turnY = if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) p0.y + gridSize else (p0.y + p1.y) / 2f
+                outWaypoints.add(pLead0)
+                outWaypoints.add(Offset(pLead0.x, turnY))
+                outWaypoints.add(Offset(p1.x, turnY))
+                outWaypoints.add(p1)
+            }
+            return
+        }
+
+        // 3. Only endPortLead (Junction -> Node input)
+        if (endPortLead) {
+            val pLead1 = computeEndPortLead(p1, endBorderX, gridSize)
+            val b1 = endBorderX ?: (p1.x - NODE_PORT_INSET)
+            val isForward = if (endBorderX != null) b1 > p0.x else p1.x > p0.x
+
+            if (isForward) {
+                if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                    outWaypoints.add(p1)
+                } else if (pLead1.x >= p0.x) {
+                    if (startHorizontal) {
+                        outWaypoints.add(Offset(pLead1.x, p0.y))
+                        outWaypoints.add(pLead1)
+                    } else {
+                        outWaypoints.add(Offset(p0.x, p1.y))
+                        outWaypoints.add(pLead1)
+                    }
+                    outWaypoints.add(p1)
+                } else {
+                    // Source is ahead of pLead1.x (too close to target); if in near range, avoid additional waypoints
+                    val corridorWidth = p1.x - p0.x
+                    if (corridorWidth < 30f) {
+                        outWaypoints.add(Offset(p0.x, p1.y))
+                    } else {
+                        if (startHorizontal) {
+                            val stepX = (p0.x + p1.x) / 2f
+                            outWaypoints.add(Offset(stepX, p0.y))
+                            outWaypoints.add(Offset(stepX, p1.y))
+                        } else {
+                            outWaypoints.add(Offset(p0.x, p1.y))
+                        }
+                    }
+                    outWaypoints.add(p1)
+                }
+            } else {
+                val turnY = if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) p0.y + gridSize else (p0.y + p1.y) / 2f
+                if (startHorizontal) {
+                    outWaypoints.add(Offset(p0.x + gridSize, p0.y))
+                    outWaypoints.add(Offset(p0.x + gridSize, turnY))
+                    outWaypoints.add(Offset(pLead1.x, turnY))
+                    outWaypoints.add(pLead1)
+                } else {
+                    outWaypoints.add(Offset(p0.x, turnY))
+                    outWaypoints.add(Offset(pLead1.x, turnY))
+                    outWaypoints.add(pLead1)
+                }
+                outWaypoints.add(p1)
+            }
+            return
+        }
+
+        outWaypoints.add(p1)
+    }
 
     private fun simplifyOrthogonalPath(points: List<Offset>): List<Offset> {
         if (points.size <= 2) return points
@@ -636,7 +926,12 @@ object SplineMathUtils {
         stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
         startFilletLeadIn: Offset? = null,
         endTrimDistance: Float = 0f,
-        useMiddleRouteForDirectConnection: Boolean = true
+        useMiddleRouteForDirectConnection: Boolean = true,
+        startPortLead: Boolean = false,
+        endPortLead: Boolean = false,
+        gridSize: Float = DEFAULT_GRID_SIZE,
+        startBorderX: Float? = null,
+        endBorderX: Float? = null
     ): Path {
         val validPoints = points.filter { it.x.isFinite() && it.y.isFinite() }
         val path = Path()
@@ -676,11 +971,16 @@ object SplineMathUtils {
                 }
                 val boardPts = sanitizePoints(rawBoardPts)
                 val orthoBoard = computeOrthogonalPoints(
-                    boardPts,
-                    startHorizontal,
-                    endHorizontal,
-                    stepMode,
-                    useMiddleRouteForDirectConnection
+                    points = boardPts,
+                    startHorizontal = startHorizontal,
+                    endHorizontal = endHorizontal,
+                    stepMode = stepMode,
+                    useMiddleRouteForDirectConnection = useMiddleRouteForDirectConnection,
+                    startPortLead = startPortLead,
+                    endPortLead = endPortLead,
+                    gridSize = gridSize,
+                    startBorderX = startBorderX,
+                    endBorderX = endBorderX
                 )
                 // Re-transform orthogonal waypoints back to screen space.
                 val orthoScreen = if (scale != 1f || canvasOffset != Offset.Zero) {
@@ -723,7 +1023,12 @@ object SplineMathUtils {
         stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
         startFilletLeadIn: Offset? = null,
         endTrimDistance: Float = 0f,
-        useMiddleRouteForDirectConnection: Boolean = true
+        useMiddleRouteForDirectConnection: Boolean = true,
+        startPortLead: Boolean = false,
+        endPortLead: Boolean = false,
+        gridSize: Float = DEFAULT_GRID_SIZE,
+        startBorderX: Float? = null,
+        endBorderX: Float? = null
     ): List<Offset> {
         val validPoints = points.filter { it.x.isFinite() && it.y.isFinite() }
         if (validPoints.isEmpty()) return emptyList()
@@ -747,7 +1052,12 @@ object SplineMathUtils {
                     startHorizontal,
                     endHorizontal,
                     stepMode,
-                    useMiddleRouteForDirectConnection
+                    useMiddleRouteForDirectConnection,
+                    startPortLead = startPortLead,
+                    endPortLead = endPortLead,
+                    gridSize = gridSize,
+                    startBorderX = startBorderX,
+                    endBorderX = endBorderX
                 )
                 val orthoPoints = if (scale != 1f || canvasOffset != Offset.Zero) {
                     orthoBoard.map { it * scale + canvasOffset }

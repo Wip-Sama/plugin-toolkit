@@ -142,6 +142,7 @@ fun BoardCanvas(
     onChangeConnectionStyle: (ConnectionCurveStyle) -> Unit = {},
     onChangeConnectionRoundness: (Float) -> Unit = {},
     onChangeOrthogonalStepMode: (OrthogonalStepMode) -> Unit = {},
+    onChangeOrthogonalPortLead: (Boolean) -> Unit = {},
     onPaintConnection: ((Connection) -> Unit)? = null,
     onWashConnection: ((Connection) -> Unit)? = null,
     onPaintGroup: ((Long) -> Unit)? = null,
@@ -349,6 +350,7 @@ fun BoardCanvas(
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness,
                 orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
+                orthogonalPortLead = state.orthogonalPortLead ?: flow.orthogonalPortLead ?: false,
                 groups = flow.groups
             )
             .boardPanGesture(
@@ -385,6 +387,7 @@ fun BoardCanvas(
                 curveStyle = state.connectionCurveStyle,
                 roundness = state.connectionRoundness,
                 orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
+                orthogonalPortLead = state.orthogonalPortLead ?: flow.orthogonalPortLead ?: false,
                 isAdvancedConnectionMode = state.isAdvancedConnectionMode,
                 onAddJunctionAndBranch = onAddJunctionAndBranch,
                 selectedPointIds = state.selectedPointIds,
@@ -513,7 +516,8 @@ fun BoardCanvas(
             portLayoutVersion = portLayoutVersion,
             curveStyle = state.connectionCurveStyle,
             roundness = state.connectionRoundness,
-            stepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto
+            stepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
+            orthogonalPortLead = state.orthogonalPortLead ?: flow.orthogonalPortLead ?: false
         )
 
         // 1.1 Groups Layer (Behind nodes and labels)
@@ -783,6 +787,7 @@ fun BoardCanvas(
                     connectionStyle = state.connectionCurveStyle,
                     connectionRoundness = state.connectionRoundness,
                     orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
+                    orthogonalPortLead = state.orthogonalPortLead ?: flow.orthogonalPortLead ?: false,
                     onTogglePaintTool = onTogglePaintTool,
                     onToggleWashTool = onToggleWashTool,
                     onToggleEyedropper = onToggleEyedropper,
@@ -794,6 +799,7 @@ fun BoardCanvas(
                     onChangeConnectionStyle = onChangeConnectionStyle,
                     onChangeConnectionRoundness = onChangeConnectionRoundness,
                     onChangeOrthogonalStepMode = onChangeOrthogonalStepMode,
+                    onChangeOrthogonalPortLead = onChangeOrthogonalPortLead,
                     onZoomIn = { onZoom(-1f, centerPosition, false) },
                     onZoomOut = { onZoom(1f, centerPosition, false) },
                     modifier = Modifier

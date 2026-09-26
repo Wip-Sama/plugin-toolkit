@@ -692,7 +692,8 @@ data class Flow(
     val defaultValues: Map<String, JsonElement> = emptyMap(),
     val connectionCurveStyle: ConnectionCurveStyle? = null,
     val connectionRoundness: Float? = null,
-    val orthogonalStepMode: OrthogonalStepMode? = null
+    val orthogonalStepMode: OrthogonalStepMode? = null,
+    val orthogonalPortLead: Boolean? = null
 ) {
     val connectionPoints: List<ConnectionPoint> get() = junctions
 

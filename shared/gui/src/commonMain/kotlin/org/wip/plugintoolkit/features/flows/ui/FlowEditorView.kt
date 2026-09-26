@@ -70,6 +70,7 @@ import org.wip.plugintoolkit.api.ParameterConditionEvaluator
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorViewModel
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEvent
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import org.wip.plugintoolkit.shared.components.LocalOverlayHost
 import org.wip.plugintoolkit.shared.components.OverlayHost
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
@@ -404,7 +405,10 @@ fun FlowEditorView(
                     offset = state.offset,
                     junctions = flow.junctions,
                     curveStyle = state.connectionCurveStyle,
-                    roundness = state.connectionRoundness
+                    roundness = state.connectionRoundness,
+                    stepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
+                    orthogonalPortLead = state.orthogonalPortLead ?: flow.orthogonalPortLead ?: false,
+                    nodes = flow.nodes
                 )
                 if (closestConnAndProj != null) {
                     val (closestConn, splitPos) = closestConnAndProj
@@ -557,6 +561,7 @@ fun FlowEditorView(
             onChangeConnectionStyle = { viewModel.onEvent(FlowEvent.UpdateConnectionCurveStyle(it)) },
             onChangeConnectionRoundness = { viewModel.onEvent(FlowEvent.UpdateConnectionRoundness(it)) },
             onChangeOrthogonalStepMode = { viewModel.onEvent(FlowEvent.UpdateOrthogonalStepMode(it)) },
+            onChangeOrthogonalPortLead = { viewModel.onEvent(FlowEvent.UpdateOrthogonalPortLead(it)) },
             onPaintConnection = { viewModel.onEvent(FlowEvent.PaintConnection(it)) },
             onWashConnection = { viewModel.onEvent(FlowEvent.WashConnection(it)) },
             onPaintGroup = { viewModel.onEvent(FlowEvent.PaintGroup(it)) },

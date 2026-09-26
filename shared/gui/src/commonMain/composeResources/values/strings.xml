@@ -714,6 +714,8 @@
     <string name="flow_orthogonal_step_middle">Middle</string>
     <string name="flow_orthogonal_step_before">Step Before</string>
     <string name="flow_orthogonal_step_after">Step After</string>
+    <string name="flow_orthogonal_port_lead">Port Clearance (1u)</string>
+    <string name="flow_orthogonal_port_lead_subtitle">Adds an invisible waypoint 1u of grid space away from node input and output ports in Auto mode</string>
 
     <!-- Flow Info additions -->
     <string name="flow_info_paint_label">P / B</string>

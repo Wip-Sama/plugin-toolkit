@@ -586,7 +586,7 @@ class SplineMathUtilsTest {
         )
         // Original target was (100, 0).
         // Untrimmed length is 100 (from 100 to 0).
-        // Max radius allowed for a length of 100 is 100 * 0.45 = 45f.
+        // Max radius allowed for a length of 100 is 100 * 0.5 = 50f.
         // Corner radius requested by sampleConnectionPoints is 14f.
         // Even with the trim of 50f, the original (untrimmed) segment was used to determine the start fillet!
         // Start corner should be exactly at 14f from junc, so (86, 100).
@@ -596,9 +596,9 @@ class SplineMathUtilsTest {
         assertEquals(100f, first.y, 0.5f)
         
         // Ensure the end is indeed trimmed
-        // target is (100, 0), moving up from (100, 100). trim 50 from end is capped at 100 * 0.45 = 45 -> stops at (100, 45).
+        // target is (100, 0), moving up from (100, 100). trim 50 from end is capped at 100 * 0.5 = 50 -> stops at (100, 50).
         assertEquals(100f, sampled.last().x, 0.5f)
-        assertEquals(45f, sampled.last().y, 0.5f)
+        assertEquals(50f, sampled.last().y, 0.5f)
     }
 
     @Test

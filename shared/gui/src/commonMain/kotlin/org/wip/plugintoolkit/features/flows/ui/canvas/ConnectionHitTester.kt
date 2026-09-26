@@ -5,6 +5,7 @@ import co.touchlab.kermit.Logger
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowJunction
+import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
 import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
@@ -19,16 +20,46 @@ data class JunctionFilletParams(
 
 object ConnectionHitTester {
 
-    fun usesMiddleRouteForDirectConnection(connection: Connection): Boolean =
-        connection.sourceJunctionId == null &&
+    fun usesMiddleRouteForDirectConnection(connection: Connection, orthogonalPortLead: Boolean = false): Boolean =
+        !orthogonalPortLead &&
+                connection.sourceJunctionId == null &&
                 connection.targetJunctionId == null &&
                 connection.junctionIds.isEmpty() &&
                 connection.waypoints.isEmpty()
 
-    private fun findJunctionLocalPrevPoint(path: List<Offset>, junction: Offset, epsilon: Float = 1f): Offset? {
+    fun hasStartPortLead(connection: Connection, portLeadEnabled: Boolean): Boolean =
+        portLeadEnabled && connection.sourceJunctionId == null && connection.sourceNodeId != Connection.FLOATING_NODE_ID
+
+    fun hasEndPortLead(connection: Connection, portLeadEnabled: Boolean): Boolean =
+        portLeadEnabled && connection.targetJunctionId == null && !connection.isFloating && connection.targetNodeId != Connection.FLOATING_NODE_ID
+
+    fun getSourceNodeBorderX(
+        connection: Connection,
+        nodes: List<Node>,
+        defaultNodeWidth: Float = 400f
+    ): Float? {
+        if (connection.sourceJunctionId != null || connection.sourceNodeId == Connection.FLOATING_NODE_ID) return null
+        val node = nodes.find { it.id == connection.sourceNodeId } ?: return null
+        return node.position.x + defaultNodeWidth
+    }
+
+    fun getTargetNodeBorderX(
+        connection: Connection,
+        nodes: List<Node>
+    ): Float? {
+        if (connection.targetJunctionId != null || connection.isFloating || connection.targetNodeId == Connection.FLOATING_NODE_ID) return null
+        val node = nodes.find { it.id == connection.targetNodeId } ?: return null
+        return node.position.x
+    }
+
+    private fun findJunctionLocalPrevPoint(path: List<Offset>, junction: Offset, epsilon: Float = 4f): Offset? {
         if (path.size < 2) return null
         val idx = path.indexOfFirst { (it - junction).getDistance() < epsilon }
-        return if (idx > 0) path[idx - 1] else null
+        return when {
+            idx > 0 -> path[idx - 1]
+            idx == 0 -> null
+            else -> path[path.size - 2]
+        }
     }
 
     fun getConnectionOrientations(
@@ -37,64 +68,42 @@ object ConnectionHitTester {
         junctionMap: Map<Long, Offset> = emptyMap(),
         getPortBoardPosition: ((Long, String, Boolean) -> Offset?)? = null,
         groups: List<FlowGroup> = emptyList(),
-        density: Float = 1f
+        density: Float = 1f,
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+        orthogonalPortLead: Boolean = false,
+        nodes: List<Node> = emptyList()
+    ): Pair<Boolean, Boolean> = determineConnectionOrientations(
+        connection = connection,
+        connections = connections,
+        junctionMap = junctionMap,
+        getPortBoardPosition = getPortBoardPosition,
+        groups = groups,
+        density = density,
+        stepMode = stepMode,
+        orthogonalPortLead = orthogonalPortLead,
+        nodes = nodes,
+        visited = emptySet()
+    )
+
+    private fun determineConnectionOrientations(
+        connection: Connection,
+        connections: List<Connection>,
+        junctionMap: Map<Long, Offset>,
+        getPortBoardPosition: ((Long, String, Boolean) -> Offset?)?,
+        groups: List<FlowGroup>,
+        density: Float,
+        stepMode: OrthogonalStepMode,
+        orthogonalPortLead: Boolean,
+        nodes: List<Node>,
+        visited: Set<Connection>
     ): Pair<Boolean, Boolean> {
         val connId = "conn[${connection.sourceNodeId}:${connection.sourcePortId}->${connection.targetNodeId}:${connection.targetPortId}]"
-        // 1. Determine end orientation (how this connection arrives at its target):
-        val endIsHorizontal = if (connection.targetJunctionId == null && !connection.isFloating) {
-            // Node input ports always receive connections horizontally from the left
-            Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (target is a node input port, always horizontal)" }
-            true
-        } else if (connection.targetJunctionId != null) {
-            val tgtJuncPos = junctionMap[connection.targetJunctionId]
-            if (tgtJuncPos != null) {
-                if (connection.sourceJunctionId == null && connection.waypoints.isEmpty()) {
-                    Logger.v(tag = "ConnectionOrientations") {
-                        "$connId: endIsHorizontal=true (node output port -> junction, no waypoints: always arrives horizontally)"
-                    }
-                    true
-                } else {
-                    val inBoardPts = if (getPortBoardPosition != null) {
-                        getConnectionBoardPoints(
-                            connection = connection,
-                            getPortBoardPosition = getPortBoardPosition,
-                            junctionMap = junctionMap,
-                            groups = groups,
-                            density = density
-                        )
-                    } else null
-
-                    val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
-                        findJunctionLocalPrevPoint(inBoardPts, tgtJuncPos)
-                    } else if (connection.sourceJunctionId != null) {
-                        junctionMap[connection.sourceJunctionId]
-                    } else {
-                        null
-                    }
-
-                    if (inPrevPoint != null) {
-                        val dx = tgtJuncPos.x - inPrevPoint.x
-                        val dy = tgtJuncPos.y - inPrevPoint.y
-                        val result = abs(dx) >= abs(dy)
-                        Logger.v(tag = "ConnectionOrientations") {
-                            "$connId: endIsHorizontal=$result from prev-segment (dx=$dx, dy=$dy, abs(dx)>=abs(dy)=$result)"
-                        }
-                        result
-                    } else {
-                        Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (no prev point found, defaulting)" }
-                        true
-                    }
-                }
-            } else {
-                Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (target junction pos not in map, defaulting)" }
-                true
-            }
-        } else {
-            Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (floating/default)" }
-            true
+        if (connection in visited) {
+            return Pair(true, true)
         }
+        val currentVisited = visited + connection
 
-        // 2. Determine start orientation (how this connection leaves its source):
+        // 1. Determine start orientation (how this connection leaves its source):
         val startIsHorizontal = if (connection.sourceJunctionId == null) {
             // Node output ports always exit horizontally to the right
             Logger.v(tag = "ConnectionOrientations") { "$connId: startIsHorizontal=true (node output port, always horizontal)" }
@@ -109,44 +118,64 @@ object ConnectionHitTester {
             }
 
             if (incoming != null && juncPos != null) {
-                val inEndH: Boolean
-                if (incoming.sourceJunctionId == null && incoming.waypoints.isEmpty()) {
-                    // Incoming comes directly from a node output port: always horizontal arrival
-                    inEndH = true
-                    Logger.v(tag = "ConnectionOrientations") {
-                        "$connId: incoming=${
-                            "conn[${incoming.sourceNodeId}:${incoming.sourcePortId}]->junc[$juncId]"
-                        } inEndH=true (node output -> junction, no waypoints)"
-                    }
+                val inBoardPts = if (getPortBoardPosition != null) {
+                    getConnectionBoardPoints(
+                        connection = incoming,
+                        getPortBoardPosition = getPortBoardPosition,
+                        junctionMap = junctionMap,
+                        groups = groups,
+                        density = density
+                    )
+                } else null
+
+                val (inStartH, inEndH) = determineConnectionOrientations(
+                    connection = incoming,
+                    connections = connections,
+                    junctionMap = junctionMap,
+                    getPortBoardPosition = getPortBoardPosition,
+                    groups = groups,
+                    density = density,
+                    stepMode = stepMode,
+                    orthogonalPortLead = orthogonalPortLead,
+                    nodes = nodes,
+                    visited = currentVisited
+                )
+
+                val inOrthoPts = if (inBoardPts != null && inBoardPts.size >= 2) {
+                    val inStartBorderX = getSourceNodeBorderX(incoming, nodes)
+                    val inEndBorderX = getTargetNodeBorderX(incoming, nodes)
+                    SplineMathUtils.computeOrthogonalPoints(
+                        inBoardPts,
+                        startHorizontal = inStartH,
+                        endHorizontal = inEndH,
+                        stepMode = stepMode,
+                        useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(incoming, orthogonalPortLead),
+                        startPortLead = hasStartPortLead(incoming, orthogonalPortLead),
+                        endPortLead = hasEndPortLead(incoming, orthogonalPortLead),
+                        startBorderX = inStartBorderX,
+                        endBorderX = inEndBorderX
+                    )
+                } else null
+
+                val inPrevPoint = if (inOrthoPts != null && inOrthoPts.size >= 2) {
+                    findJunctionLocalPrevPoint(inOrthoPts, juncPos)
+                } else if (inBoardPts != null && inBoardPts.size >= 2) {
+                    findJunctionLocalPrevPoint(inBoardPts, juncPos)
+                } else if (incoming.sourceJunctionId != null) {
+                    junctionMap[incoming.sourceJunctionId]
                 } else {
-                    // Derive arrival axis from actual orthogonal segment preceding the junction
-                    val inBoardPts = if (getPortBoardPosition != null) {
-                        getConnectionBoardPoints(
-                            connection = incoming,
-                            getPortBoardPosition = getPortBoardPosition,
-                            junctionMap = junctionMap,
-                            groups = groups,
-                            density = density
-                        )
-                    } else null
-
-                    val inPrevPoint = if (inBoardPts != null && inBoardPts.size >= 2) {
-                        findJunctionLocalPrevPoint(inBoardPts, juncPos)
-                    } else if (incoming.sourceJunctionId != null) {
-                        junctionMap[incoming.sourceJunctionId]
-                    } else {
-                        null
-                    }
-
-                    val dxIn = if (inPrevPoint != null) juncPos.x - inPrevPoint.x else 1f
-                    val dyIn = if (inPrevPoint != null) juncPos.y - inPrevPoint.y else 0f
-                    inEndH = abs(dxIn) >= abs(dyIn)
-                    Logger.v(tag = "ConnectionOrientations") {
-                        "$connId: incoming junc[${
-                            incoming.sourceJunctionId ?: incoming.sourceNodeId
-                        }]->junc[$juncId] inEndH=$inEndH (dxIn=$dxIn, dyIn=$dyIn)"
-                    }
+                    null
                 }
+
+                val dxIn = if (inPrevPoint != null) juncPos.x - inPrevPoint.x else 1f
+                val dyIn = if (inPrevPoint != null) juncPos.y - inPrevPoint.y else 0f
+                val incomingAxisH = if (abs(dxIn) > 0.01f || abs(dyIn) > 0.01f) {
+                    abs(dxIn) >= abs(dyIn)
+                } else {
+                    inEndH
+                }
+                val incomingDx = if (abs(dxIn) > 0.01f || abs(dyIn) > 0.01f) dxIn else (if (incomingAxisH) 1f else 0f)
+                val incomingDy = if (abs(dxIn) > 0.01f || abs(dyIn) > 0.01f) dyIn else (if (incomingAxisH) 0f else 1f)
 
                 val floatingTarget = connection.floatingTarget
                 val targetPos = when {
@@ -156,35 +185,20 @@ object ConnectionHitTester {
                         getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
                     else -> null
                 }
-                val incomingBoardPts = if (getPortBoardPosition != null) {
-                    getConnectionBoardPoints(
-                        connection = incoming,
-                        getPortBoardPosition = getPortBoardPosition,
-                        junctionMap = junctionMap,
-                        groups = groups,
-                        density = density
-                    )
-                } else null
-                val incomingPrevPoint = if (incomingBoardPts != null && incomingBoardPts.size >= 2) {
-                    findJunctionLocalPrevPoint(incomingBoardPts, juncPos)
-                } else {
-                    junctionMap[incoming.sourceJunctionId]
-                }
                 val targetDx = targetPos?.x?.minus(juncPos.x) ?: 0f
                 val targetDy = targetPos?.y?.minus(juncPos.y) ?: 0f
-                val incomingDx = incomingPrevPoint?.let { juncPos.x - it.x } ?: 1f
-                val incomingDy = incomingPrevPoint?.let { juncPos.y - it.y } ?: 1f
-                val continuesForward = if (inEndH) {
-                    targetDx > 10f && incomingDx >= 0f ||
-                        targetDx < -10f && incomingDx < 0f
+
+                val continuesForward = if (incomingAxisH) {
+                    (targetDx > SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE && incomingDx >= 0f) ||
+                        (targetDx < -SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE && incomingDx < 0f)
                 } else {
-                    targetDy > 10f && incomingDy >= 0f ||
-                        targetDy < -10f && incomingDy < 0f
+                    (targetDy > SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE && incomingDy >= 0f) ||
+                        (targetDy < -SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE && incomingDy < 0f)
                 }
-                val result = if (continuesForward) inEndH else !inEndH
+                val result = if (continuesForward) incomingAxisH else !incomingAxisH
                 Logger.v(tag = "ConnectionOrientations") {
-                    "$connId: startIsHorizontal=$result (incomingAxis=$inEndH, " +
-                        "targetDx=$targetDx, targetDy=$targetDy, continuesForward=$continuesForward)"
+                    "$connId: startIsHorizontal=$result (incomingAxis=$incomingAxisH, " +
+                        "incomingDx=$incomingDx, incomingDy=$incomingDy, targetDx=$targetDx, targetDy=$targetDy, continuesForward=$continuesForward)"
                 }
                 result
             } else {
@@ -211,6 +225,99 @@ object ConnectionHitTester {
             }
         }
 
+        // 2. Determine end orientation (how this connection arrives at its target):
+        val endIsHorizontal = if (connection.targetJunctionId == null && !connection.isFloating) {
+            // Node input ports always receive connections horizontally from the left
+            Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (target is a node input port, always horizontal)" }
+            true
+        } else if (connection.targetJunctionId != null) {
+            val tgtJuncPos = junctionMap[connection.targetJunctionId]
+            if (tgtJuncPos != null) {
+                val myBoardPts = if (getPortBoardPosition != null) {
+                    getConnectionBoardPoints(
+                        connection = connection,
+                        getPortBoardPosition = getPortBoardPosition,
+                        junctionMap = junctionMap,
+                        groups = groups,
+                        density = density
+                    )
+                } else null
+
+                if (myBoardPts != null && myBoardPts.size == 2) {
+                    val p0 = myBoardPts[0]
+                    val dx = tgtJuncPos.x - p0.x
+                    val dy = tgtJuncPos.y - p0.y
+                    if (abs(dy) < SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                        true
+                    } else if (abs(dx) < SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                        false
+                    } else {
+                        !startIsHorizontal
+                    }
+                } else if (myBoardPts != null && myBoardPts.size > 2) {
+                    val prevPoint = myBoardPts[myBoardPts.size - 2]
+                    val dx = tgtJuncPos.x - prevPoint.x
+                    val dy = tgtJuncPos.y - prevPoint.y
+                    if (abs(dy) < SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE) true
+                    else if (abs(dx) < SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE) false
+                    else abs(dx) >= abs(dy)
+                } else if (connection.sourceJunctionId != null && junctionMap[connection.sourceJunctionId] != null) {
+                    val p0 = junctionMap[connection.sourceJunctionId]!!
+                    val dx = tgtJuncPos.x - p0.x
+                    val dy = tgtJuncPos.y - p0.y
+                    if (abs(dy) < SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE) true
+                    else if (abs(dx) < SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE) false
+                    else !startIsHorizontal
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        } else if (connection.isFloating && connection.floatingTarget != null) {
+            val floatingTargetPos = connection.floatingTarget!!.toComposeOffset()
+            val myBoardPts = if (getPortBoardPosition != null) {
+                getConnectionBoardPoints(
+                    connection = connection,
+                    getPortBoardPosition = getPortBoardPosition,
+                    junctionMap = junctionMap,
+                    groups = groups,
+                    density = density
+                )
+            } else null
+
+            val myOrthoPts = if (myBoardPts != null && myBoardPts.size >= 2) {
+                val myStartBorderX = getSourceNodeBorderX(connection, nodes)
+                val myEndBorderX = getTargetNodeBorderX(connection, nodes)
+                SplineMathUtils.computeOrthogonalPoints(
+                    myBoardPts,
+                    startHorizontal = startIsHorizontal,
+                    endHorizontal = true,
+                    stepMode = stepMode,
+                    useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection, orthogonalPortLead),
+                    startPortLead = hasStartPortLead(connection, orthogonalPortLead),
+                    endPortLead = hasEndPortLead(connection, orthogonalPortLead),
+                    startBorderX = myStartBorderX,
+                    endBorderX = myEndBorderX
+                )
+            } else null
+
+            val prevPoint = if (myOrthoPts != null && myOrthoPts.size >= 2) {
+                myOrthoPts[myOrthoPts.size - 2]
+            } else null
+
+            if (prevPoint != null) {
+                val dx = floatingTargetPos.x - prevPoint.x
+                val dy = floatingTargetPos.y - prevPoint.y
+                abs(dx) >= abs(dy)
+            } else {
+                true
+            }
+        } else {
+            Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (floating/default)" }
+            true
+        }
+
         Logger.v(tag = "ConnectionOrientations") { "$connId: FINAL startIsHorizontal=$startIsHorizontal, endIsHorizontal=$endIsHorizontal" }
         return Pair(startIsHorizontal, endIsHorizontal)
     }
@@ -225,14 +332,16 @@ object ConnectionHitTester {
         scale: Float = 1f,
         offset: Offset = Offset.Zero,
         tension: Float = 0.5f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+        orthogonalPortLead: Boolean = false,
+        nodes: List<Node> = emptyList()
     ): JunctionFilletParams {
         var startFilletLeadIn: Offset? = null
         var endTrimDistance = 0f
 
         // 1. Start fillet for connection originating from a junction
         val srcJuncId = connection.sourceJunctionId
-        if (srcJuncId != null && getPortBoardPosition != null) {
+        if (srcJuncId != null) {
             val juncPos = junctionMap[srcJuncId]
             if (juncPos != null) {
                 val incoming = connections.find {
@@ -253,14 +362,21 @@ object ConnectionHitTester {
                             junctionMap = junctionMap,
                             getPortBoardPosition = getPortBoardPosition,
                             groups = groups,
-                            density = density
+                            density = density,
+                            stepMode = stepMode,
+                            orthogonalPortLead = orthogonalPortLead,
+                            nodes = nodes
                         )
                         val inOrthoPts = SplineMathUtils.computeOrthogonalPoints(
                             inBoardPts,
                             startHorizontal = inStartH,
                             endHorizontal = inEndH,
                             stepMode = stepMode,
-                            useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(incoming)
+                            useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(incoming, orthogonalPortLead),
+                            startPortLead = hasStartPortLead(incoming, orthogonalPortLead),
+                            endPortLead = hasEndPortLead(incoming, orthogonalPortLead),
+                            startBorderX = getSourceNodeBorderX(incoming, nodes),
+                            endBorderX = getTargetNodeBorderX(incoming, nodes)
                         )
                         val prevPoint = findJunctionLocalPrevPoint(inOrthoPts, juncPos)
 
@@ -278,7 +394,7 @@ object ConnectionHitTester {
 
         // 2. End trim for connection terminating at a junction with turning outgoing branches
         val tgtJuncId = connection.targetJunctionId
-        if (tgtJuncId != null && getPortBoardPosition != null) {
+        if (tgtJuncId != null) {
             val juncPos = junctionMap[tgtJuncId]
             if (juncPos != null) {
                 val outgoingList = connections.filter {
@@ -299,14 +415,21 @@ object ConnectionHitTester {
                             junctionMap = junctionMap,
                             getPortBoardPosition = getPortBoardPosition,
                             groups = groups,
-                            density = density
+                            density = density,
+                            stepMode = stepMode,
+                            orthogonalPortLead = orthogonalPortLead,
+                            nodes = nodes
                         )
                         val myOrthoPts = SplineMathUtils.computeOrthogonalPoints(
                             myBoardPts,
                             startHorizontal = myStartH,
                             endHorizontal = myEndH,
                             stepMode = stepMode,
-                            useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection)
+                            useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection, orthogonalPortLead),
+                            startPortLead = hasStartPortLead(connection, orthogonalPortLead),
+                            endPortLead = hasEndPortLead(connection, orthogonalPortLead),
+                            startBorderX = getSourceNodeBorderX(connection, nodes),
+                            endBorderX = getTargetNodeBorderX(connection, nodes)
                         )
                         val prevPoint = findJunctionLocalPrevPoint(myOrthoPts, juncPos)
 
@@ -317,7 +440,11 @@ object ConnectionHitTester {
                                 val vIn = Offset(dIn.x / lenIn, dIn.y / lenIn)
                                 var hasThrough = false
                                 var minBranchRadius: Float? = null
-                                val rBase = maxOf(14f * scale, tension * 28f * scale)
+                                val rBase = maxOf(
+                                    SplineMathUtils.DEFAULT_CORNER_RADIUS * scale,
+                                    tension * SplineMathUtils.TENSION_RADIUS_FACTOR * scale,
+                                    SplineMathUtils.MIN_RENDER_CORNER_RADIUS
+                                )
 
                                 for (outConn in outgoingList) {
                                     val outBoardPts = getConnectionBoardPoints(
@@ -335,14 +462,21 @@ object ConnectionHitTester {
                                         junctionMap = junctionMap,
                                         getPortBoardPosition = getPortBoardPosition,
                                         groups = groups,
-                                        density = density
+                                        density = density,
+                                        stepMode = stepMode,
+                                        orthogonalPortLead = orthogonalPortLead,
+                                        nodes = nodes
                                     )
                                     val outOrthoPts = SplineMathUtils.computeOrthogonalPoints(
                                         outBoardPts,
                                         startHorizontal = outStartH,
                                         endHorizontal = outEndH,
                                         stepMode = stepMode,
-                                        useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(outConn)
+                                        useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(outConn, orthogonalPortLead),
+                                        startPortLead = hasStartPortLead(outConn, orthogonalPortLead),
+                                        endPortLead = hasEndPortLead(outConn, orthogonalPortLead),
+                                        startBorderX = getSourceNodeBorderX(outConn, nodes),
+                                        endBorderX = getTargetNodeBorderX(outConn, nodes)
                                     )
                                     val outIdx = outOrthoPts.indexOfFirst { (it - juncPos).getDistance() < 1f }
                                     val nextPoint = if (outIdx >= 0 && outIdx < outOrthoPts.size - 1) {
@@ -366,7 +500,7 @@ object ConnectionHitTester {
                                         } else if (abs(dot) < 0.1f) {
                                             val lenInScreen = lenIn * scale
                                             val lenOutScreen = lenOut * scale
-                                            val r = minOf(rBase, lenInScreen * 0.45f, lenOutScreen * 0.45f)
+                                            val r = minOf(rBase, lenInScreen * SplineMathUtils.TRIM_FACTOR, lenOutScreen * SplineMathUtils.TRIM_FACTOR)
                                             val minR = 0.01f
                                             if (r >= minR && r > 0f) {
                                                 Logger.v(tag = "JunctionFillet") {
@@ -424,7 +558,9 @@ object ConnectionHitTester {
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+        orthogonalPortLead: Boolean = false,
+        nodes: List<Node> = emptyList()
     ): Connection? {
         val junctionMap = junctions.associate { it.id to it.position.toComposeOffset() }
         var bestConnection: Connection? = null
@@ -456,7 +592,10 @@ object ConnectionHitTester {
                 junctionMap = junctionMap,
                 getPortBoardPosition = getPortBoardPosition,
                 groups = groups,
-                density = density
+                density = density,
+                stepMode = stepMode,
+                orthogonalPortLead = orthogonalPortLead,
+                nodes = nodes
             )
             val filletParams = getJunctionFilletParams(
                 connection = connection,
@@ -468,7 +607,9 @@ object ConnectionHitTester {
                 scale = scale,
                 offset = offset,
                 tension = roundness,
-                stepMode = stepMode
+                stepMode = stepMode,
+                orthogonalPortLead = orthogonalPortLead,
+                nodes = nodes
             )
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
@@ -482,7 +623,11 @@ object ConnectionHitTester {
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
                 endTrimDistance = filletParams.endTrimDistance,
-                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection)
+                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection, orthogonalPortLead),
+                startPortLead = hasStartPortLead(connection, orthogonalPortLead),
+                endPortLead = hasEndPortLead(connection, orthogonalPortLead),
+                startBorderX = getSourceNodeBorderX(connection, nodes),
+                endBorderX = getTargetNodeBorderX(connection, nodes)
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -519,7 +664,9 @@ object ConnectionHitTester {
         roundness: Float = 0.5f,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Middle,
+        orthogonalPortLead: Boolean = false,
+        nodes: List<Node> = emptyList()
     ): ConnectionProjection? {
         val junctionMap = junctions.associate { it.id to it.position.toComposeOffset() }
         var bestConnection: Connection? = null
@@ -553,7 +700,10 @@ object ConnectionHitTester {
                 junctionMap = junctionMap,
                 getPortBoardPosition = getPortBoardPosition,
                 groups = groups,
-                density = density
+                density = density,
+                stepMode = stepMode,
+                orthogonalPortLead = orthogonalPortLead,
+                nodes = nodes
             )
             val filletParams = getJunctionFilletParams(
                 connection = connection,
@@ -565,7 +715,9 @@ object ConnectionHitTester {
                 scale = scale,
                 offset = offset,
                 tension = roundness,
-                stepMode = stepMode
+                stepMode = stepMode,
+                orthogonalPortLead = orthogonalPortLead,
+                nodes = nodes
             )
             val effectiveStyle = curveStyle
             val sampledPoints = SplineMathUtils.sampleConnectionPoints(
@@ -579,7 +731,11 @@ object ConnectionHitTester {
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
                 endTrimDistance = filletParams.endTrimDistance,
-                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection)
+                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection, orthogonalPortLead),
+                startPortLead = hasStartPortLead(connection, orthogonalPortLead),
+                endPortLead = hasEndPortLead(connection, orthogonalPortLead),
+                startBorderX = getSourceNodeBorderX(connection, nodes),
+                endBorderX = getTargetNodeBorderX(connection, nodes)
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -640,7 +796,7 @@ object ConnectionHitTester {
 
     fun getConnectionBoardPoints(
         connection: Connection,
-        getPortBoardPosition: (Long, String, Boolean) -> Offset?,
+        getPortBoardPosition: ((Long, String, Boolean) -> Offset?)? = null,
         junctionMap: Map<Long, Offset>,
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f
@@ -663,7 +819,7 @@ object ConnectionHitTester {
                     srcCollapsedGroup.position.y + (collapsedHeight / 2f)
                 )
             }
-            else -> getPortBoardPosition(connection.sourceNodeId, connection.sourcePortId, true)
+            else -> getPortBoardPosition?.invoke(connection.sourceNodeId, connection.sourcePortId, true)
         } ?: return null
 
         val floating = connection.floatingTarget
@@ -677,7 +833,7 @@ object ConnectionHitTester {
                 )
             }
             floating != null -> floating.toComposeOffset()
-            else -> getPortBoardPosition(connection.targetNodeId, connection.targetPortId, false)
+            else -> getPortBoardPosition?.invoke(connection.targetNodeId, connection.targetPortId, false)
         } ?: return null
 
         val allPoints = mutableListOf<Offset>()
@@ -754,7 +910,9 @@ object ConnectionHitTester {
         groups: List<FlowGroup> = emptyList(),
         density: Float = 1f,
         hitRadius: Float = 12f * scale,
-        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto
+        stepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
+        orthogonalPortLead: Boolean = false,
+        nodes: List<Node> = emptyList()
     ): Triple<Connection, Int, Offset>? {
         var closest: Triple<Connection, Int, Offset>? = null
         var minDistance = if (hitRadius < 8f) 8f else hitRadius
@@ -778,7 +936,10 @@ object ConnectionHitTester {
                 junctionMap = junctionMap,
                 getPortBoardPosition = getPortBoardPosition,
                 groups = groups,
-                density = density
+                density = density,
+                stepMode = stepMode,
+                orthogonalPortLead = orthogonalPortLead,
+                nodes = nodes
             )
             val filletParams = getJunctionFilletParams(
                 connection = connection,
@@ -790,7 +951,9 @@ object ConnectionHitTester {
                 scale = scale,
                 offset = offset,
                 tension = roundness,
-                stepMode = stepMode
+                stepMode = stepMode,
+                orthogonalPortLead = orthogonalPortLead,
+                nodes = nodes
             )
             val effectiveStyle = curveStyle
             val midpoints = SplineMathUtils.computeSegmentMidpoints(
@@ -804,7 +967,11 @@ object ConnectionHitTester {
                 stepMode = stepMode,
                 startFilletLeadIn = filletParams.startFilletLeadIn,
                 endTrimDistance = filletParams.endTrimDistance,
-                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection)
+                useMiddleRouteForDirectConnection = usesMiddleRouteForDirectConnection(connection, orthogonalPortLead),
+                startPortLead = hasStartPortLead(connection, orthogonalPortLead),
+                endPortLead = hasEndPortLead(connection, orthogonalPortLead),
+                startBorderX = getSourceNodeBorderX(connection, nodes),
+                endBorderX = getTargetNodeBorderX(connection, nodes)
             )
 
             midpoints.forEachIndexed { segIdx, midPt ->

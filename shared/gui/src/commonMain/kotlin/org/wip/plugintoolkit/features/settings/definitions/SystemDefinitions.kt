@@ -215,6 +215,13 @@ fun SettingsRegistryBuilder.systemDefinitions(
                         }
                     }
                 ) { copy(defaultOrthogonalStepMode = it) }
+
+                switch(
+                    FlowSettings::defaultOrthogonalPortLead,
+                    Res.string.flow_orthogonal_port_lead,
+                    Icons.Default.AltRoute,
+                    subtitle = SettingText.Resource(Res.string.flow_orthogonal_port_lead_subtitle)
+                ) { copy(defaultOrthogonalPortLead = it) }
             }
         }
 
