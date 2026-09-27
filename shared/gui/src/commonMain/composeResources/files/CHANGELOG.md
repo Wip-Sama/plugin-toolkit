@@ -2,13 +2,13 @@ Version: 3.0.0
 Name: Packaged Timed Colors
 Date: 27-09-2026
 Added:
+	- Plugins can now be compiled as standalone apps (the standalone version of the plugin can also be loaded by the app)
 	- Advanced connections in flow manager
 	- Different connections styles in flow editor (some of them are experimental, you will notice why)
 	- Shortcut and Controls editor in settings
 	- Labels and Groups in flow editor
 	- Colors in flow editor
 	- Toolbar in flow editor
-	- Plugins can now be compiled as standalone apps (the standalone version of the plugin can also be loaded by the app)
 Changes:
 	- New font for the job terminal
 Fixed:
