@@ -3,18 +3,14 @@ Name: Packaged Timed Colors
 Date: xx-09-2026
 Added:
 	- Advanced connections in flow manager
-	- Different connections styles in flow editor
+	- Different connections styles in flow editor (some of them are experimental, you will notice why)
 	- Shortcut and Controls editor in settings
 	- Labels and Groups in flow editor
 	- Colors in flow editor
 	- Toolbar in flow editor
 	- Plugins can now be compiled as standalone apps (the standalone version of the plugin can also be loaded by the app)
-	- Scheduler to automatically start flows / capabilities at specific times [TODO]
-	- Scheduler plugin events, a plugin can now create events that can be used to trigger an event schedule (they do not start by themselves and need to be setup by the user) [TODO]
-	- Experimental opt-in metrics collection (this is fully customizable to chose which metrics to collect/share) [TODO]
 Changes:
 	- New font for the job terminal
-	- The color picker wa fully reworked [TODO]
 Fixed:
 	- Connection Detachment During Canvas Pan
 	- When a capability definition changed without migration the flow still appeared valid even if it was not
@@ -23,7 +19,12 @@ Fixed:
   - fixed job limits not properly enforced
   - Selection box locking onto screen and detaching during canvas zoom
   - Box selection shortcut failing to trigger when remapped in Shortcut Manager
-  - Group contained connection points not updating dynamically during drag and failing to restore on undo/redo
+- Group contained connection points not updating dynamically during drag and failing to restore on undo/redo
+Planned:
+  - Scheduler to automatically start flows / capabilities at specific times
+  - Scheduler plugin events, a plugin can now create events that can be used to trigger an event schedule (they do not start by themselves and need to be setup by the user)
+  - Experimental opt-in metrics collection (this is fully customizable to chose which metrics to collect/share)
+  - Rework again the color picker
 ----------------------------------------------------------------------------------------------------
 Version: 2.1.0
 Date: 10-09-2026

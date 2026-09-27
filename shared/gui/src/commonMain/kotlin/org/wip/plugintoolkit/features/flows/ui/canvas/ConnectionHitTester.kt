@@ -576,12 +576,13 @@ object ConnectionHitTester {
             ) ?: continue
             val screenPoints = boardPoints.map { (it * scale) + offset }
 
-            val minX = screenPoints.minOf { it.x } - (30f * scale)
-            val maxX = screenPoints.maxOf { it.x } + (30f * scale)
-            val minY = screenPoints.minOf { it.y } - (30f * scale)
-            val maxY = screenPoints.maxOf { it.y } + (30f * scale)
+            val coarseMargin = 1000f * scale
+            val coarseMinX = screenPoints.minOf { it.x } - coarseMargin
+            val coarseMaxX = screenPoints.maxOf { it.x } + coarseMargin
+            val coarseMinY = screenPoints.minOf { it.y } - coarseMargin
+            val coarseMaxY = screenPoints.maxOf { it.y } + coarseMargin
 
-            if (position.x !in minX..maxX || position.y !in minY..maxY) {
+            if (position.x !in coarseMinX..coarseMaxX || position.y !in coarseMinY..coarseMaxY) {
                 continue
             }
 
@@ -629,6 +630,17 @@ object ConnectionHitTester {
                 endBorderX = getTargetNodeBorderX(connection, nodes),
                 boardPoints = boardPoints
             )
+            if (sampledPoints.isEmpty()) continue
+
+            val minX = sampledPoints.minOf { it.x } - minDistance
+            val maxX = sampledPoints.maxOf { it.x } + minDistance
+            val minY = sampledPoints.minOf { it.y } - minDistance
+            val maxY = sampledPoints.maxOf { it.y } + minDistance
+
+            if (position.x !in minX..maxX || position.y !in minY..maxY) {
+                continue
+            }
+
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
                 minDistance = dist
@@ -684,12 +696,13 @@ object ConnectionHitTester {
             ) ?: continue
             val screenPoints = boardPoints.map { (it * scale) + offset }
 
-            val minX = screenPoints.minOf { it.x } - (30f * scale)
-            val maxX = screenPoints.maxOf { it.x } + (30f * scale)
-            val minY = screenPoints.minOf { it.y } - (30f * scale)
-            val maxY = screenPoints.maxOf { it.y } + (30f * scale)
+            val coarseMargin = 1000f * scale
+            val coarseMinX = screenPoints.minOf { it.x } - coarseMargin
+            val coarseMaxX = screenPoints.maxOf { it.x } + coarseMargin
+            val coarseMinY = screenPoints.minOf { it.y } - coarseMargin
+            val coarseMaxY = screenPoints.maxOf { it.y } + coarseMargin
 
-            if (position.x !in minX..maxX || position.y !in minY..maxY) {
+            if (position.x !in coarseMinX..coarseMaxX || position.y !in coarseMinY..coarseMaxY) {
                 continue
             }
 
@@ -737,6 +750,17 @@ object ConnectionHitTester {
                 endBorderX = getTargetNodeBorderX(connection, nodes),
                 boardPoints = boardPoints
             )
+            if (sampledPoints.isEmpty()) continue
+
+            val minX = sampledPoints.minOf { it.x } - minDistance
+            val maxX = sampledPoints.maxOf { it.x } + minDistance
+            val minY = sampledPoints.minOf { it.y } - minDistance
+            val maxY = sampledPoints.maxOf { it.y } + minDistance
+
+            if (position.x !in minX..maxX || position.y !in minY..maxY) {
+                continue
+            }
+
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
                 minDistance = dist

@@ -2,12 +2,17 @@ package org.wip.plugintoolkit.features.flows.ui
 
 import androidx.compose.ui.geometry.Offset
 import org.wip.plugintoolkit.features.flows.model.Connection
+import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.Offset as ModelOffset
 import org.wip.plugintoolkit.features.flows.ui.canvas.ConnectionHitTester
+import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.test.assertFalse
 
 class ConnectionHitTesterTest {
 
@@ -515,5 +520,73 @@ class ConnectionHitTesterTest {
             "Perpendicular junction with long segments (lenIn=3900, lenOut=1500) must always " +
             "produce a non-zero endTrimDistance (old minR formula = 15 > rBase = 14 caused rejection)"
         )
+    }
+
+    @Test
+    fun testFindClosestConnectionOnOrthogonalPortLeadOutsideScreenPointsBounds() {
+        // Node 1 (FlowInput): source node at (100, 100), width=400 (right border at 500)
+        // Output port "out" is at (500, 150)
+        // Node 2 (FlowOutput): target node at (100, 400), left border at 100
+        // Input port "in" is at (100, 450)
+        // Connection goes from Node 1 to Node 2 (backward in X: from x=500 to x=100)
+        // With orthogonalPortLead=true, the start port lead extends to x=550 (50px to the right of port)
+        // and the end port lead extends to x=50 (50px to the left of port).
+        // screenPoints only contains (500, 150) and (100, 450), with minX=100 and maxX=500.
+        // Hovering at x=540 (outside maxX) or x=60 (outside minX) must successfully hit the connection!
+        val conn = Connection(sourceNodeId = 1L, sourcePortId = "out", targetNodeId = 2L, targetPortId = "in")
+        val node1 = Node.FlowInputNode(1L, ModelOffset(100f, 100f), emptyList())
+        val node2 = Node.FlowOutputNode(2L, ModelOffset(100f, 400f), emptyList())
+        val getPortPos: (Long, String, Boolean) -> Offset? = { nodeId, portId, isOutput ->
+            when {
+                nodeId == 1L && portId == "out" && isOutput -> Offset(500f, 150f)
+                nodeId == 2L && portId == "in" && !isOutput -> Offset(100f, 450f)
+                else -> null
+            }
+        }
+
+        // 1. Hover on start port lead at (540, 150) (x > 500)
+        val hitStartLead = ConnectionHitTester.findClosestConnection(
+            position = Offset(540f, 150f),
+            connections = listOf(conn),
+            getPortBoardPosition = getPortPos,
+            scale = 1f,
+            offset = Offset.Zero,
+            curveStyle = ConnectionCurveStyle.Orthogonal,
+            stepMode = OrthogonalStepMode.Auto,
+            orthogonalPortLead = true,
+            nodes = listOf(node1, node2)
+        )
+        assertNotNull(hitStartLead, "Should hover connection on start port lead extending beyond source node")
+        assertEquals(conn, hitStartLead)
+
+        // 2. Hover on end port lead at (60, 450) (x < 100)
+        val hitEndLead = ConnectionHitTester.findClosestConnection(
+            position = Offset(60f, 450f),
+            connections = listOf(conn),
+            getPortBoardPosition = getPortPos,
+            scale = 1f,
+            offset = Offset.Zero,
+            curveStyle = ConnectionCurveStyle.Orthogonal,
+            stepMode = OrthogonalStepMode.Auto,
+            orthogonalPortLead = true,
+            nodes = listOf(node1, node2)
+        )
+        assertNotNull(hitEndLead, "Should hover connection on end port lead extending beyond target node")
+        assertEquals(conn, hitEndLead)
+
+        // 3. findClosestConnectionWithProjection on the port lead
+        val projHit = ConnectionHitTester.findClosestConnectionWithProjection(
+            position = Offset(540f, 150f),
+            connections = listOf(conn),
+            getPortBoardPosition = getPortPos,
+            scale = 1f,
+            offset = Offset.Zero,
+            curveStyle = ConnectionCurveStyle.Orthogonal,
+            stepMode = OrthogonalStepMode.Auto,
+            orthogonalPortLead = true,
+            nodes = listOf(node1, node2)
+        )
+        assertNotNull(projHit, "Projection should succeed on start port lead")
+        assertEquals(conn, projHit.connection)
     }
 }

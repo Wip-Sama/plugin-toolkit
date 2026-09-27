@@ -766,6 +766,43 @@ class SplineMathUtilsOrthogonalRoutingTest {
             )
         }
     }
+
+    @Test
+    fun testOrthogonalAutoMultiPointWithPortLeadsBackwardRoutingMaintainsLeads() {
+        // Output port p0 at (500, 100) on node with right border at 500
+        // Custom waypoint at (300, 300) (behind the source node)
+        // Input port p1 at (100, 500) on node with left border at 100
+        // Grid size = 50f -> pLead0 = (550, 100), pLead1 = (50, 500)
+        val p0 = Offset(500f, 100f)
+        val wp = Offset(300f, 300f)
+        val p1 = Offset(100f, 500f)
+
+        val routed = SplineMathUtils.computeOrthogonalPoints(
+            points = listOf(p0, wp, p1),
+            startHorizontal = true,
+            endHorizontal = true,
+            stepMode = OrthogonalStepMode.Auto,
+            startPortLead = true,
+            endPortLead = true,
+            gridSize = 50f,
+            startBorderX = 500f,
+            endBorderX = 100f
+        )
+
+        // Must preserve the port leads (550, 100) and (50, 500), departing pLead0 vertically
+        // and arriving at pLead1 vertically rather than cutting through the nodes horizontally.
+        assertEquals(
+            listOf(
+                Offset(500f, 100f),
+                Offset(550f, 100f),
+                Offset(550f, 300f),
+                Offset(50f, 300f),
+                Offset(50f, 500f),
+                Offset(100f, 500f)
+            ),
+            routed
+        )
+    }
 }
 
 

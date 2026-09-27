@@ -691,10 +691,26 @@ object SplineMathUtils {
             innerPts.add(pts.last())
         }
 
+        val effectiveStartH = if (startPortLead && innerPts.size >= 2) {
+            val pLead0 = innerPts[0]
+            val pNext = innerPts[1]
+            pNext.x > pLead0.x
+        } else {
+            if (startPortLead) true else startHorizontal
+        }
+
+        val effectiveEndH = if (endPortLead && innerPts.size >= 2) {
+            val pPrev = innerPts[innerPts.size - 2]
+            val pLead1 = innerPts.last()
+            pPrev.x < pLead1.x
+        } else {
+            if (endPortLead) true else endHorizontal
+        }
+
         val routedInner = computeOrthogonalPoints(
             points = innerPts,
-            startHorizontal = if (startPortLead) true else startHorizontal,
-            endHorizontal = if (endPortLead) true else endHorizontal,
+            startHorizontal = effectiveStartH,
+            endHorizontal = effectiveEndH,
             stepMode = OrthogonalStepMode.Auto,
             useMiddleRouteForDirectConnection = false,
             startPortLead = false,
