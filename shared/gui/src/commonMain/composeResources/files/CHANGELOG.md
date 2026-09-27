@@ -1,6 +1,6 @@
 Version: 3.0.0
 Name: Packaged Timed Colors
-Date: xx-09-2026
+Date: 27-09-2026
 Added:
 	- Advanced connections in flow manager
 	- Different connections styles in flow editor (some of them are experimental, you will notice why)

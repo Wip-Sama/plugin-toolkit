@@ -1,5 +1,5 @@
 [versions]
-app = "2.1.0"
+app = "3.0.0"
 min-compatible-plugin-version = "1.7.4"
 androidx-lifecycle = "2.11.0"
 compose-hot-reload = "1.2.0"
