@@ -187,15 +187,14 @@ fun BoardGridAndConnectionsCanvas(
 
         // Draw connections, waypoints, and midpoints
         flow.connections.forEach { connection ->
-            val screenPoints = ConnectionHitTester.getConnectionScreenPoints(
+            val boardPoints = ConnectionHitTester.getConnectionBoardPoints(
                 connection = connection,
                 getPortBoardPosition = getPortBoardPosition,
                 junctionMap = junctionMap,
-                scale = state.scale,
-                offset = state.offset,
                 groups = flow.groups,
                 density = this.density
             )
+            val screenPoints = boardPoints?.map { (it * state.scale) + state.offset }
 
             if (screenPoints != null && screenPoints.size >= 2) {
                 val isInvalid = state.validationErrors.any {
@@ -275,7 +274,8 @@ fun BoardGridAndConnectionsCanvas(
                     startPortLead = ConnectionHitTester.hasStartPortLead(connection, orthogonalPortLead),
                     endPortLead = ConnectionHitTester.hasEndPortLead(connection, orthogonalPortLead),
                     startBorderX = startBorderX,
-                    endBorderX = endBorderX
+                    endBorderX = endBorderX,
+                    boardPoints = boardPoints
                 )
                 drawPath(
                     path = path,
@@ -405,6 +405,7 @@ fun BoardGridAndConnectionsCanvas(
                     currentPos to startBoardPos
                 }
 
+                val boardPts = listOf(startPos, endPos)
                 val pts = listOf((startPos * state.scale) + state.offset, (endPos * state.scale) + state.offset)
                 val isTargetNodePort = highlightedPortId != null && highlightedNodeId != null
                 val leadStart = if (connectionStartIsOutput) orthogonalPortLead else (isTargetNodePort && orthogonalPortLead)
@@ -426,7 +427,8 @@ fun BoardGridAndConnectionsCanvas(
                     startPortLead = leadStart,
                     endPortLead = leadEnd,
                     startBorderX = previewStartBorderX,
-                    endBorderX = previewEndBorderX
+                    endBorderX = previewEndBorderX,
+                    boardPoints = boardPts
                 )
                 drawPath(
                     path = path,
@@ -523,7 +525,8 @@ fun BoardGridAndConnectionsCanvas(
                     startPortLead = isStartNodePort && orthogonalPortLead,
                     endPortLead = isEndNodePort && orthogonalPortLead,
                     startBorderX = previewStartBorderX,
-                    endBorderX = previewEndBorderX
+                    endBorderX = previewEndBorderX,
+                    boardPoints = allBoardPts
                 )
                 drawPath(
                     path = previewPath,

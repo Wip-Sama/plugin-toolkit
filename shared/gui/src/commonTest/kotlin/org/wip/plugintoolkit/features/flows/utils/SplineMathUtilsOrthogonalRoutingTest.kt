@@ -693,5 +693,79 @@ class SplineMathUtilsOrthogonalRoutingTest {
             "Near ports (dx=15 < 30) must avoid adding cramped middle vertical step waypoints. Got: $points"
         )
     }
+
+    @Test
+    fun testTightBendCornerRadiusSymmetricWithoutConnectionPoint() {
+        // Tight U-bend: Down to (100, 200), Right to (150, 200), Up to (150, 100)
+        // With start fillet lead-in at the first point (simulating incoming wire into a junction at (100, 200)).
+        // Corner at (150, 200) must receive full corner radius (14f), NOT be shortened or halved.
+        val p0 = Offset(100f, 200f)
+        val p1 = Offset(150f, 200f)
+        val p2 = Offset(150f, 100f)
+        val leadIn = Offset(100f, 100f)
+
+        val samples = SplineMathUtils.sampleConnectionPoints(
+            points = listOf(p0, p1, p2),
+            style = ConnectionCurveStyle.Orthogonal,
+            tension = 0.5f,
+            startHorizontal = true,
+            endHorizontal = false,
+            startFilletLeadIn = leadIn
+        )
+
+        // Both corners should have smooth rounding.
+        // Corner 1 starts around (100, 200) and turns to horizontal.
+        // Corner 2 starts along the horizontal segment and turns to vertical up towards (150, 100).
+        // Check that the wire turns up at (150 - r, 200) where r = 14f (approx 136f).
+        val corner2StartX = samples.filter { abs(it.y - 200f) < 0.5f }.maxOf { it.x }
+        // The straight bottom segment must reach at least 150 - 14 = 136, not be truncated early to 143+
+        assertTrue(
+            corner2StartX <= 136.5f,
+            "Corner 2 on tight bend must begin turning with full radius (~14f, at x <= 136.5f). Got corner2StartX=$corner2StartX"
+        )
+    }
+
+    @Test
+    fun testJunctionToNodeRoutingZoomStabilityAtLeadBoundary() {
+        // Test when junction p0 is on the grid line equal to pLead1.x (endBorderX - gridSize = 200 - 50 = 150).
+        // Regardless of scale and floating-point offsets, routing must consistently route horizontally from p0
+        // and avoid dropping into an immediate vertical exit.
+        val p0 = Offset(150f, 100f)
+        val p1 = Offset(219f, 200f) // endBorderX = 200f, gridSize = 50f -> pLead1.x = 150f
+        val scales = listOf(0.25f, 0.5f, 0.738194f, 1.0f, 1.333f, 2.0f, 3.5f)
+
+        for (scale in scales) {
+            val canvasOffset = Offset(123.456f, -78.9f)
+            val screenPts = listOf(p0, p1).map { (it * scale) + canvasOffset }
+            val boardPts = listOf(p0, p1)
+
+            val routed = SplineMathUtils.computeOrthogonalPoints(
+                points = boardPts,
+                startHorizontal = true,
+                endHorizontal = true,
+                stepMode = OrthogonalStepMode.Auto,
+                useMiddleRouteForDirectConnection = false,
+                startPortLead = false,
+                endPortLead = true,
+                gridSize = 50f,
+                startBorderX = null,
+                endBorderX = 200f
+            )
+
+            // The first routed step leaving p0 must be strictly horizontal (y remains 100f)
+            assertTrue(routed.size >= 2, "Routed path must have at least 2 points at scale=$scale")
+            assertEquals(
+                p0.y,
+                routed[1].y,
+                0.01f,
+                "Wire leaving junction p0 must be strictly horizontal at scale=$scale. Next point was: ${routed[1]}"
+            )
+            assertTrue(
+                routed[1].x > p0.x,
+                "Wire leaving junction p0 must move forward in x at scale=$scale. Next point was: ${routed[1]}"
+            )
+        }
+    }
 }
+
 

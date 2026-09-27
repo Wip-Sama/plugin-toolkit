@@ -350,12 +350,12 @@ object SplineMathUtils {
             }
 
             for (i in 1 until effectivePoints.size - 1) {
-                val pPrev = if (i == 1) startFilletEnd else effectivePoints[i - 1]
-                val pCurr = effectivePoints[i]
-                val pNext = effectivePoints[i + 1]
+                val origPrev = points[i - 1]
+                val pCurr = points[i]
+                val origNext = points[i + 1]
 
-                val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
-                val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
+                val vIn = Offset(origPrev.x - pCurr.x, origPrev.y - pCurr.y)
+                val vOut = Offset(origNext.x - pCurr.x, origNext.y - pCurr.y)
                 val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
                 val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
 
@@ -381,18 +381,18 @@ object SplineMathUtils {
         }
 
         for (i in 1 until effectivePoints.size - 1) {
-            val pPrev = effectivePoints[i - 1]
-            val pCurr = effectivePoints[i]
-            val pNext = effectivePoints[i + 1]
+            val origPrev = points[i - 1]
+            val pCurr = points[i]
+            val origNext = points[i + 1]
 
-            val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
-            val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
+            val vIn = Offset(origPrev.x - pCurr.x, origPrev.y - pCurr.y)
+            val vOut = Offset(origNext.x - pCurr.x, origNext.y - pCurr.y)
             val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
             val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
 
             val r = minOf(cornerRadius, lenIn * TRIM_FACTOR, lenOut * TRIM_FACTOR)
             val minR = MIN_CORNER_RADIUS
-            if (lenIn == 0f || lenOut == 0f || r < minR) {
+            if (lenIn == 0f || lenOut == 0f || r < minR || r <= 0f) {
                 path.lineTo(pCurr.x, pCurr.y)
             } else {
                 val startCorner = Offset(pCurr.x + (vIn.x / lenIn) * r, pCurr.y + (vIn.y / lenIn) * r)
@@ -426,7 +426,8 @@ object SplineMathUtils {
         endPortLead: Boolean = false,
         gridSize: Float = DEFAULT_GRID_SIZE,
         startBorderX: Float? = null,
-        endBorderX: Float? = null
+        endBorderX: Float? = null,
+        boardPoints: List<Offset>? = null
     ): List<Offset> {
         val pts = sanitizePoints(points)
         if (pts.size < 2) return emptyList()
@@ -439,12 +440,16 @@ object SplineMathUtils {
             }
             ConnectionCurveStyle.Orthogonal -> {
                 // Route in board space for zoom-stable thresholds.
-                val rawBoardPts = if (scale != 1f || canvasOffset != Offset.Zero) {
-                    points.filter { it.x.isFinite() && it.y.isFinite() }.map { (it - canvasOffset) * (1f / scale) }
+                val boardPts = if (boardPoints != null && boardPoints.size >= 2) {
+                    sanitizePoints(boardPoints)
                 } else {
-                    points.filter { it.x.isFinite() && it.y.isFinite() }
+                    val rawBoardPts = if (scale != 1f || canvasOffset != Offset.Zero) {
+                        points.filter { it.x.isFinite() && it.y.isFinite() }.map { (it - canvasOffset) * (1f / scale) }
+                    } else {
+                        points.filter { it.x.isFinite() && it.y.isFinite() }
+                    }
+                    sanitizePoints(rawBoardPts)
                 }
-                val boardPts = sanitizePoints(rawBoardPts)
                 val orthoBoard = computeOrthogonalPoints(
                     boardPts,
                     startHorizontal,
@@ -729,13 +734,14 @@ object SplineMathUtils {
             if (isForward) {
                 if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
                     outWaypoints.add(p1)
-                } else if (pLead1.x >= pLead0.x) {
-                    outWaypoints.add(Offset(pLead1.x, p0.y))
-                    outWaypoints.add(pLead1)
+                } else if (pLead1.x >= pLead0.x - ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                    val leadX = maxOf(pLead0.x, pLead1.x)
+                    outWaypoints.add(Offset(leadX, p0.y))
+                    outWaypoints.add(Offset(leadX, p1.y))
                     outWaypoints.add(p1)
                 } else {
                     // Nodes or ports are too close together for full leads.
-                    // If ports are in near range (< 30f), avoid adding the additional middle waypoints
+                    // If ports are in near range (<= gridSize), avoid adding the additional middle waypoints
                     // that cause loops or improper vertical middle fallbacks.
                     val corridorWidth = if (b1 > b0) b1 - b0 else (p1.x - p0.x)
                     if (corridorWidth < 30f) {
@@ -773,31 +779,23 @@ object SplineMathUtils {
             if (isForward) {
                 if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
                     outWaypoints.add(p1)
-                } else if (p1.x >= pLead0.x) {
+                } else if (p1.x > pLead0.x + ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                    val leadX = pLead0.x
                     if (endHorizontal) {
-                        outWaypoints.add(pLead0)
-                        outWaypoints.add(Offset(pLead0.x, p1.y))
+                        outWaypoints.add(Offset(leadX, p0.y))
+                        outWaypoints.add(Offset(leadX, p1.y))
                     } else {
                         outWaypoints.add(Offset(p1.x, p0.y))
                     }
                     outWaypoints.add(p1)
                 } else {
-                    // Target is ahead but within lead range; if in near range, avoid additional waypoints
-                    val corridorWidth = p1.x - p0.x
-                    if (corridorWidth < 30f) {
-                        if (endHorizontal) {
-                            outWaypoints.add(Offset(p0.x, p1.y))
-                        } else {
-                            outWaypoints.add(Offset(p1.x, p0.y))
-                        }
+                    // Target is ahead but within lead range; route cleanly without zero-length steps
+                    if (endHorizontal) {
+                        val stepX = (p0.x + p1.x) / 2f
+                        outWaypoints.add(Offset(stepX, p0.y))
+                        outWaypoints.add(Offset(stepX, p1.y))
                     } else {
-                        if (endHorizontal) {
-                            val stepX = (p0.x + p1.x) / 2f
-                            outWaypoints.add(Offset(stepX, p0.y))
-                            outWaypoints.add(Offset(stepX, p1.y))
-                        } else {
-                            outWaypoints.add(Offset(p1.x, p0.y))
-                        }
+                        outWaypoints.add(Offset(p1.x, p0.y))
                     }
                     outWaypoints.add(p1)
                 }
@@ -820,28 +818,24 @@ object SplineMathUtils {
             if (isForward) {
                 if (abs(p0.y - p1.y) < ORTHOGONAL_ALIGNMENT_TOLERANCE) {
                     outWaypoints.add(p1)
-                } else if (pLead1.x >= p0.x) {
+                } else if (pLead1.x > p0.x + ORTHOGONAL_ALIGNMENT_TOLERANCE) {
+                    val leadX = pLead1.x
                     if (startHorizontal) {
-                        outWaypoints.add(Offset(pLead1.x, p0.y))
-                        outWaypoints.add(pLead1)
+                        outWaypoints.add(Offset(leadX, p0.y))
+                        outWaypoints.add(Offset(leadX, p1.y))
                     } else {
                         outWaypoints.add(Offset(p0.x, p1.y))
-                        outWaypoints.add(pLead1)
+                        outWaypoints.add(Offset(leadX, p1.y))
                     }
                     outWaypoints.add(p1)
                 } else {
-                    // Source is ahead of pLead1.x (too close to target); if in near range, avoid additional waypoints
-                    val corridorWidth = p1.x - p0.x
-                    if (corridorWidth < 30f) {
-                        outWaypoints.add(Offset(p0.x, p1.y))
+                    // Source is at or ahead of pLead1.x (close to target)
+                    if (startHorizontal) {
+                        val stepX = (p0.x + p1.x) / 2f
+                        outWaypoints.add(Offset(stepX, p0.y))
+                        outWaypoints.add(Offset(stepX, p1.y))
                     } else {
-                        if (startHorizontal) {
-                            val stepX = (p0.x + p1.x) / 2f
-                            outWaypoints.add(Offset(stepX, p0.y))
-                            outWaypoints.add(Offset(stepX, p1.y))
-                        } else {
-                            outWaypoints.add(Offset(p0.x, p1.y))
-                        }
+                        outWaypoints.add(Offset(p0.x, p1.y))
                     }
                     outWaypoints.add(p1)
                 }
@@ -931,7 +925,8 @@ object SplineMathUtils {
         endPortLead: Boolean = false,
         gridSize: Float = DEFAULT_GRID_SIZE,
         startBorderX: Float? = null,
-        endBorderX: Float? = null
+        endBorderX: Float? = null,
+        boardPoints: List<Offset>? = null
     ): Path {
         val validPoints = points.filter { it.x.isFinite() && it.y.isFinite() }
         val path = Path()
@@ -964,12 +959,16 @@ object SplineMathUtils {
             ConnectionCurveStyle.Orthogonal -> {
                 // Always route in board space so the routing thresholds (0.2f, 0.5f, etc.) are
                 // evaluated against logical units — producing the same path topology at every zoom.
-                val rawBoardPts = if (scale != 1f || canvasOffset != Offset.Zero) {
-                    validPoints.map { (it - canvasOffset) * (1f / scale) }
+                val boardPts = if (boardPoints != null && boardPoints.size >= 2) {
+                    sanitizePoints(boardPoints)
                 } else {
-                    validPoints
+                    val rawBoardPts = if (scale != 1f || canvasOffset != Offset.Zero) {
+                        validPoints.map { (it - canvasOffset) * (1f / scale) }
+                    } else {
+                        validPoints
+                    }
+                    sanitizePoints(rawBoardPts)
                 }
-                val boardPts = sanitizePoints(rawBoardPts)
                 val orthoBoard = computeOrthogonalPoints(
                     points = boardPts,
                     startHorizontal = startHorizontal,
@@ -1028,7 +1027,8 @@ object SplineMathUtils {
         endPortLead: Boolean = false,
         gridSize: Float = DEFAULT_GRID_SIZE,
         startBorderX: Float? = null,
-        endBorderX: Float? = null
+        endBorderX: Float? = null,
+        boardPoints: List<Offset>? = null
     ): List<Offset> {
         val validPoints = points.filter { it.x.isFinite() && it.y.isFinite() }
         if (validPoints.isEmpty()) return emptyList()
@@ -1043,10 +1043,14 @@ object SplineMathUtils {
 
             ConnectionCurveStyle.Orthogonal -> {
                 // Route in board space for zoom-stable thresholds, then re-transform to screen.
-                val rawBoardPts = if (scale != 1f || canvasOffset != Offset.Zero) {
-                    validPoints.map { (it - canvasOffset) * (1f / scale) }
-                } else { validPoints }
-                val boardPts = sanitizePoints(rawBoardPts)
+                val boardPts = if (boardPoints != null && boardPoints.size >= 2) {
+                    sanitizePoints(boardPoints)
+                } else {
+                    val rawBoardPts = if (scale != 1f || canvasOffset != Offset.Zero) {
+                        validPoints.map { (it - canvasOffset) * (1f / scale) }
+                    } else { validPoints }
+                    sanitizePoints(rawBoardPts)
+                }
                 val orthoBoard = computeOrthogonalPoints(
                     boardPts,
                     startHorizontal,
@@ -1126,12 +1130,12 @@ object SplineMathUtils {
                         sampled.add(effectiveOrtho[1])
                     } else {
                         for (i in 1 until effectiveOrtho.size - 1) {
-                            val pPrev = if (i == 1) startFilletEnd else effectiveOrtho[i - 1]
-                            val pCurr = effectiveOrtho[i]
-                            val pNext = effectiveOrtho[i + 1]
+                            val origPrev = orthoPoints[i - 1]
+                            val pCurr = orthoPoints[i]
+                            val origNext = orthoPoints[i + 1]
 
-                            val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
-                            val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
+                            val vIn = Offset(origPrev.x - pCurr.x, origPrev.y - pCurr.y)
+                            val vOut = Offset(origNext.x - pCurr.x, origNext.y - pCurr.y)
                             val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
                             val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
 
@@ -1161,12 +1165,12 @@ object SplineMathUtils {
                     } else {
                         sampled.add(effectiveOrtho[0])
                         for (i in 1 until effectiveOrtho.size - 1) {
-                            val pPrev = effectiveOrtho[i - 1]
-                            val pCurr = effectiveOrtho[i]
-                            val pNext = effectiveOrtho[i + 1]
+                            val origPrev = orthoPoints[i - 1]
+                            val pCurr = orthoPoints[i]
+                            val origNext = orthoPoints[i + 1]
 
-                            val vIn = Offset(pPrev.x - pCurr.x, pPrev.y - pCurr.y)
-                            val vOut = Offset(pNext.x - pCurr.x, pNext.y - pCurr.y)
+                            val vIn = Offset(origPrev.x - pCurr.x, origPrev.y - pCurr.y)
+                            val vOut = Offset(origNext.x - pCurr.x, origNext.y - pCurr.y)
                             val lenIn = sqrt(vIn.x * vIn.x + vIn.y * vIn.y)
                             val lenOut = sqrt(vOut.x * vOut.x + vOut.y * vOut.y)
 

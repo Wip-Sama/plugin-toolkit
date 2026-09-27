@@ -567,15 +567,14 @@ object ConnectionHitTester {
         var minDistance = if (initialMinDistance < 15f) 15f else initialMinDistance
 
         for (connection in connections) {
-            val screenPoints = getConnectionScreenPoints(
+            val boardPoints = getConnectionBoardPoints(
                 connection = connection,
                 getPortBoardPosition = getPortBoardPosition,
                 junctionMap = junctionMap,
-                scale = scale,
-                offset = offset,
                 groups = groups,
                 density = density
             ) ?: continue
+            val screenPoints = boardPoints.map { (it * scale) + offset }
 
             val minX = screenPoints.minOf { it.x } - (30f * scale)
             val maxX = screenPoints.maxOf { it.x } + (30f * scale)
@@ -627,7 +626,8 @@ object ConnectionHitTester {
                 startPortLead = hasStartPortLead(connection, orthogonalPortLead),
                 endPortLead = hasEndPortLead(connection, orthogonalPortLead),
                 startBorderX = getSourceNodeBorderX(connection, nodes),
-                endBorderX = getTargetNodeBorderX(connection, nodes)
+                endBorderX = getTargetNodeBorderX(connection, nodes),
+                boardPoints = boardPoints
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -675,15 +675,14 @@ object ConnectionHitTester {
         var minDistance = if (initialMinDistance < 15f) 15f else initialMinDistance
 
         for (connection in connections) {
-            val screenPoints = getConnectionScreenPoints(
+            val boardPoints = getConnectionBoardPoints(
                 connection = connection,
                 getPortBoardPosition = getPortBoardPosition,
                 junctionMap = junctionMap,
-                scale = scale,
-                offset = offset,
                 groups = groups,
                 density = density
             ) ?: continue
+            val screenPoints = boardPoints.map { (it * scale) + offset }
 
             val minX = screenPoints.minOf { it.x } - (30f * scale)
             val maxX = screenPoints.maxOf { it.x } + (30f * scale)
@@ -735,7 +734,8 @@ object ConnectionHitTester {
                 startPortLead = hasStartPortLead(connection, orthogonalPortLead),
                 endPortLead = hasEndPortLead(connection, orthogonalPortLead),
                 startBorderX = getSourceNodeBorderX(connection, nodes),
-                endBorderX = getTargetNodeBorderX(connection, nodes)
+                endBorderX = getTargetNodeBorderX(connection, nodes),
+                boardPoints = boardPoints
             )
             val dist = SplineMathUtils.distanceToPath(position, sampledPoints)
             if (dist < minDistance) {
@@ -918,15 +918,14 @@ object ConnectionHitTester {
         var minDistance = if (hitRadius < 8f) 8f else hitRadius
 
         for (connection in connections) {
-            val screenPoints = getConnectionScreenPoints(
+            val boardPoints = getConnectionBoardPoints(
                 connection = connection,
                 getPortBoardPosition = getPortBoardPosition,
                 junctionMap = junctionMap,
-                scale = scale,
-                offset = offset,
                 groups = groups,
                 density = density
             ) ?: continue
+            val screenPoints = boardPoints.map { (it * scale) + offset }
 
             if (screenPoints.size < 2) continue
 
@@ -971,7 +970,8 @@ object ConnectionHitTester {
                 startPortLead = hasStartPortLead(connection, orthogonalPortLead),
                 endPortLead = hasEndPortLead(connection, orthogonalPortLead),
                 startBorderX = getSourceNodeBorderX(connection, nodes),
-                endBorderX = getTargetNodeBorderX(connection, nodes)
+                endBorderX = getTargetNodeBorderX(connection, nodes),
+                boardPoints = boardPoints
             )
 
             midpoints.forEachIndexed { segIdx, midPt ->
