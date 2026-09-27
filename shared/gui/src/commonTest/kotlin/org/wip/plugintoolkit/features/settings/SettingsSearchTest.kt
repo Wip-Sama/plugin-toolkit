@@ -42,7 +42,7 @@ class SettingsSearchTest {
         )
 
         val registry = SettingsRegistry(defs)
-        val viewModel = SettingsSearchViewModel(registry)
+        val viewModel = SettingsSearchViewModel(registry, shortcutActions = emptyList())
 
         val resolvedStrings = registry.definitions.value.flatMap {
             listOfNotNull(it.title, it.subtitle, it.sectionTitle)
@@ -80,7 +80,7 @@ class SettingsSearchTest {
         )
 
         val registry = SettingsRegistry(defs)
-        val viewModel = SettingsSearchViewModel(registry)
+        val viewModel = SettingsSearchViewModel(registry, shortcutActions = emptyList())
         val resolvedStrings = registry.definitions.value.flatMap {
             listOfNotNull(it.title, it.subtitle, it.sectionTitle)
         }.associateWith { (it as SettingText.Raw).text }
@@ -97,7 +97,7 @@ class SettingsSearchTest {
             createDefinition("s1", "Auto Update", "Enable automatic updates", navKey = SettingNavKey.SystemSettings)
         )
         val registry = SettingsRegistry(defs)
-        val viewModel = SettingsSearchViewModel(registry)
+        val viewModel = SettingsSearchViewModel(registry, shortcutActions = emptyList())
         val resolvedStrings = registry.definitions.value.flatMap {
             listOfNotNull(it.title, it.subtitle, it.sectionTitle)
         }.associateWith { (it as SettingText.Raw).text }
@@ -139,7 +139,7 @@ class SettingsSearchTest {
             createDefinition("sys.memory", "Max Memory Limit", "Allocate heap", navKey = SettingNavKey.SystemSettings)
         )
         val registry = SettingsRegistry(defs)
-        val viewModel = SettingsSearchViewModel(registry)
+        val viewModel = SettingsSearchViewModel(registry, shortcutActions = emptyList())
         val resolvedStrings = registry.definitions.value.flatMap {
             listOfNotNull(it.title, it.subtitle, it.sectionTitle)
         }.associateWith { (it as SettingText.Raw).text }

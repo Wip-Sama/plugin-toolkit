@@ -191,11 +191,19 @@ class FlowEditorAutosaveTest {
         assertTrue(viewModel.state.value.hasUnsavedChanges)
 
         val tracker: ActiveFlowEditorTracker = getKoin().get()
-        assertTrue(tracker.hasUnsavedChanges.value)
+        for (i in 1..100) {
+            if (tracker.hasUnsavedChanges.value) break
+            delay(10)
+        }
+        assertTrue(tracker.hasUnsavedChanges.value, "Tracker must report true when unsaved changes exist")
 
         // User confirms exit in dialog -> tracker.discardChanges() is invoked
         tracker.discardChanges()
 
+        for (i in 1..100) {
+            if (!tracker.hasUnsavedChanges.value && viewModel.state.value.flow.connections.isEmpty()) break
+            delay(10)
+        }
         assertFalse(tracker.hasUnsavedChanges.value, "Tracker must report false after discard")
         assertEquals(0, viewModel.state.value.flow.connections.size, "Flow must be reverted back to 0 connections")
         assertFalse(viewModel.state.value.hasUnsavedChanges, "ViewModel hasUnsavedChanges must be false")
