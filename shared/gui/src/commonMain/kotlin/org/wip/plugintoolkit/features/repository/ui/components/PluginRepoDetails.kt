@@ -380,7 +380,7 @@ fun PluginRepoDetails(
                                 bottomFadeLength = ToolkitTheme.spacing.medium
                             )
                             .fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
                     ) {
                         items(plugins.distinctBy { it.pkg }, key = { it.pkg }) { plugin ->
                             PluginListItem(
@@ -414,11 +414,11 @@ fun PluginRepoDetails(
                         modifier = Modifier
                             .verticalFadingEdges(
                                 lazyListState = flowsListState,
-                                topFadeLength = ToolkitTheme.spacing.small,
-                                bottomFadeLength = ToolkitTheme.spacing.small
+                                topFadeLength = ToolkitTheme.spacing.medium,
+                                bottomFadeLength = ToolkitTheme.spacing.medium
                             )
                             .fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
                     ) {
                         items(flows) { flow ->
                             FlowListItem(

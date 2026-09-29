@@ -1,3 +1,17 @@
+Version: 3.0.1
+Date: xx-xx-2026
+Added:
+Changes:
+Fixed:
+	- Updating the log level at runtime would not properly use the new level
+	- Narrow Window Squishing & Row Growth in settings
+	- Shortcut, Settings and many more spacing inconsistencies
+	- Plugin Action Working Indicator spinning on a central point alongside itself
+Removed:
+	- Verbose logging spam in the flow editor
+Planned:
+
+----------------------------------------------------------------------------------------------------
 Version: 3.0.0
 Name: Packaged Timed Colors
 Date: 27-09-2026

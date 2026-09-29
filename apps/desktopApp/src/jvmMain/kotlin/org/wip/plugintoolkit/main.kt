@@ -12,7 +12,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import org.wip.plugintoolkit.core.logging.syncLoggerSeverity
+import org.wip.plugintoolkit.core.logging.toSeverity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
@@ -32,8 +33,10 @@ import co.touchlab.kermit.Severity
 import co.touchlab.kermit.platformLogWriter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
@@ -244,40 +247,29 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
         }
     )
 
-    val initialSeverity = when (initialSettings.logging.level) {
-        LogLevel.Verbose -> Severity.Verbose
-        LogLevel.Debug -> Severity.Debug
-        LogLevel.Info -> Severity.Info
-        LogLevel.Warn -> Severity.Warn
-        LogLevel.Error -> Severity.Error
-        LogLevel.Assert -> Severity.Assert
-    }
+    val initialSeverity = initialSettings.logging.level.toSeverity()
     Logger.setMinSeverity(initialSeverity)
 
     // Sync logger severity with settings changes dynamically
-    snapshotFlow { viewModel.settings.value.logging.level }.onEach { level ->
-        val severity = when (level) {
-            LogLevel.Verbose -> Severity.Verbose
-            LogLevel.Debug -> Severity.Debug
-            LogLevel.Info -> Severity.Info
-            LogLevel.Warn -> Severity.Warn
-            LogLevel.Error -> Severity.Error
-            LogLevel.Assert -> Severity.Assert
-        }
-        Logger.setMinSeverity(severity)
-    }.launchIn(appScope)
+    syncLoggerSeverity(
+        settings = viewModel.settings,
+        scope = appScope
+    )
 
     // Dynamically sync single-instance lock with settings changes
-    snapshotFlow { viewModel.settings.value.general.singleInstanceLock }.onEach { isEnabled ->
-        val appDataDir = File(detectedConfig.getAppDataDir())
-        if (isEnabled) {
-            if (!org.wip.plugintoolkit.core.utils.AppLockManager.isLockAcquired()) {
-                org.wip.plugintoolkit.core.utils.AppLockManager.acquireLock(appDataDir)
+    viewModel.settings
+        .map { it.general.singleInstanceLock }
+        .distinctUntilChanged()
+        .onEach { isEnabled ->
+            val appDataDir = File(detectedConfig.getAppDataDir())
+            if (isEnabled) {
+                if (!org.wip.plugintoolkit.core.utils.AppLockManager.isLockAcquired()) {
+                    org.wip.plugintoolkit.core.utils.AppLockManager.acquireLock(appDataDir)
+                }
+            } else {
+                org.wip.plugintoolkit.core.utils.AppLockManager.releaseLock()
             }
-        } else {
-            org.wip.plugintoolkit.core.utils.AppLockManager.releaseLock()
-        }
-    }.launchIn(appScope)
+        }.launchIn(appScope)
 
     Logger.i { "Application starting. Logging initialized at: $logDir with minSeverity=$initialSeverity" }
 

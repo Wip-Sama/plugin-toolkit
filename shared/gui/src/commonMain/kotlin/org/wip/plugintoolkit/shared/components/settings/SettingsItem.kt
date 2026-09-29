@@ -43,6 +43,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import org.wip.plugintoolkit.core.model.LocalizedString
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import androidx.compose.ui.text.style.TextOverflow
 import org.wip.plugintoolkit.features.settings.utils.LocalSettingsSearchQuery
 import org.wip.plugintoolkit.shared.components.GroupOrientation
 import org.wip.plugintoolkit.shared.components.rememberGroupedShape
@@ -131,13 +132,17 @@ fun SettingsItem(
                         text = title,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (subtitle != null) {
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     if (extraContent != null) {

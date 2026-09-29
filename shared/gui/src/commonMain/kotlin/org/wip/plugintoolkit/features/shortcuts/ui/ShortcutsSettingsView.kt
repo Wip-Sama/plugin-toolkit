@@ -40,10 +40,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +55,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.model.resolve
 import org.wip.plugintoolkit.core.model.resolveNonComposable
@@ -74,17 +78,10 @@ import plugintoolkit.composeapp.generated.resources.setting_shortcut_priority_sy
 import plugintoolkit.composeapp.generated.resources.setting_shortcut_priority_system_title
 import plugintoolkit.composeapp.generated.resources.shortcut_priority_mode_static
 import plugintoolkit.composeapp.generated.resources.shortcut_priority_mode_zindex
-import plugintoolkit.composeapp.generated.resources.shortcut_situation_flow_board
-import plugintoolkit.composeapp.generated.resources.shortcut_situation_flow_node
-import plugintoolkit.composeapp.generated.resources.shortcut_situation_flow_point
-import plugintoolkit.composeapp.generated.resources.shortcut_situation_flow_selection
-import plugintoolkit.composeapp.generated.resources.shortcut_situation_flow_wire
-import plugintoolkit.composeapp.generated.resources.shortcut_situation_global
-import plugintoolkit.composeapp.generated.resources.shortcut_situation_job_terminal
-import plugintoolkit.composeapp.generated.resources.shortcut_situation_settings
 import plugintoolkit.composeapp.generated.resources.shortcuts_conflicts_detected
 import plugintoolkit.composeapp.generated.resources.shortcuts_reset
 import plugintoolkit.composeapp.generated.resources.shortcuts_section_priority
+import plugintoolkit.composeapp.generated.resources.shortcuts_title
 
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 
@@ -125,10 +122,6 @@ fun ShortcutsSettingsView(
                         effectiveTriggers.any { it.format().contains(query, ignoreCase = true) }
             }
         }
-    }
-
-    val groupedActions = remember(filteredActions) {
-        filteredActions.groupBy { it.situation }
     }
 
     val scrollState = rememberScrollState()
@@ -185,6 +178,7 @@ fun ShortcutsSettingsView(
                 title = stringResource(Res.string.setting_shortcut_priority_system_title),
                 subtitle = stringResource(Res.string.setting_shortcut_priority_system_subtitle),
                 icon = Icons.Default.Layers,
+                shape = getGroupedShape(0, 1),
                 control = {
                     ExpressiveMenu(
                         options = ShortcutPriorityMode.entries,
@@ -205,63 +199,54 @@ fun ShortcutsSettingsView(
             )
         }
 
-        // Action Groups
-        groupedActions.forEach { (situation, actions) ->
-            val groupTitle = when (situation) {
-                ShortcutSituation.Global -> stringResource(Res.string.shortcut_situation_global)
-                ShortcutSituation.FlowBoard -> stringResource(Res.string.shortcut_situation_flow_board)
-                ShortcutSituation.FlowConnectionPoint -> stringResource(Res.string.shortcut_situation_flow_point)
-                ShortcutSituation.FlowNode -> stringResource(Res.string.shortcut_situation_flow_node)
-                ShortcutSituation.FlowSelection -> stringResource(Res.string.shortcut_situation_flow_selection)
-                ShortcutSituation.FlowWire -> stringResource(Res.string.shortcut_situation_flow_wire)
-                ShortcutSituation.JobTerminal -> stringResource(Res.string.shortcut_situation_job_terminal)
-                ShortcutSituation.Settings -> stringResource(Res.string.shortcut_situation_settings)
-            }
+        // Action Group
+        SettingsGroup(title = stringResource(Res.string.shortcuts_title)) {
+            filteredActions.forEachIndexed { index, action ->
+                val isCustomized = shortcutManager.isCustomized(action.id)
+                val hasConflict = allConflicts.any { it.action1.id == action.id || it.action2.id == action.id }
+                val effectivePri = shortcutManager.getEffectiveActionPriority(action.id).toInt()
+                val relPri = shortcutManager.getEffectiveRelativePriority(action.id)
+                val relStr = if (relPri >= 0) "+$relPri" else "$relPri"
 
-            SettingsGroup(title = groupTitle) {
-                actions.forEachIndexed { index, action ->
-                    val isCustomized = shortcutManager.isCustomized(action.id)
-                    val hasConflict = allConflicts.any { it.action1.id == action.id || it.action2.id == action.id }
-                    val effectivePri = shortcutManager.getEffectiveActionPriority(action.id).toInt()
-                    val relPri = shortcutManager.getEffectiveRelativePriority(action.id)
-                    val relStr = if (relPri >= 0) "+$relPri" else "$relPri"
+                SettingsItem(
+                    title = action.title.resolve(),
+                    subtitle = "${action.situation.displayLabel} • ${action.description.resolve()} • Priority: $effectivePri (relative $relStr)",
+                    icon = getActionIcon(action.id, action.situation),
+                    shape = getGroupedShape(index, filteredActions.size),
+                    control = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                        ) {
+                            if (hasConflict) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                            }
 
-                    SettingsItem(
-                        title = action.title.resolve(),
-                        subtitle = "${action.description.resolve()} • Priority: $effectivePri (relative $relStr)",
-                        icon = getActionIcon(action.id, situation),
-                        shape = getGroupedShape(index, actions.size),
-                        control = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                            OutlinedButton(
+                                onClick = { actionToRemap = action },
+                                contentPadding = PaddingValues(
+                                    horizontal = ToolkitTheme.spacing.small,
+                                    vertical = ToolkitTheme.spacing.extraExtraSmall
+                                ),
+                                shape = ToolkitTheme.shapes.pill
                             ) {
-                                if (hasConflict) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                    )
-                                }
+                                Text(
+                                    text = shortcutManager.formatEffectiveTriggers(action.id),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
 
-                                OutlinedButton(
-                                    onClick = { actionToRemap = action },
-                                    contentPadding = PaddingValues(
-                                        horizontal = ToolkitTheme.spacing.small,
-                                        vertical = ToolkitTheme.spacing.extraExtraSmall
-                                    ),
-                                    shape = ToolkitTheme.shapes.pill
-                                ) {
-                                    Text(
-                                        text = shortcutManager.formatEffectiveTriggers(action.id),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-
-                                if (isCustomized) {
+                            if (isCustomized) {
+                                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
                                     IconButton(
                                         onClick = {
                                             shortcutManager.resetBinding(action.id)
@@ -278,8 +263,8 @@ fun ShortcutsSettingsView(
                                 }
                             }
                         }
-                    )
-                }
+                    }
+                )
             }
         }
 

@@ -1,7 +1,6 @@
 package org.wip.plugintoolkit.features.flows.ui.canvas
 
 import androidx.compose.ui.geometry.Offset
-import co.touchlab.kermit.Logger
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowJunction
@@ -106,7 +105,6 @@ object ConnectionHitTester {
         // 1. Determine start orientation (how this connection leaves its source):
         val startIsHorizontal = if (connection.sourceJunctionId == null) {
             // Node output ports always exit horizontally to the right
-            Logger.v(tag = "ConnectionOrientations") { "$connId: startIsHorizontal=true (node output port, always horizontal)" }
             true
         } else {
             val juncId = connection.sourceJunctionId
@@ -196,10 +194,6 @@ object ConnectionHitTester {
                         (targetDy < -SplineMathUtils.ORTHOGONAL_ALIGNMENT_TOLERANCE && incomingDy < 0f)
                 }
                 val result = if (continuesForward) incomingAxisH else !incomingAxisH
-                Logger.v(tag = "ConnectionOrientations") {
-                    "$connId: startIsHorizontal=$result (incomingAxis=$incomingAxisH, " +
-                        "incomingDx=$incomingDx, incomingDy=$incomingDy, targetDx=$targetDx, targetDy=$targetDy, continuesForward=$continuesForward)"
-                }
                 result
             } else {
                 // No incoming connection: determine departure axis from target displacement
@@ -213,13 +207,8 @@ object ConnectionHitTester {
                 if (targetPos != null && juncPos != null) {
                     val dx = targetPos.x - juncPos.x
                     val dy = targetPos.y - juncPos.y
-                    val result = abs(dx) >= abs(dy)
-                    Logger.v(tag = "ConnectionOrientations") {
-                        "$connId: startIsHorizontal=$result (no incoming, junc->target dx=$dx, dy=$dy)"
-                    }
-                    result
+                    abs(dx) >= abs(dy)
                 } else {
-                    Logger.v(tag = "ConnectionOrientations") { "$connId: startIsHorizontal=true (no incoming, no target pos, defaulting)" }
                     true
                 }
             }
@@ -228,7 +217,6 @@ object ConnectionHitTester {
         // 2. Determine end orientation (how this connection arrives at its target):
         val endIsHorizontal = if (connection.targetJunctionId == null && !connection.isFloating) {
             // Node input ports always receive connections horizontally from the left
-            Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (target is a node input port, always horizontal)" }
             true
         } else if (connection.targetJunctionId != null) {
             val tgtJuncPos = junctionMap[connection.targetJunctionId]
@@ -314,11 +302,9 @@ object ConnectionHitTester {
                 true
             }
         } else {
-            Logger.v(tag = "ConnectionOrientations") { "$connId: endIsHorizontal=true (floating/default)" }
             true
         }
 
-        Logger.v(tag = "ConnectionOrientations") { "$connId: FINAL startIsHorizontal=$startIsHorizontal, endIsHorizontal=$endIsHorizontal" }
         return Pair(startIsHorizontal, endIsHorizontal)
     }
 
@@ -382,10 +368,6 @@ object ConnectionHitTester {
 
                         if (prevPoint != null) {
                             startFilletLeadIn = (prevPoint * scale) + offset
-                            Logger.v(tag = "JunctionFillet") {
-                                "startFillet conn[${connection.sourceNodeId}:${connection.sourcePortId}] " +
-                                "src-junc[${connection.sourceJunctionId}]: lead-in=$prevPoint (screen=${startFilletLeadIn})"
-                            }
                         }
                     }
                 }
@@ -492,9 +474,6 @@ object ConnectionHitTester {
                                         val dot = vIn.x * vOut.x + vIn.y * vOut.y
                                         if (dot > 0.9f) {
                                             // Through-connection: no fillet needed on incoming wire
-                                            Logger.v(tag = "JunctionFillet") {
-                                                "endTrim junc[$tgtJuncId]: outgoing conn[${outConn.sourceNodeId}] is through-connection (dot=$dot > 0.9), skipping trim"
-                                            }
                                             hasThrough = true
                                             break
                                         } else if (abs(dot) < 0.1f) {
@@ -503,20 +482,7 @@ object ConnectionHitTester {
                                             val r = minOf(rBase, lenInScreen * SplineMathUtils.TRIM_FACTOR, lenOutScreen * SplineMathUtils.TRIM_FACTOR)
                                             val minR = 0.01f
                                             if (r >= minR && r > 0f) {
-                                                Logger.v(tag = "JunctionFillet") {
-                                                    "endTrim junc[$tgtJuncId]: perpendicular branch (dot=$dot), r=$r accepted " +
-                                                    "(rBase=$rBase, lenInScreen=$lenInScreen, lenOutScreen=$lenOutScreen)"
-                                                }
                                                 minBranchRadius = if (minBranchRadius == null) r else minOf(minBranchRadius, r)
-                                            } else {
-                                                Logger.v(tag = "JunctionFillet") {
-                                                    "endTrim junc[$tgtJuncId]: perpendicular branch (dot=$dot), r=$r REJECTED " +
-                                                    "(r < minR=$minR or r <= 0)"
-                                                }
-                                            }
-                                        } else {
-                                            Logger.v(tag = "JunctionFillet") {
-                                                "endTrim junc[$tgtJuncId]: outgoing conn[${outConn.sourceNodeId}] neither through nor perpendicular (dot=$dot), skipping"
                                             }
                                         }
                                     }
@@ -524,17 +490,6 @@ object ConnectionHitTester {
 
                                 if (!hasThrough && minBranchRadius != null) {
                                     endTrimDistance = minBranchRadius
-                                    Logger.v(tag = "JunctionFillet") {
-                                        "endTrim junc[$tgtJuncId]: final endTrimDistance=$endTrimDistance (screen px)"
-                                    }
-                                } else if (hasThrough) {
-                                    Logger.v(tag = "JunctionFillet") {
-                                        "endTrim junc[$tgtJuncId]: no trim applied (through-connection detected)"
-                                    }
-                                } else {
-                                    Logger.v(tag = "JunctionFillet") {
-                                        "endTrim junc[$tgtJuncId]: no trim applied (no valid perpendicular branch)"
-                                    }
                                 }
                             }
                         }

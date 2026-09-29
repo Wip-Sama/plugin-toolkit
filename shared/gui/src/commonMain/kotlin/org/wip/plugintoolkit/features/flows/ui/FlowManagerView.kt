@@ -327,7 +327,7 @@ fun FlowManagerView(
             )
         }
 
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.large))
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
         Column(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),

@@ -338,7 +338,7 @@ fun PluginManagerView(
             }
         }
 
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
         // Search & Filter Row
         Column(
@@ -419,7 +419,7 @@ fun PluginManagerView(
                 contentPadding = PaddingValues(
                     vertical = ToolkitTheme.spacing.small
                 ),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
                 items(filteredPlugins, key = { it.pkg }) { plugin ->
                     val hasUpdate = remember(plugin.pkg, plugin.version) {

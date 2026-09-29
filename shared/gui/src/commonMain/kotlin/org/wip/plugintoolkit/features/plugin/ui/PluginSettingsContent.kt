@@ -404,8 +404,8 @@ fun PluginSettingsContent(
                 if (isBusy) {
                     CircularProgressIndicator(
                         modifier = Modifier
-                            .size(ToolkitTheme.dimensions.iconMedium)
-                            .padding(start = ToolkitTheme.spacing.medium),
+                            .padding(start = ToolkitTheme.spacing.medium)
+                            .size(ToolkitTheme.dimensions.iconMedium),
                         strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth
                     )
                 }
