@@ -31,14 +31,19 @@ class DefaultSemanticRegistry : SemanticRegistry {
      */
     override fun getCategory(types: List<SemanticType>): SemanticCategory? {
         val mappedCategories = types.mapNotNull { type ->
+            val ns = type.namespace?.lowercase()
+            val name = type.name.lowercase()
             val primary = (type.namespace ?: type.name).lowercase()
-            when (primary) {
-                "color" -> SemanticCategory.COLOR
-                "image" -> SemanticCategory.IMAGE
-                "audio" -> SemanticCategory.AUDIO
-                "video" -> SemanticCategory.VIDEO
-                "file" -> SemanticCategory.FILE
-                "path" -> SemanticCategory.PATH
+            when {
+                ns == "path" && name == "file" -> SemanticCategory.FILE
+                ns == "path" && name == "folder" -> SemanticCategory.PATH
+                name == "folder" -> SemanticCategory.PATH
+                primary == "color" -> SemanticCategory.COLOR
+                primary == "image" -> SemanticCategory.IMAGE
+                primary == "audio" -> SemanticCategory.AUDIO
+                primary == "video" -> SemanticCategory.VIDEO
+                primary == "file" -> SemanticCategory.FILE
+                primary == "path" -> SemanticCategory.PATH
                 else -> null
             }
         }.toSet()
@@ -64,7 +69,16 @@ class DefaultSemanticRegistry : SemanticRegistry {
         var hasGenericVideo = false
 
         for (type in types) {
+            val ns = type.namespace?.lowercase()
+            val name = type.name.lowercase()
             val primary = (type.namespace ?: type.name).lowercase()
+
+            if (ns == "path" && name == "file") {
+                val ext = type.variant
+                if (ext != null && ext != "*") {
+                    extensions.add(ext)
+                }
+            }
 
             when (primary) {
                 "image" -> {

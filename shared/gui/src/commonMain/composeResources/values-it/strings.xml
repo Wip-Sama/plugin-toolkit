@@ -324,6 +324,12 @@
     <string name="flow_outputs_title">Output Previsti</string>
     <string name="flow_collected_automatically">Raccolto automaticamente</string>
     <string name="flow_execute_button">Esegui Flusso</string>
+    <string name="flow_restart_button">Riavvia Flusso</string>
+    <string name="flow_resume_button">Riprendi Flusso</string>
+    <string name="flow_pause_button">Metti in Pausa Flusso</string>
+    <string name="flow_status_paused">In Pausa</string>
+    <string name="flow_clear_history">Cancella Cronologia</string>
+    <string name="flow_fill_required_parameters">Compila tutti i parametri richiesti prima dell&apos;esecuzione</string>
     <string name="flow_history_title">Cronologia Esecuzione</string>
     <string name="flow_no_history">Nessuna esecuzione registrata per questo flusso.</string>
     <string name="flow_run_id_label">ID Esecuzione: %1$s</string>
@@ -854,4 +860,21 @@
     <string name="standalone_setup_completed">Configurazione Completata</string>
     <string name="standalone_setup_in_progress">Configurazione plugin in corso…</string>
     <string name="standalone_no_capabilities">Nessuna funzionalità trovata per questo plugin</string>
+
+    <!-- Load Node Configuration & File Inputs -->
+    <string name="node_configure_load_title">Configura Nodo Carica</string>
+    <string name="node_load_semantic_type_info">Tipo Semantico: %1$s</string>
+    <string name="node_load_extensions_desc">Estensioni di file supportate (es. txt, json, !csv)</string>
+    <string name="node_load_supported_extensions">Estensioni Supportate</string>
+    <string name="node_load_extensions_placeholder">es. txt, json, !csv</string>
+    <string name="node_load_default_file_path">Percorso File Predefinito</string>
+    <string name="node_load_default_file_placeholder">es. /percorso/del/file/predefinito</string>
+    <string name="action_browse_file">Sfoglia file</string>
+    <string name="action_browse_folder">Sfoglia cartella</string>
+    <string name="input_no_file_selected">Nessun file selezionato</string>
+    <string name="input_no_folder_selected">Nessuna cartella selezionata</string>
+    <string name="input_no_image_selected">Nessuna immagine selezionata</string>
+    <string name="input_no_audio_selected">Nessun audio selezionato</string>
+    <string name="input_no_video_selected">Nessun video selezionato</string>
+    <string name="input_unsupported_extension">Estensione non supportata (consentite: %1$s)</string>
 </resources>

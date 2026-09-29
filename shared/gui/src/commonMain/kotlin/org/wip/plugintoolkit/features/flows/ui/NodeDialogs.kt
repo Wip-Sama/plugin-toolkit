@@ -56,6 +56,13 @@ import plugintoolkit.composeapp.generated.resources.node_edit_output_title
 import plugintoolkit.composeapp.generated.resources.node_port_name_label
 import plugintoolkit.composeapp.generated.resources.node_semantic_type_label
 import plugintoolkit.composeapp.generated.resources.node_semantic_type_placeholder
+import plugintoolkit.composeapp.generated.resources.node_configure_load_title
+import plugintoolkit.composeapp.generated.resources.node_load_semantic_type_info
+import plugintoolkit.composeapp.generated.resources.node_load_extensions_desc
+import plugintoolkit.composeapp.generated.resources.node_load_supported_extensions
+import plugintoolkit.composeapp.generated.resources.node_load_extensions_placeholder
+import plugintoolkit.composeapp.generated.resources.node_load_default_file_path
+import plugintoolkit.composeapp.generated.resources.node_load_default_file_placeholder
 
 @Composable
 fun NodeDialogs(
@@ -352,10 +359,8 @@ fun NodeDialogs(
 
     if (showLoadSettingsDialog && node is Node.SystemNode) {
         if (node.systemAction.lowercase() == "load") {
-            val port = node.outputs.firstOrNull { it.id == "data" }
             val inPort = node.inputs.firstOrNull { it.id == "file_path" }
-            if (port != null && inPort != null) {
-                var semanticTypesStr by remember { mutableStateOf(port.semanticTypes.joinToString { it.canonicalId }) }
+            if (inPort != null) {
                 var extensionsStr by remember { mutableStateOf(inPort.constraints?.extensions?.joinToString(", ") ?: "") }
                 var defaultFilePath by remember { mutableStateOf(inPort.defaultValue?.toString() ?: "") }
 
@@ -363,7 +368,7 @@ fun NodeDialogs(
                     onDismissRequest = onDismissLoadSettings,
                     title = {
                         Text(
-                            text = "Configure Load Node",
+                            text = stringResource(Res.string.node_configure_load_title),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium
                         )
@@ -374,34 +379,28 @@ fun NodeDialogs(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Set the expected semantic types for the loaded file (e.g. image/png, file/txt).",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            ToolkitTextField(
-                                value = semanticTypesStr,
-                                onValueChange = { semanticTypesStr = it },
-                                label = { Text("Supported Semantic Types") },
-                                placeholder = { Text("e.g. image/png, file/txt") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
+                                text = stringResource(Res.string.node_load_semantic_type_info, "path/file"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "Add extensions constraint (!txt to allow semantics but forcefully reject txt)",
-                                style = MaterialTheme.typography.bodyMedium
+                                text = stringResource(Res.string.node_load_extensions_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             ToolkitTextField(
                                 value = extensionsStr,
                                 onValueChange = { extensionsStr = it },
-                                label = { Text("Supported Extensions") },
-                                placeholder = { Text("e.g. txt, json, !csv") },
+                                label = { Text(stringResource(Res.string.node_load_supported_extensions)) },
+                                placeholder = { Text(stringResource(Res.string.node_load_extensions_placeholder)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             ToolkitTextField(
                                 value = defaultFilePath,
                                 onValueChange = { defaultFilePath = it },
-                                label = { Text(stringResource(Res.string.node_default_value) + " (file_path)") },
-                                placeholder = { Text("e.g. /path/to/default/file") },
+                                label = { Text(stringResource(Res.string.node_load_default_file_path)) },
+                                placeholder = { Text(stringResource(Res.string.node_load_default_file_placeholder)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -410,12 +409,11 @@ fun NodeDialogs(
                     confirmButton = {
                         Button(
                             onClick = {
-                                val parsed = parseSemanticTypes(semanticTypesStr)
-                                val extensionsList = extensionsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                val extensionsList = extensionsStr.split(",").map { it.trim().removePrefix(".") }.filter { it.isNotEmpty() }
                                 onUpdateSystemNodeSettings(
                                     node.id,
                                     "data",
-                                    parsed,
+                                    emptyList(),
                                     "file_path",
                                     extensionsList.takeIf { it.isNotEmpty() }
                                 )

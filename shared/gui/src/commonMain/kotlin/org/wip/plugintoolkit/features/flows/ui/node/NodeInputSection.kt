@@ -80,6 +80,7 @@ fun NodeInputSection(
     showTopDivider: Boolean = false,
     isDrawingConnection: Boolean = false,
     isNodeHovered: Boolean = false,
+    onPress: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val sectionTag = "input_section_${sectionType.name.lowercase()}_${node.id}"
@@ -213,7 +214,8 @@ fun NodeInputSection(
                         isInactiveAndConnected = inactiveConnectedPortIds.contains(input.id),
                         onPortDisposed = onPortDisposed,
                         isDrawingConnection = isDrawingConnection,
-                        isNodeHovered = isNodeHovered
+                        isNodeHovered = isNodeHovered,
+                        onPress = onPress
                     )
                 }
             }

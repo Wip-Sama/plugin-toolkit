@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -62,6 +63,11 @@ import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_collected_automatically
 import plugintoolkit.composeapp.generated.resources.flow_execute_button
+import plugintoolkit.composeapp.generated.resources.flow_restart_button
+import plugintoolkit.composeapp.generated.resources.flow_resume_button
+import plugintoolkit.composeapp.generated.resources.flow_pause_button
+import plugintoolkit.composeapp.generated.resources.flow_clear_history
+import plugintoolkit.composeapp.generated.resources.flow_fill_required_parameters
 import plugintoolkit.composeapp.generated.resources.flow_history_title
 import plugintoolkit.composeapp.generated.resources.flow_no_history
 import plugintoolkit.composeapp.generated.resources.flow_outputs_title
@@ -83,7 +89,8 @@ data class FlowParameter(
     val role: org.wip.plugintoolkit.api.ParameterRole = org.wip.plugintoolkit.api.ParameterRole.STANDARD,
     val pluginId: String = "",
     val isRequired: Boolean = true,
-    val constraints: org.wip.plugintoolkit.api.ParameterConstraints? = null
+    val constraints: org.wip.plugintoolkit.api.ParameterConstraints? = null,
+    val customExtensions: List<String>? = null
 )
 
 enum class ParameterType {
@@ -260,10 +267,11 @@ fun FlowRunnerView(
                                                         defaultValue = resolvedDefault,
                                                         semanticTypes = filePort.semanticTypes.ifEmpty {
                                                             org.wip.plugintoolkit.api.parseSemanticTypes(
-                                                                "file"
+                                                                "path/file"
                                                             )
                                                         },
-                                                        role = org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION
+                                                        role = org.wip.plugintoolkit.api.ParameterRole.INPUT_LOCATION,
+                                                        customExtensions = filePort.constraints?.extensions
                                                     )
                                                 )
                                             } else emptyList()
@@ -420,7 +428,8 @@ fun FlowRunnerView(
                         onValueChange = { newValue ->
                             parameterValues["${param.nodeId}_${param.portId}"] = newValue
                         },
-                        pluginId = param.pluginId
+                        pluginId = param.pluginId,
+                        customExtensions = param.customExtensions
                     )
                 }
 
@@ -573,21 +582,82 @@ fun FlowRunnerView(
                         Text(stringResource(Res.string.action_reset_to_default))
                     }
 
-                    Button(
-                        onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = MaterialTheme.shapes.medium,
-                        enabled = isFlowValid
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        Text(stringResource(Res.string.flow_execute_button))
+                    val runningJob = remember(allJobs, currentFlow) {
+                        allJobs.find { it.type == JobType.Flow && it.capabilityName == currentFlow.name && (it.status == JobStatus.Running || it.status == JobStatus.PauseRequested) }
+                    }
+                    val pausedJob = remember(allJobs, currentFlow) {
+                        allJobs.find { it.type == JobType.Flow && it.capabilityName == currentFlow.name && it.status == JobStatus.Paused }
+                    }
+
+                    if (pausedJob != null) {
+                        Button(
+                            onClick = { jobViewModel.resumeJob(pausedJob.id) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Text(stringResource(Res.string.flow_resume_button))
+                        }
+
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+
+                        Button(
+                            onClick = {
+                                jobViewModel.cancelJob(pausedJob.id, force = true)
+                                viewModel.executeFlow(currentFlow, parameterValues.toMap())
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            shape = MaterialTheme.shapes.medium,
+                            enabled = isFlowValid
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Text(stringResource(Res.string.flow_restart_button))
+                        }
+                    } else if (runningJob != null) {
+                        Button(
+                            onClick = { jobViewModel.pauseJob(runningJob.id) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            ),
+                            enabled = runningJob.status == JobStatus.Running,
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Icon(Icons.Default.Pause, contentDescription = null)
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Text(stringResource(Res.string.flow_pause_button))
+                        }
+                    } else {
+                        Button(
+                            onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = MaterialTheme.shapes.medium,
+                            enabled = isFlowValid
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Text(stringResource(Res.string.flow_execute_button))
+                        }
                     }
                 }
-                if (!isFlowValid) {
+                val runningJobForHint = remember(allJobs, currentFlow) {
+                    allJobs.find { it.type == JobType.Flow && it.capabilityName == currentFlow.name && (it.status == JobStatus.Running || it.status == JobStatus.PauseRequested) }
+                }
+                val pausedJobForHint = remember(allJobs, currentFlow) {
+                    allJobs.find { it.type == JobType.Flow && it.capabilityName == currentFlow.name && it.status == JobStatus.Paused }
+                }
+                if (!isFlowValid && pausedJobForHint == null && runningJobForHint == null) {
                     Text(
-                        text = "Fill in all required parameters before running",
+                        text = stringResource(Res.string.flow_fill_required_parameters),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
@@ -627,7 +697,7 @@ fun FlowRunnerView(
                         }) {
                             Icon(Icons.Default.ClearAll, contentDescription = null)
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text("Clear History")
+                            Text(stringResource(Res.string.flow_clear_history))
                         }
                     }
                 }
@@ -653,7 +723,13 @@ fun FlowRunnerView(
                                     } else {
                                         jobViewModel.cancelJob(job.id, force = true)
                                     }
-                                }
+                                },
+                                onPause = if (job.status == JobStatus.Running) { { jobViewModel.pauseJob(job.id) } } else null,
+                                onResume = if (job.status == JobStatus.Paused) { { jobViewModel.resumeJob(job.id) } } else null,
+                                onCancel = { force -> jobViewModel.cancelJob(job.id, force) },
+                                onClear = if (job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) {
+                                    { jobViewModel.clearEndedJob(job.id) }
+                                } else null
                             )
                             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                         }

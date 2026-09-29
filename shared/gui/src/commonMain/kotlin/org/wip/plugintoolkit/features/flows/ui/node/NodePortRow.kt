@@ -91,7 +91,8 @@ fun InputPortRow(
     isInactiveAndConnected: Boolean = false,
     onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
     isDrawingConnection: Boolean = false,
-    isNodeHovered: Boolean = false
+    isNodeHovered: Boolean = false,
+    onPress: (Long) -> Unit = {}
 ) {
     DisposableEffect(node.id, input.id) {
         onDispose {
@@ -318,7 +319,13 @@ fun InputPortRow(
                 modifier = Modifier
                     .width(ToolkitTheme.dimensions.widthLarge)
                     .then(valueModifier)
-                    .onFocusChanged { if (!it.isFocused) onFocusLost() }
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            onPress(node.id)
+                        } else {
+                            onFocusLost()
+                        }
+                    }
             ) {
                 val nodePluginId = (node as? Node.CapabilityNode)?.pluginInfo?.id ?: ""
                 DynamicParameterInput(
@@ -326,6 +333,7 @@ fun InputPortRow(
                     metadata = metadata,
                     value = getPortValueString(currentPortValue, input.dataType),
                     onValueChange = { newValue ->
+                        onPress(node.id)
                         onUpdateValue(
                             node.id,
                             input.id,
@@ -337,7 +345,8 @@ fun InputPortRow(
                     providedSettings = providedSettings,
                     providedLocks = effectiveLocks,
                     pluginId = nodePluginId,
-                    compact = true
+                    compact = true,
+                    customExtensions = input.constraints?.extensions
                 )
             }
 
@@ -348,6 +357,7 @@ fun InputPortRow(
                     modifier = Modifier
                         .size(ToolkitTheme.dimensions.iconMediumLarge)
                         .clickable {
+                            onPress(node.id)
                             val valToSet = input.value ?: currentPortValue
                             onUpdateInputPortDefault(node.id, input.id, valToSet)
                         }

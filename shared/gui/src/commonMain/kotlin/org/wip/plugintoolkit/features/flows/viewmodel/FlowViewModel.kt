@@ -672,10 +672,49 @@ class FlowViewModel(
             jobManager.jobs.value.any { job ->
                 job.type == JobType.Flow &&
                         job.capabilityName == flowName &&
-                        (job.status == JobStatus.Running || job.status == JobStatus.Queued)
+                        (job.status == JobStatus.Running || job.status == JobStatus.Queued || job.status == JobStatus.PauseRequested)
             }
         } catch (e: Exception) {
             false
+        }
+    }
+
+    fun isFlowPaused(flowName: String): Boolean {
+        return try {
+            val jobManager = getKoin().get<JobManager>()
+            jobManager.jobs.value.any { job ->
+                job.type == JobType.Flow &&
+                        job.capabilityName == flowName &&
+                        job.status == JobStatus.Paused
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun resumeFlow(jobId: String) {
+        viewModelScope.launch {
+            try {
+                val jobManager = getKoin().get<JobManager>()
+                jobManager.resumeJob(jobId)
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to resume flow job $jobId" }
+            }
+        }
+    }
+
+    fun restartFlow(flow: Flow, parameterValues: Map<String, String>) {
+        viewModelScope.launch {
+            try {
+                val jobManager = getKoin().get<JobManager>()
+                val existingPaused = jobManager.jobs.value.filter {
+                    it.type == JobType.Flow && it.capabilityName == flow.name && it.status == JobStatus.Paused
+                }
+                existingPaused.forEach { jobManager.cancelJob(it.id, force = true) }
+                executeFlow(flow, parameterValues)
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to restart flow '${flow.name}'" }
+            }
         }
     }
 
@@ -687,6 +726,17 @@ class FlowViewModel(
             return
         }
         try {
+            try {
+                val jobManager = getKoin().get<JobManager>()
+                val relatedJobs = jobManager.jobs.value.filter {
+                    it.type == JobType.Flow && it.capabilityName == name
+                }
+                viewModelScope.launch {
+                    relatedJobs.forEach { jobManager.cancelJob(it.id, force = true) }
+                }
+            } catch (_: Exception) {
+                // Ignore if JobManager is not yet initialized
+            }
             flowRepository.deleteFlow(name)
         } catch (e: FlowReadOnlyViolationException) {
             viewModelScope.launch(Dispatchers.Main) {

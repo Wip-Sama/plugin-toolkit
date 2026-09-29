@@ -50,6 +50,17 @@ class JobRepository(
                         status = JobStatus.Failed,
                         errorMessage = "Job was interrupted due to application termination."
                     )
+                } else if (job.status == JobStatus.PauseRequested) {
+                    if (job.resumeState != null) {
+                        Logger.i { "Recovered job ${job.id} was PauseRequested with resumeState, marking as Paused." }
+                        job.copy(status = JobStatus.Paused)
+                    } else {
+                        Logger.w { "Recovered job ${job.id} was PauseRequested without resumeState, marking as Failed/Interrupted." }
+                        job.copy(
+                            status = JobStatus.Failed,
+                            errorMessage = "Job was interrupted due to application termination."
+                        )
+                    }
                 } else {
                     job
                 }

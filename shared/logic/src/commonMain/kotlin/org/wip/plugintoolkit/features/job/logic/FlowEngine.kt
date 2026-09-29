@@ -341,9 +341,9 @@ class FlowEngine(
             if (executedNodeIds.contains(node.id)) return@forEachIndexed
             if (!activeNodes.contains(node.id)) return@forEachIndexed
 
-            if (pauseRequested && node is org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode) {
+            if (pauseRequested) {
                 if (isRoot) {
-                    manager.addJobLog(job.id, "Flow execution paused before capability: ${node.title}")
+                    manager.addJobLog(job.id, "Flow execution paused before node: ${node.title}")
                     throw PauseFlowException(buildCurrentState())
                 }
             }

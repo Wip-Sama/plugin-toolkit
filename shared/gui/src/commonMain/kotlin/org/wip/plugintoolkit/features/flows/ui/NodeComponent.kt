@@ -247,6 +247,16 @@ fun NodeComponent(
         modifier = modifier
             .width(ToolkitTheme.dimensions.nodeWidth)
             .testTag("node_card_${node.id}")
+            .pointerInput(node.id) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        if (event.type == PointerEventType.Press) {
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            }
     ) {
         Card(
             modifier = Modifier
@@ -382,7 +392,8 @@ fun NodeComponent(
                             inactiveConnectedPortIds = inactiveConnectedPortIds,
                             onPortDisposed = onPortDisposed,
                             isDrawingConnection = isDrawingConnection,
-                            isNodeHovered = effectiveNodeHovered
+                            isNodeHovered = effectiveNodeHovered,
+                            onPress = currentOnPress
                         )
                     }
 

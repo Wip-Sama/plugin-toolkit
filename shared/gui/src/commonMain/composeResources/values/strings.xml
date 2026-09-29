@@ -328,6 +328,12 @@
     <string name="flow_outputs_title">Expected Outputs</string>
     <string name="flow_collected_automatically">Collected automatically</string>
     <string name="flow_execute_button">Execute Flow</string>
+    <string name="flow_restart_button">Restart Flow</string>
+    <string name="flow_resume_button">Resume Flow</string>
+    <string name="flow_pause_button">Pause Flow</string>
+    <string name="flow_status_paused">Paused</string>
+    <string name="flow_clear_history">Clear History</string>
+    <string name="flow_fill_required_parameters">Fill in all required parameters before running</string>
     <string name="flow_history_title">Execution History</string>
     <string name="flow_no_history">No runs recorded for this flow.</string>
     <string name="flow_run_id_label">Run ID: %1$s</string>
@@ -858,4 +864,21 @@
     <string name="standalone_setup_completed">Setup Completed</string>
     <string name="standalone_setup_in_progress">Setting up plugin…</string>
     <string name="standalone_no_capabilities">No capabilities found for this plugin</string>
+
+    <!-- Load Node Configuration & File Inputs -->
+    <string name="node_configure_load_title">Configure Load Node</string>
+    <string name="node_load_semantic_type_info">Semantic Type: %1$s</string>
+    <string name="node_load_extensions_desc">Supported file extensions (e.g. txt, json, !csv)</string>
+    <string name="node_load_supported_extensions">Supported Extensions</string>
+    <string name="node_load_extensions_placeholder">e.g. txt, json, !csv</string>
+    <string name="node_load_default_file_path">Default File Path</string>
+    <string name="node_load_default_file_placeholder">e.g. /path/to/default/file</string>
+    <string name="action_browse_file">Browse file</string>
+    <string name="action_browse_folder">Browse folder</string>
+    <string name="input_no_file_selected">No file selected</string>
+    <string name="input_no_folder_selected">No folder selected</string>
+    <string name="input_no_image_selected">No image selected</string>
+    <string name="input_no_audio_selected">No audio selected</string>
+    <string name="input_no_video_selected">No video selected</string>
+    <string name="input_unsupported_extension">Unsupported extension (allowed: %1$s)</string>
 </resources>

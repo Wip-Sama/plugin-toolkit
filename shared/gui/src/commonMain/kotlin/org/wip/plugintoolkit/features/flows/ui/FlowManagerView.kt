@@ -119,6 +119,8 @@ fun FlowManagerView(
 ) {
     val state by viewModel.state.collectAsState()
     val pluginManager = org.koin.compose.koinInject<org.wip.plugintoolkit.features.plugin.logic.PluginManager>()
+    val jobManager = org.koin.compose.koinInject<org.wip.plugintoolkit.features.job.logic.JobManager>()
+    val allJobs by jobManager.jobs.collectAsState(emptyList())
     val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
     val loadedPlugins by pluginManager.loadedPlugins.collectAsState()
     val installedPlugins by pluginManager.installedPlugins.collectAsState()
@@ -374,8 +376,11 @@ fun FlowManagerView(
                         }
                     }
 
-                    val isRunning = remember(flow.name, state.flows) {
+                    val isRunning = remember(flow.name, state.flows, allJobs) {
                         viewModel.isFlowRunning(flow.name)
+                    }
+                    val isPaused = remember(flow.name, allJobs) {
+                        viewModel.isFlowPaused(flow.name)
                     }
 
                     FlowItem(
@@ -385,6 +390,7 @@ fun FlowManagerView(
                         missingCapabilities = missingCapabilities,
                         notReadyNodes = notReadyNodes,
                         isRunning = isRunning,
+                        isPaused = isPaused,
                         isSelected = state.selectedFlowId == flow.name,
                         onSelect = {
                             if (missingCapabilities.isNotEmpty() || notReadyNodes.isNotEmpty()) {

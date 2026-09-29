@@ -85,8 +85,9 @@ fun PortCircle(
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
-                        awaitFirstDown(requireUnconsumed = false)
+                        val down = awaitFirstDown(requireUnconsumed = false)
                         if (currentEvent.buttons.isPrimaryPressed) {
+                            down.consume()
                             cumulativeOffset = Offset.Zero
                             currentOnDragStart()
 
@@ -100,6 +101,7 @@ fun PortCircle(
                                 }
                                 val change = event.changes.firstOrNull()
                                 if (change != null) {
+                                    change.consume()
                                     cumulativeOffset += change.position - change.previousPosition
                                     currentOnDrag(cumulativeOffset)
                                 }

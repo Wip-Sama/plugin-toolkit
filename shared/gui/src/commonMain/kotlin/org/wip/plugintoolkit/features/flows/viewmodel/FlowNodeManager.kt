@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.features.flows.viewmodel
 
 import androidx.compose.ui.geometry.Offset
+import org.wip.plugintoolkit.api.CommonSemanticTypes
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.canConvert
@@ -219,6 +220,10 @@ class FlowNodeManager {
         val newFlow = currentState.flow.copy(nodes = updatedNodes)
         return currentState.copy(
             flow = newFlow,
+            selectedNodeIds = setOf(nodeId),
+            selectedPointIds = emptySet(),
+            selectedGroupIds = emptySet(),
+            selectedLabelIds = emptySet(),
             hasUnsavedChanges = true
         )
     }
@@ -270,6 +275,10 @@ class FlowNodeManager {
         val newFlow = currentState.flow.copy(nodes = updatedNodes)
         return currentState.copy(
             flow = newFlow,
+            selectedNodeIds = setOf(nodeId),
+            selectedPointIds = emptySet(),
+            selectedGroupIds = emptySet(),
+            selectedLabelIds = emptySet(),
             hasUnsavedChanges = true
         )
     }
@@ -288,6 +297,10 @@ class FlowNodeManager {
         val newFlow = currentState.flow.copy(nodes = updatedNodes)
         return currentState.copy(
             flow = newFlow,
+            selectedNodeIds = setOf(nodeId),
+            selectedPointIds = emptySet(),
+            selectedGroupIds = emptySet(),
+            selectedLabelIds = emptySet(),
             hasUnsavedChanges = true
         )
     }
@@ -312,7 +325,14 @@ class FlowNodeManager {
                         if (port.id == inputPortId) {
                             val currentConstraints =
                                 port.constraints ?: PortConstraints()
-                            port.copy(constraints = currentConstraints.copy(extensions = extensions))
+                            port.copy(
+                                constraints = currentConstraints.copy(extensions = extensions),
+                                semanticTypes = if (node.systemAction.lowercase() == "load") {
+                                    listOf(CommonSemanticTypes.PATH_FILE)
+                                } else {
+                                    port.semanticTypes
+                                }
+                            )
                         } else port
                     }
                 } else node.inputs
@@ -327,6 +347,10 @@ class FlowNodeManager {
         return currentState.copy(
             flow = newFlow,
             nextId = currentState.nextId + 1,
+            selectedNodeIds = setOf(nodeId),
+            selectedPointIds = emptySet(),
+            selectedGroupIds = emptySet(),
+            selectedLabelIds = emptySet(),
             hasUnsavedChanges = true
         )
     }

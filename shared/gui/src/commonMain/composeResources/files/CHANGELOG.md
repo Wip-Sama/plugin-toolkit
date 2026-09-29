@@ -1,16 +1,22 @@
 Version: 3.0.1
 Date: xx-xx-2026
 Added:
+	- Resume Flow, Restart Flow, and Pause Flow actions in Flow Runner view
+	- Resuming and restarting paused flows is now fully supported across application restarts
 Changes:
+	- Node can now be focused by simply changing a value
+    - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling
 Fixed:
 	- Updating the log level at runtime would not properly use the new level
 	- Narrow Window Squishing & Row Growth in settings
 	- Shortcut, Settings and many more spacing inconsistencies
 	- Plugin Action Working Indicator spinning on a central point alongside itself
+	- Nodes correctly prevent interacting with connections below them
+	- Load system node now restricts semantic type to path/file, selects files instead of folders, and properly enforces custom extensions in UI and execution
+	- Paused jobs no longer count towards max concurrent job execution limits (pause-requested jobs continue counting until fully stopped)
 Removed:
 	- Verbose logging spam in the flow editor
 Planned:
-
 ----------------------------------------------------------------------------------------------------
 Version: 3.0.0
 Name: Packaged Timed Colors

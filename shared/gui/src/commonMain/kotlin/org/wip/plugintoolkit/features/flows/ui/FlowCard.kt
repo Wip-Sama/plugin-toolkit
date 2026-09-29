@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
@@ -50,6 +51,7 @@ import plugintoolkit.composeapp.generated.resources.flow_nodes_count
 import plugintoolkit.composeapp.generated.resources.flow_not_ready_node_chip
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_running
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_used_in_other
+import plugintoolkit.composeapp.generated.resources.flow_status_paused
 import plugintoolkit.composeapp.generated.resources.flow_used_in_chip
 import plugintoolkit.composeapp.generated.resources.flow_used_in_parents
 
@@ -61,6 +63,7 @@ internal fun FlowItem(
     missingCapabilities: List<String>,
     notReadyNodes: List<Node>,
     isRunning: Boolean,
+    isPaused: Boolean = false,
     isSelected: Boolean,
     onSelect: () -> Unit,
     onEditMetadata: () -> Unit,
@@ -120,10 +123,28 @@ internal fun FlowItem(
                                     modifier = Modifier
                                         .size(ToolkitTheme.spacing.extraSmall)
                                         .background(MaterialTheme.colorScheme.primary, CircleShape)
-                                )
+                                        )
                             },
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            style = ToolkitChipStyle.Filled,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (isPaused) {
+                        ToolkitChip(
+                            text = stringResource(Res.string.flow_status_paused),
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.Pause,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                             style = ToolkitChipStyle.Filled,
                             fontWeight = FontWeight.Bold
                         )

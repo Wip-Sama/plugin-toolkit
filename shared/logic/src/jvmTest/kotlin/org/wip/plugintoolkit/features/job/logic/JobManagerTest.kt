@@ -647,4 +647,119 @@ class JobManagerTest {
 
         jobManager.tryCompleteJob("signal-pause-3", "Done")
     }
+
+    @Test
+    fun testPausedJobsDoNotCountTowardsMaxConcurrentJobs() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings().copy(
+            jobs = AppSettings().jobs.copy(maxConcurrentJobs = 1)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job1 = BackgroundJob(id = "paused-test-1", name = "Job 1", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap1")
+        val job2 = BackgroundJob(id = "paused-test-2", name = "Job 2", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap2")
+
+        jobManager.enqueueJob(job1)
+        jobManager.enqueueJob(job2)
+
+        // Claim job 1
+        val claimed1 = jobManager.waitForNextJob()
+        assertEquals("paused-test-1", claimed1.id)
+        assertEquals(JobStatus.Running, claimed1.status)
+
+        // Job 2 cannot be claimed because limit = 1 and job 1 is running
+        val attempt1 = withTimeoutOrNull(200) { jobManager.waitForNextJob() }
+        assertNull(attempt1, "Job 2 should not run while Job 1 is running under limit 1")
+
+        // Request pause on running job 1 -> it transitions to PauseRequested
+        jobManager.pauseJob("paused-test-1")
+        val job1PauseReq = jobManager.jobs.value.find { it.id == "paused-test-1" }
+        assertNotNull(job1PauseReq)
+        assertEquals(JobStatus.PauseRequested, job1PauseReq.status)
+
+        // Pause-requested jobs are still running so they should count towards the max concurrent job limit until fully stopped
+        val attemptWhilePauseRequested = withTimeoutOrNull(200) { jobManager.waitForNextJob() }
+        assertNull(attemptWhilePauseRequested, "Job 2 should not run while Job 1 is PauseRequested under limit 1")
+
+        // Fully stop and pause job 1 with resume state -> it becomes Paused
+        jobManager.tryPauseJob("paused-test-1", JsonPrimitive("resume-state-1"))
+        val job1Paused = jobManager.jobs.value.find { it.id == "paused-test-1" }
+        assertNotNull(job1Paused)
+        assertEquals(JobStatus.Paused, job1Paused.status)
+
+        // Job 1 is still in jobs list, but Paused jobs do NOT count towards maxConcurrentJobs.
+        // Therefore, job 2 should now be claimable!
+        val claimed2 = withTimeoutOrNull(1000) { jobManager.waitForNextJob() }
+        assertNotNull(claimed2, "Job 2 should be claimable after Job 1 is paused")
+        assertEquals("paused-test-2", claimed2.id)
+        assertEquals(JobStatus.Running, claimed2.status)
+
+        // Resume job 1 -> it moves to Queued
+        jobManager.resumeJob("paused-test-1")
+        val job1Resumed = jobManager.jobs.value.find { it.id == "paused-test-1" }
+        assertNotNull(job1Resumed)
+        assertEquals(JobStatus.Queued, job1Resumed.status)
+
+        // Job 1 cannot be claimed yet because job 2 is currently running under limit 1
+        val attempt2 = withTimeoutOrNull(200) { jobManager.waitForNextJob() }
+        assertNull(attempt2, "Job 1 should not run while Job 2 is running under limit 1")
+
+        // Complete job 2 -> slot frees up
+        jobManager.tryCompleteJob("paused-test-2", "Done")
+
+        // Job 1 can now be claimed again
+        val claimed1Again = withTimeoutOrNull(1000) { jobManager.waitForNextJob() }
+        assertNotNull(claimed1Again)
+        assertEquals("paused-test-1", claimed1Again.id)
+
+        jobManager.tryCompleteJob("paused-test-1", "Done")
+    }
+
+    @Test
+    fun testQueuedJobPauseImmediatelyTransitionsToPaused() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings().copy(
+            jobs = AppSettings().jobs.copy(maxConcurrentJobs = 1)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val job1 = BackgroundJob(id = "q-pause-1", name = "Job 1", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap1")
+        val job2 = BackgroundJob(id = "q-pause-2", name = "Job 2", type = JobType.Capability, pluginId = "test-plugin", capabilityName = "cap2")
+
+        jobManager.enqueueJob(job1)
+        jobManager.enqueueJob(job2)
+
+        val claimed1 = jobManager.waitForNextJob()
+        assertEquals("q-pause-1", claimed1.id)
+
+        // Pausing queued job 2 must transition directly to JobStatus.Paused (NOT stuck in PauseRequested)
+        jobManager.pauseJob("q-pause-2")
+        val job2State = jobManager.jobs.value.find { it.id == "q-pause-2" }
+        assertNotNull(job2State)
+        assertEquals(JobStatus.Paused, job2State.status)
+
+        // Active job IDs includes Paused jobs
+        val activeIds = withTimeoutOrNull(1000) { jobManager.activeJobIds.first { it.contains("q-pause-2") } }
+        assertNotNull(activeIds)
+        assertTrue(activeIds.contains("q-pause-2"))
+        assertTrue(jobManager.isJobPendingOrRunning("q-pause-2"))
+
+        // Resuming queued job 2 transitions back to Queued
+        jobManager.resumeJob("q-pause-2")
+        val job2Resumed = jobManager.jobs.value.find { it.id == "q-pause-2" }
+        assertNotNull(job2Resumed)
+        assertEquals(JobStatus.Queued, job2Resumed.status)
+
+        jobManager.tryCompleteJob("q-pause-1", "Done")
+
+        val claimed2 = withTimeoutOrNull(1000) { jobManager.waitForNextJob() }
+        assertNotNull(claimed2)
+        assertEquals("q-pause-2", claimed2.id)
+
+        jobManager.tryCompleteJob("q-pause-2", "Done")
+    }
 }

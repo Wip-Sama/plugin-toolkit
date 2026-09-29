@@ -20,7 +20,7 @@ class JobViewModel(
     val endedJobs = jobManager.endedJobs
 
     val runningJobs = jobs.map { list ->
-        list.filter { it.status == JobStatus.Running }
+        list.filter { it.status == JobStatus.Running || it.status == JobStatus.PauseRequested }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val queuedJobs = jobs.map { list ->

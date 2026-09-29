@@ -8,6 +8,11 @@ import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.ui.toComposeOffset
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowEditorState
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowNodeManager
+import kotlinx.serialization.json.JsonPrimitive
+import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.features.flows.model.InputPort
+import org.wip.plugintoolkit.features.flows.model.OutputPort
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -23,8 +28,20 @@ class FlowNodeManagerTest {
             position = position,
             title = "Test Node $id",
             systemAction = "test",
-            inputs = emptyList(),
-            outputs = emptyList()
+            inputs = listOf(
+                InputPort(
+                    id = "inPort",
+                    name = "Input",
+                    dataType = DataType.Primitive(PrimitiveType.INT)
+                )
+            ),
+            outputs = listOf(
+                OutputPort(
+                    id = "outPort",
+                    name = "Output",
+                    dataType = DataType.Primitive(PrimitiveType.INT)
+                )
+            )
         )
     }
 
@@ -156,5 +173,111 @@ class FlowNodeManagerTest {
         assertEquals(listOf(2L, 1L), newState.flow.nodes.map { it.id })
         assertEquals(setOf(1L), newState.selectedNodeIds)
         assertEquals(ModelOffset(10f, 10f), newState.flow.nodes.find { it.id == 1L }!!.position)
+    }
+
+    @Test
+    fun testUpdateInputPortValueImplicitlySelectsNodeAndClearsOtherSelections() {
+        val node1 = createTestNode(1L)
+        val node2 = createTestNode(2L)
+        val initialState = FlowEditorState(
+            flow = Flow("test", nodes = listOf(node1, node2)),
+            selectedNodeIds = setOf(2L),
+            selectedPointIds = setOf(99L),
+            selectedGroupIds = setOf(88L),
+            selectedLabelIds = setOf(77L)
+        )
+
+        val newState = manager.handleUpdateInputPortValue(
+            currentState = initialState,
+            nodeId = 1L,
+            portId = "inPort",
+            value = JsonPrimitive(123)
+        )
+
+        assertEquals(setOf(1L), newState.selectedNodeIds)
+        assertTrue(newState.selectedPointIds.isEmpty())
+        assertTrue(newState.selectedGroupIds.isEmpty())
+        assertTrue(newState.selectedLabelIds.isEmpty())
+        assertTrue(newState.hasUnsavedChanges)
+    }
+
+    @Test
+    fun testUpdateInputPortDefaultImplicitlySelectsNodeAndClearsOtherSelections() {
+        val node1 = createTestNode(1L)
+        val initialState = FlowEditorState(
+            flow = Flow("test", nodes = listOf(node1)),
+            selectedNodeIds = emptySet(),
+            selectedPointIds = setOf(10L)
+        )
+
+        val newState = manager.handleUpdateInputPortDefault(
+            currentState = initialState,
+            nodeId = 1L,
+            portId = "inPort",
+            defaultValue = JsonPrimitive(55)
+        )
+
+        assertEquals(setOf(1L), newState.selectedNodeIds)
+        assertTrue(newState.selectedPointIds.isEmpty())
+        assertTrue(newState.hasUnsavedChanges)
+    }
+
+    @Test
+    fun testUpdateBoundaryNodeImplicitlySelectsNodeAndClearsOtherSelections() {
+        val boundaryNode = Node.FlowInputNode(
+            id = 1L,
+            position = ModelOffset(0f, 0f),
+            outputs = listOf(
+                OutputPort(
+                    id = "out",
+                    name = "Output",
+                    dataType = DataType.Primitive(PrimitiveType.STRING)
+                )
+            )
+        )
+        val initialState = FlowEditorState(
+            flow = Flow("test", nodes = listOf(boundaryNode)),
+            selectedNodeIds = emptySet(),
+            selectedPointIds = setOf(5L)
+        )
+
+        val newState = manager.handleUpdateBoundaryNode(
+            currentState = initialState,
+            nodeId = 1L,
+            portName = "NewName",
+            dataType = DataType.Primitive(PrimitiveType.STRING),
+            semanticTypes = emptyList(),
+            constraints = null,
+            isList = false,
+            isRequired = true,
+            defaultValue = JsonPrimitive("defaultVal")
+        )
+
+        assertEquals(setOf(1L), newState.selectedNodeIds)
+        assertTrue(newState.selectedPointIds.isEmpty())
+        assertTrue(newState.hasUnsavedChanges)
+    }
+
+    @Test
+    fun testUpdateSystemNodeSettingsImplicitlySelectsNodeAndClearsOtherSelections() {
+        val node = createTestNode(1L)
+        val initialState = FlowEditorState(
+            flow = Flow("test", nodes = listOf(node)),
+            selectedNodeIds = emptySet(),
+            selectedGroupIds = setOf(3L)
+        )
+
+        val newState = manager.handleUpdateSystemNodeSettings(
+            currentState = initialState,
+            nodeId = 1L,
+            portId = "outPort",
+            semanticTypes = emptyList(),
+            inputPortId = "inPort",
+            extensions = listOf("png")
+        )
+
+        assertEquals(setOf(1L), newState.selectedNodeIds)
+        assertTrue(newState.selectedGroupIds.isEmpty())
+        assertTrue(newState.hasUnsavedChanges)
     }
 }

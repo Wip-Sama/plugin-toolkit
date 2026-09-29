@@ -414,7 +414,10 @@ fun BoardCanvas(
                 onWashJunction = onWashJunction,
                 onSampleColor = onSampleColor,
                 onMoveSegment = onMoveSegment,
-                onEndMoveSegment = onEndMoveSegment
+                onEndMoveSegment = onEndMoveSegment,
+                nodeSizes = nodeSizes,
+                density = density,
+                defaultNodeWidthPx = with(density) { dimensions.nodeWidth.toPx() }
             )
             .boardSelectionBoxGesture(
                 interactionState = interactionState,

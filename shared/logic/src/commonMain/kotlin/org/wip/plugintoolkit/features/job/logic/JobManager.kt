@@ -50,11 +50,11 @@ class JobManager(
     val jobs: StateFlow<List<BackgroundJob>> = _jobs.asStateFlow()
 
     val activeJobIds: StateFlow<Set<String>> = _jobs.map { list ->
-        list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.PauseRequested }.map { it.id }.toSet()
+        list.filter { it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.PauseRequested || it.status == JobStatus.Paused }.map { it.id }.toSet()
     }.stateIn(scope, SharingStarted.Eagerly, emptySet())
 
     fun isJobPendingOrRunning(jobId: String): Boolean {
-        return _jobs.value.any { it.id == jobId && (it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.PauseRequested) }
+        return _jobs.value.any { it.id == jobId && (it.status == JobStatus.Queued || it.status == JobStatus.Running || it.status == JobStatus.PauseRequested || it.status == JobStatus.Paused) }
     }
 
     private val _endedJobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
@@ -280,26 +280,39 @@ class JobManager(
 
     suspend fun pauseJob(jobId: String) {
         var jobName = ""
-        var paused = false
+        var isQueued = false
+        var isRunning = false
         _jobs.update { currentList ->
             val job = currentList.find { it.id == jobId } ?: return@update currentList
             jobName = job.name
-            if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
-                paused = true
-                currentList.map { if (it.id == jobId) it.copy(status = JobStatus.PauseRequested) else it }
-            } else {
-                currentList
+            when (job.status) {
+                JobStatus.Queued -> {
+                    isQueued = true
+                    currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Paused) else it }
+                }
+                JobStatus.Running -> {
+                    isRunning = true
+                    currentList.map { if (it.id == jobId) it.copy(status = JobStatus.PauseRequested) else it }
+                }
+                else -> currentList
             }
         }
 
-        if (paused) {
+        if (isQueued) {
+            addHistoryEntryInternal(jobId, jobName, "Paused")
+            Logger.i { "Job $jobId ($jobName) paused directly from queued state" }
+            val job = _jobs.value.find { it.id == jobId }
+            if (job != null) {
+                saveResumeState(job)
+            }
+            jobSignal.trySend(Unit)
+        } else if (isRunning) {
             handlesMutex.withLock {
                 activeJobHandles[jobId]?.pause()
             }
-            // We don't mark it as paused here yet.
-            // We wait for the job execution to finish and return a resumeState.
             addHistoryEntryInternal(jobId, jobName, "Pause Requested")
             Logger.i { "Job $jobId ($jobName) pause requested" }
+            jobSignal.trySend(Unit)
         }
     }
 
@@ -309,7 +322,7 @@ class JobManager(
         _jobs.update { currentList ->
             val job = currentList.find { it.id == jobId } ?: return@update currentList
             jobName = job.name
-            if (job.status == JobStatus.Paused || job.status == JobStatus.PauseRequested) {
+            if (job.status == JobStatus.Paused) {
                 resumed = true
                 currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Queued) else it }
             } else {
@@ -586,7 +599,7 @@ class JobManager(
 
     suspend fun registerJobHandle(jobId: String, handle: JobHandle) {
         val job = _jobs.value.find { it.id == jobId }
-        if (job == null || (job.status != JobStatus.Running && job.status != JobStatus.Paused)) {
+        if (job == null || (job.status != JobStatus.Running && job.status != JobStatus.Paused && job.status != JobStatus.PauseRequested)) {
             handle.cancel(force = true)
             return
         }

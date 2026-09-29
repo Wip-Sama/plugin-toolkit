@@ -115,6 +115,95 @@ class LoadNodeTest {
         }
     }
 
+    @Test
+    fun testLoadCustomExtensionsValidation() = runTest {
+        val tempDir = "build/tmp/load_node_test_ext"
+        SystemFileSystem.createDirectories(Path(tempDir))
+
+        try {
+            val validFile = "valid.txt"
+            val invalidFile = "invalid.png"
+            val content = "Some text"
+
+            // Save valid and invalid files
+            val saveNode = Node.SystemNode(1, Offset.Zero, "Save", "save", emptyList(), emptyList())
+            SaveNodeExecutor().execute(
+                MockNodeExecutionContext(saveNode, tempDir, mapOf("data" to content, "file_path" to validFile))
+            )
+            SaveNodeExecutor().execute(
+                MockNodeExecutionContext(saveNode, tempDir, mapOf("data" to content, "file_path" to invalidFile))
+            )
+
+            val inPort = org.wip.plugintoolkit.features.flows.model.InputPort(
+                id = "file_path",
+                name = "File Path",
+                dataType = DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.STRING),
+                constraints = org.wip.plugintoolkit.features.flows.model.PortConstraints(
+                    extensions = listOf("txt", "json")
+                )
+            )
+            val loadNode = Node.SystemNode(2, Offset.Zero, "Load", "load", listOf(inPort), emptyList())
+
+            // Valid extension loads successfully
+            val validContext = MockNodeExecutionContext(loadNode, tempDir, mapOf("file_path" to validFile))
+            LoadNodeExecutor(io.mockk.mockk(relaxed = true)).execute(validContext)
+            assertEquals(content, validContext.outputs["data"])
+
+            // Invalid extension throws exception
+            val invalidContext = MockNodeExecutionContext(loadNode, tempDir, mapOf("file_path" to invalidFile))
+            val ex = kotlin.test.assertFailsWith<Exception> {
+                LoadNodeExecutor(io.mockk.mockk(relaxed = true)).execute(invalidContext)
+            }
+            assertTrue(ex.message!!.contains("unsupported extension 'png'"))
+        } finally {
+            deleteRecursively(Path(tempDir))
+        }
+    }
+
+    @Test
+    fun testLoadNegatedExtensionValidation() = runTest {
+        val tempDir = "build/tmp/load_node_test_neg_ext"
+        SystemFileSystem.createDirectories(Path(tempDir))
+
+        try {
+            val allowedFile = "allowed.txt"
+            val rejectedFile = "rejected.csv"
+            val content = "Data"
+
+            val saveNode = Node.SystemNode(1, Offset.Zero, "Save", "save", emptyList(), emptyList())
+            SaveNodeExecutor().execute(
+                MockNodeExecutionContext(saveNode, tempDir, mapOf("data" to content, "file_path" to allowedFile))
+            )
+            SaveNodeExecutor().execute(
+                MockNodeExecutionContext(saveNode, tempDir, mapOf("data" to content, "file_path" to rejectedFile))
+            )
+
+            val inPort = org.wip.plugintoolkit.features.flows.model.InputPort(
+                id = "file_path",
+                name = "File Path",
+                dataType = DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.STRING),
+                constraints = org.wip.plugintoolkit.features.flows.model.PortConstraints(
+                    extensions = listOf("!csv")
+                )
+            )
+            val loadNode = Node.SystemNode(2, Offset.Zero, "Load", "load", listOf(inPort), emptyList())
+
+            // Allowed file loads
+            val allowedContext = MockNodeExecutionContext(loadNode, tempDir, mapOf("file_path" to allowedFile))
+            LoadNodeExecutor(io.mockk.mockk(relaxed = true)).execute(allowedContext)
+            assertEquals(content, allowedContext.outputs["data"])
+
+            // Negated extension throws
+            val rejectedContext = MockNodeExecutionContext(loadNode, tempDir, mapOf("file_path" to rejectedFile))
+            val ex = kotlin.test.assertFailsWith<Exception> {
+                LoadNodeExecutor(io.mockk.mockk(relaxed = true)).execute(rejectedContext)
+            }
+            assertTrue(ex.message!!.contains("rejected extension 'csv'"))
+        } finally {
+            deleteRecursively(Path(tempDir))
+        }
+    }
+
     private fun deleteRecursively(path: Path) {
         if (SystemFileSystem.exists(path)) {
             val metadata = SystemFileSystem.metadataOrNull(path)

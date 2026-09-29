@@ -267,16 +267,28 @@ class LoadNodeExecutor(
         if (filePath.isBlank()) {
             throw Exception("File path is required")
         }
+        val inPort = context.node.inputs.find { it.id == "file_path" }
+        val customExtensions = inPort?.constraints?.extensions ?: emptyList()
         val dataPort = context.node.outputs.find { it.id == "data" }
         val semanticTypes = dataPort?.semanticTypes ?: emptyList()
-        if (semanticTypes.isNotEmpty()) {
-            val allowedExtensions = semanticRegistry.getAllowedExtensions(semanticTypes)
-            if (allowedExtensions.isNotEmpty()) {
-                val filename = filePath.substringAfterLast('/').substringAfterLast('\\')
-                val ext = filename.substringAfterLast('.', "").lowercase()
-                if (ext !in allowedExtensions) {
-                    throw Exception("File '$filePath' has unsupported extension '$ext'")
-                }
+        val semanticExtensions = if (semanticTypes.isNotEmpty()) {
+            semanticRegistry.getAllowedExtensions(semanticTypes)
+        } else emptyList()
+
+        val rawExtensions = customExtensions.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        val negated = rawExtensions.filter { it.startsWith("!") }.map { it.removePrefix("!").removePrefix(".") }
+        val positive = rawExtensions.filter { !it.startsWith("!") }.map { it.removePrefix(".") }
+        val effectiveAllowed = (if (positive.isNotEmpty()) positive else semanticExtensions).filter { it !in negated }.distinct()
+
+        val filename = filePath.substringAfterLast('/').substringAfterLast('\\')
+        val ext = if (filename.contains('.')) filename.substringAfterLast('.').lowercase() else ""
+
+        if (ext.isNotEmpty() && ext in negated) {
+            throw Exception("File '$filePath' has rejected extension '$ext'")
+        }
+        if (effectiveAllowed.isNotEmpty()) {
+            if (ext.isEmpty() || ext !in effectiveAllowed) {
+                throw Exception("File '$filePath' has unsupported extension '$ext'. Allowed: ${effectiveAllowed.joinToString(", ")}")
             }
         }
 
