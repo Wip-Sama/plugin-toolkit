@@ -1,3 +1,15 @@
+Version: 2.1.3
+Date: 30-09-2026
+Added:
+  - Added capabilityWithNetworkAndProgress showcase demonstrating PluginNetworkClient, throughput tracking, ratio progress, and secondary progress backoff.
+  - Enhanced runDiagnostic action with rich ProgressData percentage, ratio, and secondary indeterminate progress.
+---------------------------------------------------------------------------------
+Version: 2.1.2
+Date: 30-09-2026
+Added:
+  - Added multi-select enum collection setting (`Set<AIModelArchitecture>`) and capability parameter (`Collection<AIModelArchitecture>`) with minChoices and maxChoices constraints.
+  - Added capabilityWithFlowContext showcase demonstrating @Capability(context = CapabilityContext.FLOW_ONLY).
+---------------------------------------------------------------------------------
 Version: 2.1.1
 Date: 11-09-2026
 Added:

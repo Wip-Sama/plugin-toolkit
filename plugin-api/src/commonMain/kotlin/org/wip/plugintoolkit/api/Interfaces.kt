@@ -266,10 +266,99 @@ interface PluginLogger {
 }
 
 /**
- * Progress reporter for plugins to push progress updates.
+ * Progress reporter for plugins to push primary, secondary, and sub-task progress updates,
+ * including percentages, ratios (e.g. 12.3 / 14.5 MB), dynamic messages, and throughput/status info.
  */
 interface ProgressReporter {
+    /**
+     * Report progress fraction from 0.0 to 1.0.
+     */
     fun report(progress: Float)
+
+    /**
+     * Report progress fraction from 0.0 to 1.0 with a status/detail message (e.g. download speed, remaining data).
+     */
+    fun report(progress: Float, message: String?) = report(progress)
+
+    /**
+     * Report structured progress data (supports percentage, ratio, and indeterminate).
+     */
+    fun report(data: ProgressData) {
+        data.fraction?.let { report(it, data.message) }
+    }
+
+    /**
+     * Report progress as a ratio (e.g. current = 12.3, total = 14.5, unit = "MB").
+     */
+    fun report(current: Double, total: Double, unit: String? = null, message: String? = null) {
+        report(ProgressData.ratio(current, total, unit, message))
+    }
+
+    /**
+     * Report secondary progress (0.0 to 1.0), useful when waiting for API rate limits or retry backoffs.
+     */
+    fun reportSecondary(progress: Float) {}
+
+    /**
+     * Report secondary progress with a status/detail message.
+     */
+    fun reportSecondary(progress: Float, message: String?) = reportSecondary(progress)
+
+    /**
+     * Report structured secondary progress data.
+     */
+    fun reportSecondary(data: ProgressData) {
+        data.fraction?.let { reportSecondary(it, data.message) }
+    }
+
+    /**
+     * Report secondary progress as a ratio.
+     */
+    fun reportSecondary(current: Double, total: Double, unit: String? = null, message: String? = null) {
+        reportSecondary(ProgressData.ratio(current, total, unit, message))
+    }
+
+    /**
+     * Clear the secondary progress indicator.
+     */
+    fun clearSecondary() {}
+
+    /**
+     * Report progress for a named sub-task / sub-progress bar within the job.
+     */
+    fun reportSubProgress(name: String, data: ProgressData) {}
+
+    /**
+     * Report progress fraction for a named sub-task within the job.
+     */
+    fun reportSubProgress(name: String, progress: Float, message: String? = null) {
+        reportSubProgress(name, ProgressData.percentage(progress, message))
+    }
+
+    /**
+     * Remove or clear a named sub-task progress bar.
+     */
+    fun clearSubProgress(name: String) {}
+}
+
+/**
+ * Network client for plugins that tracks throughput, downloaded bytes, and uploaded bytes.
+ */
+interface PluginNetworkClient {
+    suspend fun get(url: String, headers: Map<String, String> = emptyMap()): ByteArray
+    suspend fun getText(url: String, headers: Map<String, String> = emptyMap()): String
+    suspend fun post(url: String, body: ByteArray, headers: Map<String, String> = emptyMap()): ByteArray
+    suspend fun postText(url: String, body: String, headers: Map<String, String> = emptyMap()): String
+}
+
+/**
+ * Fallback no-op implementation of [PluginNetworkClient].
+ */
+object NoOpPluginNetworkClient : PluginNetworkClient {
+    override suspend fun get(url: String, headers: Map<String, String>): ByteArray = ByteArray(0)
+    override suspend fun getText(url: String, headers: Map<String, String>): String = ""
+    override suspend fun post(url: String, body: ByteArray, headers: Map<String, String>): ByteArray = ByteArray(0)
+    override suspend fun postText(url: String, body: String, headers: Map<String, String>): String = ""
 }
 
 /**
@@ -419,6 +508,16 @@ interface PluginContext {
     val settings: Map<String, JsonElement>
     val storage: PluginStorage
     val signals: PluginSignalManager
+
+    /**
+     * Managed network client with automatic download/upload byte tracking and throughput calculation.
+     */
+    val networkClient: PluginNetworkClient get() = NoOpPluginNetworkClient
+
+    /**
+     * Explicitly record network usage (bytes and throughput) when using external or custom network libraries.
+     */
+    fun recordNetworkUsage(bytesRead: Long, bytesWritten: Long = 0L, throughputBytesPerSec: Long? = null) {}
 
     /**
      * Inform the host that a user action is required for the plugin to function correctly.

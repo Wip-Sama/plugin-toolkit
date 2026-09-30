@@ -111,6 +111,15 @@ object SystemNodesRegistry {
             "convert" -> listOf(
                 InputPort("input_data", "Input", DataType.Primitive(PrimitiveType.ANY)),
                 InputPort(
+                    "target_type",
+                    "Target Type",
+                    DataType.Enum(
+                        "TargetType",
+                        listOf("AUTO", "STRING", "INT", "DOUBLE", "BOOLEAN", "LONG", "FLOAT")
+                    ),
+                    defaultValue = "AUTO"
+                ),
+                InputPort(
                     "ignore_semantic_type",
                     "Ignore Semantic Type",
                     DataType.Primitive(PrimitiveType.BOOLEAN),
@@ -123,8 +132,95 @@ object SystemNodesRegistry {
                 InputPort("list2", "List 2", DataType.Array(DataType.Primitive(PrimitiveType.ANY)))
             )
 
+            "string_merger", "merge_string" -> listOf(
+                InputPort(
+                    "strings",
+                    "Strings",
+                    DataType.Array(DataType.Primitive(PrimitiveType.STRING))
+                ),
+                InputPort(
+                    "separator",
+                    "Separator",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = ", ",
+                    isRequired = false
+                ),
+                InputPort(
+                    "prefix",
+                    "Prefix",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = "",
+                    isRequired = false
+                ),
+                InputPort(
+                    "postfix",
+                    "Postfix",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = "",
+                    isRequired = false
+                )
+            )
+
+            "extract_from_string", "string_extract" -> listOf(
+                InputPort(
+                    "string",
+                    "String",
+                    DataType.Primitive(PrimitiveType.STRING)
+                ),
+                InputPort(
+                    "regex",
+                    "Regex",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = ""
+                ),
+                InputPort(
+                    "group_index",
+                    "Group Index (Optional)",
+                    DataType.Primitive(PrimitiveType.INT),
+                    defaultValue = null,
+                    isRequired = false
+                )
+            )
+
+            "list_filter", "lists_filter" -> listOf(
+                InputPort(
+                    "items",
+                    "Items",
+                    DataType.Array(DataType.Primitive(PrimitiveType.ANY))
+                ),
+                InputPort(
+                    "pattern",
+                    "Pattern (e.g. x:y:z)",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = ":"
+                )
+            )
+
+            "list_check" -> listOf(
+                InputPort(
+                    "items",
+                    "Items",
+                    DataType.Array(DataType.Primitive(PrimitiveType.ANY))
+                ),
+                InputPort(
+                    "min_length",
+                    "Min Length",
+                    DataType.Primitive(PrimitiveType.INT),
+                    defaultValue = 0,
+                    isRequired = false
+                ),
+                InputPort(
+                    "max_length",
+                    "Max Length",
+                    DataType.Primitive(PrimitiveType.INT),
+                    defaultValue = null,
+                    isRequired = false
+                )
+            )
+
             "conditional" -> listOf(
-                InputPort("condition", "Condition", DataType.Primitive(PrimitiveType.BOOLEAN), defaultValue = false),
+                InputPort("condition", "Condition", DataType.Primitive(PrimitiveType.ANY), defaultValue = false),
+                InputPort("expected_value", "Expected Value (Optional)", DataType.Primitive(PrimitiveType.ANY), isRequired = false),
                 InputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY))
             )
 
@@ -146,22 +242,39 @@ object SystemNodesRegistry {
             "for" -> listOf(
                 InputPort(
                     "subflow_name",
-                    "Subflow Name",
+                    "Subflow Name (Optional)",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("flow")
+                    semanticTypes = parseSemanticTypes("flow"),
+                    defaultValue = "",
+                    isRequired = false
                 ),
-                InputPort("start", "Start", DataType.Primitive(PrimitiveType.INT), defaultValue = 0),
-                InputPort("end", "End", DataType.Primitive(PrimitiveType.INT), defaultValue = 10),
-                InputPort("step", "Step", DataType.Primitive(PrimitiveType.INT), defaultValue = 1),
-                InputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY))
+                InputPort(
+                    "enum_name",
+                    "Plugin Enum (Optional)",
+                    DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = "",
+                    isRequired = false
+                ),
+                InputPort(
+                    "items",
+                    "Items (Optional)",
+                    DataType.Array(DataType.Primitive(PrimitiveType.ANY)),
+                    isRequired = false
+                ),
+                InputPort("start", "Start", DataType.Primitive(PrimitiveType.INT), defaultValue = 0, isRequired = false),
+                InputPort("end", "End", DataType.Primitive(PrimitiveType.INT), defaultValue = 10, isRequired = false),
+                InputPort("step", "Step", DataType.Primitive(PrimitiveType.INT), defaultValue = 1, isRequired = false),
+                InputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY), isRequired = false)
             )
 
             "while" -> listOf(
                 InputPort(
                     "subflow_name",
-                    "Subflow Name",
+                    "Subflow Name (Optional)",
                     DataType.Primitive(PrimitiveType.STRING),
-                    semanticTypes = parseSemanticTypes("flow")
+                    semanticTypes = parseSemanticTypes("flow"),
+                    defaultValue = "",
+                    isRequired = false
                 ),
                 InputPort(
                     "condition",
@@ -169,7 +282,14 @@ object SystemNodesRegistry {
                     DataType.Primitive(PrimitiveType.BOOLEAN),
                     defaultValue = true
                 ),
-                InputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY))
+                InputPort(
+                    "max_iterations",
+                    "Max Iterations",
+                    DataType.Primitive(PrimitiveType.INT),
+                    defaultValue = 100,
+                    isRequired = false
+                ),
+                InputPort("input_data", "Input Data", DataType.Primitive(PrimitiveType.ANY), isRequired = false)
             )
 
             "create_folder" -> listOf(
@@ -247,11 +367,32 @@ object SystemNodesRegistry {
                 OutputPort("not_equal", "Not Equal (A != B)", DataType.Primitive(PrimitiveType.BOOLEAN))
             )
 
+            "string_merger", "merge_string" -> listOf(
+                OutputPort("output", "Output", DataType.Primitive(PrimitiveType.STRING))
+            )
+
+            "extract_from_string", "string_extract" -> listOf(
+                OutputPort("output", "Matches", DataType.Array(DataType.Primitive(PrimitiveType.STRING)))
+            )
+
+            "list_filter", "lists_filter" -> listOf(
+                OutputPort("output", "Output", DataType.Array(DataType.Primitive(PrimitiveType.ANY)))
+            )
+
+            "list_check" -> listOf(
+                OutputPort("output", "Output", DataType.Array(DataType.Primitive(PrimitiveType.ANY))),
+                OutputPort("result", "Result", DataType.Primitive(PrimitiveType.BOOLEAN))
+            )
+
             "for" -> listOf(
+                OutputPort("item", "Item", DataType.Primitive(PrimitiveType.ANY)),
+                OutputPort("index", "Index", DataType.Primitive(PrimitiveType.INT)),
                 OutputPort("output_data", "Output Data", DataType.Primitive(PrimitiveType.ANY))
             )
 
             "while" -> listOf(
+                OutputPort("item", "Item", DataType.Primitive(PrimitiveType.ANY)),
+                OutputPort("iteration", "Iteration", DataType.Primitive(PrimitiveType.INT)),
                 OutputPort("output_data", "Output Data", DataType.Primitive(PrimitiveType.ANY))
             )
 
@@ -282,6 +423,29 @@ object SystemNodesRegistry {
                     val currentOutputType = inferred[Pair(node.id, "output_data")]
                     if (inputType != currentOutputType) {
                         inferred[Pair(node.id, "output_data")] = inputType
+                        changed = true
+                    }
+                }
+            }
+
+            "convert" -> {
+                val targetTypePort = node.inputs.find { it.id == "target_type" }
+                val targetTypeVal = targetTypePort?.value?.let {
+                    if (it is kotlinx.serialization.json.JsonPrimitive) it.content else it.toString()
+                }?.uppercase() ?: "AUTO"
+                val explicitType = when (targetTypeVal) {
+                    "STRING" -> DataType.Primitive(PrimitiveType.STRING)
+                    "INT" -> DataType.Primitive(PrimitiveType.INT)
+                    "DOUBLE" -> DataType.Primitive(PrimitiveType.DOUBLE)
+                    "BOOLEAN" -> DataType.Primitive(PrimitiveType.BOOLEAN)
+                    "LONG" -> DataType.Primitive(PrimitiveType.LONG)
+                    "FLOAT" -> DataType.Primitive(PrimitiveType.FLOAT)
+                    else -> null
+                }
+                if (explicitType != null) {
+                    val currentOutputType = inferred[Pair(node.id, "output_data")]
+                    if (currentOutputType != explicitType) {
+                        inferred[Pair(node.id, "output_data")] = explicitType
                         changed = true
                     }
                 }
@@ -319,6 +483,49 @@ object SystemNodesRegistry {
                 }
             }
 
+            "string_merger", "merge_string" -> {
+                val stringType = DataType.Primitive(PrimitiveType.STRING)
+                if (inferred[Pair(node.id, "output")] != stringType) {
+                    inferred[Pair(node.id, "output")] = stringType
+                    changed = true
+                }
+            }
+
+            "extract_from_string", "string_extract" -> {
+                val arrayStringType = DataType.Array(DataType.Primitive(PrimitiveType.STRING))
+                if (inferred[Pair(node.id, "output")] != arrayStringType) {
+                    inferred[Pair(node.id, "output")] = arrayStringType
+                    changed = true
+                }
+            }
+
+            "list_filter", "lists_filter", "list_check" -> {
+                val itemsType = inferred[Pair(node.id, "items")]
+                val outputType = inferred[Pair(node.id, "output")]
+
+                val itemsItems = (itemsType as? DataType.Array)?.items
+                val outputItems = (outputType as? DataType.Array)?.items
+
+                val specificArrayType = when {
+                    itemsType is DataType.Array && itemsItems != null && !(itemsItems is DataType.Primitive && itemsItems.primitiveType == PrimitiveType.ANY) -> itemsType
+                    outputType is DataType.Array && outputItems != null && !(outputItems is DataType.Primitive && outputItems.primitiveType == PrimitiveType.ANY) -> outputType
+                    itemsType is DataType.Array -> itemsType
+                    outputType is DataType.Array -> outputType
+                    else -> null
+                }
+
+                if (specificArrayType != null) {
+                    if (inferred[Pair(node.id, "output")] != specificArrayType) {
+                        inferred[Pair(node.id, "output")] = specificArrayType
+                        changed = true
+                    }
+                    if (inferred[Pair(node.id, "items")] != specificArrayType) {
+                        inferred[Pair(node.id, "items")] = specificArrayType
+                        changed = true
+                    }
+                }
+            }
+
             "conditional" -> {
                 val inputType = inferred[Pair(node.id, "input_data")]
                 val trueType = inferred[Pair(node.id, "if_true")]
@@ -348,6 +555,14 @@ object SystemNodesRegistry {
             }
 
             "for" -> {
+                val itemsType = inferred[Pair(node.id, "items")]
+                if (itemsType is DataType.Array) {
+                    val currentItemType = inferred[Pair(node.id, "item")]
+                    if (currentItemType != itemsType.items) {
+                        inferred[Pair(node.id, "item")] = itemsType.items
+                        changed = true
+                    }
+                }
                 val inputType = inferred[Pair(node.id, "input_data")]
                 val outputType = inferred[Pair(node.id, "output_data")]
                 if (inputType != null && inputType != outputType) {
@@ -437,6 +652,28 @@ object SystemNodesRegistry {
                     }
                     if (inferredSemantic[Pair(node.id, "list2")] != specificSemantic) {
                         inferredSemantic[Pair(node.id, "list2")] = specificSemantic
+                        changed = true
+                    }
+                    if (inferredSemantic[Pair(node.id, "output")] != specificSemantic) {
+                        inferredSemantic[Pair(node.id, "output")] = specificSemantic
+                        changed = true
+                    }
+                }
+            }
+
+            "list_filter", "lists_filter", "list_check" -> {
+                val itemsSemantic = inferredSemantic[Pair(node.id, "items")].orEmpty()
+                val outputSemantic = inferredSemantic[Pair(node.id, "output")].orEmpty()
+
+                val specificSemantic = when {
+                    itemsSemantic.isNotEmpty() -> itemsSemantic
+                    outputSemantic.isNotEmpty() -> outputSemantic
+                    else -> null
+                }
+
+                if (specificSemantic != null) {
+                    if (inferredSemantic[Pair(node.id, "items")] != specificSemantic) {
+                        inferredSemantic[Pair(node.id, "items")] = specificSemantic
                         changed = true
                     }
                     if (inferredSemantic[Pair(node.id, "output")] != specificSemantic) {

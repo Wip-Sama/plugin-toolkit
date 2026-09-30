@@ -31,7 +31,7 @@ fun PaletteNode.toNode(
                     semanticTypes = meta.semanticTypes,
                     defaultValue = meta.defaultValue,
                     constraints = meta.constraints?.let {
-                        PortConstraints(regex = it.regex)
+                        PortConstraints(regex = it.regex, min = it.minValue, max = it.maxValue, multiSelect = it.multiSelect)
                     },
                     isAdvanced = meta.isAdvanced,
                     condition = meta.condition
@@ -87,7 +87,7 @@ fun PaletteNode.toNode(
             Node.SystemNode(
                 id = id,
                 position = position,
-                title = action.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                title = getSystemNodeDisplayName(action),
                 systemAction = action,
                 inputs = inputs,
                 outputs = outputs

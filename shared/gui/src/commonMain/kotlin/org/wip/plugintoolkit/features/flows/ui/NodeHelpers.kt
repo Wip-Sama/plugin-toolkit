@@ -141,6 +141,17 @@ fun getBooleanValue(value: Any?): Boolean {
     return value.toString().lowercase().toBooleanStrictOrNull() ?: false
 }
 
+fun getSystemNodeDisplayName(action: String): String = when (action.lowercase()) {
+    "string_merger", "merge_string" -> "Merge String"
+    "extract_from_string", "string_extract" -> "Extract from String"
+    "list_filter", "lists_filter" -> "Lists Filter"
+    "list_check" -> "List Check"
+    "save_file" -> "Save File"
+    "save_folder" -> "Save Folder"
+    "create_folder" -> "Create Folder"
+    else -> action.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+}
+
 fun getNodeDescription(node: Node): String {
     return when (node) {
         is Node.CapabilityNode -> node.capability.description ?: "Executes the '${node.capability.name}' capability."
@@ -150,13 +161,20 @@ fun getNodeDescription(node: Node): String {
                 "load" -> "Loads data from a file at the specified file path."
                 "log" -> "Logs a message to the console/run logs with the specified severity."
                 "delay" -> "Pauses flow execution for a specified duration in milliseconds."
-                "convert" -> "Converts inputs safely between primitive types (String, Int, Double, Boolean). Provides a success status."
+                "convert" -> "Converts inputs safely between primitive types (String, Int, Double, Boolean), supporting explicit or implicit target types."
                 "merger" -> "Merges two list arrays into a single combined list."
-                "conditional" -> "Routes input data to either the 'If True' or 'If False' output port based on a boolean condition."
+                "string_merger", "merge_string" -> "Merges a collection of strings into a single string with an optional separator, prefix, and postfix."
+                "extract_from_string", "string_extract" -> "Extracts substrings matching a regular expression pattern, with support for capture groups."
+                "list_filter", "lists_filter" -> "Filters or slices a list using Python-like slice syntax (e.g. x:y:z, index, or intervals)."
+                "list_check" -> "Checks if a list length is within specified min and max bounds, returning a boolean result and the list."
+                "conditional" -> "Routes input data to either 'If True' or 'If False' based on condition truthiness or equality with an expected value."
                 "error" -> "Halts flow execution immediately with a custom error message."
                 "comparator" -> "Compares two values (numeric or string) and outputs minor (<), major (>), equal (==), and not equal (!=) boolean results."
-                "for" -> "Runs a subflow iteratively for a range of index values, accumulating data."
-                "while" -> "Runs a subflow repeatedly while a boolean condition remains true."
+                "for" -> "Runs connected nodes or a subflow iteratively for each value of an enum, list, or range, collecting results."
+                "while" -> "Runs connected nodes or a subflow repeatedly while a boolean condition remains true."
+                "create_folder" -> "Creates a directory at the specified path."
+                "save_file" -> "Saves a single file to a specified destination directory."
+                "save_folder" -> "Saves an entire folder to a specified destination directory."
                 else -> "System operation: ${node.title}."
             }
         }

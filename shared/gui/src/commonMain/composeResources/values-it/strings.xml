@@ -483,6 +483,7 @@
     <string name="plugin_execution_result">Risultato Esecuzione</string>
     <string name="plugin_metadata">Metadati</string>
     <string name="common_no_options">Nessuna opzione disponibile</string>
+    <string name="common_select_options">Seleziona opzioni...</string>
     <string name="action_clear_selection">Cancella selezione</string>
     <string name="theme_system">Sistema</string>
     <string name="theme_light">Chiaro</string>
@@ -583,6 +584,14 @@
     <string name="job_export_success_toast">Report di esecuzione esportato con successo</string>
     <string name="job_no_metrics_recorded">Nessuna metrica registrata</string>
     <string name="job_execution_count_format">x%1$d</string>
+    <string name="job_metric_bytes_read">Byte letti</string>
+    <string name="job_metric_bytes_written">Byte scritti</string>
+    <string name="job_metric_io">I/O file</string>
+    <string name="job_metric_network">Rete</string>
+    <string name="job_metric_throughput">Throughput</string>
+    <string name="job_execution_run_format">Esecuzione n. %1$d</string>
+    <string name="job_view_individual_runs">Visualizza esecuzioni singole</string>
+    <string name="job_secondary_progress_label">Attività secondaria</string>
     <string name="setting_single_instance_lock">Blocco Istanza Singola</string>
     <string name="setting_single_instance_lock_subtitle">Impedisce l\'esecuzione contemporanea di più istanze di PluginToolkit utilizzando un file di blocco protetto.</string>
     <string name="setting_single_instance_lock_warning_title">Disabilitare il blocco istanza singola?</string>

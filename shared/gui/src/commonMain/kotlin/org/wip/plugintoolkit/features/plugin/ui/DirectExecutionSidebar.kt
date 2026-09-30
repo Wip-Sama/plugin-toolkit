@@ -176,8 +176,9 @@ fun DirectExecutionSidebar(
                     val locks = pluginLocksState[pluginId] ?: pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
 
                     val filteredCapabilities = manifest.capabilities.filter { capability ->
-                        capability.name.contains(capabilitySearchQuery, ignoreCase = true) ||
-                            (capability.description != null && capability.description.contains(capabilitySearchQuery, ignoreCase = true))
+                        capability.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
+                            (capability.name.contains(capabilitySearchQuery, ignoreCase = true) ||
+                             (capability.description != null && capability.description.contains(capabilitySearchQuery, ignoreCase = true)))
                     }
 
                     val capabilityElements = filteredCapabilities.map { capability ->

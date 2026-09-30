@@ -44,7 +44,13 @@ data class MyAdvancedSettings(
         description = "Timeout in seconds",
         minValue = 1.0,
         maxValue = 120.0
-    ) val timeoutSeconds: Int
+    ) val timeoutSeconds: Int,
+
+    @PluginSetting(
+        description = "Supported Architectures",
+        minChoices = 1,
+        maxChoices = 3
+    ) val architectures: Set<AIModelArchitecture> = setOf(AIModelArchitecture.FAST_INFERENCE)
 )
 ```
 
@@ -63,15 +69,16 @@ Parameters can be annotated with different annotations depending on their role a
 
 The host application will automatically infer the required file access permissions based on the presence of `@CapabilityInput` and `@CapabilityOutput` annotations in your capability parameters. No manual permission annotation is needed.
 
-| Type        | Kotlin Example                   | Description                                        |
-|:------------|:---------------------------------|:---------------------------------------------------|
-| **String**  | `String`                         | Standard text input.                               |
-| **Numeric** | `Int`, `Long`, `Double`, `Float` | Numeric inputs (validated by min/max if provided). |
-| **Boolean** | `Boolean`                        | Rendered as a toggle/switch in the UI.             |
-| **Enum**    | `MyEnum`                         | Rendered as a dropdown list of options.            |
-| **List**    | `List<String>`                   | A collection of values.                            |
-| **Object**  | `@Serializable class MyData`     | Complex objects (serialized as JSON).              |
-| **Any**     | `JsonElement`                    | Raw JSON input for maximum flexibility.            |
+| Type                            | Kotlin Example                                       | Description                                                             |
+|:--------------------------------|:-----------------------------------------------------|:------------------------------------------------------------------------|
+| **String**                      | `String`                                             | Standard text input.                                                    |
+| **Numeric**                     | `Int`, `Long`, `Double`, `Float`                     | Numeric inputs (validated by min/max if provided).                      |
+| **Boolean**                     | `Boolean`                                            | Rendered as a toggle/switch in the UI.                                  |
+| **Enum**                        | `MyEnum`                                             | Rendered as a single-selection dropdown list of options.                |
+| **Enum Collection**             | `Collection<MyEnum>`, `Set<MyEnum>`, `List<MyEnum>`  | Rendered as a multi-selection dropdown menu with checkable options.     |
+| **Collection / Iterable / List**| `Collection<String>`, `List<String>`, `Set<String>`  | A collection of values.                                                 |
+| **Object**                      | `@Serializable class MyData`                         | Complex objects (serialized as JSON).                                   |
+| **Any**                         | `JsonElement`                                        | Raw JSON input for maximum flexibility.                                 |
 
 #### Complex Objects
 
@@ -100,7 +107,8 @@ When using complex objects (custom `@Serializable` data classes) as parameters o
 @Capability(
     name = "Process Data",
     description = "Processes some input and returns a result.",
-    supportsPause = true
+    supportsPause = true,
+    context = CapabilityContext.ANY // ANY, FLOW_ONLY, or STANDALONE_ONLY
 )
 suspend fun processMyData(
     @CapabilityParam("The input string") input: String,
@@ -113,6 +121,14 @@ suspend fun processMyData(
 Each capability can define multiple parameters using the `@CapabilityParam` annotation.
 The ParamType is inferred from the type and will use JSON to parse and transmit the object to the plugin.     
 While using a suspend function is good practice, it is not obligatory.
+
+#### Capability Execution Context (`CapabilityContext`)
+
+Capabilities can be scoped to specific execution environments using the `context` attribute:
+
+- **`CapabilityContext.ANY` (Default)**: The capability is available for direct execution (in the plugin runner sidebar) as well as within the visual Flow Editor palette.
+- **`CapabilityContext.FLOW_ONLY`**: The capability is designed specifically for orchestration as a node within flows (e.g. data transformation or subflow steps). It is hidden from direct execution sidebars and standalone runner views. Direct standalone execution requests via `JobWorker` are rejected.
+- **`CapabilityContext.STANDALONE_ONLY`**: The capability can only be executed directly via the plugin runner and is hidden from the visual Flow Editor palette.
 
 #### Parameter Validation Constraints
 
@@ -129,6 +145,9 @@ The `@CapabilityParam` annotation supports several constraints that the host app
 | `maxLength`   | Int      | Maximum allowed string length.                                              |
 | `minValue`    | Double   | Minimum numeric value (for `Int` and `Double` parameters).                  |
 | `maxValue`    | Double   | Maximum numeric value (for `Int` and `Double` parameters).                  |
+| `multiSelect` | Boolean  | Enables multi-selection. Auto-inferred for Enum `Collection`, `Set`, or `List`. |
+| `minChoices`  | Int      | Minimum number of options that must be selected in a multi-select dropdown.  |
+| `maxChoices`  | Int      | Maximum number of options that can be selected in a multi-select dropdown.  |
 
 **Example with constraints:**
 
@@ -150,8 +169,8 @@ fun validateIp(
 }
 ```
 
-**List/Array parameter validation:**
-When a parameter is a `List<T>` and has a `regex` or length constraint, the host validates **each individual item** in the list separately. For example, a `List<String>` with an IP regex will validate each comma-separated IP independently.
+**List/Collection parameter validation:**
+When a parameter is a `Collection<T>`, `List<T>`, or `Set<T>` and has a `regex` or length constraint, the host validates **each individual item** in the list separately. For example, a `List<String>` with an IP regex will validate each comma-separated IP independently.
 
 ```kotlin
 @Capability(name = "Batch Validate", description = "Validates multiple IPs")
@@ -159,9 +178,30 @@ fun batchValidate(
     @CapabilityParam(
         description = "Comma-separated IP addresses",
         regex = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
-    ) ips: List<String>
+    ) ips: Collection<String>
 ): String {
     return "Validated ${ips.size} IPs"
+}
+```
+
+**Multi-Selectable Enum Collections:**
+When a parameter or setting is declared as a `Collection<Enum>`, `List<Enum>`, `Set<Enum>`, or `Iterable<Enum>` (or has `multiSelect = true`), the UI renders an expressive multi-select dropdown menu with checkable options. You can bound the number of selected choices using `minChoices` and `maxChoices`:
+
+```kotlin
+@Capability(
+    name = "Benchmark Architectures",
+    description = "Benchmarks selected model architectures",
+    context = CapabilityContext.FLOW_ONLY
+)
+fun benchmarkArchitectures(
+    @CapabilityParam(
+        description = "Target architectures to benchmark",
+        minChoices = 1,
+        maxChoices = 3
+    ) targets: Set<AIModelArchitecture>
+): BenchmarkReport {
+    // targets is parsed from a JSON array e.g. ["FAST_INFERENCE", "HIGH_PRECISION"]
+    return runBenchmarks(targets)
 }
 ```
 
@@ -481,7 +521,8 @@ The `PluginContext` (and focused interfaces like `PluginLogger`, `PluginFileSyst
 - **Execution File System**: `ExecutionFileSystem` (Temporary, isolated sandbox storage for the current execution. Cleared automatically after the flow finishes.)
 - **Host File System**: `HostFileSystem` (External file access. Restricted to paths explicitly granted by the user via file input/output parameters: `@CapabilityInput` and `@CapabilityOutput`.)
 - **Plugin Storage**: `PluginStorage` (`context.storage`) provides a persistent, internal key-value store (`get`, `put`, `getAll`, `remove`) for saving plugin-internal state without polluting user settings.
-- **Progress**: `ProgressReporter` (e.g. `progress.report(0.5f)`)
+- **Progress**: `ProgressReporter` (supports percentages `progress.report(0.5f, "Downloading...")`, ratio values `progress.report(ProgressData.ratio(12.3, 14.5, "MB", "Transferring..."))`, indeterminate states, secondary progress bars `progress.reportSecondary(ProgressData.indeterminate("Waiting for rate limit reset..."))`, and sub-task progress).
+- **Network Client & Resource Monitoring**: `PluginNetworkClient` (`context.networkClient`) provides tracked HTTP GET/POST calls and automatic bandwidth/throughput monitoring; plugins can also explicitly record external bandwidth via `context.recordNetworkUsage(readBytes, writtenBytes, throughputBytesPerSec)`.
 - **Signals**: `PluginSignalManager` (e.g. `context.signals.onSignal { ... }`)
 - **Process Watcher**: `context.watchProcess(pid: Long)` / `context.watchProcess(process: java.lang.Process)` (Monitors external processes, terminal commands, or Python scripts to include their memory in job metrics and monitoring.)
 

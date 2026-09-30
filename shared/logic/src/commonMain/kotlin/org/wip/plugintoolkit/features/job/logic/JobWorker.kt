@@ -168,6 +168,10 @@ class JobWorker(
             ?: throw Exception("Plugin ${job.pluginId} not found")
 
         val manifest = plugin.getManifest().getOrThrow()
+        val cap = manifest.capabilities.find { it.name == job.capabilityName }
+        if (cap?.context == org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY) {
+            throw IllegalStateException("Capability '${job.capabilityName}' is scoped only as a node in flows and cannot be executed directly.")
+        }
         val mutableParams = job.parameters.toMutableMap()
         val settingsPersistence: SettingsPersistence = get()
         val sandboxDir = "${settingsPersistence.getSettingsDir()}/jobs/${job.id}/sandbox/node_0"
@@ -261,7 +265,26 @@ class JobWorker(
                     )
                     val totalAfter = memAfter + procMemAfter
                     val finalMemory = maxOf(peakMemory, totalAfter)
-                    manager.recordCapabilityMetric(job.id, job.capabilityName, durationMs, finalMemory)
+
+                    val tracker = (context as? org.wip.plugintoolkit.features.plugin.logic.DefaultPluginContext)?.tracker
+                    val bytesRead = tracker?.bytesRead
+                    val bytesWritten = tracker?.bytesWritten
+                    val networkBytesRead = tracker?.networkBytesRead
+                    val networkBytesWritten = tracker?.networkBytesWritten
+                    val throughput = tracker?.averageThroughputBytesPerSec
+
+                    manager.recordCapabilityMetric(
+                        jobId = job.id,
+                        capabilityName = job.capabilityName,
+                        durationMs = durationMs,
+                        memoryBytes = finalMemory,
+                        totalMemoryBytes = finalMemory,
+                        bytesRead = bytesRead,
+                        bytesWritten = bytesWritten,
+                        networkBytesRead = networkBytesRead,
+                        networkBytesWritten = networkBytesWritten,
+                        throughputBytesPerSec = throughput
+                    )
                     return@async processResult
                 } catch (e: TimeoutCancellationException) {
                     lastError = e
@@ -606,7 +629,29 @@ class JobWorker(
         val action = manifest.actions.find { it.functionName == job.capabilityName }
             ?: throw Exception("Action ${job.capabilityName} not found in manifest")
 
+        val startMark = kotlin.time.TimeSource.Monotonic.markNow()
         val result = withContext(kotlinx.coroutines.Dispatchers.IO) { processor.runAction(action, job.parameters, context) }
+        val durationMs = startMark.elapsedNow().inWholeMilliseconds
+
+        val tracker = (context as? org.wip.plugintoolkit.features.plugin.logic.DefaultPluginContext)?.tracker
+        val bytesRead = tracker?.bytesRead
+        val bytesWritten = tracker?.bytesWritten
+        val networkBytesRead = tracker?.networkBytesRead
+        val networkBytesWritten = tracker?.networkBytesWritten
+        val throughput = tracker?.averageThroughputBytesPerSec
+
+        manager.recordCapabilityMetric(
+            jobId = job.id,
+            capabilityName = action.name,
+            durationMs = durationMs,
+            memoryBytes = null,
+            totalMemoryBytes = null,
+            bytesRead = bytesRead,
+            bytesWritten = bytesWritten,
+            networkBytesRead = networkBytesRead,
+            networkBytesWritten = networkBytesWritten,
+            throughputBytesPerSec = throughput
+        )
 
         if (result.isSuccess) {
             manager.updateJobProgress(job.id, 1.0f)

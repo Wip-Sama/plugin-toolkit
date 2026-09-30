@@ -54,7 +54,7 @@ object NodeSerializationUtils {
             is Number -> JsonPrimitive(value)
             is String -> JsonPrimitive(value)
             is Map<*, *> -> JsonObject(value.entries.associate { it.key.toString() to anyToJsonElement(it.value) })
-            is List<*> -> JsonArray(value.map { anyToJsonElement(it) })
+            is Iterable<*> -> JsonArray(value.map { anyToJsonElement(it) })
             is Array<*> -> JsonArray(value.map { anyToJsonElement(it) })
             else -> JsonPrimitive(value.toString())
         }

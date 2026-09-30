@@ -51,8 +51,9 @@ fun CapabilitySidebar(
     var searchQuery by remember { mutableStateOf("") }
 
     val filteredCapabilities = manifest.capabilities.filter { capability ->
-        capability.name.contains(searchQuery, ignoreCase = true) ||
-            (capability.description != null && capability.description.contains(searchQuery, ignoreCase = true))
+        capability.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
+            (capability.name.contains(searchQuery, ignoreCase = true) ||
+             (capability.description != null && capability.description.contains(searchQuery, ignoreCase = true)))
     }
 
     Surface(

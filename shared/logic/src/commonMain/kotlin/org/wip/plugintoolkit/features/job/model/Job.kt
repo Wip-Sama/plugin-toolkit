@@ -54,7 +54,13 @@ data class BackgroundJob(
 data class CapabilityExecutionMetric(
     val capabilityName: String,
     val durationMs: Long,
-    val memoryUsageBytes: Long? = null
+    val memoryUsageBytes: Long? = null,
+    val totalMemoryBytes: Long? = null,
+    val bytesRead: Long? = null,
+    val bytesWritten: Long? = null,
+    val networkBytesRead: Long? = null,
+    val networkBytesWritten: Long? = null,
+    val throughputBytesPerSec: Long? = null
 )
 
 @Serializable
@@ -76,9 +82,42 @@ data class JobExecutionMetrics(
             .groupBy { it.capabilityName }
             .mapValues { (_, metrics) -> metrics.size }
 
+    val metricsPerCapability: Map<String, List<CapabilityExecutionMetric>>
+        get() = capabilityMetrics.groupBy { it.capabilityName }
+
+    val peakMemoryPerCapability: Map<String, Long?>
+        get() = capabilityMetrics
+            .groupBy { it.capabilityName }
+            .mapValues { (_, metrics) -> metrics.mapNotNull { it.memoryUsageBytes }.maxOrNull() }
+
+    val totalMemoryPerCapability: Map<String, Long?>
+        get() = capabilityMetrics
+            .groupBy { it.capabilityName }
+            .mapValues { (_, metrics) ->
+                metrics.mapNotNull { it.totalMemoryBytes ?: it.memoryUsageBytes }.sum().takeIf { it > 0L }
+            }
+
+    val totalBytesReadPerCapability: Map<String, Long>
+        get() = capabilityMetrics
+            .groupBy { it.capabilityName }
+            .mapValues { (_, metrics) -> metrics.sumOf { it.bytesRead ?: 0L } }
+
+    val totalBytesWrittenPerCapability: Map<String, Long>
+        get() = capabilityMetrics
+            .groupBy { it.capabilityName }
+            .mapValues { (_, metrics) -> metrics.sumOf { it.bytesWritten ?: 0L } }
+
+    val averageThroughputPerCapability: Map<String, Long?>
+        get() = capabilityMetrics
+            .groupBy { it.capabilityName }
+            .mapValues { (_, metrics) ->
+                val throughputs = metrics.mapNotNull { it.throughputBytesPerSec }.filter { it > 0L }
+                if (throughputs.isEmpty()) null else throughputs.sum() / throughputs.size
+            }
+
     val effectiveTotalMemoryUsageBytes: Long?
         get() = totalMemoryUsageBytes
-            ?: capabilityMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
+            ?: capabilityMetrics.mapNotNull { it.totalMemoryBytes ?: it.memoryUsageBytes }.sum().takeIf { it > 0L }
             ?: memoryUsageBytes
 }
 

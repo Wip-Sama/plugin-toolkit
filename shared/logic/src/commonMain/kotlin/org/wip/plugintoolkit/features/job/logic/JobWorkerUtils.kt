@@ -46,7 +46,7 @@ fun toJsonElement(value: Any?): JsonElement {
         is Number -> JsonPrimitive(value)
         is String -> JsonPrimitive(value)
         is Map<*, *> -> JsonObject(value.entries.associate { it.key.toString() to toJsonElement(it.value) })
-        is List<*> -> JsonArray(value.map { toJsonElement(it) })
+        is Iterable<*> -> JsonArray(value.map { toJsonElement(it) })
         is Array<*> -> JsonArray(value.map { toJsonElement(it) })
         else -> JsonPrimitive(value.toString())
     }
@@ -284,6 +284,27 @@ fun validateCapabilityParameters(
                 if (isNumericType && valStr.isNotEmpty()) {
                     throw IllegalArgumentException("Parameter '$paramName' value '$valStr' is not a valid number.")
                 }
+            }
+        }
+
+        val minChoices = constraints.minChoices
+        val maxChoices = constraints.maxChoices
+        if (minChoices != null || maxChoices != null) {
+            val choiceCount = when (valueElement) {
+                is JsonArray -> valueElement.size
+                is JsonPrimitive -> {
+                    val metaType = metadata.type
+                    if (metaType is DataType.Array) {
+                        org.wip.plugintoolkit.features.plugin.utils.SettingsUtils.splitArrayValue(valueElement.content, metaType).size
+                    } else if (valueElement.content.isBlank()) 0 else 1
+                }
+                else -> 0
+            }
+            if (minChoices != null && choiceCount < minChoices) {
+                throw IllegalArgumentException("Parameter '$paramName' requires at least $minChoices choices, but $choiceCount were selected.")
+            }
+            if (maxChoices != null && choiceCount > maxChoices) {
+                throw IllegalArgumentException("Parameter '$paramName' allows at most $maxChoices choices, but $choiceCount were selected.")
             }
         }
     }

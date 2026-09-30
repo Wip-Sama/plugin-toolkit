@@ -44,7 +44,7 @@ class SinglePluginHostViewModel(
 
     val manifest: PluginManifest = pluginEntry.getManifest().getOrThrow()
     val pluginId: String = manifest.plugin.id
-    val capabilities: List<Capability> = manifest.capabilities
+    val capabilities: List<Capability> = manifest.capabilities.filter { it.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY }
     val hasSetupHandler: Boolean = manifest.hasSetupHandler
 
     var selectedCapability by mutableStateOf<Capability?>(capabilities.firstOrNull())

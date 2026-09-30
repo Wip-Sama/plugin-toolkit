@@ -184,4 +184,68 @@ class JobResultCardTest {
         // When resized below default height, toggle expands to expandedHeight
         assertEquals(expandedHeight, calculateToggledLogHeight(100.dp, defaultHeight, expandedHeight))
     }
+
+    @Test
+    fun testBuildJobExportReportWithCapabilityBreakdownResourceMetrics() {
+        val testStart = Instant.fromEpochMilliseconds(1700000000000L)
+        val testEnd = Instant.fromEpochMilliseconds(1700000010000L)
+
+        val job = BackgroundJob(
+            id = "flow-job-456",
+            name = "Flow Job",
+            type = JobType.Flow,
+            status = JobStatus.Completed,
+            enqueuedAt = testStart,
+            startedAt = testStart,
+            completedAt = testEnd,
+            pluginId = "org.wip.flowplugin",
+            capabilityName = "flowCapability",
+            executionMetrics = JobExecutionMetrics(
+                startedAt = testStart,
+                completedAt = testEnd,
+                totalDurationMs = 10000L,
+                capabilityMetrics = listOf(
+                    CapabilityExecutionMetric(
+                        capabilityName = "downloadData",
+                        durationMs = 3000L,
+                        memoryUsageBytes = 1024L * 1024L * 8L,
+                        totalMemoryBytes = 1024L * 1024L * 8L,
+                        bytesRead = 0L,
+                        bytesWritten = 1024L * 1024L * 5L,
+                        networkBytesRead = 1024L * 1024L * 5L,
+                        networkBytesWritten = 512L,
+                        throughputBytesPerSec = 2_000_000L
+                    ),
+                    CapabilityExecutionMetric(
+                        capabilityName = "downloadData",
+                        durationMs = 2000L,
+                        memoryUsageBytes = 1024L * 1024L * 4L,
+                        totalMemoryBytes = 1024L * 1024L * 4L,
+                        bytesRead = 0L,
+                        bytesWritten = 1024L * 1024L * 2L,
+                        networkBytesRead = 1024L * 1024L * 2L,
+                        networkBytesWritten = 256L,
+                        throughputBytesPerSec = 1_500_000L
+                    )
+                )
+            )
+        )
+
+        val report = buildJobExportReport(
+            job = job,
+            logs = emptyList(),
+            startedAtLabel = "Started",
+            completedAtLabel = "Completed",
+            durationLabel = "Duration",
+            memoryLabel = "Peak Memory",
+            capabilityBreakdownLabel = "Capabilities",
+            totalMemoryLabel = "Total Memory"
+        )
+
+        assertTrue(report.contains("downloadData: 5000 ms (5.0s) (x2) [50%]"))
+        assertTrue(report.contains("File I/O"))
+        assertTrue(report.contains("Network"))
+        assertTrue(report.contains("#1: 3000 ms"))
+        assertTrue(report.contains("#2: 2000 ms"))
+    }
 }

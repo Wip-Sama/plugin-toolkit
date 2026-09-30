@@ -16,6 +16,8 @@ import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.ProgressReporter
+import org.wip.plugintoolkit.api.ProgressData
+import org.wip.plugintoolkit.api.PluginNetworkClient
 import org.wip.plugintoolkit.api.watchProcess
 import org.wip.plugintoolkit.api.ConditionOperator
 import org.wip.plugintoolkit.api.annotations.Capability
@@ -62,7 +64,12 @@ data class CompleteExampleSettings(
     @PluginSetting(
         description = "Required user identifier",
         required = true
-    ) val userId: String? = "user_demo"
+    ) val userId: String? = "user_demo",
+
+    @PluginSetting(
+        description = "Supported AI model architectures (multi-selection)",
+        defaultValue = "[\"FAST_INFERENCE\", \"HIGH_PRECISION\"]"
+    ) val enabledArchitectures: Set<AIModelArchitecture>? = setOf(AIModelArchitecture.FAST_INFERENCE)
 )
 
 @Serializable
@@ -146,7 +153,7 @@ enum class FeatureMode {
 @PluginInfo(
     id = "org.wip.complete",
     name = "Complete Example Plugin",
-    version = "2.1.1",
+    version = "2.1.3",
     description = "Complete showcase of plugin API features including settings, validation, signals, storage, file system, lifecycle hooks, and flow contexts.",
     supportedOs = [OS.WINDOWS, OS.LINUX, OS.MACOS]
 )
@@ -191,14 +198,41 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
         logger.info("State reset complete.")
     }
 
-    @PluginAction(name = "Execute Health Diagnostic", description = "Runs diagnostic tasks reporting progress.")
+    @PluginAction(name = "Execute Health Diagnostic", description = "Runs diagnostic tasks reporting rich progress and secondary progress.")
     suspend fun runDiagnostic(logger: PluginLogger, progress: ProgressReporter) {
         logger.info("Starting complete example health diagnostic...")
-        for (i in 1..5) {
-            progress.report(i / 5f)
-            delay(100)
-        }
+        progress.report(ProgressData.percentage(0.2f, "Checking system health - 120 items/s"))
+        progress.reportSecondary(ProgressData.indeterminate("Validating secondary subsystems"))
+        delay(50)
+        progress.report(ProgressData.ratio(12.3, 14.5, "MB", "Verifying cache integrity"))
+        progress.reportSecondary(ProgressData.percentage(1.0f, "Subsystems OK"))
+        delay(50)
+        progress.clearSecondary()
+        progress.report(1.0f, "Diagnostic completed successfully")
         logger.info("Health diagnostic complete.")
+    }
+
+    @Capability(
+        name = "capabilityWithNetworkAndProgress",
+        description = "Showcase of network client usage, throughput tracking, primary/secondary progress reporting, and retry backoff."
+    )
+    suspend fun capabilityWithNetworkAndProgress(
+        @CapabilityParam(description = "Total data to process in MB", defaultValue = "10.0") dataMb: Double,
+        context: PluginContext,
+        networkClient: PluginNetworkClient
+    ): ExecutionResult {
+        context.logger.info("Starting capabilityWithNetworkAndProgress for $dataMb MB...")
+        context.progress.report(ProgressData.ratio(0.0, dataMb, "MB", "Starting data transfer"))
+
+        // Simulate network throughput and secondary progress for rate limit / backoff
+        context.progress.reportSecondary(ProgressData.percentage(0.5f, "Simulating rate limit backoff: 500ms remaining"))
+        delay(50)
+        context.progress.clearSecondary()
+
+        val bytesToRecord = (dataMb * 1024 * 1024).toLong()
+        context.recordNetworkUsage(bytesRead = bytesToRecord, bytesWritten = 1024L, throughputBytesPerSec = 5_000_000L)
+        context.progress.report(ProgressData.ratio(dataMb, dataMb, "MB", "Transfer complete"))
+        return ExecutionResult.Success(PluginResponse(result = JsonPrimitive("Processed $dataMb MB successfully")))
     }
 
     @Capability(
@@ -311,9 +345,10 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
     )
     fun capabilityWithFlowContext(
         @CapabilityParam(description = "Execution mode selection") mode: FeatureMode,
-        @CapabilityParam(description = "Configuration data map") config: Map<String, String>
+        @CapabilityParam(description = "Allowed model architectures (multi-select collection)") architectures: Collection<AIModelArchitecture> = listOf(AIModelArchitecture.FAST_INFERENCE),
+        @CapabilityParam(description = "Configuration data map") config: Map<String, String> = emptyMap()
     ): String {
-        return "Flow execution mode: ${mode.name}, userId: ${settings.userId}, config entries: ${config.size}"
+        return "Flow execution mode: ${mode.name}, architectures: ${architectures.joinToString { it.name }}, userId: ${settings.userId}, config entries: ${config.size}"
     }
 
     @Capability(

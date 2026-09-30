@@ -162,4 +162,20 @@ class BinaryCompatibilityTest {
         assertTrue(action.showToast, "showToast should default to true when missing in JSON")
         assertEquals(null, action.toastMessage)
     }
+
+    @Test
+    fun testProgressReporterSingleMethodImplementationCompatibility() {
+        var recorded = 0f
+        val legacyReporter = object : ProgressReporter {
+            override fun report(progress: Float) {
+                recorded = progress
+            }
+        }
+        legacyReporter.report(0.42f)
+        assertEquals(0.42f, recorded)
+        legacyReporter.report(0.9f, "detail")
+        assertEquals(0.9f, recorded)
+        legacyReporter.reportSecondary(0.5f)
+        legacyReporter.clearSecondary()
+    }
 }

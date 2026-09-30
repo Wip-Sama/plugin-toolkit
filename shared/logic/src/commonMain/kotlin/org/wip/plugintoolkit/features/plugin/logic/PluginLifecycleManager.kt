@@ -48,6 +48,12 @@ class PluginLifecycleManager(
     private val fileSystem: FileSystem
 ) : KoinComponent {
     private val notificationService: NotificationService by inject()
+    private val httpClient: io.ktor.client.HttpClient?
+        get() = try {
+            getKoin().getOrNull()
+        } catch (_: Exception) {
+            null
+        }
     private val _loadedPlugins = MutableStateFlow<Set<String>>(emptySet())
     val loadedPlugins: StateFlow<Set<String>> = _loadedPlugins.asStateFlow()
 
@@ -396,15 +402,75 @@ class PluginLifecycleManager(
         // 2. User overrides
         mergedSettings.putAll(storedSettings.settings)
 
+        val tracker = ResourceUsageTracker()
+        val trackedFs = TrackingPluginFileSystem(DefaultPluginFileSystem(installPath, jarFullPath), tracker)
+        val trackedCacheFs = TrackingPluginFileSystem(DefaultPluginFileSystem.createCacheOnly(installPath), tracker)
+        val rawExecFs = executionFileSystem ?: DefaultExecutionFileSystem("${installPath}/temp_execution")
+        val trackedExecFs = TrackingExecutionFileSystem(rawExecFs, tracker)
+        val trackedHostFs = TrackingHostFileSystem(HostFileSystemImpl(allowedPaths, isDestructiveAllowed), tracker)
+        val trackedNet = TrackedPluginNetworkClient(httpClient, tracker)
+
         val pluginLogger = jobManager.getPluginLogger(pkg, jobId)
         val progressReporter = object : ProgressReporter {
             override fun report(progress: Float) {
+                report(org.wip.plugintoolkit.api.ProgressData.percentage(progress))
+            }
+
+            override fun report(progress: Float, message: String?) {
+                report(org.wip.plugintoolkit.api.ProgressData.percentage(progress, message))
+            }
+
+            override fun report(data: org.wip.plugintoolkit.api.ProgressData) {
                 if (jobId != null) {
                     if (capabilityName != null) {
-                        jobManager.updateCapabilityProgress(jobId, capabilityName, progress)
+                        jobManager.updateCapabilityProgress(jobId, capabilityName, data)
                     } else {
-                        jobManager.updateJobProgress(jobId, progress)
+                        jobManager.updateJobProgress(jobId, data)
                     }
+                }
+            }
+
+            override fun reportSecondary(progress: Float) {
+                reportSecondary(org.wip.plugintoolkit.api.ProgressData.percentage(progress))
+            }
+
+            override fun reportSecondary(progress: Float, message: String?) {
+                reportSecondary(org.wip.plugintoolkit.api.ProgressData.percentage(progress, message))
+            }
+
+            override fun reportSecondary(data: org.wip.plugintoolkit.api.ProgressData) {
+                if (jobId != null) {
+                    if (capabilityName != null) {
+                        jobManager.updateCapabilitySecondaryProgress(jobId, capabilityName, data)
+                    } else {
+                        jobManager.updateJobSecondaryProgress(jobId, data)
+                    }
+                }
+            }
+
+            override fun clearSecondary() {
+                if (jobId != null) {
+                    if (capabilityName != null) {
+                        jobManager.clearCapabilitySecondaryProgress(jobId, capabilityName)
+                    } else {
+                        jobManager.clearJobSecondaryProgress(jobId)
+                    }
+                }
+            }
+
+            override fun reportSubProgress(name: String, data: org.wip.plugintoolkit.api.ProgressData) {
+                if (jobId != null) {
+                    jobManager.updateCapabilityProgress(jobId, name, data)
+                }
+            }
+
+            override fun reportSubProgress(name: String, progress: Float, message: String?) {
+                reportSubProgress(name, org.wip.plugintoolkit.api.ProgressData.percentage(progress, message))
+            }
+
+            override fun clearSubProgress(name: String) {
+                if (jobId != null) {
+                    jobManager.removeCapabilityProgress(jobId, name)
                 }
             }
         }
@@ -412,12 +478,14 @@ class PluginLifecycleManager(
         return DefaultPluginContext(
             logger = pluginLogger,
             progress = progressReporter,
-            fileSystem = DefaultPluginFileSystem(installPath, jarFullPath),
-            cacheFileSystem = DefaultPluginFileSystem.createCacheOnly(installPath),
-            executionFileSystem = executionFileSystem ?: DefaultExecutionFileSystem("${installPath}/temp_execution"),
-            hostFileSystem = HostFileSystemImpl(allowedPaths, isDestructiveAllowed),
+            fileSystem = trackedFs,
+            cacheFileSystem = trackedCacheFs,
+            executionFileSystem = trackedExecFs,
+            hostFileSystem = trackedHostFs,
             settings = mergedSettings,
             storage = DefaultPluginStorage(installPath, fileSystem),
+            tracker = tracker,
+            networkClient = trackedNet,
             onRequiredActionChange = { actionName ->
                 registry.scope.launch {
                     registry.updatePlugin(pkg) { it.copy(requiredAction = actionName) }
@@ -544,6 +612,8 @@ class DefaultPluginContext(
     settings: Map<String, JsonElement>,
     override val storage: org.wip.plugintoolkit.api.PluginStorage,
     override val signals: PluginSignalManager = DefaultPluginSignalManager(),
+    val tracker: ResourceUsageTracker = ResourceUsageTracker(),
+    override val networkClient: org.wip.plugintoolkit.api.PluginNetworkClient = org.wip.plugintoolkit.api.NoOpPluginNetworkClient,
     private val onRequiredActionChange: (String?) -> Unit = {},
     private val onUpdateSettings: (suspend (Map<String, JsonElement>) -> Unit)? = null,
     private val onShowToast: ((String) -> Unit)? = null
@@ -567,6 +637,10 @@ class DefaultPluginContext(
     override suspend fun updateSettings(newSettings: Map<String, JsonElement>) {
         _settings.putAll(newSettings)
         onUpdateSettings?.invoke(newSettings)
+    }
+
+    override fun recordNetworkUsage(bytesRead: Long, bytesWritten: Long, throughputBytesPerSec: Long?) {
+        tracker.recordNetworkUsage(bytesRead, bytesWritten, throughputBytesPerSec)
     }
 
     private val activeWatchers = atomic(persistentListOf<ProcessWatcher>())

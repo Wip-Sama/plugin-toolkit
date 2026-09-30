@@ -3,9 +3,23 @@ Date: xx-xx-2026
 Added:
 	- Resume Flow, Restart Flow, and Pause Flow actions in Flow Runner view
 	- Resuming and restarting paused flows is now fully supported across application restarts
+	- Flow-only capabilities
+	- Multi-selectable dropdown menus for Enum Collections/Lists/Sets with choices count validation (`minChoices`/`maxChoices`)
+	- Convert system node explicit target type selection (`STRING`, `INT`, `DOUBLE`, `BOOLEAN`, `LONG`, `FLOAT`, or `AUTO` fallback)
+	- String Merger system node (`string_merger` / `merge_string`) merging `Collection<String>` into a formatted String with delimiter, prefix, and suffix
+	- Extract from string system node (`extract_from_string`) extracting regex patterns and capture groups into a list of strings
+	- Lists filter system node (`list_filter`) slicing and filtering lists using Python-like slice syntax (e.g. x:y:z, single index, intervals)
+	- List check system node (`list_check`) validating list lengths against min/max bounds, returning a boolean result and list output
+	- Expanded Progress Reporting with rich display modes (percentages, numeric ratio values like 12.3/14.5 MB, and indeterminate indicators)
+	- Secondary Progress Bar support for capabilities and background action jobs (e.g. for rate-limit cooldowns, retries, and multi-step tasks)
+	- Resource Monitoring tracking peak memory, total memory, file I/O read/written bytes, and network throughput across capabilities and actions
+	- Flow Capability Breakdown drawer to inspect individual executions and resource metrics when the same capability executes multiple times
 Changes:
 	- Node can now be focused by simply changing a value
-    - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling
+  - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling
+	- Relaxed rigid List assumptions across parameter validation, serialization, and node execution to generic `Collection` and `Iterable`
+	- Migrated For and While system nodes to execute in-flow loops over connected downstream nodes for each variant (plugin enum, collections, or numeric ranges) without requiring external subflows
+	- Updated Conditional node with `expected_value` input port to support value equality branching alongside boolean truthiness, with full selection, movement, and copy-paste support
 Fixed:
 	- Updating the log level at runtime would not properly use the new level
 	- Narrow Window Squishing & Row Growth in settings

@@ -60,7 +60,8 @@ object GeneratorUtils {
             "kotlin.Boolean" -> DataType.Primitive(PrimitiveType.BOOLEAN)
             "kotlin.Unit" -> DataType.Primitive(PrimitiveType.UNIT)
             "kotlinx.serialization.json.JsonElement", "kotlin.Any" -> DataType.Primitive(PrimitiveType.ANY)
-            "kotlin.collections.List", "kotlin.collections.MutableList", "kotlin.collections.Set", "kotlin.collections.MutableSet" -> {
+            "kotlin.collections.List", "kotlin.collections.MutableList", "kotlin.collections.Set", "kotlin.collections.MutableSet",
+            "kotlin.collections.Collection", "kotlin.collections.MutableCollection", "kotlin.collections.Iterable" -> {
                 val elementType = ksType.arguments.firstOrNull()?.type?.resolve()
                 if (elementType != null) {
                     DataType.Array(mapKSTypeToDataType(elementType, visited))
@@ -439,16 +440,41 @@ object GeneratorUtils {
         return org.wip.plugintoolkit.api.ConditionGroup(parent.conditions + child.conditions, isOr = false)
     }
 
-    fun extractConstraints(ann: KSAnnotation?): org.wip.plugintoolkit.api.ParameterConstraints? {
-        if (ann == null) return null
-        val minValue = ann.arguments.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
-        val maxValue = ann.arguments.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
-        val minLength = ann.arguments.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
-        val maxLength = ann.arguments.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
-        val regex = ann.arguments.find { it.name?.asString() == "regex" }?.value as? String ?: ""
-        val multiSelect = ann.arguments.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
-        val minChoices = ann.arguments.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
-        val maxChoices = ann.arguments.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
+    fun isCollectionOrIterable(ksType: KSType?): Boolean {
+        if (ksType == null) return false
+        val qName = ksType.declaration.qualifiedName?.asString() ?: ""
+        return qName in listOf(
+            "kotlin.collections.List",
+            "kotlin.collections.MutableList",
+            "kotlin.collections.Set",
+            "kotlin.collections.MutableSet",
+            "kotlin.collections.Collection",
+            "kotlin.collections.MutableCollection",
+            "kotlin.collections.Iterable"
+        )
+    }
+
+    fun isCollectionOfEnum(ksType: KSType?): Boolean {
+        if (!isCollectionOrIterable(ksType)) return false
+        val elemKsType = ksType?.arguments?.firstOrNull()?.type?.resolve()
+        val decl = elemKsType?.declaration
+        return decl is KSClassDeclaration && decl.classKind == ClassKind.ENUM_CLASS
+    }
+
+    fun extractConstraints(ann: KSAnnotation?, ksType: KSType? = null): org.wip.plugintoolkit.api.ParameterConstraints? {
+        if (ann == null && ksType == null) return null
+        val minValue = ann?.arguments?.find { it.name?.asString() == "minValue" }?.value as? Double ?: Double.NaN
+        val maxValue = ann?.arguments?.find { it.name?.asString() == "maxValue" }?.value as? Double ?: Double.NaN
+        val minLength = ann?.arguments?.find { it.name?.asString() == "minLength" }?.value as? Int ?: -1
+        val maxLength = ann?.arguments?.find { it.name?.asString() == "maxLength" }?.value as? Int ?: -1
+        val regex = ann?.arguments?.find { it.name?.asString() == "regex" }?.value as? String ?: ""
+        var multiSelect = ann?.arguments?.find { it.name?.asString() == "multiSelect" }?.value as? Boolean ?: false
+        val minChoices = ann?.arguments?.find { it.name?.asString() == "minChoices" }?.value as? Int ?: -1
+        val maxChoices = ann?.arguments?.find { it.name?.asString() == "maxChoices" }?.value as? Int ?: -1
+
+        if (!multiSelect && isCollectionOfEnum(ksType)) {
+            multiSelect = true
+        }
 
         val hasConstraints = !minValue.isNaN() || !maxValue.isNaN() || minLength != -1 || maxLength != -1 ||
                 regex.isNotEmpty() || multiSelect || minChoices != -1 || maxChoices != -1
@@ -624,7 +650,7 @@ object GeneratorUtils {
                         ?.filterIsInstance<String>() ?: emptyList()
                     val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
 
-                    val constraints = extractConstraints(paramAnn)
+                    val constraints = extractConstraints(paramAnn, propTypeKS)
                     val propIsAdvanced = paramAnn?.arguments?.find { it.name?.asString() == "isAdvanced" }?.value as? Boolean ?: false
                     val isAdvanced = parentIsAdvanced || propIsAdvanced
 
@@ -737,7 +763,7 @@ object GeneratorUtils {
                     ?.filterIsInstance<String>() ?: emptyList()
                 val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
 
-                val constraints = extractConstraints(paramAnn)
+                val constraints = extractConstraints(paramAnn, ksType)
                 val isAdvanced = paramAnn?.arguments?.find { it.name?.asString() == "isAdvanced" }?.value as? Boolean ?: false
                 val condition = extractConditionGroup(param)
 

@@ -58,7 +58,7 @@ object AnySerializer : KSerializer<Any?> {
             is Number -> JsonPrimitive(value)
             is String -> JsonPrimitive(value)
             is Map<*, *> -> JsonObject(value.entries.associate { it.key.toString() to toJsonElement(it.value) })
-            is List<*> -> JsonArray(value.map { toJsonElement(it) })
+            is Iterable<*> -> JsonArray(value.map { toJsonElement(it) })
             is Array<*> -> JsonArray(value.map { toJsonElement(it) })
             else -> JsonPrimitive(value.toString())
         }
@@ -1273,5 +1273,6 @@ data class PortConstraints(
     val regex: String? = null,
     val min: Double? = null,
     val max: Double? = null,
-    val extensions: List<String>? = null
+    val extensions: List<String>? = null,
+    val multiSelect: Boolean? = null
 )

@@ -92,10 +92,28 @@ class JobManager(
         jobId: String,
         capabilityName: String,
         durationMs: Long,
-        memoryBytes: Long? = null
+        memoryBytes: Long? = null,
+        totalMemoryBytes: Long? = null,
+        bytesRead: Long? = null,
+        bytesWritten: Long? = null,
+        networkBytesRead: Long? = null,
+        networkBytesWritten: Long? = null,
+        throughputBytesPerSec: Long? = null
     ) {
         val list = activeJobCapabilityMetrics.computeIfAbsent(jobId) { CopyOnWriteArrayList() }
-        list.add(CapabilityExecutionMetric(capabilityName, durationMs, memoryBytes))
+        list.add(
+            CapabilityExecutionMetric(
+                capabilityName = capabilityName,
+                durationMs = durationMs,
+                memoryUsageBytes = memoryBytes,
+                totalMemoryBytes = totalMemoryBytes,
+                bytesRead = bytesRead,
+                bytesWritten = bytesWritten,
+                networkBytesRead = networkBytesRead,
+                networkBytesWritten = networkBytesWritten,
+                throughputBytesPerSec = throughputBytesPerSec
+            )
+        )
         if (memoryBytes != null && memoryBytes > 0L) {
             activeJobPeakMemory.compute(jobId) { _, current ->
                 kotlin.math.max(current ?: 0L, memoryBytes)
@@ -401,22 +419,94 @@ class JobManager(
         }
     }
 
-    fun updateJobProgress(jobId: String, progress: Float) {
+    fun updateJobProgress(
+        jobId: String,
+        progress: Float,
+        message: String? = null,
+        current: Double? = null,
+        total: Double? = null,
+        unit: String? = null,
+        displayMode: org.wip.plugintoolkit.api.ProgressDisplayMode = org.wip.plugintoolkit.api.ProgressDisplayMode.PERCENTAGE
+    ) {
         val clampedProgress = progress.coerceIn(0f, 1f)
-        _jobProgress.update { current ->
-            val currentProgress = current[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
-            if (currentProgress.mainProgress == clampedProgress) {
-                current
-            } else {
-                current + (jobId to currentProgress.copy(mainProgress = clampedProgress))
-            }
+        _jobProgress.update { curr ->
+            val currentProgress = curr[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
+            curr + (jobId to currentProgress.copy(
+                mainProgress = clampedProgress,
+                mainMessage = message,
+                mainCurrent = current,
+                mainTotal = total,
+                mainUnit = unit,
+                mainDisplayMode = displayMode
+            ))
         }
         val percent = clampedProgress * 100f
         val formattedPercent = formatProgressPercent(percent)
+        val logDetails = if (!message.isNullOrBlank()) "$formattedPercent ($message)" else formattedPercent
         val previous = lastLoggedProgress[jobId]
-        if (previous != formattedPercent) {
-            lastLoggedProgress[jobId] = formattedPercent
-            addJobLog(jobId, "Progress: $formattedPercent", "VERBOSE")
+        if (previous != logDetails) {
+            lastLoggedProgress[jobId] = logDetails
+            addJobLog(jobId, "Progress: $logDetails", "VERBOSE")
+        }
+    }
+
+    fun updateJobProgress(jobId: String, data: org.wip.plugintoolkit.api.ProgressData) {
+        updateJobProgress(
+            jobId = jobId,
+            progress = data.fraction ?: 0f,
+            message = data.message,
+            current = data.current,
+            total = data.total,
+            unit = data.unit,
+            displayMode = data.displayMode
+        )
+    }
+
+    fun updateJobSecondaryProgress(
+        jobId: String,
+        progress: Float?,
+        message: String? = null,
+        current: Double? = null,
+        total: Double? = null,
+        unit: String? = null,
+        displayMode: org.wip.plugintoolkit.api.ProgressDisplayMode = org.wip.plugintoolkit.api.ProgressDisplayMode.PERCENTAGE
+    ) {
+        val clamped = progress?.coerceIn(0f, 1f)
+        _jobProgress.update { curr ->
+            val currentProgress = curr[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
+            curr + (jobId to currentProgress.copy(
+                secondaryProgress = clamped,
+                secondaryMessage = message,
+                secondaryCurrent = current,
+                secondaryTotal = total,
+                secondaryUnit = unit,
+                secondaryDisplayMode = displayMode
+            ))
+        }
+    }
+
+    fun updateJobSecondaryProgress(jobId: String, data: org.wip.plugintoolkit.api.ProgressData) {
+        updateJobSecondaryProgress(
+            jobId = jobId,
+            progress = data.fraction,
+            message = data.message,
+            current = data.current,
+            total = data.total,
+            unit = data.unit,
+            displayMode = data.displayMode
+        )
+    }
+
+    fun clearJobSecondaryProgress(jobId: String) {
+        _jobProgress.update { curr ->
+            val currentProgress = curr[jobId] ?: return@update curr
+            curr + (jobId to currentProgress.copy(
+                secondaryProgress = null,
+                secondaryMessage = null,
+                secondaryCurrent = null,
+                secondaryTotal = null,
+                secondaryUnit = null
+            ))
         }
     }
 
@@ -426,10 +516,70 @@ class JobManager(
     }
 
     fun updateCapabilityProgress(jobId: String, capabilityName: String, progress: Float) {
-        _jobProgress.update { current ->
-            val currentProgress = current[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
-            val updatedCaps = currentProgress.capabilitiesProgress + (capabilityName to progress)
-            current + (jobId to currentProgress.copy(capabilitiesProgress = updatedCaps))
+        updateCapabilityProgress(jobId, capabilityName, org.wip.plugintoolkit.api.ProgressData.percentage(progress))
+    }
+
+    fun updateCapabilityProgress(
+        jobId: String,
+        capabilityName: String,
+        data: org.wip.plugintoolkit.api.ProgressData
+    ) {
+        _jobProgress.update { curr ->
+            val currentProgress = curr[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
+            val existingItem = currentProgress.capabilitiesDetailedProgress[capabilityName]
+            val newItem = (existingItem ?: org.wip.plugintoolkit.features.job.model.CapabilityProgressItem()).copy(
+                progress = data.fraction ?: 0f,
+                message = data.message,
+                current = data.current,
+                total = data.total,
+                unit = data.unit,
+                displayMode = data.displayMode
+            )
+            val updatedCaps = currentProgress.capabilitiesProgress + (capabilityName to (data.fraction ?: 0f))
+            val updatedDetailed = currentProgress.capabilitiesDetailedProgress + (capabilityName to newItem)
+            curr + (jobId to currentProgress.copy(
+                capabilitiesProgress = updatedCaps,
+                capabilitiesDetailedProgress = updatedDetailed
+            ))
+        }
+    }
+
+    fun updateCapabilitySecondaryProgress(
+        jobId: String,
+        capabilityName: String,
+        data: org.wip.plugintoolkit.api.ProgressData
+    ) {
+        _jobProgress.update { curr ->
+            val currentProgress = curr[jobId] ?: org.wip.plugintoolkit.features.job.model.JobProgress()
+            val existingItem = currentProgress.capabilitiesDetailedProgress[capabilityName]
+                ?: org.wip.plugintoolkit.features.job.model.CapabilityProgressItem()
+            val newItem = existingItem.copy(
+                secondaryProgress = data.fraction,
+                secondaryMessage = data.message,
+                secondaryCurrent = data.current,
+                secondaryTotal = data.total,
+                secondaryUnit = data.unit,
+                secondaryDisplayMode = data.displayMode
+            )
+            val updatedDetailed = currentProgress.capabilitiesDetailedProgress + (capabilityName to newItem)
+            curr + (jobId to currentProgress.copy(capabilitiesDetailedProgress = updatedDetailed))
+        }
+    }
+
+    fun clearCapabilitySecondaryProgress(jobId: String, capabilityName: String) {
+        _jobProgress.update { curr ->
+            val currentProgress = curr[jobId] ?: return@update curr
+            val existingItem = currentProgress.capabilitiesDetailedProgress[capabilityName] ?: return@update curr
+            val newItem = existingItem.copy(
+                secondaryProgress = null,
+                secondaryMessage = null,
+                secondaryCurrent = null,
+                secondaryTotal = null,
+                secondaryUnit = null
+            )
+            curr + (jobId to currentProgress.copy(
+                capabilitiesDetailedProgress = currentProgress.capabilitiesDetailedProgress + (capabilityName to newItem)
+            ))
         }
     }
 
@@ -437,7 +587,11 @@ class JobManager(
         _jobProgress.update { current ->
             val currentProgress = current[jobId] ?: return@update current
             val updatedCaps = currentProgress.capabilitiesProgress - capabilityName
-            current + (jobId to currentProgress.copy(capabilitiesProgress = updatedCaps))
+            val updatedDetailed = currentProgress.capabilitiesDetailedProgress - capabilityName
+            current + (jobId to currentProgress.copy(
+                capabilitiesProgress = updatedCaps,
+                capabilitiesDetailedProgress = updatedDetailed
+            ))
         }
     }
 

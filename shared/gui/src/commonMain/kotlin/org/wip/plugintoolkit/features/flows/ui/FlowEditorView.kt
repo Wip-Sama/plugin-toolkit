@@ -179,7 +179,7 @@ fun FlowEditorView(
         availablePlugins.forEach { entry ->
             val manifest = entry.getManifest().getOrNull()
             if (manifest != null) {
-                manifest.capabilities.forEach { cap ->
+                manifest.capabilities.filter { it.context != org.wip.plugintoolkit.api.CapabilityContext.STANDALONE_ONLY }.forEach { cap ->
                     list.add(PaletteNode.Capability(manifest.plugin, cap))
                 }
             }
@@ -188,7 +188,8 @@ fun FlowEditorView(
         list.add(PaletteNode.FlowOutput)
         listOf(
             "Save", "save_file", "save_folder", "Load", "Log", "Delay",
-            "Convert", "Merger", "Conditional", "Comparator", "For", "While", "create_folder", "Error"
+            "Convert", "Merger", "string_merger", "extract_from_string", "list_filter", "list_check",
+            "Conditional", "Comparator", "For", "While", "create_folder", "Error"
         ).forEach { action ->
             list.add(PaletteNode.System(action))
         }

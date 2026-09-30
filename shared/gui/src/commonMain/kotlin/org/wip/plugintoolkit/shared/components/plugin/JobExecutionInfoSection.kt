@@ -37,11 +37,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.delay
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.FormatUtils
 import org.wip.plugintoolkit.core.utils.MemoryUtils
 import org.wip.plugintoolkit.features.job.utils.ProcessMemoryUtils
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.CapabilityExecutionMetric
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.job_capability_breakdown_title
@@ -49,10 +55,14 @@ import plugintoolkit.composeapp.generated.resources.job_completed_at_label
 import plugintoolkit.composeapp.generated.resources.job_duration_label
 import plugintoolkit.composeapp.generated.resources.job_execution_count_format
 import plugintoolkit.composeapp.generated.resources.job_execution_info_title
+import plugintoolkit.composeapp.generated.resources.job_execution_run_format
 import plugintoolkit.composeapp.generated.resources.job_memory_label
+import plugintoolkit.composeapp.generated.resources.job_metric_io
+import plugintoolkit.composeapp.generated.resources.job_metric_network
 import plugintoolkit.composeapp.generated.resources.job_peak_memory_label
 import plugintoolkit.composeapp.generated.resources.job_started_at_label
 import plugintoolkit.composeapp.generated.resources.job_total_memory_label
+import plugintoolkit.composeapp.generated.resources.job_view_individual_runs
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 
@@ -175,9 +185,8 @@ internal fun ExecutionInfoSection(
         }
 
         // Per-capability breakdown
-        val capDurations = metrics?.totalDurationPerCapability ?: emptyMap()
-        val capCounts = metrics?.executionCountPerCapability ?: emptyMap()
-        if (capDurations.isNotEmpty()) {
+        val metricsByCapability = metrics?.capabilityMetrics?.groupBy { it.capabilityName } ?: emptyMap()
+        if (metricsByCapability.isNotEmpty()) {
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             Text(
                 text = stringResource(Res.string.job_capability_breakdown_title),
@@ -187,64 +196,240 @@ internal fun ExecutionInfoSection(
             )
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
-            val totalMs = durationMs?.coerceAtLeast(1L) ?: capDurations.values.sum().coerceAtLeast(1L)
+            val totalAllCapMs = metricsByCapability.values.sumOf { execs -> execs.sumOf { it.durationMs } }
+            val totalMs = durationMs?.coerceAtLeast(1L) ?: totalAllCapMs.coerceAtLeast(1L)
+
             Column(
                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                capDurations.forEach { (capName, ms) ->
-                    val count = capCounts[capName] ?: 1
-                    val fraction = (ms.toFloat() / totalMs).coerceIn(0f, 1f)
-                    val percent = (fraction * 100).roundToInt()
+                metricsByCapability.forEach { (capName, executions) ->
+                    CapabilityBreakdownCard(
+                        capabilityName = capName,
+                        executions = executions,
+                        totalJobDurationMs = totalMs
+                    )
+                }
+            }
+        }
+    }
+}
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surfaceContainerLowest,
-                                ToolkitTheme.shapes.small
-                            )
-                            .padding(ToolkitTheme.spacing.small)
-                    ) {
+@Composable
+private fun CapabilityBreakdownCard(
+    capabilityName: String,
+    executions: List<CapabilityExecutionMetric>,
+    totalJobDurationMs: Long,
+    modifier: Modifier = Modifier
+) {
+    val count = executions.size
+    val totalCapMs = executions.sumOf { it.durationMs }
+    val fraction = (totalCapMs.toFloat() / totalJobDurationMs).coerceIn(0f, 1f)
+    val percent = (fraction * 100).roundToInt()
+
+    val peakMemory = executions.mapNotNull { it.memoryUsageBytes }.maxOrNull()
+    val totalMemory = executions.mapNotNull { it.totalMemoryBytes ?: it.memoryUsageBytes }.sum().takeIf { it > 0L }
+    val totalBytesRead = executions.mapNotNull { it.bytesRead }.sum().takeIf { it > 0L }
+    val totalBytesWritten = executions.mapNotNull { it.bytesWritten }.sum().takeIf { it > 0L }
+    val totalNetRead = executions.mapNotNull { it.networkBytesRead }.sum().takeIf { it > 0L }
+    val totalNetWritten = executions.mapNotNull { it.networkBytesWritten }.sum().takeIf { it > 0L }
+    val throughputs = executions.mapNotNull { it.throughputBytesPerSec }.filter { it > 0L }
+    val avgThroughput = if (throughputs.isNotEmpty()) throughputs.sum() / throughputs.size else null
+
+    var isDrawerExpanded by remember(capabilityName, count) { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerLowest,
+                ToolkitTheme.shapes.small
+            )
+            .padding(ToolkitTheme.spacing.small)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (count > 1) {
+                        Modifier.clickable { isDrawerExpanded = !isDrawerExpanded }
+                    } else {
+                        Modifier
+                    }
+                ),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = capabilityName,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = ToolkitTheme.codeFontFamily,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (count > 1) {
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                    Text(
+                        text = stringResource(Res.string.job_execution_count_format, count),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                    Icon(
+                        imageVector = if (isDrawerExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = stringResource(Res.string.job_view_individual_runs),
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall),
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+            Text(
+                text = "${formatDuration(totalCapMs)} ($percent%)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
+                .clip(MaterialTheme.shapes.extraSmall),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+
+        // Metrics row (Peak Memory, Total Memory, File I/O, Network Throughput)
+        val hasMetrics = peakMemory != null || totalMemory != null || totalBytesRead != null || totalBytesWritten != null || totalNetRead != null || totalNetWritten != null || avgThroughput != null
+        if (hasMetrics) {
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.smallMedium),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (peakMemory != null) {
+                    Text(
+                        text = "${stringResource(Res.string.job_peak_memory_label)}: ${MemoryUtils.formatMemoryBytes(peakMemory)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (totalMemory != null) {
+                    Text(
+                        text = "${stringResource(Res.string.job_total_memory_label)}: ${MemoryUtils.formatMemoryBytes(totalMemory)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (totalBytesRead != null || totalBytesWritten != null) {
+                    val readStr = FormatUtils.formatFileSize(totalBytesRead ?: 0L)
+                    val writeStr = FormatUtils.formatFileSize(totalBytesWritten ?: 0L)
+                    Text(
+                        text = "${stringResource(Res.string.job_metric_io)}: R: $readStr / W: $writeStr",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (totalNetRead != null || totalNetWritten != null || avgThroughput != null) {
+                    val netBytes = (totalNetRead ?: 0L) + (totalNetWritten ?: 0L)
+                    val netStr = FormatUtils.formatFileSize(netBytes)
+                    val tputStr = if (avgThroughput != null) " (${FormatUtils.formatThroughput(avgThroughput)})" else ""
+                    Text(
+                        text = "${stringResource(Res.string.job_metric_network)}: $netStr$tputStr",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        // Expandable drawer for individual executions when capability ran multiple times
+        if (count > 1) {
+            AnimatedVisibility(visible = isDrawerExpanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = ToolkitTheme.spacing.small)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceContainerLow,
+                            ToolkitTheme.shapes.small
+                        )
+                        .padding(ToolkitTheme.spacing.small),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
+                ) {
+                    Text(
+                        text = stringResource(Res.string.job_view_individual_runs),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    executions.forEachIndexed { index, exec ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(Res.string.job_execution_run_format, index + 1),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    text = capName,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    fontFamily = ToolkitTheme.codeFontFamily,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    text = formatDuration(exec.durationMs),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
                                 )
-                                if (count > 1) {
-                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                val memBytes = exec.memoryUsageBytes
+                                if (memBytes != null) {
                                     Text(
-                                        text = stringResource(Res.string.job_execution_count_format, count),
+                                        text = "Peak: ${MemoryUtils.formatMemoryBytes(memBytes)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                                val totBytes = exec.totalMemoryBytes
+                                if (totBytes != null) {
+                                    Text(
+                                        text = "Tot: ${MemoryUtils.formatMemoryBytes(totBytes)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                                val bRead = exec.bytesRead
+                                val bWritten = exec.bytesWritten
+                                if (bRead != null || bWritten != null) {
+                                    val r = FormatUtils.formatFileSize(bRead ?: 0L)
+                                    val w = FormatUtils.formatFileSize(bWritten ?: 0L)
+                                    Text(
+                                        text = "IO: $r/$w",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                                val netRead = exec.networkBytesRead
+                                val netWritten = exec.networkBytesWritten
+                                val tputVal = exec.throughputBytesPerSec
+                                if (netRead != null || netWritten != null || tputVal != null) {
+                                    val totalNet = (netRead ?: 0L) + (netWritten ?: 0L)
+                                    val tput = if (tputVal != null) " @ ${FormatUtils.formatThroughput(tputVal)}" else ""
+                                    Text(
+                                        text = "Net: ${FormatUtils.formatFileSize(totalNet)}$tput",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.outline
                                     )
                                 }
                             }
-                            Text(
-                                text = "${formatDuration(ms)} ($percent%)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold
-                            )
                         }
-                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
-                        LinearProgressIndicator(
-                            progress = { fraction },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
-                                .clip(MaterialTheme.shapes.extraSmall),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
                     }
                 }
             }

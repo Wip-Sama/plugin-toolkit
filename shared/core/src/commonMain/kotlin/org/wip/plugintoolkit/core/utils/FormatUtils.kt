@@ -26,4 +26,27 @@ object FormatUtils {
         val rounded = (size * 10.0).roundToLong() / 10.0
         return "$rounded ${units[unitIndex]}"
     }
+
+    /**
+     * Formats a network throughput rate (bytes per second) into a human-readable string (e.g., "1.5 MB/s").
+     *
+     * @param bytesPerSec The throughput rate in bytes per second.
+     * @return Formatted throughput string.
+     */
+    fun formatThroughput(bytesPerSec: Long): String {
+        if (bytesPerSec <= 0L) return "0 B/s"
+        return "${formatFileSize(bytesPerSec)}/s"
+    }
+
+    /**
+     * Formats a numeric progress value cleanly without trailing zeros when integer (e.g., "12.3", "5").
+     */
+    fun formatProgressValue(value: Double): String {
+        return if (value % 1.0 == 0.0) {
+            value.toLong().toString()
+        } else {
+            val rounded = (value * 10.0).roundToLong() / 10.0
+            rounded.toString()
+        }
+    }
 }

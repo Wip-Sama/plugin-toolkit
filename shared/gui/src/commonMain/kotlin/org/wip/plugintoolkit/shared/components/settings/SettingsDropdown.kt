@@ -185,6 +185,161 @@ fun <T> ExpressiveMenu(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun <T> MultiSelectExpressiveMenu(
+    options: List<T>,
+    selectedOptions: Set<T>,
+    onOptionsChange: (Set<T>) -> Unit,
+    labelProvider: @Composable (T) -> String,
+    displayTextProvider: (T) -> String = { it.toString() },
+    placeholder: String = "Select options...",
+    enabled: Boolean = true,
+    disabledOptions: Set<T> = emptySet(),
+    disabledOptionTargetKey: (T) -> String = { "" },
+    hasUnsavedChanges: Boolean = false,
+    pluginId: String = "",
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
+    gapAfter: (T) -> Boolean = { false }
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = !expanded }
+    ) {
+        Surface(
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.small),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val displayText = if (selectedOptions.isEmpty()) {
+                    placeholder
+                } else {
+                    options.filter { it in selectedOptions }.joinToString(", ") { displayTextProvider(it) }
+                }
+                Text(
+                    text = displayText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (selectedOptions.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            }
+        }
+
+        val containerRadius = ToolkitTheme.shapes.large
+        val itemShape = ToolkitTheme.shapes.medium
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            modifier = Modifier
+                .widthIn(min = ToolkitTheme.dimensions.menuMinWidth)
+                .clip(containerRadius),
+            onDismissRequest = { expanded = false },
+            shape = containerRadius,
+            tonalElevation = ToolkitTheme.spacing.none,
+            shadowElevation = ToolkitTheme.dimensions.menuElevation,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            matchTextFieldWidth = false
+        ) {
+            Column(
+                modifier = Modifier.padding(
+                    horizontal = ToolkitTheme.spacing.xs,
+                    vertical = ToolkitTheme.spacing.xs
+                ),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraExtraSmall)
+            ) {
+                options.forEachIndexed { index, option ->
+                    val isDisabled = option in disabledOptions
+                    val isSelected = option in selectedOptions
+                    val itemSettingKey = disabledOptionTargetKey(option)
+                    var isHovered by remember { mutableStateOf(false) }
+
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                            ) {
+                                androidx.compose.material3.Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = null,
+                                    enabled = !isDisabled
+                                )
+                                Text(
+                                    text = labelProvider(option),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        },
+                        onClick = {
+                            if (!isDisabled) {
+                                val next = if (isSelected) selectedOptions - option else selectedOptions + option
+                                onOptionsChange(next)
+                            }
+                        },
+                        modifier = Modifier
+                            .height(ToolkitTheme.dimensions.standardButtonHeight)
+                            .clip(itemShape)
+                            .background(
+                                when {
+                                    isSelected -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                    isHovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
+                                    else -> ToolkitTheme.colors.transparent
+                                }
+                            )
+                            .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+                            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+                            .then(
+                                if (onNavigateToPluginSetting != null) {
+                                    Modifier.lockedClickInterceptor(
+                                        isLocked = isDisabled,
+                                        pluginId = pluginId,
+                                        targetSettingKey = itemSettingKey,
+                                        hasUnsavedChanges = hasUnsavedChanges,
+                                        onNavigateToPluginSetting = { pid, key ->
+                                            expanded = false
+                                            onNavigateToPluginSetting(pid, key)
+                                        }
+                                    )
+                                } else {
+                                    Modifier.lockedClickInterceptor(
+                                        isLocked = isDisabled,
+                                        targetScreen = if (pluginId.isNotEmpty() || itemSettingKey.isNotEmpty()) {
+                                            Screen.PluginManager(pluginId = pluginId.ifEmpty { null }, scrollToSetting = itemSettingKey.ifEmpty { null })
+                                        } else null,
+                                        hasUnsavedChanges = hasUnsavedChanges
+                                    )
+                                }
+                            ),
+                        colors = MenuDefaults.itemColors(
+                            textColor = if (isDisabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                        else if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                                        else MaterialTheme.colorScheme.onSurface
+                        ),
+                        enabled = !isDisabled,
+                        contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.none)
+                    )
+                    if (gapAfter(option) && index != options.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Preview
 @Composable
 private fun ExpressiveMenuPreview() {

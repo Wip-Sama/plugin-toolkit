@@ -94,6 +94,9 @@ import plugintoolkit.composeapp.generated.resources.flow_output_results_title
 import plugintoolkit.composeapp.generated.resources.flow_run_id_label
 import plugintoolkit.composeapp.generated.resources.flow_triggered_label
 import plugintoolkit.composeapp.generated.resources.job_capability_breakdown_title
+import org.wip.plugintoolkit.api.ProgressDisplayMode
+import org.wip.plugintoolkit.core.utils.FormatUtils
+import plugintoolkit.composeapp.generated.resources.job_secondary_progress_label
 import plugintoolkit.composeapp.generated.resources.job_completed_at_label
 import plugintoolkit.composeapp.generated.resources.job_copy_logs_success_toast
 import plugintoolkit.composeapp.generated.resources.job_duration_label
@@ -201,44 +204,221 @@ internal fun JobResultProgressSection(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        LinearProgressIndicator(
-            progress = { progress.mainProgress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ToolkitTheme.dimensions.heightSmall)
-                .clip(MaterialTheme.shapes.small),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        // Main Progress Indicator
+        if (progress.mainDisplayMode == ProgressDisplayMode.INDETERMINATE) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(ToolkitTheme.dimensions.heightSmall)
+                    .clip(MaterialTheme.shapes.small),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        } else {
+            LinearProgressIndicator(
+                progress = { progress.mainProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(ToolkitTheme.dimensions.heightSmall)
+                    .clip(MaterialTheme.shapes.small),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+
+        val mainPct = (progress.mainProgress * 100).toInt().coerceIn(0, 100)
+        val mainCurrent = progress.mainCurrent
+        val mainTotal = progress.mainTotal
+        val mainMessage = progress.mainMessage
+        val mainText = when (progress.mainDisplayMode) {
+            ProgressDisplayMode.RATIO -> {
+                if (mainCurrent != null && mainTotal != null) {
+                    val curStr = FormatUtils.formatProgressValue(mainCurrent)
+                    val totStr = FormatUtils.formatProgressValue(mainTotal)
+                    val unitStr = if (!progress.mainUnit.isNullOrBlank()) " ${progress.mainUnit}" else ""
+                    "$curStr / $totStr$unitStr ($mainPct%)"
+                } else {
+                    stringResource(Res.string.plugin_executing_progress, mainPct)
+                }
+            }
+            ProgressDisplayMode.INDETERMINATE -> {
+                mainMessage ?: stringResource(Res.string.plugin_executing_progress, mainPct)
+            }
+            ProgressDisplayMode.PERCENTAGE -> {
+                stringResource(Res.string.plugin_executing_progress, mainPct)
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = stringResource(Res.string.plugin_executing_progress, (progress.mainProgress * 100).toInt()),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Column(modifier = Modifier.weight(1f, fill = false)) {
+                Text(
+                    text = mainText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (!mainMessage.isNullOrBlank() && progress.mainDisplayMode != ProgressDisplayMode.INDETERMINATE) {
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                    Text(
+                        text = mainMessage,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             ElapsedTimeText(job = job)
         }
 
-        progress.capabilitiesProgress.forEach { (capName, capProg) ->
+        // Secondary Progress Bar
+        val secProgress = progress.secondaryProgress
+        val secMessage = progress.secondaryMessage
+        val secCurrent = progress.secondaryCurrent
+        val secTotal = progress.secondaryTotal
+        val hasSecondary = secProgress != null || !secMessage.isNullOrBlank()
+        if (hasSecondary) {
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-            Text(
-                text = "$capName (${(capProg * 100).toInt()}%)",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            LinearProgressIndicator(
-                progress = { capProg },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
-                    .clip(MaterialTheme.shapes.small),
-                color = MaterialTheme.colorScheme.secondary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = secMessage ?: stringResource(Res.string.job_secondary_progress_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Medium
+                )
+                if (secProgress != null && progress.secondaryDisplayMode != ProgressDisplayMode.INDETERMINATE) {
+                    val secPct = (secProgress * 100).toInt().coerceIn(0, 100)
+                    val secText = if (progress.secondaryDisplayMode == ProgressDisplayMode.RATIO && secCurrent != null && secTotal != null) {
+                        val curStr = FormatUtils.formatProgressValue(secCurrent)
+                        val totStr = FormatUtils.formatProgressValue(secTotal)
+                        val unitStr = if (!progress.secondaryUnit.isNullOrBlank()) " ${progress.secondaryUnit}" else ""
+                        "$curStr / $totStr$unitStr ($secPct%)"
+                    } else {
+                        "$secPct%"
+                    }
+                    Text(
+                        text = secText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+            if (progress.secondaryDisplayMode == ProgressDisplayMode.INDETERMINATE || (secProgress == null && !secMessage.isNullOrBlank())) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
+                        .clip(MaterialTheme.shapes.extraSmall),
+                    color = MaterialTheme.colorScheme.tertiary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            } else if (secProgress != null) {
+                LinearProgressIndicator(
+                    progress = { secProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
+                        .clip(MaterialTheme.shapes.extraSmall),
+                    color = MaterialTheme.colorScheme.tertiary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+        }
+
+        // Sub-progresses / capabilities progress
+        val allSubKeys = (progress.capabilitiesDetailedProgress.keys + progress.capabilitiesProgress.keys).distinct()
+        allSubKeys.forEach { subKey ->
+            val detailed = progress.capabilitiesDetailedProgress[subKey]
+            val subProg = detailed?.progress ?: progress.capabilitiesProgress[subKey] ?: 0f
+            val subPct = (subProg * 100).toInt().coerceIn(0, 100)
+
+            val subCurrent = detailed?.current
+            val subTotal = detailed?.total
+            val subMsg = detailed?.message
+            val subSecProgress = detailed?.secondaryProgress
+            val subSecMessage = detailed?.secondaryMessage
+
+            val labelText = if (detailed != null && detailed.displayMode == ProgressDisplayMode.RATIO && subCurrent != null && subTotal != null) {
+                val curStr = FormatUtils.formatProgressValue(subCurrent)
+                val totStr = FormatUtils.formatProgressValue(subTotal)
+                val unitStr = if (!detailed.unit.isNullOrBlank()) " ${detailed.unit}" else ""
+                "$subKey ($curStr / $totStr$unitStr - $subPct%)"
+            } else {
+                "$subKey ($subPct%)"
+            }
+
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = labelText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Medium
+                )
+                if (!subMsg.isNullOrBlank()) {
+                    Text(
+                        text = subMsg,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+            if (detailed?.displayMode == ProgressDisplayMode.INDETERMINATE) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
+                        .clip(MaterialTheme.shapes.extraSmall),
+                    color = MaterialTheme.colorScheme.secondary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            } else {
+                LinearProgressIndicator(
+                    progress = { subProg },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
+                        .clip(MaterialTheme.shapes.extraSmall),
+                    color = MaterialTheme.colorScheme.secondary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+
+            // Sub-item secondary progress if present
+            if (subSecProgress != null || !subSecMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                if (!subSecMessage.isNullOrBlank()) {
+                    Text(
+                        text = subSecMessage,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+                if (subSecProgress != null) {
+                    LinearProgressIndicator(
+                        progress = { subSecProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
+                            .clip(MaterialTheme.shapes.extraSmall),
+                        color = MaterialTheme.colorScheme.tertiary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
+            }
         }
     }
 }

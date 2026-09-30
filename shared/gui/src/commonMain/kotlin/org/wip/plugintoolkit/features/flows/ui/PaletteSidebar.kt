@@ -225,7 +225,10 @@ private fun CapabilitiesPalette(
     val groupedCaps = remember(searchQuery, plugins) {
         plugins.map { p ->
             val manifest = p.getManifest().getOrThrow()
-            manifest.plugin to manifest.capabilities.filter { it.name.contains(searchQuery, ignoreCase = true) }
+            manifest.plugin to manifest.capabilities.filter {
+                it.context != org.wip.plugintoolkit.api.CapabilityContext.STANDALONE_ONLY &&
+                    it.name.contains(searchQuery, ignoreCase = true)
+            }
         }.filter { it.second.isNotEmpty() }
     }
 
@@ -357,12 +360,19 @@ private fun SystemPalette(
                 "Delay",
                 "Convert",
                 "Merger",
+                "string_merger",
+                "extract_from_string",
+                "list_filter",
+                "list_check",
                 "Conditional",
                 "Comparator",
                 "For",
                 "While",
                 "create_folder"
-            ).filter { it.contains(searchQuery, ignoreCase = true) }
+            ).filter {
+                it.contains(searchQuery, ignoreCase = true) ||
+                getSystemNodeDisplayName(it).contains(searchQuery, ignoreCase = true)
+            }
 
             if (systemActions.isNotEmpty()) {
                 Text(
@@ -379,7 +389,7 @@ private fun SystemPalette(
                 systemActions.forEach { action ->
                     val systemNode = PaletteNode.System(action)
                     PaletteItem(
-                        text = action,
+                        text = getSystemNodeDisplayName(action),
                         color = ToolkitTheme.colors.success,
                         rootLayoutCoordinates = rootLayoutCoordinates,
                         onDragStart = { pos, grabOffset -> onDragStart(systemNode, pos, grabOffset) },

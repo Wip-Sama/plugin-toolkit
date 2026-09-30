@@ -487,6 +487,7 @@
     <string name="plugin_execution_result">Execution Result</string>
     <string name="plugin_metadata">Metadata</string>
     <string name="common_no_options">No options available</string>
+    <string name="common_select_options">Select options...</string>
     <string name="action_clear_selection">Clear selection</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
@@ -587,6 +588,14 @@
     <string name="job_export_success_toast">Execution report exported successfully</string>
     <string name="job_no_metrics_recorded">No execution metrics recorded</string>
     <string name="job_execution_count_format">x%1$d</string>
+    <string name="job_metric_bytes_read">Bytes Read</string>
+    <string name="job_metric_bytes_written">Bytes Written</string>
+    <string name="job_metric_io">File I/O</string>
+    <string name="job_metric_network">Network</string>
+    <string name="job_metric_throughput">Throughput</string>
+    <string name="job_execution_run_format">Run #%1$d</string>
+    <string name="job_view_individual_runs">View individual executions</string>
+    <string name="job_secondary_progress_label">Sub-task</string>
     <string name="setting_single_instance_lock">Single Instance Lock</string>
     <string name="setting_single_instance_lock_subtitle">Prevent multiple instances of PluginToolkit from running concurrently using a protected lock file.</string>
     <string name="setting_single_instance_lock_warning_title">Disable Single Instance Lock?</string>

@@ -83,6 +83,7 @@ object ProcessorConstants {
     val CN_PLUGIN_FILESYSTEM = PluginFileSystem::class.asClassName()
     val CN_EXECUTION_FILESYSTEM = org.wip.plugintoolkit.api.ExecutionFileSystem::class.asClassName()
     val CN_HOST_FILESYSTEM = HostFileSystem::class.asClassName()
+    val CN_PLUGIN_NETWORK_CLIENT = org.wip.plugintoolkit.api.PluginNetworkClient::class.asClassName()
     val CN_PROGRESS_REPORTER = ProgressReporter::class.asClassName()
     val CN_EXECUTION_RESULT = ExecutionResult::class.asClassName()
     val CN_EXECUTION_RESULT_SUCCESS = ExecutionResult.Success::class.asClassName()

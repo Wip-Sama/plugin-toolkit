@@ -54,6 +54,29 @@ interface NodeExecutionContext {
      * @return A map of output port names to their values.
      */
     suspend fun executeSubFlow(flowName: String, parameters: Map<String, JsonElement>): Map<String, Any?>
+
+    /**
+     * The containing flow graph currently being executed, if available.
+     */
+    val currentFlow: org.wip.plugintoolkit.features.flows.model.Flow? get() = null
+
+    /**
+     * Known enum options discovered across loaded plugins (class name / simple name -> options).
+     */
+    val pluginEnums: Map<String, List<String>> get() = emptyMap()
+
+    /**
+     * Marks nodes as executed by an in-flow control node so they are not re-executed in the outer flow.
+     */
+    fun markNodesExecuted(nodeIds: Set<Long>) {}
+
+    /**
+     * Executes an in-memory subflow without requiring a file on disk.
+     */
+    suspend fun executeDynamicSubFlow(
+        flow: org.wip.plugintoolkit.features.flows.model.Flow,
+        parameters: Map<String, JsonElement>
+    ): Map<String, Any?> = emptyMap()
 }
 
 /**
@@ -93,6 +116,13 @@ class DefaultSystemNodeExecutorRegistry(
         "conditional" to ConditionalNodeExecutor(),
         "error" to ErrorNodeExecutor(),
         "merger" to MergerNodeExecutor(),
+        "string_merger" to StringMergerNodeExecutor(),
+        "merge_string" to StringMergerNodeExecutor(),
+        "extract_from_string" to ExtractFromStringNodeExecutor(),
+        "string_extract" to ExtractFromStringNodeExecutor(),
+        "list_filter" to ListFilterNodeExecutor(),
+        "lists_filter" to ListFilterNodeExecutor(),
+        "list_check" to ListCheckNodeExecutor(),
         "comparator" to ComparatorNodeExecutor(),
         "for" to ForNodeExecutor(),
         "while" to WhileNodeExecutor(),

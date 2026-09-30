@@ -281,8 +281,9 @@ fun SinglePluginRunnerView(
                     }
 
                     val filteredCapabilities = remember(manifest.capabilities, capabilitySearchQuery) {
-                        if (capabilitySearchQuery.isBlank()) manifest.capabilities
-                        else manifest.capabilities.filter { cap ->
+                        val available = manifest.capabilities.filter { it.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY }
+                        if (capabilitySearchQuery.isBlank()) available
+                        else available.filter { cap ->
                             cap.name.contains(capabilitySearchQuery, ignoreCase = true) ||
                                 (cap.description?.contains(capabilitySearchQuery, ignoreCase = true) == true)
                         }

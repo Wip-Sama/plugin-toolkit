@@ -26,6 +26,7 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ACTION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_CONTEXT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_FILESYSTEM
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_LOGGER
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_NETWORK_CLIENT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_REQUEST
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_RESPONSE
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PROGRESS_REPORTER
@@ -124,6 +125,10 @@ object DispatcherGenerator {
 
                     paramType == CN_PLUGIN_CONTEXT -> {
                         mapCode.add("context")
+                    }
+
+                    paramType == CN_PLUGIN_NETWORK_CLIENT -> {
+                        mapCode.add("context.networkClient")
                     }
 
                     param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) } -> {
@@ -314,6 +319,7 @@ object DispatcherGenerator {
                     CN_PLUGIN_LOGGER -> argExprs.add(CodeBlock.of("context.logger"))
                     CN_PROGRESS_REPORTER -> argExprs.add(CodeBlock.of("context.progress"))
                     CN_PLUGIN_CONTEXT -> argExprs.add(CodeBlock.of("context"))
+                    CN_PLUGIN_NETWORK_CLIENT -> argExprs.add(CodeBlock.of("context.networkClient"))
                     else -> {
                         if (isNullable) {
                             argExprs.add(

@@ -367,12 +367,51 @@ class FlowEngine(
                 is org.wip.plugintoolkit.features.flows.model.Node.SystemNode -> {
                     val executor = executorRegistry.getExecutor(node.systemAction)
                     val sysResumeState = capabilityResumeStates[node.id]
+                    val executedLoopBodyIds = mutableSetOf<Long>()
                     val context = object : NodeExecutionContext {
                         override val node: org.wip.plugintoolkit.features.flows.model.Node.SystemNode = node
                         override val job = job
                         override val appDataDir = appDataDir
                         override val runtimeInferredTypes = runtimeInferred
                         override val resumeState = sysResumeState
+                        override val currentFlow = flow
+                        override val pluginEnums: Map<String, List<String>>
+                            get() {
+                                val result = mutableMapOf<String, List<String>>()
+                                for (p in PluginLoader.getPlugins()) {
+                                    val m = p.getManifest().getOrNull() ?: continue
+                                    for (cap in m.capabilities) {
+                                        for ((_, param) in cap.parameters.orEmpty()) {
+                                            val enumType = when (val dt = param.type) {
+                                                is DataType.Enum -> dt
+                                                is DataType.Array -> dt.items as? DataType.Enum
+                                                else -> null
+                                            }
+                                            if (enumType != null) {
+                                                result[enumType.className] = enumType.options
+                                                result[enumType.className.substringAfterLast('.')] = enumType.options
+                                            }
+                                        }
+                                    }
+                                    for ((_, setting) in m.settings.orEmpty()) {
+                                        val enumType = when (val dt = setting.type) {
+                                            is DataType.Enum -> dt
+                                            is DataType.Array -> dt.items as? DataType.Enum
+                                            else -> null
+                                        }
+                                        if (enumType != null) {
+                                            result[enumType.className] = enumType.options
+                                            result[enumType.className.substringAfterLast('.')] = enumType.options
+                                        }
+                                    }
+                                }
+                                return result
+                            }
+
+                        override fun markNodesExecuted(nodeIds: Set<Long>) {
+                            executedLoopBodyIds.addAll(nodeIds)
+                        }
+
                         override fun getInputValue(portId: String, defaultValue: Any?) =
                             getInputValue(node.id, portId, defaultValue)
 
@@ -382,6 +421,23 @@ class FlowEngine(
 
                         override fun addLog(message: String, level: String) {
                             manager.addJobLog(job.id, message, level)
+                        }
+
+                        override suspend fun executeDynamicSubFlow(
+                            subFlow: org.wip.plugintoolkit.features.flows.model.Flow,
+                            parameters: Map<String, JsonElement>
+                        ): Map<String, Any?> {
+                            val subJob = BackgroundJob(
+                                id = "${job.id}-dyn-${node.id}",
+                                name = "Dynamic Subflow: ${subFlow.name}",
+                                type = JobType.Flow,
+                                pluginId = "system",
+                                capabilityName = subFlow.name,
+                                parameters = parameters
+                            )
+                            val nestedResumeState =
+                                (sysResumeState as? JsonObject)?.get("subflowResumeState") as? JsonObject
+                            return executeSubFlowRecursively(subFlow, subJob, appDataDir, nestedResumeState, depth + 1)
                         }
 
                         override suspend fun executeSubFlow(
@@ -412,6 +468,7 @@ class FlowEngine(
                     try {
                         executor.execute(context)
                         capabilityResumeStates.remove(node.id)
+                        executedNodeIds.addAll(executedLoopBodyIds)
                     } catch (e: PauseFlowException) {
                         capabilityResumeStates[node.id] = e.resumeState
                         throw PauseFlowException(buildCurrentState())
@@ -597,7 +654,26 @@ class FlowEngine(
                                 )
                                 val totalAfter = memAfter + procMemAfter
                                 val finalMemory = maxOf(peakMemory, totalAfter)
-                                manager.recordCapabilityMetric(job.id, node.capability.name, durationMs, finalMemory)
+
+                                val tracker = (context as? org.wip.plugintoolkit.features.plugin.logic.DefaultPluginContext)?.tracker
+                                val bytesRead = tracker?.bytesRead
+                                val bytesWritten = tracker?.bytesWritten
+                                val networkBytesRead = tracker?.networkBytesRead
+                                val networkBytesWritten = tracker?.networkBytesWritten
+                                val throughput = tracker?.averageThroughputBytesPerSec
+
+                                manager.recordCapabilityMetric(
+                                    jobId = job.id,
+                                    capabilityName = node.capability.name,
+                                    durationMs = durationMs,
+                                    memoryBytes = finalMemory,
+                                    totalMemoryBytes = finalMemory,
+                                    bytesRead = bytesRead,
+                                    bytesWritten = bytesWritten,
+                                    networkBytesRead = networkBytesRead,
+                                    networkBytesWritten = networkBytesWritten,
+                                    throughputBytesPerSec = throughput
+                                )
                                 return@async processResult
                             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                                 lastError = e
@@ -777,11 +853,26 @@ class FlowEngine(
                 is org.wip.plugintoolkit.features.flows.model.Node.SubFlowNode -> activeOutputs.addAll(node.outputs.map { it.id })
                 is org.wip.plugintoolkit.features.flows.model.Node.SystemNode -> {
                     if (node.systemAction.lowercase() == "conditional") {
-                        val condition = when (val conditionVal = getInputValue(node.id, "condition", false)) {
-                            is Boolean -> conditionVal
-                            is String -> conditionVal.toBoolean()
-                            is Number -> conditionVal.toInt() != 0
-                            else -> false
+                        val conditionVal = getInputValue(node.id, "condition", false)
+                        val expectedVal = getInputValue(node.id, "expected_value", null)
+                        val condition = if (expectedVal != null) {
+                            val condStr = when (conditionVal) {
+                                is JsonPrimitive -> conditionVal.content
+                                else -> conditionVal?.toString()
+                            }
+                            val expStr = when (expectedVal) {
+                                is JsonPrimitive -> expectedVal.content
+                                else -> expectedVal.toString()
+                            }
+                            condStr == expStr
+                        } else {
+                            when (conditionVal) {
+                                is Boolean -> conditionVal
+                                is String -> conditionVal.toBoolean()
+                                is Number -> conditionVal.toInt() != 0
+                                is JsonPrimitive -> conditionVal.content.toBoolean()
+                                else -> false
+                            }
                         }
                         if (condition) activeOutputs.add("if_true") else activeOutputs.add("if_false")
                     } else {

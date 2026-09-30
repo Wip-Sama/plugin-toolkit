@@ -29,3 +29,61 @@ Because order often matters when merging data into a list, the flow editor expli
 ## Group Movement
 
 You can select multiple nodes by holding Shift and clicking, or by dragging a selection box across the canvas. When moving a selected group of nodes, all connections and visual indicators attached to those nodes update dynamically and seamlessly as the group is repositioned.
+
+## Flow-Only Capabilities
+
+Plugins can declare capabilities with `context = CapabilityContext.FLOW_ONLY`. These capabilities are exclusively available as nodes within the Flow Editor palette and cannot be invoked as standalone runner jobs. This is ideal for helper, normalization, or intermediate transformation capabilities that only make sense within an orchestrated workflow.
+
+## Control Flow & Loop Nodes
+
+The flow engine includes built-in system nodes for dynamic iterations and conditional branching without requiring disk-based subflow files:
+
+### In-Flow Loops (`For` and `While`)
+- **`For` Node**:
+  - Can iterate over a plugin enum (by entering the enum name in `enum_name`), an incoming collection/list (`items` or `input_data`), or a numeric range (`start`..`end` with `step`).
+  - Connected downstream nodes execute automatically for each variant or item.
+  - The current element and iteration index are exposed through `item` and `index` output ports.
+  - Results from each iteration are aggregated and emitted through the `output_data` port as a collection.
+- **`While` Node**:
+  - Iterates connected downstream nodes while the `condition` input evaluates to true, bounded by `max_iterations`.
+  - Emits the current iteration count and aggregated `output_data`.
+
+### Conditional Node
+- Evaluates truthiness of the `condition` input or matches against an optional `expected_value` input port.
+- Activates either the `if_true` or `if_false` output branch accordingly.
+- Conditional nodes, along with loop and merger nodes, are fully selectable, movable, and copy-pastable alongside regular nodes.
+
+## Data Transformation Nodes
+
+### Convert Node
+Allows converting data between types. Users can select an explicit conversion type via the `target_type` input port:
+- `AUTO` (default): Uses implicit runtime type inference.
+- `STRING`, `INT`, `DOUBLE`, `BOOLEAN`, `LONG`, `FLOAT`: Enforces explicit conversion to the desired primitive type.
+
+### String Merger / Merge String Node (`string_merger`, `merge_string`)
+Merges a collection of strings (`Collection<String>`) or lists into a single formatted string.
+- Configurable `separator` (default `", "`), `prefix` (default `""`), and `postfix` (default `""`).
+- Emits the merged result on the `output` port.
+
+### Extract from String Node (`extract_from_string`, `string_extract`)
+Extracts substrings matching a regular expression pattern from an input string:
+- `string`: The input string to inspect.
+- `regex`: Regular expression pattern to search for.
+- `group_index` (optional): Capture group index to extract (0 for full match, 1 for first capture group, etc.). If omitted, automatically defaults to capture group 1 when capture groups exist in the regex, or full match (0) otherwise.
+- Emits matched strings as a list (`List<String>`) on `output` and `matches`.
+
+### Lists Filter Node (`list_filter`, `lists_filter`)
+Filters and slices a list using standard Python-style slice syntax:
+- `items`: Input list (`List<Any>`), with element types automatically propagated via type inference.
+- `pattern`: Slicing expression (e.g. `x:y:z`, `x:y`, `:y`, `x:`, `::z`, `::-1`, single index `x` such as `-1` or `0`, with optional brackets `[x:y:z]` or `[-1]`).
+- Out-of-bounds slices safely return empty lists without failing the flow.
+- Emits the sliced sublist as `List<Any>` on the `output` port.
+
+### List Check Node (`list_check`)
+Validates that an incoming list meets minimum and maximum length constraints:
+- `items`: Input list (`List<Any>`), with item type and semantic type preservation.
+- `min_length` (optional): Minimum required number of elements.
+- `max_length` (optional): Maximum allowed number of elements.
+- `output`: Outputs the original input list if validation passes, or an empty list if validation fails.
+- `result`: Boolean output port emitting `true` if the list size is within bounds, or `false` if the check failed.
+

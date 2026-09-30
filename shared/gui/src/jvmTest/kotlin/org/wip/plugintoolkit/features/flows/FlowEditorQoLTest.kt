@@ -24,6 +24,7 @@ import org.wip.plugintoolkit.features.flows.history.UpdateLabelCommand
 import org.wip.plugintoolkit.features.flows.history.UpdateWaypointsCommand
 import org.wip.plugintoolkit.features.flows.logic.FlowRepository
 import org.wip.plugintoolkit.features.flows.logic.FlowTypeInference
+import org.wip.plugintoolkit.features.flows.logic.SystemNodesRegistry
 import org.wip.plugintoolkit.features.flows.ui.snapToGrid
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -721,6 +722,68 @@ class FlowEditorQoLTest {
         assertEquals(1, vm.state.value.flow.nodes.size)
         assertEquals(1, vm.state.value.flow.groups.size)
         assertEquals(1, vm.state.value.flow.labels.size)
+    }
+
+    @Test
+    fun testControlFlowAndMergerNodesSelectionMovementAndCopyPaste() {
+        val condNode = Node.SystemNode(
+            id = 1L,
+            position = ModelOffset(100f, 100f),
+            title = "Conditional",
+            systemAction = "conditional",
+            inputs = SystemNodesRegistry.getInputs("conditional"),
+            outputs = SystemNodesRegistry.getOutputs("conditional")
+        )
+        val forNode = Node.SystemNode(
+            id = 2L,
+            position = ModelOffset(300f, 100f),
+            title = "For",
+            systemAction = "for",
+            inputs = SystemNodesRegistry.getInputs("for"),
+            outputs = SystemNodesRegistry.getOutputs("for")
+        )
+        val whileNode = Node.SystemNode(
+            id = 3L,
+            position = ModelOffset(500f, 100f),
+            title = "While",
+            systemAction = "while",
+            inputs = SystemNodesRegistry.getInputs("while"),
+            outputs = SystemNodesRegistry.getOutputs("while")
+        )
+        val mergerNode = Node.SystemNode(
+            id = 4L,
+            position = ModelOffset(700f, 100f),
+            title = "String Merger",
+            systemAction = "string_merger",
+            inputs = SystemNodesRegistry.getInputs("string_merger"),
+            outputs = SystemNodesRegistry.getOutputs("string_merger")
+        )
+
+        val flow = Flow(name = "ControlFlowAndMergerTest", nodes = listOf(condNode, forNode, whileNode, mergerNode))
+        val vm = createViewModel(flow)
+
+        // 1. Select all 4 nodes
+        vm.onEvent(FlowEvent.SelectNodes(setOf(1L, 2L, 3L, 4L)))
+        assertEquals(setOf(1L, 2L, 3L, 4L), vm.state.value.selectedNodeIds)
+
+        // 2. Move node 1 with delta (50f, 50f)
+        vm.onEvent(FlowEvent.MoveNode(1L, Offset(50f, 50f), snap = false, showGhost = false))
+        vm.onEvent(FlowEvent.EndMoveNode(1L, density = 1f))
+        val movedCondNode = vm.state.value.flow.nodes.find { it.id == 1L }!!
+        assertEquals(ModelOffset(150f, 150f), movedCondNode.position)
+
+        // 3. Copy selected nodes
+        vm.onEvent(FlowEvent.CopySelectedNodes)
+
+        // 4. Paste at Offset(400f, 400f)
+        vm.onEvent(FlowEvent.PasteNodes(Offset(400f, 400f)))
+
+        // Total nodes should now be 8
+        assertEquals(8, vm.state.value.flow.nodes.size)
+        val pastedNodes = vm.state.value.flow.nodes.filter { it.id !in 1L..4L }
+        assertEquals(4, pastedNodes.size)
+        val actions = pastedNodes.filterIsInstance<Node.SystemNode>().map { it.systemAction }.toSet()
+        assertEquals(setOf("conditional", "for", "while", "string_merger"), actions)
     }
 
     @Test

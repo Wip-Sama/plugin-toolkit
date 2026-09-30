@@ -54,7 +54,11 @@ fun DynamicParameterInput(
         }
 
         else -> {
-            if ((metadata.type as? org.wip.plugintoolkit.api.DataType.Enum)?.options?.isNotEmpty() == true) {
+            val isSingleEnum = (metadata.type as? org.wip.plugintoolkit.api.DataType.Enum)?.options?.isNotEmpty() == true
+            val isMultiEnum = ((metadata.type as? org.wip.plugintoolkit.api.DataType.Array)?.items as? org.wip.plugintoolkit.api.DataType.Enum)?.options?.isNotEmpty() == true ||
+                (metadata.constraints?.multiSelect == true && isSingleEnum)
+
+            if (isSingleEnum || isMultiEnum) {
                 EnumDropdownInput(
                     name = name,
                     metadata = metadata,

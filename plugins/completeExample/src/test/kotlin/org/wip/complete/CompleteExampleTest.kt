@@ -177,7 +177,10 @@ class CompleteExampleTest {
     fun testCapabilityWithFlowContext() {
         val settings = CompleteExampleSettings(userId = "user_123")
         val plugin = CompleteExamplePlugin(settings)
-        val response = plugin.capabilityWithFlowContext(FeatureMode.LOCAL, mapOf("key" to "value"))
+        val response = plugin.capabilityWithFlowContext(
+            mode = FeatureMode.LOCAL,
+            config = mapOf("key" to "value")
+        )
         assertTrue(response.contains("LOCAL"))
         assertTrue(response.contains("user_123"))
     }

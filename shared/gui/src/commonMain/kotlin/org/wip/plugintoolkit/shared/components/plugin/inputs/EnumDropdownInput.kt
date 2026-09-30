@@ -17,9 +17,13 @@ import org.wip.plugintoolkit.api.ParameterMetadata
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.utils.CapabilityLockUtils
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
+import org.wip.plugintoolkit.shared.components.settings.MultiSelectExpressiveMenu
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.common_no_options
+import plugintoolkit.composeapp.generated.resources.common_select_options
 import plugintoolkit.composeapp.generated.resources.settings_enum_unlock_message
 
 @Composable
@@ -60,7 +64,10 @@ fun EnumDropdownInput(
             }
         }
 
-        val enumType = metadata.type as? org.wip.plugintoolkit.api.DataType.Enum
+        val enumType = (metadata.type as? org.wip.plugintoolkit.api.DataType.Enum)
+            ?: ((metadata.type as? org.wip.plugintoolkit.api.DataType.Array)?.items as? org.wip.plugintoolkit.api.DataType.Enum)
+        val isMultiSelect = metadata.constraints?.multiSelect == true ||
+            (metadata.type as? org.wip.plugintoolkit.api.DataType.Array)?.items is org.wip.plugintoolkit.api.DataType.Enum
         val options = enumType?.options ?: emptyList()
         val optionRequirements = enumType?.optionRequirements ?: emptyMap()
         val optionLockRequirements = enumType?.optionLockRequirements ?: emptyMap()
@@ -97,25 +104,60 @@ fun EnumDropdownInput(
         }
 
         if (options.isNotEmpty()) {
-            val effectiveSelected = if (value in options) value else (options.firstOrNull() ?: "")
-            LaunchedEffect(effectiveSelected) {
-                if (value !in options && effectiveSelected.isNotBlank()) {
-                    onValueChange(effectiveSelected)
+            if (isMultiSelect) {
+                val selectedSet: Set<String> = remember(value) {
+                    try {
+                        val trimmed = value.trim()
+                        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                            Json.decodeFromString<List<String>>(trimmed).toSet()
+                        } else if (trimmed.isNotBlank()) {
+                            trimmed.split(",").map { it.trim().trim('"', '\'') }.filter { it.isNotEmpty() }.toSet()
+                        } else {
+                            emptySet()
+                        }
+                    } catch (e: Exception) {
+                        if (value.isNotBlank()) setOf(value.trim()) else emptySet()
+                    }
                 }
-            }
 
-            ExpressiveMenu<String>(
-                options = options,
-                selectedOption = effectiveSelected,
-                onOptionSelected = { onValueChange(it) },
-                labelProvider = { it },
-                enabled = enabled,
-                disabledOptions = disabledOptions,
-                disabledOptionTargetKey = optionTargetSettingKey,
-                hasUnsavedChanges = hasUnsavedChanges,
-                pluginId = effectivePluginId,
-                onNavigateToPluginSetting = onNavigateToPluginSetting
-            )
+                MultiSelectExpressiveMenu<String>(
+                    options = options,
+                    selectedOptions = selectedSet,
+                    onOptionsChange = { newSet ->
+                        val encoded = Json.encodeToString(newSet.toList())
+                        onValueChange(encoded)
+                    },
+                    labelProvider = { it },
+                    displayTextProvider = { it },
+                    placeholder = stringResource(Res.string.common_select_options),
+                    enabled = enabled,
+                    disabledOptions = disabledOptions,
+                    disabledOptionTargetKey = optionTargetSettingKey,
+                    hasUnsavedChanges = hasUnsavedChanges,
+                    pluginId = effectivePluginId,
+                    onNavigateToPluginSetting = onNavigateToPluginSetting
+                )
+            } else {
+                val effectiveSelected = if (value in options) value else (options.firstOrNull() ?: "")
+                LaunchedEffect(effectiveSelected) {
+                    if (value !in options && effectiveSelected.isNotBlank()) {
+                        onValueChange(effectiveSelected)
+                    }
+                }
+
+                ExpressiveMenu<String>(
+                    options = options,
+                    selectedOption = effectiveSelected,
+                    onOptionSelected = { onValueChange(it) },
+                    labelProvider = { it },
+                    enabled = enabled,
+                    disabledOptions = disabledOptions,
+                    disabledOptionTargetKey = optionTargetSettingKey,
+                    hasUnsavedChanges = hasUnsavedChanges,
+                    pluginId = effectivePluginId,
+                    onNavigateToPluginSetting = onNavigateToPluginSetting
+                )
+            }
             if (disabledOptions.isNotEmpty()) {
                 // TODO: This visual hint is now redundant as a tap target (interception moved to individual
                 //       DropdownMenuItems above). Consider removing or updating this text in a future cleanup.
