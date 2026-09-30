@@ -125,6 +125,9 @@
     <string name="setting_plugin_unplug_behavior_subtitle">Cosa fare alla disattivazione/disinstallazione di un plugin con lavori attivi</string>
     <string name="setting_plugin_unplug_behavior_block">Impedisci scollegamento durante il lavoro</string>
     <string name="setting_plugin_unplug_behavior_stop">Ferma tutto e scollega</string>
+    <string name="plugin_state_locked">In Uso</string>
+    <string name="plugin_state_locked_tooltip">Questo plugin è attualmente in uso da lavori attivi e non può essere scaricato.</string>
+
     <string name="setting_max_concurrent_jobs">Max Lavori Simultanei</string>
     <string name="setting_max_concurrent_jobs_subtitle">Numero di worker disponibili per le attività in background</string>
     <string name="setting_save_job_history">Salva Cronologia Lavori</string>

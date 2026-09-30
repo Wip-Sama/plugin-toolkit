@@ -27,6 +27,7 @@ fun PluginCard(
     alternateUpdate: AlternateRepoUpdate? = null,
     enabled: Boolean = true,
     activity: PluginActivityInfo? = null,
+    isLockedByJob: Boolean = false,
     onToggle: (Boolean) -> Unit,
     onSwitchRepo: (String) -> Unit = {},
     onAction: (PluginStatusAction) -> Unit,
@@ -46,6 +47,7 @@ fun PluginCard(
                 PluginCardInfoSection(
                     plugin = plugin,
                     isLoaded = isLoaded,
+                    isLockedByJob = isLockedByJob,
                     activity = activity,
                     alternateUpdate = alternateUpdate,
                     onSwitchRepo = onSwitchRepo,

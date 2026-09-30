@@ -10,10 +10,13 @@ Added:
 	- Extract from string system node (`extract_from_string`) extracting regex patterns and capture groups into a list of strings
 	- Lists filter system node (`list_filter`) slicing and filtering lists using Python-like slice syntax (e.g. x:y:z, single index, intervals)
 	- List check system node (`list_check`) validating list lengths against min/max bounds, returning a boolean result and list output
-	- Expanded Progress Reporting with rich display modes (percentages, numeric ratio values like 12.3/14.5 MB, and indeterminate indicators)
-	- Secondary Progress Bar support for capabilities and background action jobs (e.g. for rate-limit cooldowns, retries, and multi-step tasks)
+	- Expanded Progress Reporting with rich display modes
+	- Secondary Progress Bar support for capabilities and background action jobs
 	- Resource Monitoring tracking peak memory, total memory, file I/O read/written bytes, and network throughput across capabilities and actions
 	- Flow Capability Breakdown drawer to inspect individual executions and resource metrics when the same capability executes multiple times
+	- Flow-level plugin safety locking preventing unload of plugins utilized in running flows
+	- Visual "In Use" lock badge in Plugin Manager for plugins locked by active capability or flow jobs
+	- Application close confirmation prompt when active background jobs are executing
 Changes:
 	- Node can now be focused by simply changing a value
   - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling

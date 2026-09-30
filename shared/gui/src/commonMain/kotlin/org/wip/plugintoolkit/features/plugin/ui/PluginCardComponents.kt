@@ -87,6 +87,8 @@ import plugintoolkit.composeapp.generated.resources.plugin_status_validation_fai
 import plugintoolkit.composeapp.generated.resources.plugin_step_setup
 import plugintoolkit.composeapp.generated.resources.plugin_step_update
 import plugintoolkit.composeapp.generated.resources.plugin_step_validation
+import plugintoolkit.composeapp.generated.resources.plugin_state_locked
+import plugintoolkit.composeapp.generated.resources.plugin_state_locked_tooltip
 import plugintoolkit.composeapp.generated.resources.plugin_switch_repo_action
 import plugintoolkit.composeapp.generated.resources.plugin_uninstall
 import plugintoolkit.composeapp.generated.resources.plugin_update
@@ -124,6 +126,7 @@ internal data class CardButtonState(
 internal fun PluginCardInfoSection(
     plugin: InstalledPlugin,
     isLoaded: Boolean,
+    isLockedByJob: Boolean,
     activity: PluginActivityInfo?,
     alternateUpdate: AlternateRepoUpdate?,
     onSwitchRepo: (String) -> Unit,
@@ -180,6 +183,22 @@ internal fun PluginCardInfoSection(
                         text = stringResource(Res.string.plugin_loaded),
                         containerColor = ToolkitTheme.colors.success,
                         contentColor = ToolkitTheme.colors.onSuccess,
+                    )
+                }
+
+                if (isLockedByJob) {
+                    ToolkitChip(
+                        text = stringResource(Res.string.plugin_state_locked),
+                        containerColor = ToolkitTheme.colors.warning,
+                        contentColor = ToolkitTheme.colors.onWarning,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = stringResource(Res.string.plugin_state_locked_tooltip),
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                                tint = ToolkitTheme.colors.onWarning
+                            )
+                        }
                     )
                 }
 

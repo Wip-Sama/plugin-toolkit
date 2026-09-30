@@ -22,6 +22,8 @@ import org.wip.plugintoolkit.core.utils.FileUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.flows.logic.FlowRepository
+import org.wip.plugintoolkit.features.flows.logic.getAllReferencedPluginIds
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.PluginUnplugBehavior
@@ -269,22 +271,47 @@ class PluginLifecycleManager(
 
     /**
      * Ensures that no jobs are running for the specified plugins before unloading.
+     * This includes:
+     *  - Direct capability/flow jobs whose [pluginId] belongs to one of [pkgs].
+     *  - Any running flow jobs that use one of [pkgs] as a capability node (plugin used inside a flow).
      * Blocks or cancels jobs based on user settings.
      */
     suspend fun ensureSafeToUnload(pkgs: List<String>): Result<Unit> {
-        val runningJobs = jobManager.jobs.value.filter {
-            it.pluginId in pkgs && it.status == JobStatus.Running && it.type != JobType.PluginInstallation
+        val pkgSet = pkgs.toSet()
+        val allRunningJobs = jobManager.jobs.value.filter {
+            it.status == JobStatus.Running && it.type != JobType.PluginInstallation
         }
-        if (runningJobs.isNotEmpty()) {
+        val directJobs = allRunningJobs.filter { it.pluginId in pkgSet }
+        val indirectJobs = allRunningJobs.filter { job ->
+            if (job.type == JobType.Capability && job.pluginId in pkgSet) return@filter true
+            if (job.type == JobType.Flow) {
+                val flowRepository: FlowRepository? = try {
+                    getKoin().getOrNull()
+                } catch (_: Exception) {
+                    null
+                }
+                if (flowRepository != null) {
+                    val allFlows = flowRepository.flows.value
+                    val rootFlow = allFlows.find { it.name == job.capabilityName }
+                    if (rootFlow != null) {
+                        val usedPlugins = rootFlow.getAllReferencedPluginIds(allFlows)
+                        return@filter usedPlugins.any { it in pkgSet }
+                    }
+                }
+            }
+            false
+        }
+        val blockedJobs = (directJobs + indirectJobs).distinctBy { it.id }
+        if (blockedJobs.isNotEmpty()) {
             val settings = settingsRepository.loadSettings()
             if (settings.extensions.pluginUnplugBehavior == PluginUnplugBehavior.Block) {
                 val msg =
-                    "Cannot proceed: ${runningJobs.size} jobs are still running for plugins: ${pkgs.joinToString()}"
+                    "Cannot proceed: ${blockedJobs.size} jobs are still running for plugins: ${pkgs.joinToString()}"
                 Logger.w { msg }
                 return Result.failure(Exception(msg))
             } else {
-                Logger.i { "Stopping ${runningJobs.size} jobs before unloading plugins: ${pkgs.joinToString()}" }
-                runningJobs.forEach { jobManager.cancelJob(it.id) }
+                Logger.i { "Stopping ${blockedJobs.size} jobs before unloading plugins: ${pkgs.joinToString()}" }
+                blockedJobs.forEach { jobManager.cancelJob(it.id) }
             }
         }
         return Result.success(Unit)

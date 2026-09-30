@@ -125,6 +125,9 @@
     <string name="setting_plugin_unplug_behavior_subtitle">What to do when disabling or uninstalling a plugin with active jobs</string>
     <string name="setting_plugin_unplug_behavior_block">Prevent unplugging while working</string>
     <string name="setting_plugin_unplug_behavior_stop">Stop everything and unplug</string>
+    <string name="plugin_state_locked">In Use</string>
+    <string name="plugin_state_locked_tooltip">This plugin is currently in use by active jobs and cannot be unloaded.</string>
+
     <string name="setting_max_concurrent_jobs">Max Concurrent Jobs</string>
     <string name="setting_max_concurrent_jobs_subtitle">Number of workers available to run background tasks</string>
     <string name="setting_save_job_history">Save Job History</string>

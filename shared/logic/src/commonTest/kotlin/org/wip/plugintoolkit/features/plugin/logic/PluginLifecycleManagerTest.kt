@@ -319,4 +319,83 @@ class PluginLifecycleManagerTest {
         val result = lifecycleManager.ensureSafeToUnload(listOf(pkg))
         kotlin.test.assertTrue(result.isFailure, "Capability job should block unloading when behavior is Block")
     }
+
+    @Test
+    fun testEnsureSafeToUnloadBlocksWhenFlowJobRunningDirectlyForPlugin() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { it.copy(extensions = it.extensions.copy(pluginUnplugBehavior = PluginUnplugBehavior.Block)) }
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+
+        val pkg = "test.flow.plugin"
+        val flowJob = BackgroundJob(
+            id = "flow_job_1",
+            name = "Running Flow",
+            type = JobType.Flow,
+            pluginId = pkg,
+            capabilityName = "myFlow"
+        )
+        jobManager.enqueueJob(flowJob)
+        jobManager.waitForNextJob()
+
+        val result = lifecycleManager.ensureSafeToUnload(listOf(pkg))
+        kotlin.test.assertTrue(result.isFailure, "Flow job should block unloading when behavior is Block")
+    }
+
+    @Test
+    fun testEnsureSafeToUnloadBlocksWhenFlowJobUsesPluginInsideFlow() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.updateSettings { it.copy(extensions = it.extensions.copy(pluginUnplugBehavior = PluginUnplugBehavior.Block)) }
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+
+        val pkg = "test.nested.flow.plugin"
+        val flow = org.wip.plugintoolkit.features.flows.model.Flow(
+            name = "TestFlow",
+            nodes = listOf(
+                org.wip.plugintoolkit.features.flows.model.Node.CapabilityNode(
+                    id = 1L,
+                    position = org.wip.plugintoolkit.features.flows.model.Offset.Zero,
+                    pluginInfo = org.wip.plugintoolkit.api.PluginInfo(id = pkg, name = "Plugin", version = "1.0", description = ""),
+                    capability = org.wip.plugintoolkit.api.Capability("cap", "desc", returnType = org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.STRING)),
+                    inputs = emptyList(),
+                    outputs = emptyList()
+                )
+            )
+        )
+        val mockFlowRepo = io.mockk.mockk<org.wip.plugintoolkit.features.flows.logic.FlowRepository>(relaxed = true)
+        io.mockk.every { mockFlowRepo.flows } returns kotlinx.coroutines.flow.MutableStateFlow(listOf(flow))
+
+        org.koin.core.context.startKoin {
+            modules(
+                org.koin.dsl.module {
+                    single { mockFlowRepo }
+                }
+            )
+        }
+        try {
+            val flowJob = BackgroundJob(
+                id = "flow_job_nested",
+                name = "Running Flow with Plugin",
+                type = JobType.Flow,
+                pluginId = "system",
+                capabilityName = "TestFlow"
+            )
+            jobManager.enqueueJob(flowJob)
+            jobManager.waitForNextJob()
+
+            val result = lifecycleManager.ensureSafeToUnload(listOf(pkg))
+            kotlin.test.assertTrue(result.isFailure, "Flow job using plugin should block unloading when behavior is Block")
+        } finally {
+            org.koin.core.context.stopKoin()
+        }
+    }
 }

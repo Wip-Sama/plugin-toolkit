@@ -9,6 +9,7 @@ import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.flows.logic.FlowExecutionGuard
 import org.wip.plugintoolkit.features.flows.logic.FlowReadOnlyViolationException
+import org.wip.plugintoolkit.features.flows.logic.getAllReferencedPluginIds
 import org.wip.plugintoolkit.features.flows.model.Flow
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.Offset
@@ -118,5 +119,61 @@ class FlowExecutionGuardTest {
         assertFailsWith<FlowReadOnlyViolationException> {
             guard.assertCanMutate("SubFlowB", allFlows)
         }
+    }
+
+    @Test
+    fun testCollectReferencedPluginIdsDirectAndNestedSubflows() {
+        val pluginA = PluginInfo(id = "org.wip.plugin.a", name = "A", version = "1.0", description = "")
+        val pluginB = PluginInfo(id = "org.wip.plugin.b", name = "B", version = "1.0", description = "")
+
+        val capNodeA = Node.CapabilityNode(
+            id = 10,
+            position = Offset.Zero,
+            pluginInfo = pluginA,
+            capability = Capability("capA", "desc", returnType = DataType.Primitive(PrimitiveType.STRING)),
+            inputs = emptyList(),
+            outputs = emptyList()
+        )
+        val capNodeB = Node.CapabilityNode(
+            id = 20,
+            position = Offset.Zero,
+            pluginInfo = pluginB,
+            capability = Capability("capB", "desc", returnType = DataType.Primitive(PrimitiveType.STRING)),
+            inputs = emptyList(),
+            outputs = emptyList()
+        )
+
+        val childFlow = Flow(name = "ChildFlow", nodes = listOf(capNodeB))
+        val parentFlow = Flow(
+            name = "ParentFlow",
+            nodes = listOf(capNodeA, createSubflowNode(1, "ChildFlow"))
+        )
+
+        val allFlows = listOf(parentFlow, childFlow)
+        val referencedPlugins = parentFlow.getAllReferencedPluginIds(allFlows)
+
+        kotlin.test.assertEquals(setOf("org.wip.plugin.a", "org.wip.plugin.b"), referencedPlugins)
+    }
+
+    @Test
+    fun testCollectReferencedPluginIdsHandlesCycles() {
+        val pluginC = PluginInfo(id = "org.wip.plugin.c", name = "C", version = "1.0", description = "")
+        val capNodeC = Node.CapabilityNode(
+            id = 30,
+            position = Offset.Zero,
+            pluginInfo = pluginC,
+            capability = Capability("capC", "desc", returnType = DataType.Primitive(PrimitiveType.STRING)),
+            inputs = emptyList(),
+            outputs = emptyList()
+        )
+
+        // Cyclic flows: Flow1 -> Flow2 -> Flow1
+        val flow1 = Flow(name = "Flow1", nodes = listOf(capNodeC, createSubflowNode(1, "Flow2")))
+        val flow2 = Flow(name = "Flow2", nodes = listOf(createSubflowNode(2, "Flow1")))
+
+        val allFlows = listOf(flow1, flow2)
+        val referencedPlugins = flow1.getAllReferencedPluginIds(allFlows)
+
+        kotlin.test.assertEquals(setOf("org.wip.plugin.c"), referencedPlugins)
     }
 }

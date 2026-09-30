@@ -149,6 +149,7 @@ fun PluginManagerView(
     val activities by viewModel.pluginActivities.collectAsState()
     val activeInstallationJobs by viewModel.activePluginInstallationJobs.collectAsState()
     val alternateRepoUpdates by viewModel.alternateRepoUpdates.collectAsState()
+    val lockedPlugins by viewModel.lockedPlugins.collectAsState()
 
     val lazyListState = rememberLazyListState()
 
@@ -438,6 +439,7 @@ fun PluginManagerView(
                         customActions = customActions,
                         enabled = isReady,
                         activity = activity,
+                        isLockedByJob = lockedPlugins.contains(plugin.pkg),
                         onToggle = { if (isReady) viewModel.toggleEnabled(plugin.pkg, it) },
                         onSwitchRepo = { viewModel.promptSwitchRepo(it) },
                         onAction = { action ->

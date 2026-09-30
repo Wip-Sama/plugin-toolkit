@@ -16,6 +16,14 @@ import kotlinx.coroutines.test.setMain
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.ui.DialogService
+import org.wip.plugintoolkit.api.Capability
+import org.wip.plugintoolkit.api.DataType
+import org.wip.plugintoolkit.api.PluginInfo
+import org.wip.plugintoolkit.api.PrimitiveType
+import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.Offset
+import org.wip.plugintoolkit.features.flows.viewmodel.FlowState
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
@@ -25,12 +33,16 @@ import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
+import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PluginManagerViewModelTest {
@@ -49,6 +61,7 @@ class PluginManagerViewModelTest {
     private val repoPluginsFlow = MutableStateFlow<Map<String, List<ExtensionPlugin>>>(emptyMap())
     private val repositoriesFlow = MutableStateFlow<List<ExtensionRepo>>(emptyList())
     private val settingsFlow = MutableStateFlow(AppSettings())
+    private val flowStateFlow = MutableStateFlow(FlowState())
 
     @BeforeTest
     fun setUp() {
@@ -65,6 +78,7 @@ class PluginManagerViewModelTest {
         every { appConfig.PLUGINS_DIR_NAME } returns "plugins"
         every { jobManager.jobProgress } returns MutableStateFlow(emptyMap())
         every { jobManager.jobs } returns MutableStateFlow(emptyList())
+        every { flowViewModel.state } returns flowStateFlow
     }
 
     @AfterTest
@@ -190,5 +204,114 @@ class PluginManagerViewModelTest {
 
         verify { repoManager.setPackageSourceOverride("org.wip.vision", "https://repo-community.com") }
         coVerify { pluginManager.updateRemote("org.wip.vision") }
+    }
+
+    @Test
+    fun testLockedPluginsIncludesRunningCapabilityJobs() = runTest(testDispatcher) {
+        val jobsFlow = MutableStateFlow(
+            listOf(
+                BackgroundJob(
+                    id = "cap-1",
+                    name = "Capability Job",
+                    type = JobType.Capability,
+                    pluginId = "org.wip.plugin.a",
+                    capabilityName = "run"
+                ).copy(status = JobStatus.Running)
+            )
+        )
+        every { jobManager.jobs } returns jobsFlow
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.lockedPlugins.value.contains("org.wip.plugin.a"), "Running Capability job should lock the plugin")
+    }
+
+    @Test
+    fun testLockedPluginsIncludesQueuedFlowJobs() = runTest(testDispatcher) {
+        val jobsFlow = MutableStateFlow(
+            listOf(
+                BackgroundJob(
+                    id = "flow-1",
+                    name = "Flow Job",
+                    type = JobType.Flow,
+                    pluginId = "org.wip.plugin.b",
+                    capabilityName = "my-flow"
+                ).copy(status = JobStatus.Queued)
+            )
+        )
+        every { jobManager.jobs } returns jobsFlow
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.lockedPlugins.value.contains("org.wip.plugin.b"), "Queued Flow job should lock the plugin")
+    }
+
+    @Test
+    fun testLockedPluginsExcludesInstallationAndCompletedJobs() = runTest(testDispatcher) {
+        val jobsFlow = MutableStateFlow(
+            listOf(
+                BackgroundJob(
+                    id = "install-1",
+                    name = "Installation Job",
+                    type = JobType.PluginInstallation,
+                    pluginId = "org.wip.plugin.c",
+                    capabilityName = "install"
+                ).copy(status = JobStatus.Running),
+                BackgroundJob(
+                    id = "cap-done",
+                    name = "Completed Capability",
+                    type = JobType.Capability,
+                    pluginId = "org.wip.plugin.d",
+                    capabilityName = "run"
+                ).copy(status = JobStatus.Completed)
+            )
+        )
+        every { jobManager.jobs } returns jobsFlow
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.lockedPlugins.value.isEmpty(), "Installation and completed jobs must not lock plugins")
+    }
+
+    @Test
+    fun testLockedPluginsIncludesPluginsUsedInsideRunningFlowJobs() = runTest(testDispatcher) {
+        val flow = Flow(
+            name = "Flow With Plugin",
+            nodes = listOf(
+                Node.CapabilityNode(
+                    id = 1L,
+                    position = Offset.Zero,
+                    pluginInfo = PluginInfo(id = "org.wip.plugin.nested", name = "Nested", version = "1.0.0", description = "test"),
+                    capability = Capability(name = "doSomething", description = "test", returnType = DataType.Primitive(PrimitiveType.STRING)),
+                    inputs = emptyList(),
+                    outputs = emptyList()
+                )
+            )
+        )
+        flowStateFlow.value = FlowState(flows = listOf(flow))
+
+        val jobsFlow = MutableStateFlow(
+            listOf(
+                BackgroundJob(
+                    id = "flow-run-1",
+                    name = "Flow Execution",
+                    type = JobType.Flow,
+                    pluginId = "system",
+                    capabilityName = "Flow With Plugin"
+                ).copy(status = JobStatus.Running)
+            )
+        )
+        every { jobManager.jobs } returns jobsFlow
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        assertTrue(
+            viewModel.lockedPlugins.value.contains("org.wip.plugin.nested"),
+            "Plugin used inside active flow must be marked as locked in lockedPlugins"
+        )
     }
 }

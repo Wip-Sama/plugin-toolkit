@@ -61,6 +61,9 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.update.UpdateService
 import org.wip.plugintoolkit.core.utils.PlatformLocalization
 import org.wip.plugintoolkit.core.utils.PlatformPathUtils
+import org.wip.plugintoolkit.features.job.logic.JobManager
+import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
@@ -91,6 +94,33 @@ import kotlin.system.exitProcess
 
 private const val WINDOW_MIN_WIDTH = 680
 private const val WINDOW_MIN_HEIGHT = 480
+
+/**
+ * Checks for active (non-installation) running jobs and, if any are found, shows a native
+ * confirmation dialog asking the user whether to really close the application.
+ * Returns `true` if the close should proceed (no active jobs, or user confirmed), `false` otherwise.
+ */
+private fun confirmCloseWithActiveJobs(): Boolean {
+    val jobManager = try { getKoin().get<JobManager>() } catch (e: Throwable) { return true }
+    val activeJobs = jobManager.jobs.value.filter {
+        it.status == JobStatus.Running && it.type != JobType.PluginInstallation
+    }
+    if (activeJobs.isEmpty()) return true
+
+    val options = arrayOf("Close Anyway", "Keep Running")
+    val choice = javax.swing.JOptionPane.showOptionDialog(
+        null,
+        "There are ${activeJobs.size} active job(s) still running.\n" +
+                "Closing now will interrupt all running jobs. Are you sure you want to exit?",
+        "Active Jobs Running",
+        javax.swing.JOptionPane.DEFAULT_OPTION,
+        javax.swing.JOptionPane.WARNING_MESSAGE,
+        null,
+        options,
+        options[1]
+    )
+    return choice == 0
+}
 
 fun detectSystemConfig(): SystemConfig {
     val userDir = File(System.getProperty("user.dir"))
@@ -379,7 +409,7 @@ fun runMain(
                 menu = {
                     Item("Open", onClick = { isVisible = true })
                     Separator()
-                    Item("Exit", onClick = { exitApplication() })
+                    Item("Exit", onClick = { if (confirmCloseWithActiveJobs()) exitApplication() })
                 }
             )
         }
@@ -400,7 +430,7 @@ fun runMain(
                         onClose = {
                             if (viewModel.settings.value.general.closeToTray) {
                                 isVisible = false
-                            } else {
+                            } else if (confirmCloseWithActiveJobs()) {
                                 exitApplication()
                             }
                         }
@@ -411,7 +441,7 @@ fun runMain(
                     onCloseRequest = {
                         if (viewModel.settings.value.general.closeToTray) {
                             isVisible = false
-                        } else {
+                        } else if (confirmCloseWithActiveJobs()) {
                             exitApplication()
                         }
                     },

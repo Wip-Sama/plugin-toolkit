@@ -74,3 +74,34 @@ class FlowExecutionGuard(
         }
     }
 }
+
+/**
+ * Recursively collects all plugin IDs (package names) referenced by [Node.CapabilityNode]
+ * instances in this [Flow] and its referenced subflows.
+ */
+fun Flow.getAllReferencedPluginIds(
+    allFlows: List<Flow>,
+    visited: MutableSet<String> = mutableSetOf()
+): Set<String> {
+    if (!visited.add(name)) return emptySet()
+    val result = mutableSetOf<String>()
+    nodes.forEach { node ->
+        when (node) {
+            is Node.CapabilityNode -> {
+                val pkg = node.pluginInfo.id
+                if (pkg.isNotBlank()) {
+                    result.add(pkg)
+                }
+            }
+            is Node.SubFlowNode -> {
+                val subFlow = allFlows.find { it.name == node.flowName }
+                if (subFlow != null) {
+                    result.addAll(subFlow.getAllReferencedPluginIds(allFlows, visited))
+                }
+            }
+            else -> {}
+        }
+    }
+    return result
+}
+

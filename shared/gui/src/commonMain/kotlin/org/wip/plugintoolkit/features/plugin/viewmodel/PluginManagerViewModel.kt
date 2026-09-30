@@ -22,6 +22,7 @@ import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.ui.DialogService
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.VersionUtils
+import org.wip.plugintoolkit.features.flows.logic.getAllReferencedPluginIds
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
@@ -115,6 +116,34 @@ class PluginManagerViewModel(
     val activePluginInstallationJobs: StateFlow<Map<String, Float>> = activePluginJobs
         .map { map -> map.mapValues { it.value.progress } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /**
+     * Set of plugin package names that currently have at least one running or queued
+     * Capability or Flow job referencing them. Used to show a "Locked" indicator in the
+     * plugin manager so users know the plugin is actively in use and cannot be freely unloaded.
+     */
+    val lockedPlugins: StateFlow<Set<String>> = combine(
+        jobManager.jobs,
+        flowViewModel.state
+    ) { jobs, flowState ->
+        val activeJobs = jobs.filter { job ->
+            (job.type == JobType.Capability || job.type == JobType.Flow) &&
+                    (job.status == JobStatus.Running || job.status == JobStatus.Queued)
+        }
+        val locked = mutableSetOf<String>()
+        val allFlows = flowState.flows
+        activeJobs.forEach { job ->
+            if (job.pluginId.isNotBlank() && job.pluginId != "system") {
+                locked.add(job.pluginId)
+            }
+            if (job.type == JobType.Flow) {
+                allFlows.find { it.name == job.capabilityName }?.let { rootFlow ->
+                    locked.addAll(rootFlow.getAllReferencedPluginIds(allFlows))
+                }
+            }
+        }
+        locked
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     private val _togglingPlugins = MutableStateFlow<Set<String>>(emptySet())
     val togglingPlugins: StateFlow<Set<String>> = _togglingPlugins.asStateFlow()
@@ -671,7 +700,11 @@ class PluginManagerViewModel(
             repoManager.setPackageSourceOverride(pkg, newRepoUrl)
             val repo = repoManager.repositories.value.find { it.url == newRepoUrl }
             val repoName = repo?.name ?: newRepoUrl
-            notificationService.toast(getString(Res.string.plugin_repo_switched_toast, repoName))
+            try {
+                notificationService.toast(getString(Res.string.plugin_repo_switched_toast, repoName))
+            } catch (t: Throwable) {
+                notificationService.toast("Switched repository source to $repoName")
+            }
             updatePlugin(pkg)
         }
     }
