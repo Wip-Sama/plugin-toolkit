@@ -3490,6 +3490,70 @@ class FlowEditorQoLTest {
         kotlin.test.assertNull(outFillet.startFilletLeadIn)
         assertEquals(0f, outFillet.endTrimDistance, 0.01f)
     }
+
+    @Test
+    fun testToggleGroupSelectionEvent() {
+        val vm = createViewModel()
+        assertEquals(emptySet(), vm.state.value.selectedGroupIds)
+
+        vm.onEvent(FlowEvent.ToggleGroupSelection(101L))
+        assertEquals(setOf(101L), vm.state.value.selectedGroupIds)
+
+        vm.onEvent(FlowEvent.ToggleGroupSelection(102L))
+        assertEquals(setOf(101L, 102L), vm.state.value.selectedGroupIds)
+
+        vm.onEvent(FlowEvent.ToggleGroupSelection(101L))
+        assertEquals(setOf(102L), vm.state.value.selectedGroupIds)
+    }
+
+    @Test
+    fun testToggleLabelSelectionEvent() {
+        val vm = createViewModel()
+        assertEquals(emptySet(), vm.state.value.selectedLabelIds)
+
+        vm.onEvent(FlowEvent.ToggleLabelSelection(201L))
+        assertEquals(setOf(201L), vm.state.value.selectedLabelIds)
+
+        vm.onEvent(FlowEvent.ToggleLabelSelection(202L))
+        assertEquals(setOf(201L, 202L), vm.state.value.selectedLabelIds)
+
+        vm.onEvent(FlowEvent.ToggleLabelSelection(201L))
+        assertEquals(setOf(202L), vm.state.value.selectedLabelIds)
+    }
+
+    @Test
+    fun testTogglePointSelectionEvent() {
+        val vm = createViewModel()
+        assertEquals(emptySet(), vm.state.value.selectedPointIds)
+
+        vm.onEvent(FlowEvent.TogglePointSelection(301L))
+        assertEquals(setOf(301L), vm.state.value.selectedPointIds)
+
+        vm.onEvent(FlowEvent.TogglePointSelection(302L))
+        assertEquals(setOf(301L, 302L), vm.state.value.selectedPointIds)
+
+        vm.onEvent(FlowEvent.TogglePointSelection(301L))
+        assertEquals(setOf(302L), vm.state.value.selectedPointIds)
+    }
+
+    @Test
+    fun testBringToFrontWithCtrlInViewModel() {
+        val node1 = Node.SystemNode(id = 1L, position = ModelOffset(0f, 0f), title = "N1", systemAction = "act", inputs = emptyList(), outputs = emptyList())
+        val node2 = Node.SystemNode(id = 2L, position = ModelOffset(50f, 50f), title = "N2", systemAction = "act", inputs = emptyList(), outputs = emptyList())
+        val vm = createViewModel(Flow("TestMultiSelect", nodes = listOf(node1, node2)))
+
+        // Click node 1 without ctrl -> select node 1
+        vm.onEvent(FlowEvent.BringToFront(1L, isCtrlPressed = false))
+        assertEquals(setOf(1L), vm.state.value.selectedNodeIds)
+
+        // Ctrl+click node 2 -> adds node 2 to selection
+        vm.onEvent(FlowEvent.BringToFront(2L, isCtrlPressed = true))
+        assertEquals(setOf(1L, 2L), vm.state.value.selectedNodeIds)
+
+        // Ctrl+click node 1 -> removes node 1 from selection
+        vm.onEvent(FlowEvent.BringToFront(1L, isCtrlPressed = true))
+        assertEquals(setOf(2L), vm.state.value.selectedNodeIds)
+    }
 }
 
 

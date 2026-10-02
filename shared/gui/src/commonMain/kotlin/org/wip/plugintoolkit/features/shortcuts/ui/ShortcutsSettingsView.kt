@@ -298,6 +298,7 @@ private fun getActionIcon(actionId: String, situation: ShortcutSituation): Image
         ShortcutActionId.FLOW_PAN_CANVAS -> Icons.Default.PanTool
         ShortcutActionId.FLOW_ZOOM_CANVAS -> Icons.Default.ZoomIn
         ShortcutActionId.FLOW_SELECT_NODE -> Icons.Default.TouchApp
+        ShortcutActionId.FLOW_TOGGLE_SELECTION -> Icons.Default.TouchApp
         ShortcutActionId.FLOW_BOX_SELECT -> Icons.Default.CropSquare
         ShortcutActionId.FLOW_MOVE_NODE -> Icons.Default.PanTool
         ShortcutActionId.FLOW_DELETE_SELECTED -> Icons.Default.Delete

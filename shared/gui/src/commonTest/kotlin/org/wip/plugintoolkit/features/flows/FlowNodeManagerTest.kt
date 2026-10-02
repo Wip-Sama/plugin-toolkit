@@ -280,4 +280,67 @@ class FlowNodeManagerTest {
         assertTrue(newState.selectedGroupIds.isEmpty())
         assertTrue(newState.hasUnsavedChanges)
     }
+
+    @Test
+    fun testHandleBringToFrontWithoutCtrlSelectsSingleNodeAndClearsOtherSelections() {
+        val node1 = createTestNode(1L)
+        val node2 = createTestNode(2L)
+        val initialState = FlowEditorState(
+            flow = Flow("test", nodes = listOf(node1, node2)),
+            selectedNodeIds = setOf(2L),
+            selectedPointIds = setOf(10L),
+            selectedGroupIds = setOf(20L),
+            selectedLabelIds = setOf(30L)
+        )
+
+        val newState = manager.handleBringToFront(initialState, nodeId = 1L, isCtrlPressed = false)
+
+        assertEquals(setOf(1L), newState.selectedNodeIds)
+        assertTrue(newState.selectedPointIds.isEmpty())
+        assertTrue(newState.selectedGroupIds.isEmpty())
+        assertTrue(newState.selectedLabelIds.isEmpty())
+        assertEquals(1L, newState.flow.nodes.last().id)
+    }
+
+    @Test
+    fun testHandleBringToFrontWithCtrlAddsNodeToSelectionAndPreservesOtherSelections() {
+        val node1 = createTestNode(1L)
+        val node2 = createTestNode(2L)
+        val initialState = FlowEditorState(
+            flow = Flow("test", nodes = listOf(node1, node2)),
+            selectedNodeIds = setOf(2L),
+            selectedPointIds = setOf(10L),
+            selectedGroupIds = setOf(20L),
+            selectedLabelIds = setOf(30L)
+        )
+
+        val newState = manager.handleBringToFront(initialState, nodeId = 1L, isCtrlPressed = true)
+
+        assertEquals(setOf(2L, 1L), newState.selectedNodeIds)
+        assertEquals(setOf(10L), newState.selectedPointIds)
+        assertEquals(setOf(20L), newState.selectedGroupIds)
+        assertEquals(setOf(30L), newState.selectedLabelIds)
+        assertEquals(1L, newState.flow.nodes.last().id)
+    }
+
+    @Test
+    fun testHandleBringToFrontWithCtrlRemovesNodeFromSelectionAndPreservesOtherSelections() {
+        val node1 = createTestNode(1L)
+        val node2 = createTestNode(2L)
+        val initialState = FlowEditorState(
+            flow = Flow("test", nodes = listOf(node1, node2)),
+            selectedNodeIds = setOf(1L, 2L),
+            selectedPointIds = setOf(10L),
+            selectedGroupIds = setOf(20L),
+            selectedLabelIds = setOf(30L)
+        )
+
+        val newState = manager.handleBringToFront(initialState, nodeId = 1L, isCtrlPressed = true)
+
+        assertEquals(setOf(2L), newState.selectedNodeIds)
+        assertEquals(setOf(10L), newState.selectedPointIds)
+        assertEquals(setOf(20L), newState.selectedGroupIds)
+        assertEquals(setOf(30L), newState.selectedLabelIds)
+        assertEquals(1L, newState.flow.nodes.last().id)
+    }
 }

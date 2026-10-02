@@ -801,6 +801,8 @@
     <string name="shortcut_action_flow_zoom_desc">Ingrandisci o rimpicciolisci la lavagna</string>
     <string name="shortcut_action_flow_select_node">Seleziona Nodo</string>
     <string name="shortcut_action_flow_select_node_desc">Fai clic sulla scheda di un nodo per selezionarlo</string>
+    <string name="shortcut_action_flow_toggle_selection">Attiva/disattiva Selezione</string>
+    <string name="shortcut_action_flow_toggle_selection_desc">Ctrl+clic su un elemento per aggiungerlo o rimuoverlo dalla selezione</string>
     <string name="shortcut_action_flow_move_node">Sposta Nodi Selezionati</string>
     <string name="shortcut_action_flow_move_node_desc">Trascina i nodi selezionati attraverso la lavagna</string>
     <string name="shortcut_action_flow_delete_selected">Elimina Selezionati</string>

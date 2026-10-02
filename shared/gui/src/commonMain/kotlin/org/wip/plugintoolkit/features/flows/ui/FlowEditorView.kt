@@ -581,6 +581,26 @@ fun FlowEditorView(
             onSelectLabels = { viewModel.onEvent(FlowEvent.SelectLabels(it)) },
             onSelectGroups = { viewModel.onEvent(FlowEvent.SelectGroups(it)) },
             onSelectPoints = { viewModel.onEvent(FlowEvent.SelectPoints(it)) },
+            onSelectGroup = { id, isCtrl ->
+                if (isCtrl) {
+                    viewModel.onEvent(FlowEvent.ToggleGroupSelection(id))
+                } else {
+                    viewModel.onEvent(FlowEvent.SelectGroups(setOf(id)))
+                    viewModel.onEvent(FlowEvent.SelectNodes(emptySet()))
+                    viewModel.onEvent(FlowEvent.SelectLabels(emptySet()))
+                    viewModel.onEvent(FlowEvent.SelectPoints(emptySet()))
+                }
+            },
+            onSelectLabel = { id, isCtrl ->
+                if (isCtrl) {
+                    viewModel.onEvent(FlowEvent.ToggleLabelSelection(id))
+                } else {
+                    viewModel.onEvent(FlowEvent.SelectLabels(setOf(id)))
+                    viewModel.onEvent(FlowEvent.SelectNodes(emptySet()))
+                    viewModel.onEvent(FlowEvent.SelectGroups(emptySet()))
+                    viewModel.onEvent(FlowEvent.SelectPoints(emptySet()))
+                }
+            },
             onAddWaypoint = { conn, pos -> viewModel.onEvent(FlowEvent.AddWaypoint(conn, pos.toModelOffset())) },
             onMoveWaypoint = { conn, index, newPos ->
                 viewModel.onEvent(FlowEvent.MoveWaypoint(conn, index, newPos))
@@ -969,9 +989,9 @@ fun FlowEditorView(
                                     // Ignored, BoardCanvas handles it
                                 },
                                  onDropConnection = handleConnectionDrop,
-                                 onPress = { id ->
+                                 onPress = { id, isCtrl ->
                                      interactionState.selectedJunctionId = null
-                                     viewModel.onEvent(FlowEvent.BringToFront(id))
+                                     viewModel.onEvent(FlowEvent.BringToFront(id, isCtrl))
                                  },
                                  highlightedPortId = nodeHighlightedPortId,
                                 highlightedPortIds = nodeHighlightedPortIds,

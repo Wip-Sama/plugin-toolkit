@@ -48,24 +48,10 @@
 -keep class org.koin.** { *; }
 -keep interface org.koin.** { *; }
 -dontwarn org.koin.**
-# Keep classes that are instantiated via Koin (best effort)
--keep class org.wip.plugintoolkit.features.**.logic.** { *; }
--keep class org.wip.plugintoolkit.features.**.viewmodel.** { *; }
-
-# Kermit - Logging
--keep class co.touchlab.kermit.** { *; }
--dontwarn co.touchlab.kermit.**
-
-# SLF4J
--keep class org.slf4j.** { *; }
--dontwarn org.slf4j.**
-
-# Compose Resources
+# Project Classes and UI Components
+-keep class org.wip.plugintoolkit.** { *; }
+-keep interface org.wip.plugintoolkit.** { *; }
 -keep class plugintoolkit.composeapp.generated.resources.** { *; }
-
-# Project Models and Persistence
--keep class org.wip.plugintoolkit.features.**.model.** { *; }
--keep class org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence { *; }
 
 # Plugin API and Entry Points
 -keep class org.wip.plugintoolkit.api.** { *; }

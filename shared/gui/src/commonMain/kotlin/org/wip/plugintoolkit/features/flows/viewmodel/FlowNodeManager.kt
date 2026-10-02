@@ -355,10 +355,16 @@ class FlowNodeManager {
         )
     }
 
-    fun handleBringToFront(currentState: FlowEditorState, nodeId: Long): FlowEditorState {
+    fun handleBringToFront(currentState: FlowEditorState, nodeId: Long, isCtrlPressed: Boolean = false): FlowEditorState {
         val node = currentState.flow.nodes.find { it.id == nodeId } ?: return currentState
         val isAlreadySelected = currentState.selectedNodeIds.contains(nodeId)
-        val newSelection = if (isAlreadySelected) {
+        val newSelection = if (isCtrlPressed) {
+            if (isAlreadySelected) {
+                currentState.selectedNodeIds - nodeId
+            } else {
+                currentState.selectedNodeIds + nodeId
+            }
+        } else if (isAlreadySelected) {
             currentState.selectedNodeIds
         } else {
             setOf(nodeId)
@@ -366,9 +372,9 @@ class FlowNodeManager {
         return currentState.copy(
             flow = currentState.flow.copy(nodes = currentState.flow.nodes.filter { it.id != nodeId } + node),
             selectedNodeIds = newSelection,
-            selectedPointIds = if (isAlreadySelected) currentState.selectedPointIds else emptySet(),
-            selectedGroupIds = if (isAlreadySelected) currentState.selectedGroupIds else emptySet(),
-            selectedLabelIds = if (isAlreadySelected) currentState.selectedLabelIds else emptySet()
+            selectedPointIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedPointIds else emptySet(),
+            selectedGroupIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedGroupIds else emptySet(),
+            selectedLabelIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedLabelIds else emptySet()
         )
     }
 

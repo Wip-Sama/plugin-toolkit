@@ -159,7 +159,11 @@ fun AppNavigation(
                 }
 
                 is Screen.FlowRunner -> NavEntry(key) {
-                    FlowRunnerView(viewModel = flowViewModel, initialFlowName = key.flowName)
+                    FlowRunnerView(
+                        viewModel = flowViewModel,
+                        initialFlowName = key.flowName,
+                        onEditFlow = { flowName -> router.navigateTo(Screen.FlowEditor(flowName)) }
+                    )
                 }
 
                 is Screen.FlowEditor -> NavEntry(key) {

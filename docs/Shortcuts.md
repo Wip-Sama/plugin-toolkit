@@ -62,6 +62,7 @@ Located in package `org.wip.plugintoolkit.features.shortcuts.model`:
   - `ShortcutActionId.FLOW_PAN_CANVAS` (`FlowBoard`)
   - `ShortcutActionId.FLOW_ZOOM_CANVAS` (`FlowBoard`)
   - `ShortcutActionId.FLOW_SELECT_NODE` (`FlowBoard`)
+  - `ShortcutActionId.FLOW_TOGGLE_SELECTION` (`FlowBoard`)
   - `ShortcutActionId.FLOW_BOX_SELECT` (`FlowBoard`)
   - `ShortcutActionId.FLOW_STRUCTURED_MODE` (`FlowBoard`)
   - `ShortcutActionId.FLOW_PAINT_TOOL` (`FlowBoard`)

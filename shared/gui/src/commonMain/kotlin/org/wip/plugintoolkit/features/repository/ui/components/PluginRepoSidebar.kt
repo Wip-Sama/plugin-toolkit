@@ -40,6 +40,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,9 +49,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -90,9 +100,20 @@ fun PluginRepoSidebar(
 ) {
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboard.current
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(50)
+        runCatching { searchFocusRequester.requestFocus() }
+    }
 
     SidebarContainer(
-        modifier = modifier,
+        modifier = modifier.onPreviewKeyEvent { event ->
+            if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                searchFocusRequester.requestFocus()
+                true
+            } else false
+        },
         width = ToolkitTheme.dimensions.sidebarExpandedWidth,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         topContent = {
@@ -131,7 +152,7 @@ fun PluginRepoSidebar(
                 ToolkitTextField(
                     value = repoSearchQuery,
                     onValueChange = onRepoSearchQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                     placeholder = {
                         Text(
                             stringResource(Res.string.repo_filter_repositories_placeholder),

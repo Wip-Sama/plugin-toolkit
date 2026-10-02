@@ -165,6 +165,7 @@ fun FlowControlsInfoCard(
                         title = stringResource(Res.string.flow_info_cat_selection),
                         actionIds = listOf(
                             ShortcutActionId.FLOW_SELECT_NODE,
+                            ShortcutActionId.FLOW_TOGGLE_SELECTION,
                             ShortcutActionId.FLOW_BOX_SELECT,
                             ShortcutActionId.FLOW_MOVE_NODE,
                             ShortcutActionId.FLOW_DELETE_SELECTED

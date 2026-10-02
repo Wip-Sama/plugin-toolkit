@@ -35,11 +35,21 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation3.runtime.NavEntry
+import kotlinx.coroutines.delay
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -179,6 +189,12 @@ fun SettingsScreen(
     val searchQuery = searchViewModel.searchQuery
     val allDefinitions by searchViewModel.allDefinitions.collectAsState()
     val registry = searchViewModel.registry
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(50)
+        runCatching { searchFocusRequester.requestFocus() }
+    }
 
     // Resolve all settings strings to avoid @Composable issues in ViewModel logic
     val resolvedStrings = allDefinitions.flatMap {
@@ -204,7 +220,17 @@ fun SettingsScreen(
         )
     )
 
-    Row(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .onPreviewKeyEvent { event ->
+                if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                    searchFocusRequester.requestFocus()
+                    true
+                } else false
+            }
+    ) {
         // ── Left: internal settings sidebar ─────────────────────────────────
         NavigationSidebar(
             title = Res.string.settings.localized,
@@ -223,7 +249,10 @@ fun SettingsScreen(
                 org.wip.plugintoolkit.shared.components.ToolkitTextField(
                     value = searchQuery,
                     onValueChange = { searchViewModel.searchQuery = it },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.medium),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = ToolkitTheme.spacing.medium)
+                        .focusRequester(searchFocusRequester),
                     placeholder = { Text(stringResource(Res.string.settings_search_placeholder)) },
                     leadingIcon = {
                         Icon(

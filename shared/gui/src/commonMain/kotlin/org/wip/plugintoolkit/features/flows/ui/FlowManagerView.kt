@@ -46,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -54,10 +55,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.BoxWithConstraints
+import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -207,8 +217,24 @@ fun FlowManagerView(
             }
         }
     }
+    val searchFocusRequester = remember { FocusRequester() }
 
-    Column(modifier = modifier.fillMaxSize().padding(ToolkitTheme.spacing.extraLarge)) {
+    LaunchedEffect(Unit) {
+        delay(50)
+        runCatching { searchFocusRequester.requestFocus() }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(ToolkitTheme.spacing.extraLarge)
+            .onPreviewKeyEvent { event ->
+                if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                    searchFocusRequester.requestFocus()
+                    true
+                } else false
+            }
+    ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val isCompact = maxWidth < ToolkitTheme.dimensions.breakpointCompact
             Row(
@@ -296,7 +322,7 @@ fun FlowManagerView(
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
             leadingIcon = {
                 Icon(
                     Icons.Default.Search,

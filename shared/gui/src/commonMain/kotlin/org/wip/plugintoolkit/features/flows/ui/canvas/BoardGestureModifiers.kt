@@ -1001,6 +1001,7 @@ fun Modifier.boardPointerEventGesture(
                             interactionState.lastPointerPosition = position
                             val isAlt = event.keyboardModifiers.isAltPressed || interactionState.isAltModifierPressed
                             val isShift = event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed
+                            val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
 
                             // Direct hit-test existing points first: Priority over wire clicks
                             val hitJunc = ConnectionHitTester.findClosestJunction(
@@ -1080,7 +1081,18 @@ fun Modifier.boardPointerEventGesture(
                                     currentShortcutManager?.eat(event, ShortcutActionId.FLOW_DELETE_SELECTED) ?: event.changes.forEach { it.consume() }
                                 } else {
                                     val isSelected = juncId in currentSelectedPointIds
-                                    if (!isSelected) {
+                                    if (isCtrl) {
+                                        val newSelectedPointIds = if (isSelected) {
+                                            currentSelectedPointIds - juncId
+                                        } else {
+                                            currentSelectedPointIds + juncId
+                                        }
+                                        currentOnSelectPoints?.invoke(newSelectedPointIds)
+                                        junctionDragStartPointPositions = currentJunctions.filter { it.id in newSelectedPointIds }.associate { it.id to it.position }
+                                        junctionDragStartNodePositions = currentNodes.filter { it.id in currentSelectedNodeIds }.associate { it.id to it.position }
+                                        junctionDragStartGroupPositions = currentGroups.filter { it.id in currentSelectedGroupIds }.associate { it.id to it.position }
+                                        junctionDragStartLabelPositions = currentLabels.filter { it.id in currentSelectedLabelIds }.associate { it.id to it.position }
+                                    } else if (!isSelected) {
                                         currentOnSelectPoints?.invoke(setOf(juncId))
                                         currentOnSelectNodes?.invoke(emptySet())
                                         currentOnSelectGroups?.invoke(emptySet())

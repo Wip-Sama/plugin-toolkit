@@ -155,7 +155,7 @@ sealed interface FlowEvent {
         val extensions: List<String>? = null
     ) : FlowEvent
 
-    data class BringToFront(val nodeId: Long) : FlowEvent
+    data class BringToFront(val nodeId: Long, val isCtrlPressed: Boolean = false) : FlowEvent
 
     // Selection
     data class SelectNodes(val ids: Set<Long>) : FlowEvent
@@ -204,6 +204,9 @@ sealed interface FlowEvent {
     data class SelectLabels(val ids: Set<Long>) : FlowEvent
     data class SelectGroups(val ids: Set<Long>) : FlowEvent
     data class SelectPoints(val ids: Set<Long>) : FlowEvent
+    data class ToggleGroupSelection(val groupId: Long) : FlowEvent
+    data class ToggleLabelSelection(val labelId: Long) : FlowEvent
+    data class TogglePointSelection(val pointId: Long) : FlowEvent
 
     // Groups & Labels
     data class AddGroup(val position: org.wip.plugintoolkit.features.flows.model.Offset) : FlowEvent

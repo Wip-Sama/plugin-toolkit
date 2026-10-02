@@ -307,6 +307,7 @@ object ShortcutActionId {
     const val FLOW_PAN_CANVAS = "flow.board.pan"
     const val FLOW_ZOOM_CANVAS = "flow.board.zoom"
     const val FLOW_SELECT_NODE = "flow.board.select_node"
+    const val FLOW_TOGGLE_SELECTION = "flow.board.toggle_selection"
     const val FLOW_BOX_SELECT = "flow.board.box_select"
     const val FLOW_STRUCTURED_MODE = "flow.board.structured_mode"
     const val FLOW_PAINT_TOOL = "flow.board.paint_tool"

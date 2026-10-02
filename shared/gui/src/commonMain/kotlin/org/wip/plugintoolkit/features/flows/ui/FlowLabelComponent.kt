@@ -41,6 +41,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -80,6 +81,7 @@ fun FlowLabelComponent(
     onMove: ((Long, Offset) -> Unit)? = null,
     onEndMove: ((Long) -> Unit)? = null,
     isSelected: Boolean = false,
+    onSelectLabel: ((Long, Boolean) -> Unit)? = null,
     isPaintToolActive: Boolean = false,
     isWashToolActive: Boolean = false,
     isEyedropperActive: Boolean = false,
@@ -150,6 +152,7 @@ fun FlowLabelComponent(
                         val event = awaitPointerEvent()
                         if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
                             val isShift = event.keyboardModifiers.isShiftPressed
+                            val isCtrl = event.keyboardModifiers.isCtrlPressed
                             if (isEyedropperActive && onSampleColor != null) {
                                 onSampleColor(label.color ?: "#FFFFFF")
                                 event.changes.forEach { it.consume() }
@@ -162,6 +165,8 @@ fun FlowLabelComponent(
                             } else if (isShift && !isReadOnly) {
                                 isEditing = true
                                 event.changes.forEach { it.consume() }
+                            } else if (!isReadOnly) {
+                                onSelectLabel?.invoke(label.id, isCtrl)
                             }
                         }
                     }
@@ -170,6 +175,11 @@ fun FlowLabelComponent(
             .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
                 if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive) {
                     detectDragGestures(
+                        onDragStart = {
+                            if (!isSelected && onSelectLabel != null) {
+                                onSelectLabel(label.id, false)
+                            }
+                        },
                         onDragEnd = {
                             if (onEndMove != null) {
                                 onEndMove(label.id)

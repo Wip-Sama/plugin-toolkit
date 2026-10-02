@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
@@ -69,7 +70,7 @@ fun NodeHeader(
     onHeaderColor: Color,
     isReady: Boolean,
     isReadOnly: Boolean,
-    onPress: (Long) -> Unit,
+    onPress: (Long, Boolean) -> Unit,
     onMove: (Long, Offset, Boolean, Boolean) -> Unit,
     onEndMove: (Long) -> Unit,
     onExpand: (Long) -> Unit,
@@ -91,6 +92,7 @@ fun NodeHeader(
     var showTooltip by remember { mutableStateOf(false) }
     var tooltipJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
+    var isCtrlPressedOnHeader by remember { mutableStateOf(false) }
 
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnMove by rememberUpdatedState(onMove)
@@ -102,6 +104,16 @@ fun NodeHeader(
             .height(ToolkitTheme.dimensions.nodeHeaderHeight)
             .background(headerColor)
             .testTag("node_header_${node.id}")
+            .pointerInput(node.id) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press) {
+                            isCtrlPressedOnHeader = event.keyboardModifiers.isCtrlPressed
+                        }
+                    }
+                }
+            }
             .pointerInput(node.id, isReadOnly, isEyedropperActive, isPaintToolActive, isWashToolActive, isShiftPressed) {
                 if (isEyedropperActive && onSampleColor != null) {
                     detectTapGestures(
@@ -127,7 +139,7 @@ fun NodeHeader(
                         launch {
                             detectDragGestures(
                                 onDragStart = {
-                                    currentOnPress(node.id)
+                                    currentOnPress(node.id, isCtrlPressedOnHeader)
                                 },
                                 onDragEnd = {
                                     currentOnEndMove(node.id)
@@ -146,7 +158,7 @@ fun NodeHeader(
                         launch {
                             detectTapGestures(
                                 onTap = {
-                                    currentOnPress(node.id)
+                                    currentOnPress(node.id, isCtrlPressedOnHeader)
                                 }
                             )
                         }

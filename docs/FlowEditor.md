@@ -26,9 +26,23 @@ Because order often matters when merging data into a list, the flow editor expli
 - **Editing Order**: You can left-click on the connection's order badge to open a context menu. This menu allows you to quickly adjust the connection's order, such as moving it to the first or last position in the list.
 - **Default Order**: Newly added connections to a list input are appended to the end of the list by default.
 
-## Group Movement
+## Selection & Multi-Selection
 
-You can select multiple nodes by holding Shift and clicking, or by dragging a selection box across the canvas. When moving a selected group of nodes, all connections and visual indicators attached to those nodes update dynamically and seamlessly as the group is repositioned.
+The Flow Editor supports flexible single- and multi-selection models for organizing and editing complex graphs:
+
+### Single Selection
+- **Left Click**: Clicking on an element (node, group card, floating label, or wire junction) selects that single item and clears all other selections.
+- **Empty Canvas Click**: Clicking anywhere on the empty canvas clears the entire selection.
+
+### Multi-Selection
+- **Ctrl + Left Click (Toggle Selection)**: Holding `Ctrl` while left-clicking any element (node, group card, floating label, or connection junction) toggles that individual element into or out of the current selection without deselecting other items. You can combine different element types in a single selection (e.g. several nodes, a group, and wire junctions).
+- **Marquee Box Selection**: Left-click and drag across empty canvas space to draw a selection rectangle. All nodes, groups, labels, and connection points enclosed within or intersecting the marquee box are added to the selection.
+
+### Multi-Element Operations
+When multiple elements are selected, operations apply across the entire selection set:
+- **Group Drag / Move**: Dragging any selected element moves all currently selected nodes, groups, labels, and junctions simultaneously. All connecting wires, waypoints, and visual layout indicators dynamically update and snap in real time.
+- **Batch Deletion**: Pressing `Delete` or `Backspace` deletes all selected elements and their corresponding connections simultaneously.
+- **Batch Painting & Washing**: Using the Paint Tool (`P` / `B`) or Wash Tool (`W`) on a selection tints or resets the visual styling of all selected elements in a single click.
 
 ## Flow-Only Capabilities
 

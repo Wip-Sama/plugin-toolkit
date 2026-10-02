@@ -17,22 +17,26 @@ Added:
 	- Flow-level plugin safety locking preventing unload of plugins utilized in running flows
 	- Visual "In Use" lock badge in Plugin Manager for plugins locked by active capability or flow jobs
 	- Application close confirmation prompt when active background jobs are executing
+  - Edit button in flow runner
+  - Flow editor multi selection with ctrl
 Changes:
 	- Node can now be focused by simply changing a value
   - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling
 	- Relaxed rigid List assumptions across parameter validation, serialization, and node execution to generic `Collection` and `Iterable`
 	- Migrated For and While system nodes to execute in-flow loops over connected downstream nodes for each variant (plugin enum, collections, or numeric ranges) without requiring external subflows
 	- Updated Conditional node with `expected_value` input port to support value equality branching alongside boolean truthiness, with full selection, movement, and copy-paste support
+  - When entering in a page that has a search bar it will be auto-focused to allow for fast search
 Fixed:
-	- Updating the log level at runtime would not properly use the new level
-	- Narrow Window Squishing & Row Growth in settings
-	- Shortcut, Settings and many more spacing inconsistencies
-	- Plugin Action Working Indicator spinning on a central point alongside itself
-	- Nodes correctly prevent interacting with connections below them
-	- Load system node now restricts semantic type to path/file, selects files instead of folders, and properly enforces custom extensions in UI and execution
-	- Paused jobs no longer count towards max concurrent job execution limits (pause-requested jobs continue counting until fully stopped)
+  - Updating the log level at runtime would not properly use the new level
+  - Narrow Window Squishing & Row Growth in settings
+  - Shortcut, Settings and many more spacing inconsistencies
+  - Plugin Action Working Indicator spinning on a central point alongside itself
+  - Nodes correctly prevent interacting with connections below them
+  - Load system node now restricts semantic type to path/file, selects files instead of folders, and properly enforces custom extensions in UI and execution
+  - Paused jobs no longer count towards max concurrent job execution limits (pause-requested jobs continue counting until fully stopped)
 Removed:
-	- Verbose logging spam in the flow editor
+  - Verbose logging spam in the flow editor
+  - Disable animations setting
 Planned:
 ----------------------------------------------------------------------------------------------------
 Version: 3.0.0

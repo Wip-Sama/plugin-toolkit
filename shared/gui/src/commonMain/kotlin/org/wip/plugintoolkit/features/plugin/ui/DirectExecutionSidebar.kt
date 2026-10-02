@@ -32,6 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,9 +42,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.PluginEntry
@@ -82,6 +92,19 @@ fun DirectExecutionSidebar(
     var pluginSearchQuery by remember { mutableStateOf("") }
     var capabilitySearchQuery by remember { mutableStateOf("") }
     var isShiftPressed by remember { mutableStateOf(false) }
+    val pluginSearchFocusRequester = remember { FocusRequester() }
+    val capabilitySearchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(selectedPluginId) {
+        delay(50)
+        runCatching {
+            if (selectedPluginId == null) {
+                pluginSearchFocusRequester.requestFocus()
+            } else {
+                capabilitySearchFocusRequester.requestFocus()
+            }
+        }
+    }
 
     Box(
         modifier = modifier
@@ -89,6 +112,16 @@ fun DirectExecutionSidebar(
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clipToBounds()
+            .onPreviewKeyEvent { event ->
+                if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                    if (selectedPluginId == null) {
+                        pluginSearchFocusRequester.requestFocus()
+                    } else {
+                        capabilitySearchFocusRequester.requestFocus()
+                    }
+                    true
+                } else false
+            }
             .onPointerEvent(PointerEventType.Press) { event ->
                 isShiftPressed = event.keyboardModifiers.isShiftPressed
             }
@@ -129,40 +162,39 @@ fun DirectExecutionSidebar(
                     onToggleNavbar = {},
                     canCollapse = false,
                     headerContent = {
-                        if (loadedPlugins.size > 5 || pluginSearchQuery.isNotEmpty()) {
-                            ToolkitTextField(
-                                value = pluginSearchQuery,
-                                onValueChange = { pluginSearchQuery = it },
-                                placeholder = {
-                                    Text(
-                                        stringResource(Res.string.search_plugins_placeholder),
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Search,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                                    )
-                                },
-                                trailingIcon = if (pluginSearchQuery.isNotEmpty()) {
-                                    {
-                                        IconButton(onClick = { pluginSearchQuery = "" }) {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = "Clear",
-                                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                            )
-                                        }
+                        ToolkitTextField(
+                            value = pluginSearchQuery,
+                            onValueChange = { pluginSearchQuery = it },
+                            placeholder = {
+                                Text(
+                                    stringResource(Res.string.search_plugins_placeholder),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                            },
+                            trailingIcon = if (pluginSearchQuery.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { pluginSearchQuery = "" }) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Clear",
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                        )
                                     }
-                                } else null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = ToolkitTheme.spacing.small),
-                                singleLine = true
-                            )
-                        }
+                                }
+                            } else null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = ToolkitTheme.spacing.small)
+                                .focusRequester(pluginSearchFocusRequester),
+                            singleLine = true
+                        )
                     }
                 )
             } else {
@@ -293,7 +325,8 @@ fun DirectExecutionSidebar(
                                     } else null,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(bottom = ToolkitTheme.spacing.small),
+                                        .padding(bottom = ToolkitTheme.spacing.small)
+                                        .focusRequester(capabilitySearchFocusRequester),
                                     singleLine = true
                                 )
                             }

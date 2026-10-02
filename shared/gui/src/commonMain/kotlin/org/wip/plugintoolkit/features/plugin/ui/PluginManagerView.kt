@@ -57,7 +57,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.PluginAction
@@ -140,7 +149,8 @@ fun PluginManagerView(
     viewModel: PluginManagerViewModel = koinInject(),
     initialPluginId: String? = null,
     initialScrollToSetting: String? = null,
-    onOpenPlugin: (String) -> Unit
+    onOpenPlugin: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val plugins by viewModel.sortedPlugins.collectAsState()
     val loadedPlugins by viewModel.loadedPlugins.collectAsState()
@@ -224,9 +234,22 @@ fun PluginManagerView(
         }
     }
 
-    Column(modifier = Modifier
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(50)
+        runCatching { searchFocusRequester.requestFocus() }
+    }
+
+    Column(modifier = modifier
         .fillMaxSize()
         .padding(ToolkitTheme.spacing.extraLarge)
+        .onPreviewKeyEvent { event ->
+            if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                searchFocusRequester.requestFocus()
+                true
+            } else false
+        }
     ) {
         if (!isReady) {
             Box(
@@ -349,7 +372,7 @@ fun PluginManagerView(
             ToolkitTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                 placeholder = {
                     Text(
                         stringResource(Res.string.plugin_search_placeholder),

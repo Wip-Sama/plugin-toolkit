@@ -35,6 +35,8 @@ import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_redo
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_redo_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_select_node
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_select_node_desc
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_toggle_selection
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_toggle_selection_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_selection
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_selection_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_structured_mode
@@ -112,6 +114,20 @@ object DefaultShortcutCatalog {
             situation = ShortcutSituation.FlowBoard,
             defaultTriggers = listOf(
                 ShortcutTrigger(
+                    pointerButton = ShortcutPointerButton.Left,
+                    gesture = ShortcutGesture.Click
+                )
+            ),
+            relativePriority = ShortcutPriorities.Relative.HIGHEST
+        ),
+        ShortcutAction(
+            id = ShortcutActionId.FLOW_TOGGLE_SELECTION,
+            title = Res.string.shortcut_action_flow_toggle_selection.localized,
+            description = Res.string.shortcut_action_flow_toggle_selection_desc.localized,
+            situation = ShortcutSituation.FlowBoard,
+            defaultTriggers = listOf(
+                ShortcutTrigger(
+                    isCtrl = true,
                     pointerButton = ShortcutPointerButton.Left,
                     gesture = ShortcutGesture.Click
                 )

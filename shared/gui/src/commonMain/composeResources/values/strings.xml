@@ -805,6 +805,8 @@
     <string name="shortcut_action_flow_zoom_desc">Zoom the canvas in and out</string>
     <string name="shortcut_action_flow_select_node">Select Node</string>
     <string name="shortcut_action_flow_select_node_desc">Click a node card to select it</string>
+    <string name="shortcut_action_flow_toggle_selection">Toggle Selection</string>
+    <string name="shortcut_action_flow_toggle_selection_desc">Ctrl+Click an element to add or remove it from the selection</string>
     <string name="shortcut_action_flow_move_node">Move Selected Nodes</string>
     <string name="shortcut_action_flow_move_node_desc">Drag selected nodes across the canvas</string>
     <string name="shortcut_action_flow_delete_selected">Delete Selected</string>

@@ -16,14 +16,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -39,6 +43,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.json.JsonPrimitive
@@ -51,16 +63,20 @@ import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
+import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
+import org.wip.plugintoolkit.features.navigation.LocalGlobalRouter
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_edit
 import plugintoolkit.composeapp.generated.resources.flow_collected_automatically
 import plugintoolkit.composeapp.generated.resources.flow_execute_button
 import plugintoolkit.composeapp.generated.resources.flow_restart_button
@@ -73,6 +89,7 @@ import plugintoolkit.composeapp.generated.resources.flow_no_history
 import plugintoolkit.composeapp.generated.resources.flow_outputs_title
 import plugintoolkit.composeapp.generated.resources.flow_run_description
 import plugintoolkit.composeapp.generated.resources.flow_run_title
+import plugintoolkit.composeapp.generated.resources.flow_search_placeholder
 import plugintoolkit.composeapp.generated.resources.flow_select_hint
 import plugintoolkit.composeapp.generated.resources.flow_select_title
 import plugintoolkit.composeapp.generated.resources.action_set_as_default
@@ -102,8 +119,18 @@ enum class ParameterType {
 fun FlowRunnerView(
     viewModel: FlowViewModel,
     initialFlowName: String? = null,
+    onEditFlow: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val router = LocalGlobalRouter.current
+    var searchQuery by remember { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(50)
+        runCatching { searchFocusRequester.requestFocus() }
+    }
+
     val state by viewModel.state.collectAsState()
     val jobViewModel: JobViewModel = koinInject()
     val allJobs by jobViewModel.jobs.collectAsState(emptyList())
@@ -156,9 +183,23 @@ fun FlowRunnerView(
             }
     }
 
-    Row(modifier = modifier.fillMaxSize()) {
+    val filteredFlows = remember(executableFlows, searchQuery) {
+        if (searchQuery.isBlank()) executableFlows
+        else executableFlows.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                    searchFocusRequester.requestFocus()
+                    true
+                } else false
+            }
+    ) {
         // Sidebar: Select Flow to Run (Standard NavigationSidebar)
-        val flowElements = executableFlows.map { flow ->
+        val flowElements = filteredFlows.map { flow ->
             SidebarElement(
                 id = flow,
                 icon = Icons.Default.PlayArrow,
@@ -173,7 +214,42 @@ fun FlowRunnerView(
             onScreenSelected = { selectedFlowToRun = it },
             isNavbarCollapsed = false,
             onToggleNavbar = {},
-            canCollapse = false
+            canCollapse = false,
+            headerContent = {
+                ToolkitTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = ToolkitTheme.spacing.medium)
+                        .focusRequester(searchFocusRequester),
+                    placeholder = {
+                        Text(
+                            stringResource(Res.string.flow_search_placeholder),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(Res.string.flow_search_placeholder),
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                        )
+                    },
+                    trailingIcon = if (searchQuery.isNotEmpty()) {
+                        {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Clear",
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                            }
+                        }
+                    } else null,
+                    singleLine = true
+                )
+            }
         )
 
         // Main Area: Run and History
@@ -580,6 +656,25 @@ fun FlowRunnerView(
                         )
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                         Text(stringResource(Res.string.action_reset_to_default))
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            if (onEditFlow != null) {
+                                onEditFlow(currentFlow.name)
+                            } else {
+                                router.navigateTo(Screen.FlowEditor(currentFlow.name))
+                            }
+                        },
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(stringResource(Res.string.action_edit))
                     }
 
                     val runningJob = remember(allJobs, currentFlow) {

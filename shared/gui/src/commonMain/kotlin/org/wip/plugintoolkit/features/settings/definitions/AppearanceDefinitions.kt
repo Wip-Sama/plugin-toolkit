@@ -1,7 +1,6 @@
 package org.wip.plugintoolkit.features.settings.definitions
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Brightness6
@@ -110,15 +109,6 @@ fun SettingsRegistryBuilder.appearanceDefinitions() {
                     )
                 }
             )
-
-            bindGroup(AppSettings::general, { copy(general = it) }) {
-                switch(
-                    GeneralSettings::animationsEnabled,
-                    Res.string.setting_animations_enabled,
-                    Icons.Default.Animation,
-                    subtitle = SettingText.Resource(Res.string.setting_animations_enabled_subtitle)
-                ) { copy(animationsEnabled = it) }
-            }
         }
 
         // ── Localization ─────────────────────────────────────────────

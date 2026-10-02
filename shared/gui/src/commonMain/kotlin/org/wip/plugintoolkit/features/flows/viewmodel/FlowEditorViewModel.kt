@@ -937,7 +937,7 @@ class FlowEditorViewModel(
             }
 
             is FlowEvent.BringToFront -> {
-                newState = nodeManager.handleBringToFront(currentState, event.nodeId)
+                newState = nodeManager.handleBringToFront(currentState, event.nodeId, event.isCtrlPressed)
             }
 
             is FlowEvent.SelectNodes -> {
@@ -954,6 +954,27 @@ class FlowEditorViewModel(
 
             is FlowEvent.SelectPoints -> {
                 newState = currentState.copy(selectedPointIds = event.ids)
+            }
+
+            is FlowEvent.ToggleGroupSelection -> {
+                val isSelected = currentState.selectedGroupIds.contains(event.groupId)
+                newState = currentState.copy(
+                    selectedGroupIds = if (isSelected) currentState.selectedGroupIds - event.groupId else currentState.selectedGroupIds + event.groupId
+                )
+            }
+
+            is FlowEvent.ToggleLabelSelection -> {
+                val isSelected = currentState.selectedLabelIds.contains(event.labelId)
+                newState = currentState.copy(
+                    selectedLabelIds = if (isSelected) currentState.selectedLabelIds - event.labelId else currentState.selectedLabelIds + event.labelId
+                )
+            }
+
+            is FlowEvent.TogglePointSelection -> {
+                val isSelected = currentState.selectedPointIds.contains(event.pointId)
+                newState = currentState.copy(
+                    selectedPointIds = if (isSelected) currentState.selectedPointIds - event.pointId else currentState.selectedPointIds + event.pointId
+                )
             }
 
             is FlowEvent.ClearSelection -> {

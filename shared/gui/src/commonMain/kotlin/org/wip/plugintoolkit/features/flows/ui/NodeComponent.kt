@@ -37,6 +37,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -84,7 +85,7 @@ fun NodeComponent(
     onDropConnection: (isShiftPressed: Boolean) -> Unit = {},
     onPortPositioned: (Long, String, Boolean, LayoutCoordinates) -> Unit = { _, _, _, _ -> },
     onPortDisposed: (Long, String, Boolean) -> Unit = { _, _, _ -> },
-    onPress: (Long) -> Unit = {},
+    onPress: (Long, Boolean) -> Unit = { _, _ -> },
     onUpdateBoundaryNode: (Long, String, DataType, List<SemanticType>, PortConstraints?, Boolean, Boolean, Any?) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onUpdateSystemNodeSettings: (Long, String, List<SemanticType>, String?, List<String>?) -> Unit = { _, _, _, _, _ -> },
     onUpdateInputPortDefault: (Long, String, Any?) -> Unit = { _, _, _ -> },
@@ -120,6 +121,7 @@ fun NodeComponent(
     var showLoadSettingsDialog by remember { mutableStateOf(false) }
     var isCardHovered by remember { mutableStateOf(false) }
     val effectiveNodeHovered = isNodeHovered || isCardHovered
+    var isCtrlPressedOnPress by remember { mutableStateOf(false) }
 
     val currentOnMove by rememberUpdatedState(onMove)
     val currentOnEndMove by rememberUpdatedState(onEndMove)
@@ -250,6 +252,16 @@ fun NodeComponent(
             .pointerInput(node.id) {
                 awaitPointerEventScope {
                     while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press) {
+                            isCtrlPressedOnPress = event.keyboardModifiers.isCtrlPressed
+                        }
+                    }
+                }
+            }
+            .pointerInput(node.id) {
+                awaitPointerEventScope {
+                    while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Main)
                         if (event.type == PointerEventType.Press) {
                             event.changes.forEach { it.consume() }
@@ -283,7 +295,7 @@ fun NodeComponent(
                         },
                         onPress = {
                             if (!isEyedropperActive) {
-                                currentOnPress(node.id)
+                                currentOnPress(node.id, isCtrlPressedOnPress)
                             }
                         }
                     )
@@ -393,7 +405,7 @@ fun NodeComponent(
                             onPortDisposed = onPortDisposed,
                             isDrawingConnection = isDrawingConnection,
                             isNodeHovered = effectiveNodeHovered,
-                            onPress = currentOnPress
+                            onPress = { id -> currentOnPress(id, isCtrlPressedOnPress) }
                         )
                     }
 

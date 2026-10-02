@@ -47,6 +47,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -106,6 +107,7 @@ fun FlowGroupComponent(
     onWashGroup: ((Long) -> Unit)? = null,
     onSampleColor: ((String) -> Unit)? = null,
     onResizeGroup: ((Long, Offset, Offset, Boolean) -> Unit)? = null,
+    onSelectGroup: ((Long, Boolean) -> Unit)? = null,
     isInteractionBlocked: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -179,6 +181,7 @@ fun FlowGroupComponent(
                             val event = awaitPointerEvent()
                             if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
                                 val isShift = event.keyboardModifiers.isShiftPressed
+                                val isCtrl = event.keyboardModifiers.isCtrlPressed
                                 if (isEyedropperActive && onSampleColor != null) {
                                     onSampleColor(group.color ?: "#4CAF50")
                                     event.changes.forEach { it.consume() }
@@ -191,6 +194,8 @@ fun FlowGroupComponent(
                                 } else if (isShift && !isReadOnly) {
                                     isEditingTitle = true
                                     event.changes.forEach { it.consume() }
+                                } else if (!isReadOnly) {
+                                    onSelectGroup?.invoke(group.id, isCtrl)
                                 }
                             }
                         }
@@ -205,6 +210,9 @@ fun FlowGroupComponent(
                             val isNearRight = offset.x >= (group.size.x - RESIZE_HANDLE_THICKNESS_DP * 1.5f)
                             val isNearBottom = !group.isCollapsed && offset.y >= (group.size.y - RESIZE_HANDLE_THICKNESS_DP * 1.5f)
                             isDraggingGroup = !isNearRight && !isNearBottom
+                            if (isDraggingGroup && !isSelected && onSelectGroup != null) {
+                                onSelectGroup(group.id, false)
+                            }
                         },
                         onDragEnd = {
                             if (isDraggingGroup) {
