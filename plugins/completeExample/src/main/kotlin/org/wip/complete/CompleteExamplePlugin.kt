@@ -238,7 +238,8 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
     @Capability(
         name = "capabilityWithPauseResume",
         description = "Showcase of a long-running, pausable capability with state persistence and cancellation checks.",
-        supportsPause = true
+        supportsPause = true,
+        maxConcurrentExecutions = 2
     )
     suspend fun capabilityWithPauseResume(
         @CapabilityParam(description = "Number of iteration steps", defaultValue = "5") totalSteps: Int,

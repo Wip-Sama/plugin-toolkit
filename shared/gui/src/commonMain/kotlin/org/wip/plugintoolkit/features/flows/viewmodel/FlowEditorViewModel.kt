@@ -2542,14 +2542,10 @@ class FlowEditorViewModel(
             return
         }
 
-        var isRunning = false
-        try {
-            val jobManager = getKoin().get<JobManager>()
-            isRunning = jobManager.jobs.value.any {
-                it.type == JobType.Flow && (it.capabilityName == currentFlowName || it.pluginId == currentFlowName) && (it.status == JobStatus.Running || it.status == JobStatus.Queued)
-            }
+        val isRunning = try {
+            flowRepository.isFlowLocked(currentFlowName)
         } catch (e: Exception) {
-            // Ignore
+            false
         }
 
         val isUsedAsSubflow = currentState.flows.any { otherFlow ->

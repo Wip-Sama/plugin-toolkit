@@ -173,6 +173,10 @@ object ManifestGenerator {
                     "requiredLocks = listOf(%L),\n",
                     requiredLocksList.joinToString { "\"$it\"" })
             }
+            val maxConcurrentExecutions = (capAnn.arguments.find { it.name?.asString() == "maxConcurrentExecutions" }?.value as? Int)?.takeIf { it > 0 }
+            if (maxConcurrentExecutions != null) {
+                capabilitiesCode.add("maxConcurrentExecutions = %L,\n", maxConcurrentExecutions)
+            }
             capabilitiesCode.add("parameters = mapOf(\n")
             capabilitiesCode.indent()
 

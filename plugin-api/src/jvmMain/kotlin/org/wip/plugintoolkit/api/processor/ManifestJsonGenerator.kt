@@ -146,6 +146,8 @@ object ManifestJsonGenerator {
             val reqLockAnn = func.annotations.find { it.hasQualifiedName(ProcessorConstants.REQUIRES_LOCK_ANNOTATION) }
             val requiredLocksList = (reqLockAnn?.arguments?.find { it.name?.asString() == "locks" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
+            val maxConcurrentExecutions = (capAnn.arguments.find { it.name?.asString() == "maxConcurrentExecutions" }?.value as? Int)?.takeIf { it > 0 }
+
             Capability(
                 name = capName,
                 description = capDesc,
@@ -158,7 +160,8 @@ object ManifestJsonGenerator {
                 context = context,
                 requiresSettings = requiresSettingsList,
                 requiredLocks = requiredLocksList,
-                fileAccess = fileAccess
+                fileAccess = fileAccess,
+                maxConcurrentExecutions = maxConcurrentExecutions
             )
         }
 

@@ -217,6 +217,9 @@ class SinglePluginHostViewModel(
 
             val jobId = jobCounterMutex.withLock { ++jobCounter }.toString()
 
+            val store = pluginManager.loadPluginSettings(pluginId)
+            val effectiveMax = store.getEffectiveMaxConcurrent(capability.name, capability.maxConcurrentExecutions)
+
             val job = BackgroundJob(
                 id = jobId,
                 name = "${manifest.plugin.name}: ${capability.name}",
@@ -226,7 +229,8 @@ class SinglePluginHostViewModel(
                 parameters = params,
                 keepResult = saveResults,
                 isPausable = capability.isPausable,
-                isCancellable = capability.isCancellable
+                isCancellable = capability.isCancellable,
+                maxConcurrentExecutions = effectiveMax
             )
             jobManager.enqueueJob(job)
 

@@ -32,4 +32,18 @@ class ManifestModelsTest {
             throw e
         }
     }
+
+    @Test
+    fun testCapabilityMaxConcurrentExecutionsSerialization() {
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val capability = Capability(
+            name = "concurrent_task",
+            description = "Runs with concurrency limit",
+            returnType = DataType.Primitive(PrimitiveType.UNIT),
+            maxConcurrentExecutions = 3
+        )
+        val serialized = json.encodeToString(CapabilitySerializer, capability)
+        val deserialized = json.decodeFromString(CapabilitySerializer, serialized)
+        assertEquals(3, deserialized.maxConcurrentExecutions)
+    }
 }

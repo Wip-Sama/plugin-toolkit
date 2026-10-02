@@ -140,13 +140,20 @@ class JobWorker(
         } catch (e: CancellationException) {
             Logger.w { "Worker $workerId: Job ${job.name} was cancelled" }
             throw e
+        } catch (e: FlowExecutionFailureException) {
+            manager.tryFailJob(job.id, e.message, resumeState = e.resumeState)
+            lifecycleCoordinator.onLifecycleJobFailed(job, e.message)
+            Logger.e(e) { "Worker $workerId flow failure during job ${job.name}" }
         } catch (e: Throwable) {
             manager.tryFailJob(job.id, e.message)
             lifecycleCoordinator.onLifecycleJobFailed(job, e.message)
             Logger.e(e) { "Worker $workerId exception during job ${job.name}" }
         } finally {
             val currentJob = manager.jobs.value.find { it.id == job.id }
-            if (currentJob?.status != JobStatus.Paused) {
+                ?: manager.endedJobs.value.find { it.id == job.id }
+            val preserveSandbox = currentJob?.status == JobStatus.Paused ||
+                    (currentJob?.type == JobType.Flow && currentJob.status == JobStatus.Failed && currentJob.resumeState != null)
+            if (!preserveSandbox) {
                 val settingsPersistence: SettingsPersistence = get()
                 val appDataDir = settingsPersistence.getSettingsDir()
                 val sandboxDir = Path("$appDataDir/jobs/${job.id}/sandbox")
@@ -159,6 +166,8 @@ class JobWorker(
                         cleanupManager.registerFailedDeletion(sandboxDir.toString())
                     } catch (_: Exception) {}
                 }
+            } else {
+                Logger.i { "Worker $workerId: Preserving sandbox directory for job ${job.id} (status: ${currentJob?.status})" }
             }
         }
     }

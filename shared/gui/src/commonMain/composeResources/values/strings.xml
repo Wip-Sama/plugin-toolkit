@@ -895,4 +895,15 @@
     <string name="input_no_audio_selected">No audio selected</string>
     <string name="input_no_video_selected">No video selected</string>
     <string name="input_unsupported_extension">Unsupported extension (allowed: %1$s)</string>
+
+    <!-- Flow & Capability Concurrency and Reprocess Controls -->
+    <string name="setting_max_concurrent_executions">Max Concurrent Executions</string>
+    <string name="setting_max_concurrent_executions_cap_desc">Limit simultaneous runs (developer max: %1$d)</string>
+    <string name="setting_max_concurrent_executions_unlimited">No limit</string>
+    <string name="flow_max_concurrent_executions">Max Concurrent Executions</string>
+    <string name="flow_reprocess_failed">Reprocess from Failed Step</string>
+    <string name="action_reprocess">Reprocess</string>
+    <string name="action_restart">Restart</string>
+    <string name="action_store_files">Store Files</string>
+    <string name="flow_files_stored_toast">Intermediate files stored successfully</string>
 </resources>

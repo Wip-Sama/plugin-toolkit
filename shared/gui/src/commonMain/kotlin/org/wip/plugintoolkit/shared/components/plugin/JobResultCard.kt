@@ -48,6 +48,7 @@ fun JobResultCard(
     onCancel: ((Boolean) -> Unit)? = null,
     onPause: (() -> Unit)? = null,
     onResume: (() -> Unit)? = null,
+    onRestart: (() -> Unit)? = null,
     onClear: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -84,7 +85,7 @@ fun JobResultCard(
             job.executionMetrics != null ||
             logs.isNotEmpty()
 
-    val hasActions = onPause != null || onResume != null || onCancel != null || onClear != null
+    val hasActions = onPause != null || onResume != null || onRestart != null || onCancel != null || onClear != null
 
     ToolkitCard(
         modifier = modifier.fillMaxWidth(),
@@ -100,8 +101,8 @@ fun JobResultCard(
                 onDelete = onDelete
             )
 
-            // Progress bar for running jobs
-            if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
+            // Progress bar for running and paused jobs
+            if (job.status == JobStatus.Running || job.status == JobStatus.Queued || job.status == JobStatus.PauseRequested || job.status == JobStatus.Paused) {
                 Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
                 JobResultProgressSection(
                     job = job,
@@ -166,6 +167,7 @@ fun JobResultCard(
                     },
                     onPause = onPause,
                     onResume = onResume,
+                    onRestart = onRestart,
                     onCancel = onCancel,
                     onClear = onClear
                 )

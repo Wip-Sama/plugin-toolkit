@@ -46,6 +46,13 @@ class FlowEditorReadOnlyTest {
         every { mockSettingsRepo.settings } returns settingsFlow
         every { mockSettingsRepo.isLoaded } returns MutableStateFlow(true)
         every { mockFlowRepo.flows } returns MutableStateFlow(emptyList())
+        every { mockFlowRepo.isFlowLocked(any()) } answers {
+            val target = firstArg<String>()
+            jobsFlow.value.any {
+                it.type == JobType.Flow && (it.capabilityName == target || it.pluginId == target) &&
+                        (it.status == JobStatus.Running || it.status == JobStatus.Queued || it.status == JobStatus.PauseRequested || it.status == JobStatus.Paused)
+            }
+        }
 
         startKoin {
             modules(

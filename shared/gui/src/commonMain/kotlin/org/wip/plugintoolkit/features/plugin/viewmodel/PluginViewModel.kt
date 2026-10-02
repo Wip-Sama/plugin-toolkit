@@ -260,16 +260,21 @@ class PluginViewModel(
                 null
             }
 
+            val pluginId = manifest?.plugin?.id ?: ""
+            val store = pluginManager.loadPluginSettings(pluginId)
+            val effectiveMax = store.getEffectiveMaxConcurrent(capability.name, capability.maxConcurrentExecutions)
+
             val job = BackgroundJob(
                 id = jobId,
                 name = "${manifest?.plugin?.name ?: "Unknown"}: ${capability.name}",
                 type = JobType.Capability,
-                pluginId = manifest?.plugin?.id ?: "",
+                pluginId = pluginId,
                 capabilityName = capability.name,
                 parameters = params,
                 keepResult = saveResults,
                 isPausable = capability.isPausable,
-                isCancellable = capability.isCancellable
+                isCancellable = capability.isCancellable,
+                maxConcurrentExecutions = effectiveMax
             )
             jobManager.enqueueJob(job)
 

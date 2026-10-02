@@ -10,6 +10,7 @@ expect object PlatformUtils {
     suspend fun pickFolder(): String?
     suspend fun pickFile(): String?
     fun copyFile(source: String, destination: String)
+    fun copyDirectory(source: String, destination: String): Boolean
     fun downloadFile(url: String, destination: String): Result<Unit>
     fun unzip(source: String, destination: String, maxDecompressedSize: Long = 100 * 1024 * 1024): Result<Unit>
     fun getUnzippedSize(zipPath: String): Long

@@ -47,8 +47,12 @@ class FlowRepository(
     init {
         reloadFlows()
         scope.launch {
-            pluginManager.installedPlugins.collect {
-                reloadFlows()
+            try {
+                pluginManager.installedPlugins.collect {
+                    reloadFlows()
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Error observing installedPlugins in FlowRepository" }
             }
         }
     }
@@ -161,6 +165,14 @@ class FlowRepository(
 
     fun isFlowLocked(flowName: String): Boolean {
         return resolvedExecutionGuard?.isFlowLocked(flowName, _flows.value) ?: false
+    }
+
+    fun isFlowRunning(flowName: String): Boolean {
+        return resolvedExecutionGuard?.isFlowRunning(flowName, _flows.value) ?: false
+    }
+
+    fun isFlowPaused(flowName: String): Boolean {
+        return resolvedExecutionGuard?.isFlowPaused(flowName, _flows.value) ?: false
     }
 
     fun saveFlow(flow: Flow) {
@@ -284,6 +296,27 @@ class FlowRepository(
                 }
             } catch (e: Exception) {
                 Logger.e(e) { "Failed to update flow metadata for $flowName" }
+            }
+        }
+    }
+
+    fun updateFlowMaxConcurrency(flowName: String, maxConcurrent: Int?) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val appDataDir = settingsPersistence.getSettingsDir()
+                val flowFile = getFlowPath(appDataDir, flowName)
+
+                val flow = _flows.value.find { it.name == flowName } ?: return@launch
+                val updatedFlow = flow.copy(maxConcurrentExecutions = if (maxConcurrent != null && maxConcurrent > 0) maxConcurrent else null)
+
+                val flowContent = json.encodeToString(Flow.serializer(), updatedFlow)
+                SystemFileSystem.sink(flowFile).buffered().use { it.writeString(flowContent) }
+
+                _flows.update { current ->
+                    current.map { if (it.name == flowName) updatedFlow else it }
+                }
+            } catch (e: Exception) {
+                Logger.e(e) { "Failed to update max concurrency for flow $flowName" }
             }
         }
     }

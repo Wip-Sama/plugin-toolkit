@@ -762,4 +762,207 @@ class JobManagerTest {
 
         jobManager.tryCompleteJob("q-pause-2", "Done")
     }
+
+    @Test
+    fun testFlowConcurrencyEnforcement() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings().copy(
+            jobs = AppSettings().jobs.copy(maxConcurrentJobs = 5)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val flowJob1 = BackgroundJob(
+            id = "flow-a-1",
+            name = "Flow A Run 1",
+            type = JobType.Flow,
+            pluginId = "flow-engine",
+            capabilityName = "FlowA",
+            maxConcurrentExecutions = 1
+        )
+        val flowJob2 = BackgroundJob(
+            id = "flow-a-2",
+            name = "Flow A Run 2",
+            type = JobType.Flow,
+            pluginId = "flow-engine",
+            capabilityName = "FlowA",
+            maxConcurrentExecutions = 1
+        )
+        val flowJobB = BackgroundJob(
+            id = "flow-b-1",
+            name = "Flow B Run 1",
+            type = JobType.Flow,
+            pluginId = "flow-engine",
+            capabilityName = "FlowB",
+            maxConcurrentExecutions = 2
+        )
+
+        jobManager.enqueueJob(flowJob1)
+        jobManager.enqueueJob(flowJob2)
+        jobManager.enqueueJob(flowJobB)
+
+        // Claim first job: should be flow-a-1
+        val claimed1 = jobManager.waitForNextJob()
+        assertEquals("flow-a-1", claimed1.id)
+        assertEquals(JobStatus.Running, claimed1.status)
+
+        // Second claim: flow-a-2 cannot run because FlowA limit of 1 is reached.
+        // Therefore, flow-b-1 should be claimed next!
+        val claimed2 = jobManager.waitForNextJob()
+        assertEquals("flow-b-1", claimed2.id)
+        assertEquals(JobStatus.Running, claimed2.status)
+
+        // Now complete flow-a-1
+        jobManager.tryCompleteJob("flow-a-1", "Done")
+
+        // Now flow-a-2 can be claimed
+        val claimed3 = jobManager.waitForNextJob()
+        assertEquals("flow-a-2", claimed3.id)
+        assertEquals(JobStatus.Running, claimed3.status)
+
+        jobManager.tryCompleteJob("flow-a-2", "Done")
+        jobManager.tryCompleteJob("flow-b-1", "Done")
+    }
+
+    @Test
+    fun testCapabilityConcurrencyEnforcement() = runTest {
+        val persistence = FakeSettingsPersistence()
+        persistence.settings = AppSettings().copy(
+            jobs = AppSettings().jobs.copy(maxConcurrentJobs = 5)
+        )
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val capJob1 = BackgroundJob(
+            id = "cap-a-1",
+            name = "Cap A Run 1",
+            type = JobType.Capability,
+            pluginId = "pkg-1",
+            capabilityName = "cap-x",
+            maxConcurrentExecutions = 1
+        )
+        val capJob2 = BackgroundJob(
+            id = "cap-a-2",
+            name = "Cap A Run 2",
+            type = JobType.Capability,
+            pluginId = "pkg-1",
+            capabilityName = "cap-x",
+            maxConcurrentExecutions = 1
+        )
+        val capJobOther = BackgroundJob(
+            id = "cap-other-1",
+            name = "Cap Other Run 1",
+            type = JobType.Capability,
+            pluginId = "pkg-1",
+            capabilityName = "cap-y",
+            maxConcurrentExecutions = 2
+        )
+
+        jobManager.enqueueJob(capJob1)
+        jobManager.enqueueJob(capJob2)
+        jobManager.enqueueJob(capJobOther)
+
+        val claimed1 = jobManager.waitForNextJob()
+        assertEquals("cap-a-1", claimed1.id)
+
+        // cap-a-2 skipped due to concurrency limit = 1 on cap-x, cap-other-1 claimed
+        val claimed2 = jobManager.waitForNextJob()
+        assertEquals("cap-other-1", claimed2.id)
+
+        jobManager.tryCompleteJob("cap-a-1", "Result")
+
+        // Now cap-a-2 is schedulable
+        val claimed3 = jobManager.waitForNextJob()
+        assertEquals("cap-a-2", claimed3.id)
+
+        jobManager.tryCompleteJob("cap-a-2", "Result")
+        jobManager.tryCompleteJob("cap-other-1", "Result")
+    }
+
+    @Test
+    fun testFailedFlowReprocessResume() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val flowJob = BackgroundJob(
+            id = "failed-flow-1",
+            name = "Failing Flow",
+            type = JobType.Flow,
+            pluginId = "flow-engine",
+            capabilityName = "TestFlow"
+        )
+        jobManager.enqueueJob(flowJob)
+
+        val claimed = jobManager.waitForNextJob()
+        assertEquals("failed-flow-1", claimed.id)
+
+        // Fail flow with resumeState
+        val failureResumeState = JsonPrimitive("saved_node_snapshot")
+        val failSuccess = jobManager.tryFailJob("failed-flow-1", "Simulation error", resumeState = failureResumeState)
+        assertTrue(failSuccess)
+
+        // Must be in endedJobs
+        val endedJob = jobManager.endedJobs.value.find { it.id == "failed-flow-1" }
+        assertNotNull(endedJob)
+        assertEquals(JobStatus.Failed, endedJob.status)
+        assertEquals(failureResumeState, endedJob.resumeState)
+
+        // Calling resumeJob on failed flow restores it to active jobs as Queued
+        jobManager.resumeJob("failed-flow-1")
+
+        // Verify it was moved back to jobs as Queued with cleared errorMessage
+        val restoredJob = jobManager.jobs.value.find { it.id == "failed-flow-1" }
+        assertNotNull(restoredJob)
+        assertEquals(JobStatus.Queued, restoredJob.status)
+        assertNull(restoredJob.errorMessage)
+        assertEquals(failureResumeState, restoredJob.resumeState)
+
+        // Should no longer be in endedJobs
+        assertNull(jobManager.endedJobs.value.find { it.id == "failed-flow-1" })
+
+        // Should be claimable again for reprocess
+        val reprocessedClaimed = jobManager.waitForNextJob()
+        assertEquals("failed-flow-1", reprocessedClaimed.id)
+        assertEquals(JobStatus.Running, reprocessedClaimed.status)
+
+        jobManager.tryCompleteJob("failed-flow-1", "Success")
+    }
+
+    @Test
+    fun testRestartEndedJob() = runTest {
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        settingsRepo.isLoaded.first { it }
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+
+        val flowJob = BackgroundJob(
+            id = "ended-flow-1",
+            name = "Flow: Sample",
+            type = JobType.Flow,
+            pluginId = "system",
+            capabilityName = "SampleFlow",
+            parameters = mapOf("param1" to JsonPrimitive("value1"))
+        )
+        jobManager.enqueueJob(flowJob)
+        val claimed = jobManager.waitForNextJob()
+        jobManager.tryCompleteJob(claimed.id, "Done")
+
+        assertNotNull(jobManager.endedJobs.value.find { it.id == "ended-flow-1" })
+
+        val restartedId = jobManager.restartJob("ended-flow-1")
+        assertNotNull(restartedId)
+        assertTrue(restartedId != "ended-flow-1")
+
+        val newJob = jobManager.jobs.value.find { it.id == restartedId }
+        assertNotNull(newJob)
+        assertEquals(JobStatus.Queued, newJob.status)
+        assertEquals("SampleFlow", newJob.capabilityName)
+        assertEquals(JsonPrimitive("value1"), newJob.parameters["param1"])
+        assertNull(newJob.resumeState)
+        assertNull(newJob.result)
+    }
 }

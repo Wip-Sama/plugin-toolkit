@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class FlowExecutionGuardTest {
 
     private val jobManager = mockk<JobManager>(relaxed = true)
-    private val guard = FlowExecutionGuard { jobManager }
+    private val guard = FlowExecutionGuard(jobManagerProvider = { jobManager })
 
     private fun createSubflowNode(id: Long, subflowName: String): Node.SubFlowNode {
         return Node.SubFlowNode(
@@ -175,5 +175,90 @@ class FlowExecutionGuardTest {
         val referencedPlugins = flow1.getAllReferencedPluginIds(allFlows)
 
         kotlin.test.assertEquals(setOf("org.wip.plugin.c"), referencedPlugins)
+    }
+
+    @Test
+    fun testFlowLockedAndRunningWhenPauseRequested() {
+        val pausingJob = BackgroundJob(
+            id = "job-pause",
+            name = "Flow: PausingFlow",
+            type = JobType.Flow,
+            status = JobStatus.PauseRequested,
+            pluginId = "system",
+            capabilityName = "PausingFlow"
+        )
+        every { jobManager.jobs } returns MutableStateFlow(listOf(pausingJob))
+
+        val flow = Flow(name = "PausingFlow")
+        assertTrue(guard.isFlowLocked("PausingFlow", listOf(flow)))
+        assertTrue(guard.isFlowRunning("PausingFlow", listOf(flow)))
+    }
+
+    @Test
+    fun testIsFlowRunningTransitive() {
+        val runningJob = BackgroundJob(
+            id = "job-root",
+            name = "Flow: RootFlow",
+            type = JobType.Flow,
+            status = JobStatus.Running,
+            pluginId = "system",
+            capabilityName = "RootFlow"
+        )
+        every { jobManager.jobs } returns MutableStateFlow(listOf(runningJob))
+
+        val subFlow = Flow(name = "ChildSubFlow")
+        val rootFlow = Flow(
+            name = "RootFlow",
+            nodes = listOf(createSubflowNode(1, "ChildSubFlow"))
+        )
+        val allFlows = listOf(rootFlow, subFlow)
+
+        assertTrue(guard.isFlowRunning("RootFlow", allFlows))
+        assertTrue(guard.isFlowRunning("ChildSubFlow", allFlows))
+        assertFalse(guard.isFlowRunning("UnrelatedFlow", allFlows))
+    }
+
+    @Test
+    fun testDirectPausedFlowIsLockedAndPaused() {
+        val pausedJob = BackgroundJob(
+            id = "job-paused",
+            name = "Flow: PausedFlow",
+            type = JobType.Flow,
+            status = JobStatus.Paused,
+            pluginId = "system",
+            capabilityName = "PausedFlow"
+        )
+        every { jobManager.jobs } returns MutableStateFlow(listOf(pausedJob))
+
+        val flow = Flow(name = "PausedFlow")
+        assertTrue(guard.isFlowLocked("PausedFlow", listOf(flow)))
+        assertFalse(guard.isFlowRunning("PausedFlow", listOf(flow)))
+        assertTrue(guard.isFlowPaused("PausedFlow", listOf(flow)))
+    }
+
+    @Test
+    fun testIsFlowPausedTransitive() {
+        val pausedJob = BackgroundJob(
+            id = "job-root-paused",
+            name = "Flow: RootFlow",
+            type = JobType.Flow,
+            status = JobStatus.Paused,
+            pluginId = "system",
+            capabilityName = "RootFlow"
+        )
+        every { jobManager.jobs } returns MutableStateFlow(listOf(pausedJob))
+
+        val subFlow = Flow(name = "ChildSubFlow")
+        val rootFlow = Flow(
+            name = "RootFlow",
+            nodes = listOf(createSubflowNode(1, "ChildSubFlow"))
+        )
+        val allFlows = listOf(rootFlow, subFlow)
+
+        assertTrue(guard.isFlowLocked("RootFlow", allFlows))
+        assertTrue(guard.isFlowLocked("ChildSubFlow", allFlows))
+        assertTrue(guard.isFlowPaused("RootFlow", allFlows))
+        assertTrue(guard.isFlowPaused("ChildSubFlow", allFlows))
+        assertFalse(guard.isFlowPaused("UnrelatedFlow", allFlows))
     }
 }

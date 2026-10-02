@@ -17,19 +17,28 @@ class FlowReadOnlyViolationException(
 
 /**
  * Centralized guard verifying whether a flow is currently executing or utilized
- * transitively by active jobs.
+ * transitively by active jobs. Serves as the single source of truth for flow execution locks.
  */
 class FlowExecutionGuard(
-    private val jobManagerProvider: () -> JobManager?
+    private val jobManagerProvider: () -> JobManager?,
+    private val flowProvider: (() -> List<Flow>)? = null
 ) {
     /**
      * Checks if [flowName] is currently locked against mutation or deletion.
+     * A flow is locked if it is directly or transitively part of an active execution
+     * (Running, Queued, PauseRequested, or Paused).
      */
-    fun isFlowLocked(flowName: String, allFlows: List<Flow>): Boolean {
+    fun isFlowLocked(flowName: String, allFlows: List<Flow>? = null): Boolean {
         if (flowName.isBlank()) return false
+        val flows = allFlows ?: flowProvider?.invoke() ?: emptyList()
         val jobManager = jobManagerProvider() ?: return false
         val activeJobs = jobManager.jobs.value.filter {
-            it.type == JobType.Flow && (it.status == JobStatus.Running || it.status == JobStatus.Queued)
+            it.type == JobType.Flow && (
+                it.status == JobStatus.Running ||
+                it.status == JobStatus.Queued ||
+                it.status == JobStatus.PauseRequested ||
+                it.status == JobStatus.Paused
+            )
         }
 
         // 1. Direct active root flow execution check
@@ -39,9 +48,53 @@ class FlowExecutionGuard(
 
         // 2. Transitive active subflow execution check
         val activeRootFlowNames = activeJobs.map { it.capabilityName }.toSet()
-        val activeRoots = allFlows.filter { it.name in activeRootFlowNames }
+        val activeRoots = flows.filter { it.name in activeRootFlowNames }
         return activeRoots.any { rootFlow ->
-            isReferencedAsSubflowTransitively(targetFlowName = flowName, current = rootFlow, allFlows = allFlows)
+            isReferencedAsSubflowTransitively(targetFlowName = flowName, current = rootFlow, allFlows = flows)
+        }
+    }
+
+    /**
+     * Checks if [flowName] is currently actively running (or pause requested) either as a root flow or transitive subflow.
+     */
+    fun isFlowRunning(flowName: String, allFlows: List<Flow>? = null): Boolean {
+        if (flowName.isBlank()) return false
+        val flows = allFlows ?: flowProvider?.invoke() ?: emptyList()
+        val jobManager = jobManagerProvider() ?: return false
+        val runningJobs = jobManager.jobs.value.filter {
+            it.type == JobType.Flow && (it.status == JobStatus.Running || it.status == JobStatus.PauseRequested)
+        }
+
+        if (runningJobs.any { it.capabilityName == flowName || it.pluginId == flowName }) {
+            return true
+        }
+
+        val runningRootFlowNames = runningJobs.map { it.capabilityName }.toSet()
+        val runningRoots = flows.filter { it.name in runningRootFlowNames }
+        return runningRoots.any { rootFlow ->
+            isReferencedAsSubflowTransitively(targetFlowName = flowName, current = rootFlow, allFlows = flows)
+        }
+    }
+
+    /**
+     * Checks if [flowName] currently has an execution paused either as a root flow or transitive subflow.
+     */
+    fun isFlowPaused(flowName: String, allFlows: List<Flow>? = null): Boolean {
+        if (flowName.isBlank()) return false
+        val flows = allFlows ?: flowProvider?.invoke() ?: emptyList()
+        val jobManager = jobManagerProvider() ?: return false
+        val pausedJobs = jobManager.jobs.value.filter {
+            it.type == JobType.Flow && it.status == JobStatus.Paused
+        }
+
+        if (pausedJobs.any { it.capabilityName == flowName || it.pluginId == flowName }) {
+            return true
+        }
+
+        val pausedRootFlowNames = pausedJobs.map { it.capabilityName }.toSet()
+        val pausedRoots = flows.filter { it.name in pausedRootFlowNames }
+        return pausedRoots.any { rootFlow ->
+            isReferencedAsSubflowTransitively(targetFlowName = flowName, current = rootFlow, allFlows = flows)
         }
     }
 
@@ -64,8 +117,9 @@ class FlowExecutionGuard(
     /**
      * Asserts that [flowName] can be mutated. Throws [FlowReadOnlyViolationException] if locked.
      */
-    fun assertCanMutate(flowName: String, allFlows: List<Flow>) {
-        if (isFlowLocked(flowName, allFlows)) {
+    fun assertCanMutate(flowName: String, allFlows: List<Flow>? = null) {
+        val flows = allFlows ?: flowProvider?.invoke() ?: emptyList()
+        if (isFlowLocked(flowName, flows)) {
             Logger.w { "Modification rejected for flow '$flowName': active execution lock." }
             throw FlowReadOnlyViolationException(
                 flowName = flowName,

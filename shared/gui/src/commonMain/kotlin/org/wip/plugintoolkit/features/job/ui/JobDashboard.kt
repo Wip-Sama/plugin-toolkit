@@ -338,6 +338,8 @@ fun EndedTab(viewModel: JobViewModel) {
                         job = job,
                         progress = progressMap[job.id] ?: org.wip.plugintoolkit.features.job.model.JobProgress(),
                         logs = logsMap[job.id] ?: emptyList(),
+                        onResume = if (job.status == JobStatus.Failed && job.resumeState != null) { { viewModel.resumeJob(job.id) } } else null,
+                        onRestart = { viewModel.restartJob(job.id) },
                         onClear = { viewModel.clearEndedJob(job.id) }
                     )
                 }

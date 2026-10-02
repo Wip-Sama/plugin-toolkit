@@ -55,6 +55,12 @@ class JobViewModel(
         }
     }
 
+    fun restartJob(jobId: String) {
+        viewModelScope.launch {
+            jobManager.restartJob(jobId)
+        }
+    }
+
     fun reorderQueue(fromIndex: Int, toIndex: Int) {
         viewModelScope.launch {
             jobManager.reorderQueue(fromIndex, toIndex)

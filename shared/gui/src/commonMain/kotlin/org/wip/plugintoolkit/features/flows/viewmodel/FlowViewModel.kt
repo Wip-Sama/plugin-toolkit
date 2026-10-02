@@ -340,6 +340,14 @@ class FlowViewModel(
         flowRepository.triggerMigrationsForUpdatedPlugin(pluginId)
     }
 
+    fun updateFlowMaxConcurrency(flowName: String, maxConcurrent: Int?) {
+        try {
+            flowRepository.updateFlowMaxConcurrency(flowName, maxConcurrent)
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to update max concurrency for flow '$flowName'" }
+        }
+    }
+
     fun onEvent(event: FlowEvent) {
         when (event) {
             is FlowEvent.SelectFlow -> _state.update { it.copy(selectedFlowId = event.flowName) }
@@ -669,31 +677,9 @@ class FlowViewModel(
         return candidate
     }
 
-    fun isFlowRunning(flowName: String): Boolean {
-        return isFlowLocked(flowName) || try {
-            val jobManager = getKoin().get<JobManager>()
-            jobManager.jobs.value.any { job ->
-                job.type == JobType.Flow &&
-                        job.capabilityName == flowName &&
-                        (job.status == JobStatus.Running || job.status == JobStatus.Queued || job.status == JobStatus.PauseRequested)
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }
+    fun isFlowRunning(flowName: String): Boolean = flowRepository.isFlowRunning(flowName)
 
-    fun isFlowPaused(flowName: String): Boolean {
-        return try {
-            val jobManager = getKoin().get<JobManager>()
-            jobManager.jobs.value.any { job ->
-                job.type == JobType.Flow &&
-                        job.capabilityName == flowName &&
-                        job.status == JobStatus.Paused
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }
+    fun isFlowPaused(flowName: String): Boolean = flowRepository.isFlowPaused(flowName)
 
     fun resumeFlow(jobId: String) {
         viewModelScope.launch {
@@ -722,9 +708,9 @@ class FlowViewModel(
     }
 
     private fun handleDeleteFlow(name: String) {
-        if (isFlowRunning(name)) {
+        if (isFlowLocked(name)) {
             viewModelScope.launch(Dispatchers.Main) {
-                resolvedNotificationService?.toast("Cannot delete flow '$name' because it is currently running or queued.")
+                resolvedNotificationService?.toast("Cannot delete flow '$name' because it is currently executing or utilized by an active job.")
             }
             return
         }
@@ -819,7 +805,8 @@ class FlowViewModel(
                     capabilityName = flow.name,
                     parameters = params,
                     keepResult = saveResults,
-                    isPausable = true
+                    isPausable = true,
+                    maxConcurrentExecutions = flow.maxConcurrentExecutions
                 )
 
                 jobManager.enqueueJob(job)

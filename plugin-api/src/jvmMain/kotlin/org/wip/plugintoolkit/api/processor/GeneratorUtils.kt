@@ -688,8 +688,8 @@ object GeneratorUtils {
             val paramType = ksType.toTypeName()
 
             if (ProcessorConstants.INFRASTRUCTURE_TYPES.contains(paramType)) continue
-            if (param.annotations.any { it.hasQualifiedName(ProcessorConstants.RESUME_STATE_ANNOTATION) }) continue
 
+            val isResumeState = param.annotations.any { it.hasQualifiedName(ProcessorConstants.RESUME_STATE_ANNOTATION) }
             val isGroup = param.annotations.any { it.hasQualifiedName(ProcessorConstants.PARAMETER_GROUP_ANNOTATION) } ||
                     (ksType.declaration.annotations.any { it.hasQualifiedName(ProcessorConstants.PARAMETER_GROUP_ANNOTATION) })
 
@@ -734,7 +734,8 @@ object GeneratorUtils {
                     it.hasQualifiedName(ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) ||
                     it.hasQualifiedName(ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION)
                 }
-                val paramDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
+                val rawParamDesc = paramAnn?.arguments?.find { it.name?.asString() == "description" }?.value as? String ?: ""
+                val paramDesc = if (isResumeState && rawParamDesc.isEmpty()) "Saved state snapshot used to resume execution" else rawParamDesc
                 val defaultValue = paramAnn?.arguments?.find { it.name?.asString() == "defaultValue" }?.value as? String ?: ""
 
                 val isInputLoc = param.annotations.any { it.hasQualifiedName(ProcessorConstants.CAPABILITY_INPUT_ANNOTATION) }
@@ -756,7 +757,7 @@ object GeneratorUtils {
                 val isNullable = ksType.isMarkedNullable
                 val hasDefault = param.hasDefault
                 val explicitRequired = paramAnn?.arguments?.find { it.name?.asString() == "required" }?.value as? Boolean ?: false
-                val required = explicitRequired || (!isNullable && !hasDefault)
+                val required = if (isResumeState) false else (explicitRequired || (!isNullable && !hasDefault))
                 val secret = paramAnn?.arguments?.find { it.name?.asString() == "secret" }?.value as? Boolean ?: false
 
                 val semTypesVal = (paramAnn?.arguments?.find { it.name?.asString() == "semanticTypes" }?.value as? List<*>)
@@ -764,7 +765,8 @@ object GeneratorUtils {
                 val semanticTypesList = semTypesVal.flatMap { parseSemanticTypes(it) }
 
                 val constraints = extractConstraints(paramAnn, ksType)
-                val isAdvanced = paramAnn?.arguments?.find { it.name?.asString() == "isAdvanced" }?.value as? Boolean ?: false
+                val propIsAdvanced = paramAnn?.arguments?.find { it.name?.asString() == "isAdvanced" }?.value as? Boolean ?: false
+                val isAdvanced = isResumeState || propIsAdvanced
                 val condition = extractConditionGroup(param)
 
                 result.add(

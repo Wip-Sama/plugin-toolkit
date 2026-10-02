@@ -1,3 +1,9 @@
+Version: 2.1.4
+Date: 02-10-2026
+Added:
+  - Added maxConcurrentExecutions = 2 to capabilityWithPauseResume showcasing concurrency limit control.
+  - Demonstrated @ResumeState as an advanced parameter accessible via capability parameters and pause/resume lifecycle.
+---------------------------------------------------------------------------------
 Version: 2.1.3
 Date: 30-09-2026
 Added:

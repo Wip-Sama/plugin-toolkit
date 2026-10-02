@@ -36,6 +36,18 @@ actual object FileUtils {
         }
     }
 
+    actual fun copyDirectory(source: String, destination: String): Boolean {
+        return try {
+            val src = File(source)
+            val dst = File(destination)
+            if (!src.exists()) return false
+            src.copyRecursively(dst, overwrite = true)
+        } catch (e: Exception) {
+            Logger.e(e) { "Failed to copy directory from $source to $destination" }
+            false
+        }
+    }
+
     actual fun downloadFile(url: String, destination: String): Result<Unit> {
         return try {
             java.net.URI(url).toURL().openStream().use { input ->

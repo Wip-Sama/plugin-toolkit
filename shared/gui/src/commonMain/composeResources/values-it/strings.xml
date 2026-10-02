@@ -891,4 +891,15 @@
     <string name="input_no_audio_selected">Nessun audio selezionato</string>
     <string name="input_no_video_selected">Nessun video selezionato</string>
     <string name="input_unsupported_extension">Estensione non supportata (consentite: %1$s)</string>
+
+    <!-- Flow & Capability Concurrency and Reprocess Controls -->
+    <string name="setting_max_concurrent_executions">Esecuzioni Concorrenti Massime</string>
+    <string name="setting_max_concurrent_executions_cap_desc">Limita le esecuzioni simultanee (massimo sviluppatore: %1$d)</string>
+    <string name="setting_max_concurrent_executions_unlimited">Nessun limite</string>
+    <string name="flow_max_concurrent_executions">Esecuzioni Concorrenti Massime</string>
+    <string name="flow_reprocess_failed">Rielabora dal Passaggio Fallito</string>
+    <string name="action_reprocess">Rielabora</string>
+    <string name="action_restart">Riavvia</string>
+    <string name="action_store_files">Salva File</string>
+    <string name="flow_files_stored_toast">File intermedi salvati con successo</string>
 </resources>

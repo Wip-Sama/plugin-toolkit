@@ -693,7 +693,8 @@ data class Flow(
     val connectionCurveStyle: ConnectionCurveStyle? = null,
     val connectionRoundness: Float? = null,
     val orthogonalStepMode: OrthogonalStepMode? = null,
-    val orthogonalPortLead: Boolean? = null
+    val orthogonalPortLead: Boolean? = null,
+    val maxConcurrentExecutions: Int? = null
 ) {
     val connectionPoints: List<ConnectionPoint> get() = junctions
 

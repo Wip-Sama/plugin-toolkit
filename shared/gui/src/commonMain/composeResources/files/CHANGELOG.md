@@ -19,6 +19,10 @@ Added:
 	- Application close confirmation prompt when active background jobs are executing
   - Edit button in flow runner
   - Flow editor multi selection with ctrl
+  - Simple crash detector
+  - State preservation for crashed flow to allow for restarting them from the failed point
+  - Job restart capability for ended jobs in the Job Dashboard and Job Result cards
+  - Centralized single-source-of-truth flow execution locking via FlowExecutionGuard
 Changes:
 	- Node can now be focused by simply changing a value
   - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling
@@ -26,7 +30,14 @@ Changes:
 	- Migrated For and While system nodes to execute in-flow loops over connected downstream nodes for each variant (plugin enum, collections, or numeric ranges) without requiring external subflows
 	- Updated Conditional node with `expected_value` input port to support value equality branching alongside boolean truthiness, with full selection, movement, and copy-paste support
   - When entering in a page that has a search bar it will be auto-focused to allow for fast search
+  - ResumeState is now advanced by default
+  - Delegated all flow execution, paused, and running queries across FlowRepository, FlowViewModel, and FlowEditorViewModel to FlowExecutionGuard
+  - Made Flow max concurrency updates dynamic during active executions without triggering read-only graph locks
+  - Flow Runner execution button remains active for launching concurrent runs up to configured limits
 Fixed:
+  - FlowReadOnlyViolationException crash when adjusting flow concurrency during active runs
+  - Progress bar vanishing during PauseRequested and Paused states
+  - Deep pause handling in loops and subflows in FlowEngine
   - Updating the log level at runtime would not properly use the new level
   - Narrow Window Squishing & Row Growth in settings
   - Shortcut, Settings and many more spacing inconsistencies

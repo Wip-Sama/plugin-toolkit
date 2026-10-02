@@ -26,6 +26,8 @@ import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobHistoryEntry
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.core.utils.FileUtils
 import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -87,6 +89,32 @@ class JobManager(
     private val lastLoggedProgress = ConcurrentHashMap<String, String>()
     private val activeJobCapabilityMetrics = ConcurrentHashMap<String, CopyOnWriteArrayList<CapabilityExecutionMetric>>()
     private val activeJobPeakMemory = ConcurrentHashMap<String, Long>()
+    private val flowConcurrencyLimits = ConcurrentHashMap<String, Int>()
+    private val capabilityConcurrencyLimits = ConcurrentHashMap<Pair<String, String>, Int>()
+
+    fun setFlowMaxConcurrent(flowName: String, maxConcurrent: Int?) {
+        if (maxConcurrent != null && maxConcurrent > 0) {
+            flowConcurrencyLimits[flowName] = maxConcurrent
+        } else {
+            flowConcurrencyLimits.remove(flowName)
+        }
+        jobSignal.trySend(Unit)
+    }
+
+    fun getFlowMaxConcurrent(flowName: String): Int? = flowConcurrencyLimits[flowName]
+
+    fun setCapabilityMaxConcurrent(pluginId: String, capabilityName: String, maxConcurrent: Int?) {
+        val key = Pair(pluginId, capabilityName)
+        if (maxConcurrent != null && maxConcurrent > 0) {
+            capabilityConcurrencyLimits[key] = maxConcurrent
+        } else {
+            capabilityConcurrencyLimits.remove(key)
+        }
+        jobSignal.trySend(Unit)
+    }
+
+    fun getCapabilityMaxConcurrent(pluginId: String, capabilityName: String): Int? =
+        capabilityConcurrencyLimits[Pair(pluginId, capabilityName)]
 
     fun recordCapabilityMetric(
         jobId: String,
@@ -334,17 +362,66 @@ class JobManager(
         }
     }
 
+    private fun isJobSchedulable(job: BackgroundJob, currentList: List<BackgroundJob>): Boolean {
+        if (job.status != JobStatus.Queued) return false
+        if (job.type == JobType.Flow) {
+            val limit = job.maxConcurrentExecutions ?: getFlowMaxConcurrent(job.capabilityName)
+            if (limit != null && limit > 0) {
+                val runningFlows = currentList.count {
+                    it.type == JobType.Flow && it.capabilityName == job.capabilityName &&
+                            (it.status == JobStatus.Running || it.status == JobStatus.PauseRequested)
+                }
+                if (runningFlows >= limit) return false
+            }
+        } else if (job.type == JobType.Capability) {
+            val limit = job.maxConcurrentExecutions ?: getCapabilityMaxConcurrent(job.pluginId, job.capabilityName)
+            if (limit != null && limit > 0) {
+                val runningCaps = currentList.count {
+                    it.type == JobType.Capability && it.pluginId == job.pluginId && it.capabilityName == job.capabilityName &&
+                            (it.status == JobStatus.Running || it.status == JobStatus.PauseRequested)
+                }
+                if (runningCaps >= limit) return false
+            }
+        }
+        return true
+    }
+
     suspend fun resumeJob(jobId: String) {
         var resumed = false
         var jobName = ""
         _jobs.update { currentList ->
-            val job = currentList.find { it.id == jobId } ?: return@update currentList
-            jobName = job.name
-            if (job.status == JobStatus.Paused) {
-                resumed = true
-                currentList.map { if (it.id == jobId) it.copy(status = JobStatus.Queued) else it }
+            val job = currentList.find { it.id == jobId }
+            if (job != null) {
+                jobName = job.name
+                if (job.status == JobStatus.Paused || (job.status == JobStatus.Failed && job.resumeState != null)) {
+                    resumed = true
+                    currentList.map {
+                        if (it.id == jobId) it.copy(
+                            status = JobStatus.Queued,
+                            errorMessage = null,
+                            completedAt = null
+                        ) else it
+                    }
+                } else {
+                    currentList
+                }
             } else {
                 currentList
+            }
+        }
+
+        if (!resumed) {
+            val ended = _endedJobs.value.find { it.id == jobId }
+            if (ended != null && (ended.status == JobStatus.Paused || (ended.status == JobStatus.Failed && ended.resumeState != null))) {
+                _endedJobs.update { it.filterNot { k -> k.id == jobId } }
+                val queuedJob = ended.copy(
+                    status = JobStatus.Queued,
+                    errorMessage = null,
+                    completedAt = null
+                )
+                _jobs.update { it + queuedJob }
+                resumed = true
+                jobName = ended.name
             }
         }
 
@@ -353,6 +430,33 @@ class JobManager(
             Logger.i { "Job $jobId ($jobName) resumed" }
             jobSignal.trySend(Unit)
         }
+    }
+
+    suspend fun restartJob(jobId: String): String? {
+        val existingJob = _jobs.value.find { it.id == jobId }
+            ?: _endedJobs.value.find { it.id == jobId }
+            ?: return null
+
+        val prefix = if (existingJob.type == JobType.Flow) {
+            "flow-${existingJob.capabilityName.replace(" ", "_")}"
+        } else {
+            existingJob.capabilityName
+        }
+        val newId = "$prefix-${kotlin.time.TimeSource.Monotonic.markNow().elapsedNow().inWholeNanoseconds.let { Clock.System.now().toEpochMilliseconds() }}"
+        val newJob = existingJob.copy(
+            id = newId,
+            status = JobStatus.Queued,
+            resumeState = null,
+            result = null,
+            errorMessage = null,
+            completedAt = null,
+            enqueuedAt = Clock.System.now(),
+            executionMetrics = null
+        )
+        enqueueJob(newJob)
+        addHistoryEntryInternal(newId, newJob.name, "Restarted from job $jobId")
+        Logger.i { "Job $jobId (${existingJob.name}) restarted as new job $newId" }
+        return newId
     }
 
     fun reorderQueue(fromIndex: Int, toIndex: Int) {
@@ -378,8 +482,7 @@ class JobManager(
                     it.status == JobStatus.Running || it.status == JobStatus.PauseRequested
                 }
                 if (runningCount < maxConcurrentJobs) {
-                    // PriorityQueue behavior: FIFO based on list order
-                    val candidate = currentList.firstOrNull { it.status == JobStatus.Queued }
+                    val candidate = currentList.firstOrNull { isJobSchedulable(it, currentList) }
 
                     if (candidate != null) {
                         claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
@@ -394,24 +497,21 @@ class JobManager(
             }
 
             if (claimedJob != null) {
-                // If there are more available concurrency slots and queued jobs, signal again to wake up other idle workers
                 val runningCount = _jobs.value.count {
                     it.status == JobStatus.Running || it.status == JobStatus.PauseRequested
                 }
-                if (runningCount < maxConcurrentJobs && _jobs.value.any { it.status == JobStatus.Queued }) {
+                if (runningCount < maxConcurrentJobs && _jobs.value.any { isJobSchedulable(it, _jobs.value) }) {
                     jobSignal.trySend(Unit)
                 }
                 return claimedJob
             }
 
-            // Wait for signal if no jobs are queued or if max concurrent limit is reached
             Logger.v { "No queued jobs or limit reached ($maxConcurrentJobs), worker waiting for signal..." }
 
-            // Before receiving, check if capacity has become available and jobs are queued
             val currentRunning = _jobs.value.count {
                 it.status == JobStatus.Running || it.status == JobStatus.PauseRequested
             }
-            if (currentRunning < maxConcurrentJobs && _jobs.value.any { it.status == JobStatus.Queued }) {
+            if (currentRunning < maxConcurrentJobs && _jobs.value.any { isJobSchedulable(it, _jobs.value) }) {
                 continue
             }
 
@@ -694,7 +794,7 @@ class JobManager(
         return completed
     }
 
-    fun tryFailJob(jobId: String, errorMessage: String?): Boolean {
+    fun tryFailJob(jobId: String, errorMessage: String?, resumeState: JsonElement? = null): Boolean {
         var failed = false
         var jobName = ""
         _jobs.update { currentList ->
@@ -727,7 +827,8 @@ class JobManager(
                         status = JobStatus.Failed,
                         errorMessage = errorMessage,
                         completedAt = completedAt,
-                        executionMetrics = metrics
+                        executionMetrics = metrics,
+                        resumeState = resumeState ?: it.resumeState
                     ) else it
                 }
             } else {
@@ -738,6 +839,9 @@ class JobManager(
         if (failed) {
             val finishedJob = _jobs.value.find { it.id == jobId }
             if (finishedJob != null) {
+                if (finishedJob.resumeState != null) {
+                    saveResumeState(finishedJob)
+                }
                 _jobs.update { it.filterNot { k -> k.id == jobId } }
                 _endedJobs.update { (listOf(finishedJob) + it).take(maxEndedJobs) }
             }
@@ -892,21 +996,35 @@ class JobManager(
     }
 
     fun clearEndedJob(jobId: String) {
+        val job = _endedJobs.value.find { it.id == jobId }
         _endedJobs.update { it.filterNot { k -> k.id == jobId } }
         _jobLogs.update { it - jobId }
         lastLoggedProgress.remove(jobId)
         activeJobCapabilityMetrics.remove(jobId)
         activeJobPeakMemory.remove(jobId)
+        if (job != null && job.resumeState != null) {
+            try {
+                val appDataDir = settingsPersistence.getSettingsDir()
+                FileUtils.deleteDirectory("$appDataDir/jobs/$jobId/sandbox")
+            } catch (_: Exception) {}
+        }
     }
 
     fun clearAllEndedJobs() {
-        val endedIds = _endedJobs.value.map { it.id }
+        val ended = _endedJobs.value
+        val endedIds = ended.map { it.id }
         _endedJobs.value = emptyList()
         _jobLogs.update { it.filterKeys { k -> k !in endedIds } }
-        endedIds.forEach {
-            lastLoggedProgress.remove(it)
-            activeJobCapabilityMetrics.remove(it)
-            activeJobPeakMemory.remove(it)
+        ended.forEach { job ->
+            lastLoggedProgress.remove(job.id)
+            activeJobCapabilityMetrics.remove(job.id)
+            activeJobPeakMemory.remove(job.id)
+            if (job.resumeState != null) {
+                try {
+                    val appDataDir = settingsPersistence.getSettingsDir()
+                    FileUtils.deleteDirectory("$appDataDir/jobs/${job.id}/sandbox")
+                } catch (_: Exception) {}
+            }
         }
     }
 

@@ -132,8 +132,10 @@ object DispatcherGenerator {
                     }
 
                     param.annotations.any { it.hasQualifiedName(RESUME_STATE_ANNOTATION) } -> {
+                        val pName = param.name?.asString() ?: "resumeState"
                         mapCode.add(
-                            "request.resumeState?.let { %T.%M<%T>(it) }",
+                            "(request.resumeState ?: request.parameters[%S])?.let { %T.%M<%T>(it) }",
+                            pName,
                             CN_JSON,
                             MN_DECODE_FROM_JSON_ELEMENT,
                             paramType

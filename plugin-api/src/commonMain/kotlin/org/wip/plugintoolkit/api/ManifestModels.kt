@@ -553,7 +553,8 @@ data class Capability @JvmOverloads constructor(
     val context: CapabilityContext = CapabilityContext.ANY,
     val requiresSettings: List<String> = emptyList(),
     val requiredLocks: List<String> = emptyList(),
-    val fileAccess: FileAccess? = null
+    val fileAccess: FileAccess? = null,
+    val maxConcurrentExecutions: Int? = null
 ) {
     /**
      * Checks whether all settings required by this capability are provided and valid.
@@ -585,7 +586,8 @@ object CapabilitySerializer : KSerializer<Capability> {
             context = value.context,
             requiresSettings = value.requiresSettings,
             requiredLocks = value.requiredLocks,
-            fileAccess = value.fileAccess
+            fileAccess = value.fileAccess,
+            maxConcurrentExecutions = value.maxConcurrentExecutions
         )
         encoder.encodeSerializableValue(CapabilitySurrogate.serializer(), surrogate)
     }
@@ -620,7 +622,8 @@ object CapabilitySerializer : KSerializer<Capability> {
             context = surrogate.context,
             requiresSettings = surrogate.requiresSettings,
             requiredLocks = surrogate.requiredLocks,
-            fileAccess = surrogate.fileAccess
+            fileAccess = surrogate.fileAccess,
+            maxConcurrentExecutions = surrogate.maxConcurrentExecutions
         )
     }
 }
@@ -639,7 +642,8 @@ private class CapabilitySurrogate(
     val context: CapabilityContext = CapabilityContext.ANY,
     val requiresSettings: List<String> = emptyList(),
     val requiredLocks: List<String> = emptyList(),
-    val fileAccess: FileAccess? = null
+    val fileAccess: FileAccess? = null,
+    val maxConcurrentExecutions: Int? = null
 )
 
 /**

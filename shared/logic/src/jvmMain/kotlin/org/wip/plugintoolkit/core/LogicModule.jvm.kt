@@ -76,7 +76,7 @@ actual val logicModule: Module = module {
     single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(named("LoomScope"))) }
     single { SandboxCleanupManager() }
     single { JobManager(get(named("LoomScope")), get()) }
-    single { FlowExecutionGuard { getOrNull<JobManager>() } }
+    single { FlowExecutionGuard({ getOrNull<JobManager>() }, { getOrNull<FlowRepository>()?.flows?.value ?: emptyList() }) }
     single { FlowRepository(get(), get(), get(named("LoomScope")), get(), get()) }
     single { ReactiveCapabilityLockTracker(get()) }
     single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }

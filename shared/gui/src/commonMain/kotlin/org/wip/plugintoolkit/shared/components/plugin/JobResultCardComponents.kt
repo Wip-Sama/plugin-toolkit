@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.ButtonDefaults
@@ -86,10 +88,14 @@ import plugintoolkit.composeapp.generated.resources.action_expand_terminal
 import plugintoolkit.composeapp.generated.resources.action_export
 import plugintoolkit.composeapp.generated.resources.action_force_cancel
 import plugintoolkit.composeapp.generated.resources.action_pause
+import plugintoolkit.composeapp.generated.resources.action_reprocess
+import plugintoolkit.composeapp.generated.resources.action_restart
 import plugintoolkit.composeapp.generated.resources.action_resume
 import plugintoolkit.composeapp.generated.resources.action_toggle_details
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
 import plugintoolkit.composeapp.generated.resources.flow_console_logs_title
+import plugintoolkit.composeapp.generated.resources.flow_files_stored_toast
+import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import plugintoolkit.composeapp.generated.resources.flow_output_results_title
 import plugintoolkit.composeapp.generated.resources.flow_run_id_label
 import plugintoolkit.composeapp.generated.resources.flow_triggered_label
@@ -711,6 +717,7 @@ internal fun JobResultActionsRow(
     onScrollToBottom: () -> Unit,
     onPause: (() -> Unit)?,
     onResume: (() -> Unit)?,
+    onRestart: (() -> Unit)? = null,
     onCancel: ((Boolean) -> Unit)?,
     onClear: (() -> Unit)?,
     modifier: Modifier = Modifier
@@ -814,6 +821,28 @@ internal fun JobResultActionsRow(
                     )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
                     Text(stringResource(Res.string.action_resume))
+                }
+            }
+
+            if (job.status == JobStatus.Failed && job.resumeState != null && onResume != null) {
+                TextButton(onClick = onResume) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = stringResource(Res.string.action_reprocess)
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                    Text(stringResource(Res.string.action_reprocess))
+                }
+            }
+
+            if ((job.status == JobStatus.Completed || job.status == JobStatus.Failed || job.status == JobStatus.Cancelled) && onRestart != null) {
+                TextButton(onClick = onRestart) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = stringResource(Res.string.action_restart)
+                    )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                    Text(stringResource(Res.string.action_restart))
                 }
             }
 

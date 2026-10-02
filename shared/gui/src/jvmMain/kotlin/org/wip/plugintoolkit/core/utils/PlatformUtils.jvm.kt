@@ -98,6 +98,7 @@ actual object PlatformUtils {
     }
 
     actual fun copyFile(source: String, destination: String) = FileUtils.copyFile(source, destination)
+    actual fun copyDirectory(source: String, destination: String): Boolean = FileUtils.copyDirectory(source, destination)
     actual fun downloadFile(url: String, destination: String): Result<Unit> = FileUtils.downloadFile(url, destination)
     actual fun unzip(source: String, destination: String, maxDecompressedSize: Long): Result<Unit> =
         FileUtils.unzip(source, destination, maxDecompressedSize)

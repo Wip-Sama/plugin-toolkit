@@ -101,7 +101,11 @@ import plugintoolkit.composeapp.generated.resources.settings
 import plugintoolkit.composeapp.generated.resources.settings_locked_capability
 import plugintoolkit.composeapp.generated.resources.settings_no_results
 import plugintoolkit.composeapp.generated.resources.settings_search_placeholder
+import plugintoolkit.composeapp.generated.resources.setting_max_concurrent_executions
+import plugintoolkit.composeapp.generated.resources.setting_max_concurrent_executions_cap_desc
+import plugintoolkit.composeapp.generated.resources.setting_max_concurrent_executions_unlimited
 
+import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 
 @Composable
@@ -603,6 +607,51 @@ fun PluginSettingsContent(
                                     modifier = Modifier.fillMaxWidth().padding(top = ToolkitTheme.spacing.small),
                                     verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall)
                                 ) {
+                                    val devMax = capability.maxConcurrentExecutions
+                                    val userLimit = store.capabilityMaxConcurrency[capability.name]
+                                    val descText = if (devMax != null && devMax > 0) {
+                                        stringResource(Res.string.setting_max_concurrent_executions_cap_desc, devMax)
+                                    } else {
+                                        stringResource(Res.string.setting_max_concurrent_executions_unlimited)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = ToolkitTheme.spacing.medium, vertical = ToolkitTheme.spacing.extraSmall),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                stringResource(Res.string.setting_max_concurrent_executions),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                descText,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        ToolkitTextField(
+                                            value = userLimit?.toString() ?: "",
+                                            onValueChange = { input ->
+                                                val num = input.filter { it.isDigit() }.toIntOrNull()
+                                                viewModel.updateCapabilityMaxConcurrency(capability.name, num)
+                                            },
+                                            modifier = Modifier.width(ToolkitTheme.dimensions.genericInputWidth),
+                                            placeholder = {
+                                                Text(
+                                                    if (devMax != null && devMax > 0) "$devMax" else "∞",
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            },
+                                            enabled = !isBusy,
+                                            singleLine = true
+                                        )
+                                    }
+
                                     capability.parameters?.forEach { (key, meta) ->
                                         val value = store.capabilityParams[capability.name]?.get(key) ?: meta.defaultValue
                                         DynamicParameterInput(

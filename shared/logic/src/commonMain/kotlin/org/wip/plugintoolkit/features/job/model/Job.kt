@@ -47,7 +47,8 @@ data class BackgroundJob(
     val keepResult: Boolean = true,
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true,
-    val executionMetrics: JobExecutionMetrics? = null
+    val executionMetrics: JobExecutionMetrics? = null,
+    val maxConcurrentExecutions: Int? = null
 )
 
 @Serializable

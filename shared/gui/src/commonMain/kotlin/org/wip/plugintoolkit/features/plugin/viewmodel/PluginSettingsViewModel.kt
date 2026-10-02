@@ -88,6 +88,20 @@ class PluginSettingsViewModel(
         }
     }
 
+    fun updateCapabilityMaxConcurrency(capability: String, maxConcurrent: Int?) {
+        _store.update { current ->
+            val currentLimits = current.capabilityMaxConcurrency.toMutableMap()
+            if (maxConcurrent == null || maxConcurrent <= 0) {
+                currentLimits.remove(capability)
+            } else {
+                val devMax = manifest?.capabilities?.find { it.name == capability }?.maxConcurrentExecutions
+                val capped = if (devMax != null && devMax > 0) minOf(maxConcurrent, devMax) else maxConcurrent
+                currentLimits[capability] = capped
+            }
+            current.copy(capabilityMaxConcurrency = currentLimits)
+        }
+    }
+
     fun save() {
         val currentStore = _store.value
         val mergedSettings = currentStore.settings.toMutableMap()

@@ -303,6 +303,15 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
 
     Logger.i { "Application starting. Logging initialized at: $logDir with minSeverity=$initialSeverity" }
 
+    // ── Crash / Unclean Shutdown Detection ───────────────────────
+    val appDataDir = File(detectedConfig.getAppDataDir())
+    val crashInfo = org.wip.plugintoolkit.core.utils.CrashDetector.checkAndRecordSessionStart(appDataDir)
+    if (crashInfo != null) {
+        Logger.w {
+            "Startup: Detected that the application crashed or closed unexpectedly in its previous session (PID: ${crashInfo.pid}, Started: ${crashInfo.timestamp})"
+        }
+    }
+
     updateStatus("Cleaning up updates...")
     updateService.cleanupOldUpdates(settingsRepository.getSettingsDir())
 
@@ -384,6 +393,7 @@ fun runMain(
         DisposableEffect(Unit) {
             onDispose {
                 viewModelStoreOwner.viewModelStore.clear()
+                org.wip.plugintoolkit.core.utils.CrashDetector.recordCleanShutdown()
             }
         }
 

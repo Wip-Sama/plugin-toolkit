@@ -50,6 +50,7 @@ annotation class Capability(
     val supportsPause: Boolean = false,
     val supportsCancel: Boolean = true,
     val context: CapabilityContext = CapabilityContext.ANY,
+    val maxConcurrentExecutions: Int = 0,
     @Deprecated("Use @RequiresSetting on the capability function instead")
     val requiresSettings: Array<String> = []
 )

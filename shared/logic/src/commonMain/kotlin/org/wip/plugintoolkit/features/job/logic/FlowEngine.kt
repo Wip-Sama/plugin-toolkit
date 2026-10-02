@@ -32,6 +32,7 @@ import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.features.flows.logic.PathPatternResolver
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
+import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
@@ -85,9 +86,12 @@ class FlowEngine(
             "Loaded flow '${flow.name}' with ${flow.nodes.size} nodes and ${flow.connections.size} connections."
         )
 
+        val isPauseRequested = {
+            initialPauseRequested || manager.jobs.value.find { it.id == job.id }?.status == JobStatus.PauseRequested
+        }
         try {
             val jsonOutputs =
-                executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject, 0, initialPauseRequested)
+                executeGraph(flow, job, appDataDir, job.parameters, true, job.resumeState as? JsonObject, 0, initialPauseRequested, isPauseRequested)
             val finalJson = toJsonElement(jsonOutputs).toString()
             val outputFileStr = job.parameters["-1_flow_output_file"]?.let { param ->
                 try {
@@ -127,6 +131,11 @@ class FlowEngine(
         } catch (e: PauseFlowException) {
             manager.addJobLog(job.id, "Flow requested pause mid-work.")
             manager.tryPauseJob(job.id, e.resumeState as JsonObject)
+        } catch (e: FlowExecutionFailureException) {
+            manager.addJobLog(job.id, "Flow failed at node '${e.nodeTitle}': ${e.message}")
+            manager.tryFailJob(job.id, e.message, resumeState = e.resumeState)
+            lifecycleCoordinator.onLifecycleJobFailed(job, e.message)
+            throw e
         } catch (e: CancellationException) {
             throw e
         } finally {
@@ -139,10 +148,11 @@ class FlowEngine(
         job: BackgroundJob,
         appDataDir: String,
         resumeStateOverride: JsonObject? = null,
-        depth: Int = 0
+        depth: Int = 0,
+        isPauseRequested: () -> Boolean = { false }
     ): Map<String, Any?> {
         if (depth > 50) throw Exception("StackOverflow prevention: Subflow recursion depth exceeded 50.")
-        return executeGraph(flow, job, appDataDir, job.parameters, false, resumeStateOverride, depth)
+        return executeGraph(flow, job, appDataDir, job.parameters, false, resumeStateOverride, depth, false, isPauseRequested)
     }
 
     private suspend fun executeGraph(
@@ -153,7 +163,8 @@ class FlowEngine(
         isRoot: Boolean,
         resumeStateOverride: JsonObject?,
         depth: Int,
-        initialPauseRequested: Boolean = false
+        initialPauseRequested: Boolean = false,
+        isPauseRequested: () -> Boolean = { false }
     ): Map<String, Any?> {
         val runtimeInferred = FlowTypeInferenceCache.getOrCreate(flow) { runRuntimeTypeInference(flow) }
         val nodesById = flow.nodes.associateBy { it.id }
@@ -265,6 +276,9 @@ class FlowEngine(
 
         val jobExecution = currentCoroutineContext()[kotlinx.coroutines.Job]!!
         var pauseRequested = initialPauseRequested
+        val shouldPause = {
+            pauseRequested || isPauseRequested() || manager.jobs.value.find { it.id == job.id }?.status == JobStatus.PauseRequested
+        }
         var activeCapabilityHandle: JobHandle? = null
 
         if (isRoot) {
@@ -341,13 +355,14 @@ class FlowEngine(
             if (executedNodeIds.contains(node.id)) return@forEachIndexed
             if (!activeNodes.contains(node.id)) return@forEachIndexed
 
-            if (pauseRequested) {
+            if (shouldPause()) {
                 if (isRoot) {
                     manager.addJobLog(job.id, "Flow execution paused before node: ${node.title}")
-                    throw PauseFlowException(buildCurrentState())
                 }
+                throw PauseFlowException(buildCurrentState())
             }
 
+            try {
             when (node) {
                 is org.wip.plugintoolkit.features.flows.model.Node.FlowInputNode -> {
                     val outputPort = node.outputs.firstOrNull()
@@ -437,7 +452,7 @@ class FlowEngine(
                             )
                             val nestedResumeState =
                                 (sysResumeState as? JsonObject)?.get("subflowResumeState") as? JsonObject
-                            return executeSubFlowRecursively(subFlow, subJob, appDataDir, nestedResumeState, depth + 1)
+                            return executeSubFlowRecursively(subFlow, subJob, appDataDir, nestedResumeState, depth + 1, shouldPause)
                         }
 
                         override suspend fun executeSubFlow(
@@ -462,7 +477,7 @@ class FlowEngine(
 
                             val nestedResumeState =
                                 (sysResumeState as? JsonObject)?.get("subflowResumeState") as? JsonObject
-                            return executeSubFlowRecursively(subFlow, subJob, appDataDir, nestedResumeState, depth + 1)
+                            return executeSubFlowRecursively(subFlow, subJob, appDataDir, nestedResumeState, depth + 1, shouldPause)
                         }
                     }
                     try {
@@ -742,7 +757,7 @@ class FlowEngine(
                     } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                         ExecutionResult.Error(e)
                     } catch (e: CancellationException) {
-                        if (pauseRequested) ExecutionResult.Paused(JsonNull) else throw e
+                        if (shouldPause()) ExecutionResult.Paused(JsonNull) else throw e
                     } catch (e: Exception) {
                         throw Exception(
                             "Capability invocation failed for node '${node.title.ifEmpty { node.id.toString() }}' (Plugin: '${node.pluginInfo.name}', Capability: '${node.capability.name}'): ${e.message}",
@@ -774,8 +789,18 @@ class FlowEngine(
                         }
 
                         is ExecutionResult.Error -> {
+                            if (shouldPause()) {
+                                if (isRoot) manager.addJobLog(job.id, "Capability was interrupted by pause request.")
+                                throw PauseFlowException(buildCurrentState())
+                            }
                             capabilityResumeStates.remove(node.id)
-                            throw Exception("Capability invocation failed for node '${node.title.ifEmpty { node.id.toString() }}' (Plugin: '${node.pluginInfo.name}', Capability: '${node.capability.name}'): ${result.message}")
+                            val failureState = buildCurrentState()
+                            throw FlowExecutionFailureException(
+                                node.id,
+                                node.title.ifEmpty { node.id.toString() },
+                                failureState,
+                                "Capability invocation failed for node '${node.title.ifEmpty { node.id.toString() }}' (Plugin: '${node.pluginInfo.name}', Capability: '${node.capability.name}'): ${result.message}"
+                            )
                         }
 
                         is ExecutionResult.Paused -> {
@@ -823,7 +848,7 @@ class FlowEngine(
 
                         val subResumeState = capabilityResumeStates[node.id] as? JsonObject
                         val subOutputs = try {
-                            executeSubFlowRecursively(subFlow, subJob, appDataDir, subResumeState, depth + 1)
+                            executeSubFlowRecursively(subFlow, subJob, appDataDir, subResumeState, depth + 1, shouldPause)
                         } catch (e: PauseFlowException) {
                             capabilityResumeStates[node.id] = e.resumeState
                             throw PauseFlowException(buildCurrentState())
@@ -843,6 +868,26 @@ class FlowEngine(
                         }
                     }
                 }
+            }
+            } catch (e: PauseFlowException) {
+                throw e
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: FlowExecutionFailureException) {
+                throw e
+            } catch (e: Throwable) {
+                if (shouldPause()) {
+                    if (isRoot) manager.addJobLog(job.id, "Execution paused before/during node '${node.title.ifEmpty { node.id.toString() }}'")
+                    throw PauseFlowException(buildCurrentState())
+                }
+                val failureState = buildCurrentState()
+                throw FlowExecutionFailureException(
+                    node.id,
+                    node.title.ifEmpty { node.id.toString() },
+                    failureState,
+                    e.message ?: "Execution failed for node '${node.title.ifEmpty { node.id.toString() }}'",
+                    e
+                )
             }
 
             val activeOutputs = mutableSetOf<String>()
