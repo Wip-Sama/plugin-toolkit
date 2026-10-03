@@ -353,7 +353,8 @@ fun BoardCanvas(
                 roundness = state.connectionRoundness,
                 orthogonalStepMode = state.orthogonalStepMode ?: flow.orthogonalStepMode ?: OrthogonalStepMode.Auto,
                 orthogonalPortLead = state.orthogonalPortLead ?: flow.orthogonalPortLead ?: false,
-                groups = flow.groups
+                groups = flow.groups,
+                labels = flow.labels
             )
             .boardPanGesture(
                 focusRequester = focusRequester,

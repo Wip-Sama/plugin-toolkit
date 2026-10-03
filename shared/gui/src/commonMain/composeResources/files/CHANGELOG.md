@@ -25,7 +25,7 @@ Added:
   - Centralized single-source-of-truth flow execution locking via FlowExecutionGuard
   - VRam monitoring for jobs
   - Cpu utilization and core count monitoring
-  - Time series monitoring for jobs (resouce monitorin is now done costantly and kept)
+  - Time series monitoring for jobs (resource monitoring is now done costantly and kept)
 Changes:
 	- Node can now be focused by simply changing a value
   - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling
@@ -48,6 +48,10 @@ Fixed:
   - Nodes correctly prevent interacting with connections below them
   - Load system node now restricts semantic type to path/file, selects files instead of folders, and properly enforces custom extensions in UI and execution
   - Paused jobs no longer count towards max concurrent job execution limits (pause-requested jobs continue counting until fully stopped)
+  - Moving connection midpoints on group borders no longer resizes unselected groups
+  - Group resize gestures merge intermediate drag frames to prevent undo stack flooding and restore directly to the snapped grid
+  - Ctrl+Clicking groups and labels properly toggles multi-selection without clearing previous selections
+  - Selecting groups or labels on stationary click no longer instantly deselects on pointer release
 Removed:
   - Verbose logging spam in the flow editor
   - Disable animations setting

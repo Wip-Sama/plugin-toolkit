@@ -46,12 +46,15 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -117,6 +120,8 @@ fun FlowGroupComponent(
     var showColorPicker by remember { mutableStateOf(false) }
     var isEditingTitle by remember { mutableStateOf(false) }
     var titleText by remember(group.title, isEditingTitle) { mutableStateOf(group.title) }
+    var isCtrlPressedOnGroup by remember { mutableStateOf(false) }
+    var isShiftPressedOnGroup by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(isEditingTitle) {
@@ -174,83 +179,93 @@ fun FlowGroupComponent(
                 ),
                 shape = cornerShape
             )
-            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, isInteractionBlocked) {
-                if (!isInteractionBlocked) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
-                                val isShift = event.keyboardModifiers.isShiftPressed
-                                val isCtrl = event.keyboardModifiers.isCtrlPressed
-                                if (isEyedropperActive && onSampleColor != null) {
-                                    onSampleColor(group.color ?: "#4CAF50")
-                                    event.changes.forEach { it.consume() }
-                                } else if (isPaintToolActive && onPaintGroup != null) {
-                                    onPaintGroup(group.id)
-                                    event.changes.forEach { it.consume() }
-                                } else if (isWashToolActive && onWashGroup != null) {
-                                    onWashGroup(group.id)
-                                    event.changes.forEach { it.consume() }
-                                } else if (isShift && !isReadOnly) {
-                                    isEditingTitle = true
-                                    event.changes.forEach { it.consume() }
-                                } else if (!isReadOnly) {
-                                    onSelectGroup?.invoke(group.id, isCtrl)
-                                }
-                            }
+            .pointerInput(group.id) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press) {
+                            isCtrlPressedOnGroup = event.keyboardModifiers.isCtrlPressed
+                            isShiftPressedOnGroup = event.keyboardModifiers.isShiftPressed
                         }
                     }
                 }
             }
-            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, isInteractionBlocked) {
-                if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive && !isInteractionBlocked) {
-                    var isDraggingGroup = false
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val isNearRight = offset.x >= (group.size.x - RESIZE_HANDLE_THICKNESS_DP * 1.5f)
-                            val isNearBottom = !group.isCollapsed && offset.y >= (group.size.y - RESIZE_HANDLE_THICKNESS_DP * 1.5f)
-                            isDraggingGroup = !isNearRight && !isNearBottom
-                            if (isDraggingGroup && !isSelected && onSelectGroup != null) {
-                                onSelectGroup(group.id, false)
-                            }
-                        },
-                        onDragEnd = {
-                            if (isDraggingGroup) {
-                                isDraggingGroup = false
-                                if (onEndMove != null) {
-                                    onEndMove(group.id)
-                                } else {
-                                    val snapDelta = group.position.snapToGrid() - group.position
-                                    if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                        onDragDelta(snapDelta.toComposeOffset())
+            .pointerInput(group.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, isInteractionBlocked, isSelected) {
+                if (!isInteractionBlocked) {
+                    if (isEyedropperActive && onSampleColor != null) {
+                        detectTapGestures(onTap = { onSampleColor(group.color ?: "#4CAF50") })
+                    } else if (isPaintToolActive && onPaintGroup != null) {
+                        detectTapGestures(onTap = { onPaintGroup(group.id) })
+                    } else if (isWashToolActive && onWashGroup != null) {
+                        detectTapGestures(onTap = { onWashGroup(group.id) })
+                    } else if (!isReadOnly) {
+                        var isDraggingGroup = false
+                        coroutineScope {
+                            launch {
+                                detectDragGestures(
+                                    onDragStart = { offset ->
+                                        val isNearRight = isSelected && offset.x >= (group.size.x - RESIZE_HANDLE_THICKNESS_DP * 1.5f)
+                                        val isNearBottom = isSelected && !group.isCollapsed && offset.y >= (group.size.y - RESIZE_HANDLE_THICKNESS_DP * 1.5f)
+                                        isDraggingGroup = !isNearRight && !isNearBottom
+                                        if (isDraggingGroup) {
+                                            if (isCtrlPressedOnGroup) {
+                                                onSelectGroup?.invoke(group.id, true)
+                                            } else if (!isSelected) {
+                                                onSelectGroup?.invoke(group.id, false)
+                                            }
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        if (isDraggingGroup) {
+                                            isDraggingGroup = false
+                                            if (onEndMove != null) {
+                                                onEndMove(group.id)
+                                            } else {
+                                                val snapDelta = group.position.snapToGrid() - group.position
+                                                if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                                    onDragDelta(snapDelta.toComposeOffset())
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onDragCancel = {
+                                        if (isDraggingGroup) {
+                                            isDraggingGroup = false
+                                            if (onEndMove != null) {
+                                                onEndMove(group.id)
+                                            } else {
+                                                val snapDelta = group.position.snapToGrid() - group.position
+                                                if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                                    onDragDelta(snapDelta.toComposeOffset())
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        if (isDraggingGroup) {
+                                            change.consume()
+                                            if (onMove != null) {
+                                                onMove(group.id, dragAmount)
+                                            } else {
+                                                onDragDelta(dragAmount)
+                                            }
+                                        }
                                     }
-                                }
+                                )
                             }
-                        },
-                        onDragCancel = {
-                            if (isDraggingGroup) {
-                                isDraggingGroup = false
-                                if (onEndMove != null) {
-                                    onEndMove(group.id)
-                                } else {
-                                    val snapDelta = group.position.snapToGrid() - group.position
-                                    if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                        onDragDelta(snapDelta.toComposeOffset())
+                            launch {
+                                detectTapGestures(
+                                    onTap = {
+                                        if (isShiftPressedOnGroup) {
+                                            isEditingTitle = true
+                                        } else {
+                                            onSelectGroup?.invoke(group.id, isCtrlPressedOnGroup)
+                                        }
                                     }
-                                }
-                            }
-                        },
-                        onDrag = { change, dragAmount ->
-                            if (isDraggingGroup) {
-                                change.consume()
-                                if (onMove != null) {
-                                    onMove(group.id, dragAmount)
-                                } else {
-                                    onDragDelta(dragAmount)
-                                }
+                                )
                             }
                         }
-                    )
+                    }
                 }
             }
             .testTag("flow_group_${group.id}")
@@ -425,7 +440,7 @@ fun FlowGroupComponent(
         }
 
         // Resize Handles (Desktop Window style border resizing with cursor feedback)
-        if (!isReadOnly && onResizeGroup != null) {
+        if (isSelected && !isReadOnly && !isInteractionBlocked && onResizeGroup != null) {
             // Right edge handle (resizes width)
             Box(
                 modifier = Modifier

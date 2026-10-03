@@ -1458,7 +1458,14 @@ class FlowEditorViewModel(
                         ),
                         hasUnsavedChanges = true
                     )
-                    pendingCommand = ResizeGroupCommand(event.groupId, grp.size, newSize, grp.position, newPosition)
+                    pendingCommand = ResizeGroupCommand(
+                        groupId = event.groupId,
+                        oldSize = grp.size,
+                        newSize = newSize,
+                        oldPosition = grp.position,
+                        newPosition = newPosition,
+                        isCommitted = event.snap
+                    )
                 }
             }
 

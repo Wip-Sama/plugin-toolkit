@@ -670,24 +670,62 @@ data class PaintElementsCommand(
 }
 
 /**
+ * Interface for commands that can merge with their immediate predecessor in the undo stack.
+ */
+interface MergeableCommand : FlowCommand {
+    fun mergeWith(previous: FlowCommand): FlowCommand?
+}
+
+/**
  * Command for resizing a visual group container.
  */
 data class ResizeGroupCommand(
-    private val groupId: Long,
-    private val oldSize: ModelOffset,
-    private val newSize: ModelOffset,
-    private val oldPosition: ModelOffset? = null,
-    private val newPosition: ModelOffset? = null
-) : FlowCommand {
+    val groupId: Long,
+    val oldSize: ModelOffset,
+    val newSize: ModelOffset,
+    val oldPosition: ModelOffset? = null,
+    val newPosition: ModelOffset? = null,
+    val isCommitted: Boolean = true
+) : MergeableCommand {
     override val description: String = "Resize group"
+
     override fun execute(state: FlowEditorState): FlowEditorState =
         state.copy(flow = state.flow.copy(groups = state.flow.groups.map { 
-            if (it.id == groupId) it.copy(size = newSize, position = newPosition ?: it.position) else it 
+            if (it.id == groupId) {
+                val pos = newPosition ?: it.position
+                val contained = state.flow.nodes.filter { n ->
+                    n.position.x >= pos.x && n.position.x <= pos.x + newSize.x &&
+                    n.position.y >= pos.y && n.position.y <= pos.y + newSize.y
+                }.map { n -> n.id }
+                it.copy(size = newSize, position = pos, nodeIds = contained)
+            } else it 
         }), hasUnsavedChanges = true)
+
     override fun undo(state: FlowEditorState): FlowEditorState =
         state.copy(flow = state.flow.copy(groups = state.flow.groups.map { 
-            if (it.id == groupId) it.copy(size = oldSize, position = oldPosition ?: it.position) else it 
+            if (it.id == groupId) {
+                val pos = oldPosition ?: it.position
+                val contained = state.flow.nodes.filter { n ->
+                    n.position.x >= pos.x && n.position.x <= pos.x + oldSize.x &&
+                    n.position.y >= pos.y && n.position.y <= pos.y + oldSize.y
+                }.map { n -> n.id }
+                it.copy(size = oldSize, position = pos, nodeIds = contained)
+            } else it 
         }), hasUnsavedChanges = true)
+
+    override fun mergeWith(previous: FlowCommand): FlowCommand? {
+        if (previous is ResizeGroupCommand && previous.groupId == this.groupId && !previous.isCommitted) {
+            return ResizeGroupCommand(
+                groupId = this.groupId,
+                oldSize = previous.oldSize,
+                newSize = this.newSize,
+                oldPosition = previous.oldPosition ?: this.oldPosition,
+                newPosition = this.newPosition,
+                isCommitted = this.isCommitted
+            )
+        }
+        return null
+    }
 }
 
 /**

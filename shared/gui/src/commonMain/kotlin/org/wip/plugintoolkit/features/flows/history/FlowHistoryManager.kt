@@ -26,12 +26,7 @@ class FlowHistoryManager(
      */
     fun executeCommand(command: FlowCommand, currentState: FlowEditorState): FlowEditorState {
         val newState = command.execute(currentState)
-        undoStack.addLast(command)
-        if (undoStack.size > maxStackSize) {
-            undoStack.removeFirst()
-        }
-        redoStack.clear()
-        syncState()
+        recordExecutedCommand(command)
         return newState
     }
 
@@ -39,6 +34,19 @@ class FlowHistoryManager(
      * Records an already-applied command directly into the undo history without re-executing it.
      */
     fun recordExecutedCommand(command: FlowCommand) {
+        if (undoStack.isNotEmpty()) {
+            val last = undoStack.last()
+            if (command is MergeableCommand) {
+                val merged = command.mergeWith(last)
+                if (merged != null) {
+                    undoStack.removeLast()
+                    undoStack.addLast(merged)
+                    redoStack.clear()
+                    syncState()
+                    return
+                }
+            }
+        }
         undoStack.addLast(command)
         if (undoStack.size > maxStackSize) {
             undoStack.removeFirst()

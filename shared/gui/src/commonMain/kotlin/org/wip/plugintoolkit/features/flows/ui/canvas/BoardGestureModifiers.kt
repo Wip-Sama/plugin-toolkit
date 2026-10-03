@@ -80,6 +80,41 @@ internal fun isPointerOverAnyNode(
     }
 }
 
+fun isPointerOverAnyGroup(
+    screenPos: Offset,
+    groups: List<FlowGroup>,
+    scale: Float,
+    offset: Offset
+): Boolean {
+    if (groups.isEmpty()) return false
+    val boardPos = (screenPos - offset) / scale
+    return groups.any { group ->
+        boardPos.x >= group.position.x &&
+        boardPos.x <= group.position.x + group.size.x &&
+        boardPos.y >= group.position.y &&
+        boardPos.y <= group.position.y + group.size.y
+    }
+}
+
+fun isPointerOverAnyLabel(
+    screenPos: Offset,
+    labels: List<FlowLabel>,
+    scale: Float,
+    offset: Offset,
+    densityValue: Float
+): Boolean {
+    if (labels.isEmpty()) return false
+    val boardPos = (screenPos - offset) / scale
+    return labels.any { label ->
+        val width = maxOf(120f, (label.text.length * 9f) + 32f)
+        val height = 48f
+        boardPos.x >= label.position.x &&
+        boardPos.x <= label.position.x + width &&
+        boardPos.y >= label.position.y &&
+        boardPos.y <= label.position.y + height
+    }
+}
+
 fun Modifier.boardConnectionTapGesture(
     interactionState: BoardInteractionState,
     connections: List<Connection>,
@@ -103,7 +138,8 @@ fun Modifier.boardConnectionTapGesture(
     roundness: Float = 0.5f,
     orthogonalStepMode: OrthogonalStepMode = OrthogonalStepMode.Auto,
     orthogonalPortLead: Boolean = false,
-    groups: List<FlowGroup> = emptyList()
+    groups: List<FlowGroup> = emptyList(),
+    labels: List<FlowLabel> = emptyList()
 ): Modifier = this.pointerInput(
     connections,
     getPortBoardPosition,
@@ -119,7 +155,8 @@ fun Modifier.boardConnectionTapGesture(
     roundness,
     orthogonalStepMode,
     orthogonalPortLead,
-    groups
+    groups,
+    labels
 ) {
     val d = density?.density ?: 1f
     detectTapGestures(
@@ -136,7 +173,9 @@ fun Modifier.boardConnectionTapGesture(
                 collapsedGroupNodeIds = collapsedGroupNodeIds,
                 hoveredNodeId = interactionState.hoveredNodeId
             )
-            if (isOverNode) {
+            val isOverGroup = isPointerOverAnyGroup(tapOffset, groups, scale, offset)
+            val isOverLabel = isPointerOverAnyLabel(tapOffset, labels, scale, offset, d)
+            if (isOverNode || isOverGroup || isOverLabel) {
                 return@detectTapGestures
             }
             focusRequester.requestFocus()
@@ -260,7 +299,9 @@ fun Modifier.boardSelectionBoxGesture(
                         collapsedGroupNodeIds = collapsedGroupNodeIds,
                         hoveredNodeId = interactionState.hoveredNodeId
                     )
-                    if (isOverNode) continue
+                    val isOverGroup = isPointerOverAnyGroup(startChange.position, currentGroups, currentScale, currentOffset)
+                    val isOverLabel = isPointerOverAnyLabel(startChange.position, currentLabels, currentScale, currentOffset, currentDensity.density)
+                    if (isOverNode || isOverGroup || isOverLabel) continue
 
                     val isOverElement = interactionState.hoveredNodeId != null ||
                         interactionState.hoveredJunctionId != null ||
@@ -1045,6 +1086,13 @@ fun Modifier.boardPointerEventGesture(
                                         currentOnDeleteWaypoint?.invoke(wp.first, wp.second)
                                         interactionState.hoveredWaypoint = null
                                     } else {
+                                        if (!isCtrl) {
+                                            currentOnSelectPoints?.invoke(emptySet())
+                                            currentOnSelectNodes?.invoke(emptySet())
+                                            currentOnSelectGroups?.invoke(emptySet())
+                                            currentOnSelectLabels?.invoke(emptySet())
+                                            interactionState.selectedConnection = wp.first
+                                        }
                                         interactionState.draggingWaypoint = Pair(wp.first, wp.second)
                                         interactionState.lastPointerPosition = position
                                     }

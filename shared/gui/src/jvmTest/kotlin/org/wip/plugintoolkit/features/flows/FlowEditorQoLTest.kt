@@ -52,6 +52,8 @@ import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import androidx.compose.ui.geometry.Offset
+import org.wip.plugintoolkit.features.flows.ui.canvas.isPointerOverAnyGroup
+import org.wip.plugintoolkit.features.flows.ui.canvas.isPointerOverAnyLabel
 import org.wip.plugintoolkit.features.flows.utils.SplineMathUtils
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.features.settings.model.FlowSettings
@@ -3553,6 +3555,115 @@ class FlowEditorQoLTest {
         // Ctrl+click node 1 -> removes node 1 from selection
         vm.onEvent(FlowEvent.BringToFront(1L, isCtrlPressed = true))
         assertEquals(setOf(2L), vm.state.value.selectedNodeIds)
+    }
+
+    @Test
+    fun testResizeGroupDragContinuousMergingAndSingleUndo() {
+        val grp = FlowGroup(id = 10L, title = "Group", position = ModelOffset(0f, 0f), size = ModelOffset(200f, 150f))
+        val initialFlow = Flow(name = "TestResizeMerge", groups = listOf(grp))
+        val vm = createViewModel(initialFlow)
+
+        // Simulate continuous dragging: 50 drag frames with snap = false
+        for (i in 1..50) {
+            vm.onEvent(FlowEvent.ResizeGroup(10L, positionDelta = ModelOffset.Zero, sizeDelta = ModelOffset(2f, 1f), snap = false))
+        }
+
+        // At this point, intermediate size is 200 + 100 = 300, 150 + 50 = 200
+        val intermediateGrp = vm.state.value.flow.groups.first()
+        assertEquals(300f, intermediateGrp.size.x)
+        assertEquals(200f, intermediateGrp.size.y)
+
+        // Finalize drag: snap = true
+        vm.onEvent(FlowEvent.ResizeGroup(10L, positionDelta = ModelOffset.Zero, sizeDelta = ModelOffset.Zero, snap = true))
+
+        val finalGrp = vm.state.value.flow.groups.first()
+        assertEquals(300f, finalGrp.size.x)
+        assertEquals(200f, finalGrp.size.y)
+
+        // A SINGLE undo must restore the group directly to its original state (200f, 150f)
+        assertTrue(vm.canUndo.value)
+        vm.undo()
+
+        val restored = vm.state.value.flow.groups.first()
+        assertEquals(200f, restored.size.x)
+        assertEquals(150f, restored.size.y)
+
+        // Further undo should be impossible because all 50 intermediate steps were merged into 1 command!
+        assertFalse(vm.canUndo.value)
+
+        // Redo should restore to the final committed state (300f, 200f)
+        assertTrue(vm.canRedo.value)
+        vm.redo()
+        val redone = vm.state.value.flow.groups.first()
+        assertEquals(300f, redone.size.x)
+        assertEquals(200f, redone.size.y)
+    }
+
+    @Test
+    fun testResizeGroupUndoRestoresContainedNodeIds() {
+        val n1 = Node.FlowInputNode(id = 1L, position = ModelOffset(100f, 100f), outputs = emptyList())
+        val grp = FlowGroup(id = 10L, title = "Group", position = ModelOffset(0f, 0f), size = ModelOffset(200f, 200f), nodeIds = listOf(1L))
+        val initialFlow = Flow(name = "TestResizeNodes", nodes = listOf(n1), groups = listOf(grp))
+        val vm = createViewModel(initialFlow)
+
+        // Move position to 200, 200 so node 1 at (100, 100) is outside
+        vm.onEvent(FlowEvent.ResizeGroup(10L, positionDelta = ModelOffset(200f, 200f), sizeDelta = ModelOffset.Zero, snap = true))
+        val resizedGrp = vm.state.value.flow.groups.first()
+        assertFalse(resizedGrp.nodeIds.contains(1L))
+
+        // Undo restores node containment
+        vm.undo()
+        val restoredGrp = vm.state.value.flow.groups.first()
+        assertTrue(restoredGrp.nodeIds.contains(1L))
+        assertEquals(ModelOffset(0f, 0f), restoredGrp.position)
+        assertEquals(ModelOffset(200f, 200f), restoredGrp.size)
+    }
+
+    @Test
+    fun testGroupAndLabelSelectionToggleWithCtrl() {
+        val grp1 = FlowGroup(id = 10L, title = "G1", position = ModelOffset.Zero, size = ModelOffset(200f, 150f))
+        val grp2 = FlowGroup(id = 20L, title = "G2", position = ModelOffset(300f, 0f), size = ModelOffset(200f, 150f))
+        val lbl1 = FlowLabel(id = 30L, text = "L1", position = ModelOffset(0f, 300f))
+        val lbl2 = FlowLabel(id = 40L, text = "L2", position = ModelOffset(200f, 300f))
+        val vm = createViewModel(Flow("TestSelectToggle", groups = listOf(grp1, grp2), labels = listOf(lbl1, lbl2)))
+
+        // Toggle group selection
+        vm.onEvent(FlowEvent.ToggleGroupSelection(10L))
+        assertEquals(setOf(10L), vm.state.value.selectedGroupIds)
+
+        vm.onEvent(FlowEvent.ToggleGroupSelection(20L))
+        assertEquals(setOf(10L, 20L), vm.state.value.selectedGroupIds)
+
+        vm.onEvent(FlowEvent.ToggleGroupSelection(10L))
+        assertEquals(setOf(20L), vm.state.value.selectedGroupIds)
+
+        // Toggle label selection
+        vm.onEvent(FlowEvent.ToggleLabelSelection(30L))
+        assertEquals(setOf(30L), vm.state.value.selectedLabelIds)
+
+        vm.onEvent(FlowEvent.ToggleLabelSelection(40L))
+        assertEquals(setOf(30L, 40L), vm.state.value.selectedLabelIds)
+
+        vm.onEvent(FlowEvent.ToggleLabelSelection(30L))
+        assertEquals(setOf(40L), vm.state.value.selectedLabelIds)
+    }
+
+    @Test
+    fun testPointerOverGroupAndLabelDetection() {
+        val grp = FlowGroup(id = 10L, title = "G1", position = ModelOffset(100f, 100f), size = ModelOffset(200f, 150f))
+        val lbl = FlowLabel(id = 20L, text = "Note", position = ModelOffset(400f, 100f))
+
+        // Inside group (100..300, 100..250)
+        assertTrue(isPointerOverAnyGroup(Offset(150f, 150f), listOf(grp), scale = 1f, offset = Offset.Zero))
+        // Outside group
+        assertFalse(isPointerOverAnyGroup(Offset(50f, 50f), listOf(grp), scale = 1f, offset = Offset.Zero))
+        assertFalse(isPointerOverAnyGroup(Offset(350f, 150f), listOf(grp), scale = 1f, offset = Offset.Zero))
+
+        // Inside label (400..500+, 100..148)
+        assertTrue(isPointerOverAnyLabel(Offset(420f, 120f), listOf(lbl), scale = 1f, offset = Offset.Zero, densityValue = 1f))
+        // Outside label
+        assertFalse(isPointerOverAnyLabel(Offset(50f, 50f), listOf(lbl), scale = 1f, offset = Offset.Zero, densityValue = 1f))
+        assertFalse(isPointerOverAnyLabel(Offset(420f, 200f), listOf(lbl), scale = 1f, offset = Offset.Zero, densityValue = 1f))
     }
 }
 

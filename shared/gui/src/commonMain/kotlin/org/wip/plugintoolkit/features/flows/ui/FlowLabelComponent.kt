@@ -40,11 +40,14 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
@@ -96,6 +99,8 @@ fun FlowLabelComponent(
     var showColorPicker by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
     var textValue by remember(label.text, isEditing) { mutableStateOf(label.text) }
+    var isCtrlPressedOnLabel by remember { mutableStateOf(false) }
+    var isShiftPressedOnLabel by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(isEditing) {
@@ -146,69 +151,77 @@ fun FlowLabelComponent(
                 shape = cornerShape
             )
             .padding(horizontal = spacing.small, vertical = spacing.extraSmall)
-            .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
+            .pointerInput(label.id) {
                 awaitPointerEventScope {
                     while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
-                            val isShift = event.keyboardModifiers.isShiftPressed
-                            val isCtrl = event.keyboardModifiers.isCtrlPressed
-                            if (isEyedropperActive && onSampleColor != null) {
-                                onSampleColor(label.color ?: "#FFFFFF")
-                                event.changes.forEach { it.consume() }
-                            } else if (isPaintToolActive && onPaintLabel != null) {
-                                onPaintLabel(label.id)
-                                event.changes.forEach { it.consume() }
-                            } else if (isWashToolActive && onWashLabel != null) {
-                                onWashLabel(label.id)
-                                event.changes.forEach { it.consume() }
-                            } else if (isShift && !isReadOnly) {
-                                isEditing = true
-                                event.changes.forEach { it.consume() }
-                            } else if (!isReadOnly) {
-                                onSelectLabel?.invoke(label.id, isCtrl)
-                            }
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press) {
+                            isCtrlPressedOnLabel = event.keyboardModifiers.isCtrlPressed
+                            isShiftPressedOnLabel = event.keyboardModifiers.isShiftPressed
                         }
                     }
                 }
             }
-            .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
-                if (!isReadOnly && !isPaintToolActive && !isWashToolActive && !isEyedropperActive) {
-                    detectDragGestures(
-                        onDragStart = {
-                            if (!isSelected && onSelectLabel != null) {
-                                onSelectLabel(label.id, false)
-                            }
-                        },
-                        onDragEnd = {
-                            if (onEndMove != null) {
-                                onEndMove(label.id)
-                            } else {
-                                val snapDelta = label.position.snapToGrid() - label.position
-                                if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                    onDragDelta(snapDelta.toComposeOffset())
+            .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, isSelected) {
+                if (isEyedropperActive && onSampleColor != null) {
+                    detectTapGestures(onTap = { onSampleColor(label.color ?: "#FFFFFF") })
+                } else if (isPaintToolActive && onPaintLabel != null) {
+                    detectTapGestures(onTap = { onPaintLabel(label.id) })
+                } else if (isWashToolActive && onWashLabel != null) {
+                    detectTapGestures(onTap = { onWashLabel(label.id) })
+                } else if (!isReadOnly) {
+                    coroutineScope {
+                        launch {
+                            detectDragGestures(
+                                onDragStart = {
+                                    if (isCtrlPressedOnLabel) {
+                                        onSelectLabel?.invoke(label.id, true)
+                                    } else if (!isSelected) {
+                                        onSelectLabel?.invoke(label.id, false)
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (onEndMove != null) {
+                                        onEndMove(label.id)
+                                    } else {
+                                        val snapDelta = label.position.snapToGrid() - label.position
+                                        if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                            onDragDelta(snapDelta.toComposeOffset())
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    if (onEndMove != null) {
+                                        onEndMove(label.id)
+                                    } else {
+                                        val snapDelta = label.position.snapToGrid() - label.position
+                                        if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
+                                            onDragDelta(snapDelta.toComposeOffset())
+                                        }
+                                    }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    if (onMove != null) {
+                                        onMove(label.id, dragAmount)
+                                    } else {
+                                        onDragDelta(dragAmount)
+                                    }
                                 }
-                            }
-                        },
-                        onDragCancel = {
-                            if (onEndMove != null) {
-                                onEndMove(label.id)
-                            } else {
-                                val snapDelta = label.position.snapToGrid() - label.position
-                                if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                    onDragDelta(snapDelta.toComposeOffset())
-                                }
-                            }
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            if (onMove != null) {
-                                onMove(label.id, dragAmount)
-                            } else {
-                                onDragDelta(dragAmount)
-                            }
+                            )
                         }
-                    )
+                        launch {
+                            detectTapGestures(
+                                onTap = {
+                                    if (isShiftPressedOnLabel) {
+                                        isEditing = true
+                                    } else {
+                                        onSelectLabel?.invoke(label.id, isCtrlPressedOnLabel)
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
             .testTag("flow_label_${label.id}")
