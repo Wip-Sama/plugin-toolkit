@@ -587,6 +587,16 @@
     <string name="job_memory_label">Peak Memory Usage</string>
     <string name="job_peak_memory_label">Peak Memory Usage</string>
     <string name="job_total_memory_label">Total Memory Usage</string>
+    <string name="job_vram_label">Peak VRAM Usage</string>
+    <string name="job_actual_vram_label">VRAM</string>
+    <string name="job_peak_vram_label">Peak VRAM</string>
+    <string name="job_system_vram_label">System VRAM</string>
+    <string name="job_cpu_label">CPU Usage</string>
+    <string name="job_avg_cpu_label">Avg CPU</string>
+    <string name="job_peak_cpu_label">Peak CPU</string>
+    <string name="job_cpu_cores_label">cores</string>
+    <string name="setting_resource_sampling_interval">Resource Sampling Interval</string>
+    <string name="setting_resource_sampling_interval_subtitle">Frequency in milliseconds for sampling RAM, VRAM, and CPU utilization during job and flow execution (default: 5000 ms).</string>
     <string name="job_capability_breakdown_title">Capability Breakdown</string>
     <string name="job_export_success_toast">Execution report exported successfully</string>
     <string name="job_no_metrics_recorded">No execution metrics recorded</string>

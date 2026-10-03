@@ -41,6 +41,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.DeveloperBoard
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.FormatUtils
@@ -49,6 +50,8 @@ import org.wip.plugintoolkit.features.job.utils.ProcessMemoryUtils
 import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.CapabilityExecutionMetric
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.job.utils.ProcessGpuUtils
+import org.wip.plugintoolkit.features.job.utils.ProcessCpuUtils
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.job_capability_breakdown_title
 import plugintoolkit.composeapp.generated.resources.job_completed_at_label
@@ -62,9 +65,27 @@ import plugintoolkit.composeapp.generated.resources.job_metric_network
 import plugintoolkit.composeapp.generated.resources.job_peak_memory_label
 import plugintoolkit.composeapp.generated.resources.job_started_at_label
 import plugintoolkit.composeapp.generated.resources.job_total_memory_label
+import plugintoolkit.composeapp.generated.resources.job_vram_label
+import plugintoolkit.composeapp.generated.resources.job_actual_vram_label
+import plugintoolkit.composeapp.generated.resources.job_peak_vram_label
+import plugintoolkit.composeapp.generated.resources.job_system_vram_label
+import plugintoolkit.composeapp.generated.resources.job_cpu_label
+import plugintoolkit.composeapp.generated.resources.job_avg_cpu_label
+import plugintoolkit.composeapp.generated.resources.job_peak_cpu_label
 import plugintoolkit.composeapp.generated.resources.job_view_individual_runs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import kotlin.time.Clock
+
+private data class LiveResourceSnapshot(
+    val memoryBytes: Long,
+    val vramBytes: Long,
+    val cpuPercent: Double?,
+    val systemVramUsedBytes: Long? = null,
+    val systemVramTotalBytes: Long? = null
+)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -72,25 +93,57 @@ internal fun ExecutionInfoSection(
     job: BackgroundJob,
     modifier: Modifier = Modifier
 ) {
-    var ticker by remember { mutableStateOf(0L) }
-    LaunchedEffect(job.id, job.status) {
-        if (job.status == JobStatus.Running || job.status == JobStatus.Queued) {
-            while (true) {
-                delay(1000)
-                ticker++
-            }
-        }
-    }
-
     val metrics = job.executionMetrics
     val startedAt = metrics?.startedAt ?: job.startedAt
     val completedAt = metrics?.completedAt ?: job.completedAt
     val isRunning = job.status == JobStatus.Running || job.status == JobStatus.Queued
 
-    val durationMs = if (isRunning && startedAt != null) {
-        if (ticker >= 0) {
-            (Clock.System.now() - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
-        } else 0L
+    var liveSnapshot by remember(job.id) { mutableStateOf<LiveResourceSnapshot?>(null) }
+    var runningPeakMemory by remember(job.id) { mutableStateOf<Long?>(null) }
+    var runningPeakVram by remember(job.id) { mutableStateOf<Long?>(null) }
+    var runningPeakCpu by remember(job.id) { mutableStateOf<Double?>(null) }
+    var liveDurationMs by remember(job.id) { mutableStateOf<Long?>(null) }
+
+    val isVramSupported = remember { ProcessGpuUtils.isVramMonitoringSupported() }
+
+    LaunchedEffect(job.id, isRunning) {
+        if (isRunning) {
+            while (isActive) {
+                val start = job.executionMetrics?.startedAt ?: job.startedAt
+                if (start != null) {
+                    liveDurationMs = (Clock.System.now() - start).inWholeMilliseconds.coerceAtLeast(0L)
+                }
+                val snap = withContext(Dispatchers.Default) {
+                    val jvmMem = MemoryUtils.getCurrentMemoryUsageBytes()
+                    val procMem = ProcessMemoryUtils.getAllDescendantsMemoryBytes()
+                    val vram = ProcessGpuUtils.getTotalTrackedVramBytes()
+                    val cpu = ProcessCpuUtils.getProcessCpuUsagePercent()
+                    val sysVram = ProcessGpuUtils.getSystemVramBytes()
+                    LiveResourceSnapshot(
+                        memoryBytes = jvmMem + procMem,
+                        vramBytes = vram,
+                        cpuPercent = cpu,
+                        systemVramUsedBytes = sysVram?.first,
+                        systemVramTotalBytes = sysVram?.second
+                    )
+                }
+                liveSnapshot = snap
+                if (snap.memoryBytes > (runningPeakMemory ?: 0L)) {
+                    runningPeakMemory = snap.memoryBytes
+                }
+                if (snap.vramBytes > (runningPeakVram ?: 0L)) {
+                    runningPeakVram = snap.vramBytes
+                }
+                if (snap.cpuPercent != null && snap.cpuPercent > (runningPeakCpu ?: 0.0)) {
+                    runningPeakCpu = snap.cpuPercent
+                }
+                delay(1000)
+            }
+        }
+    }
+
+    val durationMs = if (isRunning) {
+        liveDurationMs ?: startedAt?.let { (Clock.System.now() - it).inWholeMilliseconds.coerceAtLeast(0L) }
     } else {
         metrics?.totalDurationMs ?: run {
             if (startedAt != null) {
@@ -100,17 +153,7 @@ internal fun ExecutionInfoSection(
         }
     }
 
-    var runningPeakMemory by remember(job.id) { mutableStateOf<Long?>(null) }
-    val currentMem = if (isRunning && ticker >= 0) {
-        val jvmMem = MemoryUtils.getCurrentMemoryUsageBytes()
-        val procMem = ProcessMemoryUtils.getAllDescendantsMemoryBytes()
-        val mem = jvmMem + procMem
-        if (runningPeakMemory == null || mem > (runningPeakMemory ?: 0L)) {
-            runningPeakMemory = mem
-        }
-        mem
-    } else null
-
+    val currentMem = liveSnapshot?.memoryBytes
     val peakMemoryUsage = if (isRunning) {
         val recordedJobPeak = metrics?.memoryUsageBytes ?: 0L
         maxOf(runningPeakMemory ?: 0L, recordedJobPeak, currentMem ?: 0L).takeIf { it > 0L }
@@ -127,6 +170,26 @@ internal fun ExecutionInfoSection(
         }
     } else {
         metrics?.effectiveTotalMemoryUsageBytes ?: metrics?.totalMemoryUsageBytes ?: metrics?.memoryUsageBytes
+    }
+
+    val currentVram = liveSnapshot?.vramBytes
+    val peakVramUsage = if (isRunning) {
+        val recordedJobPeakVram = metrics?.peakProcessVramBytes ?: 0L
+        maxOf(runningPeakVram ?: 0L, recordedJobPeakVram, currentVram ?: 0L)
+    } else {
+        metrics?.peakProcessVramBytes
+    }
+
+    val avgCpuUsage = if (isRunning) {
+        liveSnapshot?.cpuPercent
+    } else {
+        metrics?.avgProcessCpuPercent
+    }
+
+    val peakCpuUsage = if (isRunning) {
+        runningPeakCpu ?: liveSnapshot?.cpuPercent
+    } else {
+        metrics?.peakProcessCpuPercent ?: metrics?.avgProcessCpuPercent
     }
 
     Column(
@@ -182,6 +245,42 @@ internal fun ExecutionInfoSection(
                 label = stringResource(Res.string.job_total_memory_label),
                 value = if (totalMemoryUsage != null) MemoryUtils.formatMemoryBytes(totalMemoryUsage) else "—"
             )
+            if (isVramSupported || peakVramUsage != null || metrics?.maxSystemVramBytes != null) {
+                MetricTile(
+                    icon = Icons.Default.DeveloperBoard,
+                    label = stringResource(Res.string.job_peak_vram_label),
+                    value = MemoryUtils.formatMemoryBytes(peakVramUsage ?: 0L)
+                )
+                val actualVramText = if (isRunning) {
+                    val proc = MemoryUtils.formatMemoryBytes(currentVram ?: 0L)
+                    val sys = liveSnapshot?.systemVramUsedBytes?.let { " (Sys: ${MemoryUtils.formatMemoryBytes(it)})" } ?: ""
+                    "$proc$sys"
+                } else {
+                    val sysMax = metrics?.maxSystemVramBytes
+                    if (sysMax != null) {
+                        "Sys: ${MemoryUtils.formatMemoryBytes(sysMax)}"
+                    } else {
+                        MemoryUtils.formatMemoryBytes(peakVramUsage ?: 0L)
+                    }
+                }
+                MetricTile(
+                    icon = Icons.Default.DeveloperBoard,
+                    label = stringResource(Res.string.job_actual_vram_label),
+                    value = actualVramText
+                )
+            }
+            if (avgCpuUsage != null || peakCpuUsage != null) {
+                MetricTile(
+                    icon = Icons.Default.Speed,
+                    label = stringResource(Res.string.job_avg_cpu_label),
+                    value = avgCpuUsage?.let { "$it%" } ?: "—"
+                )
+                MetricTile(
+                    icon = Icons.Default.Speed,
+                    label = stringResource(Res.string.job_peak_cpu_label),
+                    value = peakCpuUsage?.let { "$it%" } ?: "—"
+                )
+            }
         }
 
         // Per-capability breakdown
@@ -229,6 +328,11 @@ private fun CapabilityBreakdownCard(
 
     val peakMemory = executions.mapNotNull { it.memoryUsageBytes }.maxOrNull()
     val totalMemory = executions.mapNotNull { it.totalMemoryBytes ?: it.memoryUsageBytes }.sum().takeIf { it > 0L }
+    val peakVram = executions.mapNotNull { it.peakVramBytes }.maxOrNull()
+    val avgCpu = executions.mapNotNull { it.avgProcessCpuPercent }.takeIf { it.isNotEmpty() }?.let {
+        ((it.sum() / it.size) * 10.0).roundToInt() / 10.0
+    }
+    val peakCpu = executions.mapNotNull { it.peakProcessCpuPercent }.maxOrNull()
     val totalBytesRead = executions.mapNotNull { it.bytesRead }.sum().takeIf { it > 0L }
     val totalBytesWritten = executions.mapNotNull { it.bytesWritten }.sum().takeIf { it > 0L }
     val totalNetRead = executions.mapNotNull { it.networkBytesRead }.sum().takeIf { it > 0L }
@@ -302,8 +406,8 @@ private fun CapabilityBreakdownCard(
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
 
-        // Metrics row (Peak Memory, Total Memory, File I/O, Network Throughput)
-        val hasMetrics = peakMemory != null || totalMemory != null || totalBytesRead != null || totalBytesWritten != null || totalNetRead != null || totalNetWritten != null || avgThroughput != null
+        // Metrics row (Peak Memory, Total Memory, VRAM, CPU, File I/O, Network Throughput)
+        val hasMetrics = peakMemory != null || totalMemory != null || peakVram != null || avgCpu != null || peakCpu != null || totalBytesRead != null || totalBytesWritten != null || totalNetRead != null || totalNetWritten != null || avgThroughput != null
         if (hasMetrics) {
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
             Row(
@@ -321,6 +425,25 @@ private fun CapabilityBreakdownCard(
                 if (totalMemory != null) {
                     Text(
                         text = "${stringResource(Res.string.job_total_memory_label)}: ${MemoryUtils.formatMemoryBytes(totalMemory)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (peakVram != null && peakVram > 0L) {
+                    Text(
+                        text = "${stringResource(Res.string.job_peak_vram_label)}: ${MemoryUtils.formatMemoryBytes(peakVram)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (avgCpu != null || peakCpu != null) {
+                    val cpuStr = buildString {
+                        append("${stringResource(Res.string.job_cpu_label)}: ")
+                        if (avgCpu != null) append("$avgCpu%")
+                        if (peakCpu != null) append(" [Peak $peakCpu%]")
+                    }
+                    Text(
+                        text = cpuStr,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -401,6 +524,27 @@ private fun CapabilityBreakdownCard(
                                 if (totBytes != null) {
                                     Text(
                                         text = "Tot: ${MemoryUtils.formatMemoryBytes(totBytes)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                                val execVram = exec.peakVramBytes
+                                if (execVram != null && execVram > 0L) {
+                                    Text(
+                                        text = "VRAM: ${MemoryUtils.formatMemoryBytes(execVram)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                                val execAvgCpu = exec.avgProcessCpuPercent
+                                val execPeakCpu = exec.peakProcessCpuPercent
+                                if (execAvgCpu != null || execPeakCpu != null) {
+                                    val cpuStr = buildString {
+                                        if (execAvgCpu != null) append("CPU: $execAvgCpu%")
+                                        if (execPeakCpu != null) append(" (pk: $execPeakCpu%)")
+                                    }
+                                    Text(
+                                        text = cpuStr,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.outline
                                     )

@@ -10,6 +10,7 @@ import org.wip.plugintoolkit.features.job.model.CapabilityExecutionMetric
 import org.wip.plugintoolkit.features.job.model.JobExecutionMetrics
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
+import org.wip.plugintoolkit.features.job.model.ResourceUsageSample
 import org.wip.plugintoolkit.features.plugin.ui.CardButtonState
 import org.wip.plugintoolkit.features.plugin.ui.PluginStatusAction
 
@@ -247,5 +248,95 @@ class JobResultCardTest {
         assertTrue(report.contains("Network"))
         assertTrue(report.contains("#1: 3000 ms"))
         assertTrue(report.contains("#2: 2000 ms"))
+    }
+
+    @Test
+    fun testBuildJobExportReportWithVramCpuAndTimeline() {
+        val testStart = Instant.fromEpochMilliseconds(1700000000000L)
+        val testEnd = Instant.fromEpochMilliseconds(1700000010000L)
+
+        val samples = listOf(
+            ResourceUsageSample(
+                timestamp = testStart,
+                elapsedMs = 0L,
+                ramUsageBytes = 100L * 1024L * 1024L,
+                processVramBytes = 512L * 1024L * 1024L,
+                systemVramUsedBytes = 2048L * 1024L * 1024L,
+                systemVramTotalBytes = 8192L * 1024L * 1024L,
+                processCpuPercent = 12.5,
+                systemCpuPercent = 25.0,
+                availableCores = 16,
+                activeCapability = "aiModelInference",
+                activeNodeId = "node_1"
+            ),
+            ResourceUsageSample(
+                timestamp = Instant.fromEpochMilliseconds(1700000005000L),
+                elapsedMs = 5000L,
+                ramUsageBytes = 250L * 1024L * 1024L,
+                processVramBytes = 1024L * 1024L * 1024L,
+                systemVramUsedBytes = 2560L * 1024L * 1024L,
+                systemVramTotalBytes = 8192L * 1024L * 1024L,
+                processCpuPercent = 48.0,
+                systemCpuPercent = 60.0,
+                availableCores = 16,
+                activeCapability = "aiModelInference",
+                activeNodeId = "node_1"
+            )
+        )
+
+        val job = BackgroundJob(
+            id = "ai-job-999",
+            name = "AI Inference Job",
+            type = JobType.Flow,
+            status = JobStatus.Completed,
+            enqueuedAt = testStart,
+            startedAt = testStart,
+            completedAt = testEnd,
+            pluginId = "org.wip.ai",
+            capabilityName = "aiModelInference",
+            result = "{\"status\": \"ok\"}",
+            executionMetrics = JobExecutionMetrics(
+                startedAt = testStart,
+                completedAt = testEnd,
+                totalDurationMs = 10000L,
+                memoryUsageBytes = 250L * 1024L * 1024L,
+                totalMemoryUsageBytes = 250L * 1024L * 1024L,
+                peakProcessVramBytes = 1024L * 1024L * 1024L,
+                maxSystemVramBytes = 8192L * 1024L * 1024L,
+                avgProcessCpuPercent = 30.2,
+                peakProcessCpuPercent = 48.0,
+                avgSystemCpuPercent = 42.5,
+                availableCores = 16,
+                capabilityMetrics = listOf(
+                    CapabilityExecutionMetric(
+                        capabilityName = "aiModelInference",
+                        durationMs = 10000L,
+                        memoryUsageBytes = 250L * 1024L * 1024L,
+                        peakVramBytes = 1024L * 1024L * 1024L,
+                        avgProcessCpuPercent = 30.2
+                    )
+                ),
+                resourceTimeline = samples
+            )
+        )
+
+        val report = buildJobExportReport(
+            job = job,
+            logs = emptyList(),
+            startedAtLabel = "Started",
+            completedAtLabel = "Completed",
+            durationLabel = "Duration",
+            memoryLabel = "Peak Memory",
+            capabilityBreakdownLabel = "Capabilities",
+            totalMemoryLabel = "Total Memory"
+        )
+
+        assertTrue(report.contains("VRAM Usage:     1.0 GB (System Total: 8.0 GB)"))
+        assertTrue(report.contains("CPU Usage:      30.2% [Peak: 48.0%] (System: 42.5%) on 16 cores"))
+        assertTrue(report.contains("Peak VRAM: 1.0 GB"))
+        assertTrue(report.contains("CPU: 30.2%"))
+        assertTrue(report.contains("RESOURCE USAGE TIMELINE (2 samples)"))
+        assertTrue(report.contains("[aiModelInference] | RAM: 100.0 MB | VRAM: 512.0 MB"))
+        assertTrue(report.contains("[aiModelInference] | RAM: 250.0 MB | VRAM: 1.0 GB"))
     }
 }

@@ -231,25 +231,13 @@ class JobWorker(
             while (attempt <= retries) {
                 try {
                     val startMark = kotlin.time.TimeSource.Monotonic.markNow()
-                    val memBefore = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
-                    val procMemBefore = ProcessMemoryUtils.getTotalTrackedMemoryBytes(
-                        context.getActiveProcessWatchers().map { it.pid }
+                    val sampler = JobResourceSampler(
+                        jobId = job.id,
+                        samplingIntervalMs = settings.resourceSamplingIntervalMs,
+                        getActivePids = { context.getActiveProcessWatchers().map { it.pid } },
+                        manager = manager
                     )
-                    var peakMemory = memBefore + procMemBefore
-
-                    val samplingJob = workerScope.launch(kotlinx.coroutines.Dispatchers.Default) {
-                        while (isActive) {
-                            val jvmMem = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
-                            val extraPids = context.getActiveProcessWatchers().map { it.pid }
-                            val procMem = ProcessMemoryUtils.getTotalTrackedMemoryBytes(extraPids)
-                            val totalInstant = jvmMem + procMem
-                            if (totalInstant > peakMemory) {
-                                peakMemory = totalInstant
-                                manager.recordLivePeakMemory(job.id, peakMemory)
-                            }
-                            delay(100.milliseconds)
-                        }
-                    }
+                    val samplingJob = sampler.start(workerScope)
 
                     val processResult = try {
                         if (timeout == -1L) {
@@ -268,12 +256,8 @@ class JobWorker(
                     }
 
                     val durationMs = startMark.elapsedNow().inWholeMilliseconds
-                    val memAfter = org.wip.plugintoolkit.core.utils.MemoryUtils.getCurrentMemoryUsageBytes()
-                    val procMemAfter = ProcessMemoryUtils.getTotalTrackedMemoryBytes(
-                        context.getActiveProcessWatchers().map { it.pid }
-                    )
-                    val totalAfter = memAfter + procMemAfter
-                    val finalMemory = maxOf(peakMemory, totalAfter)
+                    val resourceMetrics = sampler.finish(activeCapability = job.capabilityName)
+                    val finalMemory = resourceMetrics.peakMemoryBytes
 
                     val tracker = (context as? org.wip.plugintoolkit.features.plugin.logic.DefaultPluginContext)?.tracker
                     val bytesRead = tracker?.bytesRead
@@ -292,7 +276,11 @@ class JobWorker(
                         bytesWritten = bytesWritten,
                         networkBytesRead = networkBytesRead,
                         networkBytesWritten = networkBytesWritten,
-                        throughputBytesPerSec = throughput
+                        throughputBytesPerSec = throughput,
+                        peakVramBytes = resourceMetrics.peakVramBytes,
+                        avgProcessCpuPercent = resourceMetrics.avgProcessCpuPercent,
+                        peakProcessCpuPercent = resourceMetrics.peakProcessCpuPercent,
+                        avgSystemCpuPercent = resourceMetrics.avgSystemCpuPercent
                     )
                     return@async processResult
                 } catch (e: TimeoutCancellationException) {

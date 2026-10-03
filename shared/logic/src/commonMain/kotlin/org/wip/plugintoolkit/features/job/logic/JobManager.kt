@@ -33,10 +33,14 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import org.wip.plugintoolkit.core.utils.MemoryUtils
 import org.wip.plugintoolkit.features.job.utils.ProcessMemoryUtils
+import org.wip.plugintoolkit.features.job.utils.ProcessGpuUtils
+import org.wip.plugintoolkit.features.job.utils.ProcessCpuUtils
 import org.wip.plugintoolkit.features.job.model.CapabilityExecutionMetric
 import org.wip.plugintoolkit.features.job.model.JobExecutionMetrics
+import org.wip.plugintoolkit.features.job.model.ResourceUsageSample
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.math.round
 import kotlin.time.Clock
 
 class JobManager(
@@ -89,6 +93,9 @@ class JobManager(
     private val lastLoggedProgress = ConcurrentHashMap<String, String>()
     private val activeJobCapabilityMetrics = ConcurrentHashMap<String, CopyOnWriteArrayList<CapabilityExecutionMetric>>()
     private val activeJobPeakMemory = ConcurrentHashMap<String, Long>()
+    private val activeJobPeakVram = ConcurrentHashMap<String, Long>()
+    private val activeJobPeakCpu = ConcurrentHashMap<String, Double>()
+    private val activeJobResourceTimeline = ConcurrentHashMap<String, CopyOnWriteArrayList<ResourceUsageSample>>()
     private val flowConcurrencyLimits = ConcurrentHashMap<String, Int>()
     private val capabilityConcurrencyLimits = ConcurrentHashMap<Pair<String, String>, Int>()
 
@@ -126,7 +133,11 @@ class JobManager(
         bytesWritten: Long? = null,
         networkBytesRead: Long? = null,
         networkBytesWritten: Long? = null,
-        throughputBytesPerSec: Long? = null
+        throughputBytesPerSec: Long? = null,
+        peakVramBytes: Long? = null,
+        avgProcessCpuPercent: Double? = null,
+        peakProcessCpuPercent: Double? = null,
+        avgSystemCpuPercent: Double? = null
     ) {
         val list = activeJobCapabilityMetrics.computeIfAbsent(jobId) { CopyOnWriteArrayList() }
         list.add(
@@ -139,12 +150,27 @@ class JobManager(
                 bytesWritten = bytesWritten,
                 networkBytesRead = networkBytesRead,
                 networkBytesWritten = networkBytesWritten,
-                throughputBytesPerSec = throughputBytesPerSec
+                throughputBytesPerSec = throughputBytesPerSec,
+                peakVramBytes = peakVramBytes,
+                avgProcessCpuPercent = avgProcessCpuPercent,
+                peakProcessCpuPercent = peakProcessCpuPercent,
+                avgSystemCpuPercent = avgSystemCpuPercent
             )
         )
         if (memoryBytes != null && memoryBytes > 0L) {
             activeJobPeakMemory.compute(jobId) { _, current ->
                 kotlin.math.max(current ?: 0L, memoryBytes)
+            }
+        }
+        if (peakVramBytes != null && peakVramBytes > 0L) {
+            activeJobPeakVram.compute(jobId) { _, current ->
+                kotlin.math.max(current ?: 0L, peakVramBytes)
+            }
+        }
+        val effectiveCpu = peakProcessCpuPercent ?: avgProcessCpuPercent
+        if (effectiveCpu != null && effectiveCpu > 0.0) {
+            activeJobPeakCpu.compute(jobId) { _, current ->
+                kotlin.math.max(current ?: 0.0, effectiveCpu)
             }
         }
     }
@@ -157,6 +183,32 @@ class JobManager(
     }
 
     fun getLivePeakMemory(jobId: String): Long? = activeJobPeakMemory[jobId]
+
+    fun recordLivePeakVram(jobId: String, vramBytes: Long) {
+        if (vramBytes <= 0L) return
+        activeJobPeakVram.compute(jobId) { _, current ->
+            kotlin.math.max(current ?: 0L, vramBytes)
+        }
+    }
+
+    fun getLivePeakVram(jobId: String): Long? = activeJobPeakVram[jobId]
+
+    fun recordLivePeakCpu(jobId: String, cpuPercent: Double) {
+        if (cpuPercent <= 0.0) return
+        activeJobPeakCpu.compute(jobId) { _, current ->
+            kotlin.math.max(current ?: 0.0, cpuPercent)
+        }
+    }
+
+    fun getLivePeakCpu(jobId: String): Double? = activeJobPeakCpu[jobId]
+
+    fun recordResourceSample(jobId: String, sample: ResourceUsageSample) {
+        val list = activeJobResourceTimeline.computeIfAbsent(jobId) { CopyOnWriteArrayList() }
+        list.add(sample)
+    }
+
+    fun getResourceTimeline(jobId: String): List<ResourceUsageSample> =
+        activeJobResourceTimeline[jobId]?.toList() ?: emptyList()
 
     init {
         scope.launch {
@@ -267,6 +319,58 @@ class JobManager(
         }
     }
 
+    private fun createExecutionMetrics(
+        jobId: String,
+        startedAt: kotlin.time.Instant,
+        completedAt: kotlin.time.Instant,
+        currentMem: Long
+    ): JobExecutionMetrics {
+        val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
+        val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
+        val peakMem = kotlin.math.max(recordedPeak, currentMem)
+        val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
+        val totalCapMem = capMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
+        val totalMem = totalCapMem ?: if (peakMem > 0L) peakMem else null
+
+        val timeline = activeJobResourceTimeline.remove(jobId)?.toList() ?: emptyList()
+        val recordedPeakVram = activeJobPeakVram.remove(jobId)
+        val timelinePeakVram = timeline.mapNotNull { it.processVramBytes }.maxOrNull()
+        val peakVram = listOfNotNull(recordedPeakVram, timelinePeakVram).maxOrNull()
+        val maxSysVram = ProcessGpuUtils.getSystemVramBytes()?.second
+        val cores = ProcessCpuUtils.getAvailableProcessors()
+
+        val recordedPeakCpu = activeJobPeakCpu.remove(jobId)
+        val capPeakCpu = capMetrics.mapNotNull { it.peakProcessCpuPercent ?: it.avgProcessCpuPercent }.maxOrNull()
+        val timelinePeakCpu = timeline.mapNotNull { it.processCpuPercent }.maxOrNull()
+        val peakProcCpu = listOfNotNull(recordedPeakCpu, timelinePeakCpu, capPeakCpu).maxOrNull()
+
+        val capAvgCpu = capMetrics.mapNotNull { it.avgProcessCpuPercent }.takeIf { it.isNotEmpty() }?.let {
+            round(it.sum() / it.size * 10.0) / 10.0
+        }
+        val avgProcCpu = timeline.mapNotNull { it.processCpuPercent }.takeIf { it.isNotEmpty() }?.let {
+            round(it.sum() / it.size * 10.0) / 10.0
+        } ?: capAvgCpu
+        val avgSysCpu = timeline.mapNotNull { it.systemCpuPercent }.takeIf { it.isNotEmpty() }?.let {
+            round(it.sum() / it.size * 10.0) / 10.0
+        }
+
+        return JobExecutionMetrics(
+            startedAt = startedAt,
+            completedAt = completedAt,
+            totalDurationMs = totalDuration,
+            memoryUsageBytes = if (peakMem > 0L) peakMem else null,
+            totalMemoryUsageBytes = totalMem,
+            capabilityMetrics = capMetrics,
+            peakProcessVramBytes = peakVram,
+            maxSystemVramBytes = maxSysVram,
+            avgProcessCpuPercent = avgProcCpu,
+            peakProcessCpuPercent = peakProcCpu,
+            avgSystemCpuPercent = avgSysCpu,
+            availableCores = cores,
+            resourceTimeline = timeline
+        )
+    }
+
     suspend fun cancelJob(jobId: String, force: Boolean = false) {
         var jobName = ""
         var cancelled = false
@@ -277,23 +381,10 @@ class JobManager(
                 cancelled = true
                 val completedAt = Clock.System.now()
                 val startedAt = job.startedAt ?: job.enqueuedAt
-                val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
                 val currentMem = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
-                val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
-                val peakMem = kotlin.math.max(recordedPeak, currentMem)
-                val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
-                val totalCapMem = capMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
-                val totalMem = totalCapMem ?: if (peakMem > 0L) peakMem else null
                 lastLoggedProgress.remove(jobId)
 
-                val metrics = JobExecutionMetrics(
-                    startedAt = startedAt,
-                    completedAt = completedAt,
-                    totalDurationMs = totalDuration,
-                    memoryUsageBytes = if (peakMem > 0L) peakMem else null,
-                    totalMemoryUsageBytes = totalMem,
-                    capabilityMetrics = capMetrics
-                )
+                val metrics = createExecutionMetrics(jobId, startedAt, completedAt, currentMem)
 
                 currentList.map {
                     if (it.id == jobId) it.copy(
@@ -487,6 +578,10 @@ class JobManager(
                     if (candidate != null) {
                         claimedJob = candidate.copy(status = JobStatus.Running, startedAt = Clock.System.now())
                         activeJobPeakMemory[candidate.id] = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
+                        val initialVram = ProcessGpuUtils.getTotalTrackedVramBytes()
+                        if (initialVram > 0L) {
+                            activeJobPeakVram[candidate.id] = initialVram
+                        }
                         currentList.map { if (it.id == candidate.id) claimedJob else it }
                     } else {
                         currentList
@@ -747,23 +842,10 @@ class JobManager(
                 updateJobProgress(jobId, 1.0f)
                 val completedAt = Clock.System.now()
                 val startedAt = job.startedAt ?: job.enqueuedAt
-                val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
                 val currentMem = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
-                val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
-                val peakMem = kotlin.math.max(recordedPeak, currentMem)
-                val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
-                val totalCapMem = capMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
-                val totalMem = totalCapMem ?: if (peakMem > 0L) peakMem else null
                 lastLoggedProgress.remove(jobId)
 
-                val metrics = JobExecutionMetrics(
-                    startedAt = startedAt,
-                    completedAt = completedAt,
-                    totalDurationMs = totalDuration,
-                    memoryUsageBytes = if (peakMem > 0L) peakMem else null,
-                    totalMemoryUsageBytes = totalMem,
-                    capabilityMetrics = capMetrics
-                )
+                val metrics = createExecutionMetrics(jobId, startedAt, completedAt, currentMem)
 
                 currentList.map {
                     if (it.id == jobId) it.copy(
@@ -804,23 +886,10 @@ class JobManager(
                 failed = true
                 val completedAt = Clock.System.now()
                 val startedAt = job.startedAt ?: job.enqueuedAt
-                val totalDuration = (completedAt - startedAt).inWholeMilliseconds.coerceAtLeast(0L)
                 val currentMem = MemoryUtils.getCurrentMemoryUsageBytes() + ProcessMemoryUtils.getAllDescendantsMemoryBytes()
-                val recordedPeak = activeJobPeakMemory.remove(jobId) ?: 0L
-                val peakMem = kotlin.math.max(recordedPeak, currentMem)
-                val capMetrics = activeJobCapabilityMetrics.remove(jobId)?.toList() ?: emptyList()
-                val totalCapMem = capMetrics.mapNotNull { it.memoryUsageBytes }.sum().takeIf { it > 0L }
-                val totalMem = totalCapMem ?: if (peakMem > 0L) peakMem else null
                 lastLoggedProgress.remove(jobId)
 
-                val metrics = JobExecutionMetrics(
-                    startedAt = startedAt,
-                    completedAt = completedAt,
-                    totalDurationMs = totalDuration,
-                    memoryUsageBytes = if (peakMem > 0L) peakMem else null,
-                    totalMemoryUsageBytes = totalMem,
-                    capabilityMetrics = capMetrics
-                )
+                val metrics = createExecutionMetrics(jobId, startedAt, completedAt, currentMem)
 
                 currentList.map {
                     if (it.id == jobId) it.copy(

@@ -52,6 +52,22 @@ data class BackgroundJob(
 )
 
 @Serializable
+data class ResourceUsageSample(
+    val timestamp: Instant,
+    val elapsedMs: Long,
+    val ramUsageBytes: Long,
+    val totalRamBytes: Long? = null,
+    val processVramBytes: Long? = null,
+    val systemVramUsedBytes: Long? = null,
+    val systemVramTotalBytes: Long? = null,
+    val processCpuPercent: Double? = null,
+    val systemCpuPercent: Double? = null,
+    val availableCores: Int? = null,
+    val activeCapability: String? = null,
+    val activeNodeId: String? = null
+)
+
+@Serializable
 data class CapabilityExecutionMetric(
     val capabilityName: String,
     val durationMs: Long,
@@ -61,7 +77,11 @@ data class CapabilityExecutionMetric(
     val bytesWritten: Long? = null,
     val networkBytesRead: Long? = null,
     val networkBytesWritten: Long? = null,
-    val throughputBytesPerSec: Long? = null
+    val throughputBytesPerSec: Long? = null,
+    val peakVramBytes: Long? = null,
+    val avgProcessCpuPercent: Double? = null,
+    val peakProcessCpuPercent: Double? = null,
+    val avgSystemCpuPercent: Double? = null
 )
 
 @Serializable
@@ -71,7 +91,14 @@ data class JobExecutionMetrics(
     val totalDurationMs: Long = 0L,
     val memoryUsageBytes: Long? = null,
     val totalMemoryUsageBytes: Long? = null,
-    val capabilityMetrics: List<CapabilityExecutionMetric> = emptyList()
+    val capabilityMetrics: List<CapabilityExecutionMetric> = emptyList(),
+    val peakProcessVramBytes: Long? = null,
+    val maxSystemVramBytes: Long? = null,
+    val avgProcessCpuPercent: Double? = null,
+    val peakProcessCpuPercent: Double? = null,
+    val avgSystemCpuPercent: Double? = null,
+    val availableCores: Int? = null,
+    val resourceTimeline: List<ResourceUsageSample> = emptyList()
 ) {
     val totalDurationPerCapability: Map<String, Long>
         get() = capabilityMetrics
@@ -90,6 +117,11 @@ data class JobExecutionMetrics(
         get() = capabilityMetrics
             .groupBy { it.capabilityName }
             .mapValues { (_, metrics) -> metrics.mapNotNull { it.memoryUsageBytes }.maxOrNull() }
+
+    val peakVramPerCapability: Map<String, Long?>
+        get() = capabilityMetrics
+            .groupBy { it.capabilityName }
+            .mapValues { (_, metrics) -> metrics.mapNotNull { it.peakVramBytes }.maxOrNull() }
 
     val totalMemoryPerCapability: Map<String, Long?>
         get() = capabilityMetrics

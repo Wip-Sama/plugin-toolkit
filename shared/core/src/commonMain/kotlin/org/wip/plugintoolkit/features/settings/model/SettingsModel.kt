@@ -241,8 +241,15 @@ data class JobSettings(
     val maxEndedJobs: Int = 20,
     val pluginTimeoutMs: Long = 600000L,
     val enableTransientRetries: Boolean = true,
-    val maxRetries: Int = 2
-)
+    val maxRetries: Int = 2,
+    val resourceSamplingIntervalMs: Long = DEFAULT_RESOURCE_SAMPLING_INTERVAL_MS
+) {
+    companion object {
+        const val DEFAULT_RESOURCE_SAMPLING_INTERVAL_MS: Long = 5000L
+        const val MIN_RESOURCE_SAMPLING_INTERVAL_MS: Long = 100L
+        const val MAX_RESOURCE_SAMPLING_INTERVAL_MS: Long = 60000L
+    }
+}
 
 /**
  * Automatic application software update checking options.

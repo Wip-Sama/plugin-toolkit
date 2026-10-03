@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.AvTimer
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlaylistAddCheck
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subject
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.JobSettings
@@ -92,6 +93,14 @@ fun SettingsRegistryBuilder.jobDefinitions() {
                     subtitle = SettingText.Raw("Maximum number of automatic retries"),
                     enabled = { it.jobs.enableTransientRetries }
                 ) { copy(maxRetries = it) }
+
+                longNumeric(
+                    JobSettings::resourceSamplingIntervalMs,
+                    Res.string.setting_resource_sampling_interval,
+                    Icons.Default.Speed,
+                    range = JobSettings.MIN_RESOURCE_SAMPLING_INTERVAL_MS.toInt()..JobSettings.MAX_RESOURCE_SAMPLING_INTERVAL_MS.toInt(),
+                    subtitle = SettingText.Resource(Res.string.setting_resource_sampling_interval_subtitle)
+                ) { copy(resourceSamplingIntervalMs = it) }
             }
         }
     }

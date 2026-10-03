@@ -1,4 +1,4 @@
-Version: 3.0.1
+Version: 3.1.0
 Date: xx-xx-2026
 Added:
 	- Resume Flow, Restart Flow, and Pause Flow actions in Flow Runner view
@@ -23,6 +23,9 @@ Added:
   - State preservation for crashed flow to allow for restarting them from the failed point
   - Job restart capability for ended jobs in the Job Dashboard and Job Result cards
   - Centralized single-source-of-truth flow execution locking via FlowExecutionGuard
+  - VRam monitoring for jobs
+  - Cpu utilization and core count monitoring
+  - Time series monitoring for jobs (resouce monitorin is now done costantly and kept)
 Changes:
 	- Node can now be focused by simply changing a value
   - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling

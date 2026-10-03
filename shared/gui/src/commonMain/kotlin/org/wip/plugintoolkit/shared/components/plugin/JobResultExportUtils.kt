@@ -73,6 +73,19 @@ internal fun buildJobExportReport(
     if (totalMemoryUsage != null && totalMemoryLabel != null) {
         sb.appendLine("$totalMemoryLabel: ${MemoryUtils.formatMemoryBytes(totalMemoryUsage)}")
     }
+    val vramUsage = metrics?.peakProcessVramBytes
+    if (vramUsage != null) {
+        val sysVram = metrics.maxSystemVramBytes
+        val sysVramStr = if (sysVram != null && sysVram > 0L) " (System Total: ${MemoryUtils.formatMemoryBytes(sysVram)})" else ""
+        sb.appendLine("VRAM Usage:     ${MemoryUtils.formatMemoryBytes(vramUsage)}$sysVramStr")
+    }
+    val cpuPercent = metrics?.avgProcessCpuPercent
+    if (cpuPercent != null) {
+        val peakCpu = metrics.peakProcessCpuPercent?.let { " [Peak: ${it}%]" } ?: ""
+        val sysCpu = metrics.avgSystemCpuPercent?.let { " (System: ${it}%)" } ?: ""
+        val cores = metrics.availableCores?.let { " on $it cores" } ?: ""
+        sb.appendLine("CPU Usage:      ${cpuPercent}%$peakCpu$sysCpu$cores")
+    }
 
     if (metrics != null && metrics.capabilityMetrics.isNotEmpty()) {
         sb.appendLine()
@@ -93,6 +106,11 @@ internal fun buildJobExportReport(
             val execs = metricsByCap[capName] ?: emptyList()
             val peak = execs.mapNotNull { it.memoryUsageBytes }.maxOrNull()
             val totMem = execs.mapNotNull { it.totalMemoryBytes ?: it.memoryUsageBytes }.sum().takeIf { it > 0L }
+            val peakVram = execs.mapNotNull { it.peakVramBytes }.maxOrNull()
+            val avgProcCpu = execs.mapNotNull { it.avgProcessCpuPercent }.takeIf { it.isNotEmpty() }?.let {
+                (it.sum() / it.size * 10.0).roundToLong() / 10.0
+            }
+            val capPeakCpu = execs.mapNotNull { it.peakProcessCpuPercent }.maxOrNull()
             val r = execs.mapNotNull { it.bytesRead }.sum().takeIf { it > 0L }
             val w = execs.mapNotNull { it.bytesWritten }.sum().takeIf { it > 0L }
             val netR = execs.mapNotNull { it.networkBytesRead }.sum().takeIf { it > 0L }
@@ -103,6 +121,15 @@ internal fun buildJobExportReport(
             val details = mutableListOf<String>()
             if (peak != null) details.add("Peak Memory: ${MemoryUtils.formatMemoryBytes(peak)}")
             if (totMem != null) details.add("Total Memory: ${MemoryUtils.formatMemoryBytes(totMem)}")
+            if (peakVram != null && peakVram > 0L) details.add("Peak VRAM: ${MemoryUtils.formatMemoryBytes(peakVram)}")
+            if (avgProcCpu != null || capPeakCpu != null) {
+                val cpuStr = buildString {
+                    append("CPU: ")
+                    if (avgProcCpu != null) append("${avgProcCpu}%")
+                    if (capPeakCpu != null) append(" [Peak: ${capPeakCpu}%]")
+                }
+                details.add(cpuStr)
+            }
             if (r != null || w != null) details.add("File I/O: R ${FormatUtils.formatFileSize(r ?: 0L)} / W ${FormatUtils.formatFileSize(w ?: 0L)}")
             if (netR != null || netW != null || avgTput != null) {
                 val netBytes = (netR ?: 0L) + (netW ?: 0L)
@@ -118,6 +145,12 @@ internal fun buildJobExportReport(
                     val runDetails = mutableListOf<String>()
                     exec.memoryUsageBytes?.let { runDetails.add("Peak: ${MemoryUtils.formatMemoryBytes(it)}") }
                     exec.totalMemoryBytes?.let { runDetails.add("Tot: ${MemoryUtils.formatMemoryBytes(it)}") }
+                    exec.peakVramBytes?.let { if (it > 0L) runDetails.add("VRAM: ${MemoryUtils.formatMemoryBytes(it)}") }
+                    val runCpu = buildString {
+                        if (exec.avgProcessCpuPercent != null) append("${exec.avgProcessCpuPercent}%")
+                        if (exec.peakProcessCpuPercent != null) append(" (pk: ${exec.peakProcessCpuPercent}%)")
+                    }
+                    if (runCpu.isNotEmpty()) runDetails.add("CPU: $runCpu")
                     val bRead = exec.bytesRead
                     val bWritten = exec.bytesWritten
                     if (bRead != null || bWritten != null) {
@@ -135,6 +168,28 @@ internal fun buildJobExportReport(
                     sb.appendLine("    #${idx + 1}: ${exec.durationMs} ms (${formatDuration(exec.durationMs)})$runExtra")
                 }
             }
+        }
+    }
+
+    val timeline = metrics?.resourceTimeline ?: emptyList()
+    if (timeline.isNotEmpty()) {
+        sb.appendLine()
+        sb.appendLine("--------------------------------------------------------------------------------")
+        sb.appendLine("RESOURCE USAGE TIMELINE (${timeline.size} samples)")
+        sb.appendLine("--------------------------------------------------------------------------------")
+        timeline.forEach { sample ->
+            val time = formatDuration(sample.elapsedMs)
+            val step = sample.activeCapability?.let { " [$it]" } ?: ""
+            val ram = MemoryUtils.formatMemoryBytes(sample.ramUsageBytes)
+            val vram = sample.processVramBytes?.takeIf { it > 0L }?.let { " | VRAM: ${MemoryUtils.formatMemoryBytes(it)}" } ?: ""
+            val sysUsed = sample.systemVramUsedBytes
+            val sysTot = sample.systemVramTotalBytes
+            val sysVram = if (sysUsed != null && sysTot != null) {
+                " (Sys: ${MemoryUtils.formatMemoryBytes(sysUsed)}/${MemoryUtils.formatMemoryBytes(sysTot)})"
+            } else ""
+            val cpu = sample.processCpuPercent?.let { " | CPU: ${it}%" } ?: ""
+            val sysCpu = sample.systemCpuPercent?.let { " (Sys: ${it}%)" } ?: ""
+            sb.appendLine("  +${time.padEnd(8)}$step | RAM: $ram$vram$sysVram$cpu$sysCpu")
         }
     }
 

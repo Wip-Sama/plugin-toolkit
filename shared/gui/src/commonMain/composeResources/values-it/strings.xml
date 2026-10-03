@@ -583,6 +583,16 @@
     <string name="job_memory_label">Picco Utilizzo Memoria</string>
     <string name="job_peak_memory_label">Picco Utilizzo Memoria</string>
     <string name="job_total_memory_label">Utilizzo Memoria Totale</string>
+    <string name="job_vram_label">Picco VRAM</string>
+    <string name="job_actual_vram_label">VRAM</string>
+    <string name="job_peak_vram_label">Picco VRAM</string>
+    <string name="job_system_vram_label">VRAM di Sistema</string>
+    <string name="job_cpu_label">Utilizzo CPU</string>
+    <string name="job_avg_cpu_label">CPU Media</string>
+    <string name="job_peak_cpu_label">Picco CPU</string>
+    <string name="job_cpu_cores_label">core</string>
+    <string name="setting_resource_sampling_interval">Intervallo di Campionamento Risorse</string>
+    <string name="setting_resource_sampling_interval_subtitle">Frequenza in millisecondi per il campionamento di RAM, VRAM e CPU durante l\'esecuzione dei job e dei flussi (predefinito: 5000 ms).</string>
     <string name="job_capability_breakdown_title">Dettaglio Funzionalità</string>
     <string name="job_export_success_toast">Report di esecuzione esportato con successo</string>
     <string name="job_no_metrics_recorded">Nessuna metrica registrata</string>
