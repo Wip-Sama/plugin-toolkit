@@ -208,9 +208,6 @@ class PluginLifecycleCoordinator(
 
             is LifecycleAction.LoadPlugin -> {
                 val res = lifecycleManager.loadPlugin(action.pkg)
-                if (res.isSuccess) {
-                    lifecycleManager.refreshLocks(action.pkg)
-                }
                 action.response.complete(res)
             }
 

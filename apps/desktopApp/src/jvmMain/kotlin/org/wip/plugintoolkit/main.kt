@@ -33,12 +33,15 @@ import co.touchlab.kermit.Severity
 import co.touchlab.kermit.platformLogWriter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.files.Path
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -70,11 +73,13 @@ import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
+import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.AppTheme
 import org.wip.plugintoolkit.features.settings.model.LogLevel
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.ui.splash.SplashWindow
 import org.wip.plugintoolkit.ui.splash.showSplashWindow
 import org.wip.plugintoolkit.ui.titlebar.LocalWindowController
 import org.wip.plugintoolkit.ui.titlebar.LocalWindowScope
@@ -89,7 +94,6 @@ import java.awt.Dimension
 import java.io.File
 import javax.swing.JOptionPane
 import javax.swing.JOptionPane.showMessageDialog
-import javax.swing.JWindow
 import kotlin.system.exitProcess
 
 private const val WINDOW_MIN_WIDTH = 680
@@ -164,13 +168,15 @@ fun main(args: Array<String>) {
         null
     }
     try {
+        Logger.i { "Startup: Starting application with arguments: ${args.toList()}" }
         // Run startup on an IO thread while the AWT EDT freely animates the splash screen
         val (viewModel, mode) = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
             performStartup(args) { text ->
                 splashWindow?.updateText(text)
             }
         }
-        runMain(args, splashWindow?.window, viewModel, mode)
+        Logger.i { "Startup: performStartup finished successfully, handing over to runMain" }
+        runMain(args, splashWindow, viewModel, mode)
     } catch (e: Throwable) {
         e.printStackTrace()
         showMessageDialog(
@@ -184,8 +190,22 @@ fun main(args: Array<String>) {
 }
 
 suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit = {}): Pair<SettingsViewModel, WindowStartMode> {
-    updateStatus("Loading configuration...")
     val detectedConfig = detectSystemConfig()
+    val isSafeMode = args.contains(detectedConfig.STARTUP_FLAG_SAFE_MODE) ||
+            args.contains(detectedConfig.STARTUP_FLAG_NO_SETTINGS) ||
+            args.contains("--provisional")
+    val isNoPlugins = isSafeMode || args.contains(detectedConfig.STARTUP_FLAG_NO_PLUGINS)
+    val isForce = args.contains("--force") || args.contains("-f")
+
+    if (isSafeMode) {
+        Logger.w { "Startup: >>> PROVISIONAL / SAFE MODE ENABLED <<<" }
+        Logger.w { "Startup: Running with clean default settings. Settings disk reads/writes are disabled." }
+    }
+    if (isNoPlugins) {
+        Logger.w { "Startup: Plugin auto-loading on startup is disabled." }
+    }
+
+    updateStatus("Loading configuration...")
 
     var viewModelProvider: () -> SettingsViewModel? = { null }
 
@@ -195,7 +215,7 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
             coroutineModule,
             module {
                 single<SystemConfig> { detectedConfig }
-                single<SettingsPersistence> { JvmSettingsPersistence() }
+                single<SettingsPersistence> { JvmSettingsPersistence(isTransient = isSafeMode) }
                 single<NotificationService> {
                     val repository = get<SettingsRepository>()
                     JvmNotificationService(get(named("LoomScope"))) {
@@ -210,10 +230,10 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
 
     val koin = getKoin()
     val persistence = koin.get<SettingsPersistence>()
-    val initialSettings = persistence.load()
+    val initialSettings = if (isSafeMode) AppSettings() else persistence.load()
 
     // ── Single Instance System Lock Check ────────────────────────
-    if (initialSettings.general.singleInstanceLock) {
+    if (initialSettings.general.singleInstanceLock && !isSafeMode && !isNoPlugins && !isForce) {
         val appDataDir = File(detectedConfig.getAppDataDir())
         when (val lockResult = org.wip.plugintoolkit.core.utils.AppLockManager.acquireLock(appDataDir)) {
             is org.wip.plugintoolkit.core.utils.LockResult.Acquired -> {
@@ -287,19 +307,21 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     )
 
     // Dynamically sync single-instance lock with settings changes
-    viewModel.settings
-        .map { it.general.singleInstanceLock }
-        .distinctUntilChanged()
-        .onEach { isEnabled ->
-            val appDataDir = File(detectedConfig.getAppDataDir())
-            if (isEnabled) {
-                if (!org.wip.plugintoolkit.core.utils.AppLockManager.isLockAcquired()) {
-                    org.wip.plugintoolkit.core.utils.AppLockManager.acquireLock(appDataDir)
+    if (!isSafeMode) {
+        viewModel.settings
+            .map { it.general.singleInstanceLock }
+            .distinctUntilChanged()
+            .onEach { isEnabled ->
+                val appDataDir = File(detectedConfig.getAppDataDir())
+                if (isEnabled) {
+                    if (!org.wip.plugintoolkit.core.utils.AppLockManager.isLockAcquired()) {
+                        org.wip.plugintoolkit.core.utils.AppLockManager.acquireLock(appDataDir)
+                    }
+                } else {
+                    org.wip.plugintoolkit.core.utils.AppLockManager.releaseLock()
                 }
-            } else {
-                org.wip.plugintoolkit.core.utils.AppLockManager.releaseLock()
-            }
-        }.launchIn(appScope)
+            }.launchIn(appScope)
+    }
 
     Logger.i { "Application starting. Logging initialized at: $logDir with minSeverity=$initialSeverity" }
 
@@ -315,37 +337,47 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     updateStatus("Cleaning up updates...")
     updateService.cleanupOldUpdates(settingsRepository.getSettingsDir())
 
-    updateStatus("Initializing plugins...")
-    appScope.launch {
-        try {
-            registry.initialize()
-        } catch (e: Throwable) {
-            Logger.e(e) { "Startup: Failed to initialize PluginRegistry" }
-        }
+    if (isNoPlugins) {
+        Logger.i { "Startup: Skipping plugin auto-load (--safe-mode or --no-plugins specified)" }
+    } else {
+        updateStatus("Initializing plugins...")
+        appScope.launch {
+            try {
+                registry.initialize()
+            } catch (e: Throwable) {
+                Logger.e(e) { "Startup: Failed to initialize PluginRegistry" }
+            }
 
-        val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
-        Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
+            val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
+            Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
 
-        pluginsToLoad.forEach { plugin ->
-            if (plugin.isValidated) {
-                Logger.d { "Startup: Launching load for validated plugin ${plugin.pkg}" }
-                launch {
-                    try {
-                        val result = pluginManager.loadPlugin(plugin.pkg)
-                        if (result.isFailure) {
-                            Logger.e { "Startup: Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
+            pluginsToLoad.forEachIndexed { index, plugin ->
+                if (plugin.isValidated) {
+                    Logger.i { "Startup: [${index + 1}/${pluginsToLoad.size}] Launching load for validated plugin ${plugin.pkg}" }
+                    launch {
+                        try {
+                            withTimeout(30_000) {
+                                val result = pluginManager.loadPlugin(plugin.pkg)
+                                if (result.isFailure) {
+                                    Logger.e { "Startup: Failed to load plugin ${plugin.pkg}: ${result.exceptionOrNull()?.message}" }
+                                } else {
+                                    Logger.i { "Startup: Successfully loaded plugin ${plugin.pkg}" }
+                                }
+                            }
+                        } catch (e: TimeoutCancellationException) {
+                            Logger.e { "Startup: Timed out (30s) while loading plugin ${plugin.pkg}" }
+                        } catch (e: Throwable) {
+                            Logger.e(e) { "Startup: Unexpected error while loading plugin ${plugin.pkg}" }
                         }
-                    } catch (e: Throwable) {
-                        Logger.e(e) { "Startup: Unexpected error while loading plugin ${plugin.pkg}" }
                     }
-                }
-            } else {
-                Logger.i { "Startup: Plugin ${plugin.pkg} is enabled but not validated, triggering background setup" }
-                launch {
-                    try {
-                        pluginManager.enqueueSetupJob(plugin.pkg)
-                    } catch (e: Throwable) {
-                        Logger.e(e) { "Startup: Unexpected error while enqueuing setup for plugin ${plugin.pkg}" }
+                } else {
+                    Logger.i { "Startup: [${index + 1}/${pluginsToLoad.size}] Plugin ${plugin.pkg} is enabled but not validated, triggering background setup" }
+                    launch {
+                        try {
+                            pluginManager.enqueueSetupJob(plugin.pkg)
+                        } catch (e: Throwable) {
+                            Logger.e(e) { "Startup: Unexpected error while enqueuing setup for plugin ${plugin.pkg}" }
+                        }
                     }
                 }
             }
@@ -357,27 +389,39 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
 
     // Check for updates on startup if enabled
     val settings = viewModel.settings.value
-    if (settings.autoUpdate.enabled && settings.autoUpdate.checkOnStartup) {
+    if (settings.autoUpdate.enabled && settings.autoUpdate.checkOnStartup && !isSafeMode) {
         viewModel.checkForUpdates()
     }
 
     updateStatus("Finalizing startup...")
-    viewModel.isLoaded.first { it }
+    Logger.i { "Startup: Awaiting settings repository load (timeout 5s)..." }
+    withTimeoutOrNull(5000) {
+        viewModel.isLoaded.first { it }
+    } ?: Logger.w { "Startup: Timed out waiting for settings to load; proceeding anyway" }
 
     val startMinimizedOverride = args.contains(appConfig.STARTUP_FLAG_BACKGROUND)
-    val startMode = if (startMinimizedOverride) WindowStartMode.Minimized else initialSettings.general.windowStartMode
+    val startMode = if (isSafeMode) {
+        WindowStartMode.Normal
+    } else if (startMinimizedOverride) {
+        WindowStartMode.Minimized
+    } else {
+        initialSettings.general.windowStartMode
+    }
+    Logger.i { "Startup: Configuration finalized. Start mode: $startMode" }
 
     return Pair(viewModel, startMode)
 }
 
 fun runMain(
     args: Array<String>,
-    splashWindow: JWindow?,
+    splashWindow: SplashWindow?,
     preloadedViewModel: SettingsViewModel,
     preloadedMode: WindowStartMode
 ) {
+    Logger.i { "Startup: runMain entered with mode=$preloadedMode" }
     var isTrayOpen by mutableStateOf(true)
     application {
+        Logger.i { "Startup: Compose application loop started" }
         val viewModel = preloadedViewModel
         val startMode = preloadedMode
         val languageCode by viewModel.currentLanguageCode.collectAsState()
@@ -397,8 +441,21 @@ fun runMain(
             }
         }
 
+        val isTraySupported = remember {
+            try {
+                java.awt.SystemTray.isSupported()
+            } catch (_: Throwable) {
+                false
+            }
+        }
+        val shouldStartVisible = startMode != WindowStartMode.Minimized || !isTraySupported
+        var isVisible by remember { mutableStateOf(shouldStartVisible) }
+
+        if (startMode == WindowStartMode.Minimized && !isTraySupported) {
+            Logger.w { "Startup: Window start mode is Minimized, but SystemTray is not supported. Forcing window visible." }
+        }
+
         val trayState = rememberTrayState()
-        var isVisible by remember { mutableStateOf(startMode != WindowStartMode.Minimized) }
 
         val windowState = rememberWindowState(
             placement = when (startMode) {
@@ -410,24 +467,27 @@ fun runMain(
             size = DpSize(ToolkitTheme.dimensions.dialogMaxWidthLarge, ToolkitTheme.dimensions.dialogMaxHeight)
         )
 
-        key(languageCode) {
-            Tray(
-                state = trayState,
-                icon = painterResource(Res.drawable.app_logo),
-                tooltip = stringResource(Res.string.app_name),
-                onAction = { isVisible = true },
-                menu = {
-                    Item("Open", onClick = { isVisible = true })
-                    Separator()
-                    Item("Exit", onClick = { if (confirmCloseWithActiveJobs()) exitApplication() })
-                }
-            )
+        if (isTraySupported) {
+            key(languageCode) {
+                Tray(
+                    state = trayState,
+                    icon = painterResource(Res.drawable.app_logo),
+                    tooltip = stringResource(Res.string.app_name),
+                    onAction = { isVisible = true },
+                    menu = {
+                        Item("Open", onClick = { isVisible = true })
+                        Separator()
+                        Item("Exit", onClick = { if (confirmCloseWithActiveJobs()) exitApplication() })
+                    }
+                )
+            }
         }
 
         val appSettings by viewModel.settings.collectAsState()
         val useCustomTitleBar = appSettings.appearance.useCustomTitleBar
 
         if (isVisible) {
+            Logger.i { "Startup: Composing Window (undecorated=$useCustomTitleBar)" }
             key(useCustomTitleBar) {
                 val isMaximized = windowState.placement == WindowPlacement.Maximized
                 val windowController = remember(windowState, isMaximized) {
@@ -438,6 +498,7 @@ fun runMain(
                             windowState.placement = if (isMaximized) WindowPlacement.Floating else WindowPlacement.Maximized
                         },
                         onClose = {
+                            Logger.i { "Window: Controller onClose triggered (closeToTray=${viewModel.settings.value.general.closeToTray})" }
                             if (viewModel.settings.value.general.closeToTray) {
                                 isVisible = false
                             } else if (confirmCloseWithActiveJobs()) {
@@ -449,6 +510,7 @@ fun runMain(
 
                 Window(
                     onCloseRequest = {
+                        Logger.i { "Window: onCloseRequest triggered (closeToTray=${viewModel.settings.value.general.closeToTray})" }
                         if (viewModel.settings.value.general.closeToTray) {
                             isVisible = false
                         } else if (confirmCloseWithActiveJobs()) {
@@ -480,11 +542,18 @@ fun runMain(
                                 isDark = isDark
                             )
                         }
+                        window.toFront()
+                        window.requestFocus()
                     }
 
                     LaunchedEffect(Unit) {
+                        Logger.i { "Startup: Main window launched (bounds=${window.bounds}, isVisible=${window.isVisible}), dismissing splash screen" }
                         kotlinx.coroutines.delay(300)
                         splashWindow?.dispose()
+                        window.isVisible = true
+                        window.toFront()
+                        window.requestFocus()
+                        Logger.i { "Startup: Window visibility confirmed (isVisible=${window.isVisible}, bounds=${window.bounds})" }
                     }
 
                     LaunchedEffect(Unit) {
@@ -523,6 +592,7 @@ fun runMain(
             }
         } else {
             LaunchedEffect(Unit) {
+                Logger.i { "Startup: Application started in tray (minimized), dismissing splash screen" }
                 splashWindow?.dispose()
             }
         }

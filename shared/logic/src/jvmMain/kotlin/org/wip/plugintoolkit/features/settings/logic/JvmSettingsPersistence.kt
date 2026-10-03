@@ -15,7 +15,9 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 
-class JvmSettingsPersistence : SettingsPersistence, KoinComponent {
+class JvmSettingsPersistence(
+    private val isTransient: Boolean = false
+) : SettingsPersistence, KoinComponent {
     private val appConfig: SystemConfig by inject()
     private val json = Json {
         prettyPrint = true
@@ -39,6 +41,10 @@ class JvmSettingsPersistence : SettingsPersistence, KoinComponent {
     }
 
     override suspend fun load(): AppSettings = withContext(Dispatchers.IO) {
+        if (isTransient) {
+            Logger.i { "JvmSettingsPersistence: Transient mode active, skipping disk read and returning default AppSettings" }
+            return@withContext AppSettings()
+        }
         try {
             if (SystemFileSystem.exists(settingsFile)) {
                 val content = SystemFileSystem.source(settingsFile).buffered().use { it.readString() }
@@ -50,21 +56,25 @@ class JvmSettingsPersistence : SettingsPersistence, KoinComponent {
             } else {
                 AppSettings()
             }
-        } catch (e: Exception) {
-            Logger.e(e) { "Error loading settings" }
+        } catch (t: Throwable) {
+            Logger.e(t) { "Error loading settings" }
             AppSettings()
         }
     }
 
     override suspend fun save(settings: AppSettings) = withContext(Dispatchers.IO) {
+        if (isTransient) {
+            Logger.d { "JvmSettingsPersistence: Transient mode active, disk save suppressed" }
+            return@withContext
+        }
         try {
             if (!SystemFileSystem.exists(settingsDir)) {
                 SystemFileSystem.createDirectories(settingsDir)
             }
             val content = json.encodeToString(AppSettings.serializer(), settings)
             SystemFileSystem.sink(settingsFile).buffered().use { it.writeString(content) }
-        } catch (e: Exception) {
-            Logger.e(e) { "Error saving settings" }
+        } catch (t: Throwable) {
+            Logger.e(t) { "Error saving settings" }
         }
     }
 

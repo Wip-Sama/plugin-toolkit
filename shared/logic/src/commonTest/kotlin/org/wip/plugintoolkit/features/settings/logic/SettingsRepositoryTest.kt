@@ -114,4 +114,21 @@ class SettingsRepositoryTest {
         assertEquals("Repo 1", repos[0].name)
         assertEquals("Repo 2", repos[1].name)
     }
+
+    @Test
+    fun testLoadFailureStillSetsIsLoadedTrue() = runTest {
+        val failingPersistence = object : SettingsPersistence {
+            override suspend fun load(): AppSettings = throw IllegalStateException("Simulated disk read corruption")
+            override suspend fun save(settings: AppSettings) {}
+            override fun getSettingsDir(): String = ""
+            override fun getJobsDir(): String = ""
+            override fun openLogFolder() {}
+            override fun openLatestLog() {}
+        }
+        val repository = SettingsRepository(failingPersistence, backgroundScope)
+
+        // isLoaded must still become true to prevent startup deadlock
+        val loaded = repository.isLoaded.first { it }
+        assertTrue(loaded, "isLoaded must become true even when load() fails")
+    }
 }

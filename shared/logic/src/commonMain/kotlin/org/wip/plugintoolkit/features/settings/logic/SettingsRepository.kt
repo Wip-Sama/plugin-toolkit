@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.settings.logic
 
+import co.touchlab.kermit.Logger
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.PersistentList
@@ -39,31 +40,42 @@ class SettingsRepository(
 
     init {
         scope.launch {
-            val loaded = persistence.load()
-            var applied = loaded
-            var hadPending = false
-            loadState.update { state ->
-                when (state) {
-                    is LoadState.Loading -> {
-                        for (fn in state.pending) {
-                            applied = fn(applied)
+            try {
+                val loaded = persistence.load()
+                var applied = loaded
+                var hadPending = false
+                loadState.update { state ->
+                    when (state) {
+                        is LoadState.Loading -> {
+                            for (fn in state.pending) {
+                                applied = fn(applied)
+                            }
+                            hadPending = state.pending.isNotEmpty()
+                            LoadState.Ready
                         }
-                        hadPending = state.pending.isNotEmpty()
-                        LoadState.Ready
+                        is LoadState.Ready -> state
                     }
-                    is LoadState.Ready -> state
                 }
-            }
-            _settings.value = applied
-            _isLoaded.value = true
-            if (hadPending) {
-                saveChannel.trySend(applied)
-            }
-            saveChannel.receiveAsFlow()
-                .debounce(500.milliseconds)
-                .collect {
-                    persistence.save(it)
+                _settings.value = applied
+                if (hadPending) {
+                    saveChannel.trySend(applied)
                 }
+            } catch (t: Throwable) {
+                Logger.e(t) { "SettingsRepository: Error loading settings from persistence" }
+                loadState.value = LoadState.Ready
+            } finally {
+                _isLoaded.value = true
+            }
+
+            try {
+                saveChannel.receiveAsFlow()
+                    .debounce(500.milliseconds)
+                    .collect {
+                        persistence.save(it)
+                    }
+            } catch (t: Throwable) {
+                Logger.e(t) { "SettingsRepository: Error in saveChannel flow collector" }
+            }
         }
     }
 

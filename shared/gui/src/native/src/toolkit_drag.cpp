@@ -79,7 +79,7 @@ struct WindowConfig {
     std::vector<TitleBarRect> draggableRects;
 };
 
-static std::mutex g_configMutex;
+static std::recursive_mutex g_configMutex;
 static std::unordered_map<HWND, WindowConfig> g_windowConfigs;
 
 static UINT get_window_dpi(HWND hWnd) {
@@ -101,7 +101,7 @@ static UINT get_window_dpi(HWND hWnd) {
 }
 
 // Map storing original WNDPROC per HWND for clean delegation and uninstall
-static std::mutex g_mapMutex;
+static std::recursive_mutex g_mapMutex;
 static std::unordered_map<HWND, WNDPROC> g_wndProcMap;
 
 // Forward declarations
@@ -113,7 +113,7 @@ static bool is_in_controls_area(HWND hWnd, POINT ptClient) {
     int titleHeightDp = g_titleBarHeightDp;
     int rightControlsDp = g_rightControlsWidthDp;
     {
-        std::lock_guard<std::mutex> lock(g_configMutex);
+        std::lock_guard<std::recursive_mutex> lock(g_configMutex);
         auto it = g_windowConfigs.find(hWnd);
         if (it != g_windowConfigs.end()) {
             titleHeightDp = it->second.titleBarHeightDp;
@@ -134,7 +134,7 @@ static bool is_in_controls_area(HWND hWnd, POINT ptClient) {
 static bool is_in_draggable_titlebar(HWND hWnd, POINT ptClient) {
     WindowConfig cfg;
     {
-        std::lock_guard<std::mutex> lock(g_configMutex);
+        std::lock_guard<std::recursive_mutex> lock(g_configMutex);
         auto it = g_windowConfigs.find(hWnd);
         if (it != g_windowConfigs.end()) {
             cfg = it->second;
@@ -203,7 +203,7 @@ static void hookAllChildren(HWND hParent) {
 
 static void hookWindow(HWND h, bool isChild) {
     if (!h) return;
-    std::lock_guard<std::mutex> lock(g_mapMutex);
+    std::lock_guard<std::recursive_mutex> lock(g_mapMutex);
     if (g_wndProcMap.find(h) != g_wndProcMap.end()) {
         return; // already hooked
     }
@@ -230,7 +230,7 @@ static void hookWindow(HWND h, bool isChild) {
 static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     WNDPROC oldProc = nullptr;
     {
-        std::lock_guard<std::mutex> lock(g_mapMutex);
+        std::lock_guard<std::recursive_mutex> lock(g_mapMutex);
         auto it = g_wndProcMap.find(hWndChild);
         if (it != g_wndProcMap.end()) {
             oldProc = it->second;
@@ -279,7 +279,7 @@ static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM w
         case WM_DESTROY: {
             SetWindowLongPtr(hWndChild, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(oldProc));
             {
-                std::lock_guard<std::mutex> lock(g_mapMutex);
+                std::lock_guard<std::recursive_mutex> lock(g_mapMutex);
                 g_wndProcMap.erase(hWndChild);
             }
             return CallWindowProc(oldProc, hWndChild, uMsg, wParam, lParam);
@@ -301,7 +301,7 @@ static LRESULT CALLBACK ChildSubclassWndProc(HWND hWndChild, UINT uMsg, WPARAM w
 static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     WNDPROC oldProc = nullptr;
     {
-        std::lock_guard<std::mutex> lock(g_mapMutex);
+        std::lock_guard<std::recursive_mutex> lock(g_mapMutex);
         auto it = g_wndProcMap.find(hWnd);
         if (it != g_wndProcMap.end()) {
             oldProc = it->second;
@@ -340,9 +340,6 @@ static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
         }
 
         case WM_NCHITTEST: {
-            // Ensure any newly added child windows (like SunAwtCanvas) are hooked
-            hookAllChildren(hWnd);
-
             POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
             ScreenToClient(hWnd, &pt);
 
@@ -416,11 +413,11 @@ static LRESULT CALLBACK SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
         case WM_DESTROY: {
             SetWindowLongPtr(hWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(oldProc));
             {
-                std::lock_guard<std::mutex> lock(g_mapMutex);
+                std::lock_guard<std::recursive_mutex> lock(g_mapMutex);
                 g_wndProcMap.erase(hWnd);
             }
             {
-                std::lock_guard<std::mutex> lock(g_configMutex);
+                std::lock_guard<std::recursive_mutex> lock(g_configMutex);
                 g_windowConfigs.erase(hWnd);
             }
             return CallWindowProc(oldProc, hWnd, uMsg, wParam, lParam);
@@ -466,7 +463,7 @@ Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_initWindow(
     }
 
     {
-        std::lock_guard<std::mutex> lock(g_configMutex);
+        std::lock_guard<std::recursive_mutex> lock(g_configMutex);
         auto& cfg = g_windowConfigs[hWnd];
         if (titleBarHeightDp > 0) cfg.titleBarHeightDp = titleBarHeightDp;
         if (rightControlsWidthDp > 0) cfg.rightControlsWidthDp = rightControlsWidthDp;
@@ -484,6 +481,7 @@ Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_initWindow(
     // 3. Inform Windows that the window frame changed (triggers WM_NCCALCSIZE)
     SetWindowPos(hWnd, NULL, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    ShowWindow(hWnd, SW_SHOW);
 
     // 4. Enable DWM drop shadow & Windows 11 rounded corners
     MARGINS margins = {1, 1, 1, 1};
@@ -506,7 +504,7 @@ Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_setLeftOffset(
     if (hwnd == 0) return JNI_FALSE;
     HWND hWnd = to_hwnd(hwnd);
     {
-        std::lock_guard<std::mutex> lock(g_configMutex);
+        std::lock_guard<std::recursive_mutex> lock(g_configMutex);
         g_windowConfigs[hWnd].leftOffsetDp = leftOffsetDp;
     }
     return JNI_TRUE;
@@ -541,7 +539,7 @@ Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_setNonDraggableRects(
     }
 
     {
-        std::lock_guard<std::mutex> lock(g_configMutex);
+        std::lock_guard<std::recursive_mutex> lock(g_configMutex);
         g_windowConfigs[hWnd].nonDraggableRects = std::move(rects);
     }
     return JNI_TRUE;
@@ -576,7 +574,7 @@ Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_setDraggableRects(
     }
 
     {
-        std::lock_guard<std::mutex> lock(g_configMutex);
+        std::lock_guard<std::recursive_mutex> lock(g_configMutex);
         g_windowConfigs[hWnd].draggableRects = std::move(rects);
     }
     return JNI_TRUE;
