@@ -137,10 +137,12 @@ fun AppNavigation(
         NavDisplay(
             backStack = backStack,
             modifier = modifier.fillMaxHeight(),
-            onBack = { router.navigateUp() }
+            onBack = { router.navigateUp() },
+            transitionSpec = desktopNavTransitionSpec(),
+            popTransitionSpec = desktopNavTransitionSpec()
         ) { key ->
             when (key) {
-                is Screen.Main -> NavEntry(key) {
+                is Screen.Main -> opaqueNavEntry(key) {
                     LandingPage(onNavigate = { screen ->
                         if (screen == Screen.Main) {
                             router.clearAndNavigateTo(Screen.Main)
@@ -150,7 +152,7 @@ fun AppNavigation(
                     })
                 }
 
-                is Screen.FlowManager -> NavEntry(key) {
+                is Screen.FlowManager -> opaqueNavEntry(key) {
                     FlowManagerView(
                         viewModel = flowViewModel,
                         onEditFlow = { flowName -> router.navigateTo(Screen.FlowEditor(flowName)) },
@@ -158,7 +160,7 @@ fun AppNavigation(
                     )
                 }
 
-                is Screen.FlowRunner -> NavEntry(key) {
+                is Screen.FlowRunner -> opaqueNavEntry(key) {
                     FlowRunnerView(
                         viewModel = flowViewModel,
                         initialFlowName = key.flowName,
@@ -166,7 +168,7 @@ fun AppNavigation(
                     )
                 }
 
-                is Screen.FlowEditor -> NavEntry(key) {
+                is Screen.FlowEditor -> opaqueNavEntry(key) {
                     val editorViewModel: FlowEditorViewModel =
                         koinViewModel(key = key.flowName, parameters = { parametersOf(key.flowName) })
                     FlowEditorView(
@@ -176,24 +178,24 @@ fun AppNavigation(
                     )
                 }
 
-                is Screen.Settings -> NavEntry(key) { SettingsScreen(viewModel = settingsViewModel) }
-                is Screen.JobDashboard -> NavEntry(key) { JobDashboard() }
-                is Screen.Plugins -> NavEntry(key) { PluginSectionScreen() }
-                is Screen.Plugin -> NavEntry(key) {
+                is Screen.Settings -> opaqueNavEntry(key) { SettingsScreen(viewModel = settingsViewModel) }
+                is Screen.JobDashboard -> opaqueNavEntry(key) { JobDashboard() }
+                is Screen.Plugins -> opaqueNavEntry(key) { PluginSectionScreen() }
+                is Screen.Plugin -> opaqueNavEntry(key) {
                     PluginSectionScreen(
                         initialPluginId = key.id,
                         initialScrollToSetting = key.scrollToSetting
                     )
                 }
-                is Screen.PluginManager -> NavEntry(key) {
+                is Screen.PluginManager -> opaqueNavEntry(key) {
                     PluginManagerView(
                         initialPluginId = key.pluginId,
                         initialScrollToSetting = key.scrollToSetting,
                         onOpenPlugin = { id -> router.navigateTo(Screen.Plugin(id)) }
                     )
                 }
-                is Screen.PluginRepo -> NavEntry(key) { PluginRepoView() }
-                else -> NavEntry(key) { }
+                is Screen.PluginRepo -> opaqueNavEntry(key) { PluginRepoView() }
+                else -> opaqueNavEntry(key) { }
             }
         }
     }

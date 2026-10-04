@@ -542,15 +542,12 @@ fun runMain(
                                 isDark = isDark
                             )
                         }
-                        window.toFront()
-                        window.requestFocus()
                     }
 
                     LaunchedEffect(Unit) {
                         Logger.i { "Startup: Main window launched (bounds=${window.bounds}, isVisible=${window.isVisible}), dismissing splash screen" }
-                        kotlinx.coroutines.delay(300)
+                        kotlinx.coroutines.delay(200)
                         splashWindow?.dispose()
-                        window.isVisible = true
                         window.toFront()
                         window.requestFocus()
                         Logger.i { "Startup: Window visibility confirmed (isVisible=${window.isVisible}, bounds=${window.bounds})" }

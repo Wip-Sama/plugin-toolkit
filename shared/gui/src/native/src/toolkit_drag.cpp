@@ -481,7 +481,6 @@ Java_org_wip_plugintoolkit_ui_titlebar_NativeDrag_initWindow(
     // 3. Inform Windows that the window frame changed (triggers WM_NCCALCSIZE)
     SetWindowPos(hWnd, NULL, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-    ShowWindow(hWnd, SW_SHOW);
 
     // 4. Enable DWM drop shadow & Windows 11 rounded corners
     MARGINS margins = {1, 1, 1, 1};

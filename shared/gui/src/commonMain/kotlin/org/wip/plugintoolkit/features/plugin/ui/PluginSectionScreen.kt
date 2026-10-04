@@ -25,6 +25,8 @@ import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.plugin_not_found_unloaded
 import plugintoolkit.composeapp.generated.resources.plugin_selection_hint
+import org.wip.plugintoolkit.ui.desktopNavTransitionSpec
+import org.wip.plugintoolkit.ui.opaqueNavEntry
 
 @Serializable
 sealed interface PluginNavKey : NavKey {
@@ -88,10 +90,12 @@ fun PluginSectionScreen(
             NavDisplay(
                 backStack = backStack,
                 modifier = Modifier.fillMaxSize(),
-                onBack = { if (backStack.size > 1) backStack.removeLast() }
+                onBack = { if (backStack.size > 1) backStack.removeLast() },
+                transitionSpec = desktopNavTransitionSpec(),
+                popTransitionSpec = desktopNavTransitionSpec()
             ) { key ->
                 when (key) {
-                    is PluginNavKey.PluginList -> NavEntry(key) {
+                    is PluginNavKey.PluginList -> opaqueNavEntry(key) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
                                 stringResource(Res.string.plugin_selection_hint),
@@ -101,7 +105,7 @@ fun PluginSectionScreen(
                         }
                     }
 
-                    is PluginNavKey.PluginDetail -> NavEntry(key) {
+                    is PluginNavKey.PluginDetail -> opaqueNavEntry(key) {
                         val plugin = loadedPlugins.find { it.getManifest().getOrThrow().plugin.id == key.id }
                         if (plugin != null) {
                             LaunchedEffect(key.id) {
@@ -121,7 +125,7 @@ fun PluginSectionScreen(
                         }
                     }
 
-                    else -> NavEntry(key) { }
+                    else -> opaqueNavEntry(key) { }
                 }
             }
         }

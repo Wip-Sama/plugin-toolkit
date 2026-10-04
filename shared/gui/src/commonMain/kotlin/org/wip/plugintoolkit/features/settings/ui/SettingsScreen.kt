@@ -53,6 +53,8 @@ import kotlinx.coroutines.delay
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import org.wip.plugintoolkit.ui.desktopNavTransitionSpec
+import org.wip.plugintoolkit.ui.opaqueNavEntry
 import androidx.savedstate.serialization.SavedStateConfiguration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
@@ -377,17 +379,20 @@ fun SettingsScreen(
                     NavDisplay(
                         backStack = backStack,
                         modifier = Modifier.fillMaxSize(),
-                        onBack = { if (backStack.size > 1) backStack.removeLast() }) { key ->
+                        onBack = { if (backStack.size > 1) backStack.removeLast() },
+                        transitionSpec = desktopNavTransitionSpec(),
+                        popTransitionSpec = desktopNavTransitionSpec()
+                    ) { key ->
                         when (key) {
-                            SettingNavKey.Appearance -> NavEntry(key) {
+                            SettingNavKey.Appearance -> opaqueNavEntry(key) {
                                 AutoSettingsView(key as SettingNavKey, viewModel, registry)
                             }
 
-                            SettingNavKey.SystemSettings -> NavEntry(key) {
+                            SettingNavKey.SystemSettings -> opaqueNavEntry(key) {
                                 AutoSettingsView(key as SettingNavKey, viewModel, registry)
                             }
 
-                            SettingNavKey.Shortcuts -> NavEntry(key) {
+                            SettingNavKey.Shortcuts -> opaqueNavEntry(key) {
                                 ShortcutsSettingsView(
                                     shortcutManager = shortcutManager,
                                     settingsViewModel = viewModel,
@@ -395,9 +400,9 @@ fun SettingsScreen(
                                 )
                             }
 
-                            SettingNavKey.NotificationHistory -> NavEntry(key) { NotificationHistoryView() }
-                            SettingNavKey.About -> NavEntry(key) { AboutView() }
-                            SettingNavKey.BroadSearch -> NavEntry(key) {
+                            SettingNavKey.NotificationHistory -> opaqueNavEntry(key) { NotificationHistoryView() }
+                            SettingNavKey.About -> opaqueNavEntry(key) { AboutView() }
+                            SettingNavKey.BroadSearch -> opaqueNavEntry(key) {
                                 BroadSearchResultsView(
                                     searchQuery = searchQuery,
                                     allDefinitions = allDefinitions,
@@ -410,7 +415,7 @@ fun SettingsScreen(
                                     })
                             }
 
-                            else -> NavEntry(key) { PlaceholderView("Error") }
+                            else -> opaqueNavEntry(key) { PlaceholderView("Error") }
                         }
                     }
                 }

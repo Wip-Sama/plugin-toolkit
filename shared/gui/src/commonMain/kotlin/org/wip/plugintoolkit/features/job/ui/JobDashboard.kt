@@ -67,6 +67,8 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import org.wip.plugintoolkit.ui.desktopNavTransitionSpec
+import org.wip.plugintoolkit.ui.opaqueNavEntry
 import androidx.savedstate.serialization.SavedStateConfiguration
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
@@ -207,15 +209,17 @@ fun JobDashboard(
                 NavDisplay(
                     backStack = backStack,
                     modifier = Modifier.fillMaxSize(),
-                    onBack = { if (backStack.size > 1) backStack.removeLast() }
+                    onBack = { if (backStack.size > 1) backStack.removeLast() },
+                    transitionSpec = desktopNavTransitionSpec(),
+                    popTransitionSpec = desktopNavTransitionSpec()
                 ) { key ->
                     when (key) {
-                        is JobNavKey.General -> NavEntry(key) { GeneralTab(viewModel) }
-                        is JobNavKey.Archive -> NavEntry(key) { ArchiveTab(viewModel) }
-                        is JobNavKey.Ended -> NavEntry(key) { EndedTab(viewModel) }
-                        is JobNavKey.Scheduler -> NavEntry(key) { SchedulerTab() }
-                        is JobNavKey.History -> NavEntry(key) { HistoryTab(viewModel) }
-                        else -> NavEntry(key) { }
+                        is JobNavKey.General -> opaqueNavEntry(key) { GeneralTab(viewModel) }
+                        is JobNavKey.Archive -> opaqueNavEntry(key) { ArchiveTab(viewModel) }
+                        is JobNavKey.Ended -> opaqueNavEntry(key) { EndedTab(viewModel) }
+                        is JobNavKey.Scheduler -> opaqueNavEntry(key) { SchedulerTab() }
+                        is JobNavKey.History -> opaqueNavEntry(key) { HistoryTab(viewModel) }
+                        else -> opaqueNavEntry(key) { }
                     }
                 }
             }
