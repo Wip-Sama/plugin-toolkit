@@ -22,8 +22,8 @@ import plugintoolkit.composeapp.generated.resources.flow_editor_input_already_co
 import plugintoolkit.composeapp.generated.resources.flow_editor_same_node_warning
 
 class FlowConnectionManager(
-    private val notificationService: NotificationService?,
-    private val viewModelScope: CoroutineScope
+    private val notificationService: NotificationService? = null,
+    private val viewModelScope: CoroutineScope? = null
 ) {
 
     fun handleConnectPorts(
@@ -160,7 +160,7 @@ class FlowConnectionManager(
                     val tNode = currentState.flow.nodes.find { it.id == tgt.first }
                     val tPort = tNode?.inputs?.find { it.id == tgt.second }
                     if (tPort != null && tPort.dataType !is DataType.Array && currentState.flow.isInputPortAlreadyConnected(tgt.first, tgt.second)) {
-                        viewModelScope.launch {
+                        viewModelScope?.launch {
                             notificationService?.toast(Res.string.flow_editor_input_already_connected_error.localizedWithArgs(tgt.second))
                         }
                         return currentState
@@ -177,7 +177,7 @@ class FlowConnectionManager(
         }
 
         if (sourceJunctionId != null && targetPort != null && targetPort.dataType !is DataType.Array && currentState.flow.isInputPortAlreadyConnected(targetNodeId, targetPortId)) {
-            viewModelScope.launch {
+            viewModelScope?.launch {
                 notificationService?.toast(Res.string.flow_editor_input_already_connected_error.localizedWithArgs(targetPortId))
             }
             return currentState
@@ -243,7 +243,7 @@ class FlowConnectionManager(
         isShiftPressed: Boolean
     ): FlowEditorState {
         if (sourceNodeId == targetNodeId) {
-            viewModelScope.launch {
+            viewModelScope?.launch {
                 val message = getString(Res.string.flow_editor_same_node_warning)
                 notificationService?.toast(message)
             }
@@ -290,7 +290,7 @@ class FlowConnectionManager(
                 )
             }
         } else {
-            viewModelScope.launch {
+            viewModelScope?.launch {
                 val message = if (!typesCompatible) {
                     Res.string.flow_editor_incompatible_types.localizedWithArgs(
                         sourceInferredType.format(),

@@ -50,6 +50,7 @@ val guiModule: Module = module {
     single { SettingsViewModel(get(), get(), get(), get()) }
     single { FlowViewModel(get(), getOrNull(), getOrNull()) }
     single { ActiveFlowEditorTracker() }
+    single<org.wip.plugintoolkit.features.flows.viewmodel.FlowClipboardService> { org.wip.plugintoolkit.features.flows.viewmodel.InMemoryFlowClipboardService() }
     factory { (flowName: String) ->
         FlowEditorViewModel(
             initialFlowName = flowName,
@@ -58,7 +59,9 @@ val guiModule: Module = module {
             notificationService = getOrNull<NotificationService>(),
             pluginRegistry = getOrNull<PluginRegistry>(),
             activeFlowEditorTracker = getOrNull<ActiveFlowEditorTracker>(),
-            settingsRepository = getOrNull<SettingsRepository>()
+            settingsRepository = getOrNull<SettingsRepository>(),
+            jobManager = getOrNull<org.wip.plugintoolkit.features.job.logic.JobManager>(),
+            clipboardService = getOrNull<org.wip.plugintoolkit.features.flows.viewmodel.FlowClipboardService>() ?: org.wip.plugintoolkit.features.flows.viewmodel.InMemoryFlowClipboardService()
         )
     }
     factory { NotificationViewModel(get()) }

@@ -18,11 +18,11 @@ class FlowEditorViewModelTest {
 
     @Test
     fun testPanCalculation() {
-        val initialState = FlowEditorState(offset = Offset(100f, 200f))
-        val panDelta = Offset(50f, -30f)
+        val initialState = FlowEditorState(offset = org.wip.plugintoolkit.features.flows.model.Offset(100f, 200f))
+        val panDelta = org.wip.plugintoolkit.features.flows.model.Offset(50f, -30f)
         val newOffset = initialState.offset + panDelta
 
-        assertEquals(Offset(150f, 170f), newOffset)
+        assertEquals(org.wip.plugintoolkit.features.flows.model.Offset(150f, 170f), newOffset)
     }
 
     @Test

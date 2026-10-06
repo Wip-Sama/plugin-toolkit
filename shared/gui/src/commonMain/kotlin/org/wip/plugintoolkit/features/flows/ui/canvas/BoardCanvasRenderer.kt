@@ -115,6 +115,7 @@ fun BoardGridAndConnectionsCanvas(
     Canvas(modifier = modifier.fillMaxSize().testTag("board_grid")) {
         // Read portLayoutVersion and currentDragOffset to ensure canvas redraws reactively during node dragging
         if (portLayoutVersion < 0) return@Canvas
+        val canvasOffset = state.offset.toComposeOffset()
         val _activeDragOffset = state.currentDragOffset
         val scaledGridSize = gridSize * state.scale
         val startX = (state.offset.x % scaledGridSize) - scaledGridSize
@@ -143,7 +144,7 @@ fun BoardGridAndConnectionsCanvas(
             val isJuncDimmedByNode = nodeHoveredWireTree != null && nodeHoveredWireTree.none { it.sourceJunctionId == junction.id || it.targetJunctionId == junction.id }
             val juncAlpha = if (isJuncDimmedByConn || isJuncDimmedByNode) opacity.disabled else 1f
 
-            val center = (junction.position.toComposeOffset() * state.scale) + state.offset
+            val center = (junction.position.toComposeOffset() * state.scale) + canvasOffset
             val isHovered = interactionState.hoveredJunctionId == junction.id
             val juncColor = junction.color
             val baseColor = if (!juncColor.isNullOrBlank()) {
@@ -194,7 +195,7 @@ fun BoardGridAndConnectionsCanvas(
                 groups = flow.groups,
                 density = this.density
             )
-            val screenPoints = boardPoints?.map { (it * state.scale) + state.offset }
+            val screenPoints = boardPoints?.map { (it * state.scale) + canvasOffset }
 
             if (screenPoints != null && screenPoints.size >= 2) {
                 val isInvalid = state.validationErrors.any {
@@ -249,7 +250,7 @@ fun BoardGridAndConnectionsCanvas(
                     groups = flow.groups,
                     density = this.density,
                     scale = state.scale,
-                    offset = state.offset,
+                    offset = canvasOffset,
                     tension = roundness,
                     stepMode = stepMode,
                     orthogonalPortLead = orthogonalPortLead,
@@ -265,7 +266,7 @@ fun BoardGridAndConnectionsCanvas(
                     startHorizontal = startIsHorizontal,
                     endHorizontal = endIsHorizontal,
                     scale = state.scale,
-                    canvasOffset = state.offset,
+                    canvasOffset = canvasOffset,
                     stepMode = stepMode,
                     startFilletLeadIn = filletParams.startFilletLeadIn,
                     endTrimDistance = filletParams.endTrimDistance,
@@ -316,7 +317,7 @@ fun BoardGridAndConnectionsCanvas(
 
                 // Draw Waypoints (Unified connection points)
                 connection.waypoints.forEachIndexed { index, wp ->
-                    val center = (wp.toComposeOffset() * state.scale) + state.offset
+                    val center = (wp.toComposeOffset() * state.scale) + canvasOffset
                     val isWpHovered = interactionState.hoveredWaypoint?.first == connection &&
                             interactionState.hoveredWaypoint?.second == index
                     val isWpDragging = interactionState.draggingWaypoint?.first == connection &&
@@ -350,7 +351,7 @@ fun BoardGridAndConnectionsCanvas(
 
         // Draw snapping indicator on wire
         interactionState.snappedWirePoint?.let { snapPt ->
-            val center = (snapPt * state.scale) + state.offset
+            val center = (snapPt * state.scale) + canvasOffset
             drawCircle(
                 color = Color(0xFF00E676).copy(alpha = 0.35f),
                 radius = 13f * state.scale,
@@ -376,7 +377,7 @@ fun BoardGridAndConnectionsCanvas(
                 val fallbackPos = if (connectionCurrentPos != Offset.Zero) {
                     connectionCurrentPos
                 } else if (interactionState.lastPointerPosition != Offset.Zero) {
-                    (interactionState.lastPointerPosition - state.offset) / state.scale
+                    (interactionState.lastPointerPosition - canvasOffset) / state.scale
                 } else {
                     startBoardPos
                 }
@@ -406,7 +407,7 @@ fun BoardGridAndConnectionsCanvas(
                 }
 
                 val boardPts = listOf(startPos, endPos)
-                val pts = listOf((startPos * state.scale) + state.offset, (endPos * state.scale) + state.offset)
+                val pts = listOf((startPos * state.scale) + canvasOffset, (endPos * state.scale) + canvasOffset)
                 val isTargetNodePort = highlightedPortId != null && highlightedNodeId != null
                 val leadStart = if (connectionStartIsOutput) orthogonalPortLead else (isTargetNodePort && orthogonalPortLead)
                 val leadEnd = if (!connectionStartIsOutput) orthogonalPortLead else (isTargetNodePort && orthogonalPortLead)
@@ -421,7 +422,7 @@ fun BoardGridAndConnectionsCanvas(
                     curveStyle,
                     roundness,
                     scale = state.scale,
-                    canvasOffset = state.offset,
+                    canvasOffset = canvasOffset,
                     stepMode = stepMode,
                     useMiddleRouteForDirectConnection = !orthogonalPortLead,
                     startPortLead = leadStart,
@@ -483,7 +484,7 @@ fun BoardGridAndConnectionsCanvas(
                 }
                 allBoardPts.add(liveBoardPos)
 
-                val previewScreenPts = allBoardPts.map { (it * state.scale) + state.offset }
+                val previewScreenPts = allBoardPts.map { (it * state.scale) + canvasOffset }
                 val previewLeadIn = if (interactionState.structuredConnectionSourceJunctionId != null) {
                     val dummyConn = Connection(
                         sourceNodeId = -1L,
@@ -500,7 +501,7 @@ fun BoardGridAndConnectionsCanvas(
                         groups = flow.groups,
                         density = this.density,
                         scale = state.scale,
-                        offset = state.offset,
+                        offset = canvasOffset,
                         tension = roundness,
                         stepMode = stepMode,
                         orthogonalPortLead = orthogonalPortLead,
@@ -518,7 +519,7 @@ fun BoardGridAndConnectionsCanvas(
                     curveStyle,
                     roundness,
                     scale = state.scale,
-                    canvasOffset = state.offset,
+                    canvasOffset = canvasOffset,
                     stepMode = stepMode,
                     startFilletLeadIn = previewLeadIn,
                     useMiddleRouteForDirectConnection = !orthogonalPortLead,
@@ -536,7 +537,7 @@ fun BoardGridAndConnectionsCanvas(
 
                 // Draw dots at committed intermediate points
                 interactionState.structuredConnectionPoints.forEach { pt ->
-                    val scrPt = (pt * state.scale) + state.offset
+                    val scrPt = (pt * state.scale) + canvasOffset
                     drawCircle(
                         color = connectionColor,
                         radius = 5.5f * state.scale,

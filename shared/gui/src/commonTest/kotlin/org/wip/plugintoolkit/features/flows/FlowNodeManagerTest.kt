@@ -83,13 +83,13 @@ class FlowNodeManagerTest {
         val node = createTestNode(1L, ModelOffset(100f, 100f))
         val initialState = FlowEditorState(
             flow = Flow("test", nodes = listOf(node)),
-            offset = ComposeOffset(0f, 0f),
+            offset = ModelOffset(0f, 0f),
             scale = 1.0f
         )
 
         // 1. Start moving node 1L by delta = (10, 10)
         val stateAfterMove = manager.handleMoveNode(initialState, 1L, ComposeOffset(10f, 10f), snap = false, showGhost = true)
-        val initialScreenPos = (node.position.toComposeOffset() + stateAfterMove.currentDragOffset.toComposeOffset()) * stateAfterMove.scale + stateAfterMove.offset
+        val initialScreenPos = (node.position.toComposeOffset() + stateAfterMove.currentDragOffset.toComposeOffset()) * stateAfterMove.scale + stateAfterMove.offset.toComposeOffset()
         assertEquals(ComposeOffset(110f, 110f), initialScreenPos)
 
         // 2. Pan canvas by panDelta = (50, 50) while node is being dragged (draggedNodeId = 1L)
@@ -97,7 +97,7 @@ class FlowNodeManagerTest {
         val stateAfterPan = manager.handlePan(stateAfterMove, panDelta)
 
         // Rendered position on screen MUST remain (110, 110) under the cursor!
-        val screenPosAfterPan = (node.position.toComposeOffset() + stateAfterPan.currentDragOffset.toComposeOffset()) * stateAfterPan.scale + stateAfterPan.offset
+        val screenPosAfterPan = (node.position.toComposeOffset() + stateAfterPan.currentDragOffset.toComposeOffset()) * stateAfterPan.scale + stateAfterPan.offset.toComposeOffset()
         assertEquals(initialScreenPos, screenPosAfterPan)
     }
 

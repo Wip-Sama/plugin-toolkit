@@ -309,7 +309,7 @@ fun BoardCanvas(
             .boardKeyboardHandler(
                 interactionState = interactionState,
                 scale = state.scale,
-                offset = state.offset,
+                offset = state.offset.toComposeOffset(),
                 getPortBoardPosition = getPortBoardPosition,
                 selectedNodeIds = selectedNodeIds,
                 selectedPointIds = state.selectedPointIds,
@@ -334,7 +334,7 @@ fun BoardCanvas(
                 interactionState = interactionState,
                 connections = flow.connections,
                 scale = state.scale,
-                offset = state.offset,
+                offset = state.offset.toComposeOffset(),
                 getPortBoardPosition = getPortBoardPosition,
                 focusRequester = focusRequester,
                 nodes = flow.nodes,
@@ -365,7 +365,7 @@ fun BoardCanvas(
                 interactionState = interactionState,
                 isDrawingConnection = isDrawingConnection,
                 scale = state.scale,
-                offset = state.offset,
+                offset = state.offset.toComposeOffset(),
                 nodes = flow.nodes,
                 connections = flow.connections,
                 getPortBoardPosition = getPortBoardPosition,
@@ -429,7 +429,7 @@ fun BoardCanvas(
                 nodeSizes = nodeSizes,
                 density = density,
                 scale = state.scale,
-                offset = state.offset,
+                offset = state.offset.toComposeOffset(),
                 defaultNodeWidthPx = with(density) { dimensions.nodeWidth.toPx() },
                 focusRequester = focusRequester,
                 onSelectNodes = onSelectNodes,
@@ -552,12 +552,12 @@ fun BoardCanvas(
                     position = group.position.toComposeOffset(),
                     dragOffset = groupDragOffset,
                     scale = state.scale,
-                    boardOffset = state.offset
+                    boardOffset = state.offset.toComposeOffset()
                 ) {
                     FlowGroupComponent(
                         group = group,
                         stateScale = state.scale,
-                        stateOffset = state.offset,
+                        stateOffset = state.offset.toComposeOffset(),
                         isReadOnly = isReadOnly,
                         onUpdateGroup = onUpdateGroup,
                         onDeleteGroup = onDeleteGroup,
@@ -593,12 +593,12 @@ fun BoardCanvas(
                     position = label.position.toComposeOffset(),
                     dragOffset = labelDragOffset,
                     scale = state.scale,
-                    boardOffset = state.offset
+                    boardOffset = state.offset.toComposeOffset()
                 ) {
                     FlowLabelComponent(
                         label = label,
                         stateScale = state.scale,
-                        stateOffset = state.offset,
+                        stateOffset = state.offset.toComposeOffset(),
                         isReadOnly = isReadOnly,
                         onUpdateLabel = onUpdateLabel,
                         onDeleteLabel = onDeleteLabel,
@@ -663,7 +663,7 @@ fun BoardCanvas(
         SelectionBoxCanvas(
             interactionState = interactionState,
             scale = state.scale,
-            offset = state.offset
+            offset = state.offset.toComposeOffset()
         )
 
         // 4. Order Badges

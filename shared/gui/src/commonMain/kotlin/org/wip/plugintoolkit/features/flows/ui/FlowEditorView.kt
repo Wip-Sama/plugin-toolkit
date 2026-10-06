@@ -397,13 +397,13 @@ fun FlowEditorView(
                     )
                 }
             } else if (startNodeId != null && startPortId != null) {
-                val dropScreenPos = (currPos * state.scale) + state.offset
+                val dropScreenPos = (currPos * state.scale) + state.offset.toComposeOffset()
                 val closestConnAndProj = ConnectionHitTester.findClosestConnectionWithProjection(
                     position = dropScreenPos,
                     connections = flow.connections,
                     getPortBoardPosition = getPortBoardPosition,
                     scale = state.scale,
-                    offset = state.offset,
+                    offset = state.offset.toComposeOffset(),
                     junctions = flow.junctions,
                     curveStyle = state.connectionCurveStyle,
                     roundness = state.connectionRoundness,
@@ -710,7 +710,7 @@ fun FlowEditorView(
                         nodePosition = ghostPos.toComposeOffset(),
                         dragOffset = Offset.Zero,
                         scale = state.scale,
-                        boardOffset = state.offset,
+                        boardOffset = state.offset.toComposeOffset(),
                         modifier = Modifier.alpha(0.3f)
                     ) {
                         draggedNode?.let { NodeComponentPlaceholder(it, heightDp) }
@@ -842,7 +842,7 @@ fun FlowEditorView(
                             nodePosition = node.position.toComposeOffset(),
                             dragOffset = dragOffset,
                             scale = state.scale,
-                            boardOffset = state.offset,
+                            boardOffset = state.offset.toComposeOffset(),
                             alpha = animatedAlpha
                         ) {
 
@@ -981,7 +981,7 @@ fun FlowEditorView(
                                           connectionStartIsOutput = isOutput
                                            getPortBoardPosition(nodeId, portId, isOutput)?.let {
                                                connectionCurrentPos = it
-                                               interactionState.lastPointerPosition = (it * state.scale) + state.offset
+                                               interactionState.lastPointerPosition = (it * state.scale) + state.offset.toComposeOffset()
                                            }
                                       }
                                   },
@@ -998,7 +998,7 @@ fun FlowEditorView(
                                 highlightedPortColor = nodeHighlightedPortColor,
                                 onHoverNode = onHoverNode,
                                 stateScale = state.scale,
-                                stateOffset = state.offset,
+                                stateOffset = state.offset.toComposeOffset(),
                                 selectedNodeIds = state.selectedNodeIds,
                                 isReadOnly = state.isReadOnly,
                                 isPaintToolActive = state.isPaintToolActive,

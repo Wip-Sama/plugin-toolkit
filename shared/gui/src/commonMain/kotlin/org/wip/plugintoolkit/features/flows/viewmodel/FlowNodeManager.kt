@@ -1,23 +1,25 @@
 package org.wip.plugintoolkit.features.flows.viewmodel
 
-import androidx.compose.ui.geometry.Offset
 import org.wip.plugintoolkit.api.CommonSemanticTypes
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.isCompatibleWith
 import org.wip.plugintoolkit.features.flows.model.Connection
+import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
+import org.wip.plugintoolkit.features.flows.model.Offset as ModelOffset
 import org.wip.plugintoolkit.features.flows.model.OutputPort
 import org.wip.plugintoolkit.features.flows.model.PortConstraints
-import org.wip.plugintoolkit.features.flows.ui.minus
-import org.wip.plugintoolkit.features.flows.ui.plus
 import org.wip.plugintoolkit.features.flows.ui.snapToGrid
+import org.wip.plugintoolkit.features.flows.ui.toModelOffset
 
 class FlowNodeManager {
 
-
+    private fun isPointInGroup(x: Float, y: Float, group: FlowGroup): Boolean =
+        x >= group.position.x && x <= group.position.x + group.size.x &&
+        y >= group.position.y && y <= group.position.y + group.size.y
 
     fun handleAddNode(currentState: FlowEditorState, node: Node, density: Float): FlowEditorState {
         val newFlow = currentState.flow.copy(
@@ -33,7 +35,7 @@ class FlowNodeManager {
     fun handleMoveNode(
         currentState: FlowEditorState,
         id: Long,
-        delta: Offset,
+        delta: ModelOffset,
         snap: Boolean,
         showGhost: Boolean
     ): FlowEditorState {
@@ -51,18 +53,16 @@ class FlowNodeManager {
                                  (currentState.flow.junctions.any { it.id == id } && currentState.selectedPointIds.contains(id))
             val groupsToMove = if (isSelectedMove) currentState.selectedGroupIds else if (isGroup) setOf(id) else emptySet()
 
-            if (groupsToMove.isNotEmpty()) {
-                val groupBounds = currentState.flow.groups.filter { it.id in groupsToMove }.map { g ->
-                    androidx.compose.ui.geometry.Rect(g.position.x, g.position.y, g.position.x + g.size.x, g.position.y + g.size.y)
-                }
+            val targetGroups = currentState.flow.groups.filter { it.id in groupsToMove }
+            if (targetGroups.isNotEmpty()) {
                 capturedJunctions = currentState.flow.junctions.filter { junc ->
-                    groupBounds.any { bounds -> bounds.contains(androidx.compose.ui.geometry.Offset(junc.position.x, junc.position.y)) }
+                    targetGroups.any { grp -> isPointInGroup(junc.position.x, junc.position.y, grp) }
                 }.map { it.id }.toSet()
                 
                 val waypointsMap = mutableMapOf<Connection, Set<Int>>()
                 for (conn in currentState.flow.connections) {
                     val wpsInside = conn.waypoints.mapIndexedNotNull { index, wp ->
-                        if (groupBounds.any { bounds -> bounds.contains(androidx.compose.ui.geometry.Offset(wp.x, wp.y)) }) index else null
+                        if (targetGroups.any { grp -> isPointInGroup(wp.x, wp.y, grp) }) index else null
                     }.toSet()
                     if (wpsInside.isNotEmpty()) {
                         waypointsMap[conn] = wpsInside
@@ -404,7 +404,15 @@ class FlowNodeManager {
         return currentState.copy(flow = currentState.flow.copy(nodes = updatedNodes), hasUnsavedChanges = true)
     }
 
-    fun handlePan(currentState: FlowEditorState, delta: Offset): FlowEditorState {
+    fun handleMoveNode(
+        currentState: FlowEditorState,
+        id: Long,
+        delta: androidx.compose.ui.geometry.Offset,
+        snap: Boolean,
+        showGhost: Boolean
+    ): FlowEditorState = handleMoveNode(currentState, id, delta.toModelOffset(), snap, showGhost)
+
+    fun handlePan(currentState: FlowEditorState, delta: ModelOffset): FlowEditorState {
         val newOffset = currentState.offset + delta
         return if (currentState.draggedNodeId != null) {
             val dragCorrection = delta / currentState.scale
@@ -416,6 +424,9 @@ class FlowNodeManager {
             currentState.copy(offset = newOffset)
         }
     }
+
+    fun handlePan(currentState: FlowEditorState, delta: androidx.compose.ui.geometry.Offset): FlowEditorState =
+        handlePan(currentState, delta.toModelOffset())
 
     fun handleRefreshNode(
         currentState: FlowEditorState,

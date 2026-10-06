@@ -1,6 +1,5 @@
 package org.wip.plugintoolkit.features.flows.viewmodel
 
-import androidx.compose.ui.geometry.Offset
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -23,7 +22,7 @@ enum class ReadOnlyReason {
 
 data class FlowEditorState(
     val flow: Flow = Flow(""),
-    val offset: Offset = Offset.Zero,
+    val offset: ModelOffset = ModelOffset.Zero,
     val scale: Float = 1f,
     val nextId: Long = 0L,
     val hasUnsavedChanges: Boolean = false,

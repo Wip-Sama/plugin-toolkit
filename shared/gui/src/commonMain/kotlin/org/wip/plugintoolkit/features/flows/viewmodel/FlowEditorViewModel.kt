@@ -83,22 +83,18 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_editor_input_already_connected_error
 
 class FlowEditorViewModel(
-    private val initialFlowName: String,
-    private val flowRepository: FlowRepository,
+    val initialFlowName: String = "",
+    val flowRepository: FlowRepository,
     private val settingsPersistence: SettingsPersistence? = null,
     private val notificationService: NotificationService? = null,
     private val pluginRegistry: PluginRegistry? = null,
     private val activeFlowEditorTracker: ActiveFlowEditorTracker? = null,
-    private val settingsRepository: SettingsRepository? = null
+    private val settingsRepository: SettingsRepository? = null,
+    private val jobManager: JobManager? = null,
+    val clipboardService: FlowClipboardService = InMemoryFlowClipboardService(),
+    val nodeManager: FlowNodeManager = FlowNodeManager(),
+    connectionManager: FlowConnectionManager? = null
 ) : ViewModel() {
-
-    companion object {
-        private var clipboardNodes: List<Node> = emptyList()
-        private var clipboardConnections: List<Connection> = emptyList()
-        private var clipboardGroups: List<FlowGroup> = emptyList()
-        private var clipboardLabels: List<FlowLabel> = emptyList()
-        private var clipboardJunctions: List<FlowJunction> = emptyList()
-    }
 
     private val resolvedSettingsRepository: SettingsRepository? by lazy {
         settingsRepository ?: try {
@@ -141,6 +137,14 @@ class FlowEditorViewModel(
         }
     }
 
+    private val resolvedJobManager: JobManager? by lazy {
+        jobManager ?: try {
+            getKoin().get()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private val resolvedPluginManager: org.wip.plugintoolkit.features.plugin.logic.PluginManager? by lazy {
         try {
             getKoin().get()
@@ -170,8 +174,7 @@ class FlowEditorViewModel(
     private val _state = MutableStateFlow(FlowEditorState())
     val state: StateFlow<FlowEditorState> = _state.asStateFlow()
 
-    private val nodeManager = FlowNodeManager()
-    private val connectionManager = FlowConnectionManager(
+    private val connectionManager = connectionManager ?: FlowConnectionManager(
         notificationService = resolvedNotificationService,
         viewModelScope = viewModelScope
     )
@@ -209,8 +212,8 @@ class FlowEditorViewModel(
         }
         viewModelScope.launch {
             try {
-                val jobManager = getKoin().get<JobManager>()
-                jobManager.jobs.collect {
+                val jManager = resolvedJobManager
+                jManager?.jobs?.collect {
                     updateReadOnlyState()
                 }
             } catch (e: Exception) {
@@ -697,25 +700,28 @@ class FlowEditorViewModel(
                     }
                     val allJunctionsToCopy = selectedPoints + wireJunctions
 
-                    clipboardNodes = currentState.flow.nodes.filter { it.id in allNodesToCopy }
-                    clipboardJunctions = currentState.flow.junctions.filter { it.id in allJunctionsToCopy }
-                    clipboardConnections = currentState.flow.connections.filter { conn ->
-                        val sourceValid = (conn.sourceNodeId in allNodesToCopy) || (conn.sourceJunctionId != null && conn.sourceJunctionId in allJunctionsToCopy)
-                        val targetValid = (conn.targetNodeId in allNodesToCopy) || (conn.targetJunctionId != null && conn.targetJunctionId in allJunctionsToCopy) || (conn.floatingTarget != null)
-                        sourceValid && targetValid
-                    }
-                    clipboardGroups = currentState.flow.groups.filter { it.id in selectedGroups }
-                    clipboardLabels = currentState.flow.labels.filter { it.id in selectedLabels }
+                    clipboardService.copy(
+                        nodes = currentState.flow.nodes.filter { it.id in allNodesToCopy },
+                        junctions = currentState.flow.junctions.filter { it.id in allJunctionsToCopy },
+                        connections = currentState.flow.connections.filter { conn ->
+                            val sourceValid = (conn.sourceNodeId in allNodesToCopy) || (conn.sourceJunctionId != null && conn.sourceJunctionId in allJunctionsToCopy)
+                            val targetValid = (conn.targetNodeId in allNodesToCopy) || (conn.targetJunctionId != null && conn.targetJunctionId in allJunctionsToCopy) || (conn.floatingTarget != null)
+                            sourceValid && targetValid
+                        },
+                        groups = currentState.flow.groups.filter { it.id in selectedGroups },
+                        labels = currentState.flow.labels.filter { it.id in selectedLabels }
+                    )
                 }
             }
             is FlowEvent.PasteNodes -> {
-                if (clipboardNodes.isNotEmpty() || clipboardGroups.isNotEmpty() || clipboardLabels.isNotEmpty() || clipboardJunctions.isNotEmpty()) {
+                val clipboard = clipboardService.getContents()
+                if (clipboard.isNotEmpty) {
                     shouldRunTypeInference = true
                     
                     var nextId = currentState.nextId
                     val idMapping = mutableMapOf<Long, Long>()
                     
-                    val newNodes = clipboardNodes.map { node ->
+                    val newNodes = clipboard.nodes.map { node ->
                         val newId = nextId++
                         idMapping[node.id] = newId
                         node.copyWithId(newId)
@@ -723,7 +729,7 @@ class FlowEditorViewModel(
 
                     var nextJuncId = (currentState.flow.junctions.maxOfOrNull { it.id } ?: 0L) + 1L
                     val junctionIdMapping = mutableMapOf<Long, Long>()
-                    val newJunctions = clipboardJunctions.map { junc ->
+                    val newJunctions = clipboard.junctions.map { junc ->
                         val newJId = nextJuncId++
                         junctionIdMapping[junc.id] = newJId
                         junc.copy(id = newJId)
@@ -750,7 +756,7 @@ class FlowEditorViewModel(
                         junc.copy(position = (junc.position + offsetDelta).snapToGrid())
                     }
                     
-                    val newConnections = clipboardConnections.mapNotNull { conn ->
+                    val newConnections = clipboard.connections.mapNotNull { conn ->
                         val newSourceId = if (conn.sourceNodeId >= 0L) idMapping[conn.sourceNodeId] else conn.sourceNodeId
                         val newTargetId = if (conn.targetNodeId >= 0L) idMapping[conn.targetNodeId] else conn.targetNodeId
                         val newSourceJuncId = if (conn.sourceJunctionId != null) junctionIdMapping[conn.sourceJunctionId] else null
@@ -770,7 +776,7 @@ class FlowEditorViewModel(
                     }
 
                     var nextGroupId = (currentState.flow.groups.maxOfOrNull { it.id } ?: 0L) + 1L
-                    val positionedGroups = clipboardGroups.map { grp ->
+                    val positionedGroups = clipboard.groups.map { grp ->
                         val newGId = nextGroupId++
                         val remappedNodeIds = grp.nodeIds.mapNotNull { idMapping[it] }
                         grp.copy(
@@ -781,7 +787,7 @@ class FlowEditorViewModel(
                     }
 
                     var nextLabelId = (currentState.flow.labels.maxOfOrNull { it.id } ?: 0L) + 1L
-                    val positionedLabels = clipboardLabels.map { lbl ->
+                    val positionedLabels = clipboard.labels.map { lbl ->
                         val newLId = nextLabelId++
                         lbl.copy(
                             id = newLId,
@@ -2505,7 +2511,10 @@ class FlowEditorViewModel(
             val newScale = (currentZoom * factor).coerceIn(0.1f, 5.0f)
 
             // Zoom centered on mouse pointer
-            val panDelta = (focusPosition - currentState.offset) * (1f - newScale / currentZoom)
+            val panDelta = ModelOffset(
+                (focusPosition.x - currentState.offset.x) * (1f - newScale / currentZoom),
+                (focusPosition.y - currentState.offset.y) * (1f - newScale / currentZoom)
+            )
             currentState.copy(
                 scale = newScale,
                 offset = currentState.offset + panDelta
@@ -2547,7 +2556,7 @@ class FlowEditorViewModel(
             val newFlow = curr.flow.copy(nodes = emptyList(), connections = emptyList())
             curr.copy(
                 flow = newFlow,
-                offset = Offset.Zero,
+                offset = ModelOffset.Zero,
                 scale = 1f,
                 hasUnsavedChanges = true
             )
