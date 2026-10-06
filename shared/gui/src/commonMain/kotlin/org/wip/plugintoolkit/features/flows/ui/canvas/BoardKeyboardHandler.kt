@@ -111,6 +111,36 @@ fun Modifier.boardKeyboardHandler(
             onToggleEyedropper?.invoke()
         }
 
+        onKey(
+            ShortcutActionId.FLOW_COPY,
+            enabled = hasSelection
+        ) {
+            onCopy()
+        }
+
+        onKey(
+            ShortcutActionId.FLOW_PASTE,
+            enabled = !isReadOnly
+        ) {
+            val boardPos = (interactionState.lastPointerPosition - offset) / scale
+            onPaste(boardPos)
+        }
+
+        onKey(
+            ShortcutActionId.FLOW_ESCAPE,
+            enabled = interactionState.isDrawingStructuredConnection
+        ) {
+            if (interactionState.structuredConnectionPoints.isNotEmpty()) {
+                onLeaveStructuredConnectionAtLastPoint?.invoke(
+                    interactionState.structuredConnectionStartNodeId,
+                    interactionState.structuredConnectionStartPortId,
+                    interactionState.structuredConnectionSourceJunctionId,
+                    interactionState.structuredConnectionPoints.toList()
+                )
+            }
+            interactionState.resetStructuredConnection()
+        }
+
         onRawKey { keyEvent ->
             if (keyEvent.type == KeyEventType.KeyDown) {
                 when {

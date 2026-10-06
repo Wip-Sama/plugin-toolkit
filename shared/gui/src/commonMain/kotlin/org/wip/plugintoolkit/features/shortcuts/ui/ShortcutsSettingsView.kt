@@ -19,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatPaint
@@ -310,6 +312,9 @@ private fun getActionIcon(actionId: String, situation: ShortcutSituation): Image
         ShortcutActionId.FLOW_PAINT_TOOL -> Icons.Default.FormatPaint
         ShortcutActionId.FLOW_UNDO -> Icons.Default.Undo
         ShortcutActionId.FLOW_REDO -> Icons.Default.Redo
+        ShortcutActionId.FLOW_COPY -> Icons.Default.ContentCopy
+        ShortcutActionId.FLOW_PASTE -> Icons.Default.ContentCopy
+        ShortcutActionId.FLOW_ESCAPE -> Icons.Default.Close
         ShortcutActionId.JOB_FORCE_CANCEL -> Icons.Default.Terminal
         ShortcutActionId.SETTINGS_SCALE_2X_STEP -> Icons.Default.Settings
         else -> when (situation) {

@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.shortcuts.model
 
 import kotlinx.serialization.Serializable
 import org.wip.plugintoolkit.core.model.LocalizedString
+import org.wip.plugintoolkit.core.utils.FileUtils
 
 /**
  * Representation of any keyboard key (standard letters, digits, functional, editing, or navigation).
@@ -92,6 +93,7 @@ data class ShortcutKey(
 /**
  * Mouse button identifier involved in a shortcut trigger.
  */
+@Deprecated("Phase 1 deprecation: Pointer gestures will be handled by CanvasControlScheme.")
 @Serializable
 enum class ShortcutPointerButton(val displayName: String) {
     None("None"),
@@ -105,6 +107,7 @@ enum class ShortcutPointerButton(val displayName: String) {
 /**
  * Type of gesture executed with mouse or pointer.
  */
+@Deprecated("Phase 1 deprecation: Pointer gestures will be handled by CanvasControlScheme.")
 @Serializable
 enum class ShortcutGesture(val displayName: String) {
     None("None"),
@@ -159,9 +162,30 @@ data class ShortcutTrigger(
     val isShift: Boolean = false,
     val isAlt: Boolean = false,
     val isMeta: Boolean = false,
+    @Deprecated("Phase 1 deprecation: Pointer gestures will be handled by CanvasControlScheme.")
     val pointerButton: ShortcutPointerButton = ShortcutPointerButton.None,
+    @Deprecated("Phase 1 deprecation: Pointer gestures will be handled by CanvasControlScheme.")
     val gesture: ShortcutGesture = ShortcutGesture.None
 ) {
+    companion object {
+        /**
+         * Resolves a key trigger with the active platform's primary command modifier:
+         * Meta on macOS, Ctrl on Windows/Linux.
+         */
+        fun primary(
+            key: ShortcutKey,
+            shift: Boolean = false,
+            alt: Boolean = false,
+            isMac: Boolean = FileUtils.isMac
+        ): ShortcutTrigger = ShortcutTrigger(
+            key = key,
+            isCtrl = !isMac,
+            isMeta = isMac,
+            isShift = shift,
+            isAlt = alt
+        )
+    }
+
     val isKeyboardOnly: Boolean
         get() = key != null && pointerButton == ShortcutPointerButton.None && gesture == ShortcutGesture.None
 
@@ -266,6 +290,7 @@ data class ShortcutTrigger(
  * Specifies the input medium/method required by an action.
  * Decided by the action declaration and immutable by the user.
  */
+@Deprecated("Phase 1 deprecation: Discriminator enum will be removed upon bifurcation.")
 @Serializable
 enum class ShortcutInputMode {
     Keyboard,
@@ -301,34 +326,62 @@ data class ShortcutAction(
  * Standard identifier constants for shortcuts across the application.
  */
 object ShortcutActionId {
+    @Deprecated("Phase 1 deprecation: UI modifier flag on button click. Handled directly in UI widgets.")
     const val SKIP_CONFIRMATION = "global.skip_confirmation"
 
     // Flow Editor Canvas & Board
+    @Deprecated("Phase 1 deprecation: Pointer interaction migrating to CanvasControlScheme in Phase 2.")
     const val FLOW_PAN_CANVAS = "flow.board.pan"
+
+    @Deprecated("Phase 1 deprecation: Pointer interaction migrating to CanvasControlScheme in Phase 2.")
     const val FLOW_ZOOM_CANVAS = "flow.board.zoom"
+
+    @Deprecated("Phase 1 deprecation: Hardcoded pointer click in NodeComponent. Pruned in Phase 3.")
     const val FLOW_SELECT_NODE = "flow.board.select_node"
+
+    @Deprecated("Phase 1 deprecation: Pointer interaction migrating to CanvasControlScheme in Phase 2.")
     const val FLOW_TOGGLE_SELECTION = "flow.board.toggle_selection"
+
+    @Deprecated("Phase 1 deprecation: Pointer interaction migrating to CanvasControlScheme in Phase 2.")
     const val FLOW_BOX_SELECT = "flow.board.box_select"
+
     const val FLOW_STRUCTURED_MODE = "flow.board.structured_mode"
     const val FLOW_PAINT_TOOL = "flow.board.paint_tool"
     const val FLOW_WASH_TOOL = "flow.board.wash_tool"
     const val FLOW_EYEDROPPER = "flow.board.eyedropper"
     const val FLOW_UNDO = "flow.board.undo"
     const val FLOW_REDO = "flow.board.redo"
+    const val FLOW_COPY = "flow.board.copy"
+    const val FLOW_PASTE = "flow.board.paste"
+    const val FLOW_ESCAPE = "flow.board.escape"
 
     // Flow Selection
+    @Deprecated("Phase 1 deprecation: Hardcoded node drag in NodeComponent. Pruned in Phase 3.")
     const val FLOW_MOVE_NODE = "flow.selection.move"
+
     const val FLOW_DELETE_SELECTED = "flow.selection.delete"
 
     // Flow Connection Points
+    @Deprecated("Phase 1 deprecation: Hardcoded port wiring. Pruned in Phase 3.")
     const val FLOW_CONNECT_PORT = "flow.point.connect"
+
+    @Deprecated("Phase 1 deprecation: Hardcoded wire detachment. Pruned in Phase 3.")
     const val FLOW_DETACH_CONNECTION = "flow.point.detach"
+
+    @Deprecated("Phase 1 deprecation: Hardcoded wire branching. Pruned in Phase 3.")
     const val FLOW_BRANCH_WIRE = "flow.point.branch"
+
+    @Deprecated("Phase 1 deprecation: Telemetry ghost. Pruned in Phase 3.")
     const val FLOW_MOVE_POINT = "flow.point.move"
+
+    @Deprecated("Phase 1 deprecation: Telemetry ghost. Pruned in Phase 3.")
     const val FLOW_CREATE_RAMIFICATION = "flow.point.ramification"
 
     // Other System Shortcuts
+    @Deprecated("Phase 1 deprecation: UI modifier flag on button click. Handled directly in UI widgets.")
     const val JOB_FORCE_CANCEL = "job.force_cancel"
+
+    @Deprecated("Phase 1 deprecation: UI modifier flag on slider step. Handled directly in UI widgets.")
     const val SETTINGS_SCALE_2X_STEP = "settings.scale_2x_step"
 }
 

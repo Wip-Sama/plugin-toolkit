@@ -15,10 +15,14 @@ import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_branch_
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_branch_wire_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_connect_port
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_connect_port_desc
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_copy
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_copy_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_delete_selected
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_delete_selected_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_detach_connection
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_detach_connection_desc
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_escape
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_escape_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_eyedropper
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_eyedropper_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_move_node
@@ -27,6 +31,8 @@ import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_move_po
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_move_point_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_paint_tool
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_paint_tool_desc
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_paste
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_paste_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_pan
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_pan_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_ramification
@@ -200,10 +206,7 @@ object DefaultShortcutCatalog {
             description = Res.string.shortcut_action_flow_undo_desc.localized,
             situation = ShortcutSituation.FlowBoard,
             defaultTriggers = listOf(
-                ShortcutTrigger(
-                    isCtrl = true,
-                    key = ShortcutKey.Z
-                )
+                ShortcutTrigger.primary(key = ShortcutKey.Z)
             )
         ),
         ShortcutAction(
@@ -212,15 +215,35 @@ object DefaultShortcutCatalog {
             description = Res.string.shortcut_action_flow_redo_desc.localized,
             situation = ShortcutSituation.FlowBoard,
             defaultTriggers = listOf(
-                ShortcutTrigger(
-                    isCtrl = true,
-                    key = ShortcutKey.Y
-                ),
-                ShortcutTrigger(
-                    isCtrl = true,
-                    isShift = true,
-                    key = ShortcutKey.Z
-                )
+                ShortcutTrigger.primary(key = ShortcutKey.Y),
+                ShortcutTrigger.primary(key = ShortcutKey.Z, shift = true)
+            )
+        ),
+        ShortcutAction(
+            id = ShortcutActionId.FLOW_COPY,
+            title = Res.string.shortcut_action_flow_copy.localized,
+            description = Res.string.shortcut_action_flow_copy_desc.localized,
+            situation = ShortcutSituation.FlowBoard,
+            defaultTriggers = listOf(
+                ShortcutTrigger.primary(key = ShortcutKey.C)
+            )
+        ),
+        ShortcutAction(
+            id = ShortcutActionId.FLOW_PASTE,
+            title = Res.string.shortcut_action_flow_paste.localized,
+            description = Res.string.shortcut_action_flow_paste_desc.localized,
+            situation = ShortcutSituation.FlowBoard,
+            defaultTriggers = listOf(
+                ShortcutTrigger.primary(key = ShortcutKey.V)
+            )
+        ),
+        ShortcutAction(
+            id = ShortcutActionId.FLOW_ESCAPE,
+            title = Res.string.shortcut_action_flow_escape.localized,
+            description = Res.string.shortcut_action_flow_escape_desc.localized,
+            situation = ShortcutSituation.FlowBoard,
+            defaultTriggers = listOf(
+                ShortcutTrigger(key = ShortcutKey.Escape)
             )
         ),
 

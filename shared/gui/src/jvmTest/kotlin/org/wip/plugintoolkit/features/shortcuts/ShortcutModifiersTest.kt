@@ -202,4 +202,48 @@ class ShortcutModifiersTest {
         assertFalse(triggeredAction)
         assertEquals(Offset.Zero, draggedDelta)
     }
+
+    @Test
+    fun testCopyPasteEscapeMatching() {
+        val manager = ShortcutManager()
+
+        // Copy default is Primary + C
+        assertTrue(
+            matchesKey(
+                shortcutManager = manager,
+                actionId = ShortcutActionId.FLOW_COPY,
+                key = Key.C,
+                isCtrl = !org.wip.plugintoolkit.core.utils.FileUtils.isMac,
+                isShift = false,
+                isAlt = false,
+                isMeta = org.wip.plugintoolkit.core.utils.FileUtils.isMac
+            )
+        )
+
+        // Paste default is Primary + V
+        assertTrue(
+            matchesKey(
+                shortcutManager = manager,
+                actionId = ShortcutActionId.FLOW_PASTE,
+                key = Key.V,
+                isCtrl = !org.wip.plugintoolkit.core.utils.FileUtils.isMac,
+                isShift = false,
+                isAlt = false,
+                isMeta = org.wip.plugintoolkit.core.utils.FileUtils.isMac
+            )
+        )
+
+        // Escape default is Escape without modifiers
+        assertTrue(
+            matchesKey(
+                shortcutManager = manager,
+                actionId = ShortcutActionId.FLOW_ESCAPE,
+                key = Key.Escape,
+                isCtrl = false,
+                isShift = false,
+                isAlt = false,
+                isMeta = false
+            )
+        )
+    }
 }

@@ -168,7 +168,10 @@ fun FlowControlsInfoCard(
                             ShortcutActionId.FLOW_TOGGLE_SELECTION,
                             ShortcutActionId.FLOW_BOX_SELECT,
                             ShortcutActionId.FLOW_MOVE_NODE,
-                            ShortcutActionId.FLOW_DELETE_SELECTED
+                            ShortcutActionId.FLOW_COPY,
+                            ShortcutActionId.FLOW_PASTE,
+                            ShortcutActionId.FLOW_DELETE_SELECTED,
+                            ShortcutActionId.FLOW_ESCAPE
                         )
                     )
                 }
