@@ -1419,17 +1419,21 @@ class FlowEditorViewModel(
                         currentState.flow.groups.find { it.id == gId }?.let { nodeIdsToMove.addAll(it.nodeIds) }
                     }
 
+                    val targetGroups = currentState.flow.groups.filter { it.id in groupsToMove }
                     val capturedJunctions = currentState.flow.junctions.filter { junc ->
-                        groupsToMove.any { gId ->
-                            val g = currentState.flow.groups.find { it.id == gId }
-                            g != null &&
-                                    junc.position.x >= g.position.x &&
-                                    junc.position.x <= g.position.x + g.size.x &&
-                                    junc.position.y >= g.position.y &&
-                                    junc.position.y <= g.position.y + g.size.y
-                        }
+                        targetGroups.any { g -> g.containsPoint(junc.position) }
                     }.map { it.id }.toSet()
                     val pointIdsToMove = (if (isSelected) currentState.selectedPointIds else emptySet()) + capturedJunctions
+
+                    val capturedWaypoints = mutableMapOf<Connection, Set<Int>>()
+                    for (conn in currentState.flow.connections) {
+                        val wpsInside = conn.waypoints.mapIndexedNotNull { index, wp ->
+                            if (targetGroups.any { g -> g.containsPoint(wp) }) index else null
+                        }.toSet()
+                        if (wpsInside.isNotEmpty()) {
+                            capturedWaypoints[conn] = wpsInside
+                        }
+                    }
 
                     val rawNewGrpPos = grp.position + event.delta
                     val newGrpPos = if (event.snap) rawNewGrpPos.snapToGrid() else rawNewGrpPos
@@ -1459,12 +1463,25 @@ class FlowEditorViewModel(
                         } else pt
                     }
 
+                    val updatedConnections = currentState.flow.connections.map { conn ->
+                        val capturedWps = capturedWaypoints[conn]
+                        if (capturedWps != null && capturedWps.isNotEmpty()) {
+                            val newWps = conn.waypoints.mapIndexed { index, wp ->
+                                if (capturedWps.contains(index)) {
+                                    if (event.snap) (wp + effectiveDelta).snapToGrid() else wp + effectiveDelta
+                                } else wp
+                            }
+                            conn.copy(waypoints = newWps)
+                        } else conn
+                    }
+
                     newState = currentState.copy(
                         flow = currentState.flow.copy(
                             groups = updatedGroups,
                             labels = updatedLabels,
                             nodes = updatedNodes,
-                            junctions = updatedJunctions
+                            junctions = updatedJunctions,
+                            connections = updatedConnections
                         ),
                         hasUnsavedChanges = true
                     )
@@ -1917,7 +1934,14 @@ class FlowEditorViewModel(
                                 return
                             }
                         }
-                        if (FlowCycleDetector.wouldCreateCycle(effectiveSource.first.id, tNode.id, currentState.flow.connections)) {
+                        if (FlowCycleDetector.wouldCreateCycle(
+                                sourceNodeId = sNodeId,
+                                sourceJunctionId = sJuncId,
+                                targetNodeId = tNodeId,
+                                targetJunctionId = tJuncId,
+                                connections = currentState.flow.connections
+                            )
+                        ) {
                             resolvedNotificationService?.toast("Cannot connect: Connecting these ports would create a loop (Directed Cyclic Graph). Enforcing Directed Acyclic Graph (DAG).")
                             return
                         }

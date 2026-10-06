@@ -18,8 +18,7 @@ import org.wip.plugintoolkit.features.flows.ui.toModelOffset
 class FlowNodeManager {
 
     private fun isPointInGroup(x: Float, y: Float, group: FlowGroup): Boolean =
-        x >= group.position.x && x <= group.position.x + group.size.x &&
-        y >= group.position.y && y <= group.position.y + group.size.y
+        group.containsPoint(x, y)
 
     fun handleAddNode(currentState: FlowEditorState, node: Node, density: Float): FlowEditorState {
         val newFlow = currentState.flow.copy(
@@ -158,7 +157,8 @@ class FlowNodeManager {
     fun handleDeleteNode(currentState: FlowEditorState, id: Long): FlowEditorState {
         val newFlow = currentState.flow.copy(
             nodes = currentState.flow.nodes.filter { it.id != id },
-            connections = currentState.flow.connections.filter { it.sourceNodeId != id && it.targetNodeId != id }
+            connections = currentState.flow.connections.filter { it.sourceNodeId != id && it.targetNodeId != id },
+            groups = currentState.flow.groups.map { g -> g.copy(nodeIds = g.nodeIds.filter { it != id }) }
         )
         val newValidationErrors = currentState.validationErrors.filter {
             it.sourceNodeId != id && it.targetNodeId != id
@@ -184,7 +184,8 @@ class FlowNodeManager {
             nodes = currentState.flow.nodes.filter { !selectedIds.contains(it.id) },
             connections = currentState.flow.connections.filter {
                 !selectedIds.contains(it.sourceNodeId) && !selectedIds.contains(it.targetNodeId)
-            }
+            },
+            groups = currentState.flow.groups.map { g -> g.copy(nodeIds = g.nodeIds.filter { it !in selectedIds }) }
         )
 
         val newValidationErrors = currentState.validationErrors.filter {

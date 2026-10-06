@@ -33,13 +33,13 @@ object FlowCycleDetector {
         connections: List<Connection>
     ): Boolean {
         val source = when {
-            sourceNodeId != null && sourceNodeId >= 0L -> GraphVertex.NodeVertex(sourceNodeId)
             sourceJunctionId != null -> GraphVertex.JunctionVertex(sourceJunctionId)
+            sourceNodeId != null && sourceNodeId >= 0L -> GraphVertex.NodeVertex(sourceNodeId)
             else -> return false
         }
         val target = when {
-            targetNodeId != null && targetNodeId >= 0L -> GraphVertex.NodeVertex(targetNodeId)
             targetJunctionId != null -> GraphVertex.JunctionVertex(targetJunctionId)
+            targetNodeId != null && targetNodeId >= 0L -> GraphVertex.NodeVertex(targetNodeId)
             else -> return false
         }
         return wouldCreateCycle(source, target, connections)
@@ -106,17 +106,27 @@ object FlowCycleDetector {
 
         for (conn in nonFloating) {
             val srcVertex: GraphVertex? = when {
-                conn.sourceNodeId >= 0L -> GraphVertex.NodeVertex(conn.sourceNodeId)
                 conn.sourceJunctionId != null -> GraphVertex.JunctionVertex(conn.sourceJunctionId)
+                conn.sourceNodeId >= 0L -> GraphVertex.NodeVertex(conn.sourceNodeId)
                 else -> null
             }
             val tgtVertex: GraphVertex? = when {
-                conn.targetNodeId >= 0L -> GraphVertex.NodeVertex(conn.targetNodeId)
                 conn.targetJunctionId != null -> GraphVertex.JunctionVertex(conn.targetJunctionId)
+                conn.targetNodeId >= 0L -> GraphVertex.NodeVertex(conn.targetNodeId)
                 else -> null
             }
             if (srcVertex != null && tgtVertex != null) {
-                adj.getOrPut(srcVertex) { mutableListOf() }.add(tgtVertex)
+                if (conn.junctionIds.isEmpty()) {
+                    adj.getOrPut(srcVertex) { mutableListOf() }.add(tgtVertex)
+                } else {
+                    var prev: GraphVertex = srcVertex
+                    for (jId in conn.junctionIds) {
+                        val jVertex = GraphVertex.JunctionVertex(jId)
+                        adj.getOrPut(prev) { mutableListOf() }.add(jVertex)
+                        prev = jVertex
+                    }
+                    adj.getOrPut(prev) { mutableListOf() }.add(tgtVertex)
+                }
             }
         }
         return adj

@@ -171,6 +171,16 @@ class FlowConnectionManager(
                             notificationService?.toast("Cannot connect: incompatible data types (${effectiveSource.second.dataType.format()} cannot connect to ${tPort.dataType.format()})")
                             return currentState
                         }
+                        if (effectiveSource.second.semanticTypes.isNotEmpty() && tPort.semanticTypes.isNotEmpty()) {
+                            val semanticCheck =
+                                org.wip.plugintoolkit.api.checkSemanticCompatibility(effectiveSource.second.semanticTypes, tPort.semanticTypes)
+                            if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Incompatible) {
+                                notificationService?.toast("Cannot connect: semantic types are incompatible")
+                                return currentState
+                            } else if (semanticCheck is org.wip.plugintoolkit.api.CompatibilityResult.Warning) {
+                                notificationService?.toast("Warning: ${semanticCheck.message}")
+                            }
+                        }
                     }
                 }
             }

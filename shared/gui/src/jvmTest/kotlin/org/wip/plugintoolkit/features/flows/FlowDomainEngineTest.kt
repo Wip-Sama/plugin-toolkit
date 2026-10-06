@@ -217,4 +217,66 @@ class FlowDomainEngineTest {
         assertEquals(1, content.labels.size)
         assertEquals(1, content.junctions.size)
     }
+
+    @Test
+    fun testNodeDeletionCleansesGroupNodeIds() {
+        val nodeManager = FlowNodeManager()
+        val node1 = createTestNode(1L)
+        val node2 = createTestNode(2L)
+        val group = FlowGroup(10L, "Grp", ModelOffset.Zero, ModelOffset(200f, 200f), nodeIds = listOf(1L, 2L))
+
+        val state = FlowEditorState(
+            flow = Flow("Test", nodes = listOf(node1, node2), groups = listOf(group)),
+            selectedNodeIds = setOf(1L)
+        )
+
+        // Single node deletion
+        val afterSingleDelete = nodeManager.handleDeleteNode(state, 1L)
+        assertEquals(listOf(2L), afterSingleDelete.flow.groups.first().nodeIds, "Deleted node 1L must be removed from group nodeIds")
+
+        // Bulk node deletion
+        val afterBulkDelete = nodeManager.handleDeleteSelectedNodes(state)
+        assertEquals(listOf(2L), afterBulkDelete.flow.groups.first().nodeIds, "Deleted selected node 1L must be removed from group nodeIds")
+    }
+
+    @Test
+    fun testCompoundSelectionMovementCoherency() {
+        val nodeManager = FlowNodeManager()
+        val node1 = createTestNode(1L, ModelOffset(100f, 100f))
+        val group = FlowGroup(10L, "Grp", ModelOffset(50f, 50f), ModelOffset(300f, 300f), nodeIds = listOf(1L))
+        val junction = FlowJunction(20L, ModelOffset(150f, 150f))
+        val label = FlowLabel(30L, "Note", ModelOffset(120f, 120f))
+
+        val conn = Connection(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            targetNodeId = 2L,
+            targetPortId = "in",
+            waypoints = listOf(ModelOffset(160f, 160f)) // inside group
+        )
+
+        val state = FlowEditorState(
+            flow = Flow(
+                name = "CompoundTest",
+                nodes = listOf(node1),
+                groups = listOf(group),
+                junctions = listOf(junction),
+                labels = listOf(label),
+                connections = listOf(conn)
+            ),
+            selectedGroupIds = setOf(10L)
+        )
+
+        // Drag the group by delta (50f, 50f)
+        val delta = ModelOffset(50f, 50f)
+        val movingState = nodeManager.handleMoveNode(state, 10L, delta, snap = false, showGhost = false)
+        assertTrue(movingState.capturedJunctionIds.contains(20L), "Junction inside moving group must be captured")
+        assertTrue(movingState.capturedWaypoints.containsKey(conn), "Waypoint inside moving group must be captured")
+
+        val endState = nodeManager.handleEndMoveNode(movingState, 10L, density = 1f)
+        assertEquals(ModelOffset(100f, 100f), endState.flow.groups.first().position)
+        assertEquals(ModelOffset(150f, 150f), endState.flow.nodes.first().position)
+        assertEquals(ModelOffset(200f, 200f), endState.flow.junctions.first().position)
+        assertEquals(ModelOffset(200f, 200f), endState.flow.connections.first().waypoints.first())
+    }
 }

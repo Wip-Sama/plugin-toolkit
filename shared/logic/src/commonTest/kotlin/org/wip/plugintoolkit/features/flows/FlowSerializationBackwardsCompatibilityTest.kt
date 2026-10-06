@@ -64,7 +64,8 @@ class FlowSerializationBackwardsCompatibilityTest {
         assertEquals(1, decodedFlow.nodes.size)
         assertEquals(1, decodedFlow.connections.size)
 
-        // New fields must default to empty lists / nulls
+        // New fields must default to empty lists / nulls / schemaVersion
+        assertEquals(Flow.CURRENT_SCHEMA_VERSION, decodedFlow.schemaVersion)
         assertTrue(decodedFlow.groups.isEmpty())
         assertTrue(decodedFlow.labels.isEmpty())
         assertTrue(decodedFlow.junctions.isEmpty())
@@ -144,6 +145,7 @@ class FlowSerializationBackwardsCompatibilityTest {
         val decoded = json.decodeFromString<Flow>(encoded)
 
         assertEquals(flow, decoded)
+        assertEquals(Flow.CURRENT_SCHEMA_VERSION, decoded.schemaVersion)
         assertEquals(1, decoded.groups.size)
         assertEquals("Image Filters Group", decoded.groups.first().title)
         assertEquals("#336699", decoded.groups.first().color)

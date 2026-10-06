@@ -18,6 +18,7 @@ import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.features.flows.model.Flow
+import org.wip.plugintoolkit.features.flows.model.FlowSchemaMigrator
 import org.wip.plugintoolkit.features.flows.model.MigrationEngine
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
@@ -104,7 +105,8 @@ class FlowRepository(
                             loadedFlows.forEach { flow ->
                                 val targetFile = getFlowPath(appDataDir, flow.name)
                                 if (!SystemFileSystem.exists(targetFile)) {
-                                    val flowContent = json.encodeToString(Flow.serializer(), flow)
+                                    val migrated = FlowSchemaMigrator.migrate(flow)
+                                    val flowContent = json.encodeToString(Flow.serializer(), migrated)
                                     SystemFileSystem.sink(targetFile).buffered().use { it.writeString(flowContent) }
                                 }
                             }
@@ -134,7 +136,15 @@ class FlowRepository(
                     if (file.name.endsWith(".json")) {
                         try {
                             val content = SystemFileSystem.source(file).buffered().use { it.readString() }
-                            val flow = json.decodeFromString<Flow>(content)
+                            val decodedFlow = json.decodeFromString<Flow>(content)
+                            val flow = if (decodedFlow.schemaVersion < Flow.CURRENT_SCHEMA_VERSION) {
+                                val schemaMigrated = FlowSchemaMigrator.migrate(decodedFlow)
+                                val updatedContent = json.encodeToString(Flow.serializer(), schemaMigrated)
+                                SystemFileSystem.sink(file).buffered().use { it.writeString(updatedContent) }
+                                schemaMigrated
+                            } else {
+                                decodedFlow
+                            }
 
                             // Only run destructive migration if manifests are available;
                             // otherwise, load flows as-is until plugins are discovered.
@@ -190,10 +200,15 @@ class FlowRepository(
                         SystemFileSystem.createDirectories(flowsDir)
                     }
 
-                    val targetFile = getFlowPath(appDataDir, flow.name)
-                    val safeName = flow.name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                    val flowToSave = if (flow.schemaVersion < Flow.CURRENT_SCHEMA_VERSION) {
+                        flow.copy(schemaVersion = Flow.CURRENT_SCHEMA_VERSION)
+                    } else {
+                        flow
+                    }
+                    val targetFile = getFlowPath(appDataDir, flowToSave.name)
+                    val safeName = flowToSave.name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
                     val tempFile = Path("$appDataDir/flows/${safeName}.tmp")
-                    val flowContent = json.encodeToString(Flow.serializer(), flow)
+                    val flowContent = json.encodeToString(Flow.serializer(), flowToSave)
 
                     SystemFileSystem.sink(tempFile).buffered().use { it.writeString(flowContent) }
                     if (SystemFileSystem.exists(targetFile)) {
@@ -202,11 +217,11 @@ class FlowRepository(
                     SystemFileSystem.atomicMove(tempFile, targetFile)
 
                     _flows.update { current ->
-                        val existing = current.find { it.name == flow.name }
+                        val existing = current.find { it.name == flowToSave.name }
                         if (existing != null) {
-                            current.map { if (it.name == flow.name) flow else it }
+                            current.map { if (it.name == flowToSave.name) flowToSave else it }
                         } else {
-                            current + flow
+                            current + flowToSave
                         }
                     }
                 } catch (e: Exception) {

@@ -620,6 +620,14 @@ data class FlowGroup(
 ) : ResizableBoardElement {
     override fun copyWithPosition(newPosition: Offset): FlowGroup = copy(position = newPosition)
     override fun copyWithSize(newSize: Offset): FlowGroup = copy(size = newSize)
+
+    fun containsPoint(point: Offset): Boolean =
+        point.x >= position.x && point.x <= position.x + size.x &&
+        point.y >= position.y && point.y <= position.y + size.y
+
+    fun containsPoint(x: Float, y: Float): Boolean =
+        x >= position.x && x <= position.x + size.x &&
+        y >= position.y && y <= position.y + size.y
 }
 
 @Serializable
@@ -688,6 +696,7 @@ data class Flow(
     val labels: List<FlowLabel> = emptyList(),
     val junctions: List<FlowJunction> = emptyList(),
     val version: String = "1.0.0",
+    val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val description: String? = null,
     val defaultValues: Map<String, JsonElement> = emptyMap(),
     val connectionCurveStyle: ConnectionCurveStyle? = null,
@@ -696,6 +705,10 @@ data class Flow(
     val orthogonalPortLead: Boolean? = null,
     val maxConcurrentExecutions: Int? = null
 ) {
+    companion object {
+        const val CURRENT_SCHEMA_VERSION: Int = 1
+    }
+
     val connectionPoints: List<ConnectionPoint> get() = junctions
 
     fun allBoardElements(): List<BoardElement> = nodes + groups + labels + junctions
@@ -838,7 +851,13 @@ data class Flow(
             deduplicatedConns.any { it.sourceJunctionId == jId || it.targetJunctionId == jId }
         }.toSet()
 
+        val sanitizedGroups = groups.map { group ->
+            if (hasNodes) group.copy(nodeIds = group.nodeIds.filter { it in validNodeIds })
+            else group
+        }
+
         return copy(
+            groups = sanitizedGroups,
             junctions = junctions.filter { it.id in finalActiveJunctionIds },
             connections = deduplicatedConns
         )
