@@ -12,6 +12,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -124,18 +125,23 @@ fun BoardGridAndConnectionsCanvas(
         val cols = (size.width / scaledGridSize).toInt() + 2
         val rows = (size.height / scaledGridSize).toInt() + 2
 
-        if (state.scale >= 0.4f) {
+        if (state.scale >= 0.4f && scaledGridSize > 0f) {
+            val totalPoints = (cols + 1) * (rows + 1)
+            val gridPoints = ArrayList<Offset>(totalPoints)
             for (i in 0..cols) {
+                val x = startX + i * scaledGridSize
                 for (j in 0..rows) {
-                    val x = startX + i * scaledGridSize
                     val y = startY + j * scaledGridSize
-                    drawCircle(
-                        color = gridColor,
-                        radius = 1.5f * state.scale,
-                        center = Offset(x, y)
-                    )
+                    gridPoints.add(Offset(x, y))
                 }
             }
+            drawPoints(
+                points = gridPoints,
+                pointMode = PointMode.Points,
+                color = gridColor,
+                strokeWidth = 3f * state.scale,
+                cap = StrokeCap.Round
+            )
         }
 
         // Draw junctions (Unified connection points)

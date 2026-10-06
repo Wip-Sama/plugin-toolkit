@@ -3,9 +3,13 @@ package org.wip.plugintoolkit.features.flows
 import androidx.compose.ui.geometry.Offset
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.ui.canvas.BoardInteractionState
+import org.wip.plugintoolkit.features.flows.ui.canvas.CanvasInputMode
+import org.wip.plugintoolkit.features.flows.ui.canvas.DraggingSegmentInfo
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class BoardInteractionStateTest {
 
@@ -41,6 +45,7 @@ class BoardInteractionStateTest {
         assertNull(state.hoveredNodeId)
         assertNull(state.selectionStart)
         assertNull(state.selectionEnd)
+        assertEquals(CanvasInputMode.Idle, state.inputMode)
     }
 
     @Test
@@ -76,5 +81,63 @@ class BoardInteractionStateTest {
         assertNull(state.selectionStart)
         assertNull(state.selectionEnd)
     }
-}
 
+    @Test
+    fun testFsmMutualExclusionAndTransitions() {
+        val state = BoardInteractionState()
+        assertEquals(CanvasInputMode.Idle, state.inputMode)
+
+        // 1. Panning transition
+        state.startPanning(Offset(15f, 25f))
+        assertIs<CanvasInputMode.Panning>(state.inputMode)
+        assertEquals(Offset(15f, 25f), (state.inputMode as CanvasInputMode.Panning).startPointer)
+
+        // 2. Transition to Marquee clears Panning
+        state.startMarquee(Offset(50f, 50f))
+        assertIs<CanvasInputMode.MarqueeSelecting>(state.inputMode)
+        assertEquals(Offset(50f, 50f), state.selectionStart)
+        state.updateMarquee(Offset(150f, 200f))
+        assertEquals(Offset(150f, 200f), state.selectionEnd)
+
+        // 3. Transition to Dragging Junction clears Marquee
+        state.startDraggingJunction(junctionId = 101L, startPointer = Offset(150f, 200f))
+        assertIs<CanvasInputMode.DraggingJunction>(state.inputMode)
+        assertEquals(101L, state.draggingJunctionId)
+        assertNull(state.selectionStart)
+        assertNull(state.selectionEnd)
+
+        // 4. Transition to ConnectingWire clears dragging junction
+        state.startConnectingWire(
+            sourceNodeId = 1L,
+            sourcePortId = "out",
+            isOutput = true,
+            sourceJunctionId = null,
+            initialWaypoints = listOf(Offset(10f, 20f)),
+            livePos = Offset(30f, 40f)
+        )
+        assertIs<CanvasInputMode.ConnectingWire>(state.inputMode)
+        assertTrue(state.isDrawingStructuredConnection)
+        assertEquals(1L, state.structuredConnectionStartNodeId)
+        assertEquals("out", state.structuredConnectionStartPortId)
+        assertNull(state.draggingJunctionId)
+
+        // 5. Transition to DraggingWaypoint clears connecting wire
+        val dummyConn = Connection(1L, "out", 2L, "in")
+        state.startDraggingWaypoint(dummyConn, waypointIndex = 2)
+        assertIs<CanvasInputMode.DraggingWaypoint>(state.inputMode)
+        assertEquals(Pair(dummyConn, 2), state.draggingWaypoint)
+        assertNull(state.structuredConnectionStartNodeId)
+
+        // 6. Transition to DraggingSegment clears dragging waypoint
+        val segInfo = DraggingSegmentInfo(connection = dummyConn, segmentIndex = 0)
+        state.startDraggingSegment(segInfo)
+        assertIs<CanvasInputMode.DraggingSegment>(state.inputMode)
+        assertEquals(segInfo, state.draggingSegment)
+        assertNull(state.draggingWaypoint)
+
+        // 7. Reset to Idle restores clean state
+        state.resetToIdle()
+        assertEquals(CanvasInputMode.Idle, state.inputMode)
+        assertNull(state.draggingSegment)
+    }
+}

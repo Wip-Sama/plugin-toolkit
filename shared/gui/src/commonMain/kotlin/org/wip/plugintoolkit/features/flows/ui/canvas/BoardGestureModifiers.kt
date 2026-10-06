@@ -11,7 +11,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.input.pointer.isBackPressed
 import androidx.compose.ui.input.pointer.isCtrlPressed
@@ -483,6 +485,893 @@ fun Modifier.boardSelectionBoxGesture(
     }
 }
 
+internal class BoardGestureSessionState {
+    var junctionDragStartPointPositions: Map<Long, org.wip.plugintoolkit.features.flows.model.Offset> = emptyMap()
+    var junctionDragStartNodePositions: Map<Long, org.wip.plugintoolkit.features.flows.model.Offset> = emptyMap()
+    var junctionDragStartGroupPositions: Map<Long, org.wip.plugintoolkit.features.flows.model.Offset> = emptyMap()
+    var junctionDragStartLabelPositions: Map<Long, org.wip.plugintoolkit.features.flows.model.Offset> = emptyMap()
+    var junctionDragStartPointerPosition: Offset? = null
+    var junctionLastDispatchedBoardPos: Offset? = null
+    var segmentDragStartPos: Offset? = null
+
+    var rightClickStartPos: Offset? = null
+    var rightClickLastPos: Offset? = null
+    var rightClickDidDrag: Boolean = false
+    var middleClickLastPos: Offset? = null
+
+    fun resetRightClick() {
+        rightClickStartPos = null
+        rightClickLastPos = null
+        rightClickDidDrag = false
+    }
+
+    fun resetJunctionDrag() {
+        junctionDragStartPointPositions = emptyMap()
+        junctionDragStartNodePositions = emptyMap()
+        junctionDragStartGroupPositions = emptyMap()
+        junctionDragStartLabelPositions = emptyMap()
+        junctionDragStartPointerPosition = null
+        junctionLastDispatchedBoardPos = null
+    }
+}
+
+internal class BoardPointerGestureContext(
+    val interactionState: BoardInteractionState,
+    val session: BoardGestureSessionState,
+    val isDrawingConnection: () -> Boolean,
+    val scale: () -> Float,
+    val offset: () -> Offset,
+    val nodes: () -> List<Node>,
+    val connections: () -> List<Connection>,
+    val junctions: () -> List<FlowJunction>,
+    val groups: () -> List<FlowGroup>,
+    val labels: () -> List<FlowLabel>,
+    val nodeSizes: () -> Map<Long, IntSize>,
+    val density: () -> Density,
+    val defaultNodeWidthPx: () -> Float,
+    val getPortBoardPosition: (Long, String, Boolean) -> Offset?,
+    val onZoom: (Float, Offset, Boolean) -> Unit,
+    val onConnectionDrag: (Offset) -> Unit,
+    val onConnectionDrop: (Boolean) -> Unit,
+    val onDeleteConnection: (Connection) -> Unit,
+    val onDetachConnection: (Connection, Boolean, Offset) -> Unit,
+    val onMoveJunction: ((Long, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)?,
+    val onEndMoveJunction: ((Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>, Map<Long, Pair<org.wip.plugintoolkit.features.flows.model.Offset, org.wip.plugintoolkit.features.flows.model.Offset>>) -> Unit)?,
+    val onDeleteJunction: ((Long) -> Unit)?,
+    val onAddWaypoint: ((Connection, Offset) -> Unit)?,
+    val onMoveWaypoint: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)?,
+    val onDeleteWaypoint: ((Connection, Int) -> Unit)?,
+    val onInsertWaypoint: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)?,
+    val onFinalizeStructuredConnection: ((Long?, String?, Long?, Long, String, List<org.wip.plugintoolkit.features.flows.model.Offset>, Long?) -> Unit)?,
+    val connectionStartNodeId: () -> Long?,
+    val connectionStartPortId: () -> String?,
+    val connectionStartIsOutput: () -> Boolean,
+    val curveStyle: () -> ConnectionCurveStyle,
+    val roundness: () -> Float,
+    val orthogonalStepMode: () -> OrthogonalStepMode,
+    val orthogonalPortLead: () -> Boolean,
+    val isAdvancedConnectionMode: () -> Boolean,
+    val onAddJunctionAndBranch: ((Connection, Offset, Int) -> Unit)?,
+    val onDeleteConnectionSegment: ((Connection, Int) -> Unit)?,
+    val selectedPointIds: () -> Set<Long>,
+    val selectedNodeIds: () -> Set<Long>,
+    val selectedGroupIds: () -> Set<Long>,
+    val selectedLabelIds: () -> Set<Long>,
+    val onSelectPoints: ((Set<Long>) -> Unit)?,
+    val onSplitConnectionAndConnect: ((Connection, org.wip.plugintoolkit.features.flows.model.Offset, Long?, String?, Long?, Long?, String?, Long?, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit)?,
+    val onResetDrawingConnection: (() -> Unit)?,
+    val shortcutManager: () -> ShortcutManager?,
+    val highlightedNodeId: () -> Long?,
+    val highlightedPortId: () -> String?,
+    val onSelectNodes: ((Set<Long>) -> Unit)?,
+    val onSelectGroups: ((Set<Long>) -> Unit)?,
+    val onSelectLabels: ((Set<Long>) -> Unit)?,
+    val isPaintToolActive: () -> Boolean,
+    val isWashToolActive: () -> Boolean,
+    val isEyedropperActive: () -> Boolean,
+    val onPaintConnection: ((Connection) -> Unit)?,
+    val onWashConnection: ((Connection) -> Unit)?,
+    val onPaintJunction: ((Long) -> Unit)?,
+    val onWashJunction: ((Long) -> Unit)?,
+    val onSampleColor: ((String) -> Unit)?,
+    val onMoveSegment: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)?,
+    val onEndMoveSegment: ((Connection, Int, org.wip.plugintoolkit.features.flows.model.Offset) -> Unit)?
+)
+
+private fun handlePointerScroll(
+    event: PointerEvent,
+    change: PointerInputChange,
+    position: Offset,
+    ctx: BoardPointerGestureContext
+) {
+    val scrollDelta = change.scrollDelta
+    val delta = if (scrollDelta.y != 0f) scrollDelta.y else scrollDelta.x
+    if (delta != 0f) {
+        val isShiftPressed = event.keyboardModifiers.isShiftPressed
+        ctx.onZoom(-delta, position, isShiftPressed)
+    }
+}
+
+private fun handleActiveDragsOnMove(
+    event: PointerEvent,
+    position: Offset,
+    prevPointerPosition: Offset,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    val session = ctx.session
+    val draggingJuncId = interactionState.draggingJunctionId
+    if (draggingJuncId != null) {
+        val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
+        val startPos = session.junctionDragStartPointPositions[draggingJuncId]
+        val startPointer = session.junctionDragStartPointerPosition
+        if (startPos != null && startPointer != null) {
+            val totalDelta = (position - startPointer) / ctx.scale()
+            val targetBoardPos = if (isCtrl) {
+                (startPos.toComposeOffset() + totalDelta).snapToGrid()
+            } else {
+                startPos.toComposeOffset() + totalDelta
+            }
+            val prevBoardPos = session.junctionLastDispatchedBoardPos ?: startPos.toComposeOffset()
+            val deltaToApply = targetBoardPos - prevBoardPos
+            if (deltaToApply.x != 0f || deltaToApply.y != 0f) {
+                ctx.onMoveJunction?.invoke(draggingJuncId, deltaToApply.toModelOffset())
+                session.junctionLastDispatchedBoardPos = targetBoardPos
+            }
+        } else {
+            val delta = (position - prevPointerPosition) / ctx.scale()
+            ctx.onMoveJunction?.invoke(draggingJuncId, delta.toModelOffset())
+        }
+        ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
+    }
+
+    val draggingWp = interactionState.draggingWaypoint
+    if (draggingWp != null) {
+        var boardPos = (position - ctx.offset()) / ctx.scale()
+        val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
+        if (isCtrl) {
+            boardPos = boardPos.snapToGrid()
+        }
+        ctx.onMoveWaypoint?.invoke(draggingWp.first, draggingWp.second, boardPos.toModelOffset())
+        ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
+    }
+
+    val draggingSeg = interactionState.draggingSegment
+    if (draggingSeg != null) {
+        val delta = (position - prevPointerPosition) / ctx.scale()
+        ctx.onMoveSegment?.invoke(draggingSeg.connection, draggingSeg.segmentIndex, delta.toModelOffset())
+        ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
+    }
+}
+
+private fun handleWireSnappingOnMove(
+    position: Offset,
+    isOverNode: Boolean,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    if (ctx.isDrawingConnection() || interactionState.isDrawingStructuredConnection) {
+        val closestJuncForSnap = if (!isOverNode) {
+            ConnectionHitTester.findClosestJunction(
+                position = position,
+                junctions = ctx.junctions(),
+                scale = ctx.scale(),
+                offset = ctx.offset(),
+                hitRadius = 24f * ctx.scale()
+            )
+        } else null
+        if (closestJuncForSnap != null) {
+            interactionState.hoveredJunctionId = closestJuncForSnap.id
+            interactionState.snappedWirePoint = closestJuncForSnap.position.toComposeOffset()
+            interactionState.snappedWireConnection = null
+            interactionState.snappedWireSegmentIndex = null
+        } else {
+            val connProj = if (!isOverNode) {
+                ConnectionHitTester.findClosestConnectionWithProjection(
+                    position = position,
+                    connections = ctx.connections(),
+                    getPortBoardPosition = ctx.getPortBoardPosition,
+                    scale = ctx.scale(),
+                    offset = ctx.offset(),
+                    initialMinDistance = 24f * ctx.scale(),
+                    junctions = ctx.junctions(),
+                    curveStyle = ctx.curveStyle(),
+                    roundness = ctx.roundness(),
+                    stepMode = ctx.orthogonalStepMode(),
+                    orthogonalPortLead = ctx.orthogonalPortLead(),
+                    nodes = ctx.nodes()
+                )
+            } else null
+            if (connProj != null) {
+                interactionState.snappedWirePoint = connProj.projectedPoint
+                interactionState.snappedWireConnection = connProj.connection
+                interactionState.snappedWireSegmentIndex = connProj.segmentIndex
+                interactionState.hoveredJunctionId = null
+            } else {
+                interactionState.clearSnapping()
+            }
+        }
+    } else {
+        interactionState.clearSnapping()
+    }
+}
+
+private fun handleDrawingConnectionOnMove(
+    event: PointerEvent,
+    position: Offset,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    if (ctx.isDrawingConnection()) {
+        var boardPos = interactionState.snappedWirePoint ?: ((position - ctx.offset()) / ctx.scale())
+        val startNodeId = ctx.connectionStartNodeId()
+        val startPortId = ctx.connectionStartPortId()
+        val startBoardPos = if (startNodeId != null && startPortId != null) {
+            ctx.getPortBoardPosition(startNodeId, startPortId, ctx.connectionStartIsOutput())
+        } else null
+        if (startBoardPos != null && interactionState.snappedWirePoint == null) {
+            if (event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed) {
+                boardPos = SplineMathUtils.snapToStraightAngle(startBoardPos, boardPos)
+            } else if (event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed) {
+                boardPos = boardPos.snapToGrid()
+            }
+        }
+        ctx.onConnectionDrag(boardPos)
+    }
+
+    if (interactionState.isDrawingStructuredConnection) {
+        var livePos = interactionState.snappedWirePoint ?: ((position - ctx.offset()) / ctx.scale())
+        val lastPoint = if (interactionState.structuredConnectionPoints.isNotEmpty()) {
+            interactionState.structuredConnectionPoints.last()
+        } else {
+            val startBoardPos = if (interactionState.structuredConnectionSourceJunctionId != null) {
+                ctx.junctions().find { it.id == interactionState.structuredConnectionSourceJunctionId }?.position?.toComposeOffset()
+            } else if (interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null) {
+                ctx.getPortBoardPosition(interactionState.structuredConnectionStartNodeId!!, interactionState.structuredConnectionStartPortId!!, interactionState.structuredConnectionStartIsOutput)
+            } else null
+            startBoardPos ?: livePos
+        }
+        if (interactionState.snappedWirePoint == null) {
+            if (event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed) {
+                livePos = SplineMathUtils.snapToStraightAngle(lastPoint, livePos)
+            } else if (event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed) {
+                livePos = livePos.snapToGrid()
+            }
+        }
+        ctx.onConnectionDrag(livePos)
+        interactionState.structuredConnectionLivePos = livePos
+        if (!event.buttons.isSecondaryPressed && !event.buttons.isTertiaryPressed) {
+            event.changes.forEach { it.consume() }
+        }
+    }
+}
+
+private fun handleHoverDetectionOnMove(
+    position: Offset,
+    isOverNode: Boolean,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    if (isOverNode) {
+        interactionState.hoveredJunctionId = null
+        interactionState.clearHoveredWaypoint()
+        interactionState.clearHoveredMidpoint()
+        interactionState.clearHoveredConnection()
+    } else {
+        val closestJunc = ConnectionHitTester.findClosestJunction(
+            position = position,
+            junctions = ctx.junctions(),
+            scale = ctx.scale(),
+            offset = ctx.offset(),
+            hitRadius = maxOf(20f, 20f * ctx.scale())
+        )
+        interactionState.hoveredJunctionId = closestJunc?.id
+
+        val closestWp = ConnectionHitTester.findClosestWaypoint(
+            position = position,
+            connections = ctx.connections(),
+            scale = ctx.scale(),
+            offset = ctx.offset(),
+            hitRadius = maxOf(20f, 20f * ctx.scale())
+        )
+        interactionState.hoveredWaypoint = closestWp?.let { Pair(it.first, it.second) }
+
+        val junctionMap = ctx.junctions().associate { it.id to it.position.toComposeOffset() }
+        val closestMid = ConnectionHitTester.findClosestMidpoint(
+            position = position,
+            connections = ctx.connections(),
+            getPortBoardPosition = ctx.getPortBoardPosition,
+            junctionMap = junctionMap,
+            scale = ctx.scale(),
+            offset = ctx.offset(),
+            curveStyle = ctx.curveStyle(),
+            roundness = ctx.roundness(),
+            stepMode = ctx.orthogonalStepMode(),
+            orthogonalPortLead = ctx.orthogonalPortLead(),
+            nodes = ctx.nodes()
+        )
+        interactionState.hoveredMidpoint = closestMid?.let { Pair(it.first, it.second) }
+
+        var bestConnection: Connection? = null
+        var isHoveringPort = false
+        val portHoverRadius = 20f
+
+        ctx.nodes().forEach { node ->
+            node.inputs.forEach { port ->
+                val portBoardPos = ctx.getPortBoardPosition(node.id, port.id, false) ?: return@forEach
+                val portScreenPos = (portBoardPos * ctx.scale()) + ctx.offset()
+                if ((position - portScreenPos).getDistance() < portHoverRadius) {
+                    isHoveringPort = true
+                }
+            }
+            node.outputs.forEach { port ->
+                val portBoardPos = ctx.getPortBoardPosition(node.id, port.id, true) ?: return@forEach
+                val portScreenPos = (portBoardPos * ctx.scale()) + ctx.offset()
+                if ((position - portScreenPos).getDistance() < portHoverRadius) {
+                    isHoveringPort = true
+                }
+            }
+        }
+
+        if (!isHoveringPort && closestJunc == null && closestWp == null) {
+            bestConnection = ConnectionHitTester.findClosestConnection(
+                position = position,
+                connections = ctx.connections(),
+                getPortBoardPosition = ctx.getPortBoardPosition,
+                scale = ctx.scale(),
+                offset = ctx.offset(),
+                junctions = ctx.junctions(),
+                curveStyle = ctx.curveStyle(),
+                roundness = ctx.roundness(),
+                stepMode = ctx.orthogonalStepMode(),
+                orthogonalPortLead = ctx.orthogonalPortLead(),
+                nodes = ctx.nodes()
+            )
+        }
+
+        if (bestConnection != null && interactionState.isCtrlModifierPressed) {
+            val sourcePortBoardPos = ctx.getPortBoardPosition(bestConnection.sourceNodeId, bestConnection.sourcePortId, true)
+            val targetPortBoardPos = ctx.getPortBoardPosition(bestConnection.targetNodeId, bestConnection.targetPortId, false)
+            if (sourcePortBoardPos != null && targetPortBoardPos != null) {
+                val startPos = (sourcePortBoardPos * ctx.scale()) + ctx.offset()
+                val endPos = (targetPortBoardPos * ctx.scale()) + ctx.offset()
+                interactionState.hoveredConnectionIsSource = ConnectionHitTester.determineCloserEnd(position, startPos, endPos)
+            } else {
+                interactionState.hoveredConnectionIsSource = null
+            }
+        } else {
+            interactionState.hoveredConnectionIsSource = null
+        }
+        interactionState.hoveredConnection = bestConnection
+    }
+}
+
+private fun handlePointerMove(
+    event: PointerEvent,
+    position: Offset,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    val session = ctx.session
+    val prevPointerPosition = if (interactionState.lastPointerPosition == Offset.Zero) position else interactionState.lastPointerPosition
+    interactionState.lastPointerPosition = position
+    interactionState.isCtrlModifierPressed = event.keyboardModifiers.isCtrlPressed
+    interactionState.isShiftModifierPressed = event.keyboardModifiers.isShiftPressed
+    interactionState.isAltModifierPressed = event.keyboardModifiers.isAltPressed
+
+    if (event.buttons.isSecondaryPressed && session.rightClickStartPos != null) {
+        session.rightClickLastPos = position
+        if (!session.rightClickDidDrag && (position - session.rightClickStartPos!!).getDistance() > 6f) {
+            session.rightClickDidDrag = true
+        }
+    } else {
+        session.middleClickLastPos = null
+    }
+
+    handleActiveDragsOnMove(event, position, prevPointerPosition, ctx)
+
+    val collapsedGroupNodeIds = ctx.groups().filter { it.isCollapsed }.flatMap { it.nodeIds }.toSet()
+    val isOverNode = isPointerOverAnyNode(
+        screenPos = position,
+        nodes = ctx.nodes(),
+        nodeSizes = ctx.nodeSizes(),
+        scale = ctx.scale(),
+        offset = ctx.offset(),
+        defaultNodeWidthPx = ctx.defaultNodeWidthPx(),
+        densityValue = ctx.density().density,
+        collapsedGroupNodeIds = collapsedGroupNodeIds,
+        hoveredNodeId = interactionState.hoveredNodeId
+    )
+
+    handleWireSnappingOnMove(position, isOverNode, ctx)
+    handleDrawingConnectionOnMove(event, position, ctx)
+    handleHoverDetectionOnMove(position, isOverNode, ctx)
+}
+
+private fun handlePointerExit(ctx: BoardPointerGestureContext) {
+    val interactionState = ctx.interactionState
+    interactionState.clearHoveredConnection()
+    interactionState.hoveredJunctionId = null
+    interactionState.clearHoveredWaypoint()
+    interactionState.clearHoveredMidpoint()
+    interactionState.draggingWaypoint = null
+    interactionState.draggingJunctionId = null
+    interactionState.pendingMidpoint = null
+    interactionState.pendingMidpointWasAltPressed = false
+    interactionState.clearSnapping()
+    ctx.session.resetRightClick()
+    ctx.session.resetJunctionDrag()
+    ctx.session.middleClickLastPos = null
+}
+
+private fun handleStructuredConnectionPress(
+    event: PointerEvent,
+    position: Offset,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    if (interactionState.snappedWirePoint != null && interactionState.snappedWireConnection != null) {
+        val snappedConn = interactionState.snappedWireConnection!!
+        val snappedPt = interactionState.snappedWirePoint!!.toModelOffset()
+        val isOutput = interactionState.structuredConnectionStartIsOutput
+        val srcNodeId = if (isOutput) interactionState.structuredConnectionStartNodeId else null
+        val srcPortId = if (isOutput) interactionState.structuredConnectionStartPortId else null
+        val srcJuncId = if (isOutput) interactionState.structuredConnectionSourceJunctionId else null
+        val tgtNodeId = if (!isOutput) interactionState.structuredConnectionStartNodeId else null
+        val tgtPortId = if (!isOutput) interactionState.structuredConnectionStartPortId else null
+        val tgtJuncId = if (!isOutput) interactionState.structuredConnectionSourceJunctionId else null
+        val interPts = interactionState.structuredConnectionPoints.map { it.toModelOffset() }
+
+        ctx.onSplitConnectionAndConnect?.invoke(
+            snappedConn,
+            snappedPt,
+            srcNodeId,
+            srcPortId,
+            srcJuncId,
+            tgtNodeId,
+            tgtPortId,
+            tgtJuncId,
+            interPts
+        )
+        interactionState.resetStructuredConnection()
+        interactionState.clearSnapping()
+        event.changes.forEach { it.consume() }
+    } else {
+        val targetJuncId = interactionState.hoveredJunctionId
+        if (targetJuncId != null && targetJuncId != interactionState.structuredConnectionSourceJunctionId) {
+            val finalSourceNodeId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else -1L
+            val finalSourcePortId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else ""
+            val finalTargetNodeId = if (!interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else -1L
+            val finalTargetPortId = if (!interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else ""
+            val finalSrcJuncId = if (!interactionState.structuredConnectionStartIsOutput) targetJuncId else interactionState.structuredConnectionSourceJunctionId
+            val finalTgtJuncId = if (interactionState.structuredConnectionStartIsOutput) targetJuncId else null
+
+            ctx.onFinalizeStructuredConnection?.invoke(
+                finalSourceNodeId,
+                finalSourcePortId,
+                finalSrcJuncId,
+                finalTargetNodeId,
+                finalTargetPortId,
+                interactionState.structuredConnectionPoints.map { it.toModelOffset() },
+                finalTgtJuncId
+            )
+            interactionState.resetStructuredConnection()
+            event.changes.forEach { it.consume() }
+        } else {
+            var clickedPortNodeId: Long? = null
+            var clickedPortId: String? = null
+            ctx.nodes().forEach { node ->
+                val portsToCheck = if (interactionState.structuredConnectionStartIsOutput) node.inputs else node.outputs
+                portsToCheck.forEach { port ->
+                    val portBoardPos = ctx.getPortBoardPosition(node.id, port.id, !interactionState.structuredConnectionStartIsOutput) ?: return@forEach
+                    val portScreenPos = (portBoardPos * ctx.scale()) + ctx.offset()
+                    if ((position - portScreenPos).getDistance() < 32f) {
+                        clickedPortNodeId = node.id
+                        clickedPortId = port.id
+                    }
+                }
+            }
+
+            val resolvedPortNodeId = clickedPortNodeId ?: ctx.highlightedNodeId()
+            val resolvedPortId = clickedPortId ?: ctx.highlightedPortId()
+
+            if (resolvedPortNodeId != null && resolvedPortId != null) {
+                val finalTargetNodeId = if (interactionState.structuredConnectionStartIsOutput) resolvedPortNodeId else (interactionState.structuredConnectionStartNodeId ?: -1L)
+                val finalTargetPortId = if (interactionState.structuredConnectionStartIsOutput) resolvedPortId else (interactionState.structuredConnectionStartPortId ?: "")
+                val finalSourceNodeId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else resolvedPortNodeId
+                val finalSourcePortId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else resolvedPortId
+
+                ctx.onFinalizeStructuredConnection?.invoke(
+                    finalSourceNodeId,
+                    finalSourcePortId,
+                    interactionState.structuredConnectionSourceJunctionId,
+                    finalTargetNodeId,
+                    finalTargetPortId,
+                    interactionState.structuredConnectionPoints.map { it.toModelOffset() },
+                    null
+                )
+                interactionState.resetStructuredConnection()
+                ctx.onResetDrawingConnection?.invoke()
+                event.changes.forEach { it.consume() }
+            } else {
+                val startBoardPos = if (interactionState.structuredConnectionSourceJunctionId != null) {
+                    ctx.junctions().find { it.id == interactionState.structuredConnectionSourceJunctionId }?.position?.toComposeOffset()
+                } else if (interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null) {
+                    ctx.getPortBoardPosition(interactionState.structuredConnectionStartNodeId!!, interactionState.structuredConnectionStartPortId!!, interactionState.structuredConnectionStartIsOutput)
+                } else null
+
+                val lastPoint = if (interactionState.structuredConnectionPoints.isNotEmpty()) {
+                    interactionState.structuredConnectionPoints.last()
+                } else {
+                    startBoardPos ?: ((position - ctx.offset()) / ctx.scale())
+                }
+
+                var committedPos = (position - ctx.offset()) / ctx.scale()
+                if (interactionState.isShiftModifierPressed || event.keyboardModifiers.isShiftPressed) {
+                    committedPos = SplineMathUtils.snapToStraightAngle(lastPoint, committedPos)
+                } else if (interactionState.isCtrlModifierPressed || event.keyboardModifiers.isCtrlPressed) {
+                    committedPos = committedPos.snapToGrid()
+                }
+                interactionState.structuredConnectionPoints = (interactionState.structuredConnectionPoints + committedPos).toMutableList()
+                event.changes.forEach { it.consume() }
+            }
+        }
+    }
+}
+
+private fun handleElementPress(
+    event: PointerEvent,
+    position: Offset,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    val session = ctx.session
+    interactionState.lastPointerPosition = position
+    val isAlt = event.keyboardModifiers.isAltPressed || interactionState.isAltModifierPressed
+    val isShift = event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed
+    val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
+
+    val hitJunc = ConnectionHitTester.findClosestJunction(
+        position = position,
+        junctions = ctx.junctions(),
+        scale = ctx.scale(),
+        offset = ctx.offset(),
+        hitRadius = maxOf(20f, 20f * ctx.scale())
+    )
+    val hitWp = ConnectionHitTester.findClosestWaypoint(
+        position = position,
+        connections = ctx.connections(),
+        scale = ctx.scale(),
+        offset = ctx.offset(),
+        hitRadius = maxOf(20f, 20f * ctx.scale())
+    )
+
+    val distJunc = hitJunc?.let {
+        val screenPos = (it.position.toComposeOffset() * ctx.scale()) + ctx.offset()
+        (position - screenPos).getDistance()
+    } ?: Float.MAX_VALUE
+
+    val distWp = hitWp?.let {
+        (position - it.third).getDistance()
+    } ?: Float.MAX_VALUE
+
+    if (distWp < distJunc && hitWp != null) {
+        val wp = hitWp
+        if (ctx.isEyedropperActive() && ctx.onSampleColor != null) {
+            ctx.onSampleColor.invoke(wp.first.color ?: "#808080")
+            event.changes.forEach { it.consume() }
+        } else if (ctx.isPaintToolActive() && ctx.onPaintConnection != null) {
+            ctx.onPaintConnection.invoke(wp.first)
+            event.changes.forEach { it.consume() }
+        } else if (ctx.isWashToolActive() && ctx.onWashConnection != null) {
+            ctx.onWashConnection.invoke(wp.first)
+            event.changes.forEach { it.consume() }
+        } else {
+            val actId = if (isShift) ShortcutActionId.FLOW_DELETE_SELECTED else ShortcutActionId.FLOW_MOVE_POINT
+            if (isShift) {
+                ctx.onDeleteWaypoint?.invoke(wp.first, wp.second)
+                interactionState.hoveredWaypoint = null
+            } else {
+                if (!isCtrl) {
+                    ctx.onSelectPoints?.invoke(emptySet())
+                    ctx.onSelectNodes?.invoke(emptySet())
+                    ctx.onSelectGroups?.invoke(emptySet())
+                    ctx.onSelectLabels?.invoke(emptySet())
+                    interactionState.selectedConnection = wp.first
+                }
+                interactionState.startDraggingWaypoint(wp.first, wp.second)
+                interactionState.lastPointerPosition = position
+            }
+            ctx.shortcutManager()?.eat(event, actId) ?: event.changes.forEach { it.consume() }
+        }
+    } else if (hitJunc != null) {
+        val juncId = hitJunc.id
+        if (ctx.isEyedropperActive() || ctx.isPaintToolActive() || ctx.isWashToolActive()) {
+            val connectedConns = ctx.connections().filter { it.sourceJunctionId == juncId || it.targetJunctionId == juncId }
+            if (ctx.isEyedropperActive() && ctx.onSampleColor != null) {
+                val sample = hitJunc.color ?: connectedConns.firstOrNull { it.color != null }?.color ?: "#808080"
+                ctx.onSampleColor.invoke(sample)
+                event.changes.forEach { it.consume() }
+            } else if (ctx.isPaintToolActive() && ctx.onPaintJunction != null) {
+                ctx.onPaintJunction.invoke(juncId)
+                event.changes.forEach { it.consume() }
+            } else if (ctx.isWashToolActive() && ctx.onWashJunction != null) {
+                ctx.onWashJunction.invoke(juncId)
+                event.changes.forEach { it.consume() }
+            }
+        } else if (isAlt) {
+            interactionState.startConnectingWire(
+                sourceNodeId = null,
+                sourcePortId = null,
+                isOutput = true,
+                sourceJunctionId = juncId,
+                initialWaypoints = emptyList(),
+                livePos = (position - ctx.offset()) / ctx.scale(),
+                isStructured = true
+            )
+            ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_CREATE_RAMIFICATION) ?: event.changes.forEach { it.consume() }
+        } else if (isShift) {
+            ctx.onDeleteJunction?.invoke(juncId)
+            interactionState.hoveredJunctionId = null
+            ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_DELETE_SELECTED) ?: event.changes.forEach { it.consume() }
+        } else {
+            val selectedPointIds = ctx.selectedPointIds()
+            val isSelected = juncId in selectedPointIds
+            if (isCtrl) {
+                val newSelectedPointIds = if (isSelected) {
+                    selectedPointIds - juncId
+                } else {
+                    selectedPointIds + juncId
+                }
+                ctx.onSelectPoints?.invoke(newSelectedPointIds)
+                session.junctionDragStartPointPositions = ctx.junctions().filter { it.id in newSelectedPointIds }.associate { it.id to it.position }
+                session.junctionDragStartNodePositions = ctx.nodes().filter { it.id in ctx.selectedNodeIds() }.associate { it.id to it.position }
+                session.junctionDragStartGroupPositions = ctx.groups().filter { it.id in ctx.selectedGroupIds() }.associate { it.id to it.position }
+                session.junctionDragStartLabelPositions = ctx.labels().filter { it.id in ctx.selectedLabelIds() }.associate { it.id to it.position }
+            } else if (!isSelected) {
+                ctx.onSelectPoints?.invoke(setOf(juncId))
+                ctx.onSelectNodes?.invoke(emptySet())
+                ctx.onSelectGroups?.invoke(emptySet())
+                ctx.onSelectLabels?.invoke(emptySet())
+                session.junctionDragStartPointPositions = mapOf(juncId to hitJunc.position)
+                session.junctionDragStartNodePositions = emptyMap()
+                session.junctionDragStartGroupPositions = emptyMap()
+                session.junctionDragStartLabelPositions = emptyMap()
+            } else {
+                session.junctionDragStartPointPositions = ctx.junctions().filter { it.id in selectedPointIds }.associate { it.id to it.position }
+                session.junctionDragStartNodePositions = ctx.nodes().filter { it.id in ctx.selectedNodeIds() }.associate { it.id to it.position }
+                session.junctionDragStartGroupPositions = ctx.groups().filter { it.id in ctx.selectedGroupIds() }.associate { it.id to it.position }
+                session.junctionDragStartLabelPositions = ctx.labels().filter { it.id in ctx.selectedLabelIds() }.associate { it.id to it.position }
+            }
+            interactionState.selectedJunctionId = juncId
+            interactionState.startDraggingJunction(juncId, position)
+            interactionState.lastPointerPosition = position
+            session.junctionDragStartPointerPosition = position
+            session.junctionLastDispatchedBoardPos = hitJunc.position.toComposeOffset()
+            ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
+        }
+    } else {
+        val connProj = ConnectionHitTester.findClosestConnectionWithProjection(
+            position = position,
+            connections = ctx.connections(),
+            getPortBoardPosition = ctx.getPortBoardPosition,
+            scale = ctx.scale(),
+            offset = ctx.offset(),
+            junctions = ctx.junctions(),
+            curveStyle = ctx.curveStyle(),
+            roundness = ctx.roundness(),
+            stepMode = ctx.orthogonalStepMode(),
+            orthogonalPortLead = ctx.orthogonalPortLead(),
+            nodes = ctx.nodes()
+        )
+        if (connProj != null) {
+            if (ctx.isEyedropperActive() && ctx.onSampleColor != null) {
+                ctx.onSampleColor.invoke(connProj.connection.color ?: "#808080")
+                event.changes.forEach { it.consume() }
+            } else if (ctx.isPaintToolActive() && ctx.onPaintConnection != null) {
+                ctx.onPaintConnection.invoke(connProj.connection)
+                event.changes.forEach { it.consume() }
+            } else if (ctx.isWashToolActive() && ctx.onWashConnection != null) {
+                ctx.onWashConnection.invoke(connProj.connection)
+                event.changes.forEach { it.consume() }
+            } else if (isShift) {
+                if (connProj.connection.waypoints.isNotEmpty() && ctx.onDeleteConnectionSegment != null) {
+                    ctx.onDeleteConnectionSegment.invoke(connProj.connection, connProj.segmentIndex)
+                } else {
+                    ctx.onDeleteConnection(connProj.connection)
+                }
+                interactionState.clearHoveredConnection()
+                if (interactionState.selectedConnection == connProj.connection) {
+                    interactionState.selectedConnection = null
+                }
+                event.changes.forEach { it.consume() }
+            } else if (isAlt) {
+                val segInfo = DraggingSegmentInfo(
+                    connection = connProj.connection,
+                    segmentIndex = connProj.segmentIndex
+                )
+                interactionState.startDraggingSegment(segInfo)
+                session.segmentDragStartPos = position
+                interactionState.lastPointerPosition = position
+                ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
+            } else {
+                val newJuncId = (ctx.junctions().maxOfOrNull { it.id } ?: 0L) + 1L
+                ctx.onAddJunctionAndBranch?.invoke(connProj.connection, connProj.projectedPoint, connProj.segmentIndex)
+                interactionState.selectedJunctionId = newJuncId
+                ctx.onSelectPoints?.invoke(setOf(newJuncId))
+                ctx.onSelectNodes?.invoke(emptySet())
+                ctx.onSelectGroups?.invoke(emptySet())
+                ctx.onSelectLabels?.invoke(emptySet())
+                interactionState.startDraggingJunction(newJuncId, position)
+                interactionState.lastPointerPosition = position
+                session.junctionDragStartPointerPosition = position
+                session.junctionDragStartPointPositions = mapOf(newJuncId to connProj.projectedPoint.toModelOffset())
+                session.junctionDragStartNodePositions = emptyMap()
+                session.junctionDragStartGroupPositions = emptyMap()
+                session.junctionDragStartLabelPositions = emptyMap()
+                session.junctionLastDispatchedBoardPos = connProj.projectedPoint
+                ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
+            }
+        }
+    }
+}
+
+private fun handlePointerPress(
+    event: PointerEvent,
+    position: Offset,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    val session = ctx.session
+    if (event.buttons.isSecondaryPressed) {
+        val pos = event.changes.firstOrNull()?.position ?: position
+        session.rightClickStartPos = pos
+        session.rightClickLastPos = pos
+        session.rightClickDidDrag = false
+    } else if (event.buttons.isTertiaryPressed) {
+        val pos = event.changes.firstOrNull()?.position ?: position
+        session.middleClickLastPos = pos
+    } else if (interactionState.isDrawingStructuredConnection && event.buttons.isPrimaryPressed) {
+        handleStructuredConnectionPress(event, position, ctx)
+    } else if (event.buttons.isPrimaryPressed) {
+        val isConsumed = event.changes.any { it.isConsumed }
+        val collapsedGroupNodeIds = ctx.groups().filter { it.isCollapsed }.flatMap { it.nodeIds }.toSet()
+        val isOverNode = isPointerOverAnyNode(
+            screenPos = position,
+            nodes = ctx.nodes(),
+            nodeSizes = ctx.nodeSizes(),
+            scale = ctx.scale(),
+            offset = ctx.offset(),
+            defaultNodeWidthPx = ctx.defaultNodeWidthPx(),
+            densityValue = ctx.density().density,
+            collapsedGroupNodeIds = collapsedGroupNodeIds,
+            hoveredNodeId = interactionState.hoveredNodeId
+        )
+
+        if (isConsumed || isOverNode) {
+            if (isOverNode) {
+                event.changes.forEach { it.consume() }
+            }
+        } else {
+            handleElementPress(event, position, ctx)
+        }
+    } else if (event.keyboardModifiers.isCtrlPressed) {
+        val isConsumed = event.changes.any { it.isConsumed }
+        val collapsedGroupNodeIds = ctx.groups().filter { it.isCollapsed }.flatMap { it.nodeIds }.toSet()
+        val isOverNode = isPointerOverAnyNode(
+            screenPos = position,
+            nodes = ctx.nodes(),
+            nodeSizes = ctx.nodeSizes(),
+            scale = ctx.scale(),
+            offset = ctx.offset(),
+            defaultNodeWidthPx = ctx.defaultNodeWidthPx(),
+            densityValue = ctx.density().density,
+            collapsedGroupNodeIds = collapsedGroupNodeIds,
+            hoveredNodeId = interactionState.hoveredNodeId
+        )
+        if (!isConsumed && !isOverNode) {
+            interactionState.hoveredConnection?.let { conn ->
+                val isSrc = interactionState.hoveredConnectionIsSource ?: false
+                val boardPos = (position - ctx.offset()) / ctx.scale()
+                ctx.onDetachConnection(conn, isSrc, boardPos)
+                event.changes.forEach { it.consume() }
+            }
+        }
+    }
+}
+
+private fun handlePointerRelease(
+    event: PointerEvent,
+    position: Offset,
+    ctx: BoardPointerGestureContext
+) {
+    val interactionState = ctx.interactionState
+    val session = ctx.session
+    if (session.rightClickStartPos != null) {
+        if (!session.rightClickDidDrag) {
+            if (interactionState.isDrawingStructuredConnection) {
+                interactionState.resetStructuredConnection()
+                interactionState.clearSnapping()
+                event.changes.forEach { it.consume() }
+            } else if (ctx.isDrawingConnection()) {
+                interactionState.clearSnapping()
+                ctx.onConnectionDrop(false)
+                event.changes.forEach { it.consume() }
+            }
+        }
+        session.resetRightClick()
+    }
+    session.middleClickLastPos = null
+
+    if (interactionState.draggingSegment != null) {
+        val seg = interactionState.draggingSegment!!
+        val totalDelta = if (session.segmentDragStartPos != null) {
+            (position - session.segmentDragStartPos!!) / ctx.scale()
+        } else Offset.Zero
+        ctx.onEndMoveSegment?.invoke(seg.connection, seg.segmentIndex, totalDelta.toModelOffset())
+        interactionState.draggingSegment = null
+        session.segmentDragStartPos = null
+    }
+
+    if (interactionState.draggingJunctionId != null) {
+        val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
+        val pointMoves = session.junctionDragStartPointPositions.mapValues { (id, startPos) ->
+            val currentPos = ctx.junctions().find { it.id == id }?.position ?: startPos
+            startPos to (if (isCtrl) currentPos.snapToGrid() else currentPos)
+        }.filter { it.value.first != it.value.second }
+
+        val nodeMoves = session.junctionDragStartNodePositions.mapValues { (id, startPos) ->
+            startPos to (ctx.nodes().find { it.id == id }?.position ?: startPos)
+        }.filter { it.value.first != it.value.second }
+
+        val groupMoves = session.junctionDragStartGroupPositions.mapValues { (id, startPos) ->
+            startPos to (ctx.groups().find { it.id == id }?.position ?: startPos)
+        }.filter { it.value.first != it.value.second }
+
+        val labelMoves = session.junctionDragStartLabelPositions.mapValues { (id, startPos) ->
+            startPos to (ctx.labels().find { it.id == id }?.position ?: startPos)
+        }.filter { it.value.first != it.value.second }
+
+        if (pointMoves.isNotEmpty() || nodeMoves.isNotEmpty() || groupMoves.isNotEmpty() || labelMoves.isNotEmpty()) {
+            ctx.onEndMoveJunction?.invoke(pointMoves, nodeMoves, groupMoves, labelMoves)
+        }
+
+        session.resetJunctionDrag()
+        interactionState.draggingJunctionId = null
+    }
+
+    interactionState.draggingWaypoint = null
+
+    if (ctx.isDrawingConnection() && !event.buttons.isPrimaryPressed) {
+        if (interactionState.snappedWirePoint != null && interactionState.snappedWireConnection != null) {
+            val snappedConn = interactionState.snappedWireConnection!!
+            val snappedPt = interactionState.snappedWirePoint!!.toModelOffset()
+            val isOutput = ctx.connectionStartIsOutput()
+            val srcNodeId = if (isOutput) ctx.connectionStartNodeId() else null
+            val srcPortId = if (isOutput) ctx.connectionStartPortId() else null
+            val tgtNodeId = if (!isOutput) ctx.connectionStartNodeId() else null
+            val tgtPortId = if (!isOutput) ctx.connectionStartPortId() else null
+
+            ctx.onSplitConnectionAndConnect?.invoke(
+                snappedConn,
+                snappedPt,
+                srcNodeId,
+                srcPortId,
+                null,
+                tgtNodeId,
+                tgtPortId,
+                null,
+                emptyList()
+            )
+            interactionState.clearSnapping()
+            ctx.onResetDrawingConnection?.invoke()
+        } else {
+            ctx.onConnectionDrop(event.keyboardModifiers.isShiftPressed)
+        }
+    }
+    interactionState.clearSnapping()
+}
+
 @Composable
 fun Modifier.boardPointerEventGesture(
     interactionState: BoardInteractionState,
@@ -604,18 +1493,72 @@ fun Modifier.boardPointerEventGesture(
     val currentOnResetDrawingConnection by rememberUpdatedState(onResetDrawingConnection)
     val currentShortcutManager by rememberUpdatedState(shortcutManager)
 
-    var junctionDragStartPointPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
-    var junctionDragStartNodePositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
-    var junctionDragStartGroupPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
-    var junctionDragStartLabelPositions by remember { mutableStateOf<Map<Long, org.wip.plugintoolkit.features.flows.model.Offset>>(emptyMap()) }
-    var junctionDragStartPointerPosition by remember { mutableStateOf<Offset?>(null) }
-    var junctionLastDispatchedBoardPos by remember { mutableStateOf<Offset?>(null) }
-    var segmentDragStartPos by remember { mutableStateOf<Offset?>(null) }
+    val session = remember { BoardGestureSessionState() }
 
-    var rightClickStartPos by remember { mutableStateOf<Offset?>(null) }
-    var rightClickLastPos by remember { mutableStateOf<Offset?>(null) }
-    var rightClickDidDrag by remember { mutableStateOf(false) }
-    var middleClickLastPos by remember { mutableStateOf<Offset?>(null) }
+    val ctx = remember(session, interactionState) {
+        BoardPointerGestureContext(
+            interactionState = interactionState,
+            session = session,
+            isDrawingConnection = { currentIsDrawingConnection },
+            scale = { currentScale },
+            offset = { currentOffset },
+            nodes = { currentNodes },
+            connections = { currentConnections },
+            junctions = { currentJunctions },
+            groups = { currentGroups },
+            labels = { currentLabels },
+            nodeSizes = { currentNodeSizes },
+            density = { currentDensity },
+            defaultNodeWidthPx = { currentDefaultNodeWidthPx },
+            getPortBoardPosition = currentGetPortBoardPosition,
+            onZoom = { delta, pos, shift -> currentOnZoom(delta, pos, shift) },
+            onConnectionDrag = { pos -> currentOnConnectionDrag(pos) },
+            onConnectionDrop = { shift -> currentOnConnectionDrop(shift) },
+            onDeleteConnection = { conn -> currentOnDeleteConnection(conn) },
+            onDetachConnection = { conn, isSrc, pos -> currentOnDetachConnection(conn, isSrc, pos) },
+            onMoveJunction = currentOnMoveJunction,
+            onEndMoveJunction = currentOnEndMoveJunction,
+            onDeleteJunction = currentOnDeleteJunction,
+            onAddWaypoint = currentOnAddWaypoint,
+            onMoveWaypoint = currentOnMoveWaypoint,
+            onDeleteWaypoint = currentOnDeleteWaypoint,
+            onInsertWaypoint = currentOnInsertWaypoint,
+            onFinalizeStructuredConnection = currentOnFinalizeStructuredConnection,
+            connectionStartNodeId = { currentConnectionStartNodeId },
+            connectionStartPortId = { currentConnectionStartPortId },
+            connectionStartIsOutput = { currentConnectionStartIsOutput },
+            curveStyle = { currentCurveStyle },
+            roundness = { currentRoundness },
+            orthogonalStepMode = { currentOrthogonalStepMode },
+            orthogonalPortLead = { currentOrthogonalPortLead },
+            isAdvancedConnectionMode = { currentIsAdvancedConnectionMode },
+            onAddJunctionAndBranch = currentOnAddJunctionAndBranch,
+            onDeleteConnectionSegment = currentOnDeleteConnectionSegment,
+            selectedPointIds = { currentSelectedPointIds },
+            selectedNodeIds = { currentSelectedNodeIds },
+            selectedGroupIds = { currentSelectedGroupIds },
+            selectedLabelIds = { currentSelectedLabelIds },
+            onSelectPoints = currentOnSelectPoints,
+            onSplitConnectionAndConnect = currentOnSplitConnectionAndConnect,
+            onResetDrawingConnection = currentOnResetDrawingConnection,
+            shortcutManager = { currentShortcutManager },
+            highlightedNodeId = { currentHighlightedNodeId },
+            highlightedPortId = { currentHighlightedPortId },
+            onSelectNodes = currentOnSelectNodes,
+            onSelectGroups = currentOnSelectGroups,
+            onSelectLabels = currentOnSelectLabels,
+            isPaintToolActive = { currentIsPaintToolActive },
+            isWashToolActive = { currentIsWashToolActive },
+            isEyedropperActive = { currentIsEyedropperActive },
+            onPaintConnection = currentOnPaintConnection,
+            onWashConnection = currentOnWashConnection,
+            onPaintJunction = currentOnPaintJunction,
+            onWashJunction = currentOnWashJunction,
+            onSampleColor = currentOnSampleColor,
+            onMoveSegment = currentOnMoveSegment,
+            onEndMoveSegment = currentOnEndMoveSegment
+        )
+    }
 
     return this.pointerInput(Unit) {
         awaitPointerEventScope {
@@ -623,722 +1566,12 @@ fun Modifier.boardPointerEventGesture(
                 val event = awaitPointerEvent()
                 val change = event.changes.firstOrNull() ?: continue
                 val position = change.position
-
-                if (event.type == PointerEventType.Scroll) {
-                    val scrollDelta = change.scrollDelta
-                    val delta = if (scrollDelta.y != 0f) scrollDelta.y else scrollDelta.x
-                    if (delta != 0f) {
-                        val isShiftPressed = event.keyboardModifiers.isShiftPressed
-                        currentOnZoom(-delta, position, isShiftPressed)
-                    }
-                } else if (event.type == PointerEventType.Move) {
-                    val prevPointerPosition = if (interactionState.lastPointerPosition == Offset.Zero) position else interactionState.lastPointerPosition
-                    interactionState.lastPointerPosition = position
-                    interactionState.isCtrlModifierPressed = event.keyboardModifiers.isCtrlPressed
-                    interactionState.isShiftModifierPressed = event.keyboardModifiers.isShiftPressed
-                    interactionState.isAltModifierPressed = event.keyboardModifiers.isAltPressed
-
-                    if (event.buttons.isSecondaryPressed && rightClickStartPos != null) {
-                        val curPos = position
-                        rightClickLastPos = curPos
-                        if (!rightClickDidDrag && (curPos - rightClickStartPos!!).getDistance() > 6f) {
-                            rightClickDidDrag = true
-                        }
-                    } else {
-                        middleClickLastPos = null
-                    }
-
-                    val draggingJuncId = interactionState.draggingJunctionId
-                    if (draggingJuncId != null) {
-                        val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
-                        val startPos = junctionDragStartPointPositions[draggingJuncId]
-                        if (startPos != null && junctionDragStartPointerPosition != null) {
-                            val totalDelta = (position - junctionDragStartPointerPosition!!) / currentScale
-                            val targetBoardPos = if (isCtrl) {
-                                (startPos.toComposeOffset() + totalDelta).snapToGrid()
-                            } else {
-                                startPos.toComposeOffset() + totalDelta
-                            }
-                            val prevBoardPos = junctionLastDispatchedBoardPos ?: startPos.toComposeOffset()
-                            val deltaToApply = targetBoardPos - prevBoardPos
-                            if (deltaToApply.x != 0f || deltaToApply.y != 0f) {
-                                currentOnMoveJunction?.invoke(draggingJuncId, deltaToApply.toModelOffset())
-                                junctionLastDispatchedBoardPos = targetBoardPos
-                            }
-                        } else {
-                            val delta = (position - prevPointerPosition) / currentScale
-                            currentOnMoveJunction?.invoke(draggingJuncId, delta.toModelOffset())
-                        }
-                        currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
-                    }
-
-                    val draggingWp = interactionState.draggingWaypoint
-                    if (draggingWp != null) {
-                        var boardPos = (position - currentOffset) / currentScale
-                        val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
-                        if (isCtrl) {
-                            boardPos = boardPos.snapToGrid()
-                        }
-                        currentOnMoveWaypoint?.invoke(draggingWp.first, draggingWp.second, boardPos.toModelOffset())
-                        currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
-                    }
-
-                    val draggingSeg = interactionState.draggingSegment
-                    if (draggingSeg != null) {
-                        val delta = (position - prevPointerPosition) / currentScale
-                        currentOnMoveSegment?.invoke(draggingSeg.connection, draggingSeg.segmentIndex, delta.toModelOffset())
-                        currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
-                    }
-
-                    val collapsedGroupNodeIds = currentGroups.filter { it.isCollapsed }.flatMap { it.nodeIds }.toSet()
-                    val isOverNode = isPointerOverAnyNode(
-                        screenPos = position,
-                        nodes = currentNodes,
-                        nodeSizes = currentNodeSizes,
-                        scale = currentScale,
-                        offset = currentOffset,
-                        defaultNodeWidthPx = currentDefaultNodeWidthPx,
-                        densityValue = currentDensity.density,
-                        collapsedGroupNodeIds = collapsedGroupNodeIds,
-                        hoveredNodeId = interactionState.hoveredNodeId
-                    )
-
-                    if (currentIsDrawingConnection || interactionState.isDrawingStructuredConnection) {
-                        val closestJuncForSnap = if (!isOverNode) {
-                            ConnectionHitTester.findClosestJunction(
-                                position = position,
-                                junctions = currentJunctions,
-                                scale = currentScale,
-                                offset = currentOffset,
-                                hitRadius = 24f * currentScale
-                            )
-                        } else null
-                        if (closestJuncForSnap != null) {
-                            interactionState.hoveredJunctionId = closestJuncForSnap.id
-                            interactionState.snappedWirePoint = closestJuncForSnap.position.toComposeOffset()
-                            interactionState.snappedWireConnection = null
-                            interactionState.snappedWireSegmentIndex = null
-                        } else {
-                            val connProj = if (!isOverNode) {
-                                ConnectionHitTester.findClosestConnectionWithProjection(
-                                    position = position,
-                                    connections = currentConnections,
-                                    getPortBoardPosition = currentGetPortBoardPosition,
-                                    scale = currentScale,
-                                    offset = currentOffset,
-                                    initialMinDistance = 24f * currentScale,
-                                    junctions = currentJunctions,
-                                    curveStyle = currentCurveStyle,
-                                    roundness = currentRoundness,
-                                    stepMode = currentOrthogonalStepMode,
-                                    orthogonalPortLead = currentOrthogonalPortLead,
-                                    nodes = currentNodes
-                                )
-                            } else null
-                            if (connProj != null) {
-                                interactionState.snappedWirePoint = connProj.projectedPoint
-                                interactionState.snappedWireConnection = connProj.connection
-                                interactionState.snappedWireSegmentIndex = connProj.segmentIndex
-                                interactionState.hoveredJunctionId = null
-                            } else {
-                                interactionState.clearSnapping()
-                            }
-                        }
-                    } else {
-                        interactionState.clearSnapping()
-                    }
-
-                    if (currentIsDrawingConnection) {
-                        var boardPos = interactionState.snappedWirePoint ?: ((position - currentOffset) / currentScale)
-                        val startBoardPos = if (currentConnectionStartNodeId != null && currentConnectionStartPortId != null) {
-                            currentGetPortBoardPosition(currentConnectionStartNodeId!!, currentConnectionStartPortId!!, currentConnectionStartIsOutput)
-                        } else null
-                        if (startBoardPos != null && interactionState.snappedWirePoint == null) {
-                            if (event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed) {
-                                boardPos = SplineMathUtils.snapToStraightAngle(startBoardPos, boardPos)
-                            } else if (event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed) {
-                                boardPos = boardPos.snapToGrid()
-                            }
-                        }
-                        currentOnConnectionDrag(boardPos)
-                    }
-
-                    if (interactionState.isDrawingStructuredConnection) {
-                        var livePos = interactionState.snappedWirePoint ?: ((position - currentOffset) / currentScale)
-                        val lastPoint = if (interactionState.structuredConnectionPoints.isNotEmpty()) {
-                            interactionState.structuredConnectionPoints.last()
-                        } else {
-                            val startBoardPos = if (interactionState.structuredConnectionSourceJunctionId != null) {
-                                currentJunctions.find { it.id == interactionState.structuredConnectionSourceJunctionId }?.position?.toComposeOffset()
-                            } else if (interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null) {
-                                currentGetPortBoardPosition(interactionState.structuredConnectionStartNodeId!!, interactionState.structuredConnectionStartPortId!!, interactionState.structuredConnectionStartIsOutput)
-                            } else null
-                            startBoardPos ?: livePos
-                        }
-                        if (interactionState.snappedWirePoint == null) {
-                            if (event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed) {
-                                livePos = SplineMathUtils.snapToStraightAngle(lastPoint, livePos)
-                            } else if (event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed) {
-                                livePos = livePos.snapToGrid()
-                            }
-                        }
-                        currentOnConnectionDrag(livePos)
-                        interactionState.structuredConnectionLivePos = livePos
-                        if (!event.buttons.isSecondaryPressed && !event.buttons.isTertiaryPressed) {
-                            event.changes.forEach { it.consume() }
-                        }
-                    }
-
-                    if (isOverNode) {
-                        interactionState.hoveredJunctionId = null
-                        interactionState.clearHoveredWaypoint()
-                        interactionState.clearHoveredMidpoint()
-                        interactionState.clearHoveredConnection()
-                    } else {
-                        val closestJunc = ConnectionHitTester.findClosestJunction(
-                            position = position,
-                            junctions = currentJunctions,
-                            scale = currentScale,
-                            offset = currentOffset,
-                            hitRadius = maxOf(20f, 20f * currentScale)
-                        )
-                        interactionState.hoveredJunctionId = closestJunc?.id
-
-                        val closestWp = ConnectionHitTester.findClosestWaypoint(
-                            position = position,
-                            connections = currentConnections,
-                            scale = currentScale,
-                            offset = currentOffset,
-                            hitRadius = maxOf(20f, 20f * currentScale)
-                        )
-                        interactionState.hoveredWaypoint = closestWp?.let { Pair(it.first, it.second) }
-
-                        val junctionMap = currentJunctions.associate { it.id to it.position.toComposeOffset() }
-                        val closestMid = ConnectionHitTester.findClosestMidpoint(
-                            position = position,
-                            connections = currentConnections,
-                            getPortBoardPosition = currentGetPortBoardPosition,
-                            junctionMap = junctionMap,
-                            scale = currentScale,
-                            offset = currentOffset,
-                            curveStyle = currentCurveStyle,
-                            roundness = currentRoundness,
-                            stepMode = currentOrthogonalStepMode,
-                            orthogonalPortLead = currentOrthogonalPortLead,
-                            nodes = currentNodes
-                        )
-                        interactionState.hoveredMidpoint = closestMid?.let { Pair(it.first, it.second) }
-
-                        var bestConnection: Connection? = null
-                        var isHoveringPort = false
-                        val portHoverRadius = 20f
-
-                        currentNodes.forEach { node ->
-                            node.inputs.forEach { port ->
-                                val portBoardPos = currentGetPortBoardPosition(node.id, port.id, false) ?: return@forEach
-                                val portScreenPos = (portBoardPos * currentScale) + currentOffset
-                                if ((position - portScreenPos).getDistance() < portHoverRadius) {
-                                    isHoveringPort = true
-                                }
-                            }
-                            node.outputs.forEach { port ->
-                                val portBoardPos = currentGetPortBoardPosition(node.id, port.id, true) ?: return@forEach
-                                val portScreenPos = (portBoardPos * currentScale) + currentOffset
-                                if ((position - portScreenPos).getDistance() < portHoverRadius) {
-                                    isHoveringPort = true
-                                }
-                            }
-                        }
-
-                        if (!isHoveringPort && closestJunc == null && closestWp == null) {
-                            bestConnection = ConnectionHitTester.findClosestConnection(
-                                position = position,
-                                connections = currentConnections,
-                                getPortBoardPosition = currentGetPortBoardPosition,
-                                scale = currentScale,
-                                offset = currentOffset,
-                                junctions = currentJunctions,
-                                curveStyle = currentCurveStyle,
-                                roundness = currentRoundness,
-                                stepMode = currentOrthogonalStepMode,
-                                orthogonalPortLead = currentOrthogonalPortLead,
-                                nodes = currentNodes
-                            )
-                        }
-
-                        if (bestConnection != null && interactionState.isCtrlModifierPressed) {
-                            val sourcePortBoardPos =
-                                currentGetPortBoardPosition(bestConnection.sourceNodeId, bestConnection.sourcePortId, true)
-                            val targetPortBoardPos =
-                                currentGetPortBoardPosition(bestConnection.targetNodeId, bestConnection.targetPortId, false)
-                            if (sourcePortBoardPos != null && targetPortBoardPos != null) {
-                                val startPos = (sourcePortBoardPos * currentScale) + currentOffset
-                                val endPos = (targetPortBoardPos * currentScale) + currentOffset
-                                interactionState.hoveredConnectionIsSource = ConnectionHitTester.determineCloserEnd(position, startPos, endPos)
-                            } else {
-                                interactionState.hoveredConnectionIsSource = null
-                            }
-                        } else {
-                            interactionState.hoveredConnectionIsSource = null
-                        }
-                        interactionState.hoveredConnection = bestConnection
-                    }
-                } else if (event.type == PointerEventType.Exit) {
-                    interactionState.clearHoveredConnection()
-                    interactionState.hoveredJunctionId = null
-                    interactionState.clearHoveredWaypoint()
-                    interactionState.clearHoveredMidpoint()
-                    interactionState.draggingWaypoint = null
-                    interactionState.draggingJunctionId = null
-                    junctionLastDispatchedBoardPos = null
-                    interactionState.pendingMidpoint = null
-                    interactionState.pendingMidpointWasAltPressed = false
-                    interactionState.clearSnapping()
-                    rightClickStartPos = null
-                    rightClickLastPos = null
-                    rightClickDidDrag = false
-                    middleClickLastPos = null
-                } else if (event.type == PointerEventType.Press) {
-                    if (event.buttons.isSecondaryPressed) {
-                        val pos = event.changes.firstOrNull()?.position ?: position
-                        rightClickStartPos = pos
-                        rightClickLastPos = pos
-                        rightClickDidDrag = false
-                    } else if (event.buttons.isTertiaryPressed) {
-                        val pos = event.changes.firstOrNull()?.position ?: position
-                        middleClickLastPos = pos
-                    } else if (interactionState.isDrawingStructuredConnection && event.buttons.isPrimaryPressed) {
-                        // Check if snapped to wire segment to split and finalize
-                        if (interactionState.snappedWirePoint != null && interactionState.snappedWireConnection != null) {
-                            val snappedConn = interactionState.snappedWireConnection!!
-                            val snappedPt = interactionState.snappedWirePoint!!.toModelOffset()
-                            val isOutput = interactionState.structuredConnectionStartIsOutput
-                            val srcNodeId = if (isOutput) interactionState.structuredConnectionStartNodeId else null
-                            val srcPortId = if (isOutput) interactionState.structuredConnectionStartPortId else null
-                            val srcJuncId = if (isOutput) interactionState.structuredConnectionSourceJunctionId else null
-                            val tgtNodeId = if (!isOutput) interactionState.structuredConnectionStartNodeId else null
-                            val tgtPortId = if (!isOutput) interactionState.structuredConnectionStartPortId else null
-                            val tgtJuncId = if (!isOutput) interactionState.structuredConnectionSourceJunctionId else null
-                            val interPts = interactionState.structuredConnectionPoints.map { it.toModelOffset() }
-
-                            currentOnSplitConnectionAndConnect?.invoke(
-                                snappedConn,
-                                snappedPt,
-                                srcNodeId,
-                                srcPortId,
-                                srcJuncId,
-                                tgtNodeId,
-                                tgtPortId,
-                                tgtJuncId,
-                                interPts
-                            )
-                            interactionState.resetStructuredConnection()
-                            interactionState.clearSnapping()
-                            event.changes.forEach { it.consume() }
-                        } else {
-                            // Check if over an existing junction to finalize
-                            val targetJuncId = interactionState.hoveredJunctionId
-                            if (targetJuncId != null && targetJuncId != interactionState.structuredConnectionSourceJunctionId) {
-                                val finalSourceNodeId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else -1L
-                                val finalSourcePortId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else ""
-                                val finalTargetNodeId = if (!interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else -1L
-                                val finalTargetPortId = if (!interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else ""
-                                val finalSrcJuncId = if (!interactionState.structuredConnectionStartIsOutput) targetJuncId else interactionState.structuredConnectionSourceJunctionId
-                                val finalTgtJuncId = if (interactionState.structuredConnectionStartIsOutput) targetJuncId else null
-
-                                currentOnFinalizeStructuredConnection?.invoke(
-                                    finalSourceNodeId,
-                                    finalSourcePortId,
-                                    finalSrcJuncId,
-                                    finalTargetNodeId,
-                                    finalTargetPortId,
-                                    interactionState.structuredConnectionPoints.map { it.toModelOffset() },
-                                    finalTgtJuncId
-                                )
-                                interactionState.resetStructuredConnection()
-                                event.changes.forEach { it.consume() }
-                            } else {
-                                // Check if over a port to finalize
-                                var clickedPortNodeId: Long? = null
-                                var clickedPortId: String? = null
-                                currentNodes.forEach { node ->
-                                    val portsToCheck = if (interactionState.structuredConnectionStartIsOutput) node.inputs else node.outputs
-                                    portsToCheck.forEach { port ->
-                                        val portBoardPos = currentGetPortBoardPosition(node.id, port.id, !interactionState.structuredConnectionStartIsOutput) ?: return@forEach
-                                        val portScreenPos = (portBoardPos * currentScale) + currentOffset
-                                        if ((position - portScreenPos).getDistance() < 32f) {
-                                            clickedPortNodeId = node.id
-                                            clickedPortId = port.id
-                                        }
-                                    }
-                                }
-
-                                val resolvedPortNodeId = clickedPortNodeId ?: currentHighlightedNodeId
-                                val resolvedPortId = clickedPortId ?: currentHighlightedPortId
-
-                                if (resolvedPortNodeId != null && resolvedPortId != null) {
-                                    val finalTargetNodeId = if (interactionState.structuredConnectionStartIsOutput) resolvedPortNodeId else (interactionState.structuredConnectionStartNodeId ?: -1L)
-                                    val finalTargetPortId = if (interactionState.structuredConnectionStartIsOutput) resolvedPortId else (interactionState.structuredConnectionStartPortId ?: "")
-                                    val finalSourceNodeId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartNodeId ?: -1L) else resolvedPortNodeId
-                                    val finalSourcePortId = if (interactionState.structuredConnectionStartIsOutput) (interactionState.structuredConnectionStartPortId ?: "") else resolvedPortId
-
-                                    currentOnFinalizeStructuredConnection?.invoke(
-                                        finalSourceNodeId,
-                                        finalSourcePortId,
-                                        interactionState.structuredConnectionSourceJunctionId,
-                                        finalTargetNodeId,
-                                        finalTargetPortId,
-                                        interactionState.structuredConnectionPoints.map { it.toModelOffset() },
-                                        null
-                                    )
-                                    interactionState.resetStructuredConnection()
-                                    currentOnResetDrawingConnection?.invoke()
-                                    event.changes.forEach { it.consume() }
-                                } else {
-                                    // Commit point to structured connection
-                                    val startBoardPos = if (interactionState.structuredConnectionSourceJunctionId != null) {
-                                        currentJunctions.find { it.id == interactionState.structuredConnectionSourceJunctionId }?.position?.toComposeOffset()
-                                    } else if (interactionState.structuredConnectionStartNodeId != null && interactionState.structuredConnectionStartPortId != null) {
-                                        currentGetPortBoardPosition(interactionState.structuredConnectionStartNodeId!!, interactionState.structuredConnectionStartPortId!!, interactionState.structuredConnectionStartIsOutput)
-                                    } else null
-
-                                    val lastPoint = if (interactionState.structuredConnectionPoints.isNotEmpty()) {
-                                        interactionState.structuredConnectionPoints.last()
-                                    } else {
-                                        startBoardPos ?: ((position - currentOffset) / currentScale)
-                                    }
-
-                                    var committedPos = (position - currentOffset) / currentScale
-                                    if (interactionState.isShiftModifierPressed || event.keyboardModifiers.isShiftPressed) {
-                                        committedPos = SplineMathUtils.snapToStraightAngle(lastPoint, committedPos)
-                                    } else if (interactionState.isCtrlModifierPressed || event.keyboardModifiers.isCtrlPressed) {
-                                        committedPos = committedPos.snapToGrid()
-                                    }
-                                    interactionState.structuredConnectionPoints = (interactionState.structuredConnectionPoints + committedPos).toMutableList()
-                                    event.changes.forEach { it.consume() }
-                                }
-                            }
-                        }
-                    } else if (event.buttons.isPrimaryPressed) {
-                        val isConsumed = event.changes.any { it.isConsumed }
-                        val collapsedGroupNodeIds = currentGroups.filter { it.isCollapsed }.flatMap { it.nodeIds }.toSet()
-                        val isOverNode = isPointerOverAnyNode(
-                            screenPos = position,
-                            nodes = currentNodes,
-                            nodeSizes = currentNodeSizes,
-                            scale = currentScale,
-                            offset = currentOffset,
-                            defaultNodeWidthPx = currentDefaultNodeWidthPx,
-                            densityValue = currentDensity.density,
-                            collapsedGroupNodeIds = collapsedGroupNodeIds,
-                            hoveredNodeId = interactionState.hoveredNodeId
-                        )
-
-                        if (isConsumed || isOverNode) {
-                            if (isOverNode) {
-                                event.changes.forEach { it.consume() }
-                            }
-                        } else {
-                            interactionState.lastPointerPosition = position
-                            val isAlt = event.keyboardModifiers.isAltPressed || interactionState.isAltModifierPressed
-                            val isShift = event.keyboardModifiers.isShiftPressed || interactionState.isShiftModifierPressed
-                            val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
-
-                            // Direct hit-test existing points first: Priority over wire clicks
-                            val hitJunc = ConnectionHitTester.findClosestJunction(
-                                position = position,
-                                junctions = currentJunctions,
-                                scale = currentScale,
-                                offset = currentOffset,
-                                hitRadius = maxOf(20f, 20f * currentScale)
-                            )
-                            val hitWp = ConnectionHitTester.findClosestWaypoint(
-                                position = position,
-                                connections = currentConnections,
-                                scale = currentScale,
-                                offset = currentOffset,
-                                hitRadius = maxOf(20f, 20f * currentScale)
-                            )
-
-                            val distJunc = hitJunc?.let {
-                                val screenPos = (it.position.toComposeOffset() * currentScale) + currentOffset
-                                (position - screenPos).getDistance()
-                            } ?: Float.MAX_VALUE
-
-                            val distWp = hitWp?.let {
-                                (position - it.third).getDistance()
-                            } ?: Float.MAX_VALUE
-
-                            if (distWp < distJunc && hitWp != null) {
-                                val wp = hitWp
-                                if (currentIsEyedropperActive && currentOnSampleColor != null) {
-                                    currentOnSampleColor?.invoke(wp.first.color ?: "#808080")
-                                    event.changes.forEach { it.consume() }
-                                } else if (currentIsPaintToolActive && currentOnPaintConnection != null) {
-                                    currentOnPaintConnection?.invoke(wp.first)
-                                    event.changes.forEach { it.consume() }
-                                } else if (currentIsWashToolActive && currentOnWashConnection != null) {
-                                    currentOnWashConnection?.invoke(wp.first)
-                                    event.changes.forEach { it.consume() }
-                                } else {
-                                    val actId = if (isShift) ShortcutActionId.FLOW_DELETE_SELECTED else ShortcutActionId.FLOW_MOVE_POINT
-                                    if (isShift) {
-                                        currentOnDeleteWaypoint?.invoke(wp.first, wp.second)
-                                        interactionState.hoveredWaypoint = null
-                                    } else {
-                                        if (!isCtrl) {
-                                            currentOnSelectPoints?.invoke(emptySet())
-                                            currentOnSelectNodes?.invoke(emptySet())
-                                            currentOnSelectGroups?.invoke(emptySet())
-                                            currentOnSelectLabels?.invoke(emptySet())
-                                            interactionState.selectedConnection = wp.first
-                                        }
-                                        interactionState.draggingWaypoint = Pair(wp.first, wp.second)
-                                        interactionState.lastPointerPosition = position
-                                    }
-                                    currentShortcutManager?.eat(event, actId) ?: event.changes.forEach { it.consume() }
-                                }
-                            } else if (hitJunc != null) {
-                                val juncId = hitJunc.id
-                                if (currentIsEyedropperActive || currentIsPaintToolActive || currentIsWashToolActive) {
-                                    val connectedConns = currentConnections.filter { it.sourceJunctionId == juncId || it.targetJunctionId == juncId }
-                                    if (currentIsEyedropperActive && currentOnSampleColor != null) {
-                                        val sample = hitJunc.color ?: connectedConns.firstOrNull { it.color != null }?.color ?: "#808080"
-                                        currentOnSampleColor?.invoke(sample)
-                                        event.changes.forEach { it.consume() }
-                                    } else if (currentIsPaintToolActive && currentOnPaintJunction != null) {
-                                        currentOnPaintJunction?.invoke(juncId)
-                                        event.changes.forEach { it.consume() }
-                                    } else if (currentIsWashToolActive && currentOnWashJunction != null) {
-                                        currentOnWashJunction?.invoke(juncId)
-                                        event.changes.forEach { it.consume() }
-                                    }
-                                } else if (isAlt) {
-                                    // Ramification / branching directly from junction
-                                    interactionState.isDrawingStructuredConnection = true
-                                    interactionState.structuredConnectionSourceJunctionId = juncId
-                                    interactionState.structuredConnectionStartNodeId = null
-                                    interactionState.structuredConnectionStartPortId = null
-                                    interactionState.structuredConnectionStartIsOutput = true
-                                    interactionState.structuredConnectionPoints = mutableListOf()
-                                    interactionState.structuredConnectionLivePos = (position - currentOffset) / currentScale
-                                    currentShortcutManager?.eat(event, ShortcutActionId.FLOW_CREATE_RAMIFICATION) ?: event.changes.forEach { it.consume() }
-                                } else if (isShift) {
-                                    currentOnDeleteJunction?.invoke(juncId)
-                                    interactionState.hoveredJunctionId = null
-                                    currentShortcutManager?.eat(event, ShortcutActionId.FLOW_DELETE_SELECTED) ?: event.changes.forEach { it.consume() }
-                                } else {
-                                    val isSelected = juncId in currentSelectedPointIds
-                                    if (isCtrl) {
-                                        val newSelectedPointIds = if (isSelected) {
-                                            currentSelectedPointIds - juncId
-                                        } else {
-                                            currentSelectedPointIds + juncId
-                                        }
-                                        currentOnSelectPoints?.invoke(newSelectedPointIds)
-                                        junctionDragStartPointPositions = currentJunctions.filter { it.id in newSelectedPointIds }.associate { it.id to it.position }
-                                        junctionDragStartNodePositions = currentNodes.filter { it.id in currentSelectedNodeIds }.associate { it.id to it.position }
-                                        junctionDragStartGroupPositions = currentGroups.filter { it.id in currentSelectedGroupIds }.associate { it.id to it.position }
-                                        junctionDragStartLabelPositions = currentLabels.filter { it.id in currentSelectedLabelIds }.associate { it.id to it.position }
-                                    } else if (!isSelected) {
-                                        currentOnSelectPoints?.invoke(setOf(juncId))
-                                        currentOnSelectNodes?.invoke(emptySet())
-                                        currentOnSelectGroups?.invoke(emptySet())
-                                        currentOnSelectLabels?.invoke(emptySet())
-                                        junctionDragStartPointPositions = mapOf(juncId to hitJunc.position)
-                                        junctionDragStartNodePositions = emptyMap()
-                                        junctionDragStartGroupPositions = emptyMap()
-                                        junctionDragStartLabelPositions = emptyMap()
-                                    } else {
-                                        junctionDragStartPointPositions = currentJunctions.filter { it.id in currentSelectedPointIds }.associate { it.id to it.position }
-                                        junctionDragStartNodePositions = currentNodes.filter { it.id in currentSelectedNodeIds }.associate { it.id to it.position }
-                                        junctionDragStartGroupPositions = currentGroups.filter { it.id in currentSelectedGroupIds }.associate { it.id to it.position }
-                                        junctionDragStartLabelPositions = currentLabels.filter { it.id in currentSelectedLabelIds }.associate { it.id to it.position }
-                                    }
-                                    interactionState.selectedJunctionId = juncId
-                                    interactionState.draggingJunctionId = juncId
-                                    interactionState.lastPointerPosition = position
-                                    junctionDragStartPointerPosition = position
-                                    junctionLastDispatchedBoardPos = hitJunc.position.toComposeOffset()
-                                    currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
-                                }
-                            } else {
-                                val connProj = ConnectionHitTester.findClosestConnectionWithProjection(
-                                    position = position,
-                                    connections = currentConnections,
-                                    getPortBoardPosition = currentGetPortBoardPosition,
-                                    scale = currentScale,
-                                    offset = currentOffset,
-                                    junctions = currentJunctions,
-                                    curveStyle = currentCurveStyle,
-                                    roundness = currentRoundness,
-                                    stepMode = currentOrthogonalStepMode,
-                                    orthogonalPortLead = currentOrthogonalPortLead,
-                                    nodes = currentNodes
-                                )
-                                if (connProj != null) {
-                                    if (currentIsEyedropperActive && currentOnSampleColor != null) {
-                                        currentOnSampleColor?.invoke(connProj.connection.color ?: "#808080")
-                                        event.changes.forEach { it.consume() }
-                                    } else if (currentIsPaintToolActive && currentOnPaintConnection != null) {
-                                        currentOnPaintConnection?.invoke(connProj.connection)
-                                        event.changes.forEach { it.consume() }
-                                    } else if (currentIsWashToolActive && currentOnWashConnection != null) {
-                                        currentOnWashConnection?.invoke(connProj.connection)
-                                        event.changes.forEach { it.consume() }
-                                    } else if (isShift) {
-                                        if (connProj.connection.waypoints.isNotEmpty() && currentOnDeleteConnectionSegment != null) {
-                                            currentOnDeleteConnectionSegment?.invoke(connProj.connection, connProj.segmentIndex)
-                                        } else {
-                                            currentOnDeleteConnection(connProj.connection)
-                                        }
-                                        interactionState.clearHoveredConnection()
-                                        if (interactionState.selectedConnection == connProj.connection) {
-                                            interactionState.selectedConnection = null
-                                        }
-                                        event.changes.forEach { it.consume() }
-                                    } else if (isAlt) {
-                                        // Alt + drag on wire segment: move the entire segment!
-                                        interactionState.draggingSegment = DraggingSegmentInfo(
-                                            connection = connProj.connection,
-                                            segmentIndex = connProj.segmentIndex
-                                        )
-                                        segmentDragStartPos = position
-                                        interactionState.lastPointerPosition = position
-                                        currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
-                                    } else {
-                                        // Normal click anywhere on wire: spawn new point (junction) and immediately begin dragging it!
-                                        val newJuncId = (currentJunctions.maxOfOrNull { it.id } ?: 0L) + 1L
-                                        currentOnAddJunctionAndBranch?.invoke(connProj.connection, connProj.projectedPoint, connProj.segmentIndex)
-                                        interactionState.selectedJunctionId = newJuncId
-                                        currentOnSelectPoints?.invoke(setOf(newJuncId))
-                                        currentOnSelectNodes?.invoke(emptySet())
-                                        currentOnSelectGroups?.invoke(emptySet())
-                                        currentOnSelectLabels?.invoke(emptySet())
-                                        interactionState.draggingJunctionId = newJuncId
-                                        interactionState.lastPointerPosition = position
-                                        junctionDragStartPointerPosition = position
-                                        junctionDragStartPointPositions = mapOf(newJuncId to connProj.projectedPoint.toModelOffset())
-                                        junctionDragStartNodePositions = emptyMap()
-                                        junctionDragStartGroupPositions = emptyMap()
-                                        junctionDragStartLabelPositions = emptyMap()
-                                        junctionLastDispatchedBoardPos = connProj.projectedPoint
-                                        currentShortcutManager?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
-                                    }
-                                }
-                            }
-                        }
-                    } else if (event.keyboardModifiers.isCtrlPressed) {
-                        val isConsumed = event.changes.any { it.isConsumed }
-                        val collapsedGroupNodeIds = currentGroups.filter { it.isCollapsed }.flatMap { it.nodeIds }.toSet()
-                        val isOverNode = isPointerOverAnyNode(
-                            screenPos = position,
-                            nodes = currentNodes,
-                            nodeSizes = currentNodeSizes,
-                            scale = currentScale,
-                            offset = currentOffset,
-                            defaultNodeWidthPx = currentDefaultNodeWidthPx,
-                            densityValue = currentDensity.density,
-                            collapsedGroupNodeIds = collapsedGroupNodeIds,
-                            hoveredNodeId = interactionState.hoveredNodeId
-                        )
-                        if (!isConsumed && !isOverNode) {
-                            interactionState.hoveredConnection?.let { conn ->
-                                val isSrc = interactionState.hoveredConnectionIsSource ?: false
-                                val boardPos = (position - currentOffset) / currentScale
-                                currentOnDetachConnection(conn, isSrc, boardPos)
-                                event.changes.forEach { it.consume() }
-                            }
-                        }
-                    }
-                } else if (event.type == PointerEventType.Release) {
-                    if (rightClickStartPos != null) {
-                        if (!rightClickDidDrag) {
-                            // Right-click tap without drag: cancel ongoing drawing sessions cleanly
-                            if (interactionState.isDrawingStructuredConnection) {
-                                interactionState.resetStructuredConnection()
-                                interactionState.clearSnapping()
-                                event.changes.forEach { it.consume() }
-                            } else if (currentIsDrawingConnection) {
-                                interactionState.clearSnapping()
-                                currentOnConnectionDrop(false)
-                                event.changes.forEach { it.consume() }
-                            }
-                        }
-                        rightClickStartPos = null
-                        rightClickLastPos = null
-                        rightClickDidDrag = false
-                    }
-                    middleClickLastPos = null
-                    if (interactionState.draggingSegment != null) {
-                        val seg = interactionState.draggingSegment!!
-                        val totalDelta = if (segmentDragStartPos != null) {
-                            (position - segmentDragStartPos!!) / currentScale
-                        } else Offset.Zero
-                        currentOnEndMoveSegment?.invoke(seg.connection, seg.segmentIndex, totalDelta.toModelOffset())
-                        interactionState.draggingSegment = null
-                        segmentDragStartPos = null
-                    }
-                    if (interactionState.draggingJunctionId != null) {
-                        val isCtrl = event.keyboardModifiers.isCtrlPressed || interactionState.isCtrlModifierPressed
-                        val pointMoves = junctionDragStartPointPositions.mapValues { (id, startPos) ->
-                            val currentPos = currentJunctions.find { it.id == id }?.position ?: startPos
-                            startPos to (if (isCtrl) currentPos.snapToGrid() else currentPos)
-                        }.filter { it.value.first != it.value.second }
-
-                        val nodeMoves = junctionDragStartNodePositions.mapValues { (id, startPos) ->
-                            startPos to (currentNodes.find { it.id == id }?.position ?: startPos)
-                        }.filter { it.value.first != it.value.second }
-
-                        val groupMoves = junctionDragStartGroupPositions.mapValues { (id, startPos) ->
-                            startPos to (currentGroups.find { it.id == id }?.position ?: startPos)
-                        }.filter { it.value.first != it.value.second }
-
-                        val labelMoves = junctionDragStartLabelPositions.mapValues { (id, startPos) ->
-                            startPos to (currentLabels.find { it.id == id }?.position ?: startPos)
-                        }.filter { it.value.first != it.value.second }
-
-                        if (pointMoves.isNotEmpty() || nodeMoves.isNotEmpty() || groupMoves.isNotEmpty() || labelMoves.isNotEmpty()) {
-                            currentOnEndMoveJunction?.invoke(pointMoves, nodeMoves, groupMoves, labelMoves)
-                        }
-
-                        junctionDragStartPointPositions = emptyMap()
-                        junctionDragStartNodePositions = emptyMap()
-                        junctionDragStartGroupPositions = emptyMap()
-                        junctionDragStartLabelPositions = emptyMap()
-                        junctionDragStartPointerPosition = null
-                        junctionLastDispatchedBoardPos = null
-                        interactionState.draggingJunctionId = null
-                    }
-                    interactionState.draggingWaypoint = null
-                    if (currentIsDrawingConnection && !event.buttons.isPrimaryPressed) {
-                        if (interactionState.snappedWirePoint != null && interactionState.snappedWireConnection != null) {
-                            val snappedConn = interactionState.snappedWireConnection!!
-                            val snappedPt = interactionState.snappedWirePoint!!.toModelOffset()
-                            val isOutput = currentConnectionStartIsOutput
-                            val srcNodeId = if (isOutput) currentConnectionStartNodeId else null
-                            val srcPortId = if (isOutput) currentConnectionStartPortId else null
-                            val tgtNodeId = if (!isOutput) currentConnectionStartNodeId else null
-                            val tgtPortId = if (!isOutput) currentConnectionStartPortId else null
-
-                            currentOnSplitConnectionAndConnect?.invoke(
-                                snappedConn,
-                                snappedPt,
-                                srcNodeId,
-                                srcPortId,
-                                null,
-                                tgtNodeId,
-                                tgtPortId,
-                                null,
-                                emptyList()
-                            )
-                            interactionState.clearSnapping()
-                            currentOnResetDrawingConnection?.invoke()
-                        } else {
-                            currentOnConnectionDrop(event.keyboardModifiers.isShiftPressed)
-                        }
-                    }
-                    interactionState.clearSnapping()
+                when (event.type) {
+                    PointerEventType.Scroll -> handlePointerScroll(event, change, position, ctx)
+                    PointerEventType.Move -> handlePointerMove(event, position, ctx)
+                    PointerEventType.Exit -> handlePointerExit(ctx)
+                    PointerEventType.Press -> handlePointerPress(event, position, ctx)
+                    PointerEventType.Release -> handlePointerRelease(event, position, ctx)
                 }
             }
         }

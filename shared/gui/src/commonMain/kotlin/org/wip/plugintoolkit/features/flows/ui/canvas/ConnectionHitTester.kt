@@ -501,6 +501,32 @@ object ConnectionHitTester {
         return JunctionFilletParams(startFilletLeadIn = startFilletLeadIn, endTrimDistance = endTrimDistance)
     }
 
+    data class ScreenBoundingBox(
+        val minX: Float,
+        val maxX: Float,
+        val minY: Float,
+        val maxY: Float
+    ) {
+        fun containsWithMargin(point: Offset, margin: Float): Boolean {
+            return point.x >= minX - margin && point.x <= maxX + margin &&
+                   point.y >= minY - margin && point.y <= maxY + margin
+        }
+    }
+
+    fun computeScreenBoundingBox(points: List<Offset>): ScreenBoundingBox {
+        var minX = Float.MAX_VALUE
+        var maxX = -Float.MAX_VALUE
+        var minY = Float.MAX_VALUE
+        var maxY = -Float.MAX_VALUE
+        for (p in points) {
+            if (p.x < minX) minX = p.x
+            if (p.x > maxX) maxX = p.x
+            if (p.y < minY) minY = p.y
+            if (p.y > maxY) maxY = p.y
+        }
+        return ScreenBoundingBox(minX, maxX, minY, maxY)
+    }
+
     fun findClosestConnection(
         position: Offset,
         connections: List<Connection>,
@@ -530,14 +556,12 @@ object ConnectionHitTester {
                 density = density
             ) ?: continue
             val screenPoints = boardPoints.map { (it * scale) + offset }
+            if (screenPoints.size < 2) continue
 
-            val coarseMargin = 1000f * scale
-            val coarseMinX = screenPoints.minOf { it.x } - coarseMargin
-            val coarseMaxX = screenPoints.maxOf { it.x } + coarseMargin
-            val coarseMinY = screenPoints.minOf { it.y } - coarseMargin
-            val coarseMaxY = screenPoints.maxOf { it.y } + coarseMargin
-
-            if (position.x !in coarseMinX..coarseMaxX || position.y !in coarseMinY..coarseMaxY) {
+            // AABB spatial early pruning: eliminates O(N * K) spline evaluations for distant wires
+            val aabb = computeScreenBoundingBox(screenPoints)
+            val pruningMargin = maxOf(minDistance, 150f * scale)
+            if (!aabb.containsWithMargin(position, pruningMargin)) {
                 continue
             }
 
@@ -650,14 +674,12 @@ object ConnectionHitTester {
                 density = density
             ) ?: continue
             val screenPoints = boardPoints.map { (it * scale) + offset }
+            if (screenPoints.size < 2) continue
 
-            val coarseMargin = 1000f * scale
-            val coarseMinX = screenPoints.minOf { it.x } - coarseMargin
-            val coarseMaxX = screenPoints.maxOf { it.x } + coarseMargin
-            val coarseMinY = screenPoints.minOf { it.y } - coarseMargin
-            val coarseMaxY = screenPoints.maxOf { it.y } + coarseMargin
-
-            if (position.x !in coarseMinX..coarseMaxX || position.y !in coarseMinY..coarseMaxY) {
+            // AABB spatial early pruning
+            val aabb = computeScreenBoundingBox(screenPoints)
+            val pruningMargin = maxOf(minDistance, 150f * scale)
+            if (!aabb.containsWithMargin(position, pruningMargin)) {
                 continue
             }
 
@@ -754,6 +776,9 @@ object ConnectionHitTester {
         var minDistance = if (hitRadius < 20f) 20f else hitRadius
         for (junction in junctions) {
             val screenPos = (junction.position.toComposeOffset() * scale) + offset
+            if (abs(position.x - screenPos.x) > minDistance || abs(position.y - screenPos.y) > minDistance) {
+                continue
+            }
             val dist = (position - screenPos).getDistance()
             if (dist < minDistance) {
                 minDistance = dist
@@ -863,10 +888,12 @@ object ConnectionHitTester {
         for (connection in connections) {
             connection.waypoints.forEachIndexed { index, wp ->
                 val screenPos = (wp.toComposeOffset() * scale) + offset
-                val dist = (position - screenPos).getDistance()
-                if (dist < minDistance) {
-                    minDistance = dist
-                    closest = Triple(connection, index, screenPos)
+                if (abs(position.x - screenPos.x) <= minDistance && abs(position.y - screenPos.y) <= minDistance) {
+                    val dist = (position - screenPos).getDistance()
+                    if (dist < minDistance) {
+                        minDistance = dist
+                        closest = Triple(connection, index, screenPos)
+                    }
                 }
             }
         }
@@ -905,8 +932,14 @@ object ConnectionHitTester {
                 density = density
             ) ?: continue
             val screenPoints = boardPoints.map { (it * scale) + offset }
-
             if (screenPoints.size < 2) continue
+
+            // AABB spatial early pruning
+            val aabb = computeScreenBoundingBox(screenPoints)
+            val pruningMargin = maxOf(minDistance, 150f * scale)
+            if (!aabb.containsWithMargin(position, pruningMargin)) {
+                continue
+            }
 
             val (startIsHorizontal, endIsHorizontal) = getConnectionOrientations(
                 connection = connection,
