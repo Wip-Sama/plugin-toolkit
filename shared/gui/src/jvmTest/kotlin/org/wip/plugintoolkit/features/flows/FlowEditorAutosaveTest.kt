@@ -213,6 +213,7 @@ class FlowEditorAutosaveTest {
     @Test
     fun testTryConnectPortsSavesOnlyOnceWhenAutosaveEnabled() = runBlocking {
         val viewModel = createViewModel(flowName = "AutosaveOnceFlow", autosave = true)
+        viewModel.autosaveDebounceMs = 50L
         assertTrue(viewModel.isAutoSaveEnabled)
 
         viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(100f, 100f)))
@@ -222,13 +223,69 @@ class FlowEditorAutosaveTest {
         val nodeA = nodes[0]
         val nodeB = nodes[1]
 
-        // Clear previous saveFlow calls from adding nodes
+        // Wait for add-nodes autosave to settle and clear recorded calls
+        delay(100)
         io.mockk.clearMocks(mockFlowRepo, answers = false, recordedCalls = true, childMocks = false)
 
         // Connect ports using TryConnectPorts with autosave = true
         viewModel.onEvent(FlowEvent.TryConnectPorts(nodeA.id, "output", nodeB.id, "message", false))
 
+        // Wait for debounce window to flush autosave
+        delay(100)
+
         // With no re-entrancy, saveFlow should be called exactly ONCE, not twice!
         verify(exactly = 1) { mockFlowRepo.saveFlow(any()) }
     }
+
+    @Test
+    fun testAutosaveDebouncesRapidMutationsIntoSingleSave() = runBlocking {
+        val viewModel = createViewModel(flowName = "DebounceFlow", autosave = true)
+        viewModel.autosaveDebounceMs = 200L
+        assertTrue(viewModel.isAutoSaveEnabled)
+
+        io.mockk.clearMocks(mockFlowRepo, answers = false, recordedCalls = true, childMocks = false)
+
+        // Rapid burst of 3 mutations within < 50ms
+        viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(100f, 100f)))
+        viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(200f, 100f)))
+        viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(300f, 100f)))
+
+        // Immediately after burst, debounced autosave hasn't fired yet
+        verify(exactly = 0) { mockFlowRepo.saveFlow(any()) }
+
+        // After debounce interval expires (200ms + buffer)
+        delay(350)
+
+        // Exactly one consolidated save call occurred
+        verify(exactly = 1) { mockFlowRepo.saveFlow(any()) }
+    }
+
+    @Test
+    fun testExternalRepositoryEmissionsDoNotClearUndoStack() = runBlocking {
+        val initialFlow = Flow("ExternalSyncFlow", nodes = listOf(
+            Node.SystemNode(1L, org.wip.plugintoolkit.features.flows.model.Offset(0f, 0f), "Log", "Log", SystemNodesRegistry.getInputs("Log"), SystemNodesRegistry.getOutputs("Log"))
+        ))
+        flowsFlow.value = listOf(initialFlow)
+
+        val viewModel = createViewModel(flowName = "ExternalSyncFlow", autosave = false)
+        assertFalse(viewModel.canUndo.value)
+
+        // Perform an action to put a command on the undo stack
+        viewModel.onEvent(FlowEvent.AddSystemNode("Log", Offset(200f, 200f)))
+        assertTrue(viewModel.canUndo.value, "Undo stack must have the action")
+        assertTrue(viewModel.state.value.hasUnsavedChanges)
+
+        // Simulate external repository update (e.g. background flow reload or other flow changed)
+        val updatedFlowList = listOf(
+            initialFlow,
+            Flow("OtherFlow")
+        )
+        flowsFlow.value = updatedFlowList
+        delay(100)
+
+        // Crucial stabilization check: Undo stack must NOT be cleared, unsaved changes must NOT be wiped!
+        assertTrue(viewModel.canUndo.value, "External flow emission must NOT wipe active undo stack")
+        assertTrue(viewModel.state.value.hasUnsavedChanges, "External flow emission must NOT reset hasUnsavedChanges")
+    }
 }
+

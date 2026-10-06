@@ -143,7 +143,10 @@ data class DeleteNodesCommand(
     private val deletedNodes: List<Node>,
     private val cascadeConnections: List<Connection> = emptyList(),
     private val cascadeJunctions: List<FlowJunction> = emptyList(),
-    private val addedConnections: List<Connection> = emptyList()
+    private val addedConnections: List<Connection> = emptyList(),
+    private val originalNodeIndices: Map<Long, Int> = emptyMap(),
+    private val originalSelectedNodeIds: Set<Long> = emptySet(),
+    private val originalSelectedPointIds: Set<Long> = emptySet()
 ) : FlowCommand {
     override val description: String = "Delete ${deletedNodes.size} node(s)"
 
@@ -170,12 +173,26 @@ data class DeleteNodesCommand(
         val existingConnSet = state.flow.connections.toSet()
         val existingJuncIds = state.flow.junctions.map { it.id }.toSet()
 
+        val restoredNodes = deletedNodes.filter { it.id !in existingNodeIds }
+        val finalNodes = if (originalNodeIndices.isNotEmpty()) {
+            val list = state.flow.nodes.toMutableList()
+            restoredNodes.sortedBy { originalNodeIndices[it.id] ?: Int.MAX_VALUE }.forEach { node ->
+                val targetIdx = (originalNodeIndices[node.id] ?: list.size).coerceIn(0, list.size)
+                list.add(targetIdx, node)
+            }
+            list
+        } else {
+            state.flow.nodes + restoredNodes
+        }
+
         return state.copy(
             flow = state.flow.copy(
-                nodes = state.flow.nodes + deletedNodes.filter { it.id !in existingNodeIds },
+                nodes = finalNodes,
                 connections = (state.flow.connections.filter { it !in addedConnections } + cascadeConnections.filter { it !in existingConnSet }),
                 junctions = state.flow.junctions + cascadeJunctions.filter { it.id !in existingJuncIds }
             ),
+            selectedNodeIds = state.selectedNodeIds + (if (originalSelectedNodeIds.isNotEmpty()) originalSelectedNodeIds else deletedNodeIds),
+            selectedPointIds = state.selectedPointIds + (if (originalSelectedPointIds.isNotEmpty()) originalSelectedPointIds else cascadeJuncIds),
             hasUnsavedChanges = true
         )
     }
@@ -186,7 +203,8 @@ data class DeleteNodesCommand(
  */
 data class ConnectPortsCommand(
     private val connection: Connection,
-    private val overwrittenConnections: List<Connection> = emptyList()
+    private val overwrittenConnections: List<Connection> = emptyList(),
+    private val originalConnections: List<Connection>? = null
 ) : FlowCommand {
     override val description: String = "Connect port"
 
@@ -204,9 +222,25 @@ data class ConnectPortsCommand(
     }
 
     override fun undo(state: FlowEditorState): FlowEditorState {
+        if (originalConnections != null) {
+            return state.copy(
+                flow = state.flow.copy(connections = originalConnections),
+                hasUnsavedChanges = true
+            )
+        }
+        val connIndex = state.flow.connections.indexOf(connection)
         val withoutNew = state.flow.connections.filter { it != connection }
+        val restored = if (connIndex >= 0 && overwrittenConnections.isNotEmpty()) {
+            val list = state.flow.connections.toMutableList()
+            list.removeAt(connIndex)
+            val insertPos = connIndex.coerceIn(0, list.size)
+            list.addAll(insertPos, overwrittenConnections)
+            list
+        } else {
+            withoutNew + overwrittenConnections
+        }
         return state.copy(
-            flow = state.flow.copy(connections = withoutNew + overwrittenConnections),
+            flow = state.flow.copy(connections = restored),
             hasUnsavedChanges = true
         )
     }

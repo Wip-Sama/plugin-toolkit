@@ -181,6 +181,70 @@ class FlowCommandHistoryTest {
     }
 
     @Test
+    fun testDeleteNodesCommandPreservesExactListIndicesAndSelectionsOnUndo() {
+        val nodeA = Node.FlowInputNode(1L, ModelOffset(0f, 0f), emptyList())
+        val nodeB = Node.SystemNode(2L, ModelOffset(10f, 10f), "B", "b", emptyList(), emptyList())
+        val nodeC = Node.SystemNode(3L, ModelOffset(20f, 20f), "C", "c", emptyList(), emptyList())
+        val nodeD = Node.FlowOutputNode(4L, ModelOffset(30f, 30f), emptyList())
+
+        val junc = FlowJunction(99L, ModelOffset.Zero)
+        val state = FlowEditorState(
+            flow = Flow("TestIndex", nodes = listOf(nodeA, nodeB, nodeC, nodeD), junctions = listOf(junc)),
+            selectedNodeIds = setOf(2L, 4L),
+            selectedPointIds = setOf(99L)
+        )
+
+        val indicesMap = mapOf(2L to 1, 4L to 3)
+        val command = DeleteNodesCommand(
+            deletedNodes = listOf(nodeB, nodeD),
+            cascadeConnections = emptyList(),
+            cascadeJunctions = listOf(junc),
+            originalNodeIndices = indicesMap,
+            originalSelectedNodeIds = setOf(2L, 4L),
+            originalSelectedPointIds = setOf(99L)
+        )
+
+        val deletedState = command.execute(state)
+        assertEquals(listOf(1L, 3L), deletedState.flow.nodes.map { it.id })
+        assertTrue(deletedState.selectedNodeIds.isEmpty())
+        assertTrue(deletedState.selectedPointIds.isEmpty())
+        assertTrue(deletedState.flow.junctions.isEmpty())
+
+        val undoneState = command.undo(deletedState)
+        // Verify exact index restoration (z-order preserved)
+        assertEquals(listOf(1L, 2L, 3L, 4L), undoneState.flow.nodes.map { it.id })
+        assertEquals(setOf(2L, 4L), undoneState.selectedNodeIds)
+        assertEquals(setOf(99L), undoneState.selectedPointIds)
+        assertEquals(1, undoneState.flow.junctions.size)
+    }
+
+    @Test
+    fun testConnectPortsCommandPreservesOriginalConnectionOrderOnUndo() {
+        val c1 = Connection(1L, "out1", 10L, "in1")
+        val c2 = Connection(2L, "out2", 11L, "in2")
+        val c3 = Connection(3L, "out3", 12L, "in3")
+        val originalList = listOf(c1, c2, c3)
+
+        val state = FlowEditorState(
+            flow = Flow("TestOrder", connections = originalList)
+        )
+
+        val cNew = Connection(4L, "out4", 11L, "in2") // overwrites c2
+        val command = ConnectPortsCommand(
+            connection = cNew,
+            overwrittenConnections = listOf(c2),
+            originalConnections = originalList
+        )
+
+        val executed = command.execute(state)
+        assertEquals(listOf(c1, c3, cNew), executed.flow.connections)
+
+        val undone = command.undo(executed)
+        // Crucial test: order must be exact original [c1, c2, c3], not [c1, c3, c2]
+        assertEquals(originalList, undone.flow.connections)
+    }
+
+    @Test
     fun testUpdateNodeCommandUndoAndRedo() {
         val node = Node.FlowInputNode(1L, ModelOffset.Zero, emptyList(), isCollapsed = false)
         val updatedNode = Node.FlowInputNode(1L, ModelOffset.Zero, emptyList(), isCollapsed = true)

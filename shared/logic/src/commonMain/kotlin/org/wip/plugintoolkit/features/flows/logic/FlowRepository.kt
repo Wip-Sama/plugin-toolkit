@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -40,6 +42,8 @@ class FlowRepository(
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
+
+    private val saveMutex = Mutex()
 
     private val _flows = MutableStateFlow<List<Flow>>(emptyList())
     val flows: StateFlow<List<Flow>> = _flows.asStateFlow()
@@ -178,27 +182,36 @@ class FlowRepository(
     fun saveFlow(flow: Flow) {
         resolvedExecutionGuard?.assertCanMutate(flow.name, _flows.value)
         scope.launch(Dispatchers.IO) {
-            try {
-                val appDataDir = settingsPersistence.getSettingsDir()
-                val flowsDir = Path("$appDataDir/flows")
-                if (!SystemFileSystem.exists(flowsDir)) {
-                    SystemFileSystem.createDirectories(flowsDir)
-                }
-
-                val file = getFlowPath(appDataDir, flow.name)
-                val flowContent = json.encodeToString(Flow.serializer(), flow)
-                SystemFileSystem.sink(file).buffered().use { it.writeString(flowContent) }
-
-                _flows.update { current ->
-                    val existing = current.find { it.name == flow.name }
-                    if (existing != null) {
-                        current.map { if (it.name == flow.name) flow else it }
-                    } else {
-                        current + flow
+            saveMutex.withLock {
+                try {
+                    val appDataDir = settingsPersistence.getSettingsDir()
+                    val flowsDir = Path("$appDataDir/flows")
+                    if (!SystemFileSystem.exists(flowsDir)) {
+                        SystemFileSystem.createDirectories(flowsDir)
                     }
+
+                    val targetFile = getFlowPath(appDataDir, flow.name)
+                    val safeName = flow.name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                    val tempFile = Path("$appDataDir/flows/${safeName}.tmp")
+                    val flowContent = json.encodeToString(Flow.serializer(), flow)
+
+                    SystemFileSystem.sink(tempFile).buffered().use { it.writeString(flowContent) }
+                    if (SystemFileSystem.exists(targetFile)) {
+                        SystemFileSystem.delete(targetFile)
+                    }
+                    SystemFileSystem.atomicMove(tempFile, targetFile)
+
+                    _flows.update { current ->
+                        val existing = current.find { it.name == flow.name }
+                        if (existing != null) {
+                            current.map { if (it.name == flow.name) flow else it }
+                        } else {
+                            current + flow
+                        }
+                    }
+                } catch (e: Exception) {
+                    Logger.e(e) { "Failed to save flow: ${flow.name}" }
                 }
-            } catch (e: Exception) {
-                Logger.e(e) { "Failed to save flow: ${flow.name}" }
             }
         }
     }
@@ -206,46 +219,48 @@ class FlowRepository(
     fun deleteFlow(flowName: String) {
         resolvedExecutionGuard?.assertCanMutate(flowName, _flows.value)
         scope.launch(Dispatchers.IO) {
-            try {
-                val appDataDir = settingsPersistence.getSettingsDir()
-                val file = getFlowPath(appDataDir, flowName)
+            saveMutex.withLock {
+                try {
+                    val appDataDir = settingsPersistence.getSettingsDir()
+                    val file = getFlowPath(appDataDir, flowName)
 
-                val currentFlows = _flows.value
-                val deletedFlow = currentFlows.find { it.name == flowName }
+                    val currentFlows = _flows.value
+                    val deletedFlow = currentFlows.find { it.name == flowName }
 
-                if (deletedFlow != null) {
-                    val updatedList = currentFlows.map { parentFlow ->
-                        if (parentFlow.name == flowName) return@map parentFlow
-                        var updatedFlow = parentFlow
-                        var foundSubflowNode: Node.SubFlowNode?
-                        do {
-                            foundSubflowNode =
-                                updatedFlow.nodes.find { it is Node.SubFlowNode && it.flowName == flowName } as? Node.SubFlowNode
-                            if (foundSubflowNode != null) {
-                                updatedFlow =
-                                    org.wip.plugintoolkit.features.flows.model.FlowUnpacker.unpackSubflowInFlow(
-                                        updatedFlow,
-                                        foundSubflowNode.id,
-                                        deletedFlow
-                                    )
+                    if (deletedFlow != null) {
+                        val updatedList = currentFlows.map { parentFlow ->
+                            if (parentFlow.name == flowName) return@map parentFlow
+                            var updatedFlow = parentFlow
+                            var foundSubflowNode: Node.SubFlowNode?
+                            do {
+                                foundSubflowNode =
+                                    updatedFlow.nodes.find { it is Node.SubFlowNode && it.flowName == flowName } as? Node.SubFlowNode
+                                if (foundSubflowNode != null) {
+                                    updatedFlow =
+                                        org.wip.plugintoolkit.features.flows.model.FlowUnpacker.unpackSubflowInFlow(
+                                            updatedFlow,
+                                            foundSubflowNode.id,
+                                            deletedFlow
+                                        )
+                                }
+                            } while (foundSubflowNode != null)
+
+                            if (updatedFlow != parentFlow) {
+                                val targetFile = getFlowPath(appDataDir, updatedFlow.name)
+                                val flowContent = json.encodeToString(Flow.serializer(), updatedFlow)
+                                SystemFileSystem.sink(targetFile).buffered().use { it.writeString(flowContent) }
                             }
-                        } while (foundSubflowNode != null)
+                            updatedFlow
+                        }.filter { it.name != flowName }
+                        _flows.value = updatedList
+                    }
 
-                        if (updatedFlow != parentFlow) {
-                            val targetFile = getFlowPath(appDataDir, updatedFlow.name)
-                            val flowContent = json.encodeToString(Flow.serializer(), updatedFlow)
-                            SystemFileSystem.sink(targetFile).buffered().use { it.writeString(flowContent) }
-                        }
-                        updatedFlow
-                    }.filter { it.name != flowName }
-                    _flows.value = updatedList
+                    if (SystemFileSystem.exists(file)) {
+                        SystemFileSystem.delete(file)
+                    }
+                } catch (e: Exception) {
+                    Logger.e(e) { "Failed to delete flow: $flowName" }
                 }
-
-                if (SystemFileSystem.exists(file)) {
-                    SystemFileSystem.delete(file)
-                }
-            } catch (e: Exception) {
-                Logger.e(e) { "Failed to delete flow: $flowName" }
             }
         }
     }

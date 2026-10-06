@@ -223,52 +223,82 @@ class FlowEditorViewModel(
     private val gridSize = 50f
     private val zoomLevels = listOf(0.1f, 0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f)
 
+    var autosaveDebounceMs: Long = 1000L
+    private var autosaveJob: kotlinx.coroutines.Job? = null
+    private var isFlowLoaded = false
+
+    internal fun triggerAutoSave(immediate: Boolean = false) {
+        autosaveJob?.cancel()
+        if (immediate || autosaveDebounceMs <= 0L) {
+            handleSave()
+        } else {
+            autosaveJob = viewModelScope.launch {
+                kotlinx.coroutines.delay(autosaveDebounceMs)
+                handleSave()
+            }
+        }
+    }
+
     private fun loadFlow() {
         viewModelScope.launch {
             flowRepository.flows.collect { allFlows ->
                 val activeFlowName = initialFlowName
-                val activeFlow: Flow = if (activeFlowName.isBlank()) {
-                    Flow("")
+                val matchingFlow = if (activeFlowName.isBlank()) Flow("") else allFlows.find { it.name == activeFlowName }
+
+                if (!isFlowLoaded) {
+                    val activeFlow: Flow = matchingFlow ?: Flow(activeFlowName)
+                    val activeFlowWithSyncedSubflows = syncSubflowNodes(activeFlow, allFlows).healDuplicateConnections()
+                    val maxNodeId = activeFlowWithSyncedSubflows.nodes.maxOfOrNull { it.id } ?: -1L
+                    val maxPointId = activeFlowWithSyncedSubflows.junctions.maxOfOrNull { it.id } ?: -1L
+                    val maxId = maxOf(maxNodeId, maxPointId)
+
+                    val defaultStyle = resolvedSettingsRepository?.settings?.value?.flows?.defaultConnectionStyle
+                        ?: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline
+                    val defaultRoundness = resolvedSettingsRepository?.settings?.value?.flows?.defaultConnectionRoundness
+                        ?: 0.5f
+                    val defaultStepMode = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalStepMode
+                        ?: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
+                    val defaultPortLead = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalPortLead
+                        ?: false
+                    val defaultHidePorts = resolvedSettingsRepository?.settings?.value?.flows?.hideConnectionPointsUnlessHovered
+                        ?: false
+                    val effectiveStyle = activeFlowWithSyncedSubflows.connectionCurveStyle ?: defaultStyle
+                    val effectiveRoundness = activeFlowWithSyncedSubflows.connectionRoundness ?: defaultRoundness
+                    val effectiveStepMode = activeFlowWithSyncedSubflows.orthogonalStepMode ?: defaultStepMode
+                    val effectivePortLead = activeFlowWithSyncedSubflows.orthogonalPortLead ?: defaultPortLead
+
+                    _state.update { currentState ->
+                        currentState.copy(
+                            flow = activeFlowWithSyncedSubflows,
+                            connectionCurveStyle = effectiveStyle,
+                            connectionRoundness = effectiveRoundness,
+                            orthogonalStepMode = effectiveStepMode,
+                            orthogonalPortLead = effectivePortLead,
+                            hideConnectionPointsUnlessHovered = defaultHidePorts,
+                            nextId = maxId + 1,
+                            flows = allFlows,
+                            hasUnsavedChanges = false
+                        )
+                    }
+                    historyManager.clear()
+                    if (matchingFlow != null || activeFlowName.isBlank() || allFlows.isNotEmpty()) {
+                        isFlowLoaded = true
+                    }
+                    updateReadOnlyState()
+                    runTypeInference()
                 } else {
-                    allFlows.find { it.name == activeFlowName } ?: Flow(activeFlowName)
+                    // Subsequent emissions of allFlows:
+                    // Only update the available list of flows and sync external subflow definitions.
+                    // DO NOT overwrite active flow, DO NOT wipe undo history, DO NOT reset unsaved changes!
+                    _state.update { currentState ->
+                        val updatedCurrentFlow = syncSubflowNodes(currentState.flow, allFlows)
+                        currentState.copy(
+                            flow = updatedCurrentFlow,
+                            flows = allFlows
+                        )
+                    }
+                    updateReadOnlyState()
                 }
-
-                val activeFlowWithSyncedSubflows = syncSubflowNodes(activeFlow, allFlows).healDuplicateConnections()
-                val maxNodeId = activeFlowWithSyncedSubflows.nodes.maxOfOrNull { it.id } ?: -1L
-                val maxPointId = activeFlowWithSyncedSubflows.junctions.maxOfOrNull { it.id } ?: -1L
-                val maxId = maxOf(maxNodeId, maxPointId)
-
-                val defaultStyle = resolvedSettingsRepository?.settings?.value?.flows?.defaultConnectionStyle
-                    ?: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline
-                val defaultRoundness = resolvedSettingsRepository?.settings?.value?.flows?.defaultConnectionRoundness
-                    ?: 0.5f
-                val defaultStepMode = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalStepMode
-                    ?: org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode.Auto
-                val defaultPortLead = resolvedSettingsRepository?.settings?.value?.flows?.defaultOrthogonalPortLead
-                    ?: false
-                val defaultHidePorts = resolvedSettingsRepository?.settings?.value?.flows?.hideConnectionPointsUnlessHovered
-                    ?: false
-                val effectiveStyle = activeFlowWithSyncedSubflows.connectionCurveStyle ?: defaultStyle
-                val effectiveRoundness = activeFlowWithSyncedSubflows.connectionRoundness ?: defaultRoundness
-                val effectiveStepMode = activeFlowWithSyncedSubflows.orthogonalStepMode ?: defaultStepMode
-                val effectivePortLead = activeFlowWithSyncedSubflows.orthogonalPortLead ?: defaultPortLead
-
-                _state.update { currentState ->
-                    currentState.copy(
-                        flow = activeFlowWithSyncedSubflows,
-                        connectionCurveStyle = effectiveStyle,
-                        connectionRoundness = effectiveRoundness,
-                        orthogonalStepMode = effectiveStepMode,
-                        orthogonalPortLead = effectivePortLead,
-                        hideConnectionPointsUnlessHovered = defaultHidePorts,
-                        nextId = maxId + 1,
-                        flows = allFlows,
-                        hasUnsavedChanges = false
-                    )
-                }
-                historyManager.clear()
-                updateReadOnlyState()
-                runTypeInference()
             }
         }
     }
@@ -580,7 +610,14 @@ class FlowEditorViewModel(
                 if (deletedNode != null) {
                     val removedConns = beforeFlow.connections.filter { it !in updatedFlow.connections.toSet() }
                     val removedJuncs = beforeFlow.junctions.filter { it.id !in updatedFlow.junctions.map { j -> j.id }.toSet() }
-                    pendingCommand = DeleteNodesCommand(listOf(deletedNode), removedConns, removedJuncs)
+                    val nodeIdx = beforeFlow.nodes.indexOfFirst { it.id == event.id }
+                    pendingCommand = DeleteNodesCommand(
+                        deletedNodes = listOf(deletedNode),
+                        cascadeConnections = removedConns,
+                        cascadeJunctions = removedJuncs,
+                        originalNodeIndices = if (nodeIdx >= 0) mapOf(event.id to nodeIdx) else emptyMap(),
+                        originalSelectedNodeIds = if (currentState.selectedNodeIds.contains(event.id)) setOf(event.id) else emptySet()
+                    )
                 }
             }
 
@@ -789,7 +826,7 @@ class FlowEditorViewModel(
                     val addedConn = newState.flow.connections.firstOrNull { it !in currentState.flow.connections }
                     val removedConns = currentState.flow.connections.filter { it !in newState.flow.connections }
                     if (addedConn != null) {
-                        pendingCommand = ConnectPortsCommand(addedConn, removedConns)
+                        pendingCommand = ConnectPortsCommand(addedConn, removedConns, currentState.flow.connections)
                     }
                 }
             }
@@ -814,11 +851,11 @@ class FlowEditorViewModel(
                         val commands = mutableListOf<FlowCommand>()
                         commands.add(AddNodeCommand(addedNode))
                         addedConns.forEach { conn ->
-                            commands.add(ConnectPortsCommand(conn, if (conn == addedConns.last()) removedConns else emptyList()))
+                            commands.add(ConnectPortsCommand(conn, if (conn == addedConns.last()) removedConns else emptyList(), stateBefore.flow.connections))
                         }
                         pendingCommand = CompositeCommand("Auto convert and connect", commands)
                     } else if (addedConns.isNotEmpty()) {
-                        pendingCommand = ConnectPortsCommand(addedConns.first(), removedConns)
+                        pendingCommand = ConnectPortsCommand(addedConns.first(), removedConns, stateBefore.flow.connections)
                     }
                 }
             }
@@ -845,7 +882,7 @@ class FlowEditorViewModel(
                         commands.add(AddNodeCommand(addedNode))
                     }
                     addedConns.forEach { conn ->
-                        commands.add(ConnectPortsCommand(conn, if (conn == addedConns.last()) removedConns else emptyList()))
+                        commands.add(ConnectPortsCommand(conn, if (conn == addedConns.last()) removedConns else emptyList(), currentState.flow.connections))
                     }
                     pendingCommand = CompositeCommand("Auto convert and connect", commands)
                 }
@@ -1019,9 +1056,20 @@ class FlowEditorViewModel(
                 val removedJuncs = (currentState.flow.junctions.filter { it.id !in updatedFlow.junctions.map { j -> j.id }.toSet() } + deletedPoints).distinctBy { it.id }
                 val addedConns = updatedFlow.connections.filter { it !in currentState.flow.connections.toSet() }
 
+                val nodeIndices = currentState.flow.nodes.mapIndexed { idx, n -> n.id to idx }.toMap()
                 val commands = mutableListOf<FlowCommand>()
                 if (deletedNodes.isNotEmpty() || removedConns.isNotEmpty() || removedJuncs.isNotEmpty() || addedConns.isNotEmpty()) {
-                    commands.add(DeleteNodesCommand(deletedNodes, removedConns, removedJuncs, addedConns))
+                    commands.add(
+                        DeleteNodesCommand(
+                            deletedNodes = deletedNodes,
+                            cascadeConnections = removedConns,
+                            cascadeJunctions = removedJuncs,
+                            addedConnections = addedConns,
+                            originalNodeIndices = nodeIndices,
+                            originalSelectedNodeIds = currentState.selectedNodeIds,
+                            originalSelectedPointIds = currentState.selectedPointIds
+                        )
+                    )
                 }
                 for (lbl in deletedLabels) {
                     commands.add(DeleteLabelCommand(lbl))
@@ -2368,7 +2416,7 @@ class FlowEditorViewModel(
                     shouldRunTypeInference = true
                     val addedConn = newState.flow.connections.lastOrNull()
                     if (addedConn != null) {
-                        pendingCommand = ConnectPortsCommand(addedConn, removedConns)
+                        pendingCommand = ConnectPortsCommand(addedConn, removedConns, stateBefore.flow.connections)
                     }
                 }
             }
@@ -2434,7 +2482,7 @@ class FlowEditorViewModel(
 
         if (_state.value.hasUnsavedChanges && (!_state.value.isReadOnly || bypassReadOnlyForTesting) && event !is FlowEvent.Save && event !is FlowEvent.SaveAs) {
             if (isAutoSaveEnabled) {
-                handleSave()
+                triggerAutoSave()
             }
         }
     }
@@ -2573,6 +2621,7 @@ class FlowEditorViewModel(
     }
 
     private fun handleSave() {
+        autosaveJob?.cancel()
         if (_state.value.isReadOnly && !bypassReadOnlyForTesting) return
         val flowToSave = _state.value.flow
         if (flowToSave.name.isBlank()) return
@@ -2643,6 +2692,7 @@ class FlowEditorViewModel(
     }
 
     fun discardUnsavedChanges() {
+        autosaveJob?.cancel()
         val allFlows = flowRepository.flows.value
         val activeFlowName = initialFlowName
         val originalFlow = if (activeFlowName.isBlank()) {
@@ -2712,6 +2762,7 @@ class FlowEditorViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        autosaveJob?.cancel()
         resolvedActiveFlowEditorTracker.registerDiscardHandler(null)
     }
 }
