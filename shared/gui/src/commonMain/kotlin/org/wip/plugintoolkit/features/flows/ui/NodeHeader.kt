@@ -39,11 +39,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.input.pointer.isBackPressed
 import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isForwardPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
+import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import org.wip.plugintoolkit.features.controls.model.PointerButton
+import org.wip.plugintoolkit.features.controls.ui.LocalCanvasControlScheme
 import androidx.compose.ui.platform.testTag
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import androidx.compose.ui.text.font.FontWeight
@@ -92,6 +99,7 @@ fun NodeHeader(
     var showTooltip by remember { mutableStateOf(false) }
     var tooltipJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
+    val controlScheme = LocalCanvasControlScheme.current
     var isCtrlPressedOnHeader by remember { mutableStateOf(false) }
 
     val currentOnPress by rememberUpdatedState(onPress)
@@ -104,12 +112,26 @@ fun NodeHeader(
             .height(ToolkitTheme.dimensions.nodeHeaderHeight)
             .background(headerColor)
             .testTag("node_header_${node.id}")
-            .pointerInput(node.id) {
+            .pointerInput(node.id, controlScheme) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
                         if (event.type == PointerEventType.Press) {
-                            isCtrlPressedOnHeader = event.keyboardModifiers.isCtrlPressed
+                            val button = PointerButton.fromButtons(
+                                isPrimary = event.buttons.isPrimaryPressed,
+                                isSecondary = event.buttons.isSecondaryPressed,
+                                isTertiary = event.buttons.isTertiaryPressed,
+                                isBack = event.buttons.isBackPressed,
+                                isForward = event.buttons.isForwardPressed
+                            ) ?: PointerButton.Primary
+                            val km = event.keyboardModifiers
+                            isCtrlPressedOnHeader = controlScheme.isToggleSelectTriggered(
+                                button = button,
+                                ctrl = km.isCtrlPressed,
+                                shift = km.isShiftPressed,
+                                alt = km.isAltPressed,
+                                meta = km.isMetaPressed
+                            ) || km.isCtrlPressed
                         }
                     }
                 }

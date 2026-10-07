@@ -839,6 +839,12 @@
     <string name="shortcut_action_flow_undo_desc">Annulla l\'ultima azione della lavagna</string>
     <string name="shortcut_action_flow_redo">Ripeti</string>
     <string name="shortcut_action_flow_redo_desc">Ripeti l\'azione precedentemente annullata sulla lavagna</string>
+    <string name="shortcut_action_flow_copy">Copia</string>
+    <string name="shortcut_action_flow_copy_desc">Copia gli elementi e i nodi selezionati negli appunti</string>
+    <string name="shortcut_action_flow_paste">Incolla</string>
+    <string name="shortcut_action_flow_paste_desc">Incolla gli elementi copiati sulla lavagna</string>
+    <string name="shortcut_action_flow_escape">Annulla / Esc</string>
+    <string name="shortcut_action_flow_escape_desc">Annulla il tracciamento del cavo attivo o deseleziona</string>
     <string name="shortcut_action_job_force_cancel">Annullamento Forzato Job</string>
     <string name="shortcut_action_job_force_cancel_desc">Termina immediatamente un job in esecuzione senza attendere l\'arresto normale</string>
     <string name="shortcut_action_scale_step">Passo di Scala Doppio (10%)</string>

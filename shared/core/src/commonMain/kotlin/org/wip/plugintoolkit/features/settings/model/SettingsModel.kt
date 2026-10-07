@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.features.settings.model
 
 import kotlinx.serialization.Serializable
+import org.wip.plugintoolkit.features.controls.model.CanvasControlScheme
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutSettings
 
@@ -19,6 +20,7 @@ data class AppSettings(
     val autoUpdate: AutoUpdateSettings = AutoUpdateSettings(),
     val flows: FlowSettings = FlowSettings(),
     val shortcuts: ShortcutSettings = ShortcutSettings(),
+    val controls: CanvasControlScheme = CanvasControlScheme(),
     val debug: DebugSettings = DebugSettings()
 )
 

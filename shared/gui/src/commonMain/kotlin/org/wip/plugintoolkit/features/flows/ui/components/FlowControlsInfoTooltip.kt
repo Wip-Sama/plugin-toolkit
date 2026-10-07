@@ -26,8 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.model.resolve
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.FileUtils
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
 import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
+import org.wip.plugintoolkit.features.controls.ui.LocalCanvasControlScheme
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_info_cat_connections
 import plugintoolkit.composeapp.generated.resources.flow_info_cat_navigation
@@ -187,6 +189,7 @@ private fun InfoCategorySection(
     modifier: Modifier = Modifier
 ) {
     val shortcutManager = LocalShortcutManager.current
+    val controlScheme = LocalCanvasControlScheme.current
     val settings by (shortcutManager?.settings ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
 
     Column(
@@ -205,8 +208,26 @@ private fun InfoCategorySection(
         ) {
             actionIds.forEach { actionId ->
                 val action = remember(actionId, settings) { shortcutManager?.getAction(actionId) }
-                val triggerFormatted = remember(actionId, settings) {
-                    shortcutManager?.formatEffectiveTriggers(actionId) ?: "[ None ]"
+                val triggerFormatted = remember(actionId, settings, controlScheme) {
+                    when (actionId) {
+                        ShortcutActionId.FLOW_PAN_CANVAS -> {
+                            controlScheme.panBindings.joinToString(" / ") { it.format().replace("]", "Drag ]") }
+                        }
+                        ShortcutActionId.FLOW_ZOOM_CANVAS -> {
+                            if (controlScheme.zoomRequiresCtrl) {
+                                if (FileUtils.isMac) "[ Cmd + Wheel ]" else "[ Ctrl + Wheel ]"
+                            } else {
+                                "[ Scroll Wheel ]"
+                            }
+                        }
+                        ShortcutActionId.FLOW_BOX_SELECT -> {
+                            controlScheme.boxSelectBinding.format().replace("]", "Drag ]")
+                        }
+                        ShortcutActionId.FLOW_TOGGLE_SELECTION -> {
+                            controlScheme.toggleSelectBinding.format()
+                        }
+                        else -> shortcutManager?.formatEffectiveTriggers(actionId) ?: "[ None ]"
+                    }
                 }
                 val situationLabel = remember(action) {
                     action?.situation?.displayLabel?.let { "($it)" } ?: ""

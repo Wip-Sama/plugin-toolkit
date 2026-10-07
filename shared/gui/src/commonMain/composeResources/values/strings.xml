@@ -843,6 +843,12 @@
     <string name="shortcut_action_flow_undo_desc">Undo the last canvas action</string>
     <string name="shortcut_action_flow_redo">Redo</string>
     <string name="shortcut_action_flow_redo_desc">Redo the previously undone canvas action</string>
+    <string name="shortcut_action_flow_copy">Copy</string>
+    <string name="shortcut_action_flow_copy_desc">Copy selected nodes and elements to clipboard</string>
+    <string name="shortcut_action_flow_paste">Paste</string>
+    <string name="shortcut_action_flow_paste_desc">Paste copied elements onto the canvas</string>
+    <string name="shortcut_action_flow_escape">Cancel / Escape</string>
+    <string name="shortcut_action_flow_escape_desc">Cancel active wire routing or clear selection</string>
     <string name="shortcut_action_job_force_cancel">Force Cancel Job</string>
     <string name="shortcut_action_job_force_cancel_desc">Immediately terminate a running job without waiting for graceful shutdown</string>
     <string name="shortcut_action_scale_step">Double Scale Step (10%)</string>

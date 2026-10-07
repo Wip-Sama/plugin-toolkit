@@ -36,6 +36,7 @@ import org.wip.plugintoolkit.features.shortcuts.logic.ShortcutManager
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutSituation
 import org.wip.plugintoolkit.features.shortcuts.ui.LiveShortcutZoningOverlay
 import org.wip.plugintoolkit.features.shortcuts.ui.ShortcutProvider
+import org.wip.plugintoolkit.features.controls.ui.CanvasControlSchemeProvider
 import org.wip.plugintoolkit.shared.components.TooltipProvider
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.ui.AppNavigation
@@ -107,8 +108,9 @@ private fun AppContentImpl(
 
     CompositionLocalProvider(LocalDensity provides customDensity) {
         AppTheme(appearance = settings.appearance) {
-            ShortcutProvider(shortcutManager) {
-                TooltipProvider {
+            CanvasControlSchemeProvider(settings.controls) {
+                ShortcutProvider(shortcutManager) {
+                    TooltipProvider {
                 val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
                 val currentScreen: Screen = (backStack.lastOrNull() ?: Screen.Main) as Screen
 
@@ -237,5 +239,6 @@ private fun AppContentImpl(
             }
         }
     }
+}
 }
 }

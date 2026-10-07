@@ -31,6 +31,8 @@ import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutGesture
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutPointerButton
 import org.wip.plugintoolkit.features.shortcuts.ui.shortcutDrag
+import org.wip.plugintoolkit.features.controls.model.CanvasControlScheme
+import org.wip.plugintoolkit.features.controls.model.PointerButton
 import org.wip.plugintoolkit.features.flows.model.Connection
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
 import org.wip.plugintoolkit.features.flows.model.FlowJunction
@@ -215,14 +217,71 @@ fun Modifier.boardConnectionTapGesture(
 
 fun Modifier.boardPanGesture(
     focusRequester: FocusRequester,
+    controlScheme: CanvasControlScheme? = null,
     shortcutManager: ShortcutManager? = null,
     onPan: (Offset) -> Unit
-): Modifier = this.shortcutDrag(
-    shortcutManager = shortcutManager,
-    actionId = ShortcutActionId.FLOW_PAN_CANVAS,
-    onDragStart = { focusRequester.requestFocus() },
-    onDrag = onPan
-)
+): Modifier {
+    if (controlScheme == null) {
+        return this.shortcutDrag(
+            shortcutManager = shortcutManager,
+            actionId = ShortcutActionId.FLOW_PAN_CANVAS,
+            onDragStart = { focusRequester.requestFocus() },
+            onDrag = onPan
+        )
+    }
+
+    return this.pointerInput(controlScheme) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if (event.type == PointerEventType.Press) {
+                    val button = PointerButton.fromButtons(
+                        isPrimary = event.buttons.isPrimaryPressed,
+                        isSecondary = event.buttons.isSecondaryPressed,
+                        isTertiary = event.buttons.isTertiaryPressed,
+                        isBack = event.buttons.isBackPressed,
+                        isForward = event.buttons.isForwardPressed
+                    )
+                    val km = event.keyboardModifiers
+                    if (button != null && controlScheme.isPanTriggered(
+                            button = button,
+                            ctrl = km.isCtrlPressed,
+                            shift = km.isShiftPressed,
+                            alt = km.isAltPressed,
+                            meta = km.isMetaPressed
+                        )
+                    ) {
+                        val change = event.changes.firstOrNull() ?: continue
+                        event.changes.forEach { it.consume() }
+                        focusRequester.requestFocus()
+                        var lastPos = change.position
+
+                        while (true) {
+                            val dragEvent = awaitPointerEvent()
+                            val isButtonDown = when (button) {
+                                PointerButton.Primary -> dragEvent.buttons.isPrimaryPressed
+                                PointerButton.Secondary -> dragEvent.buttons.isSecondaryPressed
+                                PointerButton.Tertiary -> dragEvent.buttons.isTertiaryPressed
+                                PointerButton.Back -> dragEvent.buttons.isBackPressed
+                                PointerButton.Forward -> dragEvent.buttons.isForwardPressed
+                            }
+                            if (!isButtonDown || dragEvent.type == PointerEventType.Release) {
+                                break
+                            }
+                            if (dragEvent.type == PointerEventType.Move) {
+                                val currentPos = dragEvent.changes.firstOrNull()?.position ?: lastPos
+                                val delta = currentPos - lastPos
+                                dragEvent.changes.forEach { it.consume() }
+                                onPan(delta)
+                                lastPos = currentPos
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun Modifier.boardSelectionBoxGesture(
@@ -246,6 +305,7 @@ fun Modifier.boardSelectionBoxGesture(
     isWashToolActive: Boolean = false,
     onPaintSelection: (() -> Unit)? = null,
     onWashSelection: (() -> Unit)? = null,
+    controlScheme: CanvasControlScheme? = null,
     shortcutManager: ShortcutManager? = null
 ): Modifier {
     val currentScale by rememberUpdatedState(scale)
@@ -266,6 +326,7 @@ fun Modifier.boardSelectionBoxGesture(
     val currentIsWashToolActive by rememberUpdatedState(isWashToolActive)
     val currentOnPaintSelection by rememberUpdatedState(onPaintSelection)
     val currentOnWashSelection by rememberUpdatedState(onWashSelection)
+    val currentControlScheme by rememberUpdatedState(controlScheme)
     val currentShortcutManager by rememberUpdatedState(shortcutManager)
     val currentIsDrawingConnection by rememberUpdatedState(isDrawingConnection)
 
@@ -273,7 +334,22 @@ fun Modifier.boardSelectionBoxGesture(
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent()
-                val isBoxSelectTriggered = if (currentShortcutManager != null) {
+                val isBoxSelectTriggered = if (currentControlScheme != null) {
+                    val button = PointerButton.fromButtons(
+                        isPrimary = event.buttons.isPrimaryPressed,
+                        isSecondary = event.buttons.isSecondaryPressed,
+                        isTertiary = event.buttons.isTertiaryPressed,
+                        isBack = event.buttons.isBackPressed,
+                        isForward = event.buttons.isForwardPressed
+                    )
+                    button != null && currentControlScheme!!.isBoxSelectTriggered(
+                        button = button,
+                        ctrl = event.keyboardModifiers.isCtrlPressed,
+                        shift = event.keyboardModifiers.isShiftPressed,
+                        alt = event.keyboardModifiers.isAltPressed,
+                        meta = event.keyboardModifiers.isMetaPressed
+                    )
+                } else if (currentShortcutManager != null) {
                     currentShortcutManager!!.matchesPointer(ShortcutActionId.FLOW_BOX_SELECT, event, ShortcutGesture.Drag)
                 } else {
                     !event.keyboardModifiers.isCtrlPressed &&
@@ -321,30 +397,40 @@ fun Modifier.boardSelectionBoxGesture(
                     val modelStart = (startScreenPos - currentOffset) / currentScale
                     var dragStarted = false
 
-                    // Determine active pointer button from effective triggers
-                    val effectiveTriggers = currentShortcutManager?.getEffectiveTriggers(ShortcutActionId.FLOW_BOX_SELECT)
-                    val matchedTrigger = effectiveTriggers?.firstOrNull { trigger ->
-                        val modMatch = trigger.matchesModifiers(
-                            ctrl = event.keyboardModifiers.isCtrlPressed,
-                            shift = event.keyboardModifiers.isShiftPressed,
-                            alt = event.keyboardModifiers.isAltPressed,
-                            meta = event.keyboardModifiers.isMetaPressed
-                        )
-                        if (!modMatch) return@firstOrNull false
-                        when (trigger.pointerButton) {
-                            ShortcutPointerButton.Left -> event.buttons.isPrimaryPressed && !event.buttons.isSecondaryPressed && !event.buttons.isTertiaryPressed
-                            ShortcutPointerButton.Right -> event.buttons.isSecondaryPressed
-                            ShortcutPointerButton.Middle -> event.buttons.isTertiaryPressed
-                            ShortcutPointerButton.Back -> event.buttons.isBackPressed
-                            ShortcutPointerButton.Forward -> event.buttons.isForwardPressed
-                            ShortcutPointerButton.None -> event.buttons.isPrimaryPressed
+                    // Determine active pointer button from effective triggers or CanvasControlScheme
+                    val activePointerButton = if (currentControlScheme != null) {
+                        when (currentControlScheme!!.boxSelectBinding.button) {
+                            PointerButton.Primary -> ShortcutPointerButton.Left
+                            PointerButton.Secondary -> ShortcutPointerButton.Right
+                            PointerButton.Tertiary -> ShortcutPointerButton.Middle
+                            PointerButton.Back -> ShortcutPointerButton.Back
+                            PointerButton.Forward -> ShortcutPointerButton.Forward
                         }
-                    }
-                    val activePointerButton = matchedTrigger?.pointerButton ?: when {
-                        event.buttons.isPrimaryPressed -> ShortcutPointerButton.Left
-                        event.buttons.isSecondaryPressed -> ShortcutPointerButton.Right
-                        event.buttons.isTertiaryPressed -> ShortcutPointerButton.Middle
-                        else -> ShortcutPointerButton.Left
+                    } else {
+                        val effectiveTriggers = currentShortcutManager?.getEffectiveTriggers(ShortcutActionId.FLOW_BOX_SELECT)
+                        val matchedTrigger = effectiveTriggers?.firstOrNull { trigger ->
+                            val modMatch = trigger.matchesModifiers(
+                                ctrl = event.keyboardModifiers.isCtrlPressed,
+                                shift = event.keyboardModifiers.isShiftPressed,
+                                alt = event.keyboardModifiers.isAltPressed,
+                                meta = event.keyboardModifiers.isMetaPressed
+                            )
+                            if (!modMatch) return@firstOrNull false
+                            when (trigger.pointerButton) {
+                                ShortcutPointerButton.Left -> event.buttons.isPrimaryPressed && !event.buttons.isSecondaryPressed && !event.buttons.isTertiaryPressed
+                                ShortcutPointerButton.Right -> event.buttons.isSecondaryPressed
+                                ShortcutPointerButton.Middle -> event.buttons.isTertiaryPressed
+                                ShortcutPointerButton.Back -> event.buttons.isBackPressed
+                                ShortcutPointerButton.Forward -> event.buttons.isForwardPressed
+                                ShortcutPointerButton.None -> event.buttons.isPrimaryPressed
+                            }
+                        }
+                        matchedTrigger?.pointerButton ?: when {
+                            event.buttons.isPrimaryPressed -> ShortcutPointerButton.Left
+                            event.buttons.isSecondaryPressed -> ShortcutPointerButton.Right
+                            event.buttons.isTertiaryPressed -> ShortcutPointerButton.Middle
+                            else -> ShortcutPointerButton.Left
+                        }
                     }
 
                     try {
@@ -392,11 +478,19 @@ fun Modifier.boardSelectionBoxGesture(
                                         currentFocusRequester.requestFocus()
                                         interactionState.selectionStart = modelStart
                                         interactionState.selectionEnd = currentModelPos
-                                        currentShortcutManager?.eat(dragEvent, ShortcutActionId.FLOW_BOX_SELECT) ?: currentChange.consume()
+                                        if (currentControlScheme != null) {
+                                            currentChange.consume()
+                                        } else {
+                                            currentShortcutManager?.eat(dragEvent, ShortcutActionId.FLOW_BOX_SELECT) ?: currentChange.consume()
+                                        }
                                     }
                                 } else {
                                     interactionState.selectionEnd = currentModelPos
-                                    currentShortcutManager?.eat(dragEvent, ShortcutActionId.FLOW_BOX_SELECT) ?: currentChange.consume()
+                                    if (currentControlScheme != null) {
+                                        currentChange.consume()
+                                    } else {
+                                        currentShortcutManager?.eat(dragEvent, ShortcutActionId.FLOW_BOX_SELECT) ?: currentChange.consume()
+                                    }
 
                                     val selectLeft = minOf(modelStart.x, currentModelPos.x)
                                     val selectRight = maxOf(modelStart.x, currentModelPos.x)
@@ -561,6 +655,7 @@ internal class BoardPointerGestureContext(
     val onSplitConnectionAndConnect: ((Connection, org.wip.plugintoolkit.features.flows.model.Offset, Long?, String?, Long?, Long?, String?, Long?, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit)?,
     val onResetDrawingConnection: (() -> Unit)?,
     val shortcutManager: () -> ShortcutManager?,
+    val controlScheme: (() -> CanvasControlScheme?)? = null,
     val highlightedNodeId: () -> Long?,
     val highlightedPortId: () -> String?,
     val onSelectNodes: ((Set<Long>) -> Unit)?,
@@ -587,8 +682,22 @@ private fun handlePointerScroll(
     val scrollDelta = change.scrollDelta
     val delta = if (scrollDelta.y != 0f) scrollDelta.y else scrollDelta.x
     if (delta != 0f) {
-        val isShiftPressed = event.keyboardModifiers.isShiftPressed
-        ctx.onZoom(-delta, position, isShiftPressed)
+        val km = event.keyboardModifiers
+        val scheme = ctx.controlScheme?.invoke()
+        if (scheme != null && !scheme.shouldZoom(
+                ctrl = km.isCtrlPressed,
+                shift = km.isShiftPressed,
+                alt = km.isAltPressed,
+                meta = km.isMetaPressed
+            )
+        ) {
+            return
+        }
+
+        val direction = if (scheme?.invertZoomDirection == true) 1f else -1f
+        val sensitivity = scheme?.zoomSensitivity ?: 1.0f
+        val isShiftPressed = km.isShiftPressed
+        ctx.onZoom(direction * delta * sensitivity, position, isShiftPressed)
     }
 }
 
@@ -1414,6 +1523,7 @@ fun Modifier.boardPointerEventGesture(
     onSelectPoints: ((Set<Long>) -> Unit)? = null,
     onSplitConnectionAndConnect: ((Connection, org.wip.plugintoolkit.features.flows.model.Offset, Long?, String?, Long?, Long?, String?, Long?, List<org.wip.plugintoolkit.features.flows.model.Offset>) -> Unit)? = null,
     onResetDrawingConnection: (() -> Unit)? = null,
+    controlScheme: CanvasControlScheme? = null,
     shortcutManager: ShortcutManager? = null,
     highlightedNodeId: Long? = null,
     highlightedPortId: String? = null,
@@ -1491,6 +1601,7 @@ fun Modifier.boardPointerEventGesture(
     val currentOnSelectPoints by rememberUpdatedState(onSelectPoints)
     val currentOnSplitConnectionAndConnect by rememberUpdatedState(onSplitConnectionAndConnect)
     val currentOnResetDrawingConnection by rememberUpdatedState(onResetDrawingConnection)
+    val currentControlScheme by rememberUpdatedState(controlScheme)
     val currentShortcutManager by rememberUpdatedState(shortcutManager)
 
     val session = remember { BoardGestureSessionState() }
@@ -1542,6 +1653,7 @@ fun Modifier.boardPointerEventGesture(
             onSplitConnectionAndConnect = currentOnSplitConnectionAndConnect,
             onResetDrawingConnection = currentOnResetDrawingConnection,
             shortcutManager = { currentShortcutManager },
+            controlScheme = { currentControlScheme },
             highlightedNodeId = { currentHighlightedNodeId },
             highlightedPortId = { currentHighlightedPortId },
             onSelectNodes = currentOnSelectNodes,

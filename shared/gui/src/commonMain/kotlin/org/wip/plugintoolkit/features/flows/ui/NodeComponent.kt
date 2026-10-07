@@ -37,9 +37,19 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.input.pointer.isBackPressed
 import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isForwardPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
+import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import org.wip.plugintoolkit.features.controls.model.PointerButton
+import org.wip.plugintoolkit.features.controls.ui.LocalCanvasControlScheme
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -116,6 +126,7 @@ fun NodeComponent(
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
+    val controlScheme = LocalCanvasControlScheme.current
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditBoundaryDialog by remember { mutableStateOf(false) }
     var showLoadSettingsDialog by remember { mutableStateOf(false) }
@@ -249,12 +260,26 @@ fun NodeComponent(
         modifier = modifier
             .width(ToolkitTheme.dimensions.nodeWidth)
             .testTag("node_card_${node.id}")
-            .pointerInput(node.id) {
+            .pointerInput(node.id, controlScheme) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         if (event.type == PointerEventType.Press) {
-                            isCtrlPressedOnPress = event.keyboardModifiers.isCtrlPressed
+                            val button = PointerButton.fromButtons(
+                                isPrimary = event.buttons.isPrimaryPressed,
+                                isSecondary = event.buttons.isSecondaryPressed,
+                                isTertiary = event.buttons.isTertiaryPressed,
+                                isBack = event.buttons.isBackPressed,
+                                isForward = event.buttons.isForwardPressed
+                            ) ?: PointerButton.Primary
+                            val km = event.keyboardModifiers
+                            isCtrlPressedOnPress = controlScheme.isToggleSelectTriggered(
+                                button = button,
+                                ctrl = km.isCtrlPressed,
+                                shift = km.isShiftPressed,
+                                alt = km.isAltPressed,
+                                meta = km.isMetaPressed
+                            ) || km.isCtrlPressed
                         }
                     }
                 }

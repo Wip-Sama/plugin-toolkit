@@ -82,6 +82,7 @@ import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutSituation
 import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
+import org.wip.plugintoolkit.features.controls.ui.LocalCanvasControlScheme
 import org.wip.plugintoolkit.shared.components.LocalOverlayHost
 import org.wip.plugintoolkit.shared.components.LocalTooltipState
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
@@ -191,6 +192,7 @@ fun BoardCanvas(
     val density = boardDensity
     val focusRequester = remember { FocusRequester() }
     val shortcutManager = LocalShortcutManager.current
+    val controlScheme = LocalCanvasControlScheme.current
 
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
 
@@ -358,6 +360,7 @@ fun BoardCanvas(
             )
             .boardPanGesture(
                 focusRequester = focusRequester,
+                controlScheme = controlScheme,
                 shortcutManager = shortcutManager,
                 onPan = onPan
             )
@@ -402,6 +405,7 @@ fun BoardCanvas(
                 onSelectPoints = onSelectPoints,
                 onSplitConnectionAndConnect = onSplitConnectionAndConnect,
                 onResetDrawingConnection = onResetDrawingConnection,
+                controlScheme = controlScheme,
                 shortcutManager = shortcutManager,
                 highlightedNodeId = highlightedNodeId,
                 highlightedPortId = highlightedPortId,
@@ -443,6 +447,7 @@ fun BoardCanvas(
                 isWashToolActive = state.isWashToolActive,
                 onPaintSelection = onPaintSelection,
                 onWashSelection = onWashSelection,
+                controlScheme = controlScheme,
                 shortcutManager = shortcutManager
             )
     ) {
