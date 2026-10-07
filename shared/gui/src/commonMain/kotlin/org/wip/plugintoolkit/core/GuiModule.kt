@@ -28,10 +28,16 @@ import org.wip.plugintoolkit.features.settings.viewmodel.NotificationViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsSearchViewModel
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
 import org.wip.plugintoolkit.features.shortcuts.logic.ShortcutManager
+import org.wip.plugintoolkit.features.shortcuts.engine.ShortcutRegistry
+import org.wip.plugintoolkit.features.shortcuts.engine.ShortcutDispatcher
+import org.wip.plugintoolkit.features.shortcuts.engine.StandardShortcutRegistry
 
 val guiModule: Module = module {
     single { DialogService() }
     single { ShortcutManager(get()) }
+    single { StandardShortcutRegistry() }
+    single<ShortcutRegistry> { get<StandardShortcutRegistry>() }
+    single<ShortcutDispatcher> { get<StandardShortcutRegistry>() }
     single<SettingsRegistry> {
         val settingsViewModel: SettingsViewModel = get()
         val notificationViewModel: NotificationViewModel = get()

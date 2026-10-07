@@ -850,6 +850,27 @@
     <string name="shortcut_action_scale_step">Passo di Scala Doppio (10%)</string>
     <string name="shortcut_action_scale_step_desc">Aumenta o diminuisce la scala dell\'interfaccia con incrementi maggiori del 10%</string>
 
+    <!-- Controlli Tela e Mouse -->
+    <string name="canvas_controls_title">Controlli Tela e Mouse</string>
+    <string name="canvas_controls_subtitle">Configura spostamento tavola, sensibilità zoom, rotella del mouse e gesti di selezione</string>
+    <string name="canvas_controls_pan_binding">Spostamento Tela</string>
+    <string name="canvas_controls_pan_binding_desc">Pulsanti del mouse usati per spostare la tavola da disegno</string>
+    <string name="canvas_controls_zoom_wheel">Zoom con Rotella</string>
+    <string name="canvas_controls_zoom_wheel_desc">Abilita o disabilita l\'ingrandimento della tela tramite la rotella del mouse</string>
+    <string name="canvas_controls_zoom_require_ctrl">Richiedi Ctrl/Cmd per lo Zoom</string>
+    <string name="canvas_controls_zoom_require_ctrl_desc">Se attivo, lo zoom richiede di tenere premuto Ctrl (o Cmd su macOS) durante lo scorrimento</string>
+    <string name="canvas_controls_zoom_invert">Inverti Direzione Zoom</string>
+    <string name="canvas_controls_zoom_invert_desc">Inverti la direzione della rotella per ingrandire o rimpicciolire</string>
+    <string name="canvas_controls_zoom_sensitivity">Sensibilità Zoom (%1$.1fx)</string>
+    <string name="canvas_controls_zoom_sensitivity_desc">Regola il moltiplicatore di velocità per lo zoom della tela</string>
+    <string name="canvas_controls_box_select">Selezione ad Area</string>
+    <string name="canvas_controls_box_select_desc">Trascina sulla tela vuota per selezionare più nodi ed elementi</string>
+    <string name="canvas_controls_toggle_select">Attiva/Disattiva Selezione (Multipla)</string>
+    <string name="canvas_controls_toggle_select_desc">Clicca su un elemento tenendo premuto il modificatore per aggiungerlo o rimuoverlo</string>
+    <string name="canvas_controls_reset">Ripristina Controlli Tela</string>
+    <string name="canvas_controls_reset_desc">Ripristina lo spostamento, lo zoom e la selezione della tela alle impostazioni predefinite</string>
+    <string name="shortcuts_section_keyboard">Scorciatoie da Tastiera</string>
+
     <!-- Debug Settings & Live Shortcut Zoning -->
     <string name="section_debug">Debug</string>
     <string name="setting_live_shortcut_zoning">Zonizzazione Scorciatoie Live</string>

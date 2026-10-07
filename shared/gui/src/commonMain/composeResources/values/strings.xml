@@ -854,6 +854,27 @@
     <string name="shortcut_action_scale_step">Double Scale Step (10%)</string>
     <string name="shortcut_action_scale_step_desc">Increase or decrease interface scaling in larger 10% increments</string>
 
+    <!-- Canvas & Mouse Controls -->
+    <string name="canvas_controls_title">Canvas &amp; Mouse Controls</string>
+    <string name="canvas_controls_subtitle">Configure viewport panning, zoom sensitivity, wheel behavior, and selection gestures</string>
+    <string name="canvas_controls_pan_binding">Canvas Panning</string>
+    <string name="canvas_controls_pan_binding_desc">Mouse buttons used to pan the workspace board</string>
+    <string name="canvas_controls_zoom_wheel">Mouse Wheel Zoom</string>
+    <string name="canvas_controls_zoom_wheel_desc">Enable or disable zooming the canvas using the mouse scroll wheel</string>
+    <string name="canvas_controls_zoom_require_ctrl">Require Ctrl/Cmd for Wheel Zoom</string>
+    <string name="canvas_controls_zoom_require_ctrl_desc">When enabled, zooming requires holding Ctrl (or Cmd on macOS) while scrolling</string>
+    <string name="canvas_controls_zoom_invert">Invert Zoom Direction</string>
+    <string name="canvas_controls_zoom_invert_desc">Reverse the scroll direction for zooming in and out</string>
+    <string name="canvas_controls_zoom_sensitivity">Zoom Sensitivity (%1$.1fx)</string>
+    <string name="canvas_controls_zoom_sensitivity_desc">Adjust the speed multiplier for mouse wheel canvas zoom</string>
+    <string name="canvas_controls_box_select">Box Selection</string>
+    <string name="canvas_controls_box_select_desc">Drag on the empty canvas to multi-select nodes and elements</string>
+    <string name="canvas_controls_toggle_select">Toggle Selection (Multi-Select)</string>
+    <string name="canvas_controls_toggle_select_desc">Click an element while holding modifier to add or remove from selection</string>
+    <string name="canvas_controls_reset">Reset Canvas Controls</string>
+    <string name="canvas_controls_reset_desc">Restore canvas panning, zooming, and selection controls to default settings</string>
+    <string name="shortcuts_section_keyboard">Keyboard Shortcuts</string>
+
     <!-- Debug Settings & Live Shortcut Zoning -->
     <string name="section_debug">Debug</string>
     <string name="setting_live_shortcut_zoning">Live Shortcut Zoning</string>

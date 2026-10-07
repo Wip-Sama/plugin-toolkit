@@ -1,30 +1,43 @@
-# Central Shortcut Management System
+# Central Shortcut & Spatial Control Subsystem
 
-The **PluginToolkit** desktop application includes a centralized, context-aware Shortcut Management System designed to handle keyboard shortcuts, pointer gestures, and hybrid chords, detect binding conflicts, allow multi-trigger combinations, provide seamless user customization matching the application's standard settings design, and persist preferences within the application settings.
+The **PluginToolkit** desktop application implements a modern, bifurcated input architecture that cleanly separates **discrete keyboard accelerators** from **continuous spatial canvas interactions**. This architecture resolves category collisions between deterministic key-combinations (hotkeys, chords) and continuous multi-button pointer manipulations (viewport panning, marquee drag selection, mouse wheel zoom).
 
 ---
 
-## 1. Overview & Key Capabilities
+## 1. Bifurcated Architecture: Dual Pipeline
 
-As features expand (especially in complex visual environments like the Flow Editor), input interactions rapidly proliferate:
-- Board panning (e.g. `Right Drag` or `Middle Drag`) vs. box selection vs. connection point dragging vs. wire branching.
-- Keyboard toggles (e.g. `P` or `B` for brush tool, `W` for wash, `I` for eyedropper, `M` for structured wire mode).
-- Deletion shortcuts (e.g. `Del` or `Backspace` for deleting selected nodes).
-- Universal confirmation bypass (`Shift + Click` or user-defined shortcut across destructive dialogs and prompts).
-- Dynamic queriable menus: the Flow Editor's "Canvas Shortcuts & Controls" info card directly queries the system to display current user-configured shortcuts.
+The system is organized into two distinct, high-cohesion subsystems:
 
-### Core Architectural Features:
-1. **Multi-Trigger Support:** Actions can have multiple alternative triggers (e.g., Canvas Pan works with both `Right Drag` and `Middle Drag`; Paint tool works with both `P` and `B`).
-2. **Action-Enforced Input Modes (`ShortcutInputMode`):**
-   - The required input medium (`Keyboard`, `Pointer`, or `Hybrid`) is defined at the action declaration level, ensuring actions requiring pointer access cannot be inadvertently converted into keyboard-only triggers.
-   - **Keyboard Actions:** Pure keyboard keypresses (`ShortcutKey` + modifiers: `Ctrl`, `Shift`, `Alt`, `Meta`). Supports **ANY** key on the keyboard.
-   - **Pointer Actions:** Mouse buttons (`Left`, `Right`, `Middle`, etc.) + gestures (`Click`, `DoubleClick`, `Drag`, `Wheel`) + modifiers.
-   - **Hybrid Actions:** Key held down while executing a pointer gesture (e.g., `L + Left Click`).
-3. **Contextual Situations (`ShortcutSituation`):** Actions are scoped to specific operational contexts (e.g., `FlowBoard`, `FlowConnectionPoint`, `FlowSelection`, `Global`, `Settings`). Conflicts are strictly evaluated within the same situation, preventing false positive collisions across disjoint UI contexts.
-4. **Standard Settings UI & Global Search:** `ShortcutsSettingsView` strictly follows the design pattern of other settings views (`SettingsGroup`, `SettingsItem`), and all shortcuts and gestures are indexed by the global broad settings search.
-5. **Interactive Remapping & Segmented Controls:** `RemapShortcutDialog` enforces the declared input mode, provides `SingleChoiceSegmentedButtonRow` for mouse buttons, gesture types, and modifiers, and captures keyboard combinations by direct listening until key release.
-6. **Canvas Gesture Binding:** `boardPanGesture` and `boardSelectionBoxGesture` bind directly to active user shortcuts in `ShortcutManager`, allowing users to customize or swap pan and selection interactions.
-7. **Dynamic Queriable API:** UI surfaces (such as the canvas info card) query `ShortcutManager` to display real-time formatted triggers (`formatEffectiveTriggers`, `formatEffectiveTriggersCompact`).
+```
+                                  Desktop Input Event Pipeline
+                                                │
+                    ┌───────────────────────────┴───────────────────────────┐
+                    ▼                                                       ▼
+      [ Keyboard Accelerator Engine ]                         [ Spatial Canvas Control Scheme ]
+     • Discrete KeyChords (Ctrl+Z, P, Del)                   • Continuous Pointer Drags & Zooms
+     • Bitwise ModifierMask (Shift, Ctrl, Alt, Meta)         • CanvasControlScheme (Right/Middle Pan, Box Select)
+     • Hierarchical Scopes (Global, Window, Canvas)          • PointerGestureStateMachine (Idle, Panning, Selecting)
+     • ShortcutRegistry & ShortcutDispatcher contracts       • LocalCanvasControlScheme CompositionLocal
+     • StandardShortcutRegistry implementation               • Granular Wheel Sensitivity & Inversion Settings
+```
+
+### Core Subsystems:
+1. **Pure Keyboard Accelerator Engine (`ShortcutRegistry` / `ShortcutDispatcher`):**
+   - **`ModifierMask`:** Lightweight, bitwise integer-backed modifier representation (`SHIFT=1`, `CTRL=2`, `ALT=4`, `META=8`) with platform-aware primary modifier resolution (`ModifierMask.primary()`).
+   - **`KeyChord`:** Value type pairing a Compose `Key` with a `ModifierMask`. Formats cleanly across platforms (e.g., `Cmd+Z` on macOS, `Ctrl+Z` on Windows/Linux).
+   - **`ShortcutScope`:** Hierarchical precedence evaluation: `ModalDialog (1000)` > `FloatingPalette (500)` > `CanvasElement (300)` > `CanvasViewport (200)` > `Window (100)` > `Global (0)`.
+   - **`ShortcutCommand`:** Strongly typed discrete accelerator command with default chords, scopes, and conflict detection rules.
+   - **`StandardShortcutRegistry`:** Thread-safe, observable registry managing keybindings, detecting exact and shadow key collisions, and evaluating chord matches.
+2. **Spatial Canvas Control Scheme (`CanvasControlScheme`):**
+   - **`CanvasControlScheme`:** Dedicated data profile configuring viewport panning (default: `Right Drag` & `Middle Drag`), marquee selection box (default: `Left Drag`), multi-select toggling (`Ctrl+Click` / `Cmd+Click`), mouse wheel zoom, Ctrl/Cmd wheel zoom gating, zoom direction inversion, and sensitivity multiplier.
+   - **`PointerGestureStateMachine`:** Finite state machine managing spatial gesture lifecycles: `Idle` -> `Pending` -> `Panning` / `BoxSelecting` / `Wiring` -> `Cancelled`.
+   - **`LocalCanvasControlScheme`:** Reactively propagated via Compose `CompositionLocalProvider`, dynamically consumed by `boardPanGesture`, `boardSelectionBoxGesture`, `handlePointerScroll`, node click handlers, and tooltips.
+3. **Bifurcated Settings UI (`ShortcutsSettingsView`):**
+   - **Canvas & Mouse Controls:** Dedicated settings group with toggle switches, sensitivity sliders, and button badges for all continuous spatial parameters.
+   - **Priority & Elevation System:** Interactive selection of priority evaluation strategy (`ZIndexAndPriority` vs. `PriorityOnly`).
+   - **Keyboard Shortcuts:** Dedicated list of discrete accelerator commands with interactive conflict warnings, remapping dialogs, and individual binding reset actions.
+4. **Backward Compatibility & Legacy Migration:**
+   - Legacy pointer actions in `ShortcutActionId` (`FLOW_PAN_CANVAS`, `FLOW_ZOOM_CANVAS`, `FLOW_BOX_SELECT`, etc.) are formally deprecated in favor of `CanvasControlScheme`, yet remain indexed in search queries for backward compatibility.
 
 ---
 
