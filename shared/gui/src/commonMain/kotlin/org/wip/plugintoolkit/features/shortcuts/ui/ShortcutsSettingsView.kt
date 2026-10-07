@@ -315,8 +315,9 @@ fun ShortcutsSettingsView(
                 )
 
                 // Item 4: Zoom Sensitivity
+                val formattedZoom = "${(settings.controls.zoomSensitivity * 10f).roundToInt() / 10f}x"
                 SettingsItem(
-                    title = stringResource(Res.string.canvas_controls_zoom_sensitivity, settings.controls.zoomSensitivity),
+                    title = stringResource(Res.string.canvas_controls_zoom_sensitivity, formattedZoom),
                     subtitle = stringResource(Res.string.canvas_controls_zoom_sensitivity_desc),
                     icon = Icons.Default.Timeline,
                     shape = getGroupedShape(4, 8),
@@ -330,7 +331,7 @@ fun ShortcutsSettingsView(
                                 }
                             },
                             valueRange = 0.2f..3.0f,
-                            steps = 27,
+                            steps = 0,
                             enabled = settings.controls.zoomWithWheel
                         )
                     }

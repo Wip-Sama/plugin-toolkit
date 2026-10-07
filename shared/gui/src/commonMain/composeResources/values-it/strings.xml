@@ -767,8 +767,8 @@
     <string name="flow_group_nodes_count">%1$d nodi</string>
 
     <!-- Shortcut & Gesture Management -->
-    <string name="nav_shortcuts">Scorciatoie</string>
-    <string name="shortcuts_title">Scorciatoie e Gesti</string>
+    <string name="nav_shortcuts">Scorciatoie e Controlli</string>
+    <string name="shortcuts_title">Scorciatoie e Controlli</string>
     <string name="shortcuts_subtitle">Gestisci e personalizza le scorciatoie da tastiera e i gesti del mouse</string>
     <string name="shortcuts_search_placeholder">Cerca scorciatoie, azioni o situazioni...</string>
     <string name="shortcuts_reset_all">Ripristina Tutte ai Valori Predefiniti</string>
@@ -861,7 +861,7 @@
     <string name="canvas_controls_zoom_require_ctrl_desc">Se attivo, lo zoom richiede di tenere premuto Ctrl (o Cmd su macOS) durante lo scorrimento</string>
     <string name="canvas_controls_zoom_invert">Inverti Direzione Zoom</string>
     <string name="canvas_controls_zoom_invert_desc">Inverti la direzione della rotella per ingrandire o rimpicciolire</string>
-    <string name="canvas_controls_zoom_sensitivity">Sensibilità Zoom (%1$.1fx)</string>
+    <string name="canvas_controls_zoom_sensitivity">Sensibilità Zoom (%1$s)</string>
     <string name="canvas_controls_zoom_sensitivity_desc">Regola il moltiplicatore di velocità per lo zoom della tela</string>
     <string name="canvas_controls_box_select">Selezione ad Area</string>
     <string name="canvas_controls_box_select_desc">Trascina sulla tela vuota per selezionare più nodi ed elementi</string>

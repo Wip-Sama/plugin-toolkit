@@ -771,8 +771,8 @@
     <string name="flow_group_nodes_count">%1$d nodes</string>
 
     <!-- Shortcut & Gesture Management -->
-    <string name="nav_shortcuts">Shortcuts</string>
-    <string name="shortcuts_title">Shortcuts &amp; Gestures</string>
+    <string name="nav_shortcuts">Shortcuts and Controls</string>
+    <string name="shortcuts_title">Shortcuts and Controls</string>
     <string name="shortcuts_subtitle">Manage and customize keyboard shortcuts and mouse interactions</string>
     <string name="shortcuts_search_placeholder">Search shortcuts, actions or situations...</string>
     <string name="shortcuts_reset_all">Reset All to Defaults</string>
@@ -865,7 +865,7 @@
     <string name="canvas_controls_zoom_require_ctrl_desc">When enabled, zooming requires holding Ctrl (or Cmd on macOS) while scrolling</string>
     <string name="canvas_controls_zoom_invert">Invert Zoom Direction</string>
     <string name="canvas_controls_zoom_invert_desc">Reverse the scroll direction for zooming in and out</string>
-    <string name="canvas_controls_zoom_sensitivity">Zoom Sensitivity (%1$.1fx)</string>
+    <string name="canvas_controls_zoom_sensitivity">Zoom Sensitivity (%1$s)</string>
     <string name="canvas_controls_zoom_sensitivity_desc">Adjust the speed multiplier for mouse wheel canvas zoom</string>
     <string name="canvas_controls_box_select">Box Selection</string>
     <string name="canvas_controls_box_select_desc">Drag on the empty canvas to multi-select nodes and elements</string>
