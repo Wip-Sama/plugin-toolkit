@@ -5,8 +5,11 @@ import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.canConvert
 import org.wip.plugintoolkit.api.isCompatibleWith
+import org.wip.plugintoolkit.features.flows.model.BoardElement
 import org.wip.plugintoolkit.features.flows.model.Connection
+import org.wip.plugintoolkit.features.flows.model.ConnectionPoint
 import org.wip.plugintoolkit.features.flows.model.FlowGroup
+import org.wip.plugintoolkit.features.flows.model.FlowLabel
 import org.wip.plugintoolkit.features.flows.model.InputPort
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.model.Offset as ModelOffset
@@ -140,17 +143,49 @@ class FlowNodeManager {
 
         val reorderedNodes = updatedNodes.filter { !nodesToMove.contains(it.id) } + updatedNodes.filter { nodesToMove.contains(it.id) }
         val newFlow = currentState.flow.copy(nodes = reorderedNodes, groups = updatedGroups, labels = updatedLabels, junctions = updatedJunctions, connections = updatedConnections)
-        val newSelection = if (isSelectedMove) currentState.selectedNodeIds else (if (currentState.flow.nodes.any { it.id == id }) setOf(id) else currentState.selectedNodeIds)
+        val (newSelectedNodes, newSelectedGroups, newSelectedLabels, newSelectedPoints) = if (isSelectedMove) {
+            listOf(currentState.selectedNodeIds, currentState.selectedGroupIds, currentState.selectedLabelIds, currentState.selectedPointIds)
+        } else when {
+            isNode -> listOf(setOf(id), emptySet(), emptySet(), emptySet())
+            isGroup -> listOf(emptySet(), setOf(id), emptySet(), emptySet())
+            isLabel -> listOf(emptySet(), emptySet(), setOf(id), emptySet())
+            isPoint -> listOf(emptySet(), emptySet(), emptySet(), setOf(id))
+            else -> listOf(currentState.selectedNodeIds, currentState.selectedGroupIds, currentState.selectedLabelIds, currentState.selectedPointIds)
+        }
 
         return currentState.copy(
             flow = newFlow,
-            selectedNodeIds = newSelection,
+            selectedNodeIds = newSelectedNodes,
+            selectedGroupIds = newSelectedGroups,
+            selectedLabelIds = newSelectedLabels,
+            selectedPointIds = newSelectedPoints,
             hasUnsavedChanges = true,
             draggedNodeId = null,
             currentDragOffset = org.wip.plugintoolkit.features.flows.model.Offset.Zero,
             ghostPosition = null,
             capturedJunctionIds = emptySet(),
             capturedWaypoints = emptyMap()
+        )
+    }
+
+    fun handleDeleteBoardElement(currentState: FlowEditorState, id: Long): FlowEditorState {
+        val updatedFlow = currentState.flow.withoutBoardElement(id)
+        val newValidationErrors = currentState.validationErrors.filter {
+            it.sourceNodeId != id && it.targetNodeId != id
+        }
+        val newPendingConnection = currentState.pendingConnection?.let {
+            if (it.sourceNodeId == id || it.targetNodeId == id) null else it
+        }
+
+        return currentState.copy(
+            flow = updatedFlow,
+            validationErrors = newValidationErrors,
+            pendingConnection = newPendingConnection,
+            selectedNodeIds = currentState.selectedNodeIds - id,
+            selectedGroupIds = currentState.selectedGroupIds - id,
+            selectedLabelIds = currentState.selectedLabelIds - id,
+            selectedPointIds = currentState.selectedPointIds - id,
+            hasUnsavedChanges = true
         )
     }
 
@@ -357,26 +392,77 @@ class FlowNodeManager {
     }
 
     fun handleBringToFront(currentState: FlowEditorState, nodeId: Long, isCtrlPressed: Boolean = false): FlowEditorState {
-        val node = currentState.flow.nodes.find { it.id == nodeId } ?: return currentState
-        val isAlreadySelected = currentState.selectedNodeIds.contains(nodeId)
-        val newSelection = if (isCtrlPressed) {
-            if (isAlreadySelected) {
-                currentState.selectedNodeIds - nodeId
-            } else {
-                currentState.selectedNodeIds + nodeId
+        val element = currentState.flow.findBoardElement(nodeId) ?: return currentState
+        return when (element) {
+            is Node -> {
+                val isAlreadySelected = currentState.selectedNodeIds.contains(nodeId)
+                val newSelection = if (isCtrlPressed) {
+                    if (isAlreadySelected) currentState.selectedNodeIds - nodeId else currentState.selectedNodeIds + nodeId
+                } else if (isAlreadySelected) {
+                    currentState.selectedNodeIds
+                } else {
+                    setOf(nodeId)
+                }
+                currentState.copy(
+                    flow = currentState.flow.copy(nodes = currentState.flow.nodes.filter { it.id != nodeId } + element),
+                    selectedNodeIds = newSelection,
+                    selectedPointIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedPointIds else emptySet(),
+                    selectedGroupIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedGroupIds else emptySet(),
+                    selectedLabelIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedLabelIds else emptySet()
+                )
             }
-        } else if (isAlreadySelected) {
-            currentState.selectedNodeIds
-        } else {
-            setOf(nodeId)
+            is FlowGroup -> {
+                val isAlreadySelected = currentState.selectedGroupIds.contains(nodeId)
+                val newSelection = if (isCtrlPressed) {
+                    if (isAlreadySelected) currentState.selectedGroupIds - nodeId else currentState.selectedGroupIds + nodeId
+                } else if (isAlreadySelected) {
+                    currentState.selectedGroupIds
+                } else {
+                    setOf(nodeId)
+                }
+                currentState.copy(
+                    flow = currentState.flow.copy(groups = currentState.flow.groups.filter { it.id != nodeId } + element),
+                    selectedGroupIds = newSelection,
+                    selectedNodeIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedNodeIds else emptySet(),
+                    selectedPointIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedPointIds else emptySet(),
+                    selectedLabelIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedLabelIds else emptySet()
+                )
+            }
+            is FlowLabel -> {
+                val isAlreadySelected = currentState.selectedLabelIds.contains(nodeId)
+                val newSelection = if (isCtrlPressed) {
+                    if (isAlreadySelected) currentState.selectedLabelIds - nodeId else currentState.selectedLabelIds + nodeId
+                } else if (isAlreadySelected) {
+                    currentState.selectedLabelIds
+                } else {
+                    setOf(nodeId)
+                }
+                currentState.copy(
+                    flow = currentState.flow.copy(labels = currentState.flow.labels.filter { it.id != nodeId } + element),
+                    selectedLabelIds = newSelection,
+                    selectedNodeIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedNodeIds else emptySet(),
+                    selectedPointIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedPointIds else emptySet(),
+                    selectedGroupIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedGroupIds else emptySet()
+                )
+            }
+            is ConnectionPoint -> {
+                val isAlreadySelected = currentState.selectedPointIds.contains(nodeId)
+                val newSelection = if (isCtrlPressed) {
+                    if (isAlreadySelected) currentState.selectedPointIds - nodeId else currentState.selectedPointIds + nodeId
+                } else if (isAlreadySelected) {
+                    currentState.selectedPointIds
+                } else {
+                    setOf(nodeId)
+                }
+                currentState.copy(
+                    selectedPointIds = newSelection,
+                    selectedNodeIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedNodeIds else emptySet(),
+                    selectedGroupIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedGroupIds else emptySet(),
+                    selectedLabelIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedLabelIds else emptySet()
+                )
+            }
+            else -> currentState
         }
-        return currentState.copy(
-            flow = currentState.flow.copy(nodes = currentState.flow.nodes.filter { it.id != nodeId } + node),
-            selectedNodeIds = newSelection,
-            selectedPointIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedPointIds else emptySet(),
-            selectedGroupIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedGroupIds else emptySet(),
-            selectedLabelIds = if (isCtrlPressed || isAlreadySelected) currentState.selectedLabelIds else emptySet()
-        )
     }
 
     fun handleToggleNodeCollapse(currentState: FlowEditorState, nodeId: Long): FlowEditorState {

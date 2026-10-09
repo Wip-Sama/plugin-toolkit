@@ -943,4 +943,31 @@
     <string name="action_restart">Restart</string>
     <string name="action_store_files">Store Files</string>
     <string name="flow_files_stored_toast">Intermediate files stored successfully</string>
+
+    <!-- Flow Image Export -->
+    <string name="flow_export_image_title">Export Flow as Image</string>
+    <string name="flow_export_image_subtitle">Export high-resolution PNG image of the flow or selected elements</string>
+    <string name="flow_export_image_scope">Scope</string>
+    <string name="flow_export_image_scope_all">Whole Flow</string>
+    <string name="flow_export_image_scope_selection">Selected Elements</string>
+    <string name="flow_export_image_resolution">Resolution</string>
+    <string name="flow_export_image_resolution_half">0.5x (Draft)</string>
+    <string name="flow_export_image_resolution_1x">1.0x (Standard HD)</string>
+    <string name="flow_export_image_resolution_2x">2.0x (Ultra HD / Crisp)</string>
+    <string name="flow_export_image_background">Background</string>
+    <string name="flow_export_image_bg_grid">Canvas Grid</string>
+    <string name="flow_export_image_bg_solid">Solid Surface</string>
+    <string name="flow_export_image_bg_transparent">Transparent</string>
+    <string name="flow_export_image_btn_save">Save Image…</string>
+    <string name="flow_export_image_btn_copy">Copy to Clipboard</string>
+    <string name="flow_export_image_dimensions">Estimated size: %1$d × %2$d px</string>
+    <string name="flow_export_image_selected_count">%1$d elements selected</string>
+    <string name="flow_export_image_no_selection_hint">No elements selected. Select elements on the board or switch to Whole Flow.</string>
+    <string name="flow_export_image_empty_flow_error">Cannot export an empty flow</string>
+    <string name="flow_export_image_save_success">Flow image exported successfully</string>
+    <string name="flow_export_image_clipboard_success">Flow image copied to clipboard</string>
+    <string name="flow_export_image_error">Failed to generate or save flow image</string>
+    <string name="flow_export_image_tooltip">Export Flow Image (Ctrl+Shift+E)</string>
+    <string name="shortcut_action_flow_export_image">Export Flow Image</string>
+    <string name="shortcut_action_flow_export_image_desc">Open export image dialog for the current flow</string>
 </resources>

@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.buildkonfig)
+    alias(libs.plugins.kover)
     application
 }
 

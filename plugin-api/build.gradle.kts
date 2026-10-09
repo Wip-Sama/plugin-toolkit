@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     alias(libs.plugins.buildkonfig)
+    alias(libs.plugins.kover)
     id("maven-publish")
 }
 

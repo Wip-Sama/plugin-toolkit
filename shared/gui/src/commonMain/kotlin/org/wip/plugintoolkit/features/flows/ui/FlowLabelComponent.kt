@@ -26,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,6 +86,7 @@ fun FlowLabelComponent(
     onEndMove: ((Long) -> Unit)? = null,
     isSelected: Boolean = false,
     onSelectLabel: ((Long, Boolean) -> Unit)? = null,
+    onPress: ((Long, Boolean) -> Unit)? = null,
     isPaintToolActive: Boolean = false,
     isWashToolActive: Boolean = false,
     isEyedropperActive: Boolean = false,
@@ -102,6 +104,15 @@ fun FlowLabelComponent(
     var isCtrlPressedOnLabel by remember { mutableStateOf(false) }
     var isShiftPressedOnLabel by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
+
+    val currentOnPress by rememberUpdatedState(onPress ?: onSelectLabel)
+    val currentOnMove by rememberUpdatedState(onMove)
+    val currentOnEndMove by rememberUpdatedState(onEndMove)
+    val currentOnDragDelta by rememberUpdatedState(onDragDelta)
+    val currentIsSelected by rememberUpdatedState(isSelected)
+    val currentOnSampleColor by rememberUpdatedState(onSampleColor)
+    val currentOnPaintLabel by rememberUpdatedState(onPaintLabel)
+    val currentOnWashLabel by rememberUpdatedState(onWashLabel)
 
     LaunchedEffect(isEditing) {
         if (isEditing) {
@@ -162,50 +173,54 @@ fun FlowLabelComponent(
                     }
                 }
             }
-            .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive, isSelected) {
-                if (isEyedropperActive && onSampleColor != null) {
-                    detectTapGestures(onTap = { onSampleColor(label.color ?: "#FFFFFF") })
-                } else if (isPaintToolActive && onPaintLabel != null) {
-                    detectTapGestures(onTap = { onPaintLabel(label.id) })
-                } else if (isWashToolActive && onWashLabel != null) {
-                    detectTapGestures(onTap = { onWashLabel(label.id) })
+            .pointerInput(label.id, isReadOnly, isPaintToolActive, isWashToolActive, isEyedropperActive) {
+                val sampleColor = currentOnSampleColor
+                val paintLabel = currentOnPaintLabel
+                val washLabel = currentOnWashLabel
+                val endMove = currentOnEndMove
+                val move = currentOnMove
+                val dragDelta = currentOnDragDelta
+                if (isEyedropperActive && sampleColor != null) {
+                    detectTapGestures(onTap = { sampleColor(label.color ?: "#FFFFFF") })
+                } else if (isPaintToolActive && paintLabel != null) {
+                    detectTapGestures(onTap = { paintLabel(label.id) })
+                } else if (isWashToolActive && washLabel != null) {
+                    detectTapGestures(onTap = { washLabel(label.id) })
                 } else if (!isReadOnly) {
                     coroutineScope {
                         launch {
                             detectDragGestures(
                                 onDragStart = {
-                                    if (isCtrlPressedOnLabel) {
-                                        onSelectLabel?.invoke(label.id, true)
-                                    } else if (!isSelected) {
-                                        onSelectLabel?.invoke(label.id, false)
-                                    }
+                                    currentOnPress?.invoke(label.id, isCtrlPressedOnLabel)
                                 },
                                 onDragEnd = {
-                                    if (onEndMove != null) {
-                                        onEndMove(label.id)
+                                    if (endMove != null) {
+                                        endMove(label.id)
                                     } else {
                                         val snapDelta = label.position.snapToGrid() - label.position
                                         if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                            onDragDelta(snapDelta.toComposeOffset())
+                                            dragDelta(snapDelta.toComposeOffset())
                                         }
                                     }
                                 },
                                 onDragCancel = {
-                                    if (onEndMove != null) {
-                                        onEndMove(label.id)
+                                    if (endMove != null) {
+                                        endMove(label.id)
                                     } else {
                                         val snapDelta = label.position.snapToGrid() - label.position
                                         if (snapDelta != org.wip.plugintoolkit.features.flows.model.Offset.Zero) {
-                                            onDragDelta(snapDelta.toComposeOffset())
+                                            dragDelta(snapDelta.toComposeOffset())
                                         }
                                     }
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    if (onMove != null) {
-                                        onMove(label.id, dragAmount)
-                                    } else {
-                                        onDragDelta(dragAmount)
+                                    if (dragAmount != Offset.Zero) {
+                                        if (move != null) {
+                                            move(label.id, dragAmount)
+                                        } else {
+                                            dragDelta(dragAmount)
+                                        }
                                     }
                                 }
                             )
@@ -216,7 +231,7 @@ fun FlowLabelComponent(
                                     if (isShiftPressedOnLabel) {
                                         isEditing = true
                                     } else {
-                                        onSelectLabel?.invoke(label.id, isCtrlPressedOnLabel)
+                                        currentOnPress?.invoke(label.id, isCtrlPressedOnLabel)
                                     }
                                 }
                             )

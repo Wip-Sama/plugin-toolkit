@@ -29,6 +29,7 @@ mockk = "1.14.11"
 buildkonfig = "0.22.0"
 turbine = "1.2.1"
 clikt = "5.1.0"
+kover = "0.9.11"
 
 
 [libraries]
@@ -118,3 +119,4 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 buildkonfig = { id = "com.codingfeline.buildkonfig", version.ref = "buildkonfig" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }

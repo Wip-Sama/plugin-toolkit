@@ -23,6 +23,8 @@ import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_detach_
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_detach_connection_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_escape
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_escape_desc
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_export_image
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_export_image_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_eyedropper
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_eyedropper_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_move_node
@@ -244,6 +246,15 @@ object DefaultShortcutCatalog {
             situation = ShortcutSituation.FlowBoard,
             defaultTriggers = listOf(
                 ShortcutTrigger(key = ShortcutKey.Escape)
+            )
+        ),
+        ShortcutAction(
+            id = ShortcutActionId.FLOW_EXPORT_IMAGE,
+            title = Res.string.shortcut_action_flow_export_image.localized,
+            description = Res.string.shortcut_action_flow_export_image_desc.localized,
+            situation = ShortcutSituation.FlowBoard,
+            defaultTriggers = listOf(
+                ShortcutTrigger.primary(key = ShortcutKey.E, shift = true)
             )
         ),
 

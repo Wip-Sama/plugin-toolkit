@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -96,6 +97,15 @@ import plugintoolkit.composeapp.generated.resources.flow_name_label
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_running
 import plugintoolkit.composeapp.generated.resources.flow_readonly_reason_used_in_other
 import kotlin.math.roundToInt
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.features.flows.export.FlowImageExporter
+import org.wip.plugintoolkit.features.flows.ui.FlowExportImageDialog
+import plugintoolkit.composeapp.generated.resources.flow_export_image_clipboard_success
+import plugintoolkit.composeapp.generated.resources.flow_export_image_empty_flow_error
+import plugintoolkit.composeapp.generated.resources.flow_export_image_error
+import plugintoolkit.composeapp.generated.resources.flow_export_image_save_success
 import org.wip.plugintoolkit.features.navigation.GlobalRouter
 
 @Composable
@@ -139,6 +149,12 @@ fun FlowEditorView(
 
     var showSaveAsDialog by remember { mutableStateOf(false) }
     var saveAsName by remember { mutableStateOf("") }
+    var showExportImageDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val exportSuccessMsg = stringResource(Res.string.flow_export_image_save_success)
+    val clipboardSuccessMsg = stringResource(Res.string.flow_export_image_clipboard_success)
+    val exportErrorMsg = stringResource(Res.string.flow_export_image_error)
+    val emptyFlowErrorMsg = stringResource(Res.string.flow_export_image_empty_flow_error)
 
     // State for temporary connection drawing
     var isDrawingConnection by remember { mutableStateOf(false) }
@@ -147,6 +163,12 @@ fun FlowEditorView(
     var connectionStartIsOutput by remember { mutableStateOf(true) }
     var connectionCurrentPos by remember { mutableStateOf(Offset.Zero) }
     val interactionState = remember { BoardInteractionState() }
+    DisposableEffect(Unit) {
+        onDispose {
+            interactionState.resetToIdle()
+            viewModel.onEvent(FlowEvent.ClearSelection)
+        }
+    }
     var structuredConnectionStartInfo by remember { mutableStateOf<StructuredConnectionStartInfo?>(null) }
     var portLayoutVersion by remember { mutableStateOf(0) }
     val portLayouts = remember { mutableStateMapOf<Triple<Long, String, Boolean>, LayoutCoordinates>() }
@@ -582,24 +604,12 @@ fun FlowEditorView(
             onSelectGroups = { viewModel.onEvent(FlowEvent.SelectGroups(it)) },
             onSelectPoints = { viewModel.onEvent(FlowEvent.SelectPoints(it)) },
             onSelectGroup = { id, isCtrl ->
-                if (isCtrl) {
-                    viewModel.onEvent(FlowEvent.ToggleGroupSelection(id))
-                } else {
-                    viewModel.onEvent(FlowEvent.SelectGroups(setOf(id)))
-                    viewModel.onEvent(FlowEvent.SelectNodes(emptySet()))
-                    viewModel.onEvent(FlowEvent.SelectLabels(emptySet()))
-                    viewModel.onEvent(FlowEvent.SelectPoints(emptySet()))
-                }
+                interactionState.selectedJunctionId = null
+                viewModel.onEvent(FlowEvent.BringToFront(id, isCtrl))
             },
             onSelectLabel = { id, isCtrl ->
-                if (isCtrl) {
-                    viewModel.onEvent(FlowEvent.ToggleLabelSelection(id))
-                } else {
-                    viewModel.onEvent(FlowEvent.SelectLabels(setOf(id)))
-                    viewModel.onEvent(FlowEvent.SelectNodes(emptySet()))
-                    viewModel.onEvent(FlowEvent.SelectGroups(emptySet()))
-                    viewModel.onEvent(FlowEvent.SelectPoints(emptySet()))
-                }
+                interactionState.selectedJunctionId = null
+                viewModel.onEvent(FlowEvent.BringToFront(id, isCtrl))
             },
             onAddWaypoint = { conn, pos -> viewModel.onEvent(FlowEvent.AddWaypoint(conn, pos.toModelOffset())) },
             onMoveWaypoint = { conn, index, newPos ->
@@ -691,6 +701,7 @@ fun FlowEditorView(
             onToggleHideConnectionPorts = { viewModel.onEvent(FlowEvent.ToggleHideConnectionPorts) },
             onPaintSelection = { viewModel.onEvent(FlowEvent.PaintSelection) },
             onWashSelection = { viewModel.onEvent(FlowEvent.WashSelection) },
+            onExportImage = { showExportImageDialog = true },
             structuredConnectionStartInfo = structuredConnectionStartInfo,
             onClearStructuredConnectionStartInfo = { structuredConnectionStartInfo = null },
             interactionState = interactionState,
@@ -1103,6 +1114,7 @@ fun FlowEditorView(
             hasUnsavedChanges = state.hasUnsavedChanges,
             hasBrokenNodes = flow.nodes.any { it is Node.CapabilityNode && it.isBroken },
             onRefreshBrokenNodes = { viewModel.onEvent(FlowEvent.RefreshBrokenNodes) },
+            onExportImage = { showExportImageDialog = true },
             onSave = {
                 if (flow.name.isBlank()) {
                     saveAsName = ""
@@ -1187,6 +1199,111 @@ fun FlowEditorView(
                     showSaveAsDialog = false
                 },
                 onDismiss = { showSaveAsDialog = false }
+            )
+        }
+
+        if (showExportImageDialog) {
+            val hasSelection = state.selectedNodeIds.isNotEmpty() ||
+                    state.selectedGroupIds.isNotEmpty() ||
+                    state.selectedLabelIds.isNotEmpty() ||
+                    state.selectedPointIds.isNotEmpty()
+
+            FlowExportImageDialog(
+                flow = flow,
+                hasSelection = hasSelection,
+                selectedNodeIds = state.selectedNodeIds,
+                selectedGroupIds = state.selectedGroupIds,
+                selectedLabelIds = state.selectedLabelIds,
+                selectedPointIds = state.selectedPointIds,
+                nodeSizes = nodeSizes,
+                onExportToPng = { options ->
+                    showExportImageDialog = false
+                    coroutineScope.launch {
+                        try {
+                            val measuredPositions = mutableMapOf<Triple<Long, String, Boolean>, Offset>()
+                            for (node in flow.nodes) {
+                                for (input in node.inputs) {
+                                    getPortBoardPosition(node.id, input.id, false)?.let {
+                                        measuredPositions[Triple(node.id, input.id, false)] = it
+                                    }
+                                }
+                                for (output in node.outputs) {
+                                    getPortBoardPosition(node.id, output.id, true)?.let {
+                                        measuredPositions[Triple(node.id, output.id, true)] = it
+                                    }
+                                }
+                            }
+
+                            val bytes = FlowImageExporter.renderFlowToPng(
+                                flow = flow,
+                                options = options,
+                                selectedNodeIds = state.selectedNodeIds,
+                                selectedGroupIds = state.selectedGroupIds,
+                                selectedLabelIds = state.selectedLabelIds,
+                                selectedPointIds = state.selectedPointIds,
+                                measuredPortPositions = measuredPositions,
+                                measuredNodeSizes = nodeSizes
+                            )
+
+                            if (bytes != null) {
+                                val baseName = flow.name.ifBlank { "flow" }.replace(Regex("[^a-zA-Z0-9_-]"), "_") + "_export"
+                                val savedPath = PlatformUtils.saveFile(baseName, "png", bytes)
+                                if (savedPath != null) {
+                                    notificationService.toast(exportSuccessMsg)
+                                }
+                            } else {
+                                notificationService.toast(emptyFlowErrorMsg)
+                            }
+                        } catch (e: Exception) {
+                            notificationService.toast(exportErrorMsg)
+                        }
+                    }
+                },
+                onCopyToClipboard = { options ->
+                    showExportImageDialog = false
+                    coroutineScope.launch {
+                        try {
+                            val measuredPositions = mutableMapOf<Triple<Long, String, Boolean>, Offset>()
+                            for (node in flow.nodes) {
+                                for (input in node.inputs) {
+                                    getPortBoardPosition(node.id, input.id, false)?.let {
+                                        measuredPositions[Triple(node.id, input.id, false)] = it
+                                    }
+                                }
+                                for (output in node.outputs) {
+                                    getPortBoardPosition(node.id, output.id, true)?.let {
+                                        measuredPositions[Triple(node.id, output.id, true)] = it
+                                    }
+                                }
+                            }
+
+                            val bytes = FlowImageExporter.renderFlowToPng(
+                                flow = flow,
+                                options = options,
+                                selectedNodeIds = state.selectedNodeIds,
+                                selectedGroupIds = state.selectedGroupIds,
+                                selectedLabelIds = state.selectedLabelIds,
+                                selectedPointIds = state.selectedPointIds,
+                                measuredPortPositions = measuredPositions,
+                                measuredNodeSizes = nodeSizes
+                            )
+
+                            if (bytes != null) {
+                                val copied = FlowImageExporter.copyImageToClipboard(bytes)
+                                if (copied) {
+                                    notificationService.toast(clipboardSuccessMsg)
+                                } else {
+                                    notificationService.toast(exportErrorMsg)
+                                }
+                            } else {
+                                notificationService.toast(emptyFlowErrorMsg)
+                            }
+                        } catch (e: Exception) {
+                            notificationService.toast(exportErrorMsg)
+                        }
+                    }
+                },
+                onDismiss = { showExportImageDialog = false }
             )
         }
         

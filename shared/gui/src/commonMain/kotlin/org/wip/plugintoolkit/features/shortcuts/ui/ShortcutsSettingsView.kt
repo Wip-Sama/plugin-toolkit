@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatPaint
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.PanTool
@@ -232,6 +233,21 @@ fun ShortcutsSettingsView(
 
         // ── Canvas & Mouse Controls ─────────────────────────────────────
         if (showCanvasControls) {
+            val panAction = remember(shortcutManager) {
+                shortcutManager.allActions.firstOrNull { it.id == ShortcutActionId.FLOW_PAN_CANVAS }
+            }
+            val isPanCustomized = panAction?.let { shortcutManager.isCustomized(it.id) } ?: false
+
+            val boxAction = remember(shortcutManager) {
+                shortcutManager.allActions.firstOrNull { it.id == ShortcutActionId.FLOW_BOX_SELECT }
+            }
+            val isBoxCustomized = boxAction?.let { shortcutManager.isCustomized(it.id) } ?: false
+
+            val toggleAction = remember(shortcutManager) {
+                shortcutManager.allActions.firstOrNull { it.id == ShortcutActionId.FLOW_TOGGLE_SELECTION }
+            }
+            val isToggleCustomized = toggleAction?.let { shortcutManager.isCustomized(it.id) } ?: false
+
             SettingsGroup(title = stringResource(Res.string.canvas_controls_title)) {
                 // Item 0: Panning
                 SettingsItem(
@@ -240,20 +256,46 @@ fun ShortcutsSettingsView(
                     icon = Icons.Default.PanTool,
                     shape = getGroupedShape(0, 8),
                     control = {
-                        Surface(
-                            shape = ToolkitTheme.shapes.pill,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                         ) {
-                            Text(
-                                text = "[ Right Drag / Middle Drag ]",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(
+                            OutlinedButton(
+                                onClick = { panAction?.let { actionToRemap = it } },
+                                contentPadding = PaddingValues(
                                     horizontal = ToolkitTheme.spacing.small,
                                     vertical = ToolkitTheme.spacing.extraExtraSmall
+                                ),
+                                shape = ToolkitTheme.shapes.pill
+                            ) {
+                                Text(
+                                    text = panAction?.let { shortcutManager.formatEffectiveTriggers(it.id) }
+                                        ?: "[ Right + Drag ] / [ Middle + Drag ]",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            )
+                            }
+
+                            if (isPanCustomized && panAction != null) {
+                                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                                    IconButton(
+                                        onClick = {
+                                            shortcutManager.resetBinding(panAction.id)
+                                            shortcutManager.resetRelativePriority(panAction.id)
+                                        },
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = stringResource(Res.string.shortcuts_reset),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 )
@@ -331,7 +373,7 @@ fun ShortcutsSettingsView(
                                 }
                             },
                             valueRange = 0.2f..3.0f,
-                            steps = 0,
+                            steps = 27,
                             enabled = settings.controls.zoomWithWheel
                         )
                     }
@@ -344,20 +386,46 @@ fun ShortcutsSettingsView(
                     icon = Icons.Default.CropSquare,
                     shape = getGroupedShape(5, 8),
                     control = {
-                        Surface(
-                            shape = ToolkitTheme.shapes.pill,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                         ) {
-                            Text(
-                                text = "[ ${settings.controls.boxSelectBinding.button.displayName} Drag ]",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(
+                            OutlinedButton(
+                                onClick = { boxAction?.let { actionToRemap = it } },
+                                contentPadding = PaddingValues(
                                     horizontal = ToolkitTheme.spacing.small,
                                     vertical = ToolkitTheme.spacing.extraExtraSmall
+                                ),
+                                shape = ToolkitTheme.shapes.pill
+                            ) {
+                                Text(
+                                    text = boxAction?.let { shortcutManager.formatEffectiveTriggers(it.id) }
+                                        ?: "[ Left + Drag ]",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            )
+                            }
+
+                            if (isBoxCustomized && boxAction != null) {
+                                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                                    IconButton(
+                                        onClick = {
+                                            shortcutManager.resetBinding(boxAction.id)
+                                            shortcutManager.resetRelativePriority(boxAction.id)
+                                        },
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = stringResource(Res.string.shortcuts_reset),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 )
@@ -369,21 +437,47 @@ fun ShortcutsSettingsView(
                     icon = Icons.Default.TouchApp,
                     shape = getGroupedShape(6, 8),
                     control = {
-                        Surface(
-                            shape = ToolkitTheme.shapes.pill,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                         ) {
-                            val modifierName = if (FileUtils.isMac) "Cmd" else "Ctrl"
-                            Text(
-                                text = "[ $modifierName + ${settings.controls.toggleSelectBinding.button.displayName} ]",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(
+                            OutlinedButton(
+                                onClick = { toggleAction?.let { actionToRemap = it } },
+                                contentPadding = PaddingValues(
                                     horizontal = ToolkitTheme.spacing.small,
                                     vertical = ToolkitTheme.spacing.extraExtraSmall
+                                ),
+                                shape = ToolkitTheme.shapes.pill
+                            ) {
+                                val defaultToggle = if (FileUtils.isMac) "[ Cmd + Left + Click ]" else "[ Ctrl + Left + Click ]"
+                                Text(
+                                    text = toggleAction?.let { shortcutManager.formatEffectiveTriggers(it.id) }
+                                        ?: defaultToggle,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            )
+                            }
+
+                            if (isToggleCustomized && toggleAction != null) {
+                                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                                    IconButton(
+                                        onClick = {
+                                            shortcutManager.resetBinding(toggleAction.id)
+                                            shortcutManager.resetRelativePriority(toggleAction.id)
+                                        },
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = stringResource(Res.string.shortcuts_reset),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 )
@@ -399,6 +493,18 @@ fun ShortcutsSettingsView(
                             onClick = {
                                 settingsViewModel.updateSettings { current ->
                                     current.copy(controls = CanvasControlScheme())
+                                }
+                                panAction?.let {
+                                    shortcutManager.resetBinding(it.id)
+                                    shortcutManager.resetRelativePriority(it.id)
+                                }
+                                boxAction?.let {
+                                    shortcutManager.resetBinding(it.id)
+                                    shortcutManager.resetRelativePriority(it.id)
+                                }
+                                toggleAction?.let {
+                                    shortcutManager.resetBinding(it.id)
+                                    shortcutManager.resetRelativePriority(it.id)
                                 }
                             },
                             contentPadding = PaddingValues(
@@ -563,6 +669,7 @@ private fun getActionIcon(actionId: String, situation: ShortcutSituation): Image
         ShortcutActionId.FLOW_COPY -> Icons.Default.ContentCopy
         ShortcutActionId.FLOW_PASTE -> Icons.Default.ContentCopy
         ShortcutActionId.FLOW_ESCAPE -> Icons.Default.Close
+        ShortcutActionId.FLOW_EXPORT_IMAGE -> Icons.Default.Image
         ShortcutActionId.JOB_FORCE_CANCEL -> Icons.Default.Terminal
         ShortcutActionId.SETTINGS_SCALE_2X_STEP -> Icons.Default.Settings
         else -> when (situation) {

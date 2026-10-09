@@ -939,4 +939,31 @@
     <string name="action_restart">Riavvia</string>
     <string name="action_store_files">Salva File</string>
     <string name="flow_files_stored_toast">File intermedi salvati con successo</string>
+
+    <!-- Flow Image Export -->
+    <string name="flow_export_image_title">Esporta Flusso come Immagine</string>
+    <string name="flow_export_image_subtitle">Esporta un&apos;immagine PNG ad alta risoluzione dell&apos;intero flusso o degli elementi selezionati</string>
+    <string name="flow_export_image_scope">Ambito</string>
+    <string name="flow_export_image_scope_all">Intero Flusso</string>
+    <string name="flow_export_image_scope_selection">Elementi Selezionati</string>
+    <string name="flow_export_image_resolution">Risoluzione</string>
+    <string name="flow_export_image_resolution_half">0.5x (Bozza)</string>
+    <string name="flow_export_image_resolution_1x">1.0x (Standard HD)</string>
+    <string name="flow_export_image_resolution_2x">2.0x (Ultra HD / Nitido)</string>
+    <string name="flow_export_image_background">Sfondo</string>
+    <string name="flow_export_image_bg_grid">Griglia Canvas</string>
+    <string name="flow_export_image_bg_solid">Tinta Unita</string>
+    <string name="flow_export_image_bg_transparent">Trasparente</string>
+    <string name="flow_export_image_btn_save">Salva Immagine…</string>
+    <string name="flow_export_image_btn_copy">Copia negli Appunti</string>
+    <string name="flow_export_image_dimensions">Dimensioni stimate: %1$d × %2$d px</string>
+    <string name="flow_export_image_selected_count">%1$d elementi selezionati</string>
+    <string name="flow_export_image_no_selection_hint">Nessun elemento selezionato. Seleziona elementi sulla lavagna o passa a Intero Flusso.</string>
+    <string name="flow_export_image_empty_flow_error">Impossibile esportare un flusso vuoto</string>
+    <string name="flow_export_image_save_success">Immagine del flusso esportata con successo</string>
+    <string name="flow_export_image_clipboard_success">Immagine del flusso copiata negli appunti</string>
+    <string name="flow_export_image_error">Impossibile generare o salvare l&apos;immagine del flusso</string>
+    <string name="flow_export_image_tooltip">Esporta Immagine Flusso (Ctrl+Shift+E)</string>
+    <string name="shortcut_action_flow_export_image">Esporta Immagine Flusso</string>
+    <string name="shortcut_action_flow_export_image_desc">Apri la finestra di dialogo per esportare l&apos;immagine del flusso</string>
 </resources>

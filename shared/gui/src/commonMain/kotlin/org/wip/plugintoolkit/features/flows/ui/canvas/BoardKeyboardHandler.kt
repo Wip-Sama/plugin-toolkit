@@ -33,6 +33,7 @@ fun Modifier.boardKeyboardHandler(
     onToggleStructuredConnectionMode: (() -> Unit)? = null,
     onToggleEyedropper: (() -> Unit)? = null,
     onLeaveStructuredConnectionAtLastPoint: ((Long?, String?, Long?, List<Offset>) -> Unit)? = null,
+    onExportImage: (() -> Unit)? = null,
     shortcutManager: ShortcutManager? = null
 ): Modifier = this
     .onKeyEvent { keyEvent ->
@@ -124,6 +125,13 @@ fun Modifier.boardKeyboardHandler(
         ) {
             val boardPos = (interactionState.lastPointerPosition - offset) / scale
             onPaste(boardPos)
+        }
+
+        onKey(
+            ShortcutActionId.FLOW_EXPORT_IMAGE,
+            enabled = true
+        ) {
+            onExportImage?.invoke()
         }
 
         onKey(

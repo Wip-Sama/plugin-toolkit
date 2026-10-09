@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Palette
@@ -74,6 +75,8 @@ import plugintoolkit.composeapp.generated.resources.flow_connection_style_bezier
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_cardinal
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_orthogonal
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_straight
+import plugintoolkit.composeapp.generated.resources.flow_export_image_title
+import plugintoolkit.composeapp.generated.resources.flow_export_image_tooltip
 import plugintoolkit.composeapp.generated.resources.flow_info_button_tooltip
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_add_group
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_add_label
@@ -131,6 +134,7 @@ fun FlowFloatingAppBar(
     onChangeOrthogonalPortLead: (Boolean) -> Unit = {},
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
+    onExportImage: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val dimensions = ToolkitTheme.dimensions
@@ -408,6 +412,24 @@ fun FlowFloatingAppBar(
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = stringResource(Res.string.flow_info_button_tooltip),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(dimensions.iconSmall)
+                    )
+                }
+            }
+
+            // 6.1 Export Image Button
+            if (onExportImage != null) {
+                IconButton(
+                    onClick = onExportImage,
+                    modifier = Modifier
+                        .size(dimensions.standardButtonHeight)
+                        .tooltip { Text(stringResource(Res.string.flow_export_image_tooltip)) }
+                        .testTag("toolbar_export_image")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = stringResource(Res.string.flow_export_image_title),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(dimensions.iconSmall)
                     )

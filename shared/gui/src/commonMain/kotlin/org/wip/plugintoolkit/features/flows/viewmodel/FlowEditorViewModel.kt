@@ -253,7 +253,9 @@ class FlowEditorViewModel(
                     val activeFlowWithSyncedSubflows = syncSubflowNodes(activeFlow, allFlows).healDuplicateConnections()
                     val maxNodeId = activeFlowWithSyncedSubflows.nodes.maxOfOrNull { it.id } ?: -1L
                     val maxPointId = activeFlowWithSyncedSubflows.junctions.maxOfOrNull { it.id } ?: -1L
-                    val maxId = maxOf(maxNodeId, maxPointId)
+                    val maxGroupId = activeFlowWithSyncedSubflows.groups.maxOfOrNull { it.id } ?: -1L
+                    val maxLabelId = activeFlowWithSyncedSubflows.labels.maxOfOrNull { it.id } ?: -1L
+                    val maxId = maxOf(maxNodeId, maxPointId, maxGroupId, maxLabelId)
 
                     val defaultStyle = resolvedSettingsRepository?.settings?.value?.flows?.defaultConnectionStyle
                         ?: org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline
@@ -280,7 +282,16 @@ class FlowEditorViewModel(
                             hideConnectionPointsUnlessHovered = defaultHidePorts,
                             nextId = maxId + 1,
                             flows = allFlows,
-                            hasUnsavedChanges = false
+                            hasUnsavedChanges = false,
+                            selectedNodeIds = emptySet(),
+                            selectedGroupIds = emptySet(),
+                            selectedLabelIds = emptySet(),
+                            selectedPointIds = emptySet(),
+                            draggedNodeId = null,
+                            currentDragOffset = org.wip.plugintoolkit.features.flows.model.Offset.Zero,
+                            ghostPosition = null,
+                            capturedJunctionIds = emptySet(),
+                            capturedWaypoints = emptyMap()
                         )
                     }
                     historyManager.clear()
@@ -1025,7 +1036,12 @@ class FlowEditorViewModel(
                     selectedNodeIds = emptySet(),
                     selectedLabelIds = emptySet(),
                     selectedGroupIds = emptySet(),
-                    selectedPointIds = emptySet()
+                    selectedPointIds = emptySet(),
+                    draggedNodeId = null,
+                    currentDragOffset = org.wip.plugintoolkit.features.flows.model.Offset.Zero,
+                    ghostPosition = null,
+                    capturedJunctionIds = emptySet(),
+                    capturedWaypoints = emptyMap()
                 )
             }
 
@@ -1402,6 +1418,7 @@ class FlowEditorViewModel(
                         flow = currentState.flow.copy(
                             groups = currentState.flow.groups.filter { it.id != event.group.id }
                         ),
+                        selectedGroupIds = currentState.selectedGroupIds - event.group.id,
                         hasUnsavedChanges = true
                     )
                     pendingCommand = DeleteGroupCommand(deleted)
@@ -1565,6 +1582,7 @@ class FlowEditorViewModel(
             is FlowEvent.DeleteLabel -> {
                 newState = currentState.copy(
                     flow = currentState.flow.copy(labels = currentState.flow.labels.filter { it.id != event.label.id }),
+                    selectedLabelIds = currentState.selectedLabelIds - event.label.id,
                     hasUnsavedChanges = true
                 )
                 pendingCommand = DeleteLabelCommand(event.label)

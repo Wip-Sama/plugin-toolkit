@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -22,11 +24,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.flow_export_image_tooltip
 import plugintoolkit.composeapp.generated.resources.flow_editor_btn_exit
 import plugintoolkit.composeapp.generated.resources.flow_editor_flow_selected
 import plugintoolkit.composeapp.generated.resources.flow_editor_no_flow_selected
@@ -45,6 +49,7 @@ internal fun FlowEditorTopBar(
     hasUnsavedChanges: Boolean,
     hasBrokenNodes: Boolean = false,
     onRefreshBrokenNodes: (() -> Unit)? = null,
+    onExportImage: (() -> Unit)? = null,
     onSave: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier
@@ -154,6 +159,19 @@ internal fun FlowEditorTopBar(
                 )
             ) {
                 Text(stringResource(Res.string.flow_editor_save_changes))
+            }
+
+            if (onExportImage != null) {
+                IconButton(
+                    onClick = onExportImage,
+                    modifier = Modifier.testTag("topbar_export_image")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = stringResource(Res.string.flow_export_image_tooltip),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             OutlinedButton(

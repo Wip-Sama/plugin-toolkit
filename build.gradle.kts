@@ -7,4 +7,35 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.kover)
 }
+
+kover {
+    reports {
+        total {
+            xml {
+                onCheck = true
+            }
+            html {
+                onCheck = true
+            }
+            verify {
+                rule {
+                    minBound(50) // will increase in the future
+                }
+            }
+        }
+    }
+}
+
+// Aggregate coverage from all subprojects into the root report
+dependencies {
+    kover(project(":shared:core"))
+    kover(project(":shared:logic"))
+    kover(project(":shared:gui"))
+    kover(project(":plugin-api"))
+    kover(project(":apps:cliApp"))
+    kover(project(":plugins:completeExample"))
+    kover(project(":plugins:minimalExample"))
+}
+

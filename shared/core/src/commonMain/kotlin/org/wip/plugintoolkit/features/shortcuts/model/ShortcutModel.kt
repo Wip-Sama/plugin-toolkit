@@ -354,6 +354,7 @@ object ShortcutActionId {
     const val FLOW_COPY = "flow.board.copy"
     const val FLOW_PASTE = "flow.board.paste"
     const val FLOW_ESCAPE = "flow.board.escape"
+    const val FLOW_EXPORT_IMAGE = "flow.board.export_image"
 
     // Flow Selection
     @Deprecated("Phase 1 deprecation: Hardcoded node drag in NodeComponent. Pruned in Phase 3.")

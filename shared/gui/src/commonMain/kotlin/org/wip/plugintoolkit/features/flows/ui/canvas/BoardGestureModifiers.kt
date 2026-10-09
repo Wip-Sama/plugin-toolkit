@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.isAltPressed
@@ -233,7 +234,7 @@ fun Modifier.boardPanGesture(
     return this.pointerInput(controlScheme) {
         awaitPointerEventScope {
             while (true) {
-                val event = awaitPointerEvent()
+                val event = awaitPointerEvent(PointerEventPass.Initial)
                 if (event.type == PointerEventType.Press) {
                     val button = PointerButton.fromButtons(
                         isPrimary = event.buttons.isPrimaryPressed,
@@ -257,7 +258,7 @@ fun Modifier.boardPanGesture(
                         var lastPos = change.position
 
                         while (true) {
-                            val dragEvent = awaitPointerEvent()
+                            val dragEvent = awaitPointerEvent(PointerEventPass.Initial)
                             val isButtonDown = when (button) {
                                 PointerButton.Primary -> dragEvent.buttons.isPrimaryPressed
                                 PointerButton.Secondary -> dragEvent.buttons.isSecondaryPressed
@@ -1294,16 +1295,7 @@ private fun handleElementPress(
                     interactionState.selectedConnection = null
                 }
                 event.changes.forEach { it.consume() }
-            } else if (isAlt) {
-                val segInfo = DraggingSegmentInfo(
-                    connection = connProj.connection,
-                    segmentIndex = connProj.segmentIndex
-                )
-                interactionState.startDraggingSegment(segInfo)
-                session.segmentDragStartPos = position
-                interactionState.lastPointerPosition = position
-                ctx.shortcutManager()?.eat(event, ShortcutActionId.FLOW_MOVE_POINT) ?: event.changes.forEach { it.consume() }
-            } else {
+            } else if (!isAlt) {
                 val newJuncId = (ctx.junctions().maxOfOrNull { it.id } ?: 0L) + 1L
                 ctx.onAddJunctionAndBranch?.invoke(connProj.connection, connProj.projectedPoint, connProj.segmentIndex)
                 interactionState.selectedJunctionId = newJuncId

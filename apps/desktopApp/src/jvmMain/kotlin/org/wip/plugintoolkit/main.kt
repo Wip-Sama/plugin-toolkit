@@ -421,7 +421,7 @@ fun runMain(
     Logger.i { "Startup: runMain entered with mode=$preloadedMode" }
     var isTrayOpen by mutableStateOf(true)
     application {
-        Logger.i { "Startup: Compose application loop started" }
+        Logger.v { "Startup: Compose application loop started" }
         val viewModel = preloadedViewModel
         val startMode = preloadedMode
         val languageCode by viewModel.currentLanguageCode.collectAsState()
@@ -487,7 +487,7 @@ fun runMain(
         val useCustomTitleBar = appSettings.appearance.useCustomTitleBar
 
         if (isVisible) {
-            Logger.i { "Startup: Composing Window (undecorated=$useCustomTitleBar)" }
+            Logger.v { "Startup: Composing Window (undecorated=$useCustomTitleBar)" }
             key(useCustomTitleBar) {
                 val isMaximized = windowState.placement == WindowPlacement.Maximized
                 val windowController = remember(windowState, isMaximized) {

@@ -13,6 +13,8 @@ import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_delete_
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_delete_selected_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_escape
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_escape_desc
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_export_image
+import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_export_image_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_eyedropper
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_eyedropper_desc
 import plugintoolkit.composeapp.generated.resources.shortcut_action_flow_paint_tool
@@ -88,6 +90,15 @@ object DefaultShortcutCommands {
             scope = ShortcutScope.FeatureCanvas,
             defaultChords = listOf(
                 KeyChord(ShortcutKey.Escape)
+            )
+        ),
+        ShortcutCommand(
+            id = ShortcutActionId.FLOW_EXPORT_IMAGE,
+            title = Res.string.shortcut_action_flow_export_image.localized,
+            description = Res.string.shortcut_action_flow_export_image_desc.localized,
+            scope = ShortcutScope.FeatureCanvas,
+            defaultChords = listOf(
+                KeyChord.primary(ShortcutKey.E, shift = true)
             )
         ),
         ShortcutCommand(

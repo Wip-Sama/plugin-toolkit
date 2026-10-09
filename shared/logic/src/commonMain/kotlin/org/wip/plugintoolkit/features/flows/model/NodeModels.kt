@@ -726,6 +726,21 @@ data class Flow(
         else -> this
     }
 
+    fun withoutBoardElement(id: Long): Flow {
+        val element = findBoardElement(id) ?: return this
+        return when (element) {
+            is Node -> copy(
+                nodes = nodes.filter { it.id != id },
+                connections = connections.filter { it.sourceNodeId != id && it.targetNodeId != id },
+                groups = groups.map { g -> g.copy(nodeIds = g.nodeIds.filter { it != id }) }
+            )
+            is FlowGroup -> copy(groups = groups.filter { it.id != id })
+            is FlowLabel -> copy(labels = labels.filter { it.id != id })
+            is ConnectionPoint -> removeJunctionWithBridging(id).first
+            else -> this
+        }
+    }
+
     /**
      * Removes a junction point while bridging its incoming connections with outgoing connections.
      * Returns the updated Flow alongside the list of removed connections and newly created bridged connections.

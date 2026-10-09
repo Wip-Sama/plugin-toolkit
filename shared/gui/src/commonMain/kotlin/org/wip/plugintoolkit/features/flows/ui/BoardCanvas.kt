@@ -178,6 +178,7 @@ fun BoardCanvas(
     onToggleHideConnectionPorts: () -> Unit = {},
     onPaintSelection: () -> Unit = {},
     onWashSelection: () -> Unit = {},
+    onExportImage: (() -> Unit)? = null,
     structuredConnectionStartInfo: StructuredConnectionStartInfo? = null,
     onClearStructuredConnectionStartInfo: () -> Unit = {},
     interactionState: BoardInteractionState = remember { BoardInteractionState() },
@@ -330,6 +331,7 @@ fun BoardCanvas(
                 onLeaveStructuredConnectionAtLastPoint = { sNodeId, sPortId, sJuncId, pts ->
                     onLeaveStructuredConnectionAtLastPoint(sNodeId, sPortId, sJuncId, pts.map { it.toModelOffset() })
                 },
+                onExportImage = onExportImage,
                 shortcutManager = shortcutManager
             )
             .boardConnectionTapGesture(
@@ -550,8 +552,7 @@ fun BoardCanvas(
                                 interactionState.hoveredWaypoint != null || 
                                 interactionState.hoveredMidpoint != null ||
                                 interactionState.hoveredConnection != null ||
-                                isDrawingConnection || interactionState.isDrawingStructuredConnection ||
-                                state.draggedNodeId != null
+                                isDrawingConnection || interactionState.isDrawingStructuredConnection
 
                 BoardElementContainer(
                     position = group.position.toComposeOffset(),
@@ -571,6 +572,7 @@ fun BoardCanvas(
                         onEndMove = onEndMoveElement,
                         isSelected = isGroupSelected,
                         onSelectGroup = onSelectGroup,
+                        onPress = onSelectGroup,
                         isDropTarget = isDropTarget,
                         hasIncomingConnections = hasIncoming,
                         hasOutgoingConnections = hasOutgoing,
@@ -612,6 +614,7 @@ fun BoardCanvas(
                         onEndMove = onEndMoveElement,
                         isSelected = isLabelSelected,
                         onSelectLabel = onSelectLabel,
+                        onPress = onSelectLabel,
                         isPaintToolActive = state.isPaintToolActive,
                         isWashToolActive = state.isWashToolActive,
                         isEyedropperActive = state.isEyedropperActive,
@@ -815,6 +818,7 @@ fun BoardCanvas(
                     onChangeOrthogonalPortLead = onChangeOrthogonalPortLead,
                     onZoomIn = { onZoom(-1f, centerPosition, false) },
                     onZoomOut = { onZoom(1f, centerPosition, false) },
+                    onExportImage = onExportImage,
                     modifier = Modifier
                 )
             }
