@@ -194,7 +194,14 @@ data class Dimensions(
     val dialogUpdateHeight: Dp = 540.dp,
     val dialogUpdateMinWidth: Dp = 500.dp,
     val dialogUpdateMaxHeight: Dp = 620.dp,
-    val updateIconContainerSize: Dp = 48.dp
+    val updateIconContainerSize: Dp = 48.dp,
+    val colorPickerDialogWidth: Dp = 420.dp,
+    val colorPickerSwatchSize: Dp = 28.dp,
+    val colorPickerChannelWidth: Dp = 56.dp,
+    val colorPickerTrackHeight: Dp = 14.dp,
+    val colorPickerThumbSize: Dp = 18.dp,
+    val colorPickerCanvasHeight: Dp = 220.dp,
+    val colorPickerCanvasWidth: Dp = 360.dp
 )
 
 data class CustomColors(

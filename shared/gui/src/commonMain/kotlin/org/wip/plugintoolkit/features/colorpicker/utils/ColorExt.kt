@@ -207,7 +207,7 @@ internal fun Color.Companion.fromHueProgress(progress: Float): Color {
     return Color(red, green, blue)
 }
 
-internal fun Color.toHueProgress(): Float {
+fun Color.toHueDegrees(): Float {
     val red = this.red() / 255f
     val green = this.green() / 255f
     val blue = this.blue() / 255f
@@ -233,8 +233,12 @@ internal fun Color.toHueProgress(): Float {
         }
     }
 
-    hue *= 60
-    if (hue < 0) hue += 360
+    hue *= 60f
+    if (hue < 0f) hue += 360f
 
-    return hue
+    return hue % 360f
+}
+
+fun Color.toHueProgress(): Float {
+    return toHueDegrees() / 360f
 }

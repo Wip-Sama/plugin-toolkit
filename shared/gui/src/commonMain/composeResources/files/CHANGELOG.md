@@ -25,7 +25,8 @@ Added:
   - Centralized single-source-of-truth flow execution locking via FlowExecutionGuard
   - VRam monitoring for jobs
   - Cpu utilization and core count monitoring
-  - Time series monitoring for jobs (resource monitoring is now done costantly and kept)
+  - Time series monitoring for jobs (resource monitoring is now done constantly and kept)
+  - Export flow as images to share your work /be wary that big flows may take a lto of resources to render in good quality
 Changes:
 	- Node can now be focused by simply changing a value
   - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling
@@ -37,6 +38,8 @@ Changes:
   - Delegated all flow execution, paused, and running queries across FlowRepository, FlowViewModel, and FlowEditorViewModel to FlowExecutionGuard
   - Made Flow max concurrency updates dynamic during active executions without triggering read-only graph locks
   - Flow Runner execution button remains active for launching concurrent runs up to configured limits
+  - metric are now collected about job executions, they are promptly deleted when the job is deleted, and are not shared for now (just preparation work)
+  - New and improved color picker (again)
 Fixed:
   - FlowReadOnlyViolationException crash when adjusting flow concurrency during active runs
   - Progress bar vanishing during PauseRequested and Paused states
@@ -55,7 +58,6 @@ Fixed:
 Removed:
   - Verbose logging spam in the flow editor
   - Disable animations setting
-Planned:
 ----------------------------------------------------------------------------------------------------
 Version: 3.0.0
 Name: Packaged Timed Colors
@@ -82,8 +84,7 @@ Fixed:
 Planned:
   - Scheduler to automatically start flows / capabilities at specific times
   - Scheduler plugin events, a plugin can now create events that can be used to trigger an event schedule (they do not start by themselves and need to be setup by the user)
-  - Experimental opt-in metrics collection (this is fully customizable to chose which metrics to collect/share)
-  - Rework again the color picker
+  - ~~Rework again the color picker~~ (3.1.0)
 ----------------------------------------------------------------------------------------------------
 Version: 2.1.0
 Date: 10-09-2026

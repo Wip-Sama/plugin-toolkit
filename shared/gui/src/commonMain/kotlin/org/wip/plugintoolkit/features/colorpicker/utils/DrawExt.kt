@@ -9,10 +9,28 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import kotlin.math.roundToInt
 
-internal fun DrawScope.drawColorSelector(color: Color, location: Offset) {
-    drawCircle(color, radius = 30f, center = location)
-    drawCircle(Color.White, radius = 30f, center = location, style = Stroke(5f))
-    drawCircle(Color.LightGray, radius = 30f, center = location, style = Stroke(1f))
+internal fun DrawScope.drawColorSelector(color: Color, location: Offset, radius: Float = 20f) {
+    // Outer dark shadow/border for contrast on light backgrounds
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.35f),
+        radius = radius + 1.5f,
+        center = location,
+        style = Stroke(width = 3.5f)
+    )
+    // Primary crisp white ring
+    drawCircle(
+        color = Color.White,
+        radius = radius,
+        center = location,
+        style = Stroke(width = 3.5f)
+    )
+    // Inner dark border for contrast on bright backgrounds
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.2f),
+        radius = (radius - 2.5f).coerceAtLeast(1f),
+        center = location,
+        style = Stroke(width = 1f)
+    )
 }
 
 internal fun DrawScope.drawTransparentBackground(verticalBoxesSize: Int = 10) {

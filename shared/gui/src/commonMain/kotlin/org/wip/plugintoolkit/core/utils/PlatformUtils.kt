@@ -36,4 +36,5 @@ expect object PlatformUtils {
     fun horizontalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon
     fun verticalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon
     fun diagonalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon
+    fun sampleScreenColorAtCursor(): Color?
 }

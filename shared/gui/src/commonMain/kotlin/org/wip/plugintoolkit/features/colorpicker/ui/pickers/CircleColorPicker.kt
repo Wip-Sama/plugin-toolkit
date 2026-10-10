@@ -2,18 +2,20 @@ package org.wip.plugintoolkit.features.colorpicker.ui.pickers
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -22,152 +24,149 @@ import androidx.compose.ui.graphics.RadialGradientShader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.dp
-import org.wip.plugintoolkit.features.colorpicker.logic.BoundedPointStrategy
-import org.wip.plugintoolkit.features.colorpicker.logic.MathHelper
+import androidx.compose.ui.platform.testTag
+import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.features.colorpicker.logic.ColorPickerHelper
 import org.wip.plugintoolkit.features.colorpicker.model.Colors.gradientColors
 import org.wip.plugintoolkit.features.colorpicker.ui.ColorSlideBar
-import org.wip.plugintoolkit.features.colorpicker.utils.blue
-import org.wip.plugintoolkit.features.colorpicker.utils.darken
 import org.wip.plugintoolkit.features.colorpicker.utils.drawColorSelector
-import org.wip.plugintoolkit.features.colorpicker.utils.fromHueProgress
-import org.wip.plugintoolkit.features.colorpicker.utils.green
-import org.wip.plugintoolkit.features.colorpicker.utils.lighten
-import org.wip.plugintoolkit.features.colorpicker.utils.red
-import kotlin.math.atan2
-import kotlin.math.roundToInt
-import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
- * Circular color picker with optional brightness and alpha bars.
+ * Circular HSV wheel color picker.
+ * Reactively updates selector location on external color changes and canvas gestures.
  */
 @Composable
 internal fun CircleColorPicker(
     modifier: Modifier = Modifier,
-    showAlphaBar: Boolean,
-    showBrightnessBar: Boolean,
-    lightCenter: Boolean,
+    selectedColor: Color = Color.White,
+    showAlphaBar: Boolean = true,
+    showBrightnessBar: Boolean = true,
+    lightCenter: Boolean = true,
     onPickedColor: (Color) -> Unit
 ) {
     var radius by remember { mutableStateOf(0f) }
-    var pickerLocation by remember(radius) { mutableStateOf(Offset(radius, radius)) }
-    var pickerColor by remember {
-        mutableStateOf(if (lightCenter) Color.White else Color.Black)
-    }
+    var pickerLocation by remember { mutableStateOf(Offset.Zero) }
+    var internalColor by remember { mutableStateOf(selectedColor) }
     var brightness by remember { mutableStateOf(0f) }
-    var alpha by remember { mutableStateOf(1f) }
+    var alpha by remember { mutableStateOf(selectedColor.alpha) }
 
-    LaunchedEffect(brightness, pickerColor, alpha) {
-        onPickedColor(
-            Color(
-                pickerColor.red().moveColorTo(!lightCenter, brightness),
-                pickerColor.green().moveColorTo(!lightCenter, brightness),
-                pickerColor.blue().moveColorTo(!lightCenter, brightness),
-                (255 * alpha).roundToInt()
-            )
-        )
+    LaunchedEffect(selectedColor, radius) {
+        internalColor = selectedColor
+        val hsv = ColorPickerHelper.colorToHsv(selectedColor)
+        brightness = if (lightCenter) 1f - hsv.value else hsv.value
+        alpha = hsv.alpha
+        if (radius > 0f) {
+            pickerLocation = ColorPickerHelper.calculateCircleLocation(hsv, radius)
+        }
     }
 
-    Column(modifier = Modifier.width(IntrinsicSize.Max)) {
-        Canvas(
+    fun updateFromPosition(pos: Offset) {
+        if (radius > 0f) {
+            val (newColor, newPos) = ColorPickerHelper.calculateCircleColor(
+                x = pos.x,
+                y = pos.y,
+                radius = radius,
+                brightness = brightness,
+                alpha = alpha,
+                lightCenter = lightCenter
+            )
+            pickerLocation = newPos
+            internalColor = newColor
+            onPickedColor(newColor)
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
             modifier = modifier
-                .size(ToolkitTheme.dimensions.containerSizeLarge)
-                .onSizeChanged { radius = it.width / 2f }
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            if (radius > 0) {
-                                handleCirclePickerInput(
-                                    x = offset.x, y = offset.y, radius = radius,
-                                    lightCenter = lightCenter,
-                                    onColorChange = { pickerColor = it },
-                                    onLocationChange = { pickerLocation = it }
-                                )
-                            }
-                        }
-                    ) { change, _ ->
-                        change.consume()
-                        if (radius > 0) {
-                            handleCirclePickerInput(
-                                x = change.position.x, y = change.position.y, radius = radius,
-                                lightCenter = lightCenter,
-                                onColorChange = { pickerColor = it },
-                                onLocationChange = { pickerLocation = it }
-                            )
-                        }
+                .size(ToolkitTheme.dimensions.colorPickerCanvasHeight)
+                .onSizeChanged { size ->
+                    val r = minOf(size.width, size.height) / 2f
+                    radius = r
+                    if (r > 0f) {
+                        pickerLocation = ColorPickerHelper.calculateCircleLocation(
+                            hsv = ColorPickerHelper.colorToHsv(internalColor),
+                            radius = r
+                        )
                     }
                 }
-        ) {
-            drawCircle(Brush.sweepGradient(gradientColors))
-            drawCircle(
-                ShaderBrush(
-                    RadialGradientShader(
-                        Offset(size.width / 2f, size.height / 2f),
-                        colors = listOf(
-                            if (lightCenter) Color.White else Color.Black,
-                            Color.Transparent
-                        ),
-                        radius = size.width / 2f
+                .pointerInput(Unit) {
+                    detectTapGestures { offset -> updateFromPosition(offset) }
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset -> updateFromPosition(offset) },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            updateFromPosition(change.position)
+                        }
                     )
+                }
+        ) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val circleCenter = Offset(size.width / 2f, size.height / 2f)
+                val currentRadius = size.width / 2f
+
+                drawCircle(
+                    brush = Brush.sweepGradient(gradientColors, center = circleCenter),
+                    radius = currentRadius,
+                    center = circleCenter
                 )
-            )
-            drawColorSelector(pickerColor, pickerLocation)
+                drawCircle(
+                    brush = ShaderBrush(
+                        RadialGradientShader(
+                            circleCenter,
+                            colors = listOf(
+                                if (lightCenter) Color.White else Color.Black,
+                                Color.Transparent
+                            ),
+                            radius = currentRadius
+                        )
+                    ),
+                    radius = currentRadius,
+                    center = circleCenter
+                )
+                drawColorSelector(internalColor, pickerLocation)
+            }
         }
 
         if (showBrightnessBar) {
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             ColorSlideBar(
+                modifier = Modifier.testTag("circle_brightness_bar"),
                 value = brightness,
-                onValueChange = { brightness = it },
+                onValueChange = { b ->
+                    brightness = b
+                    val hsv = ColorPickerHelper.colorToHsv(internalColor)
+                    val newValue = if (lightCenter) 1f - b else b
+                    val newColor = ColorPickerHelper.hsvToColor(hsv.copy(value = newValue, alpha = alpha))
+                    internalColor = newColor
+                    onPickedColor(newColor)
+                },
                 colors = listOf(
                     if (lightCenter) Color.Black else Color.White,
-                    pickerColor
-                ),
+                    internalColor.copy(alpha = 1f)
+                )
             )
         }
 
         if (showAlphaBar) {
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
             ColorSlideBar(
+                modifier = Modifier.testTag("circle_alpha_bar"),
                 value = alpha,
-                onValueChange = { alpha = it },
-                colors = listOf(Color.Transparent, pickerColor)
+                onValueChange = { a ->
+                    alpha = a
+                    val newColor = internalColor.copy(alpha = a)
+                    internalColor = newColor
+                    onPickedColor(newColor)
+                },
+                colors = listOf(Color.Transparent, internalColor.copy(alpha = 1f)),
+                showCheckerboard = true
             )
         }
     }
 }
-
-private fun handleCirclePickerInput(
-    x: Float,
-    y: Float,
-    radius: Float,
-    lightCenter: Boolean,
-    onColorChange: (Color) -> Unit,
-    onLocationChange: (Offset) -> Unit
-) {
-    val angleRad = atan2(y - radius, x - radius)
-    val angleDeg = (angleRad * 180.0 / kotlin.math.PI + 360) % 360
-
-    val length = MathHelper.getLength(x, y, radius)
-    val radiusProgress = (1 - (length / radius)).coerceIn(0f, 1f)
-    val angleProgress = angleDeg / 360f
-    val pureColor = Color.fromHueProgress(angleProgress.toFloat())
-    val newColor = Color(
-        red = pureColor.red().moveColorTo(lightCenter, radiusProgress.toFloat()),
-        green = pureColor.green().moveColorTo(lightCenter, radiusProgress.toFloat()),
-        blue = pureColor.blue().moveColorTo(lightCenter, radiusProgress.toFloat()),
-    )
-    onColorChange(newColor)
-    onLocationChange(
-        MathHelper.getBoundedPointWithInRadius(x, y, length, radius, BoundedPointStrategy.Inside)
-    )
-}
-
-private fun Int.moveColorTo(toWhite: Boolean, progress: Float): Int =
-    if (toWhite) lighten(progress) else darken(progress)
-
-private fun Float.moveColorTo(toWhite: Boolean, progress: Float): Float =
-    if (toWhite) lighten(progress) else darken(progress)
-
-private fun Double.moveColorTo(toWhite: Boolean, progress: Float): Double =
-    if (toWhite) lighten(progress) else darken(progress)

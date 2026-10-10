@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -29,17 +30,33 @@ fun SelectedButtonGroup(
     buttons: List<String>,
     modifier: Modifier = Modifier,
     startingIndex: Int = 0,
+    fillMaxWidth: Boolean = false,
     onButtonSelected: (button: String) -> Unit = {},
 ) {
-    var selectedIndex by remember { mutableIntStateOf(startingIndex) }
+    var selectedIndex by remember(startingIndex) { mutableIntStateOf(startingIndex) }
+    androidx.compose.runtime.LaunchedEffect(startingIndex) {
+        selectedIndex = startingIndex
+    }
     val scrollState = rememberScrollState()
+
     Row(
-        modifier = modifier
-            .horizontalScroll(scrollState),
+        modifier = if (fillMaxWidth) {
+            modifier
+        } else {
+            modifier.horizontalScroll(scrollState)
+        },
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         buttons.forEachIndexed { index, buttonText ->
+            val buttonModifier = if (fillMaxWidth) {
+                Modifier
+                    .weight(1f)
+                    .semantics { role = Role.RadioButton }
+            } else {
+                Modifier.semantics { role = Role.RadioButton }
+            }
+
             ToggleButton(
                 checked = selectedIndex == index,
                 onCheckedChange = {
@@ -52,7 +69,7 @@ fun SelectedButtonGroup(
                         buttons.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                         else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                     },
-                modifier = Modifier.semantics { role = Role.RadioButton },
+                modifier = buttonModifier.testTag("selected_button_$index"),
             ) {
                 Text(buttonText)
             }

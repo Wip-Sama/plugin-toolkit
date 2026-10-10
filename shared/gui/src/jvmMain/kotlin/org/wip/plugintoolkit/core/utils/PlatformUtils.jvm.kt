@@ -287,6 +287,18 @@ actual object PlatformUtils {
 
     actual fun diagonalResizePointerIcon(): androidx.compose.ui.input.pointer.PointerIcon =
         androidx.compose.ui.input.pointer.PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.SE_RESIZE_CURSOR))
+
+    actual fun sampleScreenColorAtCursor(): Color? {
+        return try {
+            val mousePoint = java.awt.MouseInfo.getPointerInfo()?.location ?: return null
+            val robot = java.awt.Robot()
+            val awtColor = robot.getPixelColor(mousePoint.x, mousePoint.y)
+            Color(awtColor.red, awtColor.green, awtColor.blue, awtColor.alpha)
+        } catch (e: Throwable) {
+            Logger.w(e) { "Failed to sample color at cursor" }
+            null
+        }
+    }
 }
 
 interface PortalSettings : DBusInterface {
